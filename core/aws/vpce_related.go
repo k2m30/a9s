@@ -23,7 +23,7 @@ func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if len(vpce.SubnetIds) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", vpce.SubnetIds)
 }
@@ -42,7 +42,7 @@ func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	return relatedResult("sg", ids)
 }
@@ -55,7 +55,7 @@ func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		return resource.UnknownRelated("rtb")
 	}
 	if len(vpce.RouteTableIds) == 0 {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
+		return resource.KnownRelated("rtb", nil, false)
 	}
 	return relatedResult("rtb", vpce.RouteTableIds)
 }
@@ -68,7 +68,7 @@ func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		return resource.UnknownRelated("eni")
 	}
 	if len(vpce.NetworkInterfaceIds) == 0 {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	return relatedResult("eni", vpce.NetworkInterfaceIds)
 }
@@ -78,7 +78,7 @@ func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
@@ -97,7 +97,7 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpceID := res.ID
 	if vpceID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
@@ -152,7 +152,7 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 		}
 	}
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
@@ -176,7 +176,7 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.ErrorRelated("r53", err)
 	}
 	if out == nil || len(out.HostedZoneSummaries) == 0 {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	var ids []string
 	for _, z := range out.HostedZoneSummaries {

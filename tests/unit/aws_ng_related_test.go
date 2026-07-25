@@ -78,14 +78,14 @@ func TestRelated_NG_EKS_Found(t *testing.T) {
 	checker := ngCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-cluster" {
-		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -115,8 +115,8 @@ func TestRelated_NG_EKS_NotFound(t *testing.T) {
 	checker := ngCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_NG_EKS_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -174,14 +174,14 @@ func TestRelated_NG_Role_Found(t *testing.T) {
 	checker := ngCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != roleName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, roleName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != roleName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), roleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -211,8 +211,8 @@ func TestRelated_NG_Role_NotFound(t *testing.T) {
 	checker := ngCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count())
 	}
 }
 
@@ -233,8 +233,8 @@ func TestRelated_NG_Role_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -274,14 +274,14 @@ func TestRelated_NG_ASG_Found(t *testing.T) {
 	checker := ngCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != asgName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, asgName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != asgName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), asgName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -313,8 +313,8 @@ func TestRelated_NG_ASG_NotFound(t *testing.T) {
 	checker := ngCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -336,8 +336,8 @@ func TestRelated_NG_ASG_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -381,14 +381,14 @@ func TestRelated_NG_AMI_Match(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != amiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, amiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != amiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), amiID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -411,8 +411,8 @@ func TestRelated_NG_AMI_Empty(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (managed NG, no launch template)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (managed NG, no launch template)", result.Count())
 	}
 }
 
@@ -426,8 +426,8 @@ func TestRelated_NG_AMI_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -452,8 +452,8 @@ func TestRelated_NG_EBS_Empty(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nodegroup name unresolved)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nodegroup name unresolved)", result.Count())
 	}
 }
 
@@ -471,8 +471,8 @@ func TestRelated_NG_EBS_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type, no nodegroup_name field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type, no nodegroup_name field)", result.Count())
 	}
 }
 
@@ -498,20 +498,20 @@ func TestRelated_NG_Subnet_Match(t *testing.T) {
 	checker := ngCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{sub1, sub2} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -532,8 +532,8 @@ func TestRelated_NG_Subnet_Empty(t *testing.T) {
 	checker := ngCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty Subnets)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty Subnets)", result.Count())
 	}
 }
 
@@ -547,8 +547,8 @@ func TestRelated_NG_Subnet_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -573,11 +573,11 @@ func TestRelated_NG_SG_Found(t *testing.T) {
 	checker := ngCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-remote12345" {
-		t.Errorf("ResourceIDs = %v, want [sg-remote12345]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-remote12345" {
+		t.Errorf("ResourceIDs = %v, want [sg-remote12345]", result.ResourceIDs())
 	}
 }
 
@@ -595,8 +595,8 @@ func TestRelated_NG_SG_NilResources(t *testing.T) {
 	checker := ngCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Resources)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Resources)", result.Count())
 	}
 }
 
@@ -616,8 +616,8 @@ func TestRelated_NG_SG_EmptyGroupID(t *testing.T) {
 	checker := ngCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty RemoteAccessSecurityGroup)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty RemoteAccessSecurityGroup)", result.Count())
 	}
 }
 
@@ -631,8 +631,8 @@ func TestRelated_NG_SG_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -676,11 +676,11 @@ func TestRelated_NG_EC2_MatchByNodegroupTag(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-abcdef1234567890" {
-		t.Errorf("ResourceIDs = %v, want [i-abcdef1234567890]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-abcdef1234567890" {
+		t.Errorf("ResourceIDs = %v, want [i-abcdef1234567890]", result.ResourceIDs())
 	}
 }
 
@@ -719,8 +719,8 @@ func TestRelated_NG_EC2_NoMatchDifferentCluster(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different cluster)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different cluster)", result.Count())
 	}
 }
 
@@ -739,8 +739,8 @@ func TestRelated_NG_EC2_EmptyNodegroupName(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty nodegroup name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty nodegroup name)", result.Count())
 	}
 }
 
@@ -761,8 +761,8 @@ func TestRelated_NG_EC2_NilCache(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache, nil clients)", result.Count())
 	}
 }
 
@@ -801,7 +801,7 @@ func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }

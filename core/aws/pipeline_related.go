@@ -297,7 +297,7 @@ func mapKeys(m map[string]struct{}) []string {
 func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	pipelineARN := res.Fields["arn"]
 	if pipelineARN == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {

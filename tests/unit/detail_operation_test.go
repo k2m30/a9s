@@ -105,23 +105,15 @@ func TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardless
 				ResourceType:     "ec2",
 				SourceResourceID: "i-order0001",
 				DefDisplayName:   "Security Groups",
-				Result: resource.RelatedCheckResult{
-					TargetType:  "sg",
-					Count:       999,
-					ResourceIDs: []string{"sg-stale"},
-				},
-				OperationID: staleOp,
+				Result:           resource.KnownRelated("sg", []string{"sg-stale"}, false),
+				OperationID:      staleOp,
 			}
 			currentMsg := messages.RelatedCheckResult{
 				ResourceType:     "ec2",
 				SourceResourceID: "i-order0001",
 				DefDisplayName:   "Security Groups",
-				Result: resource.RelatedCheckResult{
-					TargetType:  "sg",
-					Count:       2,
-					ResourceIDs: []string{"sg-a", "sg-b"},
-				},
-				OperationID: currentOp.ID,
+				Result:           resource.KnownRelated("sg", []string{"sg-a", "sg-b"}, false),
+				OperationID:      currentOp.ID,
 			}
 
 			if tc.staleFirst {
@@ -139,15 +131,15 @@ func TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardless
 			}
 			found := false
 			for _, entry := range cached {
-				if entry.Result.TargetType != "sg" {
+				if entry.Result.TargetType() != "sg" {
 					continue
 				}
 				found = true
-				if entry.Result.Count != 2 {
-					t.Errorf("Count = %d, want 2 (current operation) — a superseded-operation result must never fold, regardless of delivery order", entry.Result.Count)
+				if entry.Result.Count() != 2 {
+					t.Errorf("Count = %d, want 2 (current operation) — a superseded-operation result must never fold, regardless of delivery order", entry.Result.Count())
 				}
-				if len(entry.Result.ResourceIDs) != 2 || entry.Result.ResourceIDs[0] != "sg-a" || entry.Result.ResourceIDs[1] != "sg-b" {
-					t.Errorf("ResourceIDs = %v, want [sg-a sg-b] (current operation)", entry.Result.ResourceIDs)
+				if len(entry.Result.ResourceIDs()) != 2 || entry.Result.ResourceIDs()[0] != "sg-a" || entry.Result.ResourceIDs()[1] != "sg-b" {
+					t.Errorf("ResourceIDs = %v, want [sg-a sg-b] (current operation)", entry.Result.ResourceIDs())
 				}
 			}
 			if !found {
@@ -189,12 +181,8 @@ func TestDetailOperation_Rotation_InvalidatesPreRotationOperation(t *testing.T) 
 		ResourceType:     "ec2",
 		SourceResourceID: "i-rotate0001",
 		DefDisplayName:   "Security Groups",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "sg",
-			Count:       5,
-			ResourceIDs: []string{"sg-post-rotate"},
-		},
-		OperationID: preRotateOp,
+		Result:           resource.KnownRelated("sg", []string{"sg-post-rotate"}, false),
+		OperationID:      preRotateOp,
 	})
 
 	key := runtime.RelatedCacheKey("ec2", "i-rotate0001")
@@ -534,7 +522,7 @@ func TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd(t *testing.
 		TargetType:  targetType,
 		DisplayName: "Lazy Target",
 		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-			return resource.RelatedCheckResult{TargetType: targetType, Count: 1, ResourceIDs: []string{"lazy-id-1"}}
+			return resource.KnownRelated(targetType, []string{"lazy-id-1"}, false)
 		},
 	}
 
@@ -582,7 +570,7 @@ func TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceTy
 		TargetType:  targetType,
 		DisplayName: "CT Events Guard Target",
 		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-			return resource.RelatedCheckResult{TargetType: targetType, Count: 1, ResourceIDs: []string{"lazy-id-1"}}
+			return resource.KnownRelated(targetType, []string{"lazy-id-1"}, false)
 		},
 	}
 
@@ -615,7 +603,7 @@ func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(
 		NeedsTargetCache: true,
 		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 			checkerCalls++
-			return resource.RelatedCheckResult{TargetType: targetType, Count: 0, State: domain.RelatedResolved}
+			return resource.KnownRelated(targetType, nil, false)
 		},
 	}
 
@@ -624,11 +612,11 @@ func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(
 	if checkerCalls != 0 {
 		t.Errorf("checker invoked %d time(s), want 0 — a total prefetch failure must short-circuit before the checker ever reads the missing target cache", checkerCalls)
 	}
-	if result.Result.State != domain.RelatedUnknown {
-		t.Errorf("Result.State = %v, want RelatedUnknown", result.Result.State)
+	if result.Result.State() != domain.RelatedUnknown {
+		t.Errorf("Result.State = %v, want RelatedUnknown", result.Result.State())
 	}
-	if result.Result.Count != 0 {
-		t.Errorf("Result.Count = %d, want 0 (Unknown, not a false confirmed zero)", result.Result.Count)
+	if result.Result.Count() != 0 {
+		t.Errorf("Result.Count = %d, want 0 (Unknown, not a false confirmed zero)", result.Result.Count())
 	}
 }
 

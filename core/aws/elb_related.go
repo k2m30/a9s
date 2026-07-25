@@ -28,7 +28,7 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if elbARN == "" {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
@@ -95,7 +95,7 @@ func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkELBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
@@ -112,7 +112,7 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -135,7 +135,7 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 			}
 		}
 	}
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	return resource.KnownRelated("cfn", nil, false)
 }
 
 // checkELBACM reports ACM certificates attached to this ELB's HTTPS/TLS
@@ -150,7 +150,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+		return resource.KnownRelated("acm", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -185,7 +185,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dnsName := res.Fields["dns_name"]
 	if dnsName == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -221,7 +221,7 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		lbName = res.Name
 	}
 	if lbName == "" {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -268,7 +268,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 	}
 	if elbARN == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -330,7 +330,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+		return resource.KnownRelated("waf", nil, false)
 	}
 	lbType := res.Fields["type"]
 	if lbType == "" {
@@ -339,7 +339,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if lbType == "network" || lbType == "gateway" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+		return resource.KnownRelated("waf", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
@@ -356,7 +356,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("waf", err)
 	}
 	if out.WebACL == nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+		return resource.KnownRelated("waf", nil, false)
 	}
 	id := ""
 	if out.WebACL.Id != nil {
@@ -366,7 +366,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		id = *out.WebACL.ARN
 	}
 	if id == "" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+		return resource.KnownRelated("waf", nil, false)
 	}
 	return relatedResult("waf", []string{id})
 }

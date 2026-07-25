@@ -61,8 +61,8 @@ func TestRelated_VPC_Subnet_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -84,8 +84,8 @@ func TestRelated_VPC_SG_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -107,8 +107,8 @@ func TestRelated_VPC_EC2_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -130,8 +130,8 @@ func TestRelated_VPC_ELB_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -153,8 +153,8 @@ func TestRelated_VPC_NAT_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -176,8 +176,8 @@ func TestRelated_VPC_IGW_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -199,8 +199,8 @@ func TestRelated_VPC_RTB_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -222,8 +222,8 @@ func TestRelated_VPC_VPCE_Match(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -256,8 +256,8 @@ func TestRelated_VPC_NoMatch(t *testing.T) {
 	for _, target := range targets {
 		checker := vpcCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 0 {
-			t.Errorf("target %q: Count = %d, want 0 (no match)", target, result.Count)
+		if result.Count() != 0 {
+			t.Errorf("target %q: Count = %d, want 0 (no match)", target, result.Count())
 		}
 	}
 }
@@ -274,8 +274,8 @@ func TestRelated_VPC_NilClients(t *testing.T) {
 	for _, target := range targets {
 		checker := vpcCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target %q: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target %q: Count = %d, want -1 (nil clients, empty cache)", target, result.Count())
 		}
 	}
 }
@@ -298,11 +298,11 @@ func TestRelated_VPC_CFN_HasTag(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (VPC has CFN tag)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (VPC has CFN tag)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-stack" {
-		t.Errorf("ResourceIDs = %v, want [\"vpc-stack\"]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-stack" {
+		t.Errorf("ResourceIDs = %v, want [\"vpc-stack\"]", result.ResourceIDs())
 	}
 }
 
@@ -318,7 +318,7 @@ func TestRelated_VPC_CFN_NoTag(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (VPC has no CFN tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (VPC has no CFN tag)", result.Count())
 	}
 }

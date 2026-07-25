@@ -29,7 +29,7 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, streamARN, cache)
 }
@@ -39,7 +39,7 @@ func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
@@ -63,7 +63,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -91,7 +91,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
@@ -108,7 +108,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.ErrorRelated("kms", err)
 	}
 	if out.StreamDescriptionSummary == nil || out.StreamDescriptionSummary.KeyId == nil || *out.StreamDescriptionSummary.KeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -122,7 +122,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
+		return resource.KnownRelated("ddb", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -141,7 +141,6 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	var failures []string
-	total := len(entry.Resources)
 	for _, ddbRes := range entry.Resources {
 		tableName := ddbRes.ID
 		if tableName == "" {
@@ -163,8 +162,17 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	result := relatedResult("ddb", ids)
-	result.Truncated = entry.IsTruncated
-	result.Err = AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, total)
-	return result
+	if len(ids) == 0 && !entry.IsTruncated {
+		// Nothing was confirmed and the cache page was complete: any failures
+		// here are a plain fetch failure, not a truncation signal (there is
+		// no larger population left unseen to justify "(0+)").
+		if aggErr := AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, len(entry.Resources)); aggErr != nil {
+			return resource.ErrorRelated("ddb", aggErr)
+		}
+	}
+	// Some DescribeKinesisStreamingDestination calls may have failed: ids is a
+	// proven subset, not necessarily exhaustive. Truncated (not Errored) keeps
+	// the row actionable — "at least N, could not verify the rest" — rather
+	// than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("ddb", ids, entry.IsTruncated || len(failures) > 0)
 }

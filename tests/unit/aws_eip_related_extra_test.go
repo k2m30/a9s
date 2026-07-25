@@ -32,11 +32,11 @@ func TestRelated_EIP_CFN_Found(t *testing.T) {
 	checker := eipCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "prod-network-stack" {
-		t.Errorf("ResourceIDs[0] = %q, want prod-network-stack", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "prod-network-stack" {
+		t.Errorf("ResourceIDs[0] = %q, want prod-network-stack", result.ResourceIDs()[0])
 	}
 }
 
@@ -53,8 +53,8 @@ func TestRelated_EIP_CFN_NoStackTag(t *testing.T) {
 	checker := eipCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count())
 	}
 }
 
@@ -66,8 +66,8 @@ func TestRelated_EIP_CFN_NoTags(t *testing.T) {
 	checker := eipCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no tags)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no tags)", result.Count())
 	}
 }
 
@@ -76,8 +76,8 @@ func TestRelated_EIP_CFN_WrongRawStruct(t *testing.T) {
 	checker := eipCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -107,11 +107,11 @@ func TestRelated_EIP_Alarm_MatchByInstanceId(t *testing.T) {
 	checker := eipCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "instance-cpu-high" {
-		t.Errorf("ResourceIDs[0] = %q, want instance-cpu-high", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "instance-cpu-high" {
+		t.Errorf("ResourceIDs[0] = %q, want instance-cpu-high", result.ResourceIDs()[0])
 	}
 }
 
@@ -139,8 +139,8 @@ func TestRelated_EIP_Alarm_MatchByNetworkInterfaceId(t *testing.T) {
 	checker := eipCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -153,8 +153,8 @@ func TestRelated_EIP_Alarm_NoAttachmentReturnsZero(t *testing.T) {
 	checker := eipCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not attached)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not attached)", result.Count())
 	}
 }
 
@@ -163,8 +163,8 @@ func TestRelated_EIP_Alarm_WrongRawStruct(t *testing.T) {
 	checker := eipCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -194,11 +194,11 @@ func TestRelated_EIP_ASG_FoundViaInstanceTag(t *testing.T) {
 	checker := eipCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "prod-app-asg" {
-		t.Errorf("ResourceIDs[0] = %q, want prod-app-asg", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "prod-app-asg" {
+		t.Errorf("ResourceIDs[0] = %q, want prod-app-asg", result.ResourceIDs()[0])
 	}
 }
 
@@ -210,8 +210,8 @@ func TestRelated_EIP_ASG_NoInstanceIDReturnsZero(t *testing.T) {
 	checker := eipCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no instance attached)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no instance attached)", result.Count())
 	}
 }
 
@@ -237,8 +237,8 @@ func TestRelated_EIP_ASG_InstanceNotInASGReturnsZero(t *testing.T) {
 	checker := eipCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (instance has no asg tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (instance has no asg tag)", result.Count())
 	}
 }
 
@@ -269,11 +269,11 @@ func TestRelated_EIP_ASG_InstanceFoundInTruncatedCacheReturnsZero(t *testing.T) 
 	checker := eipCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.State == domain.RelatedUnknown {
+	if result.State() == domain.RelatedUnknown {
 		t.Errorf("State = RelatedUnknown; a located instance with no ASG tag is a definitive 0, not '?', even when the ec2 cache is truncated")
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (located instance has no asg tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (located instance has no asg tag)", result.Count())
 	}
 }
 
@@ -288,8 +288,8 @@ func TestRelated_EIP_ASG_NilCacheNoClients(t *testing.T) {
 	checker := eipCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -309,11 +309,11 @@ func TestRelated_EIP_ECS_EmptyIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := eipCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count())
 	}
-	if result.TargetType != "ecs" {
-		t.Errorf("TargetType = %q, want ecs", result.TargetType)
+	if result.TargetType() != "ecs" {
+		t.Errorf("TargetType = %q, want ecs", result.TargetType())
 	}
 }
 
@@ -331,8 +331,8 @@ func TestRelated_EIP_ECS_NoENIReturnsZero(t *testing.T) {
 	}
 	checker := eipCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no NetworkInterfaceId, no ENI to join)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no NetworkInterfaceId, no ENI to join)", result.Count())
 	}
 }
 
@@ -340,8 +340,8 @@ func TestRelated_EIP_ECSSvc_EmptyIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := eipCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count())
 	}
 }
 
@@ -349,7 +349,7 @@ func TestRelated_EIP_ECSTask_EmptyIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := eipCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count())
 	}
 }

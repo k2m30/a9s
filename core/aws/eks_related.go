@@ -20,7 +20,7 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 		clusterName = res.Fields["cluster_name"]
 	}
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
+		return resource.KnownRelated("ng", nil, false)
 	}
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
@@ -59,7 +59,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		stackName = raw.Tags["aws:cloudformation:stack-name"]
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -89,7 +89,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	expectedLogGroup := "/aws/eks/" + clusterName + "/cluster"
@@ -120,7 +120,7 @@ func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("sg")
 	}
 	if raw.ResourcesVpcConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	var ids []string
 	if raw.ResourcesVpcConfig.ClusterSecurityGroupId != nil && *raw.ResourcesVpcConfig.ClusterSecurityGroupId != "" {
@@ -142,7 +142,7 @@ func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("vpc")
 	}
 	if raw.ResourcesVpcConfig == nil || raw.ResourcesVpcConfig.VpcId == nil || *raw.ResourcesVpcConfig.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*raw.ResourcesVpcConfig.VpcId})
 }
@@ -156,7 +156,7 @@ func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		raw.EncryptionConfig[0].Provider == nil ||
 		raw.EncryptionConfig[0].Provider.KeyArn == nil ||
 		*raw.EncryptionConfig[0].Provider.KeyArn == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -168,11 +168,11 @@ func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *raw.RoleArn
 	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
 		return relatedResult("role", []string{arn[idx+1:]})
 	}
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	return resource.KnownRelated("role", nil, false)
 }

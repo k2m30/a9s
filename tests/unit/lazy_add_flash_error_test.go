@@ -45,11 +45,7 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 			DisplayName:      "Flash Error Test Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{"id-boom-001", "id-boom-002"},
-				}
+				return resource.KnownRelated(targetType, []string{"id-boom-001", "id-boom-002"}, false)
 			},
 		},
 	})
@@ -122,11 +118,7 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 			DisplayName:      "Flash Partial Test Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{"id-ok", "id-bad"},
-				}
+				return resource.KnownRelated(targetType, []string{"id-ok", "id-bad"}, false)
 			},
 		},
 	})

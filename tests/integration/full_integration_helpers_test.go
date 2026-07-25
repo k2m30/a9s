@@ -271,10 +271,10 @@ func fullIntegrationExpectedRelatedCounts(t *testing.T, clients *awsclient.Servi
 			t.Fatalf("%s related def %q has nil checker", sourceType, def.DisplayName)
 		}
 		result := def.Checker(ctx, clients, source, cache)
-		if result.Err != nil {
-			t.Fatalf("%s related def %q failed: %v", sourceType, def.DisplayName, result.Err)
+		if result.Err() != nil {
+			t.Fatalf("%s related def %q failed: %v", sourceType, def.DisplayName, result.Err())
 		}
-		expected[def.DisplayName] = result.Count
+		expected[def.DisplayName] = result.Count()
 	}
 	return expected
 }
@@ -483,23 +483,23 @@ func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expect
 		if !ok {
 			t.Fatalf("%s: missing related result %q; got %v", context, name, gotByName)
 		}
-		t.Logf("%s related result %s: actual=%d expected=%d", context, name, rr.Count, want)
+		t.Logf("%s related result %s: actual=%d expected=%d", context, name, rr.Count(), want)
 		// Post-#58 a deferred/unknown/loading view result carries no
 		// authoritative count — it is State, not Count==-1, that marks it. When
 		// the def registers no target prefetch, the view could not resolve it
 		// from its own cache while the oracle did (from its separately prefetched
 		// cache): the documented cold-cache contract. Skip the strict view
 		// assertion for it, exactly as the old Count==-1 path did.
-		if rr.State != domain.RelatedResolved {
+		if rr.State() != domain.RelatedResolved {
 			if !prefetched[name] {
 				coldUnknown[name] = true
-				t.Logf("%s: related %q answered %v (cold cache, no prefetch registered); oracle computed %d from its own prefetched cache", context, name, rr.State, want)
+				t.Logf("%s: related %q answered %v (cold cache, no prefetch registered); oracle computed %d from its own prefetched cache", context, name, rr.State(), want)
 				continue
 			}
-			t.Fatalf("%s: related result %q answered non-resolved state %v despite a registered prefetch, expected resolved %d", context, name, rr.State, want)
+			t.Fatalf("%s: related result %q answered non-resolved state %v despite a registered prefetch, expected resolved %d", context, name, rr.State(), want)
 		}
-		if rr.Count != want {
-			t.Fatalf("%s: related result %q count = %d, expected %d; all results %v", context, name, rr.Count, want, gotByName)
+		if rr.Count() != want {
+			t.Fatalf("%s: related result %q count = %d, expected %d; all results %v", context, name, rr.Count(), want, gotByName)
 		}
 	}
 	return coldUnknown

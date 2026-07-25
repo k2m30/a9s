@@ -83,14 +83,14 @@ func TestRelated_DBISnap_DBI_Found(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mydb" {
-		t.Errorf("ResourceIDs = %v, want [mydb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "mydb" {
+		t.Errorf("ResourceIDs = %v, want [mydb]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -120,11 +120,11 @@ func TestRelated_DBISnap_DBI_NotFound(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -144,8 +144,8 @@ func TestRelated_DBISnap_DBI_CacheMissNoClients(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }
 
@@ -181,14 +181,14 @@ func TestRelated_DBISnap_KMS_Found(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -221,8 +221,8 @@ func TestRelated_DBISnap_KMS_NotFound(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -246,8 +246,8 @@ func TestRelated_DBISnap_KMS_CacheMissNoClients(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }
 
@@ -327,13 +327,13 @@ func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two plans cover the snapshot's parent DB)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two plans cover the snapshot's parent DB)", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs = %v, want 2 plan IDs", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs = %v, want 2 plan IDs", result.ResourceIDs())
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "plan-other-target" {
 			t.Errorf("ResourceIDs unexpectedly contains plan-other-target (its Resources do not match the parent DB ARN)")
 		}
@@ -374,8 +374,8 @@ func TestRelated_DBISnap_Backup_NoParentInDbi(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (orphan snapshot — parent gone)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (orphan snapshot — parent gone)", result.Count())
 	}
 }
 
@@ -397,8 +397,8 @@ func TestRelated_DBISnap_Backup_NoDbiCacheLoaded(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (UnknownRelated when dbi cache not loaded)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (UnknownRelated when dbi cache not loaded)", result.Count())
 	}
 }
 
@@ -436,8 +436,8 @@ func TestRelated_DBISnap_Backup_NoPlansLoaded(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (UnknownRelated when backup cache not loaded)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (UnknownRelated when backup cache not loaded)", result.Count())
 	}
 }
 
@@ -456,8 +456,8 @@ func TestRelated_DBISnap_Backup_NoParentReference(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count())
 	}
 }
 

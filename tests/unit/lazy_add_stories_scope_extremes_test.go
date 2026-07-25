@@ -46,11 +46,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 			DisplayName:      "LA-010 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{inScopeID, outScopeID},
-				}
+				return resource.KnownRelated(targetType, []string{inScopeID, outScopeID}, false)
 			},
 		},
 	})
@@ -78,7 +74,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "src-la010-seed",
-		Result:           resource.RelatedCheckResult{TargetType: targetType, Count: 1},
+		Result:           resource.KnownRelated(targetType, nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			targetType: {
 				Resources:   []resource.Resource{inScopeRes},
@@ -100,20 +96,20 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	}
 
 	// Count must equal the checker's declared count.
-	if resultMsg.Result.Count != 2 {
-		t.Errorf("Result.Count: got %d, want 2", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 2 {
+		t.Errorf("Result.Count: got %d, want 2", resultMsg.Result.Count())
 	}
 
 	// ResourceIDs must contain both IDs.
 	idSet := make(map[string]bool)
-	for _, id := range resultMsg.Result.ResourceIDs {
+	for _, id := range resultMsg.Result.ResourceIDs() {
 		idSet[id] = true
 	}
 	if !idSet[inScopeID] {
-		t.Errorf("Result.ResourceIDs missing in-scope ID %q; got %v", inScopeID, resultMsg.Result.ResourceIDs)
+		t.Errorf("Result.ResourceIDs missing in-scope ID %q; got %v", inScopeID, resultMsg.Result.ResourceIDs())
 	}
 	if !idSet[outScopeID] {
-		t.Errorf("Result.ResourceIDs missing out-of-scope ID %q; got %v", outScopeID, resultMsg.Result.ResourceIDs)
+		t.Errorf("Result.ResourceIDs missing out-of-scope ID %q; got %v", outScopeID, resultMsg.Result.ResourceIDs())
 	}
 
 	// LazyAddedResources must contain only the out-of-scope resource (the in-scope
@@ -156,11 +152,7 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 			DisplayName:      "LA-011 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       3,
-					ResourceIDs: ids,
-				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -224,11 +216,7 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 			DisplayName:      "LA-012 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{res1.ID, res2.ID},
-				}
+				return resource.KnownRelated(targetType, []string{res1.ID, res2.ID}, false)
 			},
 		},
 	})
@@ -251,7 +239,7 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "src-la012-seed",
-		Result:           resource.RelatedCheckResult{TargetType: targetType, Count: 2},
+		Result:           resource.KnownRelated(targetType, nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			targetType: {
 				Resources:   []resource.Resource{res1, res2},
@@ -329,11 +317,7 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 			DisplayName:      "LA-015 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{fullARN},
-				}
+				return resource.KnownRelated(targetType, []string{fullARN}, false)
 			},
 		},
 	})
@@ -364,11 +348,11 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	}
 
 	// The checker-emitted ARN must be preserved in ResourceIDs.
-	if len(resultMsg.Result.ResourceIDs) == 0 {
+	if len(resultMsg.Result.ResourceIDs()) == 0 {
 		t.Fatal("Result.ResourceIDs is empty — checker ARN was not preserved")
 	}
-	if resultMsg.Result.ResourceIDs[0] != fullARN {
-		t.Errorf("Result.ResourceIDs[0] = %q, want full ARN %q", resultMsg.Result.ResourceIDs[0], fullARN)
+	if resultMsg.Result.ResourceIDs()[0] != fullARN {
+		t.Errorf("Result.ResourceIDs()[0] = %q, want full ARN %q", resultMsg.Result.ResourceIDs()[0], fullARN)
 	}
 
 	// LazyAddedResources must contain the resource with the bare ID.
@@ -406,11 +390,7 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 			DisplayName:      "LA-016 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{keyUUID},
-				}
+				return resource.KnownRelated(targetType, []string{keyUUID}, false)
 			},
 		},
 	})
@@ -499,11 +479,7 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 			DisplayName:      "LA-070 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       idCount,
-					ResourceIDs: ids,
-				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -546,8 +522,8 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 		if !ok {
 			t.Fatal("no RelatedCheckResultMsg received")
 		}
-		if resultMsg.Result.Count != idCount {
-			t.Errorf("Result.Count: got %d, want %d", resultMsg.Result.Count, idCount)
+		if resultMsg.Result.Count() != idCount {
+			t.Errorf("Result.Count: got %d, want %d", resultMsg.Result.Count(), idCount)
 		}
 		if resultMsg.LazyAddedResources == nil {
 			t.Fatal("LazyAddedResources is nil — FetchByIDs was not called")
@@ -598,11 +574,7 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 			DisplayName:      "LA-071 Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1, // operator sees 1 valid resource
-					ResourceIDs: emittedIDs,
-				}
+				return resource.KnownRelated(targetType, emittedIDs, false)
 			},
 		},
 	})
@@ -693,11 +665,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				ids := checkerIDs
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       len(ids),
-					ResourceIDs: ids,
-				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -732,8 +700,8 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	if !found {
 		t.Fatal("first drill: no RelatedCheckResultMsg received")
 	}
-	if firstResult.Result.Count != 2 {
-		t.Errorf("first drill Result.Count: got %d, want 2", firstResult.Result.Count)
+	if firstResult.Result.Count() != 2 {
+		t.Errorf("first drill Result.Count: got %d, want 2", firstResult.Result.Count())
 	}
 	if firstResult.LazyAddedResources == nil {
 		t.Fatal("first drill: LazyAddedResources is nil — id1/id2 were not fetched")
@@ -760,8 +728,8 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 		t.Fatal("second drill: no RelatedCheckResultMsg received")
 	}
 
-	if secondResult.Result.Count != 3 {
-		t.Errorf("second drill Result.Count: got %d, want 3", secondResult.Result.Count)
+	if secondResult.Result.Count() != 3 {
+		t.Errorf("second drill Result.Count: got %d, want 3", secondResult.Result.Count())
 	}
 
 	// LazyAddedResources must contain only id3 — id1 and id2 are now in cache.

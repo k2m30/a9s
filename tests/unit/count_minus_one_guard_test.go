@@ -37,23 +37,23 @@ import (
 // callable with a string argument and returns a resource.RelatedCheckResult.
 // If the function is removed or renamed, this test will fail to compile.
 func TestTruncatedResultHelperExists(t *testing.T) {
-	result := resource.RelatedCheckResult{TargetType: "test", Truncated: true}
+	result := resource.KnownRelated("test", nil, true)
 
 	// Verify the shape: Truncated=true, Count=0, TargetType echoed.
-	if result.TargetType != "test" {
-		t.Errorf("TruncatedResult(\"test\").TargetType = %q; want %q", result.TargetType, "test")
+	if result.TargetType() != "test" {
+		t.Errorf("TruncatedResult(\"test\").TargetType = %q; want %q", result.TargetType(), "test")
 	}
-	if result.Count != 0 {
-		t.Errorf("TruncatedResult(\"test\").Count = %d; want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("TruncatedResult(\"test\").Count = %d; want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("TruncatedResult(\"test\").Truncated = false; want true")
 	}
-	if result.Err != nil {
-		t.Errorf("TruncatedResult(\"test\").Err = %v; want nil", result.Err)
+	if result.Err() != nil {
+		t.Errorf("TruncatedResult(\"test\").Err = %v; want nil", result.Err())
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Errorf("TruncatedResult(\"test\").ResourceIDs = %v; want empty", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("TruncatedResult(\"test\").ResourceIDs = %v; want empty", result.ResourceIDs())
 	}
 }
 
@@ -65,7 +65,7 @@ func TestTruncatedResultHelperExists(t *testing.T) {
 // produced by TruncatedResult satisfies the ValidateRelatedResult invariants.
 // This pins the contract: Truncated=true + Count=0 must be a valid state.
 func TestValidateRelatedResult_TruncatedResult_IsValid(t *testing.T) {
-	result := resource.RelatedCheckResult{TargetType: "vpc", Truncated: true}
+	result := resource.KnownRelated("vpc", nil, true)
 	if err := resource.ValidateRelatedResult(result); err != nil {
 		t.Errorf("ValidateRelatedResult(TruncatedResult(\"vpc\")) returned error: %v; want nil", err)
 	}

@@ -38,11 +38,11 @@ func TestRelated_Alarm_SNS_Found(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != snsARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, snsARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != snsARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), snsARN)
 	}
 }
 
@@ -56,8 +56,8 @@ func TestRelated_Alarm_SNS_OKActions(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -71,8 +71,8 @@ func TestRelated_Alarm_SNS_InsufficientDataActions(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -87,8 +87,8 @@ func TestRelated_Alarm_SNS_FiltersNonSNS(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (Lambda ARN should not match SNS)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (Lambda ARN should not match SNS)", result.Count())
 	}
 }
 
@@ -104,8 +104,8 @@ func TestRelated_Alarm_SNS_Deduplicates(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (same ARN in all actions should deduplicate)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (same ARN in all actions should deduplicate)", result.Count())
 	}
 }
 
@@ -116,8 +116,8 @@ func TestRelated_Alarm_SNS_NoActions(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -127,8 +127,8 @@ func TestRelated_Alarm_SNS_InvalidRawStruct(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -156,8 +156,8 @@ func TestRelated_Alarm_ASG_MatchByDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -182,8 +182,8 @@ func TestRelated_Alarm_ASG_NoMatch(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -208,8 +208,8 @@ func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no AutoScalingGroupName dimension)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no AutoScalingGroupName dimension)", result.Count())
 	}
 }
 
@@ -230,8 +230,8 @@ func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
 
@@ -251,11 +251,11 @@ func TestRelated_Alarm_APIGW_MatchByApiName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-api" {
-		t.Errorf("ResourceIDs = %v, want [my-api]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-api" {
+		t.Errorf("ResourceIDs = %v, want [my-api]", result.ResourceIDs())
 	}
 }
 
@@ -270,11 +270,11 @@ func TestRelated_Alarm_APIGW_MatchByApiId(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ApiId dimension)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ApiId dimension)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc123xyz" {
-		t.Errorf("ResourceIDs = %v, want [abc123xyz]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc123xyz" {
+		t.Errorf("ResourceIDs = %v, want [abc123xyz]", result.ResourceIDs())
 	}
 }
 
@@ -289,8 +289,8 @@ func TestRelated_Alarm_APIGW_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ApiName or ApiId dimension)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ApiName or ApiId dimension)", result.Count())
 	}
 }
 
@@ -300,8 +300,8 @@ func TestRelated_Alarm_APIGW_InvalidRawStruct(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count())
 	}
 }
 
@@ -316,11 +316,11 @@ func TestRelated_Alarm_CB_MatchByProjectName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-build" {
-		t.Errorf("ResourceIDs = %v, want [my-build]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-build" {
+		t.Errorf("ResourceIDs = %v, want [my-build]", result.ResourceIDs())
 	}
 }
 
@@ -331,8 +331,8 @@ func TestRelated_Alarm_CB_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -347,11 +347,11 @@ func TestRelated_Alarm_DBI_MatchByDBInstanceIdentifier(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod-postgres-01" {
-		t.Errorf("ResourceIDs = %v, want [prod-postgres-01]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod-postgres-01" {
+		t.Errorf("ResourceIDs = %v, want [prod-postgres-01]", result.ResourceIDs())
 	}
 }
 
@@ -362,8 +362,8 @@ func TestRelated_Alarm_DBI_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -378,11 +378,11 @@ func TestRelated_Alarm_EC2_MatchByInstanceId(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0a1b2c3d4e5f67890" {
-		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f67890]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0a1b2c3d4e5f67890" {
+		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f67890]", result.ResourceIDs())
 	}
 }
 
@@ -393,8 +393,8 @@ func TestRelated_Alarm_EC2_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -409,11 +409,11 @@ func TestRelated_Alarm_ECS_MatchByClusterName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod-cluster" {
-		t.Errorf("ResourceIDs = %v, want [prod-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod-cluster" {
+		t.Errorf("ResourceIDs = %v, want [prod-cluster]", result.ResourceIDs())
 	}
 }
 
@@ -424,8 +424,8 @@ func TestRelated_Alarm_ECS_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -443,11 +443,11 @@ func TestRelated_Alarm_EKS_MatchByClusterNameAndEKSNamespace(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (EKS namespace + ClusterName)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (EKS namespace + ClusterName)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-eks-cluster" {
-		t.Errorf("ResourceIDs = %v, want [my-eks-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-eks-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-eks-cluster]", result.ResourceIDs())
 	}
 }
 
@@ -463,8 +463,8 @@ func TestRelated_Alarm_EKS_MatchByContainerInsightsNamespace(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ContainerInsights namespace)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ContainerInsights namespace)", result.Count())
 	}
 }
 
@@ -481,8 +481,8 @@ func TestRelated_Alarm_EKS_NoMatchECSNamespace(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ECS namespace should not match EKS checker)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (ECS namespace should not match EKS checker)", result.Count())
 	}
 }
 
@@ -495,8 +495,8 @@ func TestRelated_Alarm_EKS_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ClusterName dimension)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ClusterName dimension)", result.Count())
 	}
 }
 
@@ -511,11 +511,11 @@ func TestRelated_Alarm_KMS_MatchByKeyId(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mrk-1234567890abcdef1234567890abcdef" {
-		t.Errorf("ResourceIDs = %v, want [mrk-1234567890abcdef1234567890abcdef]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "mrk-1234567890abcdef1234567890abcdef" {
+		t.Errorf("ResourceIDs = %v, want [mrk-1234567890abcdef1234567890abcdef]", result.ResourceIDs())
 	}
 }
 
@@ -526,8 +526,8 @@ func TestRelated_Alarm_KMS_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -542,11 +542,11 @@ func TestRelated_Alarm_Lambda_MatchByFunctionName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-processor" {
-		t.Errorf("ResourceIDs = %v, want [my-processor]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-processor" {
+		t.Errorf("ResourceIDs = %v, want [my-processor]", result.ResourceIDs())
 	}
 }
 
@@ -557,8 +557,8 @@ func TestRelated_Alarm_Lambda_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -573,11 +573,11 @@ func TestRelated_Alarm_Logs_MatchByLogGroupName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/lambda/my-func" {
-		t.Errorf("ResourceIDs = %v, want [/aws/lambda/my-func]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/lambda/my-func" {
+		t.Errorf("ResourceIDs = %v, want [/aws/lambda/my-func]", result.ResourceIDs())
 	}
 }
 
@@ -588,8 +588,8 @@ func TestRelated_Alarm_Logs_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -604,11 +604,11 @@ func TestRelated_Alarm_S3_MatchByBucketName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-data-bucket" {
-		t.Errorf("ResourceIDs = %v, want [my-data-bucket]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-data-bucket" {
+		t.Errorf("ResourceIDs = %v, want [my-data-bucket]", result.ResourceIDs())
 	}
 }
 
@@ -619,8 +619,8 @@ func TestRelated_Alarm_S3_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -638,11 +638,11 @@ func TestRelated_Alarm_SFN_MatchByStateMachineArn(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-workflow" {
-		t.Errorf("ResourceIDs = %v, want [my-workflow] (name extracted from ARN)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-workflow" {
+		t.Errorf("ResourceIDs = %v, want [my-workflow] (name extracted from ARN)", result.ResourceIDs())
 	}
 }
 
@@ -658,11 +658,11 @@ func TestRelated_Alarm_SFN_MatchByPlainName(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (plain name, no ARN separator)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (plain name, no ARN separator)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-workflow" {
-		t.Errorf("ResourceIDs = %v, want [my-workflow]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-workflow" {
+		t.Errorf("ResourceIDs = %v, want [my-workflow]", result.ResourceIDs())
 	}
 }
 
@@ -673,8 +673,8 @@ func TestRelated_Alarm_SFN_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -689,11 +689,11 @@ func TestRelated_Alarm_WAF_MatchByWebACL(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-waf-acl" {
-		t.Errorf("ResourceIDs = %v, want [my-waf-acl]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-waf-acl" {
+		t.Errorf("ResourceIDs = %v, want [my-waf-acl]", result.ResourceIDs())
 	}
 }
 
@@ -704,8 +704,8 @@ func TestRelated_Alarm_WAF_NoDimension(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -738,11 +738,11 @@ func TestRelated_Alarm_CTEvents_MatchMonitoringAlarm(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "ct-event-abc" {
-		t.Errorf("ResourceIDs = %v, want [ct-event-abc]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "ct-event-abc" {
+		t.Errorf("ResourceIDs = %v, want [ct-event-abc]", result.ResourceIDs())
 	}
 }
 
@@ -763,8 +763,8 @@ func TestRelated_Alarm_CTEvents_NoMatchWhenEventNameLacksAlarm(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (event_name does not contain 'Alarm')", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (event_name does not contain 'Alarm')", result.Count())
 	}
 }
 
@@ -772,8 +772,8 @@ func TestRelated_Alarm_CTEvents_EmptySourceID(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty alarm name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty alarm name)", result.Count())
 	}
 }
 
@@ -781,7 +781,7 @@ func TestRelated_Alarm_CTEvents_NilCache(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-alarm"}, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }

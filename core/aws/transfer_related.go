@@ -27,7 +27,7 @@ func checkTransferACM(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("acm")
 	}
 	if server.Certificate == nil || *server.Certificate == "" {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+		return resource.KnownRelated("acm", nil, false)
 	}
 	return relatedResult("acm", []string{*server.Certificate})
 }
@@ -42,7 +42,7 @@ func checkTransferLambda(_ context.Context, _ any, res resource.Resource, _ reso
 	}
 	if server.IdentityProviderType != transfertypes.IdentityProviderTypeAwsLambda ||
 		server.IdentityProviderDetails == nil || server.IdentityProviderDetails.Function == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	return relatedResult("lambda", []string{resource.LambdaNameFromARN(*server.IdentityProviderDetails.Function)})
 }
@@ -73,7 +73,7 @@ func checkTransferRole(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("role")
 	}
 	if server.LoggingRole == nil || *server.LoggingRole == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	roleARN := *server.LoggingRole
 	return relatedResult("role", []string{roleARN[strings.LastIndex(roleARN, "/")+1:]})
@@ -87,7 +87,7 @@ func checkTransferSubnet(_ context.Context, _ any, res resource.Resource, _ reso
 		return resource.UnknownRelated("subnet")
 	}
 	if server.EndpointDetails == nil || len(server.EndpointDetails.SubnetIds) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", server.EndpointDetails.SubnetIds)
 }
@@ -103,7 +103,7 @@ func checkTransferEIP(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("eip")
 	}
 	if server.EndpointDetails == nil || len(server.EndpointDetails.AddressAllocationIds) == 0 {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+		return resource.KnownRelated("eip", nil, false)
 	}
 	return relatedResult("eip", server.EndpointDetails.AddressAllocationIds)
 }
@@ -116,7 +116,7 @@ func checkTransferVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("vpc")
 	}
 	if server.EndpointDetails == nil || server.EndpointDetails.VpcId == nil || *server.EndpointDetails.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*server.EndpointDetails.VpcId})
 }
@@ -131,7 +131,7 @@ func checkTransferVPCE(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("vpce")
 	}
 	if server.EndpointDetails == nil || server.EndpointDetails.VpcEndpointId == nil || *server.EndpointDetails.VpcEndpointId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+		return resource.KnownRelated("vpce", nil, false)
 	}
 	return relatedResult("vpce", []string{*server.EndpointDetails.VpcEndpointId})
 }

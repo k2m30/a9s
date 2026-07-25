@@ -29,7 +29,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 		envName = res.Name
 	}
 	if envName == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -46,7 +46,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.ErrorRelated("elb", err)
 	}
 	if out.EnvironmentResources == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	var ids []string
 	for _, lb := range out.EnvironmentResources.LoadBalancers {
@@ -74,7 +74,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 		envName = res.Name
 	}
 	if envName == "" {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -91,13 +91,12 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 		return resource.ErrorRelated("tg", err)
 	}
 	if resOut.EnvironmentResources == nil || len(resOut.EnvironmentResources.LoadBalancers) == 0 {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 
 	// Collect LB names, resolve each to ARN via DescribeLoadBalancers.
 	var tgARNs []string
 	var failures []string
-	totalLBs := len(resOut.EnvironmentResources.LoadBalancers)
 	for _, lb := range resOut.EnvironmentResources.LoadBalancers {
 		if lb.Name == nil || *lb.Name == "" {
 			continue
@@ -147,9 +146,17 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 			}
 		}
 	}
-	result := relatedResult("tg", tgARNs)
-	result.Err = AggregateFailures("eb-related: LB/Listener lookup", failures, totalLBs)
-	return result
+	if len(tgARNs) == 0 {
+		// Nothing was confirmed: any failures are a plain fetch failure, not
+		// a truncation signal (there is no larger population left unseen).
+		if aggErr := AggregateFailures("eb-related: LB/Listener lookup", failures, len(resOut.EnvironmentResources.LoadBalancers)); aggErr != nil {
+			return resource.ErrorRelated("tg", aggErr)
+		}
+	}
+	// Some DescribeListeners calls may have failed: tgARNs is a proven subset,
+	// not necessarily exhaustive. Truncated (not Errored) keeps the row
+	// actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("tg", tgARNs, len(failures) > 0)
 }
 
 // checkEbSG resolves security groups configured for this EB environment via configuration settings.
@@ -174,7 +181,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		envName = res.Name
 	}
 	if appName == "" || envName == "" {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -247,7 +254,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 		envName = res.Name
 	}
 	if appName == "" || envName == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -310,7 +317,7 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 		appName = *eb.ApplicationName
 	}
 	if appName == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)

@@ -191,7 +191,7 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 	// Build a map of DisplayName → Count for easy lookup.
 	countByName := make(map[string]int)
 	for _, r := range results {
-		countByName[r.DefDisplayName] = r.Result.Count
+		countByName[r.DefDisplayName] = r.Result.Count()
 	}
 
 	// These four defs require NeedsTargetCache=true prefetch via nil clients pre-fix.

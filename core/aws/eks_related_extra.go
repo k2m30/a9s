@@ -28,7 +28,7 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if cluster.ResourcesVpcConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, s := range cluster.ResourcesVpcConfig.SubnetIds {
@@ -43,14 +43,14 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 	ngList, truncated, err := eksRelatedResourcesExtra(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 	seen := make(map[string]struct{})
 	for _, ngRes := range ngList {
@@ -80,7 +80,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	evList, truncated, err := eksRelatedResourcesExtra(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -119,7 +119,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -138,7 +138,6 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	amiSet := make(map[string]struct{})
 	var failures []string
-	total := len(ngOut.Nodegroups)
 	for _, ngName := range ngOut.Nodegroups {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
@@ -191,9 +190,21 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	for id := range amiSet {
 		ids = append(ids, id)
 	}
-	result := relatedResult("ami", ids)
-	result.Err = AggregateFailures("eks-related: DescribeNodegroup", failures, total)
-	return result
+	if len(ids) == 0 {
+		// Nothing was confirmed. A failure here means the resolution attempt
+		// itself failed — that does not establish "the population is larger
+		// than what we saw" (Truncated's contract); it establishes nothing.
+		// Surface it as an error, not a lower bound of zero.
+		if aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngOut.Nodegroups)); aggErr != nil {
+			return resource.ErrorRelated("ami", aggErr)
+		}
+		return relatedResultTrunc("ami", nil, false)
+	}
+	// Some DescribeNodegroup/DescribeLaunchTemplateVersions calls may have
+	// failed: ids is a proven subset, not necessarily exhaustive. Truncated
+	// (not Errored) keeps the row actionable rather than discarding confirmed
+	// matches as a dead end.
+	return relatedResultTrunc("ami", ids, len(failures) > 0)
 }
 
 // checkEKSEC2 resolves EC2 instances running in this EKS cluster via node group ASGs.
@@ -209,7 +220,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -255,10 +266,14 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		if ngAggErr != nil {
 			return resource.ErrorRelated("ec2", ngAggErr)
 		}
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	if c.AutoScaling == nil {
-		return resource.ErrorRelated("ec2", ngAggErr)
+		// ASG names are known but cannot be resolved to instances without an
+		// AutoScaling client — Unknown, not an error (any DescribeNodegroup
+		// failures are subsumed: we could not have proceeded past this point
+		// regardless of ngAggErr).
+		return resource.UnknownRelated("ec2")
 	}
 
 	asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
@@ -282,9 +297,11 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	for id := range seen {
 		ids = append(ids, id)
 	}
-	result := relatedResult("ec2", ids)
-	result.Err = ngAggErr
-	return result
+	// Some DescribeNodegroup calls may have failed: ids is a proven subset of
+	// the cluster's EC2 instances, not necessarily exhaustive. Truncated (not
+	// Errored) keeps the row actionable rather than discarding confirmed
+	// matches as a dead end.
+	return relatedResultTrunc("ec2", ids, ngAggErr != nil)
 }
 
 // eksRelatedResourcesExtra — companion helper so we don't duplicate the

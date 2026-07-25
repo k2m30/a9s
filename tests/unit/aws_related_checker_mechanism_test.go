@@ -73,11 +73,11 @@ func TestECSSvc_Related_ELB_MatchesByLoadBalancerArnField(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, svcRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ecs-svc.md:66 cross-refs elb by LoadBalancerArn field, not by bare ID)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ecs-svc.md:66 cross-refs elb by LoadBalancerArn field, not by bare ID)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "checkout-alb" {
-		t.Fatalf("ResourceIDs = %v, want [checkout-alb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "checkout-alb" {
+		t.Fatalf("ResourceIDs = %v, want [checkout-alb]", result.ResourceIDs())
 	}
 }
 
@@ -164,11 +164,11 @@ func TestLambda_Related_TG_MatchesViaDescribeTargetHealth(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "tg")
 	result := checker(context.Background(), clients, fnRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec lambda.md:169 DescribeTargetHealth Targets[].Id==FunctionArn)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec lambda.md:169 DescribeTargetHealth Targets[].Id==FunctionArn)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "order-tg" {
-		t.Fatalf("ResourceIDs = %v, want [order-tg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "order-tg" {
+		t.Fatalf("ResourceIDs = %v, want [order-tg]", result.ResourceIDs())
 	}
 }
 
@@ -198,8 +198,8 @@ func TestLambda_Related_TG_InstanceTargetTypeSkipsDescribeTargetHealth(t *testin
 	checker := lambdaCheckerByTarget(t, "tg")
 	result := checker(context.Background(), clients, fnRes, cache)
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 for an instance-type TG", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("Count = %d, want 0 for an instance-type TG", result.Count())
 	}
 	if fake.calls != 0 {
 		t.Fatalf("DescribeTargetHealth calls = %d, want 0 — instance-type TGs must not be probed", fake.calls)
@@ -287,11 +287,11 @@ func TestLambda_Related_ECR_ResolvesViaGetFunction(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, fnRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec lambda.md:72 GetFunction Code.ImageUri -> ecr repo)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec lambda.md:72 GetFunction Code.ImageUri -> ecr repo)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-repo" {
-		t.Fatalf("ResourceIDs = %v, want [my-repo]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-repo" {
+		t.Fatalf("ResourceIDs = %v, want [my-repo]", result.ResourceIDs())
 	}
 }
 
@@ -312,8 +312,8 @@ func TestLambda_Related_ECR_ZipPackageReturnsZeroNoGetFunctionCall(t *testing.T)
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, fnRes, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 for a Zip-package function", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("Count = %d, want 0 for a Zip-package function", result.Count())
 	}
 	if fake.calls != 0 {
 		t.Fatalf("GetFunction calls = %d, want 0 — Zip-package functions must not trigger the fan-out call", fake.calls)
@@ -357,11 +357,11 @@ func TestLambda_Related_CF_MatchesVersionedArnPrefix(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, fnRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec lambda.md:42 versioned-ARN association match)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec lambda.md:42 versioned-ARN association match)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "E1234567890ABC" {
-		t.Fatalf("ResourceIDs = %v, want [E1234567890ABC]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "E1234567890ABC" {
+		t.Fatalf("ResourceIDs = %v, want [E1234567890ABC]", result.ResourceIDs())
 	}
 }
 
@@ -422,11 +422,11 @@ func TestECSTask_Related_Role_CrossReferencesLoadedRoleCache(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, taskRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:79 cross-references the role list; a role ARN absent from the loaded cache must not be counted)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:79 cross-references the role list; a role ARN absent from the loaded cache must not be counted)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "checkout-task-role" {
-		t.Fatalf("ResourceIDs = %v, want [checkout-task-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "checkout-task-role" {
+		t.Fatalf("ResourceIDs = %v, want [checkout-task-role]", result.ResourceIDs())
 	}
 }
 
@@ -451,8 +451,8 @@ func TestECSTask_Related_Secrets_ReadsFromRealTaskRawStruct(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, taskRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:84 — real Task RawStruct must not silently zero this pivot)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:84 — real Task RawStruct must not silently zero this pivot)", result.Count())
 	}
 }
 
@@ -477,8 +477,8 @@ func TestECSTask_Related_SSM_ReadsFromRealTaskRawStruct(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, taskRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:96 — real Task RawStruct must not silently zero this pivot)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:96 — real Task RawStruct must not silently zero this pivot)", result.Count())
 	}
 }
 
@@ -519,8 +519,8 @@ func TestECSTask_Related_SG_ViaTaskENISecurityGroupCrossRef(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, taskRes, cache)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:90 Task -> ENI -> SG cross-reference)", result.Count)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:90 Task -> ENI -> SG cross-reference)", result.Count())
 	}
 }
 
@@ -566,8 +566,8 @@ func TestEC2_Related_Backup_MatchesLoadedPlanSelectionARN(t *testing.T) {
 	checker := mechanismEC2CheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, instRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec ec2.md:49 — loaded plan's selection ARN pattern covers this instance)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (spec ec2.md:49 — loaded plan's selection ARN pattern covers this instance)", result.Count())
 	}
 }
 
@@ -635,11 +635,11 @@ func TestFakes_LambdaListTags_ServesCloudFormationStackNameTag(t *testing.T) {
 	clients := &awsclient.ServiceClients{Lambda: fake}
 	checker := lambdaCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, fnRes, cache)
-	if result.Count < 1 {
-		t.Fatalf("checkLambdaCFN Count = %d, want >=1 once LambdaFake.ListTags serves a real aws:cloudformation:stack-name tag", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("checkLambdaCFN Count = %d, want >=1 once LambdaFake.ListTags serves a real aws:cloudformation:stack-name tag", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-eks-cluster" {
-		t.Fatalf("ResourceIDs = %v, want [acme-eks-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-eks-cluster" {
+		t.Fatalf("ResourceIDs = %v, want [acme-eks-cluster]", result.ResourceIDs())
 	}
 }
 

@@ -483,11 +483,7 @@ func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 
 	checkMsg := messages.RelatedCheckResult{
 		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       0,
-			ResourceIDs: nil,
-		},
+		Result:       resource.KnownRelated("tg", nil, false),
 	}
 	_, cmd := relatedApplyMsg(m, checkMsg)
 

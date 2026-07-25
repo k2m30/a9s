@@ -47,11 +47,11 @@ func TestRelated_IAMUser_Group_NilClients(t *testing.T) {
 	}
 	checker := iamUserCheckerByTarget(t, "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
 }
 
@@ -63,8 +63,8 @@ func TestRelated_IAMUser_Group_EmptyID(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "iam-group")
 	// nil clients: expect -1 not panic (empty userName triggers early return in impl, but nil clients checked first)
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -82,11 +82,11 @@ func TestRelated_IAMUser_Policy_NilClients(t *testing.T) {
 	}
 	checker := iamUserCheckerByTarget(t, "policy")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.TargetType != "policy" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	if result.TargetType() != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "policy")
 	}
 }
 
@@ -100,10 +100,10 @@ func TestRelated_IAMUser_Policy_EmptyUsername(t *testing.T) {
 	}
 	checker := iamUserCheckerByTarget(t, "policy")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error for empty username: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error for empty username: %v", result.Err())
 	}
 }

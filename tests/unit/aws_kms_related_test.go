@@ -68,14 +68,14 @@ func TestRelated_KMS_EBS_Found(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vol-0abc1234" {
-		t.Errorf("ResourceIDs = %v, want [vol-0abc1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vol-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [vol-0abc1234]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -104,8 +104,8 @@ func TestRelated_KMS_EBS_NotFound(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -121,8 +121,8 @@ func TestRelated_KMS_EBS_CacheMissNoClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -154,14 +154,14 @@ func TestRelated_KMS_RDS_Found(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mydb" {
-		t.Errorf("ResourceIDs = %v, want [mydb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "mydb" {
+		t.Errorf("ResourceIDs = %v, want [mydb]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -190,8 +190,8 @@ func TestRelated_KMS_RDS_NotFound(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -207,8 +207,8 @@ func TestRelated_KMS_RDS_CacheMissNoClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -241,14 +241,14 @@ func TestRelated_KMS_Secrets_Found(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf" {
-		t.Errorf("ResourceIDs = %v, want [arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf" {
+		t.Errorf("ResourceIDs = %v, want [arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -278,8 +278,8 @@ func TestRelated_KMS_Secrets_NotFound(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -295,8 +295,8 @@ func TestRelated_KMS_Secrets_CacheMissNoClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -324,18 +324,18 @@ func TestRelated_KMS_Role_Match(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	if !seen["my-ec2-role"] {
-		t.Errorf("ResourceIDs missing my-ec2-role; got %v", result.ResourceIDs)
+		t.Errorf("ResourceIDs missing my-ec2-role; got %v", result.ResourceIDs())
 	}
 	if !seen["my-lambda-role"] {
-		t.Errorf("ResourceIDs missing my-lambda-role; got %v", result.ResourceIDs)
+		t.Errorf("ResourceIDs missing my-lambda-role; got %v", result.ResourceIDs())
 	}
 }
 
@@ -354,8 +354,8 @@ func TestRelated_KMS_Role_Empty(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no role grants)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no role grants)", result.Count())
 	}
 }
 
@@ -369,8 +369,8 @@ func TestRelated_KMS_Role_WrongRawStruct(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty key ID short-circuits)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty key ID short-circuits)", result.Count())
 	}
 }
 
@@ -397,10 +397,10 @@ func TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (GetKeyPolicy AccessDenied must propagate as -1)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 (GetKeyPolicy AccessDenied must propagate as -1)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err = nil, want non-nil (AccessDenied error must not be swallowed)")
 	}
 }
@@ -427,10 +427,10 @@ func TestRelated_KMS_Role_ListGrantsAccessDenied_ReturnsMinusOne(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (ListGrants AccessDenied must propagate as -1)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 (ListGrants AccessDenied must propagate as -1)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err = nil, want non-nil (ListGrants AccessDenied error must not be swallowed)")
 	}
 }

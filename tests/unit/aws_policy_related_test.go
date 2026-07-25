@@ -62,22 +62,22 @@ func TestRelated_Policy_Role_ReturnsRoleNames(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 	wantIDs := map[string]bool{"admin-role": false, "readonly-role": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		wantIDs[id] = true
 	}
 	for name, found := range wantIDs {
 		if !found {
-			t.Errorf("ResourceIDs missing %q; got %v", name, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", name, result.ResourceIDs())
 		}
 	}
 }
@@ -94,11 +94,11 @@ func TestRelated_Policy_Role_ReturnsZeroWhenNoRoles(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
 }
 
@@ -114,10 +114,10 @@ func TestRelated_Policy_Role_PropagatesAPIError(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 on API error", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 on API error", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err should not be nil on API error")
 	}
 }
@@ -127,11 +127,11 @@ func TestRelated_Policy_Role_NilClientsReturnsNegOne(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
 }
 
@@ -152,14 +152,14 @@ func TestRelated_Policy_User_ReturnsUserNames(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-user")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.TargetType != "iam-user" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-user")
+	if result.TargetType() != "iam-user" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-user")
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -175,8 +175,8 @@ func TestRelated_Policy_User_ReturnsZeroWhenNoUsers(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-user")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -185,11 +185,11 @@ func TestRelated_Policy_User_NilClientsReturnsNegOne(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-user")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.TargetType != "iam-user" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-user")
+	if result.TargetType() != "iam-user" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-user")
 	}
 }
 
@@ -210,14 +210,14 @@ func TestRelated_Policy_Group_ReturnsGroupNames(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-group")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -233,8 +233,8 @@ func TestRelated_Policy_Group_ReturnsZeroWhenNoGroups(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-group")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -243,11 +243,11 @@ func TestRelated_Policy_Group_NilClientsReturnsNegOne(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-group")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
 }
 
@@ -270,11 +270,11 @@ func TestRelated_Policy_Role_ARNFallbackFromID(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ARN resolvable)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ARN resolvable)", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
 }
 
@@ -306,8 +306,8 @@ func TestRelated_Policy_TTLCache(t *testing.T) {
 	if callCount != 1 {
 		t.Errorf("API called %d times, want 1 (second call should hit cache)", callCount)
 	}
-	if result1.Count != 1 || result2.Count != 1 {
-		t.Errorf("Count = %d / %d, want 1 / 1", result1.Count, result2.Count)
+	if result1.Count() != 1 || result2.Count() != 1 {
+		t.Errorf("Count = %d / %d, want 1 / 1", result1.Count(), result2.Count())
 	}
 }
 

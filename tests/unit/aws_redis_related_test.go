@@ -236,17 +236,17 @@ func TestRelated_Redis_Alarm(t *testing.T) {
 	checker := redisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, redisGraphRoot(), cache)
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "redis-cpu-alarm" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, expected to contain %q", result.ResourceIDs, "redis-cpu-alarm")
+		t.Errorf("ResourceIDs = %v, expected to contain %q", result.ResourceIDs(), "redis-cpu-alarm")
 	}
 }
 
@@ -264,8 +264,8 @@ func TestRelated_Redis_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	checker := redisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, redisGraphRoot(), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State())
 	}
 }
 
@@ -300,11 +300,11 @@ func TestRelated_Redis_CFN(t *testing.T) {
 	checker := redisCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-prod-redis" {
-		t.Errorf("ResourceIDs = %v, want [acme-prod-redis]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-prod-redis" {
+		t.Errorf("ResourceIDs = %v, want [acme-prod-redis]", result.ResourceIDs())
 	}
 }
 
@@ -343,8 +343,8 @@ func TestRelated_Redis_CtEvents(t *testing.T) {
 	checker := redisCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, redisGraphRoot(), cache)
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1", result.Count())
 	}
 }
 
@@ -374,11 +374,11 @@ func TestRelated_Redis_KMS(t *testing.T) {
 	checker := redisCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, redisGraphRoot(), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyID)
 	}
 }
 
@@ -413,8 +413,8 @@ func TestRelated_Redis_KMS_NoKey(t *testing.T) {
 	checker := redisCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count())
 	}
 }
 
@@ -441,11 +441,11 @@ func TestRelated_Redis_Logs(t *testing.T) {
 	checker := redisCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != logGroupName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, logGroupName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != logGroupName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), logGroupName)
 	}
 }
 
@@ -471,8 +471,8 @@ func TestRelated_Redis_Logs_NoConfig(t *testing.T) {
 	checker := redisCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no log delivery config)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no log delivery config)", result.Count())
 	}
 }
 
@@ -513,8 +513,8 @@ func TestRelated_Redis_Secrets_NameMatch(t *testing.T) {
 	checker := redisCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (name-match: prod-redis-sessions/auth-token)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (name-match: prod-redis-sessions/auth-token)", result.Count())
 	}
 }
 
@@ -553,8 +553,8 @@ func TestRelated_Redis_Secrets_TagMatch(t *testing.T) {
 	checker := redisCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (tag-match: elasticache:replication-group-id=prod-redis-sessions)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (tag-match: elasticache:replication-group-id=prod-redis-sessions)", result.Count())
 	}
 }
 
@@ -592,8 +592,8 @@ func TestRelated_Redis_Secrets_NoMatch(t *testing.T) {
 	checker := redisCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no tag/name match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no tag/name match)", result.Count())
 	}
 }
 
@@ -633,11 +633,11 @@ func TestRelated_Redis_SG(t *testing.T) {
 	checker := redisCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-redis-prod-a" {
-		t.Errorf("ResourceIDs = %v, want [sg-redis-prod-a]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-redis-prod-a" {
+		t.Errorf("ResourceIDs = %v, want [sg-redis-prod-a]", result.ResourceIDs())
 	}
 }
 
@@ -682,8 +682,8 @@ func TestRelated_Redis_SNS(t *testing.T) {
 	checker := redisCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -730,8 +730,8 @@ func TestRelated_Redis_Subnet(t *testing.T) {
 	checker := redisCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), clients, redisGraphRoot(), cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -768,11 +768,11 @@ func TestRelated_Redis_VPC(t *testing.T) {
 	checker := redisCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, redisGraphRoot(), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-prod-main" {
-		t.Errorf("ResourceIDs = %v, want [vpc-prod-main]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-prod-main" {
+		t.Errorf("ResourceIDs = %v, want [vpc-prod-main]", result.ResourceIDs())
 	}
 }
 
@@ -844,8 +844,8 @@ func TestRelated_Redis_CtEvents_ExactIDMatch(t *testing.T) {
 	checker := redisCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (exact ResourceName == rgID should match)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (exact ResourceName == rgID should match)", result.Count())
 	}
 }
 
@@ -878,8 +878,8 @@ func TestRelated_Redis_CtEvents_ARNMatch(t *testing.T) {
 	checker := redisCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (ResourceName == RG ARN should match)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (ResourceName == RG ARN should match)", result.Count())
 	}
 }
 
@@ -914,14 +914,14 @@ func TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch(t *testing.T) {
 
 	// "prod-redis-sessions" must NOT match — its ID is a substring of the event's ResourceName.
 	resultShort := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
-	if resultShort.Count != 0 {
-		t.Errorf("prod-redis-sessions: Count = %d, want 0 (substring overmatch — event names a different RG)", resultShort.Count)
+	if resultShort.Count() != 0 {
+		t.Errorf("prod-redis-sessions: Count = %d, want 0 (substring overmatch — event names a different RG)", resultShort.Count())
 	}
 
 	// "prod-redis-sessions-sessions" MUST match — its ID is an exact match.
 	resultLong := checker(context.Background(), nil, prodRedisSessionsSubRG(), cache)
-	if resultLong.Count < 1 {
-		t.Errorf("prod-redis-sessions-sessions: Count = %d, want >= 1 (exact match)", resultLong.Count)
+	if resultLong.Count() < 1 {
+		t.Errorf("prod-redis-sessions-sessions: Count = %d, want >= 1 (exact match)", resultLong.Count())
 	}
 }
 
@@ -956,8 +956,8 @@ func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T)
 	checker := redisCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (EventSource alone must not match — requires ResourceName equality)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (EventSource alone must not match — requires ResourceName equality)", result.Count())
 	}
 }
 
@@ -1046,20 +1046,20 @@ func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated(t *testi
 	checker := redisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache must propagate Truncated flag)")
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "matching-alarm" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, expected to contain %q", result.ResourceIDs, "matching-alarm")
+		t.Errorf("ResourceIDs = %v, expected to contain %q", result.ResourceIDs(), "matching-alarm")
 	}
 }
 
@@ -1086,10 +1086,10 @@ func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *t
 	checker := redisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, redisGraphRoot(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no dimension match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no dimension match)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache, no matches must still set Truncated)")
 	}
 }
@@ -1114,10 +1114,10 @@ func TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsTruncated(t *testin
 	checker := redisCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, redisGraphRoot(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache must propagate Truncated flag)")
 	}
 }

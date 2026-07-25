@@ -33,10 +33,10 @@ func tgARN(res resource.Resource) string {
 func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.TargetGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	if len(raw.LoadBalancerArns) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -44,8 +44,10 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.ErrorRelated("elb", err)
 	}
 	if elbList == nil {
-		// No ELB cache available — fall back to count from ARN slice.
-		return resource.RelatedCheckResult{TargetType: "elb", Count: len(raw.LoadBalancerArns)}
+		// The TG's own LoadBalancerArns confirms something is attached, but
+		// without the elb cache there is no canonical Resource.ID to resolve
+		// them against — Unknown, not a fabricated count with no IDs.
+		return resource.UnknownRelated("elb")
 	}
 
 	// Build a set of ARNs from the TG's LoadBalancerArns.
@@ -75,7 +77,7 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+		return resource.KnownRelated("ecs-svc", nil, false)
 	}
 
 	svcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-svc")
@@ -107,7 +109,7 @@ func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cach
 func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -136,7 +138,7 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgARNVal := tgARN(res)
 	if tgARNVal == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+		return resource.KnownRelated("alarm", nil, false)
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -176,7 +178,7 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
@@ -187,7 +189,7 @@ func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := tgARN(res)
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -210,7 +212,7 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 			}
 		}
 	}
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	return resource.KnownRelated("cfn", nil, false)
 }
 
 // checkTGEC2 reports EC2 instances registered as targets of this TG.
@@ -219,13 +221,13 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	// Skip the API call if the TG is a lambda/IP-only TG; EC2 targets only
 	// apply to target_type=instance.
 	raw, ok := assertStruct[elbv2types.TargetGroup](res.RawStruct)
 	if ok && raw.TargetType != "" && raw.TargetType != elbv2types.TargetTypeEnumInstance {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ELBv2 == nil {
@@ -262,11 +264,11 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.UnknownRelated("lambda")
 	}
 	if raw.TargetType != elbv2types.TargetTypeEnumLambda {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ELBv2 == nil {

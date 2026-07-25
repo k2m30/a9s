@@ -56,9 +56,9 @@ func TestS3_Related_R53_RealisticAliasResolves(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, resource.Resource{ID: bucket, Name: bucket}, cache)
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 — a realistic Route 53 alias (record NAME == bucket FQDN, DNSName = regional endpoint) must resolve; spec §2 requires the join on record name",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -88,9 +88,9 @@ func TestS3_Related_R53_BucketNameInDNSNameDoesNotMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, resource.Resource{ID: "acme-website", Name: "acme-website"}, cache)
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — a record whose NAME does not equal the bucket FQDN must not match even if bucket name appears in the DNSName (old substring check was wrong)",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -121,9 +121,9 @@ func TestS3_Related_Role_UsesBucketPolicyPrincipals(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), cache)
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 — the spec-defined s3→role join is bucket-policy-principal-to-role, not role-policy-resource-to-bucket. The current implementation uses the wrong direction and misses the canonical case",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -156,9 +156,9 @@ func TestS3_Related_Role_UnrelatedRolePolicyMentioningBucket_DoesNotMatch(t *tes
 	// NoSuchBucketPolicy) so the spec-correct implementation emits 0.
 	src := emptyBucketResource("test-only-no-bucket-policy-" + t.Name())
 	result := checker(context.Background(), s3FakeClients(), src, cache)
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — a role whose own policy mentions the bucket must not match when the bucket policy does not list the role as a principal",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -186,9 +186,9 @@ func TestS3_Related_Backup_PrefixCollisionDoesNotOvermatch(t *testing.T) {
 	// Query for bucket "prod" — its ARN is a strict prefix of the plan's
 	// "prod-logs" ARN. Must return 0.
 	result := checker(context.Background(), nil, emptyBucketResource("prod"), cache)
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — a plan covering arn:aws:s3:::prod-logs must not match the \"prod\" bucket (prefix-collision over-match in the current implementation)",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -212,8 +212,8 @@ func TestS3_Related_Backup_ExactMatchStillResolves(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, emptyBucketResource(bucket), cache)
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 — exact ARN match must still resolve after the prefix-collision fix",
-			result.Count)
+			result.Count())
 	}
 }

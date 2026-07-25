@@ -60,14 +60,14 @@ func TestRelated_Cb_Pipeline_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), clients, cbSourceResource(projectName), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != pipelineName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, pipelineName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != pipelineName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), pipelineName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -92,10 +92,10 @@ func TestRelated_Cb_Pipeline_Match_Truncated(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), clients, cbSourceResource(projectName), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (cache is truncated)")
 	}
 }
@@ -120,8 +120,8 @@ func TestRelated_Cb_Pipeline_Empty(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), clients, cbSourceResource(projectName), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no pipeline references this project)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no pipeline references this project)", result.Count())
 	}
 }
 
@@ -135,7 +135,7 @@ func TestRelated_Cb_Pipeline_WrongRawStruct(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }

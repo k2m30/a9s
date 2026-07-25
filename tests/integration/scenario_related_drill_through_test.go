@@ -230,11 +230,11 @@ func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 					}
 					result := def.Checker(ctx, clients, src, cache)
 					obs := rootPivotObservation{
-						count:             result.Count,
-						resourceIDs:       append([]string(nil), result.ResourceIDs...),
+						count:             result.Count(),
+						resourceIDs:       append([]string(nil), result.ResourceIDs()...),
 						targetFetcherSize: len(cache[def.TargetType].Resources),
 					}
-					for _, id := range result.ResourceIDs {
+					for _, id := range result.ResourceIDs() {
 						if idExistsInTarget(cache, def.TargetType, id) {
 							obs.idsMatchedInTgt++
 						}
@@ -346,7 +346,7 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 						// 1. Compute checker result synchronously.
 						src := fullIntegrationMustFindResourceByID(t, clients, group.shortName, root.id)
 						result := def.Checker(ctx, clients, src, cache)
-						if result.Count < 1 && len(result.ResourceIDs) == 0 && len(result.FetchFilter) == 0 {
+						if result.Count() < 1 && len(result.ResourceIDs()) == 0 && len(result.FetchFilter()) == 0 {
 							// Already caught by the direct-checker test as U9 violation — skip
 							// drilling here. This subtest is purely about drill-lands-non-empty.
 							t.Skipf("checker returned Count=0 — see direct-checker test for the U9 failure")
@@ -368,8 +368,8 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 							TargetType:     def.TargetType,
 							SourceResource: srcView,
 							SourceType:     group.shortName,
-							RelatedIDs:     append([]string(nil), result.ResourceIDs...),
-							FetchFilter:    cloneStringMap(result.FetchFilter),
+							RelatedIDs:     append([]string(nil), result.ResourceIDs()...),
+							FetchFilter:    cloneStringMap(result.FetchFilter()),
 							Checker:        def.Checker,
 						}
 						scenario.applyAndDrain(navMsg)
@@ -385,7 +385,7 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 							if len(scenario.currentListResources) == 0 {
 								t.Errorf("drill %q → %s: navigation produced an empty list (type=%q). Checker emitted IDs=%v FetchFilter=%v",
 									def.DisplayName, def.TargetType, scenario.currentListType,
-									result.ResourceIDs, result.FetchFilter)
+									result.ResourceIDs(), result.FetchFilter())
 							}
 							return
 						}
@@ -414,7 +414,7 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 						}
 						if emptyCount {
 							t.Errorf("drill %q → %s: list rendered with (0) — checker emitted IDs=%v that don't match any %s fetcher row. This is the exact drift the test is designed to catch.",
-								def.DisplayName, def.TargetType, result.ResourceIDs, def.TargetType)
+								def.DisplayName, def.TargetType, result.ResourceIDs(), def.TargetType)
 							return
 						}
 						if titleMatched {
@@ -561,8 +561,8 @@ func TestScenario_GraphRootAtLeastHalfPivotsCountGE2(t *testing.T) {
 						continue
 					}
 					result := def.Checker(ctx, clients, src, cache)
-					if result.Count > perPivotMaxCount[def.DisplayName] {
-						perPivotMaxCount[def.DisplayName] = result.Count
+					if result.Count() > perPivotMaxCount[def.DisplayName] {
+						perPivotMaxCount[def.DisplayName] = result.Count()
 					}
 				}
 			}

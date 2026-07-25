@@ -47,25 +47,25 @@ func TestCheckRolePolicy_HappyPath(t *testing.T) {
 	}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.TargetType != "policy" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	if result.TargetType() != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "policy")
 	}
-	if result.Count != 2 {
+	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2 (acme-cloudwatch-logs + acme-s3-read-only); "+
 			"fixture AttachedRolePolicies[\"acme-lambda-execution\"] has 2 customer-managed entries",
-			result.Count)
+			result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 
 	wantPolicies := map[string]bool{"acme-cloudwatch-logs": false, "acme-s3-read-only": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		wantPolicies[id] = true
 	}
 	for name, found := range wantPolicies {
 		if !found {
-			t.Errorf("policy %q not found in ResourceIDs %v", name, result.ResourceIDs)
+			t.Errorf("policy %q not found in ResourceIDs %v", name, result.ResourceIDs())
 		}
 	}
 }
@@ -89,20 +89,20 @@ func TestCheckRolePolicy_AWSManagedOnlyRole(t *testing.T) {
 	}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.TargetType != "policy" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	if result.TargetType() != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "policy")
 	}
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1; acme-eks-node-role has AWS-managed policies "+
 			"(AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, AmazonEC2ContainerRegistryReadOnly) "+
 			"that the checker now emits as attached names (lazy-add resolves them at drill time)",
-			result.Count)
+			result.Count())
 	}
-	if len(result.ResourceIDs) != result.Count {
-		t.Errorf("ResourceIDs length = %d, want %d (every attached policy must surface by name)", len(result.ResourceIDs), result.Count)
+	if len(result.ResourceIDs()) != result.Count() {
+		t.Errorf("ResourceIDs length = %d, want %d (every attached policy must surface by name)", len(result.ResourceIDs()), result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -125,17 +125,17 @@ func TestCheckRolePolicy_RawStructFallback(t *testing.T) {
 	}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.TargetType != "policy" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	if result.TargetType() != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "policy")
 	}
 	// acme-lambda-execution has 2 customer-managed policies — same as HappyPath.
-	if result.Count != 2 {
+	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2; RawStruct fallback must resolve RoleName from "+
 			"iamtypes.Role.RoleName when resource.ID is empty "+
 			"(core/aws/iam_roles_related.go:149-153)",
-			result.Count)
+			result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }

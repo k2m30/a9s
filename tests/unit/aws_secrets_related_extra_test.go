@@ -76,11 +76,11 @@ func TestRelated_Secrets_CodeArtifact_MatchByName(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "codeartifact")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (name contains 'codeartifact')", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (name contains 'codeartifact')", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -100,11 +100,11 @@ func TestRelated_Secrets_CodeArtifact_NoMatch(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "codeartifact")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (name does not contain 'codeartifact')", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (name does not contain 'codeartifact')", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -119,8 +119,8 @@ func TestRelated_Secrets_CodeArtifact_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "codeartifact")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -196,11 +196,11 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "eb")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one EB env references the secret)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one EB env references the secret)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -240,10 +240,10 @@ func TestRelated_Secrets_EB_MatchTruncated(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "eb")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (matching env)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (matching env)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (cache is truncated)")
 	}
 }
@@ -259,8 +259,8 @@ func TestRelated_Secrets_EB_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "eb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -347,11 +347,11 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one task references the secret)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one task references the secret)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -394,10 +394,10 @@ func TestRelated_Secrets_ECSTask_Truncated(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (cache is truncated)")
 	}
 }
@@ -413,8 +413,8 @@ func TestRelated_Secrets_ECSTask_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -447,14 +447,14 @@ func TestRelated_Secrets_Logs_MatchByRotationLambda(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one log group for rotation Lambda)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one log group for rotation Lambda)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != expectedLogGroup {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, expectedLogGroup)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != expectedLogGroup {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), expectedLogGroup)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -474,11 +474,11 @@ func TestRelated_Secrets_Logs_NoRotationLambda(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no rotation Lambda)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no rotation Lambda)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -493,8 +493,8 @@ func TestRelated_Secrets_Logs_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -538,24 +538,24 @@ func TestRelated_Secrets_Role_MatchByResourcePolicy(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count < 2 {
-		t.Errorf("Count = %d, want >= 2 (two role ARNs in resource policy)", result.Count)
+	if result.Count() < 2 {
+		t.Errorf("Count = %d, want >= 2 (two role ARNs in resource policy)", result.Count())
 	}
 	// IDs must be bare role names (== role.ID / iam:GetRole RoleName), never
 	// full ARNs — a full ARN fails GetRole with ValidationError.
 	roleFound := map[string]bool{"api-service-role": false, "batch-processor-role": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if _, ok := roleFound[id]; ok {
 			roleFound[id] = true
 		}
 	}
 	for name, found := range roleFound {
 		if !found {
-			t.Errorf("expected bare role name %q in ResourceIDs, got %v", name, result.ResourceIDs)
+			t.Errorf("expected bare role name %q in ResourceIDs, got %v", name, result.ResourceIDs())
 		}
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -585,15 +585,15 @@ func TestRelated_Secrets_Role_MatchIncludesRotationLambdaRole(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (rotation Lambda execution role)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (rotation Lambda execution role)", result.Count())
 	}
 	const lambdaRoleName = "rotate-db-creds-execution-role"
-	if !slices.Contains(result.ResourceIDs, lambdaRoleName) {
-		t.Errorf("expected rotation Lambda role name %q in ResourceIDs, got %v", lambdaRoleName, result.ResourceIDs)
+	if !slices.Contains(result.ResourceIDs(), lambdaRoleName) {
+		t.Errorf("expected rotation Lambda role name %q in ResourceIDs, got %v", lambdaRoleName, result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -632,14 +632,14 @@ func TestRelated_Secrets_Role_CrossAccountExcluded(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (same-account role only; cross-account dropped)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (same-account role only; cross-account dropped)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "local-access-role" {
-		t.Fatalf("ResourceIDs = %v, want [local-access-role] (bare name, cross-account foreign-access-role excluded)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "local-access-role" {
+		t.Fatalf("ResourceIDs = %v, want [local-access-role] (bare name, cross-account foreign-access-role excluded)", result.ResourceIDs())
 	}
 }
 
@@ -664,11 +664,11 @@ func TestRelated_Secrets_Role_NoPolicy(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no resource policy, no rotation Lambda)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no resource policy, no rotation Lambda)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -683,8 +683,8 @@ func TestRelated_Secrets_Role_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -714,14 +714,14 @@ func TestRelated_Secrets_Sns_MatchByDLQ(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (rotation Lambda DLQ is SNS topic)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (rotation Lambda DLQ is SNS topic)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != snsTopicARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, snsTopicARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != snsTopicARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), snsTopicARN)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -745,11 +745,11 @@ func TestRelated_Secrets_Sns_DLQNotSNS(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (DLQ is SQS, not SNS)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (DLQ is SQS, not SNS)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -769,11 +769,11 @@ func TestRelated_Secrets_Sns_NoRotationLambda(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no rotation Lambda)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no rotation Lambda)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -788,7 +788,7 @@ func TestRelated_Secrets_Sns_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }

@@ -22,12 +22,12 @@ func checkDdbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("kms")
 	}
 	if table.SSEDescription == nil || table.SSEDescription.KMSMasterKeyArn == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	arn := *table.SSEDescription.KMSMasterKeyArn
 	idx := strings.LastIndex(arn, "/")
 	if idx < 0 || idx == len(arn)-1 {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := arn[idx+1:]
 	return relatedResult("kms", []string{keyID})
@@ -39,7 +39,7 @@ func checkDdbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+		return resource.KnownRelated("alarm", nil, false)
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -82,7 +82,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
@@ -112,7 +112,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
+		return resource.KnownRelated("kinesis", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
@@ -146,7 +146,7 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 // target cache is truncated and matches were found. Later pages may contain
 // additional matches, so the displayed count is a lower bound — rendered as "(N+)".
 func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Truncated: true}
+	return resource.KnownRelated(target, ids, true)
 }
 
 // checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream
@@ -162,7 +162,7 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	if table.LatestStreamArn == nil || *table.LatestStreamArn == "" {
 		// Streams not enabled on this table — no Lambda triggers are possible.
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	streamARN := *table.LatestStreamArn
 	c, cok := clients.(*ServiceClients)

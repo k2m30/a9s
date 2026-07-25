@@ -80,11 +80,11 @@ func TestRelated_ACM_ELB_NilClients(t *testing.T) {
 	}
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown when no clients available)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown when no clients available)", result.Count())
 	}
-	if result.TargetType != "elb" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	if result.TargetType() != "elb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "elb")
 	}
 }
 
@@ -93,8 +93,8 @@ func TestRelated_ACM_ELB_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count())
 	}
 }
 
@@ -135,14 +135,14 @@ func TestRelated_ACM_CF_Found(t *testing.T) {
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "E1ABCDEF123456" {
-		t.Errorf("ResourceIDs = %v, want [E1ABCDEF123456]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "E1ABCDEF123456" {
+		t.Errorf("ResourceIDs = %v, want [E1ABCDEF123456]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -170,8 +170,8 @@ func TestRelated_ACM_CF_NotFound(t *testing.T) {
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -185,8 +185,8 @@ func TestRelated_ACM_CF_CacheMiss(t *testing.T) {
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -204,8 +204,8 @@ func TestRelated_ACM_CF_EmptyCertARN(t *testing.T) {
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cert ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert ARN)", result.Count())
 	}
 }
 
@@ -218,8 +218,8 @@ func TestRelated_ACM_APIGW_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
 	checker := acmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count())
 	}
 }
 
@@ -232,8 +232,8 @@ func TestRelated_ACM_R53_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
 	checker := acmCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count())
 	}
 }
 
@@ -249,8 +249,8 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 	}
 	checker := acmCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil CertificateArn in RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil CertificateArn in RawStruct)", result.Count())
 	}
 }
 
@@ -292,7 +292,7 @@ func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
@@ -329,10 +329,10 @@ func TestRelated_ACM_CF_NilViewerCertificate(t *testing.T) {
 
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only dist with matching cert should match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only dist with matching cert should match)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "E1WITHVIEWERCERT" {
-		t.Errorf("ResourceIDs = %v, want [E1WITHVIEWERCERT]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "E1WITHVIEWERCERT" {
+		t.Errorf("ResourceIDs = %v, want [E1WITHVIEWERCERT]", result.ResourceIDs())
 	}
 }

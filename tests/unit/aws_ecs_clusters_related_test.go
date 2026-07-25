@@ -72,14 +72,14 @@ func TestRelated_ECS_ECSService_Found(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-service" {
-		t.Errorf("ResourceIDs = %v, want [my-service]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-service" {
+		t.Errorf("ResourceIDs = %v, want [my-service]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -98,8 +98,8 @@ func TestRelated_ECS_ECSService_NotFound(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -109,8 +109,8 @@ func TestRelated_ECS_ECSService_CacheMissNoClients(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -129,8 +129,8 @@ func TestRelated_ECS_ECSService_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty source ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty source ID", result.Count())
 	}
 }
 
@@ -154,14 +154,14 @@ func TestRelated_ECS_Alarm_Found(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-alarm" {
-		t.Errorf("ResourceIDs = %v, want [my-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alarm" {
+		t.Errorf("ResourceIDs = %v, want [my-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -182,8 +182,8 @@ func TestRelated_ECS_Alarm_NotFound(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -193,8 +193,8 @@ func TestRelated_ECS_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -215,8 +215,8 @@ func TestRelated_ECS_Alarm_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty source ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty source ID", result.Count())
 	}
 }
 
@@ -246,14 +246,14 @@ func TestRelated_ECS_CFN_Found(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
-		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -281,8 +281,8 @@ func TestRelated_ECS_CFN_NotFound(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -301,8 +301,8 @@ func TestRelated_ECS_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -329,8 +329,8 @@ func TestRelated_ECS_CFN_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for no CFN tag", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for no CFN tag", result.Count())
 	}
 }
 
@@ -358,11 +358,11 @@ func TestRelated_ECS_ASG_MatchByAmazonECSManagedTag(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "ecs-asg-managed" {
-		t.Errorf("ResourceIDs = %v, want [ecs-asg-managed]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "ecs-asg-managed" {
+		t.Errorf("ResourceIDs = %v, want [ecs-asg-managed]", result.ResourceIDs())
 	}
 }
 
@@ -386,8 +386,8 @@ func TestRelated_ECS_ASG_MatchByClusterNameTag(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -411,8 +411,8 @@ func TestRelated_ECS_ASG_NoMatchWhenDifferentCluster(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different cluster)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different cluster)", result.Count())
 	}
 }
 
@@ -420,8 +420,8 @@ func TestRelated_ECS_ASG_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
 	}
 }
 
@@ -429,8 +429,8 @@ func TestRelated_ECS_ASG_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 
@@ -456,11 +456,11 @@ func TestRelated_ECS_EC2_MatchByECSClusterNameTag(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0a1b2c3d4e5f67890" {
-		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f67890]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0a1b2c3d4e5f67890" {
+		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f67890]", result.ResourceIDs())
 	}
 }
 
@@ -482,8 +482,8 @@ func TestRelated_ECS_EC2_MatchByClusterNameTag(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -505,8 +505,8 @@ func TestRelated_ECS_EC2_NoMatchDifferentCluster(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different cluster)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different cluster)", result.Count())
 	}
 }
 
@@ -514,8 +514,8 @@ func TestRelated_ECS_EC2_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
 	}
 }
 
@@ -523,8 +523,8 @@ func TestRelated_ECS_EC2_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 
@@ -558,11 +558,11 @@ func TestRelated_ECS_CTEvents_Match(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "event-abc123" {
-		t.Errorf("ResourceIDs = %v, want [event-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "event-abc123" {
+		t.Errorf("ResourceIDs = %v, want [event-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -583,8 +583,8 @@ func TestRelated_ECS_CTEvents_NoMatch(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -592,8 +592,8 @@ func TestRelated_ECS_CTEvents_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
 	}
 }
 
@@ -601,8 +601,8 @@ func TestRelated_ECS_CTEvents_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 
@@ -626,8 +626,8 @@ func TestRelated_ECS_Tasks_MatchByExactClusterName(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -647,11 +647,11 @@ func TestRelated_ECS_Tasks_MatchByARNSuffix(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ARN suffix match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ARN suffix match)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "task-abc123def456" {
-		t.Errorf("ResourceIDs = %v, want [task-abc123def456]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "task-abc123def456" {
+		t.Errorf("ResourceIDs = %v, want [task-abc123def456]", result.ResourceIDs())
 	}
 }
 
@@ -670,8 +670,8 @@ func TestRelated_ECS_Tasks_NoMatchDifferentCluster(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -679,8 +679,8 @@ func TestRelated_ECS_Tasks_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
 	}
 }
 
@@ -688,8 +688,8 @@ func TestRelated_ECS_Tasks_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 
@@ -714,11 +714,11 @@ func TestRelated_ECS_Logs_Match(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/ecs/my-cluster/app" {
-		t.Errorf("ResourceIDs = %v, want [/ecs/my-cluster/app]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/ecs/my-cluster/app" {
+		t.Errorf("ResourceIDs = %v, want [/ecs/my-cluster/app]", result.ResourceIDs())
 	}
 }
 
@@ -735,8 +735,8 @@ func TestRelated_ECS_Logs_NoMatch(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -744,8 +744,8 @@ func TestRelated_ECS_Logs_EmptySourceID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
 	}
 }
 
@@ -753,8 +753,8 @@ func TestRelated_ECS_Logs_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 
@@ -781,11 +781,11 @@ func TestRelated_ECS_KMS_FoundFullARN(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abcd1234-5678-90ab-cdef-111111111111" {
-		t.Errorf("ResourceIDs = %v, want [abcd1234-5678-90ab-cdef-111111111111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abcd1234-5678-90ab-cdef-111111111111" {
+		t.Errorf("ResourceIDs = %v, want [abcd1234-5678-90ab-cdef-111111111111]", result.ResourceIDs())
 	}
 }
 
@@ -808,11 +808,11 @@ func TestRelated_ECS_KMS_PlainKeyID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abcd1234-5678-90ab-cdef-111111111111" {
-		t.Errorf("ResourceIDs = %v, want [abcd1234-5678-90ab-cdef-111111111111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abcd1234-5678-90ab-cdef-111111111111" {
+		t.Errorf("ResourceIDs = %v, want [abcd1234-5678-90ab-cdef-111111111111]", result.ResourceIDs())
 	}
 }
 
@@ -830,8 +830,8 @@ func TestRelated_ECS_KMS_NilConfiguration(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Configuration)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Configuration)", result.Count())
 	}
 }
 
@@ -853,8 +853,8 @@ func TestRelated_ECS_KMS_EmptyKeyID(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty KmsKeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty KmsKeyId)", result.Count())
 	}
 }
 
@@ -868,7 +868,7 @@ func TestRelated_ECS_KMS_WrongRawStruct(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct)", result.Count())
 	}
 }

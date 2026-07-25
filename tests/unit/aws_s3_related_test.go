@@ -166,11 +166,11 @@ func TestS3_Related_AllInScopePivots_Registered(t *testing.T) {
 func TestS3_Related_CTEvents_Present(t *testing.T) {
 	checker := s3CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, healthyBucketResource(), nil)
-	if result.TargetType != "ct-events" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "ct-events")
+	if result.TargetType() != "ct-events" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "ct-events")
 	}
 	// ct-events always uses FetchFilter, not a static cache lookup.
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Error("ct-events checker must return non-nil FetchFilter for navigation")
 	}
 }
@@ -193,8 +193,8 @@ func TestS3_Related_Lambda_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 for lambda pivot with matching function in cache", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 for lambda pivot with matching function in cache", result.Count())
 	}
 }
 
@@ -204,8 +204,8 @@ func TestS3_Related_Lambda_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, emptyBucketResource("bare-bucket"), nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for lambda pivot with no notification field", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for lambda pivot with no notification field", result.Count())
 	}
 }
 
@@ -227,8 +227,8 @@ func TestS3_Related_SNS_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 for sns pivot with matching topic in cache", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 for sns pivot with matching topic in cache", result.Count())
 	}
 }
 
@@ -238,8 +238,8 @@ func TestS3_Related_SNS_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, emptyBucketResource("bare-bucket"), nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for sns pivot with no notification field", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for sns pivot with no notification field", result.Count())
 	}
 }
 
@@ -261,8 +261,8 @@ func TestS3_Related_SQS_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 for sqs pivot with matching queue in cache", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 for sqs pivot with matching queue in cache", result.Count())
 	}
 }
 
@@ -272,8 +272,8 @@ func TestS3_Related_SQS_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, emptyBucketResource("bare-bucket"), nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for sqs pivot with no notification field", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for sqs pivot with no notification field", result.Count())
 	}
 }
 
@@ -295,12 +295,12 @@ func TestS3_Related_KMS_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "kms")
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), cache)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 for kms pivot (healthy bucket has SSE-KMS with key %q)",
-			result.Count, fixtures.S3BucketKMSKeyID)
+			result.Count(), fixtures.S3BucketKMSKeyID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -312,8 +312,8 @@ func TestS3_Related_KMS_NoMatch(t *testing.T) {
 	src := emptyBucketResource("test-only-no-kms-" + t.Name())
 	result := checker(context.Background(), s3FakeClients(), src, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for kms pivot on bucket with no SSE-KMS config", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for kms pivot on bucket with no SSE-KMS config", result.Count())
 	}
 }
 
@@ -329,12 +329,12 @@ func TestS3_Related_AccessLogBucket_Found(t *testing.T) {
 	checker := s3CheckerByDisplayName(t, "Access Log Bucket")
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), nil)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 for access-log pivot (healthy bucket logs to %q)",
-			result.Count, fixtures.LogsBucketName)
+			result.Count(), fixtures.LogsBucketName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -346,8 +346,8 @@ func TestS3_Related_AccessLogBucket_NoMatch(t *testing.T) {
 	src := emptyBucketResource("test-only-no-logging-" + t.Name())
 	result := checker(context.Background(), s3FakeClients(), src, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for access-log pivot on bucket with no logging config", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for access-log pivot on bucket with no logging config", result.Count())
 	}
 }
 
@@ -376,12 +376,12 @@ func TestS3_Related_CFN_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), cache)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 for cfn pivot (healthy bucket tagged with stack %q)",
-			result.Count, fixtures.S3CFNStackName)
+			result.Count(), fixtures.S3CFNStackName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -399,8 +399,8 @@ func TestS3_Related_CFN_NoMatch(t *testing.T) {
 		},
 	})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for cfn pivot on bucket with no CFN tag", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for cfn pivot on bucket with no CFN tag", result.Count())
 	}
 }
 
@@ -429,8 +429,8 @@ func TestS3_Related_Trail_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "trail")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 for trail pivot (trail logs to %q)", result.Count, fixtures.HealthyBucketName)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 for trail pivot (trail logs to %q)", result.Count(), fixtures.HealthyBucketName)
 	}
 }
 
@@ -455,8 +455,8 @@ func TestS3_Related_Trail_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "trail")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for trail pivot with non-matching S3BucketName", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for trail pivot with non-matching S3BucketName", result.Count())
 	}
 }
 
@@ -493,9 +493,9 @@ func TestS3_Related_CF_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 for cf pivot (distribution has origin %s.s3.*)",
-			result.Count, fixtures.HealthyBucketName)
+			result.Count(), fixtures.HealthyBucketName)
 	}
 }
 
@@ -527,8 +527,8 @@ func TestS3_Related_CF_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for cf pivot with non-matching origin", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for cf pivot with non-matching origin", result.Count())
 	}
 }
 
@@ -554,8 +554,8 @@ func TestS3_Related_Athena_NoMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 0 {
-		t.Errorf("Count = %d, want ≥0 for athena pivot with no match", result.Count)
+	if result.Count() < 0 {
+		t.Errorf("Count = %d, want ≥0 for athena pivot with no match", result.Count())
 	}
 }
 
@@ -575,9 +575,9 @@ func TestS3_Related_Athena_Found(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 for athena pivot when workgroup references %q",
-			result.Count, fixtures.HealthyBucketName)
+			result.Count(), fixtures.HealthyBucketName)
 	}
 }
 
@@ -597,8 +597,8 @@ func TestS3_Related_Backup_NoMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for backup pivot with non-matching ARN", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for backup pivot with non-matching ARN", result.Count())
 	}
 }
 
@@ -619,8 +619,8 @@ func TestS3_Related_Backup_Found(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want ≥1 for backup pivot when entry references %q", result.Count, bucketARN)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want ≥1 for backup pivot when entry references %q", result.Count(), bucketARN)
 	}
 }
 
@@ -653,8 +653,8 @@ func TestS3_Related_EBRule_NoMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for eb-rule pivot with non-matching EventPattern", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for eb-rule pivot with non-matching EventPattern", result.Count())
 	}
 }
 
@@ -677,9 +677,9 @@ func TestS3_Related_EBRule_Found(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 for eb-rule pivot when EventPattern sources from aws.s3 and names bucket %q",
-			result.Count, fixtures.HealthyBucketName)
+			result.Count(), fixtures.HealthyBucketName)
 	}
 }
 
@@ -702,8 +702,8 @@ func TestS3_Related_Glue_NoMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "glue")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for glue pivot with ScriptLocation pointing to a different bucket", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for glue pivot with ScriptLocation pointing to a different bucket", result.Count())
 	}
 }
 
@@ -726,8 +726,8 @@ func TestS3_Related_Glue_Found(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "glue")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want ≥1 for glue pivot when job ScriptLocation is in %q", result.Count, fixtures.HealthyBucketName)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want ≥1 for glue pivot when job ScriptLocation is in %q", result.Count(), fixtures.HealthyBucketName)
 	}
 }
 
@@ -751,8 +751,8 @@ func TestS3_Related_R53_NoMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for r53 pivot when no alias record name equals this bucket", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for r53 pivot when no alias record name equals this bucket", result.Count())
 	}
 }
 
@@ -779,9 +779,9 @@ func TestS3_Related_R53_Found(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 for r53 pivot when an alias record's NAME equals the bucket name %q",
-			result.Count, fixtures.HealthyBucketName)
+			result.Count(), fixtures.HealthyBucketName)
 	}
 }
 
@@ -800,8 +800,8 @@ func TestS3_Related_Role_NoBucketPolicy_Count0(t *testing.T) {
 	checker := s3CheckerByTarget(t, "role")
 	src := emptyBucketResource("test-only-no-policy-" + t.Name())
 	result := checker(context.Background(), s3FakeClients(), src, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for role pivot when bucket has no policy", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for role pivot when bucket has no policy", result.Count())
 	}
 }
 
@@ -819,8 +819,8 @@ func TestS3_Related_Role_BucketPolicyPrincipalResolves(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), cache)
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want ≥1 for role pivot when bucket policy names the role as a principal", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want ≥1 for role pivot when bucket policy names the role as a principal", result.Count())
 	}
 }
 
@@ -876,14 +876,14 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Fields: map[string]string{"name": "prod-logs"},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 2 {
-			t.Errorf("Count = %d, want 2 (plan-prefix + plan-catchall-except-quarantine)", result.Count)
+		if result.Count() != 2 {
+			t.Errorf("Count = %d, want 2 (plan-prefix + plan-catchall-except-quarantine)", result.Count())
 		}
-		if !s3ContainsID(result.ResourceIDs, "plan-prefix") {
-			t.Errorf("ResourceIDs %v missing plan-prefix", result.ResourceIDs)
+		if !s3ContainsID(result.ResourceIDs(), "plan-prefix") {
+			t.Errorf("ResourceIDs %v missing plan-prefix", result.ResourceIDs())
 		}
-		if !s3ContainsID(result.ResourceIDs, "plan-catchall-except-quarantine") {
-			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs)
+		if !s3ContainsID(result.ResourceIDs(), "plan-catchall-except-quarantine") {
+			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs())
 		}
 	})
 
@@ -894,11 +894,11 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Fields: map[string]string{"name": "staging-data"},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1 (only plan-catchall-except-quarantine)", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1 (only plan-catchall-except-quarantine)", result.Count())
 		}
-		if !s3ContainsID(result.ResourceIDs, "plan-catchall-except-quarantine") {
-			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs)
+		if !s3ContainsID(result.ResourceIDs(), "plan-catchall-except-quarantine") {
+			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs())
 		}
 	})
 
@@ -909,8 +909,8 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Fields: map[string]string{"name": "quarantine-pii"},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 0 {
-			t.Errorf("Count = %d, want 0 (plan-catchall excludes quarantine-*, others miss the prefix)", result.Count)
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0 (plan-catchall excludes quarantine-*, others miss the prefix)", result.Count())
 		}
 	})
 
@@ -921,14 +921,14 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Fields: map[string]string{"name": "specific-bucket"},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 2 {
-			t.Errorf("Count = %d, want 2 (plan-catchall-except-quarantine + plan-specific)", result.Count)
+		if result.Count() != 2 {
+			t.Errorf("Count = %d, want 2 (plan-catchall-except-quarantine + plan-specific)", result.Count())
 		}
-		if !s3ContainsID(result.ResourceIDs, "plan-catchall-except-quarantine") {
-			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs)
+		if !s3ContainsID(result.ResourceIDs(), "plan-catchall-except-quarantine") {
+			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs())
 		}
-		if !s3ContainsID(result.ResourceIDs, "plan-specific") {
-			t.Errorf("ResourceIDs %v missing plan-specific", result.ResourceIDs)
+		if !s3ContainsID(result.ResourceIDs(), "plan-specific") {
+			t.Errorf("ResourceIDs %v missing plan-specific", result.ResourceIDs())
 		}
 	})
 }

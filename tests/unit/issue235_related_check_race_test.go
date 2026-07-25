@@ -77,9 +77,9 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[typeX]
 				if !ok || len(entry.Resources) == 0 {
-					return resource.RelatedCheckResult{Count: 0}
+					return resource.KnownRelated("", nil, false)
 				}
-				return resource.RelatedCheckResult{Count: len(entry.Resources), ResourceIDs: []string{entry.Resources[0].ID}}
+				return resource.KnownRelated("", []string{entry.Resources[0].ID}, false)
 			},
 		},
 		{
@@ -89,9 +89,9 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[typeY]
 				if !ok || len(entry.Resources) == 0 {
-					return resource.RelatedCheckResult{Count: 0}
+					return resource.KnownRelated("", nil, false)
 				}
-				return resource.RelatedCheckResult{Count: len(entry.Resources), ResourceIDs: []string{entry.Resources[0].ID}}
+				return resource.KnownRelated("", []string{entry.Resources[0].ID}, false)
 			},
 		},
 		{
@@ -101,9 +101,9 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[typeZ]
 				if !ok || len(entry.Resources) == 0 {
-					return resource.RelatedCheckResult{Count: 0}
+					return resource.KnownRelated("", nil, false)
 				}
-				return resource.RelatedCheckResult{Count: len(entry.Resources), ResourceIDs: []string{entry.Resources[0].ID}}
+				return resource.KnownRelated("", []string{entry.Resources[0].ID}, false)
 			},
 		},
 	})
@@ -137,7 +137,7 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 	results := make(map[string]messages.RelatedCheckResult)
 	for _, leaf := range extractLeafMsgs(batchCmd) {
 		if r, ok := leaf.(messages.RelatedCheckResult); ok {
-			results[r.Result.TargetType] = r
+			results[r.Result.TargetType()] = r
 		}
 	}
 
@@ -156,11 +156,11 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 			t.Errorf("no RelatedCheckResultMsg for target type %q — checker did not run", tc.targetType)
 			continue
 		}
-		if r.Result.Count != 1 {
-			t.Errorf("target %q: expected Count=1 (isolated cold-cache fetch), got Count=%d", tc.targetType, r.Result.Count)
+		if r.Result.Count() != 1 {
+			t.Errorf("target %q: expected Count=1 (isolated cold-cache fetch), got Count=%d", tc.targetType, r.Result.Count())
 		}
-		if len(r.Result.ResourceIDs) != 1 || r.Result.ResourceIDs[0] != tc.wantID {
-			t.Errorf("target %q: expected ResourceIDs=[%q], got %v", tc.targetType, tc.wantID, r.Result.ResourceIDs)
+		if len(r.Result.ResourceIDs()) != 1 || r.Result.ResourceIDs()[0] != tc.wantID {
+			t.Errorf("target %q: expected ResourceIDs=[%q], got %v", tc.targetType, tc.wantID, r.Result.ResourceIDs())
 		}
 	}
 }

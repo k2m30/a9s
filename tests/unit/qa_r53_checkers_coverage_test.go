@@ -118,14 +118,14 @@ func TestR53_CanonicalDNS_TrailingDot(t *testing.T) {
 	source := resource.Resource{ID: "Z1EXAMPLE", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.TargetType != "apigw" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "apigw")
+	if result.TargetType() != "apigw" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "apigw")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (trailing dot + uppercase must be normalized)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (trailing dot + uppercase must be normalized)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != apiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, apiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != apiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
 	}
 }
 
@@ -152,8 +152,8 @@ func TestR53_CanonicalDNS_EmptyDNSName(t *testing.T) {
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
 	// No alias DNS names → Count:0, not -1.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no alias records)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no alias records)", result.Count())
 	}
 }
 
@@ -195,14 +195,14 @@ func TestRelated_R53_APIGW_Match(t *testing.T) {
 	source := resource.Resource{ID: "Z2APIGWTEST", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.TargetType != "apigw" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "apigw")
+	if result.TargetType() != "apigw" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "apigw")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != apiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, apiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != apiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
 	}
 }
 
@@ -236,8 +236,8 @@ func TestRelated_R53_APIGW_NoMatch(t *testing.T) {
 	source := resource.Resource{ID: "Z3NOAPI", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (alias does not point at execute-api domain)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (alias does not point at execute-api domain)", result.Count())
 	}
 }
 
@@ -247,8 +247,8 @@ func TestRelated_R53_APIGW_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "Z4NILCLIENTS", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count())
 	}
 }
 
@@ -257,8 +257,8 @@ func TestRelated_R53_APIGW_EmptyID(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count())
 	}
 }
 
@@ -293,11 +293,11 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	source := resource.Resource{ID: "Z5NILLIST", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (nil cache list → IDs from DNS hostname)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (nil cache list → IDs from DNS hostname)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != apiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, apiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != apiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
 	}
 }
 
@@ -339,14 +339,14 @@ func TestRelated_R53_S3_Match(t *testing.T) {
 	source := resource.Resource{ID: "Z6S3TEST", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.TargetType != "s3" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "s3")
+	if result.TargetType() != "s3" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "s3")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != bucketName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bucketName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != bucketName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), bucketName)
 	}
 }
 
@@ -384,11 +384,11 @@ func TestRelated_R53_S3_NewStyleEndpoint(t *testing.T) {
 	source := resource.Resource{ID: "Z7S3NEW", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (new-style s3-website endpoint)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (new-style s3-website endpoint)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != bucketName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bucketName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != bucketName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), bucketName)
 	}
 }
 
@@ -419,8 +419,8 @@ func TestRelated_R53_S3_NoMatch(t *testing.T) {
 	source := resource.Resource{ID: "Z8NOS3", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (alias not pointing at s3-website endpoint)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (alias not pointing at s3-website endpoint)", result.Count())
 	}
 }
 
@@ -430,8 +430,8 @@ func TestRelated_R53_S3_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "Z9NILS3", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil clients → errClientMissing)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil clients → errClientMissing)", result.State())
 	}
 }
 
@@ -440,8 +440,8 @@ func TestRelated_R53_S3_EmptyID(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count())
 	}
 }
 
@@ -456,11 +456,11 @@ func TestRelated_R53_Logs_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "ZALOGS123", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.TargetType != "logs" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "logs")
+	if result.TargetType() != "logs" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "logs")
 	}
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (ListQueryLoggingConfigs not yet wired)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (ListQueryLoggingConfigs not yet wired)", result.Count())
 	}
 }
 
@@ -469,8 +469,8 @@ func TestRelated_R53_Logs_EmptyID(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count())
 	}
 }
 
@@ -500,19 +500,19 @@ func TestRelated_R53_VPC_PrivateZone_Match(t *testing.T) {
 	}
 	result := r53CheckerByTarget(t, "vpc")(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	// ResourceIDs are sorted by relatedResult.
 	wantIDs := []string{"vpc-0a1b2c3d4e5f00001", "vpc-0a1b2c3d4e5f00002"}
 	for i, id := range wantIDs {
-		if i >= len(result.ResourceIDs) || result.ResourceIDs[i] != id {
+		if i >= len(result.ResourceIDs()) || result.ResourceIDs()[i] != id {
 			t.Errorf("ResourceIDs[%d] = %q, want %q", i, func() string {
-				if i < len(result.ResourceIDs) {
-					return result.ResourceIDs[i]
+				if i < len(result.ResourceIDs()) {
+					return result.ResourceIDs()[i]
 				}
 				return "<missing>"
 			}(), id)
@@ -543,8 +543,8 @@ func TestRelated_R53_VPC_PublicZone_ReturnsZero(t *testing.T) {
 	}
 	result := r53CheckerByTarget(t, "vpc")(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (public zone has no VPC associations)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (public zone has no VPC associations)", result.Count())
 	}
 }
 
@@ -556,8 +556,8 @@ func TestRelated_R53_VPC_PrivateZone_NilClients(t *testing.T) {
 	}
 	result := r53CheckerByTarget(t, "vpc")(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → Route53 not initialized)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients → Route53 not initialized)", result.Count())
 	}
 }
 
@@ -569,8 +569,8 @@ func TestRelated_R53_VPC_EmptyID(t *testing.T) {
 	}
 	result := r53CheckerByTarget(t, "vpc")(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count())
 	}
 }
 
@@ -594,8 +594,8 @@ func TestRelated_R53_VPC_DuplicateVPCIDs(t *testing.T) {
 	}
 	result := r53CheckerByTarget(t, "vpc")(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (duplicates must be deduplicated)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (duplicates must be deduplicated)", result.Count())
 	}
 }
 
@@ -641,11 +641,11 @@ func TestRelated_R53_APIGW_MultipleRecords_OnlyAPIDNSMatches(t *testing.T) {
 	source := resource.Resource{ID: "ZMULTI", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only APIGW alias should match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only APIGW alias should match)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != apiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, apiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != apiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
 	}
 }
 
@@ -690,14 +690,14 @@ func TestRelated_R53_ELB_Match(t *testing.T) {
 	source := resource.Resource{ID: "ZELB001", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.TargetType != "elb" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	if result.TargetType() != "elb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "elb")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != elbID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, elbID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != elbID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), elbID)
 	}
 }
 
@@ -736,11 +736,11 @@ func TestRelated_R53_ELB_DualstackPrefix(t *testing.T) {
 	source := resource.Resource{ID: "ZELB002", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (dualstack. prefix must match unprefixed dns_name)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (dualstack. prefix must match unprefixed dns_name)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != elbID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, elbID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != elbID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), elbID)
 	}
 }
 
@@ -772,8 +772,8 @@ func TestRelated_R53_ELB_NoMatch(t *testing.T) {
 	source := resource.Resource{ID: "ZELB003", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (alias does not point at .elb.amazonaws.com)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (alias does not point at .elb.amazonaws.com)", result.Count())
 	}
 }
 
@@ -783,8 +783,8 @@ func TestRelated_R53_ELB_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "ZELB004", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count())
 	}
 }
 
@@ -831,14 +831,14 @@ func TestRelated_R53_CF_Match(t *testing.T) {
 	source := resource.Resource{ID: "ZCF001", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.TargetType != "cf" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	if result.TargetType() != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cf")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != cfID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, cfID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != cfID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), cfID)
 	}
 }
 
@@ -870,8 +870,8 @@ func TestRelated_R53_CF_NoMatch(t *testing.T) {
 	source := resource.Resource{ID: "ZCF002", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (alias does not point at .cloudfront.net)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (alias does not point at .cloudfront.net)", result.Count())
 	}
 }
 
@@ -881,8 +881,8 @@ func TestRelated_R53_CF_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "ZCF003", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count())
 	}
 }
 
@@ -915,15 +915,15 @@ func TestRelated_R53_ACM_Match(t *testing.T) {
 	source := resource.Resource{ID: "ZACM001", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.TargetType != "acm" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
+	if result.TargetType() != "acm" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "acm")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	// The record name (minus trailing dot) is used as the ID.
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "_acmchallenge.example.com" {
-		t.Errorf("ResourceIDs = %v, want [_acmchallenge.example.com]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "_acmchallenge.example.com" {
+		t.Errorf("ResourceIDs = %v, want [_acmchallenge.example.com]", result.ResourceIDs())
 	}
 }
 
@@ -956,18 +956,18 @@ func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
 	source := resource.Resource{ID: "ZACM002", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two distinct validation records)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two distinct validation records)", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	if !seen["_cert1.example.com"] {
-		t.Errorf("ResourceIDs missing _cert1.example.com; got %v", result.ResourceIDs)
+		t.Errorf("ResourceIDs missing _cert1.example.com; got %v", result.ResourceIDs())
 	}
 	if !seen["_cert2.example.com"] {
-		t.Errorf("ResourceIDs missing _cert2.example.com; got %v", result.ResourceIDs)
+		t.Errorf("ResourceIDs missing _cert2.example.com; got %v", result.ResourceIDs())
 	}
 }
 
@@ -1002,8 +1002,8 @@ func TestRelated_R53_ACM_NonACMCNAMEIgnored(t *testing.T) {
 	source := resource.Resource{ID: "ZACM003", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (non-ACM CNAMEs must not be counted)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (non-ACM CNAMEs must not be counted)", result.Count())
 	}
 }
 
@@ -1013,7 +1013,7 @@ func TestRelated_R53_ACM_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "ZACM004", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count())
 	}
 }

@@ -24,7 +24,7 @@ import (
 func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := res.ID
 	if svcName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	evList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -54,7 +54,7 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := res.ID
 	if svcName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 	taskList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -84,7 +84,7 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("subnet")
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, s := range raw.NetworkConfiguration.AwsvpcConfiguration.Subnets {
@@ -100,14 +100,14 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	subnetIDs := raw.NetworkConfiguration.AwsvpcConfiguration.Subnets
 	if len(subnetIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	subnetList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "subnet")
 	if err != nil {
@@ -143,7 +143,7 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := res.ID
 	if svcName == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	clusterName := res.Fields["cluster"]
 
@@ -165,9 +165,7 @@ func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache re
 			ids = append(ids, ruleRes.ID)
 		}
 	}
-	result := relatedResult("eb-rule", ids)
-	result.Truncated = entry.IsTruncated
-	return result
+	return relatedResultTrunc("eb-rule", ids, entry.IsTruncated)
 }
 
 // ecsSvcEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecs"]
@@ -238,7 +236,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.UnknownRelated("ecr")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+		return resource.KnownRelated("ecr", nil, false)
 	}
 	taskDefARN := *raw.TaskDefinition
 
@@ -290,7 +288,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+		return resource.KnownRelated("ecr", nil, false)
 	}
 	return relatedResult("ecr", ids)
 }
@@ -306,7 +304,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("secrets")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	taskDefARN := *raw.TaskDefinition
 
@@ -354,7 +352,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	return relatedResult("secrets", ids)
 }
@@ -367,14 +365,14 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 // NeedsTargetCache: true.
 func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+		return resource.KnownRelated("sfn", nil, false)
 	}
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("sfn")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+		return resource.KnownRelated("sfn", nil, false)
 	}
 
 	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
@@ -384,7 +382,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		taskDefFamily = taskDefFamily[:idx]
 	}
 	if taskDefFamily == "" {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+		return resource.KnownRelated("sfn", nil, false)
 	}
 
 	entry, ok := cache["sfn"]
@@ -411,10 +409,17 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, sfnRes.ID)
 		}
 	}
-	result := relatedResult("sfn", ids)
-	result.Truncated = entry.IsTruncated
-	result.Err = AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources))
-	return result
+	if len(ids) == 0 && !entry.IsTruncated {
+		// Nothing was confirmed and the sfn cache page was complete: any
+		// failures here are a plain fetch failure, not a truncation signal.
+		if aggErr := AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources)); aggErr != nil {
+			return resource.ErrorRelated("sfn", aggErr)
+		}
+	}
+	// Some DescribeStateMachine calls may have failed: ids is a proven subset,
+	// not necessarily exhaustive. Truncated (not Errored) keeps the row
+	// actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("sfn", ids, entry.IsTruncated || len(failures) > 0)
 }
 
 // sfnASLHasECSFamily walks an ASL definition JSON and returns true if any Task state

@@ -46,8 +46,8 @@ func TestRelated_KMS_Role_NilClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// nil clients → guard fires: Count=-1
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil KMS client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil KMS client)", result.Count())
 	}
 }
 
@@ -61,8 +61,8 @@ func TestRelated_KMS_Role_EmptyKeyID(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// empty key ID → Count=0 (no key → no roles)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty key ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty key ID)", result.Count())
 	}
 }
 
@@ -85,8 +85,8 @@ func TestRelated_DBC_Subnet_NilClientsW5(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// nil clients → dbcSubnetGroup returns nil → Count=-1
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count())
 	}
 }
 
@@ -99,8 +99,8 @@ func TestRelated_DBC_Subnet_WrongRawStruct(t *testing.T) {
 	}
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -117,8 +117,8 @@ func TestRelated_DBC_Subnet_NoSubnetGroup(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// no DBSubnetGroup → dbcSubnetGroup returns nil → Count=-1
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no DBSubnetGroup name)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no DBSubnetGroup name)", result.Count())
 	}
 }
 
@@ -140,11 +140,11 @@ func TestRelated_VPC_ENI_FieldMatch(t *testing.T) {
 	}
 	checker := vpcCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (eni vpc_id matches)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (eni vpc_id matches)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eni-aabbccdd" {
-		t.Errorf("ResourceIDs = %v, want [eni-aabbccdd]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eni-aabbccdd" {
+		t.Errorf("ResourceIDs = %v, want [eni-aabbccdd]", result.ResourceIDs())
 	}
 }
 
@@ -165,8 +165,8 @@ func TestRelated_VPC_ENI_RawStructMatch(t *testing.T) {
 	}
 	checker := vpcCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (RawStruct VpcId match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (RawStruct VpcId match)", result.Count())
 	}
 }
 
@@ -184,8 +184,8 @@ func TestRelated_VPC_ENI_NoMatch(t *testing.T) {
 	}
 	checker := vpcCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different VPC)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different VPC)", result.Count())
 	}
 }
 
@@ -201,8 +201,8 @@ func TestRelated_VPC_ENI_EmptyVPCID(t *testing.T) {
 	}
 	checker := vpcCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count())
 	}
 }
 
@@ -213,8 +213,8 @@ func TestRelated_VPC_TGW_NilClients(t *testing.T) {
 	checker := vpcCheckerByTarget(t, "tgw")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 	// nil clients → Count=-1
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil EC2 client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil EC2 client)", result.Count())
 	}
 }
 
@@ -230,8 +230,8 @@ func TestRelated_VPC_TGW_EmptyVPCID(t *testing.T) {
 	}
 	checker := vpcCheckerByTarget(t, "tgw")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count())
 	}
 }
 
@@ -256,8 +256,8 @@ func TestRelated_Lambda_SQS_NilClientFromIDField(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil Lambda client, ID-path name extraction)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil Lambda client, ID-path name extraction)", result.Count())
 	}
 }
 
@@ -275,8 +275,8 @@ func TestRelated_Lambda_CFN_NilClientWithARN(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// nil Lambda client → cannot call ListTags → Count=-1
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil Lambda client, has ARN)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil Lambda client, has ARN)", result.Count())
 	}
 }
 
@@ -294,8 +294,8 @@ func TestRelated_Lambda_EBRule_NilClientWithName(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// nil EventBridge client → Count=-1 (targets are only accessible via live API)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil EventBridge client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil EventBridge client)", result.Count())
 	}
 }
 
@@ -314,8 +314,8 @@ func TestRelated_EFS_Lambda_EmptyFSID(t *testing.T) {
 	}
 	checker := efsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty filesystem ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty filesystem ID)", result.Count())
 	}
 }
 
@@ -332,8 +332,8 @@ func TestRelated_EFS_Lambda_NilClients(t *testing.T) {
 	checker := efsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// nil EFS client → Count=-1 (cannot resolve access points)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil EFS client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil EFS client)", result.Count())
 	}
 }
 

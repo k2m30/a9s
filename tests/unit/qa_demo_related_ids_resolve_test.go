@@ -87,11 +87,11 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 
 			for _, res := range fixtures {
 				result := def.Checker(ctx, clients, res, cache)
-				if result.Count <= 0 || len(result.ResourceIDs) == 0 {
+				if result.Count() <= 0 || len(result.ResourceIDs()) == 0 {
 					continue
 				}
 
-				for _, id := range result.ResourceIDs {
+				for _, id := range result.ResourceIDs() {
 					resolved, err := fn(ctx, clients, []string{id})
 					if err != nil {
 						orphans = append(orphans, fmt.Sprintf(

@@ -40,16 +40,14 @@ func BuildCTEventsPivotChecker(cfg CTEventsPivotConfig) resource.RelatedChecker 
 	return func(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 		id := cfg.IDExtractor(res)
 		if id == "" {
-			return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+			return resource.KnownRelated("ct-events", nil, false)
 		}
 
 		fetchFilter := map[string]string{"ResourceName": id}
 
 		eventList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "ct-events")
 		if err != nil {
-			r := resource.ErrorRelated("ct-events", err)
-			r.FetchFilter = fetchFilter
-			return r
+			return resource.ErrorRelated("ct-events", err).WithFetchFilter(fetchFilter)
 		}
 		if eventList == nil {
 			return resource.DeferredRelated("ct-events", fetchFilter)
@@ -80,8 +78,6 @@ func BuildCTEventsPivotChecker(cfg CTEventsPivotConfig) resource.RelatedChecker 
 			return resource.DeferredRelated("ct-events", fetchFilter)
 		}
 
-		result := relatedResult("ct-events", ids)
-		result.FetchFilter = fetchFilter
-		return result
+		return relatedResult("ct-events", ids).WithFetchFilter(fetchFilter)
 	}
 }

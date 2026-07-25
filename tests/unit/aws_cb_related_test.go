@@ -91,14 +91,14 @@ func TestRelated_CB_Role_MatchByServiceRole(t *testing.T) {
 	checker := cbCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "codebuild-role" {
-		t.Errorf("ResourceIDs = %v, want [codebuild-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "codebuild-role" {
+		t.Errorf("ResourceIDs = %v, want [codebuild-role]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -123,8 +123,8 @@ func TestRelated_CB_Role_NoMatch(t *testing.T) {
 	checker := cbCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count())
 	}
 }
 
@@ -149,8 +149,8 @@ func TestRelated_CB_Role_NilServiceRole(t *testing.T) {
 	checker := cbCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil ServiceRole)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil ServiceRole)", result.Count())
 	}
 }
 
@@ -168,8 +168,8 @@ func TestRelated_CB_Role_NilCache(t *testing.T) {
 	checker := cbCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
 
@@ -199,14 +199,14 @@ func TestRelated_CB_Logs_MatchByExplicitGroupName(t *testing.T) {
 	checker := cbCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/custom/my-logs" {
-		t.Errorf("ResourceIDs = %v, want [/custom/my-logs]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/custom/my-logs" {
+		t.Errorf("ResourceIDs = %v, want [/custom/my-logs]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -228,14 +228,14 @@ func TestRelated_CB_Logs_MatchByNamingConvention(t *testing.T) {
 	checker := cbCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/codebuild/my-project" {
-		t.Errorf("ResourceIDs = %v, want [/aws/codebuild/my-project]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/codebuild/my-project" {
+		t.Errorf("ResourceIDs = %v, want [/aws/codebuild/my-project]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -257,8 +257,8 @@ func TestRelated_CB_Logs_NoMatch(t *testing.T) {
 	checker := cbCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -274,8 +274,8 @@ func TestRelated_CB_Logs_NilCache(t *testing.T) {
 	checker := cbCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
 
@@ -302,11 +302,11 @@ func TestRelated_CB_Pipeline_ReturnsUnknown(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (undeterminable — pipeline cache lacks stages)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (undeterminable — pipeline cache lacks stages)", result.Count())
 	}
-	if result.TargetType != "pipeline" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "pipeline")
+	if result.TargetType() != "pipeline" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "pipeline")
 	}
 }
 
@@ -327,8 +327,8 @@ func TestRelated_CB_SG_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -341,8 +341,8 @@ func TestRelated_CB_SG_NoVPCConfig(t *testing.T) {
 	checker := cbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count())
 	}
 }
 
@@ -355,8 +355,8 @@ func TestRelated_CB_SG_WrongRawStruct(t *testing.T) {
 	checker := cbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -377,11 +377,11 @@ func TestRelated_CB_VPC_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -394,8 +394,8 @@ func TestRelated_CB_VPC_NoVPCConfig(t *testing.T) {
 	checker := cbCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count())
 	}
 }
 
@@ -414,11 +414,11 @@ func TestRelated_CB_KMS_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "a1b2c3d4-5678-abcd-ef01-234567890abc" {
-		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-abcd-ef01-234567890abc]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "a1b2c3d4-5678-abcd-ef01-234567890abc" {
+		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-abcd-ef01-234567890abc]", result.ResourceIDs())
 	}
 }
 
@@ -431,8 +431,8 @@ func TestRelated_CB_KMS_NoKey(t *testing.T) {
 	checker := cbCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no EncryptionKey)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionKey)", result.Count())
 	}
 }
 
@@ -453,8 +453,8 @@ func TestRelated_CB_Subnet_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -467,8 +467,8 @@ func TestRelated_CB_Subnet_NoVPCConfig(t *testing.T) {
 	checker := cbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count())
 	}
 }
 
@@ -500,11 +500,11 @@ func TestRelated_CB_Alarm_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "cb-build-failures" {
-		t.Errorf("ResourceIDs = %v, want [cb-build-failures]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "cb-build-failures" {
+		t.Errorf("ResourceIDs = %v, want [cb-build-failures]", result.ResourceIDs())
 	}
 }
 
@@ -531,8 +531,8 @@ func TestRelated_CB_Alarm_WrongNamespace(t *testing.T) {
 	checker := cbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong Namespace)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong Namespace)", result.Count())
 	}
 }
 
@@ -545,8 +545,8 @@ func TestRelated_CB_Alarm_NilCache(t *testing.T) {
 	checker := cbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
 
@@ -574,11 +574,11 @@ func TestRelated_CB_ECR_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != repoName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, repoName)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != repoName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), repoName)
 	}
 }
 
@@ -596,8 +596,8 @@ func TestRelated_CB_ECR_NonECRImage(t *testing.T) {
 	checker := cbCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (non-ECR image)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (non-ECR image)", result.Count())
 	}
 }
 
@@ -625,8 +625,8 @@ func TestRelated_CB_S3_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -644,8 +644,8 @@ func TestRelated_CB_S3_NoS3Artifacts(t *testing.T) {
 	checker := cbCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no S3 artifacts)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no S3 artifacts)", result.Count())
 	}
 }
 
@@ -673,11 +673,11 @@ func TestRelated_CB_Secrets_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "prod/db/password" {
-		t.Errorf("ResourceIDs = %v, want [prod/db/password]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "prod/db/password" {
+		t.Errorf("ResourceIDs = %v, want [prod/db/password]", result.ResourceIDs())
 	}
 }
 
@@ -697,8 +697,8 @@ func TestRelated_CB_Secrets_NoSecretsVars(t *testing.T) {
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SECRETS_MANAGER vars)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no SECRETS_MANAGER vars)", result.Count())
 	}
 }
 
@@ -726,11 +726,11 @@ func TestRelated_CB_SSM_Match(t *testing.T) {
 	checker := cbCheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "/prod/api/key" {
-		t.Errorf("ResourceIDs = %v, want [/prod/api/key]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "/prod/api/key" {
+		t.Errorf("ResourceIDs = %v, want [/prod/api/key]", result.ResourceIDs())
 	}
 }
 
@@ -744,7 +744,7 @@ func TestRelated_CB_SSM_NoSSMVars(t *testing.T) {
 	checker := cbCheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no PARAMETER_STORE vars)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no PARAMETER_STORE vars)", result.Count())
 	}
 }

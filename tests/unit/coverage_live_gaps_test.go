@@ -456,7 +456,7 @@ func TestLiveGap_SetReapplyChecker_RegistersCheckerAndActivatesZeroMatchFilter(t
 				ids = append(ids, r.ID)
 			}
 		}
-		return resource.RelatedCheckResult{TargetType: "ec2", ResourceIDs: ids}
+		return resource.KnownRelated("ec2", ids, false)
 	}
 
 	m.SetReapplyChecker(checker, resource.Resource{ID: "vpc-source"})
@@ -504,7 +504,7 @@ func TestLiveGap_SetReapplyChecker_NilCheckerLeavesRelatedIDSetUntouched(t *test
 				ids = append(ids, r.ID)
 			}
 		}
-		return resource.RelatedCheckResult{TargetType: "ec2", ResourceIDs: ids}
+		return resource.KnownRelated("ec2", ids, false)
 	}
 	m.SetReapplyChecker(checker, resource.Resource{ID: "vpc-source"})
 	ctrl.ApplyReapplyCheckerAgainst(resources)
@@ -551,11 +551,7 @@ func TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesU
 		ResourceType:     "ec2",
 		SourceResourceID: ec2TestResource().ID,
 		DefDisplayName:   "Security Groups",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "sg",
-			Count:       1,
-			ResourceIDs: []string{"sg-0aaa111111111111a"},
-		},
+		Result:           resource.KnownRelated("sg", []string{"sg-0aaa111111111111a"}, false),
 	})
 
 	// 'l' (ScrollRight) focuses the right column via ActionToggleFocus.
@@ -627,21 +623,13 @@ func relatedFilterGapModel(t *testing.T, extraKeys ...tea.KeyMsg) tui.Model {
 		ResourceType:     "ec2",
 		SourceResourceID: ec2TestResource().ID,
 		DefDisplayName:   "Target Groups",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       1,
-			ResourceIDs: []string{"tg-web-prod-01"},
-		},
+		Result:           resource.KnownRelated("tg", []string{"tg-web-prod-01"}, false),
 	})
 	m, _ = chainApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: ec2TestResource().ID,
 		DefDisplayName:   "Auto Scaling Groups",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "asg",
-			Count:       1,
-			ResourceIDs: []string{"asg-web-prod-01"},
-		},
+		Result:           resource.KnownRelated("asg", []string{"asg-web-prod-01"}, false),
 	})
 
 	m, _ = chainApplyMsg(m, livegapKey("l")) // ScrollRight: focuses the right column

@@ -135,8 +135,8 @@ func TestRelated_MWAA_GraphRootCounts(t *testing.T) {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "mwaa", tc.target)
 			result := checker(context.Background(), nil, res, resource.ResourceCache{})
-			if result.Count != tc.want {
-				t.Errorf("Count = %d, want %d (%s)", result.Count, tc.want, tc.field)
+			if result.Count() != tc.want {
+				t.Errorf("Count = %d, want %d (%s)", result.Count(), tc.want, tc.field)
 			}
 		})
 	}
@@ -176,11 +176,11 @@ func TestRelated_MWAA_Alarm_MatchesByEnvironmentNameDimension(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Fatalf("ResourceIDs = %v, want 2 entries", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Fatalf("ResourceIDs = %v, want 2 entries", result.ResourceIDs())
 	}
 }
 
@@ -190,11 +190,11 @@ func TestRelated_MWAA_Alarm_ColdCache_NoErr(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil — a cold cache renders a blank navigable row, not an error state", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil — a cold cache renders a blank navigable row, not an error state", result.Err())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cold cache)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (cold cache)", result.Count())
 	}
 }
 
@@ -224,7 +224,7 @@ func TestRelated_MWAA_Alarm_LiveFetchErrorSurfacesErr(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatch: &mwaaFailingCloudWatchFake{}}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Fatal("mwaa alarm checker must surface Err when the alarm list must be live-fetched (cache miss) " +
 			"and DescribeAlarms fails")
 	}
@@ -241,11 +241,11 @@ func TestRelated_MWAA_CtEvents_Drillable(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedDeferred {
+	if result.State() != domain.RelatedDeferred {
 		t.Errorf("State = %v, want RelatedDeferred (ct-events is a universal server-side pivot, "+
-			"drillable by resource name)", result.State)
+			"drillable by resource name)", result.State())
 	}
-	if len(result.FetchFilter) == 0 {
+	if len(result.FetchFilter()) == 0 {
 		t.Error("FetchFilter is empty, want a CloudTrail LookupEvents filter keyed on the environment name")
 	}
 }

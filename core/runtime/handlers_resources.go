@@ -403,9 +403,9 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 			IsError: true,
 		})
 	}
-	if ev.Result.Err != nil {
+	if err := ev.Result.Err(); err != nil {
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("related %s: %v", ev.Result.TargetType, ev.Result.Err),
+			Text:    fmt.Sprintf("related %s: %v", ev.Result.TargetType(), err),
 			IsError: true,
 		})
 	}

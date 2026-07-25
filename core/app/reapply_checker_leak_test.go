@@ -33,7 +33,7 @@ func TestReapplyChecker_NotLeakedToNormalListAfterPop(t *testing.T) {
 	}})
 	c.ensureListState()
 	subset := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-		return resource.RelatedCheckResult{TargetType: "sg", ResourceIDs: []string{"sg-a"}}
+		return resource.KnownRelated("sg", []string{"sg-a"}, false)
 	}
 	c.PatchListReapplyChecker(subset, resource.Resource{ID: "vpc-1"})
 

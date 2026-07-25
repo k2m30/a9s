@@ -134,13 +134,13 @@ func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
 	for _, target := range targets {
 		checker := ec2CheckerByTarget(t, target)
 		got := checker(context.Background(), nil, instance, cache)
-		if got.Count < 0 {
+		if got.Count() < 0 {
 			t.Fatalf("%s checker returned unknown count: %+v", target, got)
 		}
-		if got.Count == 0 {
+		if got.Count() == 0 {
 			t.Fatalf("%s checker returned zero count with matching fixture cache: %+v", target, got)
 		}
-		if len(got.ResourceIDs) == 0 {
+		if len(got.ResourceIDs()) == 0 {
 			t.Fatalf("%s checker returned empty ResourceIDs with positive count: %+v", target, got)
 		}
 	}
@@ -214,15 +214,15 @@ func TestEC2RelatedCheckers_EBS_MatchesVolumeIDs(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 2 {
-		t.Errorf("checkEC2EBS: expected count=2, got %d", got.Count)
+	if got.Count() != 2 {
+		t.Errorf("checkEC2EBS: expected count=2, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 2 {
-		t.Errorf("checkEC2EBS: expected 2 ResourceIDs, got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 2 {
+		t.Errorf("checkEC2EBS: expected 2 ResourceIDs, got %v", got.ResourceIDs())
 	}
 	// ResourceIDs should be sorted
-	if got.ResourceIDs[0] != "vol-abc" || got.ResourceIDs[1] != "vol-def" {
-		t.Errorf("checkEC2EBS: expected sorted [vol-abc, vol-def], got %v", got.ResourceIDs)
+	if got.ResourceIDs()[0] != "vol-abc" || got.ResourceIDs()[1] != "vol-def" {
+		t.Errorf("checkEC2EBS: expected sorted [vol-abc, vol-def], got %v", got.ResourceIDs())
 	}
 }
 
@@ -238,11 +238,11 @@ func TestEC2RelatedCheckers_EBS_NoVolumes(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 0 {
-		t.Errorf("checkEC2EBS with empty BlockDeviceMappings: expected count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("checkEC2EBS with empty BlockDeviceMappings: expected count=0, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 0 {
-		t.Errorf("checkEC2EBS with empty BlockDeviceMappings: expected no ResourceIDs, got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 0 {
+		t.Errorf("checkEC2EBS with empty BlockDeviceMappings: expected no ResourceIDs, got %v", got.ResourceIDs())
 	}
 }
 
@@ -261,8 +261,8 @@ func TestEC2RelatedCheckers_EBS_NilEbs(t *testing.T) {
 	// Must not panic
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 0 {
-		t.Errorf("checkEC2EBS with nil Ebs: expected count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("checkEC2EBS with nil Ebs: expected count=0, got %d", got.Count())
 	}
 }
 
@@ -280,8 +280,8 @@ func TestEC2RelatedCheckers_EBS_NilVolumeId(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 0 {
-		t.Errorf("checkEC2EBS with nil VolumeId: expected count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("checkEC2EBS with nil VolumeId: expected count=0, got %d", got.Count())
 	}
 }
 
@@ -299,11 +299,11 @@ func TestEC2RelatedCheckers_EBS_SingleVolume(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 1 {
-		t.Errorf("checkEC2EBS single volume: expected count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("checkEC2EBS single volume: expected count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "vol-only" {
-		t.Errorf("checkEC2EBS single volume: expected ResourceIDs=[vol-only], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "vol-only" {
+		t.Errorf("checkEC2EBS single volume: expected ResourceIDs=[vol-only], got %v", got.ResourceIDs())
 	}
 }
 
@@ -323,8 +323,8 @@ func TestEC2RelatedCheckers_EBS_DeduplicatesVolumeIDs(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 1 {
-		t.Errorf("checkEC2EBS should deduplicate volume IDs; expected count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("checkEC2EBS should deduplicate volume IDs; expected count=1, got %d", got.Count())
 	}
 }
 
@@ -338,8 +338,8 @@ func TestEC2RelatedCheckers_EBS_NonEC2RawStruct(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != 0 {
-		t.Errorf("checkEC2EBS with wrong RawStruct type: expected count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("checkEC2EBS with wrong RawStruct type: expected count=0, got %d", got.Count())
 	}
 }
 
@@ -380,10 +380,10 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	got := checker(context.Background(), nil, instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("alarm checker with truncated cache and 0 matches: want Truncated=true, got false")
 	}
 }
@@ -476,8 +476,8 @@ func TestRelated_EC2_TG_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -504,8 +504,8 @@ func TestRelated_EC2_TG_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -521,8 +521,8 @@ func TestRelated_EC2_TG_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -535,8 +535,8 @@ func TestRelated_EC2_TG_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count())
 	}
 }
 
@@ -565,8 +565,8 @@ func TestRelated_EC2_ASG_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -591,8 +591,8 @@ func TestRelated_EC2_ASG_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -607,8 +607,8 @@ func TestRelated_EC2_ASG_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -621,8 +621,8 @@ func TestRelated_EC2_ASG_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count())
 	}
 }
 
@@ -653,8 +653,8 @@ func TestRelated_EC2_Alarm_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -681,8 +681,8 @@ func TestRelated_EC2_Alarm_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -697,8 +697,8 @@ func TestRelated_EC2_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -711,8 +711,8 @@ func TestRelated_EC2_Alarm_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count())
 	}
 }
 
@@ -744,8 +744,8 @@ func TestRelated_EC2_CFN_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -773,8 +773,8 @@ func TestRelated_EC2_CFN_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -792,8 +792,8 @@ func TestRelated_EC2_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -807,8 +807,8 @@ func TestRelated_EC2_CFN_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for instance with no CFN stack tag", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for instance with no CFN stack tag", result.Count())
 	}
 }
 
@@ -837,8 +837,8 @@ func TestRelated_EC2_EIP_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -863,8 +863,8 @@ func TestRelated_EC2_EIP_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -879,8 +879,8 @@ func TestRelated_EC2_EIP_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -893,8 +893,8 @@ func TestRelated_EC2_EIP_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count())
 	}
 }
 
@@ -926,8 +926,8 @@ func TestRelated_EC2_EBSSnap_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -955,8 +955,8 @@ func TestRelated_EC2_EBSSnap_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -974,8 +974,8 @@ func TestRelated_EC2_EBSSnap_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -989,8 +989,8 @@ func TestRelated_EC2_EBSSnap_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for instance with no volumes", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for instance with no volumes", result.Count())
 	}
 }
 
@@ -1024,8 +1024,8 @@ func TestRelated_EC2_NG_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -1055,8 +1055,8 @@ func TestRelated_EC2_NG_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -1075,8 +1075,8 @@ func TestRelated_EC2_NG_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -1090,8 +1090,8 @@ func TestRelated_EC2_NG_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for instance with no EKS tags", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for instance with no EKS tags", result.Count())
 	}
 }
 
@@ -1122,8 +1122,8 @@ func TestRelated_EC2_CTEvents_Found(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count())
 	}
 }
 
@@ -1150,8 +1150,8 @@ func TestRelated_EC2_CTEvents_NotFound(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, instance, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -1166,8 +1166,8 @@ func TestRelated_EC2_CTEvents_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 
@@ -1180,8 +1180,8 @@ func TestRelated_EC2_CTEvents_EmptySourceID(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count())
 	}
 }
 
@@ -1210,14 +1210,14 @@ func TestRelated_EC2_SSM_Match(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ssm")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0abc1234" {
-		t.Errorf("ResourceIDs = %v, want [i-0abc1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [i-0abc1234]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -1231,8 +1231,8 @@ func TestRelated_EC2_SSM_Empty(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty instance ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty instance ID)", result.Count())
 	}
 }
 
@@ -1247,7 +1247,7 @@ func TestRelated_EC2_SSM_WrongRawStruct(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients, non-Instance RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients, non-Instance RawStruct)", result.Count())
 	}
 }

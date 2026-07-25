@@ -10,11 +10,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// testResults returns a non-nil slice of session.RelatedCacheResult for use as a cache value.
+// testResults returns a non-nil slice of session.RelatedCacheResult for use
+// as a cache value. The result carries exactly count synthetic IDs so
+// Result.Count() == count, matching this helper's old Count-literal behavior.
 func testResults(count int) []session.RelatedCacheResult {
+	ids := make([]string, count)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("ec2-%d", i)
+	}
 	return []session.RelatedCacheResult{{
 		DefDisplayName: "",
-		Result:         resource.RelatedCheckResult{TargetType: "ec2", Count: count},
+		Result:         resource.KnownRelated("ec2", ids, false),
 	}}
 }
 

@@ -85,14 +85,14 @@ func TestRelated_CFN_Role_MatchByRoleARN(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "cfn-exec-role" {
-		t.Errorf("ResourceIDs = %v, want [cfn-exec-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "cfn-exec-role" {
+		t.Errorf("ResourceIDs = %v, want [cfn-exec-role]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -117,8 +117,8 @@ func TestRelated_CFN_Role_NoMatch(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count())
 	}
 }
 
@@ -143,8 +143,8 @@ func TestRelated_CFN_Role_NilRoleARN(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RoleARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RoleARN)", result.Count())
 	}
 }
 
@@ -162,8 +162,8 @@ func TestRelated_CFN_Role_NilCache(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
 
@@ -206,11 +206,11 @@ func TestRelated_CFN_CFN_FindChildStacks(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "child-stack" {
-		t.Errorf("ResourceIDs = %v, want [child-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "child-stack" {
+		t.Errorf("ResourceIDs = %v, want [child-stack]", result.ResourceIDs())
 	}
 }
 
@@ -244,11 +244,11 @@ func TestRelated_CFN_CFN_FindParentStack(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "parent-stack" {
-		t.Errorf("ResourceIDs = %v, want [parent-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "parent-stack" {
+		t.Errorf("ResourceIDs = %v, want [parent-stack]", result.ResourceIDs())
 	}
 }
 
@@ -279,8 +279,8 @@ func TestRelated_CFN_CFN_NoRelated(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -299,8 +299,8 @@ func TestRelated_CFN_CFN_CacheMissNoClients(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -315,8 +315,8 @@ func TestRelated_CFN_CFN_InvalidRawStruct(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for invalid RawStruct", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -338,11 +338,11 @@ func TestRelated_CFN_SNS_FoundARNs(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	found1, found2 := false, false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == arn1 {
 			found1 = true
 		}
@@ -351,7 +351,7 @@ func TestRelated_CFN_SNS_FoundARNs(t *testing.T) {
 		}
 	}
 	if !found1 || !found2 {
-		t.Errorf("ResourceIDs = %v, want both [%s] and [%s]", result.ResourceIDs, arn1, arn2)
+		t.Errorf("ResourceIDs = %v, want both [%s] and [%s]", result.ResourceIDs(), arn1, arn2)
 	}
 }
 
@@ -369,8 +369,8 @@ func TestRelated_CFN_SNS_Empty(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -385,8 +385,8 @@ func TestRelated_CFN_SNS_InvalidRawStruct(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -405,8 +405,8 @@ func TestRelated_CFN_S3_NilClients(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -425,7 +425,7 @@ func TestRelated_CFN_EBRule_NilClients(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }

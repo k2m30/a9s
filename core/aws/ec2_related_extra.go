@@ -21,7 +21,7 @@ func checkEC2AMI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("ami")
 	}
 	if raw.ImageId == nil || *raw.ImageId == "" {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 	return relatedResult("ami", []string{*raw.ImageId})
 }
@@ -50,7 +50,7 @@ func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", []string{*raw.SubnetId})
 }
@@ -61,7 +61,7 @@ func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 
 	ebsList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ebs")
@@ -69,7 +69,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("kms", err)
 	}
 	if ebsList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 
 	keySet := make(map[string]struct{})
@@ -110,7 +110,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	logList, truncated, err := ec2RelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
@@ -141,7 +141,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 
 	tags := map[string]string{}

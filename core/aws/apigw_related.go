@@ -26,7 +26,7 @@ import (
 func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
@@ -79,9 +79,17 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 		}
 	}
 	ids := mapKeys(seen)
-	result := relatedResult("kms", ids)
-	result.Err = AggregateFailures("apigw-related: GetFunction", failures, total)
-	return result
+	if len(ids) == 0 {
+		// Nothing was confirmed: any failures are a plain fetch failure, not
+		// a truncation signal (there is no larger population left unseen).
+		if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil {
+			return resource.ErrorRelated("kms", aggErr)
+		}
+	}
+	// Some GetFunction calls may have failed: ids is a proven subset, not
+	// necessarily exhaustive. Truncated (not Errored) keeps the row
+	// actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("kms", ids, len(failures) > 0)
 }
 
 // checkApigwLogs searches the logs cache for log groups associated with this
@@ -97,7 +105,7 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 		apiName = res.Fields["name"]
 	}
 	if apiID == "" && apiName == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -147,7 +155,7 @@ func apigwListIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
@@ -192,7 +200,7 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _
 func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+		return resource.KnownRelated("acm", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
@@ -250,9 +258,17 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 		}
 	}
 	ids := mapKeys(seen)
-	result := relatedResult("acm", ids)
-	result.Err = AggregateFailures("apigw-related: GetApiMappings", failures, total)
-	return result
+	if len(ids) == 0 {
+		// Nothing was confirmed: any failures are a plain fetch failure, not
+		// a truncation signal (there is no larger population left unseen).
+		if aggErr := AggregateFailures("apigw-related: GetApiMappings", failures, total); aggErr != nil {
+			return resource.ErrorRelated("acm", aggErr)
+		}
+	}
+	// Some GetApiMappings calls may have failed: ids is a proven subset, not
+	// necessarily exhaustive. Truncated (not Errored) keeps the row
+	// actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("acm", ids, len(failures) > 0)
 }
 
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms
@@ -268,7 +284,7 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	suffix := apiID + ".execute-api."
 
@@ -305,7 +321,7 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	items, err := apigwListIntegrations(ctx, clients, apiID)
@@ -328,7 +344,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		vpcLinkIDs = append(vpcLinkIDs, *item.ConnectionId)
 	}
 	if len(vpcLinkIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -380,7 +396,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		nextToken = out.NextToken
 	}
 	if len(wantedSubnets) == 0 && len(wantedSGs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	elbList, truncated, fetchErr := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -430,7 +446,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	seen := make(map[string]struct{})
@@ -445,17 +461,21 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 		}
 	}
 
+	// Every branch below that bails out with only the CredentialsArn-derived
+	// seen set (never having reached GetAuthorizers) reports it as a
+	// truncated lower bound, not an exact count: authorizer-credential roles
+	// may still exist and were never checked.
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
 		if len(seen) > 0 {
-			return relatedResult("role", mapKeys(seen))
+			return relatedResultTrunc("role", mapKeys(seen), true)
 		}
 		return resource.UnknownRelated("role")
 	}
 	authAPI, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
 	if !ok {
 		if len(seen) > 0 {
-			return relatedResult("role", mapKeys(seen))
+			return relatedResultTrunc("role", mapKeys(seen), true)
 		}
 		return resource.UnknownRelated("role")
 	}
@@ -464,7 +484,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 	})
 	if authErr != nil {
 		if len(seen) > 0 {
-			return relatedResult("role", mapKeys(seen))
+			return relatedResultTrunc("role", mapKeys(seen), true)
 		}
 		return resource.ErrorRelated("role", authErr)
 	}

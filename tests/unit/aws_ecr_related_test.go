@@ -99,14 +99,14 @@ func TestRelated_ECR_Lambda_Found(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-image-fn" {
-		t.Errorf("ResourceIDs = %v, want [my-image-fn]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-image-fn" {
+		t.Errorf("ResourceIDs = %v, want [my-image-fn]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -132,8 +132,8 @@ func TestRelated_ECR_Lambda_NotFound(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -146,8 +146,8 @@ func TestRelated_ECR_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -172,8 +172,8 @@ func TestRelated_ECR_Lambda_EmptyURI(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty URI", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty URI", result.Count())
 	}
 }
 
@@ -200,14 +200,14 @@ func TestRelated_ECR_CB_Found(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-build-project" {
-		t.Errorf("ResourceIDs = %v, want [my-build-project]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-build-project" {
+		t.Errorf("ResourceIDs = %v, want [my-build-project]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -232,8 +232,8 @@ func TestRelated_ECR_CB_NotFound(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -246,8 +246,8 @@ func TestRelated_ECR_CB_CacheMissNoClients(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -271,8 +271,8 @@ func TestRelated_ECR_CB_EmptyURI(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty URI", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty URI", result.Count())
 	}
 }
 
@@ -313,14 +313,14 @@ func TestRelated_ECR_CFN_Found(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
-		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 	if fake.calls == 0 {
 		t.Error("ListTagsForResource was never called — checker must fetch tags per open repo")
@@ -351,8 +351,8 @@ func TestRelated_ECR_CFN_NotFound(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -381,8 +381,8 @@ func TestRelated_ECR_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (CFN page-fetch failed)", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (CFN page-fetch failed)", result.State())
 	}
 }
 
@@ -410,8 +410,8 @@ func TestRelated_ECR_CFN_NoCFNTag(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for no CFN tag", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for no CFN tag", result.Count())
 	}
 }
 
@@ -456,14 +456,14 @@ func TestRelated_ECR_EbRule_Match(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != ruleName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, ruleName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != ruleName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), ruleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -489,8 +489,8 @@ func TestRelated_ECR_EbRule_Empty(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (rule references different repo)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (rule references different repo)", result.Count())
 	}
 }
 
@@ -505,8 +505,8 @@ func TestRelated_ECR_EbRule_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -542,14 +542,14 @@ func TestRelated_ECR_Pipeline_Match(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != pipelineName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, pipelineName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != pipelineName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), pipelineName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -583,8 +583,8 @@ func TestRelated_ECR_Pipeline_Empty(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no pipeline references this repo)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no pipeline references this repo)", result.Count())
 	}
 }
 
@@ -599,8 +599,8 @@ func TestRelated_ECR_Pipeline_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -647,21 +647,21 @@ func TestRelated_ECR_Role_Match(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, nil)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	if !seen[role1Name] {
-		t.Errorf("ResourceIDs missing %q; got %v", role1Name, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing %q; got %v", role1Name, result.ResourceIDs())
 	}
 	if !seen[role2Name] {
-		t.Errorf("ResourceIDs missing %q; got %v", role2Name, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing %q; got %v", role2Name, result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -685,8 +685,8 @@ func TestRelated_ECR_Role_Empty(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no policy → no roles)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no policy → no roles)", result.Count())
 	}
 }
 
@@ -701,8 +701,8 @@ func TestRelated_ECR_Role_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -722,8 +722,8 @@ func TestRelated_ECR_Role_NoClient(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no client)", result.Count())
 	}
 }
 
@@ -776,17 +776,17 @@ func TestRelated_ECR_ECSTask_Match(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "api-task:1" {
-		t.Errorf("ResourceIDs = %v, want [api-task:1]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "api-task:1" {
+		t.Errorf("ResourceIDs = %v, want [api-task:1]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
-	if len(result.FetchFilter) != 0 {
-		t.Errorf("FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter)
+	if len(result.FetchFilter()) != 0 {
+		t.Errorf("FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter())
 	}
 }
 
@@ -815,10 +815,10 @@ func TestRelated_ECR_ECSTask_Match_Truncated(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (IsTruncated=true)")
 	}
 }
@@ -847,11 +847,11 @@ func TestRelated_ECR_ECSTask_Empty(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no task references this repo)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no task references this repo)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -880,17 +880,17 @@ func TestRelated_ECR_KMS_Match(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if result.TargetType() != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "kms")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -909,8 +909,8 @@ func TestRelated_ECR_KMS_NoEncryptionConfig(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no EncryptionConfiguration)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionConfiguration)", result.Count())
 	}
 }
 
@@ -925,8 +925,8 @@ func TestRelated_ECR_KMS_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count())
 	}
 }
 
@@ -954,7 +954,7 @@ func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {
 	result := checker(context.Background(), nil, source, cache)
 
 	// checkECRECSTask uses res.ID directly (no assertStruct), so it still matches.
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (checker uses res.ID, not RawStruct)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (checker uses res.ID, not RawStruct)", result.Count())
 	}
 }

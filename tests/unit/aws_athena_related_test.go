@@ -71,11 +71,11 @@ func TestRelated_Athena_S3_Unknown(t *testing.T) {
 	}
 	checker := athenaCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count())
 	}
-	if result.TargetType != "s3" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "s3")
+	if result.TargetType() != "s3" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "s3")
 	}
 }
 
@@ -93,8 +93,8 @@ func TestRelated_Athena_KMS_Unknown(t *testing.T) {
 	}
 	checker := athenaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count())
 	}
 }
 
@@ -119,11 +119,11 @@ func TestRelated_Athena_S3_Match(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-athena-results" {
-		t.Errorf("ResourceIDs = %v, want [my-athena-results]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-athena-results" {
+		t.Errorf("ResourceIDs = %v, want [my-athena-results]", result.ResourceIDs())
 	}
 }
 
@@ -137,8 +137,8 @@ func TestRelated_Athena_S3_NoOutputLocation(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no OutputLocation)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no OutputLocation)", result.Count())
 	}
 }
 
@@ -156,11 +156,11 @@ func TestRelated_Athena_KMS_Match(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
-		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-1234-5678-abcd-111111111111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
+		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-1234-5678-abcd-111111111111]", result.ResourceIDs())
 	}
 }
 
@@ -174,8 +174,8 @@ func TestRelated_Athena_KMS_NoKey(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count())
 	}
 }
 
@@ -193,12 +193,12 @@ func TestRelated_Athena_Logs_CWEnabled(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	want := "/aws/athena/primary"
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != want {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, want)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != want {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), want)
 	}
 }
 
@@ -212,8 +212,8 @@ func TestRelated_Athena_Logs_CWDisabled(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (CW metrics disabled)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (CW metrics disabled)", result.Count())
 	}
 }
 
@@ -231,11 +231,11 @@ func TestRelated_Athena_Role_Match(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "AthenaSparkExecutionRole" {
-		t.Errorf("ResourceIDs = %v, want [AthenaSparkExecutionRole]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "AthenaSparkExecutionRole" {
+		t.Errorf("ResourceIDs = %v, want [AthenaSparkExecutionRole]", result.ResourceIDs())
 	}
 }
 
@@ -249,8 +249,8 @@ func TestRelated_Athena_Role_NoRole(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ExecutionRole)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ExecutionRole)", result.Count())
 	}
 }
 
@@ -269,7 +269,7 @@ func TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown(t *testing.T) {
 	checker := athenaCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State == domain.RelatedUnknown {
+	if result.State() == domain.RelatedUnknown {
 		t.Errorf("checkAthenaS3(%q) with demo fixtures: State = RelatedUnknown, want resolved "+
 			"(the \"primary\" workgroup needs a WorkGroupDetails entry in demo fixtures)", res.ID)
 	}

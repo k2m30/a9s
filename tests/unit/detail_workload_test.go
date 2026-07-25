@@ -222,7 +222,7 @@ func TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_Still
 	for _, d := range defs {
 		results = append(results, runtime.RelatedCacheResult{
 			DefDisplayName: d.DisplayName,
-			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+			Result:         resource.KnownRelated(d.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false),
 		})
 	}
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
@@ -304,7 +304,7 @@ func TestDetailWorkload_CacheReplay_CompleteCoverage_RelatedOmitted_EnrichPresen
 	for _, d := range defs {
 		results = append(results, runtime.RelatedCacheResult{
 			DefDisplayName: d.DisplayName,
-			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+			Result:         resource.KnownRelated(d.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false),
 		})
 	}
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
@@ -361,7 +361,7 @@ func TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched(t *te
 	}
 	def0 := defs[0]
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
-		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+		{DefDisplayName: def0.DisplayName, Result: resource.KnownRelated(def0.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false)},
 	})
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelect})
@@ -417,7 +417,7 @@ func TestDetailWorkload_YAMLOpen_CompleteCoverage_RelatedOmitted(t *testing.T) {
 	for _, d := range defs {
 		results = append(results, runtime.RelatedCacheResult{
 			DefDisplayName: d.DisplayName,
-			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+			Result:         resource.KnownRelated(d.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false),
 		})
 	}
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
@@ -444,7 +444,7 @@ func TestDetailWorkload_YAMLOpen_PartialCoverage_RelatedStillDispatched(t *testi
 	}
 	def0 := defs[0]
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
-		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+		{DefDisplayName: def0.DisplayName, Result: resource.KnownRelated(def0.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false)},
 	})
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenYAML})
@@ -465,7 +465,7 @@ func TestDetailWorkload_JSONOpen_CompleteCoverage_RelatedOmitted(t *testing.T) {
 	for _, d := range defs {
 		results = append(results, runtime.RelatedCacheResult{
 			DefDisplayName: d.DisplayName,
-			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+			Result:         resource.KnownRelated(d.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false),
 		})
 	}
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
@@ -492,7 +492,7 @@ func TestDetailWorkload_JSONOpen_PartialCoverage_RelatedStillDispatched(t *testi
 	}
 	def0 := defs[0]
 	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
-		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+		{DefDisplayName: def0.DisplayName, Result: resource.KnownRelated(def0.TargetType, []string{"stale-1", "stale-2", "stale-3"}, false)},
 	})
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenJSON})

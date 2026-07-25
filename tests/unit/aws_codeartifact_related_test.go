@@ -58,15 +58,15 @@ func TestRelated_Codeartifact_KMS_Match(t *testing.T) {
 	checker := codeartifactCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 {
-		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 {
+		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs())
 	}
 	// arnLastSegment extracts the UUID portion after the last "/".
-	if result.ResourceIDs[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
-		t.Errorf("ResourceIDs[0] = %q, want key UUID", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
+		t.Errorf("ResourceIDs[0] = %q, want key UUID", result.ResourceIDs()[0])
 	}
 }
 
@@ -83,8 +83,8 @@ func TestRelated_Codeartifact_KMS_Empty(t *testing.T) {
 	checker := codeartifactCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty domain name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty domain name)", result.Count())
 	}
 }
 
@@ -98,7 +98,7 @@ func TestRelated_Codeartifact_KMS_WrongRawStruct(t *testing.T) {
 	checker := codeartifactCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }

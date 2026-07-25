@@ -48,11 +48,11 @@ func TestRelated_IAMGroup_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	// Fixture: admins group has exactly one attached policy (AdministratorAccess,
 	// AWS-managed) and no inline group policies.
 	want := []string{"AdministratorAccess"}
-	if result.Count != len(want) {
-		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count, len(want), want)
+	if result.Count() != len(want) {
+		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count(), len(want), want)
 	}
-	if !stringSetEqual(result.ResourceIDs, want) {
-		t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs, want)
+	if !stringSetEqual(result.ResourceIDs(), want) {
+		t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs(), want)
 	}
 }
 
@@ -67,11 +67,11 @@ func TestRelated_IAMRole_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	// (AmazonEKSWorkerNodePolicy, AmazonEC2ContainerRegistryReadOnly).
 	// Inline role policies (ListRolePolicies) are not surfaced by checkRolePolicy.
 	want := []string{"AmazonEKSWorkerNodePolicy", "AmazonEC2ContainerRegistryReadOnly"}
-	if result.Count != len(want) {
-		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count, len(want), want)
+	if result.Count() != len(want) {
+		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count(), len(want), want)
 	}
-	if !stringSetEqual(result.ResourceIDs, want) {
-		t.Errorf("ResourceIDs = %v, want %v (order-insensitive)", result.ResourceIDs, want)
+	if !stringSetEqual(result.ResourceIDs(), want) {
+		t.Errorf("ResourceIDs = %v, want %v (order-insensitive)", result.ResourceIDs(), want)
 	}
 }
 
@@ -112,11 +112,11 @@ func TestRelated_IAMUser_Policy_EmitsAWSManagedAttachedPolicy(t *testing.T) {
 
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (AdministratorAccess attached, lazy-add resolves AWS-managed at drill time)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (AdministratorAccess attached, lazy-add resolves AWS-managed at drill time)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "AdministratorAccess" {
-		t.Errorf("ResourceIDs = %v, want [AdministratorAccess]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "AdministratorAccess" {
+		t.Errorf("ResourceIDs = %v, want [AdministratorAccess]", result.ResourceIDs())
 	}
 }
 

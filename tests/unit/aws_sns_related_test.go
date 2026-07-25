@@ -58,14 +58,14 @@ func TestRelated_SNS_Alarm_Found(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "test-alarm" {
-		t.Errorf("ResourceIDs = %v, want [test-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "test-alarm" {
+		t.Errorf("ResourceIDs = %v, want [test-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -87,8 +87,8 @@ func TestRelated_SNS_Alarm_MultipleActions(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (same alarm with topic in multiple action lists)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (same alarm with topic in multiple action lists)", result.Count())
 	}
 }
 
@@ -116,11 +116,11 @@ func TestRelated_SNS_Alarm_MultipleAlarms(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs len = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs len = %d, want 2: %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
 }
 
@@ -140,8 +140,8 @@ func TestRelated_SNS_Alarm_NoMatch(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -162,8 +162,8 @@ func TestRelated_SNS_Alarm_EmptyARN(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty topic_arn)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty topic_arn)", result.Count())
 	}
 }
 
@@ -174,8 +174,8 @@ func TestRelated_SNS_Alarm_EmptyCache(t *testing.T) {
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
 	// No clients, cache miss → -1 (unknown).
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
 
@@ -201,8 +201,8 @@ func TestRelated_SNS_Alarm_InsufficientDataActions(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (InsufficientDataActions match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (InsufficientDataActions match)", result.Count())
 	}
 }
 

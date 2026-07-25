@@ -75,14 +75,14 @@ func TestRelated_Secrets_KMS_Found(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, secretsSource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "a1b2c3d4-5678-90ab-cdef-111111111111" {
-		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-90ab-cdef-111111111111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "a1b2c3d4-5678-90ab-cdef-111111111111" {
+		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-90ab-cdef-111111111111]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -98,8 +98,8 @@ func TestRelated_Secrets_KMS_NotFound(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, secretsSource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -107,8 +107,8 @@ func TestRelated_Secrets_KMS_CacheMissNoClients(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, secretsSource(), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -131,8 +131,8 @@ func TestRelated_Secrets_KMS_NoKmsKey(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for nil KmsKeyId", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for nil KmsKeyId", result.Count())
 	}
 }
 
@@ -151,14 +151,14 @@ func TestRelated_Secrets_Lambda_Found(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, secretsSource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "rotate-docdb-credentials" {
-		t.Errorf("ResourceIDs = %v, want [rotate-docdb-credentials]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "rotate-docdb-credentials" {
+		t.Errorf("ResourceIDs = %v, want [rotate-docdb-credentials]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -175,8 +175,8 @@ func TestRelated_Secrets_Lambda_NotFound(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, secretsSource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -184,8 +184,8 @@ func TestRelated_Secrets_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, secretsSource(), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -208,8 +208,8 @@ func TestRelated_Secrets_Lambda_NoRotation(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for nil RotationLambdaARN", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for nil RotationLambdaARN", result.Count())
 	}
 }
 
@@ -264,14 +264,14 @@ func TestRelated_Secrets_DBI_MatchesByARN(t *testing.T) {
 	}
 
 	result := checker(context.Background(), nil, source, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "dbi" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "dbi")
+	if result.TargetType() != "dbi" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "dbi")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "linked-db" {
-		t.Errorf("ResourceIDs = %v, want [linked-db]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "linked-db" {
+		t.Errorf("ResourceIDs = %v, want [linked-db]", result.ResourceIDs())
 	}
 }
 
@@ -301,8 +301,8 @@ func TestRelated_Secrets_DBI_NotFound(t *testing.T) {
 	}
 	checker := secretsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -320,8 +320,8 @@ func TestRelated_Secrets_DBI_CacheMiss(t *testing.T) {
 	}
 	checker := secretsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
 
@@ -355,14 +355,14 @@ func TestRelated_Secrets_CFN_Found(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod-stack" {
-		t.Errorf("ResourceIDs = %v, want [prod-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod-stack" {
+		t.Errorf("ResourceIDs = %v, want [prod-stack]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -386,8 +386,8 @@ func TestRelated_Secrets_CFN_NotFound(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -411,8 +411,8 @@ func TestRelated_Secrets_CFN_NoTag(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no cfn tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn tag)", result.Count())
 	}
 }
 
@@ -431,7 +431,7 @@ func TestRelated_Secrets_CFN_CacheMiss(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }

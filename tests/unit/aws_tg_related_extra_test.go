@@ -33,11 +33,11 @@ func TestRelated_TG_VPC_Found(t *testing.T) {
 	checker := tgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -57,8 +57,8 @@ func TestRelated_TG_VPC_Empty(t *testing.T) {
 	checker := tgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count())
 	}
 }
 
@@ -75,11 +75,11 @@ func TestRelated_TG_CFN_Found(t *testing.T) {
 	checker := tgCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
-		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs())
 	}
 }
 
@@ -93,8 +93,8 @@ func TestRelated_TG_CFN_NoTag(t *testing.T) {
 	checker := tgCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count())
 	}
 }
 
@@ -102,8 +102,8 @@ func TestRelated_TG_CFN_NilClients(t *testing.T) {
 	res := tgSrcResource()
 	checker := tgCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -136,15 +136,15 @@ func TestRelated_TG_EC2_Found(t *testing.T) {
 	checker := tgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	found := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}
 	if !found["i-0abc123def456789a"] || !found["i-0def456abc123789b"] {
-		t.Errorf("ResourceIDs = %v, want both instance IDs", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want both instance IDs", result.ResourceIDs())
 	}
 }
 
@@ -166,8 +166,8 @@ func TestRelated_TG_EC2_LambdaTypeSkipped(t *testing.T) {
 	checker := tgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (lambda-type TG has no EC2 instances)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (lambda-type TG has no EC2 instances)", result.Count())
 	}
 }
 
@@ -200,11 +200,11 @@ func TestRelated_TG_Lambda_Found(t *testing.T) {
 	checker := tgCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-processor" {
-		t.Errorf("ResourceIDs = %v, want [my-processor]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-processor" {
+		t.Errorf("ResourceIDs = %v, want [my-processor]", result.ResourceIDs())
 	}
 }
 
@@ -213,7 +213,7 @@ func TestRelated_TG_Lambda_NonLambdaTypeReturnsZero(t *testing.T) {
 	checker := tgCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (instance-type TG has no lambda targets)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (instance-type TG has no lambda targets)", result.Count())
 	}
 }

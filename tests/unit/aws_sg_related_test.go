@@ -59,11 +59,11 @@ func TestRelated_SG_VPC_Found(t *testing.T) {
 	checker := sgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-123" {
-		t.Errorf("ResourceIDs = %v, want [\"vpc-123\"]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-123" {
+		t.Errorf("ResourceIDs = %v, want [\"vpc-123\"]", result.ResourceIDs())
 	}
 }
 
@@ -79,8 +79,8 @@ func TestRelated_SG_VPC_EmptyVpcID(t *testing.T) {
 	checker := sgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -107,10 +107,10 @@ func TestRelated_SG_EC2_Found(t *testing.T) {
 	checker := sgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Error("ResourceIDs is empty, want at least one entry")
 	}
 }
@@ -136,8 +136,8 @@ func TestRelated_SG_EC2_NotFound(t *testing.T) {
 	checker := sgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -150,8 +150,8 @@ func TestRelated_SG_EC2_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count())
 	}
 }
 
@@ -176,8 +176,8 @@ func TestRelated_SG_EC2_EmptySourceID(t *testing.T) {
 	checker := sgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty source ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty source ID", result.Count())
 	}
 }
 
@@ -204,10 +204,10 @@ func TestRelated_SG_ENI_Found(t *testing.T) {
 	checker := sgCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Error("ResourceIDs is empty, want at least one entry")
 	}
 }
@@ -233,8 +233,8 @@ func TestRelated_SG_ENI_NotFound(t *testing.T) {
 	checker := sgCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -247,8 +247,8 @@ func TestRelated_SG_ENI_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count())
 	}
 }
 
@@ -273,10 +273,10 @@ func TestRelated_SG_ELB_Found(t *testing.T) {
 	checker := sgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Error("ResourceIDs is empty, want at least one entry")
 	}
 }
@@ -300,8 +300,8 @@ func TestRelated_SG_ELB_NotFound(t *testing.T) {
 	checker := sgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -314,8 +314,8 @@ func TestRelated_SG_ELB_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count())
 	}
 }
 
@@ -338,11 +338,11 @@ func TestRelated_SG_CFN_Found(t *testing.T) {
 	checker := sgCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
-		t.Errorf("ResourceIDs = %v, want [\"my-stack\"]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [\"my-stack\"]", result.ResourceIDs())
 	}
 }
 
@@ -361,8 +361,8 @@ func TestRelated_SG_CFN_NoTag(t *testing.T) {
 	checker := sgCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -396,8 +396,8 @@ func TestRelated_SG_SG_Found(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -428,8 +428,8 @@ func TestRelated_SG_SG_FoundInEgress(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -458,8 +458,8 @@ func TestRelated_SG_SG_SkipsSelf(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (self-reference must be excluded)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (self-reference must be excluded)", result.Count())
 	}
 }
 
@@ -488,8 +488,8 @@ func TestRelated_SG_SG_NotFound(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -502,8 +502,8 @@ func TestRelated_SG_SG_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss)", result.Count())
 	}
 }
 
@@ -532,7 +532,7 @@ func TestRelated_SG_SG_EmptySourceID(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty source ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty source ID)", result.Count())
 	}
 }

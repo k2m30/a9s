@@ -101,14 +101,14 @@ func TestRelated_ASG_Alarm_MatchByDimension(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "asg-cpu-alarm" {
-		t.Errorf("ResourceIDs = %v, want [asg-cpu-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "asg-cpu-alarm" {
+		t.Errorf("ResourceIDs = %v, want [asg-cpu-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -138,8 +138,8 @@ func TestRelated_ASG_Alarm_NoMatch(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -169,8 +169,8 @@ func TestRelated_ASG_Alarm_EmptyID(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -185,8 +185,8 @@ func TestRelated_ASG_Alarm_NilCache(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
 
@@ -220,8 +220,8 @@ func TestRelated_ASG_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (dimension name is InstanceId, not AutoScalingGroupName)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is InstanceId, not AutoScalingGroupName)", result.Count())
 	}
 }
 
@@ -249,10 +249,10 @@ func TestRelated_ASG_Alarm_Error(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err = nil, want the propagated fetch error")
 	}
 }
@@ -289,10 +289,10 @@ func TestRelated_ASG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
@@ -324,14 +324,14 @@ func TestRelated_ASG_NG_MatchByASGName(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-node-group" {
-		t.Errorf("ResourceIDs = %v, want [my-node-group]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-node-group" {
+		t.Errorf("ResourceIDs = %v, want [my-node-group]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -360,8 +360,8 @@ func TestRelated_ASG_NG_NoMatch(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -390,8 +390,8 @@ func TestRelated_ASG_NG_EmptyID(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -406,8 +406,8 @@ func TestRelated_ASG_NG_NilCache(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
 
@@ -433,17 +433,17 @@ func TestRelated_ASG_EC2_MatchByInstances(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Fatalf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Fatalf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
-	if result.ResourceIDs[0] != "i-0abc111111111111a" || result.ResourceIDs[1] != "i-0bbb222222222222b" {
-		t.Errorf("ResourceIDs = %v, want [i-0abc111111111111a, i-0bbb222222222222b]", result.ResourceIDs)
+	if result.ResourceIDs()[0] != "i-0abc111111111111a" || result.ResourceIDs()[1] != "i-0bbb222222222222b" {
+		t.Errorf("ResourceIDs = %v, want [i-0abc111111111111a, i-0bbb222222222222b]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -462,8 +462,8 @@ func TestRelated_ASG_EC2_NoInstances(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no instances)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no instances)", result.Count())
 	}
 }
 
@@ -479,8 +479,8 @@ func TestRelated_ASG_EC2_NoRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no RawStruct)", result.Count())
 	}
 }
 
@@ -516,14 +516,14 @@ func TestRelated_ASG_TG_MatchByARN(t *testing.T) {
 	checker := asgCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (TG matched by ARN)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (TG matched by ARN)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-tg" {
-		t.Errorf("ResourceIDs = %v, want [my-tg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-tg" {
+		t.Errorf("ResourceIDs = %v, want [my-tg]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -542,8 +542,8 @@ func TestRelated_ASG_TG_NoTargetGroups(t *testing.T) {
 	checker := asgCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no TargetGroupARNs)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no TargetGroupARNs)", result.Count())
 	}
 }
 
@@ -570,14 +570,14 @@ func TestRelated_ASG_Subnets_ParsesMultiple(t *testing.T) {
 	checker := asgCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3 (3 subnets)", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3 (3 subnets)", result.Count())
 	}
-	if len(result.ResourceIDs) != 3 {
-		t.Fatalf("ResourceIDs length = %d, want 3; got %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 3 {
+		t.Fatalf("ResourceIDs length = %d, want 3; got %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -596,8 +596,8 @@ func TestRelated_ASG_Subnets_EmptyIdentifier(t *testing.T) {
 	checker := asgCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty VPCZoneIdentifier)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty VPCZoneIdentifier)", result.Count())
 	}
 }
 
@@ -613,8 +613,8 @@ func TestRelated_ASG_Subnets_NoRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no RawStruct)", result.Count())
 	}
 }
 
@@ -655,14 +655,14 @@ func TestRelated_ASG_AMI_MatchByLaunchTemplate(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != amiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, amiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != amiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), amiID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -686,8 +686,8 @@ func TestRelated_ASG_AMI_NoLaunchConfigOrTemplate(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no LC or LT)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no LC or LT)", result.Count())
 	}
 }
 
@@ -703,8 +703,8 @@ func TestRelated_ASG_AMI_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -728,14 +728,14 @@ func TestRelated_ASG_ELB_MatchByClassicELBNames(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Fatalf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Fatalf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -755,8 +755,8 @@ func TestRelated_ASG_ELB_NoLoadBalancers(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ELBs or TG ARNs)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ELBs or TG ARNs)", result.Count())
 	}
 }
 
@@ -772,8 +772,8 @@ func TestRelated_ASG_ELB_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -805,24 +805,24 @@ func TestRelated_ASG_Role_MatchByServiceLinkedRole(t *testing.T) {
 	checker := asgCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (service-linked role found)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (service-linked role found)", result.Count())
 	}
 	// Role pivots return the bare RoleName, not the full ARN, so the role
 	// cache's FetchByIDs (keyed on RoleName) can resolve it — docs/resources/asg.md §2 `role`.
 	wantRoleName := "AWSServiceRoleForAutoScaling"
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), wantRoleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -854,23 +854,23 @@ func TestRelated_ASG_Role_MatchByLaunchConfigInstanceProfile(t *testing.T) {
 	checker := asgCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (role from instance profile)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (role from instance profile)", result.Count())
 	}
 	// Role pivots return the bare RoleName, not the full ARN — docs/resources/asg.md §2 `role`.
 	wantRoleName := "my-ec2-role"
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), wantRoleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -894,8 +894,8 @@ func TestRelated_ASG_Role_NoRoles(t *testing.T) {
 	checker := asgCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no roles)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no roles)", result.Count())
 	}
 }
 
@@ -911,8 +911,8 @@ func TestRelated_ASG_Role_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -944,14 +944,14 @@ func TestRelated_ASG_SG_MatchByLaunchConfig(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != sgID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, sgID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != sgID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), sgID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -975,8 +975,8 @@ func TestRelated_ASG_SG_NoLaunchConfigOrTemplate(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no LC or LT)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no LC or LT)", result.Count())
 	}
 }
 
@@ -992,8 +992,8 @@ func TestRelated_ASG_SG_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -1030,14 +1030,14 @@ func TestRelated_ASG_SNS_MatchByNotificationConfig(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != topicARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, topicARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != topicARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), topicARN)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -1059,8 +1059,8 @@ func TestRelated_ASG_SNS_NoNotifications(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no notifications)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no notifications)", result.Count())
 	}
 }
 
@@ -1076,8 +1076,8 @@ func TestRelated_ASG_SNS_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -1113,14 +1113,14 @@ func TestRelated_ASG_VPC_MatchBySubnets(t *testing.T) {
 	checker := asgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != vpcID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, vpcID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != vpcID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), vpcID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -1143,8 +1143,8 @@ func TestRelated_ASG_VPC_NoSubnets(t *testing.T) {
 	checker := asgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty VPCZoneIdentifier)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty VPCZoneIdentifier)", result.Count())
 	}
 }
 
@@ -1160,8 +1160,8 @@ func TestRelated_ASG_VPC_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -1217,14 +1217,14 @@ func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one ALB from TG ARN)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one ALB from TG ARN)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != lbARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, lbARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != lbARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), lbARN)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -1261,16 +1261,16 @@ func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (classic + ALB)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (classic + ALB)", result.Count())
 	}
 	found := map[string]bool{classicName: false, lbARN: false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}
 	for k, ok := range found {
 		if !ok {
-			t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs, k)
+			t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs(), k)
 		}
 	}
 }
@@ -1325,22 +1325,22 @@ func TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile(t *testing.T) {
 	checker := asgCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (role from LT instance profile ARN)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (role from LT instance profile ARN)", result.Count())
 	}
 	// Role pivots return the bare RoleName, not the full ARN — docs/resources/asg.md §2 `role`.
 	wantRoleName := "ec2-role-from-lt"
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), wantRoleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }

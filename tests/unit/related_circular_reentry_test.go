@@ -105,11 +105,7 @@ func feedEC2RelatedResults(m tui.Model, sourceID string) tui.Model {
 			ResourceType:     "ec2",
 			SourceResourceID: sourceID,
 			DefDisplayName:   def.DisplayName,
-			Result: resource.RelatedCheckResult{
-				TargetType:  def.TargetType,
-				Count:       stubRelatedCount,
-				ResourceIDs: stubRelatedIDs,
-			},
+			Result:           resource.KnownRelated(def.TargetType, stubRelatedIDs, false),
 		})
 	}
 	return m

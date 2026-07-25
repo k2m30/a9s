@@ -118,7 +118,7 @@ func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("sg")
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	return relatedResult("sg", ids)
 }
@@ -136,7 +136,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
 	if clusterID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -171,7 +171,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		clusterID = id
 	}
 	if clusterID == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+		return resource.KnownRelated("dbi", nil, false)
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
@@ -205,7 +205,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 		clusterID = id
 	}
 	if clusterID == "" {
-		return resource.RelatedCheckResult{TargetType: "dbc-snap", Count: 0}
+		return resource.KnownRelated("dbc-snap", nil, false)
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc-snap")
@@ -261,7 +261,7 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("vpc")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*sng.VpcId})
 }
@@ -348,7 +348,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		// Parent has no MasterUserSecret — true regardless of whether the
 		// RawStruct shape was a recognised cluster. Returning Count=0 is
 		// definitive: there is no cluster-managed master secret to associate.
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -380,7 +380,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := dbcClusterKmsKeyID(res.RawStruct)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID = kmsKeyIDFromField(keyID, res.Type)
 	return relatedResult("kms", []string{keyID})

@@ -355,11 +355,11 @@ func (c *Controller) mergeRelatedCacheIntoDetail(resourceType string, res resour
 	}
 	for _, entry := range cached {
 		errMsg := ""
-		if entry.Result.Err != nil {
-			errMsg = entry.Result.Err.Error()
+		if err := entry.Result.Err(); err != nil {
+			errMsg = err.Error()
 		}
-		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-			entry.Result.EffectiveState(), entry.Result.Count, false, errMsg, entry.Result.Truncated, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType(),
+			entry.Result.EffectiveState(), entry.Result.Count(), false, errMsg, entry.Result.Truncated(), entry.Result.ResourceIDs(), entry.Result.FetchFilter())
 	}
 }
 

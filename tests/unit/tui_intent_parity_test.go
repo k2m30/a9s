@@ -96,11 +96,7 @@ func relatedParityEvent() messages.RelatedCheckResult {
 		ResourceType:     "ec2",
 		SourceResourceID: "i-parity0001",
 		DefDisplayName:   "Security Groups",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "sg",
-			Count:       2,
-			ResourceIDs: []string{"sg-parity1", "sg-parity2"},
-		},
+		Result:           resource.KnownRelated("sg", []string{"sg-parity1", "sg-parity2"}, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"sg": {
 				Resources: []resource.Resource{
@@ -171,11 +167,11 @@ func TestIntentParity_CachePatches_TUIEqualsHeadless(t *testing.T) {
 	if tuiRelated[0].DefDisplayName != hRelated[0].DefDisplayName {
 		t.Errorf("RelatedCache[0].DefDisplayName: TUI=%q headless=%q, want equal", tuiRelated[0].DefDisplayName, hRelated[0].DefDisplayName)
 	}
-	if tuiRelated[0].Result.Count != hRelated[0].Result.Count {
-		t.Errorf("RelatedCache[0].Result.Count: TUI=%d headless=%d, want equal", tuiRelated[0].Result.Count, hRelated[0].Result.Count)
+	if tuiRelated[0].Result.Count() != hRelated[0].Result.Count() {
+		t.Errorf("RelatedCache[0].Result.Count: TUI=%d headless=%d, want equal", tuiRelated[0].Result.Count(), hRelated[0].Result.Count())
 	}
-	if tuiRelated[0].Result.Count != 2 {
-		t.Errorf("RelatedCache[0].Result.Count = %d, want 2 (exact mapping, not just non-zero)", tuiRelated[0].Result.Count)
+	if tuiRelated[0].Result.Count() != 2 {
+		t.Errorf("RelatedCache[0].Result.Count = %d, want 2 (exact mapping, not just non-zero)", tuiRelated[0].Result.Count())
 	}
 
 	if tuiSGHit != hSGHit {
@@ -221,11 +217,7 @@ func TestIntentParity_CachePatches_RepeatedApply_StaysAdditiveOnce(t *testing.T)
 		ResourceType:     "ec2",
 		SourceResourceID: "i-parity0001",
 		DefDisplayName:   "IAM Roles",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "iam-role",
-			Count:       1,
-			ResourceIDs: []string{"role-parity1"},
-		},
+		Result:           resource.KnownRelated("iam-role", []string{"role-parity1"}, false),
 	}
 	tm, _ = rootApplyMsg(tm, second)
 

@@ -25,7 +25,7 @@ import (
 func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 	asgList, truncated, err := ecsRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
@@ -60,7 +60,7 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	ec2List, truncated, err := ecsRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
@@ -93,7 +93,7 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	evList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -126,7 +126,7 @@ func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 	taskList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -158,7 +158,7 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	logList, truncated, err := ecsRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {

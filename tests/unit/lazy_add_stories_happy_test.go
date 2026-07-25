@@ -42,11 +42,7 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 			DisplayName:      "KMS Keys",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{keyID},
-				}
+				return resource.KnownRelated(targetType, []string{keyID}, false)
 			},
 		},
 	})
@@ -83,8 +79,8 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 		t.Fatal("LA-001: no RelatedCheckResultMsg received")
 	}
 
-	if resultMsg.Result.Count != 1 {
-		t.Errorf("LA-001: Count = %d, want 1", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 1 {
+		t.Errorf("LA-001: Count = %d, want 1", resultMsg.Result.Count())
 	}
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-001: LazyAddedResources is nil — FetchByIDs was not called")
@@ -127,11 +123,7 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 			DisplayName:      "AMIs",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{imageID},
-				}
+				return resource.KnownRelated(targetType, []string{imageID}, false)
 			},
 		},
 	})
@@ -167,8 +159,8 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 		t.Fatal("LA-002: no RelatedCheckResultMsg received")
 	}
 
-	if resultMsg.Result.Count != 1 {
-		t.Errorf("LA-002: Count = %d, want 1", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 1 {
+		t.Errorf("LA-002: Count = %d, want 1", resultMsg.Result.Count())
 	}
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-002: LazyAddedResources is nil — FetchByIDs was not called")
@@ -210,11 +202,7 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 			DisplayName:      "EBS Snapshots",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{snapID},
-				}
+				return resource.KnownRelated(targetType, []string{snapID}, false)
 			},
 		},
 	})
@@ -249,8 +237,8 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 		t.Fatal("LA-003: no RelatedCheckResultMsg received")
 	}
 
-	if resultMsg.Result.Count != 1 {
-		t.Errorf("LA-003: Count = %d, want 1", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 1 {
+		t.Errorf("LA-003: Count = %d, want 1", resultMsg.Result.Count())
 	}
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-003: LazyAddedResources is nil — FetchByIDs was not called")
@@ -291,11 +279,7 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 			DisplayName:      "IAM Policies",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{policyARN},
-				}
+				return resource.KnownRelated(targetType, []string{policyARN}, false)
 			},
 		},
 	})
@@ -330,8 +314,8 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 		t.Fatal("LA-004: no RelatedCheckResultMsg received")
 	}
 
-	if resultMsg.Result.Count != 1 {
-		t.Errorf("LA-004: Count = %d, want 1", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 1 {
+		t.Errorf("LA-004: Count = %d, want 1", resultMsg.Result.Count())
 	}
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-004: LazyAddedResources is nil — FetchByIDs was not called")
@@ -392,11 +376,7 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 			DisplayName:      "KMS Keys (cold)",
 			NeedsTargetCache: true,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{"pre-1", "lazy-1"},
-				}
+				return resource.KnownRelated(targetType, []string{"pre-1", "lazy-1"}, false)
 			},
 		},
 	})
@@ -489,11 +469,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 			NeedsTargetCache: true,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				// Checker emits an AWS-managed key not present in the warm cache.
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"aws-managed-la082"},
-				}
+				return resource.KnownRelated(targetType, []string{"aws-managed-la082"}, false)
 			},
 		},
 	})
@@ -520,7 +496,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "seed-la082",
-		Result:           resource.RelatedCheckResult{TargetType: targetType, Count: 1},
+		Result:           resource.KnownRelated(targetType, nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			targetType: {
 				Resources:   []resource.Resource{{ID: "cmk-warm-la082", Name: "cmk-warm-la082"}},

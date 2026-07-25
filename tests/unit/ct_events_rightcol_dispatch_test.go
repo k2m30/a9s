@@ -146,7 +146,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 			// Build a map targetType → result for O(1) lookup.
 			resultByType := make(map[string]resource.RelatedCheckResult, len(allResults))
 			for _, r := range allResults {
-				resultByType[r.TargetType] = r
+				resultByType[r.TargetType()] = r
 			}
 
 			for _, def := range defs {
@@ -161,16 +161,16 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 					}
 
 					// Classify the result.
-					isPivot := result.State == domain.RelatedDeferred
-					isNotActionable := result.Count == 0 && len(result.FetchFilter) == 0
+					isPivot := result.State() == domain.RelatedDeferred
+					isNotActionable := result.Count() == 0 && len(result.FetchFilter()) == 0
 
 					c := buildCTEventsRightColController(t, fixture)
 					errMsg := ""
-					if result.Err != nil {
-						errMsg = result.Err.Error()
+					if result.Err() != nil {
+						errMsg = result.Err().Error()
 					}
 					c.ApplyDetailRelatedResultForResource("ct-events", fixture.ID, def.DisplayName, def.TargetType,
-						result.EffectiveState(), result.Count, false, errMsg, result.Truncated, result.ResourceIDs, result.FetchFilter)
+						result.EffectiveState(), result.Count(), false, errMsg, result.Truncated(), result.ResourceIDs(), result.FetchFilter())
 
 					body := c.Snapshot().Body.Detail
 					if body == nil {
@@ -210,7 +210,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 					// true given a fresh, empty-RowStore controller.
 					if len(tasks) == 0 {
 						t.Errorf("D1/D3 FAIL: actionable row (Count=%d, State=%v, FetchFilter=%v) dispatched 0 tasks — %s",
-							result.Count, result.State, result.FetchFilter, label)
+							result.Count(), result.State(), result.FetchFilter(), label)
 						return
 					}
 					for _, task := range tasks {
@@ -232,7 +232,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 								continue
 							}
 							found = true
-							for k, v := range result.FetchFilter {
+							for k, v := range result.FetchFilter() {
 								if payload.Filter[k] != v {
 									t.Errorf("D3 FAIL: FetchFilter[%q]=%q, want %q — %s", k, payload.Filter[k], v, label)
 								}
@@ -240,7 +240,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 						}
 						if !found {
 							t.Errorf("D3 FAIL: pivot row (FetchFilter=%v) dispatched no KindFetchFiltered task — %s | tasks=%+v",
-								result.FetchFilter, label, tasks)
+								result.FetchFilter(), label, tasks)
 						}
 					}
 				})

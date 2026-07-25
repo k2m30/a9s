@@ -37,13 +37,13 @@ func TestEC2RelatedCheckers_FetchLiveDataOnColdCache(t *testing.T) {
 	for _, target := range []string{"tg", "ebs-snap"} {
 		checker := ec2CheckerByTarget(t, target)
 		got := checker(context.Background(), clients, instance, cache)
-		if got.Err != nil {
-			t.Fatalf("%s checker returned unexpected error on cold cache: %v", target, got.Err)
+		if got.Err() != nil {
+			t.Fatalf("%s checker returned unexpected error on cold cache: %v", target, got.Err())
 		}
-		if got.Count < 0 {
+		if got.Count() < 0 {
 			t.Fatalf("%s checker should resolve from live fetch on cold cache; got %+v", target, got)
 		}
-		if got.Count == 0 {
+		if got.Count() == 0 {
 			t.Fatalf("%s checker should find related resources for demo ec2 fixture on cold cache; got %+v", target, got)
 		}
 	}
@@ -53,10 +53,10 @@ func TestEC2RelatedCheckers_FetchLiveDataOnColdCache(t *testing.T) {
 	{
 		checker := ec2CheckerByTarget(t, "asg")
 		got := checker(context.Background(), clients, instance, cache)
-		if got.Err != nil {
-			t.Fatalf("asg checker returned unexpected error on cold cache: %v", got.Err)
+		if got.Err() != nil {
+			t.Fatalf("asg checker returned unexpected error on cold cache: %v", got.Err())
 		}
-		if got.Count < 0 {
+		if got.Count() < 0 {
 			t.Fatalf("asg checker should resolve on cold cache (Count >= 0); got %+v", got)
 		}
 	}
@@ -70,10 +70,10 @@ func TestEC2RelatedCheckers_NodeGroupsAndCloudTrailResolveOnColdCache(t *testing
 	for _, target := range []string{"ng", "ct-events"} {
 		checker := ec2CheckerByTarget(t, target)
 		got := checker(context.Background(), clients, instance, cache)
-		if got.Err != nil {
-			t.Fatalf("%s checker returned unexpected error on cold cache: %v", target, got.Err)
+		if got.Err() != nil {
+			t.Fatalf("%s checker returned unexpected error on cold cache: %v", target, got.Err())
 		}
-		if got.Count < 0 {
+		if got.Count() < 0 {
 			t.Fatalf("%s checker should not stay unknown on cold cache with live clients; got %+v", target, got)
 		}
 	}
@@ -85,10 +85,10 @@ func TestEC2RelatedCheckers_AlarmResolvesOnColdCache(t *testing.T) {
 
 	checker := ec2CheckerByTarget(t, "alarm")
 	got := checker(context.Background(), clients, instance, resource.ResourceCache{})
-	if got.Err != nil {
-		t.Fatalf("alarm checker returned unexpected error on cold cache: %v", got.Err)
+	if got.Err() != nil {
+		t.Fatalf("alarm checker returned unexpected error on cold cache: %v", got.Err())
 	}
-	if got.Count < 0 {
+	if got.Count() < 0 {
 		t.Fatalf("alarm checker should resolve on cold cache with live clients; got %+v", got)
 	}
 }
@@ -99,10 +99,10 @@ func TestEC2RelatedCheckers_EIPResolvesOnColdCache(t *testing.T) {
 
 	checker := ec2CheckerByTarget(t, "eip")
 	got := checker(context.Background(), clients, instance, resource.ResourceCache{})
-	if got.Err != nil {
-		t.Fatalf("eip checker returned unexpected error on cold cache: %v", got.Err)
+	if got.Err() != nil {
+		t.Fatalf("eip checker returned unexpected error on cold cache: %v", got.Err())
 	}
-	if got.Count < 0 {
+	if got.Count() < 0 {
 		t.Fatalf("eip checker should resolve on cold cache with live clients; got %+v", got)
 	}
 }
@@ -184,11 +184,11 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
 	// Business logic: instance with a CFN stack tag must find the related stack on cold cache.
-	if got.Count != 1 {
-		t.Errorf("T004: expected Count=1 for instance with CFN tag, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("T004: expected Count=1 for instance with CFN tag, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "my-cfn-stack" {
-		t.Errorf("T004: expected ResourceIDs=[my-cfn-stack], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "my-cfn-stack" {
+		t.Errorf("T004: expected ResourceIDs=[my-cfn-stack], got %v", got.ResourceIDs())
 	}
 	// Guard: fetcher must be called exactly once (N+1 prevention).
 	if mockCallCount != 1 {
@@ -231,13 +231,13 @@ func TestEC2RelatedColdCache_TruncatedZeroMatch_Truncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.TargetType != "tg" {
-		t.Errorf("T005: expected TargetType=\"tg\"; got %q", got.TargetType)
+	if got.TargetType() != "tg" {
+		t.Errorf("T005: expected TargetType=\"tg\"; got %q", got.TargetType())
 	}
-	if got.Count != 0 {
-		t.Errorf("T005: expected Count=0 (TruncatedResult lower bound) for truncated zero-match page; got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("T005: expected Count=0 (TruncatedResult lower bound) for truncated zero-match page; got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("T005: expected Truncated=true for truncated zero-match page; got Truncated=false")
 	}
 }

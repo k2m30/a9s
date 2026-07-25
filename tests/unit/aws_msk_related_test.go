@@ -69,14 +69,14 @@ func TestRelated_MSK_Alarms_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "msk-cpu-utilization" {
-		t.Errorf("ResourceIDs = %v, want [msk-cpu-utilization]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "msk-cpu-utilization" {
+		t.Errorf("ResourceIDs = %v, want [msk-cpu-utilization]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -106,8 +106,8 @@ func TestRelated_MSK_Alarms_NotFound(t *testing.T) {
 	checker := mskCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -123,8 +123,8 @@ func TestRelated_MSK_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := mskCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -163,11 +163,11 @@ func TestRelated_MSK_Lambda_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "kafka-consumer" {
-		t.Errorf("ResourceIDs = %v, want [kafka-consumer]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "kafka-consumer" {
+		t.Errorf("ResourceIDs = %v, want [kafka-consumer]", result.ResourceIDs())
 	}
 	if fake.calls != 1 {
 		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
@@ -213,17 +213,17 @@ func TestRelated_MSK_Lambda_MappedFnNotInCache_FallsBackToARNBareName(t *testing
 
 	checker := mskCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, source, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (the API-confirmed mapping is authoritative even though its function isn't the one cached — union contract)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (the API-confirmed mapping is authoritative even though its function isn't the one cached — union contract)", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "kafka-consumer" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %q (bare function name parsed from the cache-missing mapping's own ARN)", result.ResourceIDs, "kafka-consumer")
+		t.Errorf("ResourceIDs = %v, want to contain %q (bare function name parsed from the cache-missing mapping's own ARN)", result.ResourceIDs(), "kafka-consumer")
 	}
 	if fake.calls != 1 {
 		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
@@ -241,8 +241,8 @@ func TestRelated_MSK_Lambda_NoClusterARN(t *testing.T) {
 	}
 	checker := mskCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no cluster ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no cluster ARN)", result.Count())
 	}
 }
 
@@ -273,11 +273,11 @@ func TestRelated_MSK_CFN_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "analytics-stack" {
-		t.Errorf("ResourceIDs = %v, want [analytics-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "analytics-stack" {
+		t.Errorf("ResourceIDs = %v, want [analytics-stack]", result.ResourceIDs())
 	}
 }
 
@@ -300,8 +300,8 @@ func TestRelated_MSK_CFN_NoTag(t *testing.T) {
 
 	checker := mskCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no cfn stack tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn stack tag)", result.Count())
 	}
 }
 
@@ -318,7 +318,7 @@ func TestRelated_MSK_CFN_CacheMissNoClients(t *testing.T) {
 	}
 	checker := mskCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss)", result.Count())
 	}
 }

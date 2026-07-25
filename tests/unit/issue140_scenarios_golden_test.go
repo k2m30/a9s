@@ -195,18 +195,18 @@ func scenarioEC2020CountsArrived(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 35)
 	m = issue140NavigateToEC2Detail(t, m)
 	srcID := mustDemoEC2(t)[0].ID
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.RelatedCheckResult{TargetType: "asg", Count: 1}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 2}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.KnownRelated("asg", []string{"asg-1"}, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.KnownRelated("alarm", []string{"alarm-1", "alarm-2"}, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.KnownRelated("tg", nil, false)})
 	return m.View().Content
 }
 
 func scenarioEC2021RightFocusAfterTab(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 35)
 	m = issue140NavigateToEC2Detail(t, m)
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "asg", Count: 1}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 0}})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("tg", nil, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("asg", []string{"asg-1"}, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("alarm", nil, false)})
 	m = issue140ApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	return m.View().Content
 }
@@ -259,10 +259,10 @@ func scenarioEC2029FilteredAlarmsList(t *testing.T) string {
 func scenarioEC2033OnlyAlarmAvailableFocus(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 35)
 	m = issue140NavigateToEC2Detail(t, m)
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "asg", Count: 0}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 2}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "cfn", Count: 0}})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("tg", nil, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("asg", nil, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("alarm", []string{"alarm-1", "alarm-2"}, false)})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.KnownRelated("cfn", nil, false)})
 	m = issue140ApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	return m.View().Content
 }

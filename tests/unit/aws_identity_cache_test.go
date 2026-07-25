@@ -80,14 +80,14 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 	// The fake Backup client returns an empty plan list — a SUCCESSFUL fetch of a
 	// zero-size target population. A fully-scanned empty population is a proven
 	// zero, so the checker resolves to "(0)", not a blank/unknown row.
-	if result.State != domain.RelatedResolved {
-		t.Errorf("State = %v, want RelatedResolved (0 backup plans → proven zero (0))", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (0 backup plans → proven zero (0))", result.State())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if result.TargetType != "backup" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
+	if result.TargetType() != "backup" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "backup")
 	}
 }
 
@@ -134,11 +134,11 @@ func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 
 	// Empty plan list from a successful fetch → proven zero (0), regardless of
 	// region/account resolution (there are no plans to match against).
-	if result.State != domain.RelatedResolved {
-		t.Errorf("State = %v, want RelatedResolved (0 backup plans → proven zero (0))", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (0 backup plans → proven zero (0))", result.State())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -153,8 +153,8 @@ func TestIdentityCache_NilClients_ReturnsMinusOne(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State())
 	}
 }
 
@@ -169,7 +169,7 @@ func TestIdentityCache_EmptyVolumeID_ReturnsZero(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty volume ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty volume ID)", result.Count())
 	}
 }

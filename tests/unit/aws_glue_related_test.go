@@ -68,14 +68,14 @@ func TestRelated_Glue_Role_Found(t *testing.T) {
 	checker := glueCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != roleName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, roleName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != roleName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), roleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -104,8 +104,8 @@ func TestRelated_Glue_Role_NotFound(t *testing.T) {
 	checker := glueCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count())
 	}
 }
 
@@ -130,8 +130,8 @@ func TestRelated_Glue_Role_EmptyRole(t *testing.T) {
 	checker := glueCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for nil Role", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for nil Role", result.Count())
 	}
 }
 
@@ -151,8 +151,8 @@ func TestRelated_Glue_Role_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -188,14 +188,14 @@ func TestRelated_Glue_Alarms_Found(t *testing.T) {
 	checker := glueCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "glue-job-failure-alarm" {
-		t.Errorf("ResourceIDs = %v, want [glue-job-failure-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "glue-job-failure-alarm" {
+		t.Errorf("ResourceIDs = %v, want [glue-job-failure-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -229,8 +229,8 @@ func TestRelated_Glue_Alarms_NotFound(t *testing.T) {
 	checker := glueCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -250,8 +250,8 @@ func TestRelated_Glue_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown", result.State())
 	}
 }
 
@@ -264,11 +264,11 @@ func TestRelated_Glue_CFN_Unknown(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (tags need GetTags enrichment)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (tags need GetTags enrichment)", result.Count())
 	}
-	if result.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	if result.TargetType() != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cfn")
 	}
 }
 
@@ -292,18 +292,18 @@ func TestRelated_Glue_Logs_MatchBothSharedGroups(t *testing.T) {
 	checker := glueCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (both shared Glue log groups)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (both shared Glue log groups)", result.Count())
 	}
 	found := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}
 	if !found["/aws-glue/jobs/output"] {
-		t.Errorf("missing /aws-glue/jobs/output in ResourceIDs: %v", result.ResourceIDs)
+		t.Errorf("missing /aws-glue/jobs/output in ResourceIDs: %v", result.ResourceIDs())
 	}
 	if !found["/aws-glue/jobs/error"] {
-		t.Errorf("missing /aws-glue/jobs/error in ResourceIDs: %v", result.ResourceIDs)
+		t.Errorf("missing /aws-glue/jobs/error in ResourceIDs: %v", result.ResourceIDs())
 	}
 }
 
@@ -317,8 +317,8 @@ func TestRelated_Glue_Logs_NoGlueGroups(t *testing.T) {
 	checker := glueCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -328,8 +328,8 @@ func TestRelated_Glue_Logs_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -350,11 +350,11 @@ func TestRelated_Glue_S3_MatchScriptBucket(t *testing.T) {
 	checker := glueCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-glue-scripts" {
-		t.Errorf("ResourceIDs = %v, want [acme-glue-scripts]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-glue-scripts" {
+		t.Errorf("ResourceIDs = %v, want [acme-glue-scripts]", result.ResourceIDs())
 	}
 }
 
@@ -371,8 +371,8 @@ func TestRelated_Glue_S3_NilCommand(t *testing.T) {
 	checker := glueCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Command)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Command)", result.Count())
 	}
 }
 
@@ -385,8 +385,8 @@ func TestRelated_Glue_S3_InvalidRawStruct(t *testing.T) {
 	checker := glueCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -408,13 +408,13 @@ func TestRelated_Glue_Secrets_MatchSecretARN(t *testing.T) {
 	checker := glueCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	// Name extracted after ":secret:" prefix
 	const wantName = "acme/db-password-AbcDef"
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != wantName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wantName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != wantName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wantName)
 	}
 }
 
@@ -433,8 +433,8 @@ func TestRelated_Glue_Secrets_NoneOfSMPrefix(t *testing.T) {
 	checker := glueCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no secrets manager ARNs)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no secrets manager ARNs)", result.Count())
 	}
 }
 
@@ -451,8 +451,8 @@ func TestRelated_Glue_Secrets_EmptyArguments(t *testing.T) {
 	checker := glueCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty DefaultArguments)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty DefaultArguments)", result.Count())
 	}
 }
 
@@ -465,8 +465,8 @@ func TestRelated_Glue_Secrets_InvalidRawStruct(t *testing.T) {
 	checker := glueCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -487,11 +487,11 @@ func TestRelated_Glue_Athena_MatchByGlueJobField(t *testing.T) {
 	checker := glueCheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-workgroup" {
-		t.Errorf("ResourceIDs = %v, want [acme-workgroup]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-workgroup" {
+		t.Errorf("ResourceIDs = %v, want [acme-workgroup]", result.ResourceIDs())
 	}
 }
 
@@ -509,8 +509,8 @@ func TestRelated_Glue_Athena_NoMatch(t *testing.T) {
 	checker := glueCheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -520,8 +520,8 @@ func TestRelated_Glue_Athena_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -535,8 +535,8 @@ func TestRelated_Glue_KMS_InvalidRawStruct(t *testing.T) {
 	source := resource.Resource{ID: "acme-etl-job", RawStruct: "not-a-job"}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count())
 	}
 }
 
@@ -549,8 +549,8 @@ func TestRelated_Glue_KMS_NoSecurityConfigReturnsZero(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no security config)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no security config)", result.Count())
 	}
 }
 
@@ -566,8 +566,8 @@ func TestRelated_Glue_KMS_NilClientsReturnsMinusOne(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -588,11 +588,11 @@ func TestRelated_Glue_KMS_FoundViaSecurityConfig(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyID)
 	}
 }
 
@@ -611,8 +611,8 @@ func TestRelated_Glue_KMS_EmptyEncryptionReturnsZero(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty encryption config)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty encryption config)", result.Count())
 	}
 }
 
@@ -626,8 +626,8 @@ func TestRelated_Glue_CFN_EmptyJobIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
 	checker := glueCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty job ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty job ID)", result.Count())
 	}
 }
 
@@ -641,7 +641,7 @@ func TestRelated_Glue_CFN_GlueDoesNotImplementGetTagsReturnsMinusOne(t *testing.
 	}
 	checker := glueCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (Glue client lacks GetTags)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (Glue client lacks GetTags)", result.Count())
 	}
 }

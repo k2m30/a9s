@@ -273,13 +273,13 @@ func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPa
 		typeName: resource.ResourceCacheEntry{Resources: newPage},
 	}
 	result := ls.reapplyChecker(context.Background(), nil, ls.reapplySource, synth)
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		return
 	}
 	if ls.RelatedIDSet == nil {
-		ls.RelatedIDSet = make(map[string]struct{}, len(result.ResourceIDs))
+		ls.RelatedIDSet = make(map[string]struct{}, len(result.ResourceIDs()))
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id != "" {
 			ls.RelatedIDSet[id] = struct{}{}
 		}

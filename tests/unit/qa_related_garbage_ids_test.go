@@ -106,14 +106,14 @@ func TestSeededRow_MissingSourceField_NeverFabricatesIDs(t *testing.T) {
 
 	got := checker(context.Background(), clients, src, nil)
 
-	for _, id := range got.ResourceIDs {
+	for _, id := range got.ResourceIDs() {
 		if id == src.Type {
 			t.Fatalf(
 				"checkS3KMS(bucket=%q) returned ResourceIDs=%v containing %q — "+
 					"the SOURCE resource's own Type fabricated as a KMS key ID; "+
 					"this is the live-reported bug (AWS NotFoundException "+
 					"\"Invalid keyId 's3'\"). RelatedCheckResult=%+v",
-				bucket, got.ResourceIDs, id, got,
+				bucket, got.ResourceIDs(), id, got,
 			)
 		}
 	}
@@ -231,13 +231,13 @@ func TestRelatedRegistry_ThinSeededRow_NeverFabricatesSourceTypeAsID(t *testing.
 
 				got := def.Checker(context.Background(), nil, src, cache)
 
-				if len(got.ResourceIDs) == 0 {
+				if len(got.ResourceIDs()) == 0 {
 					skippedNoIDs++
 					return
 				}
 				exercisedWithIDs++
 
-				for _, id := range got.ResourceIDs {
+				for _, id := range got.ResourceIDs() {
 					if id == shortName {
 						t.Errorf(
 							"GetRelated(%q) def TargetType=%q DisplayName=%q returned "+
@@ -245,7 +245,7 @@ func TestRelatedRegistry_ThinSeededRow_NeverFabricatesSourceTypeAsID(t *testing.
 								"short name fabricated as a related-target ID on a thin "+
 								"seeded row (no RawStruct, minimal Fields). "+
 								"RelatedCheckResult=%+v",
-							shortName, def.TargetType, def.DisplayName, got.ResourceIDs, id, got,
+							shortName, def.TargetType, def.DisplayName, got.ResourceIDs(), id, got,
 						)
 					}
 				}

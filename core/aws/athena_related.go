@@ -40,11 +40,11 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.UnknownRelated("s3")
 	}
 	if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.OutputLocation == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	bucket := bucketFromS3URI(*cfg.ResultConfiguration.OutputLocation)
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	return relatedResult("s3", []string{bucket})
 }
@@ -60,7 +60,7 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, _ r
 		cfg.ResultConfiguration.EncryptionConfiguration == nil ||
 		cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == nil ||
 		*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -76,7 +76,7 @@ func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.UnknownRelated("logs")
 	}
 	if cfg.PublishCloudWatchMetricsEnabled == nil || !*cfg.PublishCloudWatchMetricsEnabled {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	// Athena publishes metrics but the log group is implicit (/aws/athena/<WG>).
 	// Emit the conventional log-group name so detail-view drill-through works.
@@ -92,7 +92,7 @@ func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.UnknownRelated("role")
 	}
 	if cfg.ExecutionRole == nil || *cfg.ExecutionRole == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	roleARN := *cfg.ExecutionRole
 	roleName := roleARN

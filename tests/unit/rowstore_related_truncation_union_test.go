@@ -21,7 +21,6 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
@@ -90,7 +89,7 @@ func TestResolveCachedPagePagination_TruncationUnion_ThroughRelatedCheckResultFo
 				ResourceType:     "ec2",
 				SourceResourceID: "i-truncation-union-1",
 				DefDisplayName:   "Truncation Union Target",
-				Result:           resource.RelatedCheckResult{TargetType: tt, State: domain.RelatedResolved, Count: 1},
+				Result:           resource.KnownRelated(tt, []string{"r-1"}, false),
 				CachedPages: map[string]resource.ResourceCacheEntry{
 					tt: {
 						Resources:   []resource.Resource{{ID: "r-1", Type: tt}},

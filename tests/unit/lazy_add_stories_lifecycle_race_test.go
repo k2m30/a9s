@@ -54,11 +54,7 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-030 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{lazyRes.ID},
-				}
+				return resource.KnownRelated(targetType, []string{lazyRes.ID}, false)
 			},
 		},
 	})
@@ -141,11 +137,7 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-031 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{lazyRes.ID},
-				}
+				return resource.KnownRelated(targetType, []string{lazyRes.ID}, false)
 			},
 		},
 	})
@@ -233,11 +225,7 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-033 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{idB},
-				}
+				return resource.KnownRelated(targetType, []string{idB}, false)
 			},
 		},
 	})
@@ -267,12 +255,8 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 		ResourceType:     srcType,
 		SourceResourceID: src.ID,
 		DefDisplayName:   "LA-033 Target",
-		Result: resource.RelatedCheckResult{
-			TargetType:  targetType,
-			Count:       1,
-			ResourceIDs: []string{idA},
-		},
-		OperationID: m.Core().ActiveDetailOp(),
+		Result:           resource.KnownRelated(targetType, []string{idA}, false),
+		OperationID:      m.Core().ActiveDetailOp(),
 	}
 	m, _ = rootApplyMsg(m, staleResult)
 
@@ -295,11 +279,11 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	}
 
 	// Fresh result must contain idB (what the checker emits), not idA.
-	if len(freshResult.Result.ResourceIDs) == 0 {
+	if len(freshResult.Result.ResourceIDs()) == 0 {
 		t.Fatal("LA-033: fresh check result has no ResourceIDs")
 	}
-	if freshResult.Result.ResourceIDs[0] != idB {
-		t.Errorf("LA-033: after re-run, ResourceIDs[0]=%q, want %q (stale idA must not survive)", freshResult.Result.ResourceIDs[0], idB)
+	if freshResult.Result.ResourceIDs()[0] != idB {
+		t.Errorf("LA-033: after re-run, ResourceIDs[0]=%q, want %q (stale idA must not survive)", freshResult.Result.ResourceIDs()[0], idB)
 	}
 }
 
@@ -341,11 +325,7 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-034 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{lazyRes.ID},
-				}
+				return resource.KnownRelated(targetType, []string{lazyRes.ID}, false)
 			},
 		},
 	})
@@ -438,11 +418,7 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-040 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{idX, idY},
-				}
+				return resource.KnownRelated(targetType, []string{idX, idY}, false)
 			},
 		},
 	})
@@ -489,13 +465,13 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 	}
 
 	// Both dispatches must have identical ResourceIDs.
-	if len(result1.Result.ResourceIDs) != len(result2.Result.ResourceIDs) {
+	if len(result1.Result.ResourceIDs()) != len(result2.Result.ResourceIDs()) {
 		t.Fatalf("LA-040: ResourceIDs length mismatch: first=%v, second=%v",
-			result1.Result.ResourceIDs, result2.Result.ResourceIDs)
+			result1.Result.ResourceIDs(), result2.Result.ResourceIDs())
 	}
-	for i, id := range result1.Result.ResourceIDs {
-		if id != result2.Result.ResourceIDs[i] {
-			t.Errorf("LA-040: ResourceIDs[%d] differs: first=%q, second=%q", i, id, result2.Result.ResourceIDs[i])
+	for i, id := range result1.Result.ResourceIDs() {
+		if id != result2.Result.ResourceIDs()[i] {
+			t.Errorf("LA-040: ResourceIDs[%d] differs: first=%q, second=%q", i, id, result2.Result.ResourceIDs()[i])
 		}
 	}
 
@@ -524,11 +500,7 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 		TargetType:  targetType,
 		DisplayName: "LA-041 Shared Target",
 		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-			return resource.RelatedCheckResult{
-				TargetType:  targetType,
-				Count:       1,
-				ResourceIDs: []string{sharedTarget},
-			}
+			return resource.KnownRelated(targetType, []string{sharedTarget}, false)
 		},
 	}
 
@@ -580,14 +552,14 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 
 	// Beta's result must contain the shared target ID.
 	found := false
-	for _, id := range resBeta.Result.ResourceIDs {
+	for _, id := range resBeta.Result.ResourceIDs() {
 		if id == sharedTarget {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("LA-041: beta result.ResourceIDs=%v, want to contain %q", resBeta.Result.ResourceIDs, sharedTarget)
+		t.Errorf("LA-041: beta result.ResourceIDs=%v, want to contain %q", resBeta.Result.ResourceIDs(), sharedTarget)
 	}
 
 	// Beta's LazyAddedResources must be nil — alpha already seeded the cache.
@@ -613,22 +585,14 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 			TargetType:  targetX,
 			DisplayName: "LA-042 Target X",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetX,
-					Count:       1,
-					ResourceIDs: []string{idForX},
-				}
+				return resource.KnownRelated(targetX, []string{idForX}, false)
 			},
 		},
 		{
 			TargetType:  targetY,
 			DisplayName: "LA-042 Target Y",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetY,
-					Count:       1,
-					ResourceIDs: []string{idForY},
-				}
+				return resource.KnownRelated(targetY, []string{idForY}, false)
 			},
 		},
 	})
@@ -672,7 +636,7 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 		raw := batchCmd()
 		switch v := raw.(type) {
 		case messages.RelatedCheckResult:
-			if v.Result.TargetType == targetX {
+			if v.Result.TargetType() == targetX {
 				return v, true
 			}
 		case tea.BatchMsg:
@@ -681,7 +645,7 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 					continue
 				}
 				msg := cmd()
-				if r, ok := msg.(messages.RelatedCheckResult); ok && r.Result.TargetType == targetX {
+				if r, ok := msg.(messages.RelatedCheckResult); ok && r.Result.TargetType() == targetX {
 					return r, true
 				}
 			}
@@ -702,12 +666,8 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 		ResourceType:     srcType,
 		SourceResourceID: src.ID,
 		DefDisplayName:   "LA-042 Target Y",
-		Result: resource.RelatedCheckResult{
-			TargetType:  targetY,
-			Count:       1,
-			ResourceIDs: []string{idForY},
-		},
-		OperationID: 0, // zero OperationID is always accepted (test sentinel)
+		Result:           resource.KnownRelated(targetY, []string{idForY}, false),
+		OperationID:      0, // zero OperationID is always accepted (test sentinel)
 	}
 	m, _ = rootApplyMsg(m, yResult)
 
@@ -722,13 +682,13 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	}
 
 	// Second X result must equal the first.
-	if len(res1.Result.ResourceIDs) != len(res2.Result.ResourceIDs) {
+	if len(res1.Result.ResourceIDs()) != len(res2.Result.ResourceIDs()) {
 		t.Fatalf("LA-042: ResourceIDs length mismatch: first=%v, second=%v",
-			res1.Result.ResourceIDs, res2.Result.ResourceIDs)
+			res1.Result.ResourceIDs(), res2.Result.ResourceIDs())
 	}
-	for i, id := range res1.Result.ResourceIDs {
-		if id != res2.Result.ResourceIDs[i] {
-			t.Errorf("LA-042: ResourceIDs[%d] corrupted after Y nav: first=%q, second=%q", i, id, res2.Result.ResourceIDs[i])
+	for i, id := range res1.Result.ResourceIDs() {
+		if id != res2.Result.ResourceIDs()[i] {
+			t.Errorf("LA-042: ResourceIDs[%d] corrupted after Y nav: first=%q, second=%q", i, id, res2.Result.ResourceIDs()[i])
 		}
 	}
 }
@@ -756,11 +716,7 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 			DisplayName: "LA-043 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				checkerCalls.Add(1)
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{targetID},
-				}
+				return resource.KnownRelated(targetType, []string{targetID}, false)
 			},
 		},
 	})
@@ -807,12 +763,12 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 	}
 
 	// The ResourceIDs must match across both dispatches.
-	if len(res1.Result.ResourceIDs) != len(res2.Result.ResourceIDs) {
+	if len(res1.Result.ResourceIDs()) != len(res2.Result.ResourceIDs()) {
 		t.Fatalf("LA-043: ResourceIDs length mismatch: first=%v, second=%v",
-			res1.Result.ResourceIDs, res2.Result.ResourceIDs)
+			res1.Result.ResourceIDs(), res2.Result.ResourceIDs())
 	}
-	if len(res2.Result.ResourceIDs) > 0 && res2.Result.ResourceIDs[0] != targetID {
-		t.Errorf("LA-043: second dispatch ResourceIDs[0]=%q, want %q", res2.Result.ResourceIDs[0], targetID)
+	if len(res2.Result.ResourceIDs()) > 0 && res2.Result.ResourceIDs()[0] != targetID {
+		t.Errorf("LA-043: second dispatch ResourceIDs[0]=%q, want %q", res2.Result.ResourceIDs()[0], targetID)
 	}
 
 	// Document behavior: the checker runs on every dispatch because a9s does NOT
@@ -871,11 +827,7 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 			DisplayName: "LA-050 Slow Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				time.Sleep(100 * time.Millisecond)
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"la050-result-id"},
-				}
+				return resource.KnownRelated(targetType, []string{"la050-result-id"}, false)
 			},
 		},
 	})
@@ -918,11 +870,11 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 
 	select {
 	case result := <-done:
-		if result.Result.Count != 1 {
-			t.Errorf("LA-050: result.Count=%d, want 1", result.Result.Count)
+		if result.Result.Count() != 1 {
+			t.Errorf("LA-050: result.Count=%d, want 1", result.Result.Count())
 		}
-		if len(result.Result.ResourceIDs) == 0 || result.Result.ResourceIDs[0] != "la050-result-id" {
-			t.Errorf("LA-050: result.ResourceIDs=%v, want [la050-result-id]", result.Result.ResourceIDs)
+		if len(result.Result.ResourceIDs()) == 0 || result.Result.ResourceIDs()[0] != "la050-result-id" {
+			t.Errorf("LA-050: result.ResourceIDs=%v, want [la050-result-id]", result.Result.ResourceIDs())
 		}
 	case <-time.After(1 * time.Second):
 		t.Fatal("LA-050: RelatedCheckResultMsg not received within 1 second — cmd hung")
@@ -949,11 +901,7 @@ func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-051 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"la051-in-flight-id"},
-				}
+				return resource.KnownRelated(targetType, []string{"la051-in-flight-id"}, false)
 			},
 		},
 	})
@@ -1028,11 +976,7 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 			DisplayName: "LA-052 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				checkerCalls.Add(1)
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"la052-id"},
-				}
+				return resource.KnownRelated(targetType, []string{"la052-id"}, false)
 			},
 		},
 	})
@@ -1089,8 +1033,8 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 
 	// All results must have the same ResourceIDs.
 	for i, r := range results {
-		if len(r.Result.ResourceIDs) == 0 || r.Result.ResourceIDs[0] != "la052-id" {
-			t.Errorf("LA-052: result[%d].ResourceIDs=%v, want [la052-id]", i, r.Result.ResourceIDs)
+		if len(r.Result.ResourceIDs()) == 0 || r.Result.ResourceIDs()[0] != "la052-id" {
+			t.Errorf("LA-052: result[%d].ResourceIDs=%v, want [la052-id]", i, r.Result.ResourceIDs())
 		}
 	}
 }
@@ -1111,11 +1055,7 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-053 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"la053-profile-a-id"},
-				}
+				return resource.KnownRelated(targetType, []string{"la053-profile-a-id"}, false)
 			},
 		},
 	})
@@ -1192,11 +1132,7 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "LA-054 Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"la054-us-east-1-id"},
-				}
+				return resource.KnownRelated(targetType, []string{"la054-us-east-1-id"}, false)
 			},
 		},
 	})

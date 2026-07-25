@@ -39,7 +39,7 @@ func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn
 func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sfnName := res.ID
 	if sfnName == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	expectedLogGroup := "/aws/vendedlogs/states/" + sfnName
@@ -99,7 +99,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -109,7 +109,7 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.UnknownRelated("role")
 	}
 	if out.RoleArn == nil || *out.RoleArn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	return relatedResult("role", []string{arnRoleName(*out.RoleArn)})
 }
@@ -119,7 +119,7 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ res
 func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -130,7 +130,7 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	if out.EncryptionConfiguration == nil || out.EncryptionConfiguration.KmsKeyId == nil ||
 		*out.EncryptionConfiguration.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{arnLastSegment(*out.EncryptionConfiguration.KmsKeyId)})
 }
@@ -141,7 +141,7 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -151,7 +151,7 @@ func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.UnknownRelated("lambda")
 	}
 	if out.Definition == nil || *out.Definition == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	seen := map[string]struct{}{}
@@ -223,7 +223,7 @@ func lambdaFuncNameFromARN(s string) string {
 func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sfnARN := res.Fields["arn"]
 	if sfnARN == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {

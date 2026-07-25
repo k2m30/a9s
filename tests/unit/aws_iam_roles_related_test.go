@@ -60,11 +60,11 @@ func TestRelated_Role_Lambda_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -96,8 +96,8 @@ func TestRelated_Role_Lambda_NotFound(t *testing.T) {
 	checker := roleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -113,8 +113,8 @@ func TestRelated_Role_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -142,8 +142,8 @@ func TestRelated_Role_Lambda_EmptyID(t *testing.T) {
 	checker := roleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty ID", result.Count())
 	}
 }
 
@@ -177,11 +177,11 @@ func TestRelated_Role_Glue_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "glue")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -213,8 +213,8 @@ func TestRelated_Role_Glue_NotFound(t *testing.T) {
 	checker := roleCheckerByTarget(t, "glue")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -230,8 +230,8 @@ func TestRelated_Role_Glue_CacheMissNoClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "glue")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -265,11 +265,11 @@ func TestRelated_Role_NG_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -301,8 +301,8 @@ func TestRelated_Role_NG_NotFound(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -318,8 +318,8 @@ func TestRelated_Role_NG_CacheMissNoClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -347,11 +347,11 @@ func TestRelated_Role_Policy_NilClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "policy")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
-	if result.TargetType != "policy" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	if result.TargetType() != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "policy")
 	}
 }
 
@@ -364,8 +364,8 @@ func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
 	checker := roleCheckerByTarget(t, "policy")
 	// With nil clients it must return -1, not panic.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -404,14 +404,14 @@ func TestRelated_Role_EC2_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "ec2" {
-		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType)
+	if result.TargetType() != "ec2" {
+		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -444,8 +444,8 @@ func TestRelated_Role_EC2_NoMatch(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching profile)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching profile)", result.Count())
 	}
 }
 
@@ -475,8 +475,8 @@ func TestRelated_Role_EC2_EmptyRoleName(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty role name", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty role name", result.Count())
 	}
 }
 
@@ -495,11 +495,11 @@ func TestRelated_Role_EC2_CacheMiss(t *testing.T) {
 	// Empty cache — no "ec2" entry at all.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss)", result.Count())
 	}
-	if result.TargetType != "ec2" {
-		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType)
+	if result.TargetType() != "ec2" {
+		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType())
 	}
 }
 
@@ -529,8 +529,8 @@ func TestRelated_Role_EC2_InstanceNoProfile(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no profile on instance)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no profile on instance)", result.Count())
 	}
 }
 
@@ -565,14 +565,14 @@ func TestRelated_Role_EKS_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (RoleArn matches)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (RoleArn matches)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-cluster" {
-		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -605,11 +605,11 @@ func TestRelated_Role_EKS_NameSegmentMatch(t *testing.T) {
 	checker := roleCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (name-segment match for prefixed ARN)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (name-segment match for prefixed ARN)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prefixed-cluster" {
-		t.Errorf("ResourceIDs = %v, want [prefixed-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prefixed-cluster" {
+		t.Errorf("ResourceIDs = %v, want [prefixed-cluster]", result.ResourceIDs())
 	}
 }
 
@@ -639,8 +639,8 @@ func TestRelated_Role_EKS_NotFound(t *testing.T) {
 	checker := roleCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different role ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different role ARN)", result.Count())
 	}
 }
 
@@ -669,14 +669,14 @@ func TestRelated_Role_IamGroup_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (group principal in trust policy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (group principal in trust policy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "dev-team" {
-		t.Errorf("ResourceIDs = %v, want [dev-team]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "dev-team" {
+		t.Errorf("ResourceIDs = %v, want [dev-team]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -706,8 +706,8 @@ func TestRelated_Role_IamGroup_MultipleGroups(t *testing.T) {
 	checker := roleCheckerByTarget(t, "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two group principals)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two group principals)", result.Count())
 	}
 }
 
@@ -734,8 +734,8 @@ func TestRelated_Role_IamGroup_NoGroupPrincipal(t *testing.T) {
 	checker := roleCheckerByTarget(t, "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no group ARN in trust policy)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no group ARN in trust policy)", result.Count())
 	}
 }
 
@@ -764,14 +764,14 @@ func TestRelated_Role_IamUser_Found(t *testing.T) {
 	checker := roleCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (user principal in trust policy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (user principal in trust policy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alice" {
-		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "alice" {
+		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -798,8 +798,8 @@ func TestRelated_Role_IamUser_NoUserPrincipal(t *testing.T) {
 	checker := roleCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no user ARN in trust policy)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no user ARN in trust policy)", result.Count())
 	}
 }
 
@@ -816,11 +816,11 @@ func TestRelated_Role_IamUser_InvalidJSON(t *testing.T) {
 	checker := roleCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (invalid JSON should not crash)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (invalid JSON should not crash)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 

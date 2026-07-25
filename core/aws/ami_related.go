@@ -16,7 +16,7 @@ import (
 func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -51,7 +51,7 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
+		return resource.KnownRelated("ebs-snap", nil, false)
 	}
 	return relatedResult("ebs-snap", ids)
 }
@@ -67,7 +67,7 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 
 	asgList, asgTruncated, err := relatedResourcesFor(ctx, clients, cache, "asg")

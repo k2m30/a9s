@@ -66,14 +66,14 @@ func TestRelated_NAT_EIP_MatchByAllocationID(t *testing.T) {
 	checker := natCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != allocID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, allocID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != allocID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), allocID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -97,8 +97,8 @@ func TestRelated_NAT_EIP_NoMatchWhenAllocIDNotInCache(t *testing.T) {
 	checker := natCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
 }
 
@@ -114,11 +114,11 @@ func TestRelated_NAT_EIP_MatchByRawStructAllocationID(t *testing.T) {
 	checker := natCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != allocID {
-		t.Errorf("ResourceIDs = %v, want [%s] (AllocationId is the eip id, resolved by identity)", result.ResourceIDs, allocID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != allocID {
+		t.Errorf("ResourceIDs = %v, want [%s] (AllocationId is the eip id, resolved by identity)", result.ResourceIDs(), allocID)
 	}
 }
 
@@ -146,14 +146,14 @@ func TestRelated_NAT_ENI_MatchByNetworkInterfaceID(t *testing.T) {
 	checker := natCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != eniID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, eniID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != eniID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), eniID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -177,8 +177,8 @@ func TestRelated_NAT_ENI_NoMatchWhenENINotInCache(t *testing.T) {
 	checker := natCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
 }
 
@@ -198,8 +198,8 @@ func TestRelated_NAT_ENI_NoAddressesReturnsZero(t *testing.T) {
 	checker := natCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no addresses)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no addresses)", result.Count())
 	}
 }
 
@@ -233,14 +233,14 @@ func TestRelated_NAT_Alarm_MatchByNatGatewayIDDimension(t *testing.T) {
 	checker := natCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != alarmName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, alarmName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != alarmName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), alarmName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -269,8 +269,8 @@ func TestRelated_NAT_Alarm_NoMatchWhenDimensionValueDiffers(t *testing.T) {
 	checker := natCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -301,7 +301,7 @@ func TestRelated_NAT_Alarm_NoMatchWhenDimensionNameDiffers(t *testing.T) {
 	checker := natCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong dimension name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong dimension name)", result.Count())
 	}
 }

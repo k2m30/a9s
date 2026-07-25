@@ -44,7 +44,7 @@ func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("vpc")
 	}
 	if cluster.VpcId == nil || *cluster.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*cluster.VpcId})
 }
@@ -58,7 +58,7 @@ func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("role")
 	}
 	if len(cluster.IamRoles) == 0 {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	var ids []string
 	for _, r := range cluster.IamRoles {
@@ -80,7 +80,7 @@ func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resour
 func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*cluster.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -101,7 +101,7 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -135,7 +135,7 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 		return resource.UnknownRelated("secrets")
 	}
 	if cluster.MasterPasswordSecretArn == nil || *cluster.MasterPasswordSecretArn == "" {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	secretARN := *cluster.MasterPasswordSecretArn
 
@@ -169,19 +169,19 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 		return resource.UnknownRelated("logs")
 	}
 	if status.LoggingEnabled == nil || !*status.LoggingEnabled {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	if status.LogDestinationType != redshifttypes.LogDestinationTypeCloudwatch {
 		// S3-only audit logging — no log group association.
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	clusterID := res.ID
 	if clusterID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	if len(status.LogExports) == 0 {
 		// CloudWatch logging enabled but no specific exports configured.
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	// Emit one log-group ID per enabled export:
 	// /aws/redshift/cluster/{clusterID}/{logExport}
@@ -204,10 +204,10 @@ func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.UnknownRelated("s3")
 	}
 	if status.LoggingEnabled == nil || !*status.LoggingEnabled {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	if status.BucketName == nil || *status.BucketName == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	return relatedResult("s3", []string{*status.BucketName})
 }
@@ -233,7 +233,7 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 		return resource.ErrorRelated("subnet", err)
 	}
 	if out == nil || len(out.ClusterSubnetGroups) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, sn := range out.ClusterSubnetGroups[0].Subnets {

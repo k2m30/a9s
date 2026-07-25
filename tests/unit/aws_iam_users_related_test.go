@@ -26,11 +26,11 @@ func TestRelated_IAMUser_IAMGroup_NilClients(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "iam-user", "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no clients)", result.Count())
 	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
 }
 
@@ -42,8 +42,8 @@ func TestRelated_IAMUser_IAMGroup_EmptyID(t *testing.T) {
 	checker := checkerByTarget(t, "iam-user", "iam-group")
 	// nil clients must return -1, not panic
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 

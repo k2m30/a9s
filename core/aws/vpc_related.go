@@ -18,7 +18,7 @@ import (
 func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
@@ -43,7 +43,7 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
@@ -68,7 +68,7 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -93,7 +93,7 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -123,7 +123,7 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
+		return resource.KnownRelated("nat", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -148,7 +148,7 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
+		return resource.KnownRelated("igw", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "igw")
@@ -173,7 +173,7 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
+		return resource.KnownRelated("rtb", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -198,7 +198,7 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+		return resource.KnownRelated("vpce", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
@@ -227,7 +227,7 @@ func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	return relatedResult("cfn", []string{stackName})
 }
@@ -237,7 +237,7 @@ func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -267,7 +267,7 @@ func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
+		return resource.KnownRelated("tgw", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {

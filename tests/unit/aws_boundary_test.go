@@ -55,10 +55,10 @@ func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		got := checker(context.Background(), clients, parent, nil)
-		if got.State != domain.RelatedError {
-			t.Errorf("State = %v, want RelatedError (AccessDenied on DescribeSubnets)", got.State)
+		if got.State() != domain.RelatedError {
+			t.Errorf("State = %v, want RelatedError (AccessDenied on DescribeSubnets)", got.State())
 		}
-		if got.Err == nil {
+		if got.Err() == nil {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
 		}
 	})
@@ -78,10 +78,10 @@ func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "ddb", "kinesis")
 		got := checker(context.Background(), clients, parent, nil)
-		if got.State != domain.RelatedError {
-			t.Errorf("State = %v, want RelatedError (AccessDenied on DescribeKinesisStreamingDestination)", got.State)
+		if got.State() != domain.RelatedError {
+			t.Errorf("State = %v, want RelatedError (AccessDenied on DescribeKinesisStreamingDestination)", got.State())
 		}
-		if got.Err == nil {
+		if got.Err() == nil {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
 		}
 	})
@@ -96,10 +96,10 @@ func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "kms", "role")
 		got := checker(context.Background(), clients, parent, nil)
-		if got.State != domain.RelatedError {
-			t.Errorf("State = %v, want RelatedError (AccessDenied on GetKeyPolicy)", got.State)
+		if got.State() != domain.RelatedError {
+			t.Errorf("State = %v, want RelatedError (AccessDenied on GetKeyPolicy)", got.State())
 		}
-		if got.Err == nil {
+		if got.Err() == nil {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
 		}
 	})
@@ -153,11 +153,11 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 		if calls < 2 {
 			t.Errorf("DescribeSubnets call count = %d, want >= 2 (retry must have fired)", calls)
 		}
-		if got.Count != 1 {
-			t.Errorf("Count = %d, want 1 (successful retry returned one VPC)", got.Count)
+		if got.Count() != 1 {
+			t.Errorf("Count = %d, want 1 (successful retry returned one VPC)", got.Count())
 		}
-		if got.Err != nil {
-			t.Errorf("Err = %v, want nil (successful retry should clear error)", got.Err)
+		if got.Err() != nil {
+			t.Errorf("Err = %v, want nil (successful retry should clear error)", got.Err())
 		}
 	})
 
@@ -222,10 +222,10 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			},
 		}
 		gotExact := checker(context.Background(), nil, source, exact)
-		if gotExact.Count < 1 {
-			t.Errorf("exact cache: Count = %d, want >= 1", gotExact.Count)
+		if gotExact.Count() < 1 {
+			t.Errorf("exact cache: Count = %d, want >= 1", gotExact.Count())
 		}
-		if gotExact.Truncated {
+		if gotExact.Truncated() {
 			t.Error("exact cache: Truncated = true, want false (IsTruncated=false)")
 		}
 
@@ -237,10 +237,10 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			},
 		}
 		gotTruncated := checker(context.Background(), nil, source, truncated)
-		if gotTruncated.Count < 1 {
-			t.Errorf("truncated cache: Count = %d, want >= 1", gotTruncated.Count)
+		if gotTruncated.Count() < 1 {
+			t.Errorf("truncated cache: Count = %d, want >= 1", gotTruncated.Count())
 		}
-		if !gotTruncated.Truncated {
+		if !gotTruncated.Truncated() {
 			t.Error("truncated cache: Truncated = false, want true (IsTruncated=true)")
 		}
 	})
@@ -280,10 +280,10 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			},
 		}
 		gotExact := checker(context.Background(), nil, efsSource, exact)
-		if gotExact.Count < 1 {
-			t.Errorf("exact cache: Count = %d, want >= 1", gotExact.Count)
+		if gotExact.Count() < 1 {
+			t.Errorf("exact cache: Count = %d, want >= 1", gotExact.Count())
 		}
-		if gotExact.Truncated {
+		if gotExact.Truncated() {
 			t.Error("exact cache: Truncated = true, want false (IsTruncated=false)")
 		}
 
@@ -295,10 +295,10 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			},
 		}
 		gotTruncated := checker(context.Background(), nil, efsSource, truncated)
-		if gotTruncated.Count < 1 {
-			t.Errorf("truncated cache: Count = %d, want >= 1", gotTruncated.Count)
+		if gotTruncated.Count() < 1 {
+			t.Errorf("truncated cache: Count = %d, want >= 1", gotTruncated.Count())
 		}
-		if !gotTruncated.Truncated {
+		if !gotTruncated.Truncated() {
 			t.Error("truncated cache: Truncated = false, want true (IsTruncated=true)")
 		}
 	})
@@ -341,14 +341,14 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 	checker := boundaryCheckerByTarget(t, "asg", "vpc")
 	got := checker(context.Background(), clients, parent, resource.ResourceCache{})
 
-	if got.Count != 2 {
-		t.Errorf("Count = %d, want 2 (5 subnets deduped to 2 VPC IDs)", got.Count)
+	if got.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (5 subnets deduped to 2 VPC IDs)", got.Count())
 	}
-	if len(got.ResourceIDs) != 2 {
-		t.Errorf("len(ResourceIDs) = %d, want 2", len(got.ResourceIDs))
+	if len(got.ResourceIDs()) != 2 {
+		t.Errorf("len(ResourceIDs) = %d, want 2", len(got.ResourceIDs()))
 	}
-	if got.Err != nil {
-		t.Errorf("unexpected error: %v", got.Err)
+	if got.Err() != nil {
+		t.Errorf("unexpected error: %v", got.Err())
 	}
 }
 
@@ -382,8 +382,8 @@ func TestChecker_NilClients_ReturnsError(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		// Ensure no panic occurs when clients is nil.
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if got.State != domain.RelatedUnknown {
-			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State)
+		if got.State() != domain.RelatedUnknown {
+			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State())
 		}
 	})
 
@@ -394,8 +394,8 @@ func TestChecker_NilClients_ReturnsError(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "ddb", "kinesis")
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if got.State != domain.RelatedUnknown {
-			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State)
+		if got.State() != domain.RelatedUnknown {
+			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State())
 		}
 	})
 }
@@ -425,8 +425,8 @@ func TestReverseScans_DoNotPopulateFetchFilter(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "cb", "pipeline")
 		result := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if len(result.FetchFilter) != 0 {
-			t.Errorf("cb→pipeline: FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter)
+		if len(result.FetchFilter()) != 0 {
+			t.Errorf("cb→pipeline: FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter())
 		}
 	})
 
@@ -440,8 +440,8 @@ func TestReverseScans_DoNotPopulateFetchFilter(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "ecs-svc", "eb-rule")
 		result := checker(context.Background(), nil, parent, cache)
-		if len(result.FetchFilter) != 0 {
-			t.Errorf("ecs-svc→eb-rule: FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter)
+		if len(result.FetchFilter()) != 0 {
+			t.Errorf("ecs-svc→eb-rule: FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter())
 		}
 	})
 
@@ -454,8 +454,8 @@ func TestReverseScans_DoNotPopulateFetchFilter(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "secrets", "ecs-task")
 		result := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if len(result.FetchFilter) != 0 {
-			t.Errorf("secrets→ecs-task: FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter)
+		if len(result.FetchFilter()) != 0 {
+			t.Errorf("secrets→ecs-task: FetchFilter = %v, want empty (reverse-scan must not set FetchFilter)", result.FetchFilter())
 		}
 	})
 }

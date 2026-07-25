@@ -69,7 +69,7 @@ func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
@@ -93,7 +93,7 @@ func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
+		return resource.KnownRelated("iam-user", nil, false)
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
@@ -122,7 +122,7 @@ func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
+		return resource.KnownRelated("iam-group", nil, false)
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {

@@ -100,15 +100,15 @@ func TestBuildCTEventsPivotChecker_EmptyID_ReturnsZero(t *testing.T) {
 	res := ctPivotSrcResource("")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf(
 			"BuildCTEventsPivotChecker: empty ID: Count = %d, want 0 — "+
 				"CT-EVENTS-PIVOT: empty ID must short-circuit to zero without scanning",
-			result.Count,
+			result.Count(),
 		)
 	}
-	if result.TargetType != "ct-events" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "ct-events")
+	if result.TargetType() != "ct-events" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "ct-events")
 	}
 }
 
@@ -132,15 +132,15 @@ func TestBuildCTEventsPivotChecker_TypedEventMatches(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf(
 			"BuildCTEventsPivotChecker: typed match: Count = %d, want 1 — "+
 				"CT-EVENTS-PIVOT: typed event matching Resources[].ResourceName must count matching events",
-			result.Count,
+			result.Count(),
 		)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "event-aaa" {
-		t.Errorf("ResourceIDs = %v, want [event-aaa]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "event-aaa" {
+		t.Errorf("ResourceIDs = %v, want [event-aaa]", result.ResourceIDs())
 	}
 }
 
@@ -162,12 +162,12 @@ func TestBuildCTEventsPivotChecker_TextFallback_NoTypedStruct(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf(
 			"BuildCTEventsPivotChecker: text fallback: Count = %d, want 1 — "+
 				"CT-EVENTS-PIVOT: text-fallback via Fields[resource_name] must match "+
 				"events without typed RawStruct",
-			result.Count,
+			result.Count(),
 		)
 	}
 }
@@ -191,11 +191,11 @@ func TestBuildCTEventsPivotChecker_Truncated_ReturnsMinusOne(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedDeferred {
+	if result.State() != domain.RelatedDeferred {
 		t.Errorf(
 			"BuildCTEventsPivotChecker: truncated cache: State = %v, want RelatedDeferred — "+
 				"CT-EVENTS-PIVOT: truncated cache means partial window; navigation defers to a server-side filtered fetch, not a positive count",
-			result.State,
+			result.State(),
 		)
 	}
 }
@@ -215,12 +215,12 @@ func TestBuildCTEventsPivotChecker_NilCacheList_ReturnsMinusOne(t *testing.T) {
 	// Cache has no ct-events entry at all.
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
+	if result.State() != domain.RelatedError {
 		t.Errorf(
 			"BuildCTEventsPivotChecker: absent cache entry: State = %v, want RelatedError — "+
 				"CT-EVENTS-PIVOT: ct-events not loaded in cache; FetchRelatedTarget calls the real registered "+
 				"fetcher with nil clients, which fails and must surface as an error, not a positive count",
-			result.State,
+			result.State(),
 		)
 	}
 }
@@ -246,11 +246,11 @@ func TestBuildCTEventsPivotChecker_CacheError_ReturnsMinusOne(t *testing.T) {
 	// ct-events fetcher; the wrong-typed clients value makes that call fail.
 	result := checker(context.Background(), struct{}{}, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
+	if result.State() != domain.RelatedError {
 		t.Errorf(
 			"BuildCTEventsPivotChecker: cache miss + bad clients: State = %v, want RelatedError — "+
 				"CT-EVENTS-PIVOT: a failed live fetch must surface as an error, not a positive count",
-			result.State,
+			result.State(),
 		)
 	}
 }
@@ -283,23 +283,23 @@ func TestBuildCTEventsPivotChecker_Wired_DbcSnap(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 2 {
+	if result.Count() != 2 {
 		t.Errorf(
 			"BuildCTEventsPivotChecker (dbc-snap scenario): Count = %d, want 2 — "+
 				"CT-EVENTS-PIVOT (Wired_DbcSnap): factory must count all events "+
 				"referencing the snapshot ID via Resources[].ResourceName",
-			result.Count,
+			result.Count(),
 		)
 	}
-	if result.TargetType != "ct-events" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "ct-events")
+	if result.TargetType() != "ct-events" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "ct-events")
 	}
 	// FetchFilter["ResourceName"] must be set so the caller can do a filtered re-fetch.
-	if result.FetchFilter["ResourceName"] != snapID {
+	if result.FetchFilter()["ResourceName"] != snapID {
 		t.Errorf(
 			"FetchFilter[ResourceName] = %q, want %q — "+
 				"CT-EVENTS-PIVOT: FetchFilter must be populated for filtered re-fetch",
-			result.FetchFilter["ResourceName"], snapID,
+			result.FetchFilter()["ResourceName"], snapID,
 		)
 	}
 }

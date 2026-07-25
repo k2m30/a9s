@@ -73,20 +73,20 @@ func TestCheckAMING_MatchesWhenNGImageIDMatches(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.TargetType != "ng" {
-		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType)
+	if result.TargetType() != "ng" {
+		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ng-custom uses ami-xyz)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ng-custom uses ami-xyz)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "ng-custom" {
-		t.Errorf("ResourceIDs = %v, want [\"ng-custom\"]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "ng-custom" {
+		t.Errorf("ResourceIDs = %v, want [\"ng-custom\"]", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false (non-truncated cache with full match)")
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil", result.Err())
 	}
 }
 
@@ -127,13 +127,13 @@ func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.TargetType != "ng" {
-		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType)
+	if result.TargetType() != "ng" {
+		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different AMI ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different AMI ID)", result.Count())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false (non-truncated cache — definitive zero)")
 	}
 }
@@ -177,17 +177,17 @@ func TestCheckAMING_TruncatedWhenCacheTruncatedAndNoMatch(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.TargetType != "ng" {
-		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType)
+	if result.TargetType() != "ng" {
+		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache — lower bound only). Result: %+v", result)
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil", result.Err())
 	}
 }
 
@@ -236,15 +236,15 @@ func TestCheckAMING_CountsOnlyMatchingNGs(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (ng-a and ng-c use ami-shared)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (ng-a and ng-c use ami-shared)", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
 	// Verify both matching nodegroups are present in ResourceIDs
 	found := make(map[string]bool)
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}
 	if !found["ng-a"] {
@@ -285,10 +285,10 @@ func TestCheckAMING_EmptyAMIIDReturnsZero(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty AMI ID is an immediate non-match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty AMI ID is an immediate non-match)", result.Count())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false (empty ID is a definitive non-match)")
 	}
 }

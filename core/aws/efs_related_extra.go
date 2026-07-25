@@ -21,7 +21,7 @@ import (
 func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+		return resource.KnownRelated("alarm", nil, false)
 	}
 	alarmList, truncated, err := efsRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
@@ -50,14 +50,14 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -76,14 +76,14 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	vpcSet := make(map[string]struct{})
 	for _, eniRes := range eniList {
@@ -119,10 +119,10 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 	// handed us a valid truncated cache would drop the honest lower bound.
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 	if fs.FileSystemArn == nil || *fs.FileSystemArn == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 	fsARN := *fs.FileSystemArn
 

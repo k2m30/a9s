@@ -43,11 +43,11 @@ func TestRelated_SNSSub_Topic_Match(t *testing.T) {
 	checker := snsSubCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != topicARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, topicARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != topicARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), topicARN)
 	}
 }
 
@@ -69,8 +69,8 @@ func TestRelated_SNSSub_Topic_NoMatch(t *testing.T) {
 	checker := snsSubCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -95,11 +95,11 @@ func TestRelated_SNSSub_Lambda_Match(t *testing.T) {
 	checker := snsSubCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != lambdaARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, lambdaARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != lambdaARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), lambdaARN)
 	}
 }
 
@@ -121,8 +121,8 @@ func TestRelated_SNSSub_Lambda_WrongProtocol(t *testing.T) {
 	checker := snsSubCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count())
 	}
 }
 
@@ -151,11 +151,11 @@ func TestRelated_SNSSub_SQS_Match(t *testing.T) {
 	checker := snsSubCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != queueName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, queueName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != queueName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), queueName)
 	}
 }
 
@@ -177,8 +177,8 @@ func TestRelated_SNSSub_SQS_WrongProtocol(t *testing.T) {
 	checker := snsSubCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count())
 	}
 }
 
@@ -217,8 +217,8 @@ func TestRelated_SNSSub_NilClients(t *testing.T) {
 		checker := snsSubCheckerByTarget(t, target)
 		res := snsSubResForTarget(target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count())
 		}
 	}
 }
@@ -228,8 +228,8 @@ func TestRelated_SNSSub_EmptyCache(t *testing.T) {
 		checker := snsSubCheckerByTarget(t, target)
 		res := snsSubResForTarget(target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (empty cache)", target, result.Count())
 		}
 	}
 }

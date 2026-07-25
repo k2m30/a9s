@@ -615,7 +615,20 @@ type RelatedDef struct {
 
 `(*Core).HandleRelatedCheckStarted` (`core/runtime/related.go`; TUI adapter `handleRelatedCheckStarted` in `internal/tui/runtime_adapter_related.go`) fans out one goroutine per `RelatedDef`, capped by `MaxConcurrentProbes`. Results carry a generation to discard stale results after Ctrl+R or profile/region switch.
 
-**Truncated-cache contract (`Truncated=true`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `relatedResultTrunc(target, ids, truncated)` (core/aws/related_common.go) returns a sentinel `RelatedCheckResult{Count:0, Truncated:true}` used when a truncated cache yielded no matches yet later pages may contain some. File-local `truncatedResult*` helpers (in `ddb_related.go`, `s3_related.go`, `ses_related.go`, `redis_related.go`) produce the same shape when matches were found but the cache was still truncated. The UI renders these as `(N+)` or `(0+)` so operators know the real count is at least N.
+**A checker result cannot carry a count alongside a failure.** `domain.RelatedCheckResult`'s fields are unexported; it is constructible only through four smart constructors, re-exported from `core/resource`:
+
+| Constructor | Meaning | Renders |
+|---|---|---|
+| `KnownRelated(target, ids, truncated)` | the call succeeded; count is `len(unique ids)` | `N`, or `N+` when truncated |
+| `UnknownRelated(target)` | we could not determine the answer | `?` |
+| `ErrorRelated(target, err)` | the call failed, with a reason to surface | error marker |
+| `DeferredRelated(target)` | not resolved yet by design | deferred |
+
+This exists because the old struct permitted `Count: 0` after a failed call, and ~136 hand-written checkers each re-derived their own error handling — so they disagreed. `dbc_related.go` and `redis_related.go` performed the identical two-hop subnet-group resolution and returned opposite answers on failure; both shipped. A denied `logs:DescribeSubscriptionFilters` rendered as a proven `(0)` on a log group that was actively streaming. **Writing `RelatedCheckResult{Count: 0}` is now a compile error outside `core/domain`**, so the lazy default is unavailable; what the type cannot prevent is a well-typed but wrong choice — calling `KnownRelated` where the code should have caught an error and called `UnknownRelated`.
+
+A genuine zero stays a proven zero: a successful call returning an empty list is `KnownRelated(target, nil, false)`. Turning those into unknowns is the opposite defect and makes every panel useless.
+
+**Truncated-cache contract (`Truncated=true`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `KnownRelated(target, ids, true)` carries that signal, and the UI renders `(N+)` or `(0+)` so operators know the real count is at least N. The same shape covers a partial union: when several calls back one pivot and only some succeed, the confirmed IDs render as `N+` rather than a false exact total. Truncation means "the population is larger than what we enumerated" — a hard failure with nothing confirmed is `ErrorRelated`, not truncation.
 
 ### Navigable Fields
 

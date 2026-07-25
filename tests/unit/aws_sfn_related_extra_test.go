@@ -72,11 +72,11 @@ func TestRelated_SFN_Role_Found(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sfn-execution-role" {
-		t.Errorf("ResourceIDs = %v, want [sfn-execution-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sfn-execution-role" {
+		t.Errorf("ResourceIDs = %v, want [sfn-execution-role]", result.ResourceIDs())
 	}
 }
 
@@ -92,8 +92,8 @@ func TestRelated_SFN_Role_NoRoleArn_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no RoleArn in output)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no RoleArn in output)", result.Count())
 	}
 }
 
@@ -116,11 +116,11 @@ func TestRelated_SFN_KMS_Found(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "kms")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != kmsKeyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, kmsKeyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != kmsKeyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), kmsKeyID)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_SFN_KMS_NoEncryptionConfig_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "kms")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no EncryptionConfiguration)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionConfiguration)", result.Count())
 	}
 }
 
@@ -155,8 +155,8 @@ func TestRelated_SFN_KMS_EmptyKmsKeyId_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "kms")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty KmsKeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty KmsKeyId)", result.Count())
 	}
 }
 
@@ -166,8 +166,8 @@ func TestRelated_SFN_KMS_NilClients_ReturnsNegOne(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -179,8 +179,8 @@ func TestRelated_SFN_KMS_EmptyARN_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count())
 	}
 }
 
@@ -212,11 +212,11 @@ func TestRelated_SFN_Lambda_FoundFromResourceARN(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-order" {
-		t.Errorf("ResourceIDs = %v, want [process-order]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "process-order" {
+		t.Errorf("ResourceIDs = %v, want [process-order]", result.ResourceIDs())
 	}
 }
 
@@ -247,11 +247,11 @@ func TestRelated_SFN_Lambda_FoundFromParametersFunctionName(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "validate-input" {
-		t.Errorf("ResourceIDs = %v, want [validate-input]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "validate-input" {
+		t.Errorf("ResourceIDs = %v, want [validate-input]", result.ResourceIDs())
 	}
 }
 
@@ -283,8 +283,8 @@ func TestRelated_SFN_Lambda_DeduplicatesMultipleReferences(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count())
 	}
 }
 
@@ -316,16 +316,16 @@ func TestRelated_SFN_Lambda_MultipleDifferentFunctions(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	found := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}
 	for _, name := range []string{"fn-alpha", "fn-beta"} {
 		if !found[name] {
-			t.Errorf("ResourceIDs %v missing %q", result.ResourceIDs, name)
+			t.Errorf("ResourceIDs %v missing %q", result.ResourceIDs(), name)
 		}
 	}
 }
@@ -353,8 +353,8 @@ func TestRelated_SFN_Lambda_NoLambdaInDefinition_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no Lambda in ASL)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no Lambda in ASL)", result.Count())
 	}
 }
 
@@ -370,8 +370,8 @@ func TestRelated_SFN_Lambda_NilDefinition_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Definition)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Definition)", result.Count())
 	}
 }
 
@@ -387,8 +387,8 @@ func TestRelated_SFN_Lambda_EmptyDefinition_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty Definition)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty Definition)", result.Count())
 	}
 }
 
@@ -398,8 +398,8 @@ func TestRelated_SFN_Lambda_NilClients_ReturnsNegOne(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -411,8 +411,8 @@ func TestRelated_SFN_Lambda_EmptyARN_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count())
 	}
 }
 
@@ -444,10 +444,10 @@ func TestRelated_SFN_Lambda_StatesIntegrationResourceIgnored(t *testing.T) {
 
 	// "arn:aws:states:::lambda:invoke" must not match (not a Lambda ARN).
 	// "arn:aws:lambda:...:function:real-function" must match via FunctionName.
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (states::: ARN ignored, FunctionName extracted)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (states::: ARN ignored, FunctionName extracted)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "real-function" {
-		t.Errorf("ResourceIDs = %v, want [real-function]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "real-function" {
+		t.Errorf("ResourceIDs = %v, want [real-function]", result.ResourceIDs())
 	}
 }

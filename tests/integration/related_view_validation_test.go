@@ -130,9 +130,9 @@ func TestFullRelatedViewValidation(t *testing.T) {
 							if !ok {
 								// The UI did not emit a result for this def. This is unexpected
 								// if the checker returned a definitive (RelatedResolved) count.
-								if expected.State == domain.RelatedResolved {
+								if expected.State() == domain.RelatedResolved {
 									t.Errorf("related %q: checker returned State=RelatedResolved Count=%d but detail view never emitted a RelatedCheckResultMsg",
-										def.DisplayName, expected.Count)
+										def.DisplayName, expected.Count())
 								}
 								return
 							}
@@ -143,14 +143,14 @@ func TestFullRelatedViewValidation(t *testing.T) {
 							// RelatedUnknown, or a server-side-filtered RelatedDeferred
 							// pivot), it could not compute the count — skip the comparison
 							// in that case, but still verify navigation below.
-							if expected.State == domain.RelatedResolved && uiMsg.Result.Count != expected.Count {
+							if expected.State() == domain.RelatedResolved && uiMsg.Result.Count() != expected.Count() {
 								t.Errorf("related %q: count mismatch: UI=%d, checker=%d",
-									def.DisplayName, uiMsg.Result.Count, expected.Count)
+									def.DisplayName, uiMsg.Result.Count(), expected.Count())
 							}
 
 							// If actionable (count > 0), follow the related entry and verify navigation.
 							// Use a fresh scenario to avoid polluting the main scenario's state.
-							if uiMsg.Result.Count > 0 || uiMsg.Result.State == domain.RelatedDeferred {
+							if uiMsg.Result.Count() > 0 || uiMsg.Result.State() == domain.RelatedDeferred {
 								// Fresh scenario for navigation — avoids relatedCache hit problem on re-entry.
 								// Shares root scenario's clients to skip STS AssumeRole per sub-test.
 								var navSc *fullIntegrationScenario

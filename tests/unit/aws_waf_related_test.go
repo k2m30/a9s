@@ -96,8 +96,8 @@ func TestRelated_WAF_ELB_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, nil)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State())
 	}
 }
 
@@ -109,8 +109,8 @@ func TestRelated_WAF_APIGW_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, nil)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State())
 	}
 }
 
@@ -121,11 +121,11 @@ func TestRelated_WAF_CF_RegionalReturnsZero(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, res, nil)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (REGIONAL scope cannot bind CloudFront)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (REGIONAL scope cannot bind CloudFront)", result.Count())
 	}
-	if result.TargetType != "cf" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	if result.TargetType() != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cf")
 	}
 }
 
@@ -146,8 +146,8 @@ func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 	}
 	checker := wafCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, res, nil)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (CLOUDFRONT scope: requires ListResourcesForWebACL)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (CLOUDFRONT scope: requires ListResourcesForWebACL)", result.Count())
 	}
 }
 
@@ -174,14 +174,14 @@ func TestRelated_WAF_Alarm_MatchByWebACLDimension(t *testing.T) {
 	checker := wafCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "waf-blocked-requests-alarm" {
-		t.Errorf("ResourceIDs = %v, want [waf-blocked-requests-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "waf-blocked-requests-alarm" {
+		t.Errorf("ResourceIDs = %v, want [waf-blocked-requests-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -206,8 +206,8 @@ func TestRelated_WAF_Alarm_NoMatch(t *testing.T) {
 	checker := wafCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -219,8 +219,8 @@ func TestRelated_WAF_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := wafCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -236,8 +236,8 @@ func TestRelated_WAF_Alarm_EmptyName(t *testing.T) {
 	checker := wafCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty name)", result.Count())
 	}
 }
 
@@ -255,8 +255,8 @@ func TestRelated_WAF_Logs_EmptyARN(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count())
 	}
 }
 
@@ -276,8 +276,8 @@ func TestRelated_WAF_Logs_NilClients(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -310,11 +310,11 @@ func TestRelated_WAF_ELB_ExtractsNameFromARN(t *testing.T) {
 	checker := wafCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-alb" {
-		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alb" {
+		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs())
 	}
 }
 
@@ -335,8 +335,8 @@ func TestRelated_WAF_ELB_NoMatch(t *testing.T) {
 	checker := wafCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ARNs returned)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ARNs returned)", result.Count())
 	}
 }
 
@@ -360,8 +360,8 @@ func TestRelated_WAF_ELB_ShortARNSkipped(t *testing.T) {
 	result := checker(context.Background(), clients, res, nil)
 
 	// ARN "only/two" splits to ["only","two"] — len < 3, skipped.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (short ARN skipped)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (short ARN skipped)", result.Count())
 	}
 }
 
@@ -391,11 +391,11 @@ func TestRelated_WAF_APIGW_ExtractsAPIIDFromARN(t *testing.T) {
 	checker := wafCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc123def" {
-		t.Errorf("ResourceIDs = %v, want [abc123def]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc123def" {
+		t.Errorf("ResourceIDs = %v, want [abc123def]", result.ResourceIDs())
 	}
 }
 
@@ -418,8 +418,8 @@ func TestRelated_WAF_APIGW_NoRestAPIsInARN(t *testing.T) {
 	checker := wafCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no /restapis/ in ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no /restapis/ in ARN)", result.Count())
 	}
 }
 
@@ -452,11 +452,11 @@ func TestRelated_WAF_Logs_CWLogGroupNameExtracted(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/waf/my-waf" {
-		t.Errorf("ResourceIDs = %v, want [/aws/waf/my-waf]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/waf/my-waf" {
+		t.Errorf("ResourceIDs = %v, want [/aws/waf/my-waf]", result.ResourceIDs())
 	}
 }
 
@@ -485,11 +485,11 @@ func TestRelated_WAF_Logs_FirehoseARNPassthrough(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != firehoseARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, firehoseARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != firehoseARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), firehoseARN)
 	}
 }
 
@@ -512,11 +512,11 @@ func TestRelated_WAF_Logs_NoLoggingConfigured(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (WAFNonexistentItemException = no logging configured)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (WAFNonexistentItemException = no logging configured)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -553,14 +553,14 @@ func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 	checker := wafCheckerByTarget(t, "cf")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Fatalf("ResourceIDs len = %d, want 2 (got %v)", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Fatalf("ResourceIDs len = %d, want 2 (got %v)", len(result.ResourceIDs()), result.ResourceIDs())
 	}
-	if result.ResourceIDs[0] != "E1ABC123DEF456" || result.ResourceIDs[1] != "E2XYZ789GHI012" {
-		t.Errorf("ResourceIDs = %v, want [E1ABC123DEF456, E2XYZ789GHI012]", result.ResourceIDs)
+	if result.ResourceIDs()[0] != "E1ABC123DEF456" || result.ResourceIDs()[1] != "E2XYZ789GHI012" {
+		t.Errorf("ResourceIDs = %v, want [E1ABC123DEF456, E2XYZ789GHI012]", result.ResourceIDs())
 	}
 }
 
@@ -589,7 +589,7 @@ func TestRelated_WAF_CF_CloudfrontScopeEmptyDistributionList(t *testing.T) {
 	checker := wafCheckerByTarget(t, "cf")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty distribution list)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty distribution list)", result.Count())
 	}
 }

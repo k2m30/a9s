@@ -146,7 +146,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	// Build result map for diagnostics.
 	countByName := make(map[string]int, len(results))
 	for _, r := range results {
-		countByName[r.DefDisplayName] = r.Result.Count
+		countByName[r.DefDisplayName] = r.Result.Count()
 	}
 
 	// The self-pivot checkers (CT events by AccessKeyId, Username, EventName,
@@ -177,11 +177,11 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 		// A self-pivot checker failure is: Count=-1 AND FetchFilter is empty AND Err is set.
 		// Count=-1 with FetchFilter non-empty is the normal navigation-mode result.
 		// Count>=0 means the field was missing so no pivot applies (also valid).
-		if r.Result.Count < 0 && len(r.Result.FetchFilter) == 0 {
-			if r.Result.Err != nil {
-				failures = append(failures, fmt.Sprintf("%q: Count=%d, Err=%v", name, r.Result.Count, r.Result.Err))
+		if r.Result.Count() < 0 && len(r.Result.FetchFilter()) == 0 {
+			if r.Result.Err() != nil {
+				failures = append(failures, fmt.Sprintf("%q: Count=%d, Err=%v", name, r.Result.Count(), r.Result.Err()))
 			} else {
-				failures = append(failures, fmt.Sprintf("%q: Count=%d, FetchFilter=nil (checker returned unknown with no filter — check panic recovery)", name, r.Result.Count))
+				failures = append(failures, fmt.Sprintf("%q: Count=%d, FetchFilter=nil (checker returned unknown with no filter — check panic recovery)", name, r.Result.Count()))
 			}
 		}
 	}
@@ -193,7 +193,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	// At least one checker overall must succeed (Count >= 0).
 	anySuccess := false
 	for _, r := range results {
-		if r.Result.Count >= 0 {
+		if r.Result.Count() >= 0 {
 			anySuccess = true
 			break
 		}

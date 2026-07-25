@@ -79,14 +79,14 @@ func TestRelated_ELB_TG_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "test-tg" {
-		t.Errorf("ResourceIDs = %v, want [test-tg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "test-tg" {
+		t.Errorf("ResourceIDs = %v, want [test-tg]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -121,8 +121,8 @@ func TestRelated_ELB_TG_NotFound(t *testing.T) {
 	checker := elbCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -142,8 +142,8 @@ func TestRelated_ELB_TG_CacheMissNoClients(t *testing.T) {
 	checker := elbCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -175,8 +175,8 @@ func TestRelated_ELB_TG_EmptyARN(t *testing.T) {
 	checker := elbCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty ARN", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty ARN", result.Count())
 	}
 }
 
@@ -215,14 +215,14 @@ func TestRelated_ELB_Alarms_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "elb-5xx-errors" {
-		t.Errorf("ResourceIDs = %v, want [elb-5xx-errors]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "elb-5xx-errors" {
+		t.Errorf("ResourceIDs = %v, want [elb-5xx-errors]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -256,8 +256,8 @@ func TestRelated_ELB_Alarms_NotFound(t *testing.T) {
 	checker := elbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -277,8 +277,8 @@ func TestRelated_ELB_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := elbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown", result.State())
 	}
 }
 
@@ -295,11 +295,11 @@ func TestRelated_ELB_CFN_Unknown(t *testing.T) {
 	}
 	checker := elbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (unknown: tags via DescribeTags per ELB)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (unknown: tags via DescribeTags per ELB)", result.State())
 	}
-	if result.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	if result.TargetType() != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cfn")
 	}
 }
 
@@ -308,8 +308,8 @@ func TestRelated_ELB_CFN_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := elbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty identity)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty identity)", result.Count())
 	}
 }
 

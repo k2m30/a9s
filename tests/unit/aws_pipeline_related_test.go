@@ -58,11 +58,11 @@ func TestRelated_Pipeline_EbRule_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3", result.Count())
 	}
-	if len(result.ResourceIDs) != 3 {
-		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 3 {
+		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs())
 	}
 }
 
@@ -77,8 +77,8 @@ func TestRelated_Pipeline_EbRule_Empty(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN field)", result.Count())
 	}
 }
 
@@ -96,8 +96,8 @@ func TestRelated_Pipeline_EbRule_WrongRawStruct(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -118,11 +118,11 @@ func TestRelated_Pipeline_CB_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "cb")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-build-project" {
-		t.Errorf("ResourceIDs = %v, want [my-build-project]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-build-project" {
+		t.Errorf("ResourceIDs = %v, want [my-build-project]", result.ResourceIDs())
 	}
 }
 
@@ -138,8 +138,8 @@ func TestRelated_Pipeline_CB_NoMatch(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "cb")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CodeBuild actions)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CodeBuild actions)", result.Count())
 	}
 }
 
@@ -149,8 +149,8 @@ func TestRelated_Pipeline_CB_NilClients(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -171,11 +171,11 @@ func TestRelated_Pipeline_Role_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "CodePipelineServiceRole" {
-		t.Errorf("ResourceIDs = %v, want [CodePipelineServiceRole]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "CodePipelineServiceRole" {
+		t.Errorf("ResourceIDs = %v, want [CodePipelineServiceRole]", result.ResourceIDs())
 	}
 }
 
@@ -191,8 +191,8 @@ func TestRelated_Pipeline_Role_NoRole(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no RoleArn set)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no RoleArn set)", result.Count())
 	}
 }
 
@@ -213,11 +213,11 @@ func TestRelated_Pipeline_CFN_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "prod-infra-stack" {
-		t.Errorf("ResourceIDs = %v, want [prod-infra-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "prod-infra-stack" {
+		t.Errorf("ResourceIDs = %v, want [prod-infra-stack]", result.ResourceIDs())
 	}
 }
 
@@ -238,11 +238,11 @@ func TestRelated_Pipeline_CodeArtifact_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "codeartifact")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-artifact-repo" {
-		t.Errorf("ResourceIDs = %v, want [my-artifact-repo]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-artifact-repo" {
+		t.Errorf("ResourceIDs = %v, want [my-artifact-repo]", result.ResourceIDs())
 	}
 }
 
@@ -264,11 +264,11 @@ func TestRelated_Pipeline_ECR_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != repoName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, repoName)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != repoName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), repoName)
 	}
 }
 
@@ -290,11 +290,11 @@ func TestRelated_Pipeline_ECSSvc_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != serviceName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, serviceName)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != serviceName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), serviceName)
 	}
 }
 
@@ -316,11 +316,11 @@ func TestRelated_Pipeline_KMS_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "deadbeef-aaaa-bbbb-cccc-000000000001" {
-		t.Errorf("ResourceIDs = %v, want [deadbeef-aaaa-bbbb-cccc-000000000001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "deadbeef-aaaa-bbbb-cccc-000000000001" {
+		t.Errorf("ResourceIDs = %v, want [deadbeef-aaaa-bbbb-cccc-000000000001]", result.ResourceIDs())
 	}
 }
 
@@ -337,8 +337,8 @@ func TestRelated_Pipeline_KMS_NoKey(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no KMS key configured)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key configured)", result.Count())
 	}
 }
 
@@ -360,11 +360,11 @@ func TestRelated_Pipeline_Lambda_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != funcName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, funcName)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != funcName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), funcName)
 	}
 }
 
@@ -386,11 +386,11 @@ func TestRelated_Pipeline_S3_ArtifactStore(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != bucketName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bucketName)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != bucketName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), bucketName)
 	}
 }
 
@@ -408,11 +408,11 @@ func TestRelated_Pipeline_S3_DeployAction(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != deployBucket {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, deployBucket)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != deployBucket {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), deployBucket)
 	}
 }
 
@@ -434,11 +434,11 @@ func TestRelated_Pipeline_SNS_Match(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != topicARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, topicARN)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != topicARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), topicARN)
 	}
 }
 
@@ -454,7 +454,7 @@ func TestRelated_Pipeline_SNS_NoApproval(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no approval actions)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no approval actions)", result.Count())
 	}
 }

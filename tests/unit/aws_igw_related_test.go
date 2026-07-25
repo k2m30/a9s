@@ -80,14 +80,14 @@ func TestRelated_IGW_VPC_Found(t *testing.T) {
 	checker := igwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != vpcID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, vpcID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != vpcID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), vpcID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -119,11 +119,11 @@ func TestRelated_IGW_VPC_NoAttachments(t *testing.T) {
 	checker := igwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for IGW with no attachments", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for IGW with no attachments", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -150,8 +150,8 @@ func TestRelated_IGW_VPC_CacheMissNoClients(t *testing.T) {
 	checker := igwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
 
@@ -200,14 +200,14 @@ func TestRelated_IGW_RTB_Found(t *testing.T) {
 	checker := igwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "rtb-0bbb222222222222b" {
-		t.Errorf("ResourceIDs = %v, want [rtb-0bbb222222222222b]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "rtb-0bbb222222222222b" {
+		t.Errorf("ResourceIDs = %v, want [rtb-0bbb222222222222b]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -256,11 +256,11 @@ func TestRelated_IGW_RTB_NotFound(t *testing.T) {
 	checker := igwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -286,7 +286,7 @@ func TestRelated_IGW_RTB_CacheMissNoClients(t *testing.T) {
 	checker := igwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }

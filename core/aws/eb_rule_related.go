@@ -21,12 +21,12 @@ func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("role")
 	}
 	if rule.RoleArn == nil || *rule.RoleArn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *rule.RoleArn
 	idx := strings.LastIndex(arn, "/")
 	if idx < 0 || idx == len(arn)-1 {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	roleName := arn[idx+1:]
 	return relatedResult("role", []string{roleName})

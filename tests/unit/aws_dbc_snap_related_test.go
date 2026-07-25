@@ -133,11 +133,11 @@ func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "plan-aaa" {
-		t.Errorf("ResourceIDs = %v, want [plan-aaa]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "plan-aaa" {
+		t.Errorf("ResourceIDs = %v, want [plan-aaa]", result.ResourceIDs())
 	}
 }
 
@@ -150,8 +150,8 @@ func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no plan matches)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no plan matches)", result.Count())
 	}
 }
 
@@ -168,8 +168,8 @@ func TestRelated_DbcSnap_Backup_NoParentReference(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count())
 	}
 }
 
@@ -270,12 +270,12 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_DocDB(t *testing.T) {
 
 	// FAILS today: checkDbcSnapDBC returns Count=1 unconditionally.
 	// PROBE-TRUNCATION-LOST BUG cousin: orphan cluster appears to exist.
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf(
 			"checkDbcSnapDBC (docdb RawStruct): ghost cluster %q with complete cache: "+
 				"Count = %d, want 0 — DBC-SNAP-NO-CACHE-CHECK BUG: orphan dbc-snap "+
 				"reports cluster exists when it was deleted",
-			ghostCluster, result.Count,
+			ghostCluster, result.Count(),
 		)
 	}
 }
@@ -293,12 +293,12 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_RDS(t *testing.T) {
 	result := checker(context.Background(), nil, res, cache)
 
 	// FAILS today: checkDbcSnapDBC returns Count=1 unconditionally (rds branch).
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf(
 			"checkDbcSnapDBC (rds RawStruct): ghost cluster %q with complete cache: "+
 				"Count = %d, want 0 — DBC-SNAP-NO-CACHE-CHECK BUG (RDS branch): orphan "+
 				"dbc-snap reports cluster exists when it was deleted",
-			ghostCluster, result.Count,
+			ghostCluster, result.Count(),
 		)
 	}
 }
@@ -319,12 +319,12 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 
 	// After fix: truncated cache + parent not found → UnknownRelated (Count=-1).
 	// FAILS today: Count=1 (no cache scan).
-	if result.State != domain.RelatedUnknown {
+	if result.State() != domain.RelatedUnknown {
 		t.Errorf(
 			"checkDbcSnapDBC (docdb RawStruct): ghost cluster %q with truncated cache: "+
 				"Count = %d, want -1 (UnknownRelated) — DBC-SNAP-NO-CACHE-CHECK BUG: "+
 				"parent may be in later page; answer must be unknown, not positive",
-			ghostCluster, result.Count,
+			ghostCluster, result.Count(),
 		)
 	}
 }
@@ -341,11 +341,11 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
+	if result.State() != domain.RelatedUnknown {
 		t.Errorf(
 			"checkDbcSnapDBC (rds RawStruct): ghost cluster %q with truncated cache: "+
 				"Count = %d, want -1 (UnknownRelated) — DBC-SNAP-NO-CACHE-CHECK BUG (RDS branch)",
-			ghostCluster, result.Count,
+			ghostCluster, result.Count(),
 		)
 	}
 }
@@ -363,11 +363,11 @@ func TestRelated_DbcSnap_DBC_PresentInCache_DocDB(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("checkDbcSnapDBC (docdb RawStruct): cluster %q present in cache: Count = %d, want 1", clusterID, result.Count)
+	if result.Count() != 1 {
+		t.Errorf("checkDbcSnapDBC (docdb RawStruct): cluster %q present in cache: Count = %d, want 1", clusterID, result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != clusterID {
-		t.Errorf("checkDbcSnapDBC (docdb RawStruct): ResourceIDs = %v, want [%s]", result.ResourceIDs, clusterID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != clusterID {
+		t.Errorf("checkDbcSnapDBC (docdb RawStruct): ResourceIDs = %v, want [%s]", result.ResourceIDs(), clusterID)
 	}
 }
 
@@ -383,10 +383,10 @@ func TestRelated_DbcSnap_DBC_PresentInCache_RDS(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("checkDbcSnapDBC (rds RawStruct): cluster %q present in cache: Count = %d, want 1", clusterID, result.Count)
+	if result.Count() != 1 {
+		t.Errorf("checkDbcSnapDBC (rds RawStruct): cluster %q present in cache: Count = %d, want 1", clusterID, result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != clusterID {
-		t.Errorf("checkDbcSnapDBC (rds RawStruct): ResourceIDs = %v, want [%s]", result.ResourceIDs, clusterID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != clusterID {
+		t.Errorf("checkDbcSnapDBC (rds RawStruct): ResourceIDs = %v, want [%s]", result.ResourceIDs(), clusterID)
 	}
 }

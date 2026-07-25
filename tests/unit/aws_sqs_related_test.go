@@ -64,8 +64,8 @@ func TestRelated_SQS_SNSSub_Match(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -86,8 +86,8 @@ func TestRelated_SQS_SNSSub_NoMatch(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -108,8 +108,8 @@ func TestRelated_SQS_SNSSub_WrongProtocol(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count())
 	}
 }
 
@@ -134,11 +134,11 @@ func TestRelated_SQS_Alarm_Match(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sqs-depth-alarm" {
-		t.Errorf("ResourceIDs = %v, want [sqs-depth-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sqs-depth-alarm" {
+		t.Errorf("ResourceIDs = %v, want [sqs-depth-alarm]", result.ResourceIDs())
 	}
 }
 
@@ -161,8 +161,8 @@ func TestRelated_SQS_Alarm_NoMatch(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -190,8 +190,8 @@ func TestRelated_SQS_Alarm_WrongNamespace_NotCounted(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (matching QueueName dimension under a non-AWS/SQS namespace must not count)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (matching QueueName dimension under a non-AWS/SQS namespace must not count)", result.Count())
 	}
 }
 
@@ -204,8 +204,8 @@ func TestRelated_SQS_NilClients(t *testing.T) {
 	for _, target := range []string{"sns-sub", "alarm"} {
 		checker := sqsCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count())
 		}
 	}
 }
@@ -216,8 +216,8 @@ func TestRelated_SQS_EmptyCache(t *testing.T) {
 	for _, target := range []string{"sns-sub", "alarm"} {
 		checker := sqsCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (empty cache)", target, result.Count())
 		}
 	}
 }
@@ -230,8 +230,8 @@ func TestRelated_SQS_Lambda_NilClients(t *testing.T) {
 	res := sqsPaymentRes()
 	checker := sqsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, nil)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -264,11 +264,11 @@ func TestRelated_SQS_EbRule_Match(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3", result.Count())
 	}
-	if len(result.ResourceIDs) != 3 {
-		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 3 {
+		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs())
 	}
 }
 
@@ -289,8 +289,8 @@ func TestRelated_SQS_EbRule_Empty(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty QueueArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty QueueArn)", result.Count())
 	}
 }
 
@@ -305,8 +305,8 @@ func TestRelated_SQS_EbRule_WrongRawStruct(t *testing.T) {
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	// When assertStruct fails, queueARN stays ""; empty QueueArn → Count=0.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct, empty QueueArn fallback)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct, empty QueueArn fallback)", result.Count())
 	}
 }
 
@@ -343,8 +343,8 @@ func TestRelated_SQS_SNS_Match(t *testing.T) {
 	result := checker(context.Background(), nil, res, cache)
 
 	// Both subscriptions point to the same topic — deduplicated to 1.
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (two subs to same topic → deduplication)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (two subs to same topic → deduplication)", result.Count())
 	}
 }
 
@@ -367,8 +367,8 @@ func TestRelated_SQS_SNS_NoMatch(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching subscriptions)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching subscriptions)", result.Count())
 	}
 }
 
@@ -392,8 +392,8 @@ func TestRelated_SQS_SNS_WrongProtocolFiltered(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (https protocol must not match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (https protocol must not match)", result.Count())
 	}
 }
 
@@ -422,11 +422,11 @@ func TestRelated_SQS_KMS_Present(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (kms_key_id present)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (kms_key_id present)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mrk-abc1234567890def" {
-		t.Errorf("ResourceIDs = %v, want [mrk-abc1234567890def]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "mrk-abc1234567890def" {
+		t.Errorf("ResourceIDs = %v, want [mrk-abc1234567890def]", result.ResourceIDs())
 	}
 }
 
@@ -437,8 +437,8 @@ func TestRelated_SQS_KMS_Absent(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no kms_key_id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no kms_key_id)", result.Count())
 	}
 }
 
@@ -459,11 +459,11 @@ func TestRelated_SQS_Lambda_Match(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-payments" {
-		t.Errorf("ResourceIDs = %v, want [process-payments]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "process-payments" {
+		t.Errorf("ResourceIDs = %v, want [process-payments]", result.ResourceIDs())
 	}
 }
 
@@ -477,8 +477,8 @@ func TestRelated_SQS_Lambda_Empty(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no mappings)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no mappings)", result.Count())
 	}
 }
 
@@ -504,7 +504,7 @@ func TestRelated_SQS_Lambda_NoQueueARN(t *testing.T) {
 	checker := sqsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty QueueArn skips API call)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty QueueArn skips API call)", result.Count())
 	}
 }

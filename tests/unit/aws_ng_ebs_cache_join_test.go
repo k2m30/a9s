@@ -105,34 +105,34 @@ func TestRelated_NG_EBS_CacheJoin_MatchByNodegroupTag(t *testing.T) {
 	// New contract needs NO AWS clients — pass nil.
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (deduped volumes)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (deduped volumes)", result.Count())
 	}
 	wantIDs := map[string]bool{
 		"vol-0abc000000000shared": true,
 		"vol-0abc000000000data1":  true,
 	}
-	if len(result.ResourceIDs) != len(wantIDs) {
-		t.Fatalf("ResourceIDs = %v, want 2 deduped volume IDs matching %v", result.ResourceIDs, wantIDs)
+	if len(result.ResourceIDs()) != len(wantIDs) {
+		t.Fatalf("ResourceIDs = %v, want 2 deduped volume IDs matching %v", result.ResourceIDs(), wantIDs)
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if !wantIDs[id] {
 			t.Errorf("unexpected volume ID in result: %q", id)
 		}
 	}
 	for id := range wantIDs {
 		found := false
-		for _, got := range result.ResourceIDs {
+		for _, got := range result.ResourceIDs() {
 			if got == id {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("expected volume ID %q missing from result %v", id, result.ResourceIDs)
+			t.Errorf("expected volume ID %q missing from result %v", id, result.ResourceIDs())
 		}
 	}
 }
@@ -205,20 +205,20 @@ func TestRelated_NG_EBS_CacheJoin_CrossClusterNodegroupNameCollision(t *testing.
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (cross-cluster nodegroup-name collision must be excluded)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (cross-cluster nodegroup-name collision must be excluded)", result.Count())
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "vol-0abc000000000other99" {
 			t.Errorf("ResourceIDs = %v — volume from cross-cluster instance %q (cluster %q) leaked into join for source cluster %q",
-				result.ResourceIDs, crossClusterInst.ID, otherCluster, sourceCluster)
+				result.ResourceIDs(), crossClusterInst.ID, otherCluster, sourceCluster)
 		}
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vol-0abc000000000prod01" {
-		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, "vol-0abc000000000prod01")
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vol-0abc000000000prod01" {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), "vol-0abc000000000prod01")
 	}
 }
 
@@ -261,18 +261,18 @@ func TestRelated_NG_EBS_CacheJoin_TruncatedNoMatch_TruncatedResult(t *testing.T)
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	want := resource.RelatedCheckResult{TargetType: "ebs", Truncated: true}
-	if result.TargetType != want.TargetType {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, want.TargetType)
+	want := resource.KnownRelated("ebs", nil, true)
+	if result.TargetType() != want.TargetType() {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), want.TargetType())
 	}
-	if result.Count != want.Count {
-		t.Errorf("Count = %d, want %d", result.Count, want.Count)
+	if result.Count() != want.Count() {
+		t.Errorf("Count = %d, want %d", result.Count(), want.Count())
 	}
-	if result.Truncated != want.Truncated {
-		t.Errorf("Truncated = %v, want %v", result.Truncated, want.Truncated)
+	if result.Truncated() != want.Truncated() {
+		t.Errorf("Truncated = %v, want %v", result.Truncated(), want.Truncated())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -295,8 +295,8 @@ func TestRelated_NG_EBS_CacheJoin_NoEC2CacheEntry(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no ec2 cache entry, cannot fetch with nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no ec2 cache entry, cannot fetch with nil clients)", result.Count())
 	}
 }
 
@@ -345,10 +345,10 @@ func TestRelated_NG_EBS_CacheJoin_MatchedInstanceNoBlockDeviceMappings(t *testin
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (matched instance has no BlockDeviceMappings, cache not truncated)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (matched instance has no BlockDeviceMappings, cache not truncated)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }

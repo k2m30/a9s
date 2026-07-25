@@ -148,11 +148,11 @@ func TestDDB_Related_Alarm_MatchesByTableNameDimension(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "orders-prod-throttle" {
-		t.Errorf("ResourceIDs = %v, want [orders-prod-throttle]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "orders-prod-throttle" {
+		t.Errorf("ResourceIDs = %v, want [orders-prod-throttle]", result.ResourceIDs())
 	}
 }
 
@@ -180,8 +180,8 @@ func TestDDB_Related_Alarm_NonMatchingTableNameValue(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (non-matching TableName)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (non-matching TableName)", result.Count())
 	}
 }
 
@@ -205,8 +205,8 @@ func TestDDB_Related_Alarm_NoDimensions(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no dimensions)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no dimensions)", result.Count())
 	}
 }
 
@@ -235,8 +235,8 @@ func TestDDB_Related_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (dimension name is InstanceId, not TableName)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is InstanceId, not TableName)", result.Count())
 	}
 }
 
@@ -255,8 +255,8 @@ func TestDDB_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State())
 	}
 }
 
@@ -281,10 +281,10 @@ func TestDDB_Related_Alarm_Error(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err = nil, want the propagated fetch error")
 	}
 }
@@ -316,10 +316,10 @@ func TestDDB_Related_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
@@ -358,11 +358,11 @@ func TestDDB_Related_Backup_MatchesByARNInResourcesCSV(t *testing.T) {
 	// Explicitly pass nil clients to assert no Backup API call is made.
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "acme-weekly-full-backup" {
-		t.Errorf("ResourceIDs = %v, want [acme-weekly-full-backup]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "acme-weekly-full-backup" {
+		t.Errorf("ResourceIDs = %v, want [acme-weekly-full-backup]", result.ResourceIDs())
 	}
 }
 
@@ -384,8 +384,8 @@ func TestDDB_Related_Backup_NoMatch(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching plan)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching plan)", result.Count())
 	}
 }
 
@@ -411,16 +411,16 @@ func TestDDB_Related_Kinesis_OneDestination(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Errorf("ResourceIDs is empty, want [%s]", fixtures.OrdersProdKinesisStream)
 	} else {
 		// The stream name is the last "/" segment of the ARN.
 		wantName := fixtures.OrdersProdKinesisStream
-		if result.ResourceIDs[0] != wantName {
-			t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs[0], wantName)
+		if result.ResourceIDs()[0] != wantName {
+			t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs()[0], wantName)
 		}
 	}
 }
@@ -436,8 +436,8 @@ func TestDDB_Related_Kinesis_EmptyDestinations(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no destinations)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no destinations)", result.Count())
 	}
 }
 
@@ -459,11 +459,11 @@ func TestDDB_Related_KMS_ReturnsKeyID(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != fixtures.OrdersProdKMSKeyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OrdersProdKMSKeyID)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != fixtures.OrdersProdKMSKeyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OrdersProdKMSKeyID)
 	}
 }
 
@@ -480,8 +480,8 @@ func TestDDB_Related_KMS_NilSSEDescription(t *testing.T) {
 	checker := ddbCheckerByTarget(t, "kms")
 	got := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if got.Count != 0 {
-		t.Errorf("Count = %d, want 0 for table with no SSEDescription (AWS-owned key)", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for table with no SSEDescription (AWS-owned key)", got.Count())
 	}
 }
 
@@ -507,11 +507,11 @@ func TestDDB_Related_KMS_MalformedARN_NoSlash(t *testing.T) {
 	checker := ddbCheckerByTarget(t, "kms")
 	got := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if got.Count != 0 {
-		t.Errorf("Count = %d, want 0 for malformed KMS ARN (no '/')", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for malformed KMS ARN (no '/')", got.Count())
 	}
-	if got.State != domain.RelatedResolved {
-		t.Errorf("State = %v, must be RelatedResolved for malformed ARN — only nil RawStruct yields RelatedUnknown", got.State)
+	if got.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, must be RelatedResolved for malformed ARN — only nil RawStruct yields RelatedUnknown", got.State())
 	}
 }
 
@@ -534,11 +534,11 @@ func TestDDB_Related_Lambda_OneMapping(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != fixtures.OrdersProdLambdaName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OrdersProdLambdaName)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != fixtures.OrdersProdLambdaName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OrdersProdLambdaName)
 	}
 	// Assert the Lambda client was called (LatestStreamArn is set on orders-prod).
 	if lambdaClient.calls == 0 {
@@ -562,8 +562,8 @@ func TestDDB_Related_Lambda_NoStream_ZeroCount(t *testing.T) {
 	checker := ddbCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no LatestStreamArn — not a failure)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no LatestStreamArn — not a failure)", result.Count())
 	}
 	if lambdaClient.calls != 0 {
 		t.Errorf("ListEventSourceMappings was called %d times, want 0 (no stream)", lambdaClient.calls)
@@ -594,10 +594,10 @@ func TestDDB_Related_Logs_PrefixMatchOnly(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only exact-prefix match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only exact-prefix match)", result.Count())
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if !strings.HasPrefix(id, "/aws/dynamodb/tables/"+fixtures.OrdersProdID+"/") {
 			t.Errorf("ResourceIDs contains non-prefix-match entry %q", id)
 		}
@@ -620,8 +620,8 @@ func TestDDB_Related_Logs_LambdaDecoy_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (/aws/lambda/ must not match DDB log prefix)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (/aws/lambda/ must not match DDB log prefix)", result.Count())
 	}
 }
 
@@ -642,8 +642,8 @@ func TestDDB_Related_Logs_SiblingSubstringTrap_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (sibling-table substring trap must not match prefix)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (sibling-table substring trap must not match prefix)", result.Count())
 	}
 }
 
@@ -689,11 +689,11 @@ func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only DDB Gateway endpoint)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only DDB Gateway endpoint)", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "vpce-ddb-gateway-0001" {
-		t.Errorf("ResourceIDs = %v, want [vpce-ddb-gateway-0001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "vpce-ddb-gateway-0001" {
+		t.Errorf("ResourceIDs = %v, want [vpce-ddb-gateway-0001]", result.ResourceIDs())
 	}
 }
 
@@ -718,8 +718,8 @@ func TestDDB_Related_VPCE_S3ServiceName_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (s3 service_name must not match ddb checker)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (s3 service_name must not match ddb checker)", result.Count())
 	}
 }
 
@@ -744,8 +744,8 @@ func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (Interface type must not match — only Gateway)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (Interface type must not match — only Gateway)", result.Count())
 	}
 }
 
@@ -812,7 +812,7 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 		for _, def := range allDefs {
 			if def.TargetType == "ct-events" {
 				r := def.Checker(context.Background(), nil, res, cache)
-				if r.State == domain.RelatedResolved && r.Count == 0 {
+				if r.State() == domain.RelatedResolved && r.Count() == 0 {
 					t.Errorf("ct-events State = RelatedResolved, Count = 0 — universal pivot must not return a definite resolved zero when events exist")
 				}
 				return
@@ -837,11 +837,11 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 	}
 
 	result := checker(context.Background(), nil, res, cache)
-	if result.State == domain.RelatedResolved && result.Count == 0 {
+	if result.State() == domain.RelatedResolved && result.Count() == 0 {
 		t.Errorf("ct-events State = RelatedResolved, Count = 0 — universal pivot must not return a definite resolved zero when events exist")
 	}
-	if result.FetchFilter == nil || result.FetchFilter["ResourceName"] != fixtures.OrdersProdID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], fixtures.OrdersProdID)
+	if result.FetchFilter() == nil || result.FetchFilter()["ResourceName"] != fixtures.OrdersProdID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], fixtures.OrdersProdID)
 	}
 }
 
@@ -887,11 +887,11 @@ func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
 			},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 3 {
-			t.Errorf("Count = %d, want 3 (explicit + wildcard + wildcard-excluded)", result.Count)
+		if result.Count() != 3 {
+			t.Errorf("Count = %d, want 3 (explicit + wildcard + wildcard-excluded)", result.Count())
 		}
-		got := make([]string, len(result.ResourceIDs))
-		copy(got, result.ResourceIDs)
+		got := make([]string, len(result.ResourceIDs()))
+		copy(got, result.ResourceIDs())
 		sortStrings(got)
 		want := []string{"plan-explicit", "plan-wildcard", "plan-wildcard-excluded"}
 		if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -908,11 +908,11 @@ func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
 			},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1 (only plan-wildcard; explicit misses, excluded drops plan-wildcard-excluded)", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1 (only plan-wildcard; explicit misses, excluded drops plan-wildcard-excluded)", result.Count())
 		}
-		if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "plan-wildcard" {
-			t.Errorf("ResourceIDs = %v, want [plan-wildcard]", result.ResourceIDs)
+		if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "plan-wildcard" {
+			t.Errorf("ResourceIDs = %v, want [plan-wildcard]", result.ResourceIDs())
 		}
 	})
 
@@ -923,8 +923,8 @@ func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
 			Fields: map[string]string{"arn": ""},
 		}
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 0 {
-			t.Errorf("Count = %d, want 0 for empty ARN (short-circuit)", result.Count)
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0 for empty ARN (short-circuit)", result.Count())
 		}
 	})
 }
@@ -980,21 +980,21 @@ func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 	checker := ddbCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one matching plan in truncated cache)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one matching plan in truncated cache)", result.Count())
 	}
 	// This is the invariant the fix introduces: truncated+matches → Truncated=true.
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated cache with matches must render as '(N+)' not '(N)'")
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "weekly-backup-plan" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain \"weekly-backup-plan\"", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want to contain \"weekly-backup-plan\"", result.ResourceIDs())
 	}
 }
 
@@ -1030,10 +1030,10 @@ func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testin
 	result := checker(context.Background(), nil, res, cache)
 
 	// TruncatedResult path: Count==0 but there may be matches on later pages.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching plan in visible portion)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching plan in visible portion)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated cache with zero visible matches must still be truncated (pages unseen)")
 	}
 }

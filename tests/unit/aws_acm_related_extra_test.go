@@ -78,14 +78,14 @@ func TestRelated_ACM_ELB_ALBShape(t *testing.T) {
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ALB in InUseBy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ALB in InUseBy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-alb" {
-		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alb" {
+		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -108,11 +108,11 @@ func TestRelated_ACM_ELB_NLBShape(t *testing.T) {
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (NLB in InUseBy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (NLB in InUseBy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-nlb" {
-		t.Errorf("ResourceIDs = %v, want [my-nlb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-nlb" {
+		t.Errorf("ResourceIDs = %v, want [my-nlb]", result.ResourceIDs())
 	}
 }
 
@@ -135,11 +135,11 @@ func TestRelated_ACM_ELB_ClassicShape(t *testing.T) {
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (classic ELB in InUseBy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (classic ELB in InUseBy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-classic-elb" {
-		t.Errorf("ResourceIDs = %v, want [my-classic-elb]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-classic-elb" {
+		t.Errorf("ResourceIDs = %v, want [my-classic-elb]", result.ResourceIDs())
 	}
 }
 
@@ -161,8 +161,8 @@ func TestRelated_ACM_ELB_NonLBARNSkipped(t *testing.T) {
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no LB ARN in InUseBy)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no LB ARN in InUseBy)", result.Count())
 	}
 }
 
@@ -188,11 +188,11 @@ func TestRelated_ACM_APIGW_DomainnamesARN(t *testing.T) {
 	checker := acmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (domainnames ARN in InUseBy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (domainnames ARN in InUseBy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "api.example.com" {
-		t.Errorf("ResourceIDs = %v, want [api.example.com]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "api.example.com" {
+		t.Errorf("ResourceIDs = %v, want [api.example.com]", result.ResourceIDs())
 	}
 }
 
@@ -214,11 +214,11 @@ func TestRelated_ACM_APIGW_RestapisARN(t *testing.T) {
 	checker := acmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (restapis ARN in InUseBy)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (restapis ARN in InUseBy)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc123xyz" {
-		t.Errorf("ResourceIDs = %v, want [abc123xyz]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc123xyz" {
+		t.Errorf("ResourceIDs = %v, want [abc123xyz]", result.ResourceIDs())
 	}
 }
 
@@ -240,8 +240,8 @@ func TestRelated_ACM_APIGW_NoMatchARN(t *testing.T) {
 	checker := acmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (LB ARN does not match APIGW patterns)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (LB ARN does not match APIGW patterns)", result.Count())
 	}
 }
 
@@ -291,14 +291,14 @@ func TestRelated_ACM_R53_ZoneSuffixMatch(t *testing.T) {
 	checker := acmCheckerByTarget(t, "r53")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (validation record suffix matches zone)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (validation record suffix matches zone)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != zone.ID {
-		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, zone.ID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -332,8 +332,8 @@ func TestRelated_ACM_R53_ZoneNoMatch(t *testing.T) {
 	checker := acmCheckerByTarget(t, "r53")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (unrelated zone in cache)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (unrelated zone in cache)", result.Count())
 	}
 }
 
@@ -360,7 +360,7 @@ func TestRelated_ACM_R53_NoCertDomainValidation(t *testing.T) {
 	checker := acmCheckerByTarget(t, "r53")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no validation records)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no validation records)", result.Count())
 	}
 }

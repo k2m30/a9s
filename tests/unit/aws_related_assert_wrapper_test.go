@@ -51,24 +51,24 @@ func TestRelatedChecker_AssertStructOnWrapper_EC2SG(t *testing.T) {
 
 	rawRes := resource.Resource{ID: "i-0abc123def4567890", RawStruct: raw}
 	wantResult := checker(context.Background(), nil, rawRes, nil)
-	if wantResult.Count != 2 {
-		t.Fatalf("sanity check failed: checker(raw) Count = %d, want 2 — fixture is wrong", wantResult.Count)
+	if wantResult.Count() != 2 {
+		t.Fatalf("sanity check failed: checker(raw) Count = %d, want 2 — fixture is wrong", wantResult.Count())
 	}
 
 	wrapped := awsclient.InstanceEnriched{Instance: raw, UserData: "#!/bin/bash\necho hi\n"}
 	wrappedRes := resource.Resource{ID: "i-0abc123def4567890", RawStruct: wrapped}
 	gotResult := checker(context.Background(), nil, wrappedRes, nil)
 
-	if gotResult.Count != wantResult.Count {
+	if gotResult.Count() != wantResult.Count() {
 		t.Errorf("checker(InstanceEnriched) Count = %d, want %d (identical to raw ec2types.Instance) — "+
-			"assertStruct[ec2types.Instance] must resolve through the wrapper", gotResult.Count, wantResult.Count)
+			"assertStruct[ec2types.Instance] must resolve through the wrapper", gotResult.Count(), wantResult.Count())
 	}
-	if len(gotResult.ResourceIDs) != len(wantResult.ResourceIDs) {
-		t.Fatalf("checker(InstanceEnriched) ResourceIDs = %v, want %v", gotResult.ResourceIDs, wantResult.ResourceIDs)
+	if len(gotResult.ResourceIDs()) != len(wantResult.ResourceIDs()) {
+		t.Fatalf("checker(InstanceEnriched) ResourceIDs = %v, want %v", gotResult.ResourceIDs(), wantResult.ResourceIDs())
 	}
-	for i, id := range wantResult.ResourceIDs {
-		if gotResult.ResourceIDs[i] != id {
-			t.Errorf("checker(InstanceEnriched) ResourceIDs[%d] = %q, want %q", i, gotResult.ResourceIDs[i], id)
+	for i, id := range wantResult.ResourceIDs() {
+		if gotResult.ResourceIDs()[i] != id {
+			t.Errorf("checker(InstanceEnriched) ResourceIDs[%d] = %q, want %q", i, gotResult.ResourceIDs()[i], id)
 		}
 	}
 }

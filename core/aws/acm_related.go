@@ -30,7 +30,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if certARN == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -88,7 +88,7 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 // acm:DescribeCertificate.InUseBy filtered to elbv2:loadbalancer ARNs.
 func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
@@ -119,7 +119,7 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ reso
 // via acm:DescribeCertificate.InUseBy filtered to apigateway domain ARNs.
 func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
@@ -154,7 +154,7 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ re
 // record name against cached zones' names (longest suffix match).
 func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	certARN := ""
 	raw, ok := assertStruct[acmtypes.CertificateSummary](res.RawStruct)
@@ -162,7 +162,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		certARN = *raw.CertificateArn
 	}
 	if certARN == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ACM == nil {
@@ -175,7 +175,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("r53", err)
 	}
 	if out.Certificate == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	var recordNames []string
 	for _, dvo := range out.Certificate.DomainValidationOptions {
@@ -184,7 +184,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(recordNames) == 0 {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	zoneList, truncated, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
 	if zoneList == nil {

@@ -61,12 +61,32 @@ func tgSrcResource() resource.Resource {
 
 func TestRelated_TG_ELB_Match(t *testing.T) {
 	res := tgSrcResource()
+	tgARN := tgTestELBARN
+
+	// checkTGELB reads LoadBalancerArns from the TG's own RawStruct, but that
+	// only proves ARN membership — the elb cache must supply the canonical
+	// elb Resource.ID (LoadBalancerName, e.g. "my-alb"; see core/aws/elb.go:35/72),
+	// a genuinely different string from the ARN and not derivable from it.
+	// Seeded here exactly like the sibling TestRelated_TG_ECSSvc_Match below.
+	cache := resource.ResourceCache{
+		"elb": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID:     "my-alb",
+				Fields: map[string]string{"load_balancer_arn": tgARN},
+			},
+		}},
+	}
 
 	checker := tgCheckerByTarget(t, "elb")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
+	}
+	// Guards against a wrong seed key silently producing a false pass: this
+	// fails if the resolved row isn't actually the canonical "my-alb" ID.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alb" {
+		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs())
 	}
 }
 
@@ -87,8 +107,8 @@ func TestRelated_TG_ELB_Empty(t *testing.T) {
 	checker := tgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -113,8 +133,8 @@ func TestRelated_TG_ECSSvc_Match(t *testing.T) {
 	checker := tgCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -137,8 +157,8 @@ func TestRelated_TG_ECSSvc_NoMatch(t *testing.T) {
 	checker := tgCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -160,8 +180,8 @@ func TestRelated_TG_ASG_Match(t *testing.T) {
 	checker := tgCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -181,8 +201,8 @@ func TestRelated_TG_ASG_NoMatch(t *testing.T) {
 	checker := tgCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -197,8 +217,8 @@ func TestRelated_TG_NilClients(t *testing.T) {
 	for _, target := range []string{"ecs-svc", "asg"} {
 		checker := tgCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count())
 		}
 	}
 }
@@ -222,8 +242,8 @@ func TestRelated_TG_Alarm_Match(t *testing.T) {
 	checker := tgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (alarm with matching TargetGroup dimension)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (alarm with matching TargetGroup dimension)", result.Count())
 	}
 }
 
@@ -243,8 +263,8 @@ func TestRelated_TG_Alarm_NoMatch(t *testing.T) {
 	checker := tgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (alarm with different TargetGroup dimension)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (alarm with different TargetGroup dimension)", result.Count())
 	}
 }
 
@@ -260,8 +280,8 @@ func TestRelated_TG_Alarm_NilCache(t *testing.T) {
 	checker := tgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero)", result.State())
 	}
 }
 
@@ -286,8 +306,8 @@ func TestRelated_TG_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 	checker := tgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (dimension name is LoadBalancer, not TargetGroup)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is LoadBalancer, not TargetGroup)", result.Count())
 	}
 }
 
@@ -312,10 +332,10 @@ func TestRelated_TG_Alarm_Error(t *testing.T) {
 	checker := tgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err = nil, want the propagated fetch error")
 	}
 }
@@ -343,10 +363,10 @@ func TestRelated_TG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	checker := tgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }

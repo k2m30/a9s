@@ -347,18 +347,18 @@ func TestKinesis_Related_Lambda_PartialCacheMatch_UnionsCachedAndUncachedIDs(t *
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, cache)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2 — both ListEventSourceMappings-confirmed FunctionArns must be counted, whether or not each happens to resolve via the lambda ResourceCache", result.Count)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2 — both ListEventSourceMappings-confirmed FunctionArns must be counted, whether or not each happens to resolve via the lambda ResourceCache", result.Count())
 	}
 
-	gotIDs := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	gotIDs := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		gotIDs[id] = true
 	}
 	if !gotIDs["fn-cached"] {
-		t.Errorf("ResourceIDs = %v, want fn-cached present (cache-resolved)", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want fn-cached present (cache-resolved)", result.ResourceIDs())
 	}
 	if !gotIDs["fn-uncached"] {
-		t.Errorf("ResourceIDs = %v, want fn-uncached present (ARN-parsed fallback for the cache-missing mapping) — today's code drops any FunctionArn absent from the lambda cache instead of unioning in the ARN-parsed bare name", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want fn-uncached present (ARN-parsed fallback for the cache-missing mapping) — today's code drops any FunctionArn absent from the lambda cache instead of unioning in the ARN-parsed bare name", result.ResourceIDs())
 	}
 }

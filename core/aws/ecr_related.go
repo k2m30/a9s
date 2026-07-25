@@ -26,7 +26,7 @@ import (
 func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := res.Fields["uri"]
 	if repoURI == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	lambdaList, truncated, err := ecrRelatedResources(ctx, clients, cache, "lambda")
@@ -58,7 +58,7 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := res.Fields["uri"]
 	if repoURI == "" {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
+		return resource.KnownRelated("cb", nil, false)
 	}
 
 	cbList, truncated, err := ecrRelatedResources(ctx, clients, cache, "cb")
@@ -91,7 +91,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("cfn", err)
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := ecrRelatedResources(ctx, clients, cache, "cfn")
@@ -156,7 +156,7 @@ func ecrCFNStackName(ctx context.Context, clients any, res resource.Resource) (s
 func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*repo.EncryptionConfiguration.KmsKey, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -176,7 +176,7 @@ func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resou
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	repoARN := ""
 	if repo.RepositoryArn != nil {
@@ -201,9 +201,7 @@ func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resou
 			ids = append(ids, ruleRes.ID)
 		}
 	}
-	result := relatedResult("eb-rule", ids)
-	result.Truncated = entry.IsTruncated
-	return result
+	return relatedResultTrunc("eb-rule", ids, entry.IsTruncated)
 }
 
 // ecrEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecr"]

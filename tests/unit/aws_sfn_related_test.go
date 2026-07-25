@@ -44,14 +44,14 @@ func TestRelated_SFN_Logs_Found(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/vendedlogs/states/order-fulfillment-workflow" {
-		t.Errorf("ResourceIDs = %v, want [/aws/vendedlogs/states/order-fulfillment-workflow]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/vendedlogs/states/order-fulfillment-workflow" {
+		t.Errorf("ResourceIDs = %v, want [/aws/vendedlogs/states/order-fulfillment-workflow]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -68,8 +68,8 @@ func TestRelated_SFN_Logs_NoMatch(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -86,8 +86,8 @@ func TestRelated_SFN_Logs_EmptyID(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -98,8 +98,8 @@ func TestRelated_SFN_Logs_CacheMissNoClients(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
 
@@ -135,14 +135,14 @@ func TestRelated_SFN_Alarm_Found(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, sfnSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sfn-failures" {
-		t.Errorf("ResourceIDs = %v, want [sfn-failures]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sfn-failures" {
+		t.Errorf("ResourceIDs = %v, want [sfn-failures]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -167,8 +167,8 @@ func TestRelated_SFN_Alarm_NoMatch(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, sfnSrcResource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -188,8 +188,8 @@ func TestRelated_SFN_Alarm_NoDimensions(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, sfnSrcResource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no dimensions)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no dimensions)", result.Count())
 	}
 }
 
@@ -218,8 +218,8 @@ func TestRelated_SFN_Alarm_EmptyARN(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty arn field)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty arn field)", result.Count())
 	}
 }
 
@@ -229,8 +229,8 @@ func TestRelated_SFN_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, sfnSrcResource(), cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
 
@@ -245,11 +245,11 @@ func TestRelated_SFN_Role_EmptyARN(t *testing.T) {
 	}
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
 }
 
@@ -265,8 +265,8 @@ func TestRelated_SFN_Role_NilClients(t *testing.T) {
 	}
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients — describe unavailable)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients — describe unavailable)", result.Count())
 	}
 }
 
@@ -296,11 +296,11 @@ func TestRelated_SFN_EbRule_Match(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3", result.Count())
 	}
-	if len(result.ResourceIDs) != 3 {
-		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 3 {
+		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs())
 	}
 }
 
@@ -315,8 +315,8 @@ func TestRelated_SFN_EbRule_Empty(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN field)", result.Count())
 	}
 }
 
@@ -334,7 +334,7 @@ func TestRelated_SFN_EbRule_WrongRawStruct(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }

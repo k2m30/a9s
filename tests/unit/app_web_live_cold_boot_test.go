@@ -707,11 +707,7 @@ func TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart(t *testing.T) {
 		s.Region = "us-east-1"
 		core := runtime.New(s, resource.AllResourceTypes())
 		core.RelatedCacheSet(relatedCacheKey, []runtime.RelatedCacheResult{
-			{DefDisplayName: "Security Groups", Result: resource.RelatedCheckResult{
-				TargetType:  "sg",
-				Count:       1,
-				ResourceIDs: []string{"sg-restart-test"},
-			}},
+			{DefDisplayName: "Security Groups", Result: resource.KnownRelated("sg", []string{"sg-restart-test"}, false)},
 		})
 		if _, ok := core.RelatedCacheGet(relatedCacheKey); !ok {
 			t.Fatal("test setup: RelatedCacheGet returned ok=false immediately after RelatedCacheSet in the same session")

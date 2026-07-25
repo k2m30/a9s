@@ -11,11 +11,16 @@ import (
 )
 
 // testRelatedResults returns a non-nil slice of RelatedCacheResult for use as
-// a cache value.
+// a cache value. The result carries exactly count synthetic IDs so
+// Result.Count() == count, matching this helper's old Count-literal behavior.
 func testRelatedResults(count int) []session.RelatedCacheResult {
+	ids := make([]string, count)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("ec2-%d", i)
+	}
 	return []session.RelatedCacheResult{{
 		DefDisplayName: "",
-		Result:         resource.RelatedCheckResult{TargetType: "ec2", Count: count},
+		Result:         resource.KnownRelated("ec2", ids, false),
 	}}
 }
 
@@ -154,7 +159,7 @@ func TestRelatedCacheLRU_SetUpdateExisting(t *testing.T) {
 	if !ok {
 		t.Fatal("expected 'k' to exist after second Set")
 	}
-	if len(got) == 0 || got[0].Result.Count != 99 {
+	if len(got) == 0 || got[0].Result.Count() != 99 {
 		t.Errorf("expected updated count 99, got %v", got)
 	}
 	if c.Len() != 1 {
@@ -177,10 +182,10 @@ func TestRelatedCacheLRU_PreservesDefDisplayName(t *testing.T) {
 	key := "ct-events:src-evt-0001"
 
 	in := []session.RelatedCacheResult{
-		{DefDisplayName: "CT events by AccessKeyId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 3, ResourceIDs: []string{"e1"}}},
-		{DefDisplayName: "CT events by Username", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 2, ResourceIDs: []string{"e2"}}},
-		{DefDisplayName: "CT events by EventName", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 1, ResourceIDs: []string{"e3"}}},
-		{DefDisplayName: "CT events by SharedEventId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 4, ResourceIDs: []string{"e4"}}},
+		{DefDisplayName: "CT events by AccessKeyId", Result: resource.KnownRelated("ct-events", []string{"e1"}, false)},
+		{DefDisplayName: "CT events by Username", Result: resource.KnownRelated("ct-events", []string{"e2"}, false)},
+		{DefDisplayName: "CT events by EventName", Result: resource.KnownRelated("ct-events", []string{"e3"}, false)},
+		{DefDisplayName: "CT events by SharedEventId", Result: resource.KnownRelated("ct-events", []string{"e4"}, false)},
 	}
 	c.Set(key, in)
 
@@ -197,8 +202,8 @@ func TestRelatedCacheLRU_PreservesDefDisplayName(t *testing.T) {
 			t.Errorf("got[%d].DefDisplayName = %q, want %q — losing this breaks self-pivot row binding",
 				i, entry.DefDisplayName, in[i].DefDisplayName)
 		}
-		if entry.Result.Count != in[i].Result.Count {
-			t.Errorf("got[%d].Result.Count = %d, want %d", i, entry.Result.Count, in[i].Result.Count)
+		if entry.Result.Count() != in[i].Result.Count() {
+			t.Errorf("got[%d].Result.Count = %d, want %d", i, entry.Result.Count(), in[i].Result.Count())
 		}
 	}
 }

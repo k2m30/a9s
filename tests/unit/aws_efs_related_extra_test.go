@@ -37,11 +37,11 @@ func TestRelated_EFS_Alarm_Found(t *testing.T) {
 	checker := efsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "efs-throughput-alarm" {
-		t.Errorf("ResourceIDs[0] = %q, want efs-throughput-alarm", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "efs-throughput-alarm" {
+		t.Errorf("ResourceIDs[0] = %q, want efs-throughput-alarm", result.ResourceIDs()[0])
 	}
 }
 
@@ -63,8 +63,8 @@ func TestRelated_EFS_Alarm_NoMatch(t *testing.T) {
 	checker := efsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching dimension)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching dimension)", result.Count())
 	}
 }
 
@@ -78,8 +78,8 @@ func TestRelated_EFS_Alarm_EmptyID(t *testing.T) {
 	checker := efsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -88,8 +88,8 @@ func TestRelated_EFS_Alarm_CacheMissNilClients(t *testing.T) {
 	checker := efsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -131,8 +131,8 @@ func TestRelated_EFS_ENI_Found(t *testing.T) {
 	checker := efsCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -152,8 +152,8 @@ func TestRelated_EFS_ENI_NoMatch(t *testing.T) {
 	checker := efsCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ENI matching this fsID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ENI matching this fsID)", result.Count())
 	}
 }
 
@@ -162,8 +162,8 @@ func TestRelated_EFS_ENI_EmptyID(t *testing.T) {
 	checker := efsCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -186,11 +186,11 @@ func TestRelated_EFS_VPC_Found(t *testing.T) {
 	checker := efsCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "vpc-efs001" {
-		t.Errorf("ResourceIDs[0] = %q, want vpc-efs001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "vpc-efs001" {
+		t.Errorf("ResourceIDs[0] = %q, want vpc-efs001", result.ResourceIDs()[0])
 	}
 }
 
@@ -217,8 +217,8 @@ func TestRelated_EFS_VPC_DeduplicatesVPCs(t *testing.T) {
 	checker := efsCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count())
 	}
 }
 
@@ -239,8 +239,8 @@ func TestRelated_EFS_VPC_NoENIMatch(t *testing.T) {
 	checker := efsCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ENI for this fsID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ENI for this fsID)", result.Count())
 	}
 }
 
@@ -249,7 +249,7 @@ func TestRelated_EFS_VPC_EmptyID(t *testing.T) {
 	checker := efsCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }

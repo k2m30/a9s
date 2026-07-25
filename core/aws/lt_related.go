@@ -40,7 +40,7 @@ func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	}
 	imageID := aws.ToString(raw.DefaultVersion.LaunchTemplateData.ImageId)
 	if !strings.HasPrefix(imageID, "ami-") {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 	return relatedResult("ami", []string{imageID})
 }

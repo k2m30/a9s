@@ -17,10 +17,10 @@ import (
 func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	// In-body: the IGW's own Attachments[0].VpcId IS the attached VPC.
 	return relatedResult("vpc", []string{*raw.Attachments[0].VpcId})
@@ -35,7 +35,7 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		igwID = *raw.InternetGatewayId
 	}
 	if igwID == "" {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
+		return resource.KnownRelated("rtb", nil, false)
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")

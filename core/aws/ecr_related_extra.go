@@ -19,7 +19,7 @@ import (
 func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoName := res.ID
 	if repoName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	evList, truncated, err := ecrRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -47,7 +47,7 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoName := res.ID
 	if repoName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 	taskList, truncated, err := ecrRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -71,9 +71,7 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 	if len(ids) == 0 && truncated {
 		return relatedResultTrunc("ecs-task", nil, true)
 	}
-	result := relatedResult("ecs-task", ids)
-	result.Truncated = truncated
-	return result
+	return relatedResultTrunc("ecs-task", ids, truncated)
 }
 
 // checkECRPipeline is a reverse-scan checker for the ecr→pipeline relationship.
@@ -91,7 +89,7 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
+		return resource.KnownRelated("pipeline", nil, false)
 	}
 
 	entry, ok := cache["pipeline"]
@@ -113,9 +111,7 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, pipelineName)
 		}
 	}
-	result := relatedResult("pipeline", ids)
-	result.Truncated = entry.IsTruncated
-	return result
+	return relatedResultTrunc("pipeline", ids, entry.IsTruncated)
 }
 
 // ecrPipelineHasRepo returns true if any action in the given stages has
@@ -144,7 +140,7 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -164,12 +160,12 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 	if err != nil {
 		// RepositoryPolicyNotFoundException means no policy exists → 0
 		if strings.Contains(err.Error(), "RepositoryPolicyNotFoundException") {
-			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+			return resource.KnownRelated("role", nil, false)
 		}
 		return resource.ErrorRelated("role", err)
 	}
 	if out.PolicyText == nil || *out.PolicyText == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	roleARNs := ecrPolicyRoleARNs(*out.PolicyText)

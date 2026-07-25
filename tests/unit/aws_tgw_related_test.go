@@ -67,8 +67,8 @@ func TestRelated_TGW_RTB_Match(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -92,8 +92,8 @@ func TestRelated_TGW_RTB_NoMatch(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -106,8 +106,8 @@ func TestRelated_TGW_NilClients(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, emptyCache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients, empty cache)", result.Count())
 	}
 }
 
@@ -119,8 +119,8 @@ func TestRelated_TGW_VPC_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, nil)
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State())
 	}
 }
 
@@ -181,24 +181,24 @@ func TestRelated_TGW_VPC_Match(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Fatalf("ResourceIDs length = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Fatalf("ResourceIDs length = %d, want 2: %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{"vpc-aaa111", "vpc-bbb222"} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 	// Guard against an error slipping through while Count still looks right.
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -216,11 +216,11 @@ func TestRelated_TGW_VPC_Empty(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no attachments)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no attachments)", result.Count())
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs())
 	}
 }
 
@@ -236,8 +236,8 @@ func TestRelated_TGW_VPC_WrongRawStruct(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -256,14 +256,14 @@ func TestRelated_TGW_Role_Match(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != tgwSLRARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, tgwSLRARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != tgwSLRARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tgwSLRARN)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -277,11 +277,11 @@ func TestRelated_TGW_Role_Empty(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (NoSuchEntity — SLR not present)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (NoSuchEntity — SLR not present)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -293,8 +293,8 @@ func TestRelated_TGW_Role_NilClients(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -320,20 +320,20 @@ func TestRelated_TGW_Subnet_Match(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{sub1, sub2} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -353,11 +353,11 @@ func TestRelated_TGW_Subnet_Empty(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no subnet IDs in attachment)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no subnet IDs in attachment)", result.Count())
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs())
 	}
 }
 
@@ -369,7 +369,7 @@ func TestRelated_TGW_Subnet_NilClients(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }

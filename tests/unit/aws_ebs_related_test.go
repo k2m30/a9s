@@ -61,14 +61,14 @@ func TestRelated_EBS_EC2_Found(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f60001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f60001]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -80,8 +80,8 @@ func TestRelated_EBS_EC2_NotAttached(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -90,8 +90,8 @@ func TestRelated_EBS_EC2_EmptyID(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -110,11 +110,11 @@ func TestRelated_EBS_Snap_Found(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "snap-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs = %v, want [snap-0a1b2c3d4e5f60001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "snap-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs = %v, want [snap-0a1b2c3d4e5f60001]", result.ResourceIDs())
 	}
 }
 
@@ -131,8 +131,8 @@ func TestRelated_EBS_Snap_NotFound(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -141,8 +141,8 @@ func TestRelated_EBS_Snap_CacheMissNoClients(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -158,8 +158,8 @@ func TestRelated_EBS_Snap_MultipleSnaps(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -176,11 +176,11 @@ func TestRelated_EBS_KMS_Found(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "a1b2c3d4-5678-90ab-cdef-111111111111" {
-		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-90ab-cdef-111111111111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "a1b2c3d4-5678-90ab-cdef-111111111111" {
+		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-90ab-cdef-111111111111]", result.ResourceIDs())
 	}
 }
 
@@ -193,8 +193,8 @@ func TestRelated_EBS_KMS_NotEncrypted(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -207,8 +207,8 @@ func TestRelated_EBS_KMS_BadRawStruct(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1", result.Count())
 	}
 }
 
@@ -240,11 +240,11 @@ func TestRelated_EBS_Alarm_MatchByVolumeId(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != alarmName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, alarmName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != alarmName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), alarmName)
 	}
 }
 
@@ -267,8 +267,8 @@ func TestRelated_EBS_Alarm_NoMatchOtherDimension(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching VolumeId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching VolumeId)", result.Count())
 	}
 }
 
@@ -278,8 +278,8 @@ func TestRelated_EBS_Alarm_EmptyVolumeIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := ebsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty volume ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty volume ID)", result.Count())
 	}
 }
 
@@ -314,11 +314,11 @@ func TestRelated_EBS_CFN_MatchByStackTag(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != stackName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, stackName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != stackName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), stackName)
 	}
 }
 
@@ -332,8 +332,8 @@ func TestRelated_EBS_CFN_NoStackTagReturnsZero(t *testing.T) {
 	}
 	checker := ebsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count())
 	}
 }
 
@@ -347,7 +347,7 @@ func TestRelated_EBS_CFN_InvalidRawStructReturnsZero(t *testing.T) {
 	}
 	checker := ebsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (bad raw struct, no tag possible)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (bad raw struct, no tag possible)", result.Count())
 	}
 }

@@ -94,7 +94,7 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 			allResults := ctEventsRealCheckerResults(fixture, emptyCache)
 
 			for _, result := range allResults {
-				if !cacheBackedTypes[result.TargetType] {
+				if !cacheBackedTypes[result.TargetType()] {
 					continue
 				}
 
@@ -111,11 +111,11 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 				//
 				// We assert State != RelatedUnknown here. Currently this fails because
 				// the short-circuit in ctEventsRelatedResources returns nil resourceList.
-				if result.State == domain.RelatedUnknown && len(result.FetchFilter) == 0 && result.Err == nil {
+				if result.State() == domain.RelatedUnknown && len(result.FetchFilter()) == 0 && result.Err() == nil {
 					t.Errorf("Bug E: event=%s targetType=%s: checker returned State: RelatedUnknown with nil clients"+
 						" and empty cache — short-circuit ignores nil error from failed paginated fetcher."+
 						" Expected a resolved Count=0 (no match) because nil-client fetcher should not be treated as unknown.",
-						fixture.ID, result.TargetType)
+						fixture.ID, result.TargetType())
 				}
 			}
 		})
@@ -165,7 +165,7 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 
 	var iamUserResult *resource.RelatedCheckResult
 	for i, r := range allResults {
-		if r.TargetType == "iam-user" {
+		if r.TargetType() == "iam-user" {
 			cp := allResults[i]
 			iamUserResult = &cp
 			break
@@ -179,13 +179,13 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 	// short-circuit fires, and the checker returns State: RelatedUnknown.
 	// Expected: a resolved Count=0 (definitive "not found" because the fetcher
 	// should not report unknown on nil clients).
-	if iamUserResult.State == domain.RelatedUnknown && iamUserResult.Err == nil && len(iamUserResult.FetchFilter) == 0 {
+	if iamUserResult.State() == domain.RelatedUnknown && iamUserResult.Err() == nil && len(iamUserResult.FetchFilter()) == 0 {
 		t.Errorf("Bug E pinned: event=e-e1f2a3b4 (AttachUserPolicy/alice.johnson):"+
 			" checkCtEventsUser returned State: RelatedUnknown with nil clients and empty cache"+
 			" — short-circuit in ctEventsRelatedResources discards nil error from failed fetcher."+
 			" Expected a resolved Count=0 (no match, not unknown/error)."+
 			" ResourceIDs=%v Err=%v FetchFilter=%v",
-			iamUserResult.ResourceIDs, iamUserResult.Err, iamUserResult.FetchFilter)
+			iamUserResult.ResourceIDs(), iamUserResult.Err(), iamUserResult.FetchFilter())
 	}
 }
 
@@ -227,14 +227,14 @@ func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *te
 
 		allResults := ctEventsRealCheckerResults(fixture, emptyCache)
 		for _, r := range allResults {
-			if r.TargetType != "role" {
+			if r.TargetType() != "role" {
 				continue
 			}
 			// Bug E: nil clients + empty cache → short-circuit → State: RelatedUnknown.
-			if r.State == domain.RelatedUnknown && len(r.FetchFilter) == 0 && r.Err == nil {
+			if r.State() == domain.RelatedUnknown && len(r.FetchFilter()) == 0 && r.Err() == nil {
 				bugECases = append(bugECases, bugECase{
 					fixtureID: fixture.ID,
-					count:     r.Count,
+					count:     r.Count(),
 				})
 			}
 		}

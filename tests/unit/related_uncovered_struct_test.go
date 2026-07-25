@@ -78,14 +78,14 @@ func TestRelated_DBI_Secrets_MatchesByARN(t *testing.T) {
 	}
 
 	got := checker(context.Background(), nil, source, cache)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if got.TargetType != "secrets" {
-		t.Errorf("expected TargetType=secrets, got %q", got.TargetType)
+	if got.TargetType() != "secrets" {
+		t.Errorf("expected TargetType=secrets, got %q", got.TargetType())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "rds!db-abc-defghij" {
-		t.Errorf("expected ResourceIDs=[rds!db-abc-defghij], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "rds!db-abc-defghij" {
+		t.Errorf("expected ResourceIDs=[rds!db-abc-defghij], got %v", got.ResourceIDs())
 	}
 }
 
@@ -108,11 +108,11 @@ func TestRelated_DBI_Secrets_NoManagedSecret(t *testing.T) {
 		}},
 	}
 	got := checker(context.Background(), nil, source, cache)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 for no MasterUserSecret, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 for no MasterUserSecret, got %d", got.Count())
 	}
-	if got.TargetType != "secrets" {
-		t.Errorf("expected TargetType=secrets, got %q", got.TargetType)
+	if got.TargetType() != "secrets" {
+		t.Errorf("expected TargetType=secrets, got %q", got.TargetType())
 	}
 }
 
@@ -123,11 +123,11 @@ func TestRelated_Pipeline_CB_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "cb")
 	res := resource.Resource{ID: "my-pipeline", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (undeterminable — no stages on PipelineSummary), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (undeterminable — no stages on PipelineSummary), got %d", got.Count())
 	}
-	if got.TargetType != "cb" {
-		t.Errorf("expected TargetType=cb, got %q", got.TargetType)
+	if got.TargetType() != "cb" {
+		t.Errorf("expected TargetType=cb, got %q", got.TargetType())
 	}
 }
 
@@ -137,11 +137,11 @@ func TestRelated_Pipeline_Role_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "role")
 	res := resource.Resource{ID: "my-pipeline", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (undeterminable — no RoleArn on PipelineSummary), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (undeterminable — no RoleArn on PipelineSummary), got %d", got.Count())
 	}
-	if got.TargetType != "role" {
-		t.Errorf("expected TargetType=role, got %q", got.TargetType)
+	if got.TargetType() != "role" {
+		t.Errorf("expected TargetType=role, got %q", got.TargetType())
 	}
 }
 
@@ -153,11 +153,11 @@ func TestRelated_Lambda_SQS_UnknownWithoutClients(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "lambda", "sqs")
 	res := resource.Resource{ID: "my-function", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count())
 	}
-	if got.TargetType != "sqs" {
-		t.Errorf("expected TargetType=sqs, got %q", got.TargetType)
+	if got.TargetType() != "sqs" {
+		t.Errorf("expected TargetType=sqs, got %q", got.TargetType())
 	}
 }
 
@@ -167,8 +167,8 @@ func TestRelated_Lambda_SQS_EmptyIDReturnsZero(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "lambda", "sqs")
 	res := resource.Resource{ID: "", Name: "", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 for empty function id, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 for empty function id, got %d", got.Count())
 	}
 }
 
@@ -186,11 +186,11 @@ func TestRelated_Lambda_CFN_UnknownWithoutClients(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count())
 	}
-	if got.TargetType != "cfn" {
-		t.Errorf("expected TargetType=cfn, got %q", got.TargetType)
+	if got.TargetType() != "cfn" {
+		t.Errorf("expected TargetType=cfn, got %q", got.TargetType())
 	}
 }
 
@@ -207,8 +207,8 @@ func TestRelated_Lambda_CFN_NoARNReturnsZero(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 (no function ARN), got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 (no function ARN), got %d", got.Count())
 	}
 }
 
@@ -227,11 +227,11 @@ func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1, got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1, got %d", got.Count())
 	}
-	if got.TargetType != "eb-rule" {
-		t.Errorf("expected TargetType=eb-rule, got %q", got.TargetType)
+	if got.TargetType() != "eb-rule" {
+		t.Errorf("expected TargetType=eb-rule, got %q", got.TargetType())
 	}
 }
 
@@ -249,11 +249,11 @@ func TestRelated_SFN_EbRule_ReturnsZeroOnEmptyARN(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "sfn", "eb-rule")
 	res := resource.Resource{ID: "my-state-machine", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 (no ARN — nothing to look up), got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 (no ARN — nothing to look up), got %d", got.Count())
 	}
-	if got.TargetType != "eb-rule" {
-		t.Errorf("expected TargetType=eb-rule, got %q", got.TargetType)
+	if got.TargetType() != "eb-rule" {
+		t.Errorf("expected TargetType=eb-rule, got %q", got.TargetType())
 	}
 }
 
@@ -262,11 +262,11 @@ func TestRelated_R53_ELB_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "elb")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count())
 	}
-	if got.TargetType != "elb" {
-		t.Errorf("expected TargetType=elb, got %q", got.TargetType)
+	if got.TargetType() != "elb" {
+		t.Errorf("expected TargetType=elb, got %q", got.TargetType())
 	}
 }
 
@@ -275,8 +275,8 @@ func TestRelated_R53_ELB_EmptyZoneReturnsZero(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "elb")
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count())
 	}
 }
 
@@ -285,11 +285,11 @@ func TestRelated_R53_CF_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "cf")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count())
 	}
-	if got.TargetType != "cf" {
-		t.Errorf("expected TargetType=cf, got %q", got.TargetType)
+	if got.TargetType() != "cf" {
+		t.Errorf("expected TargetType=cf, got %q", got.TargetType())
 	}
 }
 
@@ -298,8 +298,8 @@ func TestRelated_R53_CF_EmptyZoneReturnsZero(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "cf")
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count())
 	}
 }
 
@@ -308,11 +308,11 @@ func TestRelated_R53_ACM_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "acm")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 (validation records per-zone), got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 (validation records per-zone), got %d", got.Count())
 	}
-	if got.TargetType != "acm" {
-		t.Errorf("expected TargetType=acm, got %q", got.TargetType)
+	if got.TargetType() != "acm" {
+		t.Errorf("expected TargetType=acm, got %q", got.TargetType())
 	}
 }
 
@@ -321,8 +321,8 @@ func TestRelated_R53_ACM_EmptyZoneReturnsZero(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "acm")
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count())
 	}
 }
 
@@ -351,11 +351,11 @@ func TestRelated_DBI_SG_ExtractsSecurityGroups(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "sg-abc123" {
-		t.Errorf("expected ResourceIDs=[sg-abc123], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "sg-abc123" {
+		t.Errorf("expected ResourceIDs=[sg-abc123], got %v", got.ResourceIDs())
 	}
 }
 
@@ -367,8 +367,8 @@ func TestRelated_DBI_SG_NoSecurityGroups(t *testing.T) {
 		RawStruct: rdstypes.DBInstance{VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{}},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
 
@@ -380,8 +380,8 @@ func TestRelated_DBI_SG_WrongType(t *testing.T) {
 		RawStruct: "not-a-struct",
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.State != domain.RelatedUnknown {
-		t.Errorf("expected Count=-1 for wrong type, got %d", got.Count)
+	if got.State() != domain.RelatedUnknown {
+		t.Errorf("expected Count=-1 for wrong type, got %d", got.Count())
 	}
 }
 
@@ -399,11 +399,11 @@ func TestRelated_DBC_SG_ExtractsSecurityGroups(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "sg-docdb1" {
-		t.Errorf("expected ResourceIDs=[sg-docdb1], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "sg-docdb1" {
+		t.Errorf("expected ResourceIDs=[sg-docdb1], got %v", got.ResourceIDs())
 	}
 }
 
@@ -419,11 +419,11 @@ func TestRelated_DbcSnap_DBC_ExtractsCluster(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "my-cluster" {
-		t.Errorf("expected ResourceIDs=[my-cluster], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "my-cluster" {
+		t.Errorf("expected ResourceIDs=[my-cluster], got %v", got.ResourceIDs())
 	}
 }
 
@@ -435,8 +435,8 @@ func TestRelated_DbcSnap_DBC_NoCluster(t *testing.T) {
 		RawStruct: docdbtypes.DBClusterSnapshot{DBClusterIdentifier: nil},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
 
@@ -452,11 +452,11 @@ func TestRelated_DbcSnap_KMS_ExtractsKey(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "abc-def" {
-		t.Errorf("expected ResourceIDs=[abc-def], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "abc-def" {
+		t.Errorf("expected ResourceIDs=[abc-def], got %v", got.ResourceIDs())
 	}
 }
 
@@ -468,8 +468,8 @@ func TestRelated_DbcSnap_KMS_NoKey(t *testing.T) {
 		RawStruct: docdbtypes.DBClusterSnapshot{KmsKeyId: nil},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
 
@@ -489,11 +489,11 @@ func TestRelated_MSK_SG_ExtractsFromProvisioned(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 2 {
-		t.Errorf("expected Count=2, got %d", got.Count)
+	if got.Count() != 2 {
+		t.Errorf("expected Count=2, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 2 {
-		t.Errorf("expected 2 ResourceIDs, got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 2 {
+		t.Errorf("expected 2 ResourceIDs, got %v", got.ResourceIDs())
 	}
 }
 
@@ -505,8 +505,8 @@ func TestRelated_MSK_SG_NilProvisioned(t *testing.T) {
 		RawStruct: kafkatypes.Cluster{Provisioned: nil},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
 
@@ -522,11 +522,11 @@ func TestRelated_EbRule_Role_ExtractsRoleName(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "my-role" {
-		t.Errorf("expected ResourceIDs=[my-role], got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "my-role" {
+		t.Errorf("expected ResourceIDs=[my-role], got %v", got.ResourceIDs())
 	}
 }
 
@@ -538,8 +538,8 @@ func TestRelated_EbRule_Role_NoRoleArn(t *testing.T) {
 		RawStruct: eventbridgetypes.Rule{RoleArn: nil},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
 
@@ -559,15 +559,15 @@ func TestRelated_OpenSearch_Logs_ExtractsLogGroups(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count())
 	}
-	if len(got.ResourceIDs) != 1 {
-		t.Fatalf("expected 1 ResourceID, got %v", got.ResourceIDs)
+	if len(got.ResourceIDs()) != 1 {
+		t.Fatalf("expected 1 ResourceID, got %v", got.ResourceIDs())
 	}
 	want := "/aws/opensearch/domains/my-domain/index-slow-logs"
-	if got.ResourceIDs[0] != want {
-		t.Errorf("expected ResourceIDs[0]=%q, got %q", want, got.ResourceIDs[0])
+	if got.ResourceIDs()[0] != want {
+		t.Errorf("expected ResourceIDs[0]=%q, got %q", want, got.ResourceIDs()[0])
 	}
 }
 
@@ -581,7 +581,7 @@ func TestRelated_OpenSearch_Logs_Empty(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }

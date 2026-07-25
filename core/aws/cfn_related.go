@@ -20,10 +20,10 @@ import (
 func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	if stack.RoleARN == nil || *stack.RoleARN == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	// In-body: the stack's service RoleARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
@@ -36,7 +36,7 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -106,7 +106,7 @@ func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	return relatedResult("sns", ids)
 }

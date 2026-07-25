@@ -161,11 +161,11 @@ func TestRelated_LT_GraphRootPatternF(t *testing.T) {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "lt", tc.target)
 			result := checker(context.Background(), nil, res, resource.ResourceCache{})
-			if result.Count != tc.want {
-				t.Errorf("Count = %d, want %d", result.Count, tc.want)
+			if result.Count() != tc.want {
+				t.Errorf("Count = %d, want %d", result.Count(), tc.want)
 			}
-			if !reflect.DeepEqual(result.ResourceIDs, tc.ids) {
-				t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs, tc.ids)
+			if !reflect.DeepEqual(result.ResourceIDs(), tc.ids) {
+				t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs(), tc.ids)
 			}
 		})
 	}
@@ -191,11 +191,11 @@ func TestRelated_LT_GraphRootCacheCrossRef(t *testing.T) {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "lt", tc.target)
 			result := checker(context.Background(), nil, res, cache)
-			if result.Count != tc.want {
-				t.Errorf("Count = %d, want %d", result.Count, tc.want)
+			if result.Count() != tc.want {
+				t.Errorf("Count = %d, want %d", result.Count(), tc.want)
 			}
-			if !reflect.DeepEqual(result.ResourceIDs, tc.ids) {
-				t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs, tc.ids)
+			if !reflect.DeepEqual(result.ResourceIDs(), tc.ids) {
+				t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs(), tc.ids)
 			}
 		})
 	}
@@ -212,22 +212,22 @@ func TestRelated_LT_EKSNodeRootCounts(t *testing.T) {
 	t.Run("subnet", func(t *testing.T) {
 		checker := checkerByTarget(t, "lt", "subnet")
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "subnet-0aaa111111111111a" {
-			t.Errorf("ResourceIDs = %v, want [subnet-0aaa111111111111a]", result.ResourceIDs)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "subnet-0aaa111111111111a" {
+			t.Errorf("ResourceIDs = %v, want [subnet-0aaa111111111111a]", result.ResourceIDs())
 		}
 	})
 
 	t.Run("sg_via_network_interfaces_union", func(t *testing.T) {
 		checker := checkerByTarget(t, "lt", "sg")
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1 (NetworkInterfaces[].Groups union)", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1 (NetworkInterfaces[].Groups union)", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-0bbb222222222222b" {
-			t.Errorf("ResourceIDs = %v, want [sg-0bbb222222222222b]", result.ResourceIDs)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-0bbb222222222222b" {
+			t.Errorf("ResourceIDs = %v, want [sg-0bbb222222222222b]", result.ResourceIDs())
 		}
 	})
 
@@ -235,11 +235,11 @@ func TestRelated_LT_EKSNodeRootCounts(t *testing.T) {
 		checker := checkerByTarget(t, "lt", "ng")
 		cache := ltSiblingCache(t)
 		result := checker(context.Background(), nil, res, cache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "general-pool" {
-			t.Errorf("ResourceIDs = %v, want [general-pool]", result.ResourceIDs)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "general-pool" {
+			t.Errorf("ResourceIDs = %v, want [general-pool]", result.ResourceIDs())
 		}
 	})
 }
@@ -253,11 +253,11 @@ func TestRelated_LT_SSMReferenceNoAMIPivot(t *testing.T) {
 	res := ltResourceByID(t, fixtures.SSMAmiLTID)
 	checker := checkerByTarget(t, "lt", "ami")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (a resolve:ssm: reference is a display fact, never a pivot)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (a resolve:ssm: reference is a display fact, never a pivot)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil", result.Err())
 	}
 }
 
@@ -287,13 +287,13 @@ func TestRelated_LT_EC2_TruncatedCacheResolvedNotUnknown(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "lt", "ec2")
 	result := checker(context.Background(), nil, res, cache)
-	if result.State != domain.RelatedResolved {
-		t.Errorf("State = %v, want RelatedResolved (a present, typed cache is trusted even when truncated)", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (a present, typed cache is trusted even when truncated)", result.State())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no visible match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no visible match)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (cache IsTruncated must carry through)")
 	}
 }
@@ -302,8 +302,8 @@ func TestRelated_LT_EC2_AbsentCacheUnknown(t *testing.T) {
 	res := ltResourceByID(t, fixtures.ProdWebLTID)
 	checker := checkerByTarget(t, "lt", "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (no ec2 cache entry at all)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (no ec2 cache entry at all)", result.State())
 	}
 }
 
@@ -353,11 +353,11 @@ func TestRelated_LT_ASG_ViaOverridesOnly(t *testing.T) {
 
 	checker := checkerByTarget(t, "lt", "asg")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (Overrides[].LaunchTemplateSpecification must resolve, not just the top-level fields)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (Overrides[].LaunchTemplateSpecification must resolve, not just the top-level fields)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "override-only-asg" {
-		t.Errorf("ResourceIDs = %v, want [override-only-asg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "override-only-asg" {
+		t.Errorf("ResourceIDs = %v, want [override-only-asg]", result.ResourceIDs())
 	}
 }
 
@@ -374,11 +374,11 @@ func TestRelated_LT_DegradedRow_PatternFPivotsCleanZero(t *testing.T) {
 		t.Run(target, func(t *testing.T) {
 			checker := checkerByTarget(t, "lt", target)
 			result := checker(context.Background(), nil, res, resource.ResourceCache{})
-			if result.Err != nil {
-				t.Errorf("Err = %v, want nil (must not error/panic on a degraded row's zero DefaultVersion)", result.Err)
+			if result.Err() != nil {
+				t.Errorf("Err = %v, want nil (must not error/panic on a degraded row's zero DefaultVersion)", result.Err())
 			}
-			if result.Count != 0 {
-				t.Errorf("Count = %d, want 0 (degraded row has a zero DefaultVersion — no nested fields to pivot on)", result.Count)
+			if result.Count() != 0 {
+				t.Errorf("Count = %d, want 0 (degraded row has a zero DefaultVersion — no nested fields to pivot on)", result.Count())
 			}
 		})
 	}
@@ -395,10 +395,10 @@ func TestRelated_LT_CtEvents_Drillable(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedDeferred {
-		t.Errorf("State = %v, want RelatedDeferred (ct-events is a universal server-side pivot, drillable by resource id)", result.State)
+	if result.State() != domain.RelatedDeferred {
+		t.Errorf("State = %v, want RelatedDeferred (ct-events is a universal server-side pivot, drillable by resource id)", result.State())
 	}
-	if len(result.FetchFilter) == 0 {
+	if len(result.FetchFilter()) == 0 {
 		t.Error("FetchFilter is empty, want a CloudTrail LookupEvents filter keyed on the launch template id")
 	}
 }

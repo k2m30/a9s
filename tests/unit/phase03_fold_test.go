@@ -896,7 +896,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				ResourceType:     tc.canonShort,
 				SourceResourceID: "src-1",
 				DefDisplayName:   tc.canonShort + " Resources",
-				Result:           resource.RelatedCheckResult{TargetType: tc.canonShort, Count: 1},
+				Result:           resource.KnownRelated(tc.canonShort, []string{rid}, false),
 				OperationID:      0,
 				CachedPages: map[string]resource.ResourceCacheEntry{
 					tc.canonShort: {

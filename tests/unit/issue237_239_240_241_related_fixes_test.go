@@ -22,6 +22,7 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -48,6 +49,19 @@ import (
 // Then:  the RelatedCheckResultMsg.CachedPages entry carries the full Pagination
 //
 //	(including NextToken), not a synthetic PaginationMeta with an empty token
+
+// distinctiveIDs returns n distinct, non-empty IDs — used to construct a
+// resource.KnownRelated result whose Count is a specific test-chosen marker
+// value (e.g. "99" or "7") so an assertion can check for that exact number
+// appearing (or not appearing) in the rendered view.
+func distinctiveIDs(n int) []string {
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("distinctive-id-%d", i)
+	}
+	return ids
+}
+
 func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	const (
 		srcType    = "_t237_src"
@@ -78,7 +92,11 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 				if !ok {
 					return resource.UnknownRelated(targetType)
 				}
-				return resource.RelatedCheckResult{Count: len(entry.Resources)}
+				ids := make([]string, len(entry.Resources))
+				for i, r := range entry.Resources {
+					ids[i] = r.ID
+				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -197,10 +215,7 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
 		OperationID:      staleOp,
-		Result: resource.RelatedCheckResult{
-			TargetType: "tg",
-			Count:      99, // distinctive count — must NOT appear
-		},
+		Result:           resource.KnownRelated("tg", distinctiveIDs(99), false), // distinctive count — must NOT appear
 	})
 
 	viewAfterStale := stripANSI(rootViewContent(m))
@@ -228,10 +243,7 @@ func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
 		OperationID:      currentOp,
-		Result: resource.RelatedCheckResult{
-			TargetType: "tg",
-			Count:      7,
-		},
+		Result:           resource.KnownRelated("tg", distinctiveIDs(7), false),
 	})
 
 	view := stripANSI(rootViewContent(m))
@@ -272,9 +284,9 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 			Checker: func(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				// Derive result purely from source resource fields — no cache reads.
 				if res.Fields["has_target"] == "true" {
-					return resource.RelatedCheckResult{Count: 1, ResourceIDs: []string{"derived-id"}}
+					return resource.KnownRelated(targetType, []string{"derived-id"}, false)
 				}
-				return resource.RelatedCheckResult{Count: 0}
+				return resource.KnownRelated(targetType, nil, false)
 			},
 		},
 	})
@@ -363,7 +375,11 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 				if !ok {
 					return resource.UnknownRelated(targetType)
 				}
-				return resource.RelatedCheckResult{Count: len(entry.Resources)}
+				ids := make([]string, len(entry.Resources))
+				for i, r := range entry.Resources {
+					ids[i] = r.ID
+				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -477,7 +493,7 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 				}
 
 				atomic.AddInt64(&concurrentNow, -1)
-				return resource.RelatedCheckResult{Count: 1}
+				return resource.KnownRelated(targetType, []string{targetType + "-related"}, false)
 			},
 		}
 	}

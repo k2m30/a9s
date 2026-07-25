@@ -163,22 +163,22 @@ type RelatedChecker = domain.RelatedChecker
 // For cross-checking that returned IDs match the target type's canonical
 // Resource.ID, use ValidateRelatedResultAgainstCacheForTest.
 func ValidateRelatedResult(r RelatedCheckResult) error {
-	if r.TargetType == "" {
+	if r.TargetType() == "" {
 		return fmt.Errorf("RelatedCheckResult: empty TargetType")
 	}
-	if r.Count > 0 && len(r.ResourceIDs) == 0 {
-		return fmt.Errorf("RelatedCheckResult[%s]: Count=%d but no ResourceIDs", r.TargetType, r.Count)
+	if r.Count() > 0 && len(r.ResourceIDs()) == 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Count=%d but no ResourceIDs", r.TargetType(), r.Count())
 	}
-	if r.State != domain.RelatedResolved {
-		if r.Count != 0 {
-			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but Count=%d (must be 0)", r.TargetType, r.State, r.Count)
+	if r.State() != domain.RelatedResolved {
+		if r.Count() != 0 {
+			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but Count=%d (must be 0)", r.TargetType(), r.State(), r.Count())
 		}
-		if len(r.ResourceIDs) > 0 {
-			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but %d ResourceIDs present", r.TargetType, r.State, len(r.ResourceIDs))
+		if len(r.ResourceIDs()) > 0 {
+			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but %d ResourceIDs present", r.TargetType(), r.State(), len(r.ResourceIDs()))
 		}
 	}
-	if r.Truncated && r.State != domain.RelatedResolved {
-		return fmt.Errorf("RelatedCheckResult[%s]: Truncated=true but State=%s (must be RelatedResolved)", r.TargetType, r.State)
+	if r.Truncated() && r.State() != domain.RelatedResolved {
+		return fmt.Errorf("RelatedCheckResult[%s]: Truncated=true but State=%s (must be RelatedResolved)", r.TargetType(), r.State())
 	}
 	return nil
 }
@@ -207,10 +207,10 @@ func ValidateRelatedResultAgainstCacheForTest(r RelatedCheckResult, cache Resour
 	if err := ValidateRelatedResult(r); err != nil {
 		return err
 	}
-	if len(r.ResourceIDs) == 0 {
+	if len(r.ResourceIDs()) == 0 {
 		return nil
 	}
-	entry, ok := cache[r.TargetType]
+	entry, ok := cache[r.TargetType()]
 	if !ok {
 		return nil
 	}
@@ -221,13 +221,13 @@ func ValidateRelatedResultAgainstCacheForTest(r RelatedCheckResult, cache Resour
 	for _, res := range entry.Resources {
 		known[res.ID] = struct{}{}
 	}
-	for _, id := range r.ResourceIDs {
+	for _, id := range r.ResourceIDs() {
 		if _, seen := known[id]; !seen {
 			return fmt.Errorf(
 				"RelatedCheckResult[%s]: ResourceID %q is not a canonical Resource.ID for target type %q "+
 					"(not found in target-type cache of %d resources); "+
 					"checker likely returned an ARN/name/adjacent-ID kind instead of the target's canonical ID",
-				r.TargetType, id, r.TargetType, len(entry.Resources),
+				r.TargetType(), id, r.TargetType(), len(entry.Resources),
 			)
 		}
 	}
@@ -241,7 +241,7 @@ func ValidateRelatedResultAgainstCacheForTest(r RelatedCheckResult, cache Resour
 // so the hop to the TARGET was never attempted. Renders as the fourth visible
 // state — a blank, navigable row (no count, drill in) — never "(?)".
 func UnknownRelated(targetType string) RelatedCheckResult {
-	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedUnknown}
+	return domain.UnknownRelated(targetType)
 }
 
 // ErrorRelated returns a RelatedCheckResult representing "the checker (or a
@@ -251,14 +251,26 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 // The failure is surfaced separately through a Flash{IsError:true} + the "!"
 // error log (Golden Contract rule 6); the user retries with Ctrl+R.
 func ErrorRelated(targetType string, err error) RelatedCheckResult {
-	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedError, Err: err}
+	return domain.ErrorRelated(targetType, err)
 }
 
 // DeferredRelated returns a RelatedCheckResult representing "the count is not
 // resolved locally; Enter should drill in via a server-side FetchFilter fetch
 // instead". Renders with a blank count badge and is always actionable.
 func DeferredRelated(targetType string, filter map[string]string) RelatedCheckResult {
-	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedDeferred, FetchFilter: filter}
+	return domain.DeferredRelated(targetType, filter)
+}
+
+// KnownRelated returns a proven RelatedCheckResult: the checker's lookup
+// completed and ids is either the exhaustive match set (truncated == false)
+// or the best-effort subset found so far, with more possibly unseen
+// (truncated == true). This is the ONLY way to construct a RelatedResolved
+// result with a count — the bare struct literal that let a checker report
+// Count: 0 after a swallowed error no longer compiles outside core/domain,
+// since RelatedCheckResult's fields are all unexported. See
+// domain.KnownRelated for the truncated-as-partial-success semantics.
+func KnownRelated(targetType string, ids []string, truncated bool) RelatedCheckResult {
+	return domain.KnownRelated(targetType, ids, truncated)
 }
 
 // IsRelatedActionable is the single source of truth for "can the user drill into

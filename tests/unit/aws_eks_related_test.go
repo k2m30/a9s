@@ -85,14 +85,14 @@ func TestRelated_EKS_NodeGroups_Found(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs len = %d, want 2; got %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs len = %d, want 2; got %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -119,8 +119,8 @@ func TestRelated_EKS_NodeGroups_NoMatch(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_EKS_NodeGroups_CacheMissNoClients(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -165,8 +165,8 @@ func TestRelated_EKS_NodeGroups_EmptyClusterName(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty cluster name", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty cluster name", result.Count())
 	}
 }
 
@@ -196,14 +196,14 @@ func TestRelated_EKS_Alarms_MatchClusterName(t *testing.T) {
 	checker := eksCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eks-cpu-high" {
-		t.Errorf("ResourceIDs = %v, want [eks-cpu-high]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eks-cpu-high" {
+		t.Errorf("ResourceIDs = %v, want [eks-cpu-high]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -231,8 +231,8 @@ func TestRelated_EKS_Alarms_NoMatch(t *testing.T) {
 	checker := eksCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -248,8 +248,8 @@ func TestRelated_EKS_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := eksCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -281,14 +281,14 @@ func TestRelated_EKS_CFN_FromTags(t *testing.T) {
 	checker := eksCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eks-cluster-stack" {
-		t.Errorf("ResourceIDs = %v, want [eks-cluster-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eks-cluster-stack" {
+		t.Errorf("ResourceIDs = %v, want [eks-cluster-stack]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -318,8 +318,8 @@ func TestRelated_EKS_CFN_NoTag(t *testing.T) {
 	checker := eksCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for cluster with no CFN tag", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for cluster with no CFN tag", result.Count())
 	}
 }
 
@@ -338,8 +338,8 @@ func TestRelated_EKS_CFN_CacheMissNoClients(t *testing.T) {
 	checker := eksCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -409,20 +409,20 @@ func TestRelated_EKS_AMI_Match(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2; ResourceIDs: %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2; ResourceIDs: %v", result.Count(), result.ResourceIDs())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{ami1, ami2} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -444,8 +444,8 @@ func TestRelated_EKS_AMI_Empty(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (managed NG — no custom LT)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (managed NG — no custom LT)", result.Count())
 	}
 }
 
@@ -459,8 +459,8 @@ func TestRelated_EKS_AMI_WrongRawStruct(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -518,21 +518,21 @@ func TestRelated_EKS_AMI_SoftSkipsDeletedLaunchTemplate(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil (deleted LT must be soft-skipped, not surfaced as error)", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil (deleted LT must be soft-skipped, not surfaced as error)", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only valid-LT nodegroup's AMI collected)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only valid-LT nodegroup's AMI collected)", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == ami1 {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs %v missing %q (valid nodegroup AMI must appear)", result.ResourceIDs, ami1)
+		t.Errorf("ResourceIDs %v missing %q (valid nodegroup AMI must appear)", result.ResourceIDs(), ami1)
 	}
 }
 
@@ -572,20 +572,20 @@ func TestRelated_EKS_EC2_Match(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2; ResourceIDs: %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2; ResourceIDs: %v", result.Count(), result.ResourceIDs())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{inst1, inst2} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
@@ -618,8 +618,8 @@ func TestRelated_EKS_EC2_Empty(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no instances)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no instances)", result.Count())
 	}
 }
 
@@ -633,8 +633,8 @@ func TestRelated_EKS_EC2_WrongRawStruct(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -667,17 +667,17 @@ func TestRelated_EKS_KMS_Match(t *testing.T) {
 	checker := eksCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if result.TargetType() != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "kms")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -696,8 +696,8 @@ func TestRelated_EKS_KMS_NoEncryptionConfig(t *testing.T) {
 	checker := eksCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no EncryptionConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionConfig)", result.Count())
 	}
 }
 
@@ -712,8 +712,8 @@ func TestRelated_EKS_KMS_WrongRawStruct(t *testing.T) {
 	checker := eksCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count())
 	}
 }
 
@@ -739,17 +739,17 @@ func TestRelated_EKS_Role_Match(t *testing.T) {
 	checker := eksCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != roleName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, roleName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != roleName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), roleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -768,8 +768,8 @@ func TestRelated_EKS_Role_NoRoleArn(t *testing.T) {
 	checker := eksCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no RoleArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no RoleArn)", result.Count())
 	}
 }
 
@@ -784,7 +784,7 @@ func TestRelated_EKS_Role_WrongRawStruct(t *testing.T) {
 	checker := eksCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count())
 	}
 }

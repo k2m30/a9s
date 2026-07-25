@@ -31,7 +31,7 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	return relatedResult("ec2", ids)
 }
@@ -49,7 +49,7 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgName := res.ID
 	if asgName == "" {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
+		return resource.KnownRelated("ng", nil, false)
 	}
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
@@ -109,7 +109,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 				return relatedResult("ami", []string{imageID})
 			}
 		}
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 
 	// LaunchTemplate path (direct or via MixedInstancesPolicy)
@@ -118,7 +118,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 
 	version := aws.String("$Latest")
@@ -140,7 +140,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			return relatedResult("ami", []string{*v.LaunchTemplateData.ImageId})
 		}
 	}
-	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+	return resource.KnownRelated("ami", nil, false)
 }
 
 // checkASGELB resolves load balancers associated with this ASG.
@@ -152,20 +152,22 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("elb")
 	}
 	if len(asg.LoadBalancerNames) == 0 && len(asg.TargetGroupARNs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	var ids []string
 	// Classic ELB names are direct IDs
 	ids = append(ids, asg.LoadBalancerNames...)
 
-	// Resolve ALB/NLB from TG ARNs
+	// Resolve ALB/NLB from TG ARNs. Bailing out here still reports the classic
+	// ELB names already collected, but as a truncated lower bound — the
+	// ALB/NLB side of TargetGroupARNs was never resolved, so ids is not the
+	// exhaustive answer.
 	if len(asg.TargetGroupARNs) > 0 {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			// Return what we have from classic ELBs; ALB/NLB unknown
 			if len(ids) > 0 {
-				return relatedResult("elb", ids)
+				return relatedResultTrunc("elb", ids, true)
 			}
 			return resource.UnknownRelated("elb")
 		}
@@ -176,7 +178,7 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 		if err != nil {
 			if len(ids) > 0 {
-				return relatedResult("elb", ids)
+				return relatedResultTrunc("elb", ids, true)
 			}
 			return resource.ErrorRelated("elb", err)
 		}
@@ -207,7 +209,12 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ res
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return relatedResult("role", ids)
+		// Without clients, the instance-profile role path was never checked —
+		// ids (if any) is a lower bound, not the exhaustive answer.
+		if len(ids) > 0 {
+			return relatedResultTrunc("role", ids, true)
+		}
+		return resource.UnknownRelated("role")
 	}
 
 	// Resolve instance profile from launch config or launch template

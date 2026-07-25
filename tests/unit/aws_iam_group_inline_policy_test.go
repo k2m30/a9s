@@ -100,7 +100,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 	}
 
 	for _, leaf := range extractLeafMsgs(relatedCmd) {
-		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == "policy" {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType() == "policy" {
 			return r
 		}
 	}
@@ -120,10 +120,10 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 func TestIAMGroup_ManagedPolicies_RelatedCount(t *testing.T) {
 	result := runIAMGroupRelatedCheck(t, "developers")
 
-	if result.Result.Count <= 0 {
+	if result.Result.Count() <= 0 {
 		t.Errorf("developers group (acme-s3-read-only + acme-deploy-policy attached) got Count=%d, want >0; "+
 			"checkGroupPolicy may not be calling ListAttachedGroupPolicies correctly",
-			result.Result.Count)
+			result.Result.Count())
 	}
 }
 
@@ -141,11 +141,11 @@ func TestIAMGroup_InlinePoliciesOnly_RelatedCount(t *testing.T) {
 	result := runIAMGroupRelatedCheck(t, "readonly")
 
 	// Fails until checkGroupPolicy calls ListGroupPolicies:
-	if result.Result.Count <= 0 {
+	if result.Result.Count() <= 0 {
 		t.Errorf("readonly group (inline policies only) got Count=%d, want >0; "+
 			"BUG: checkGroupPolicy does not call ListGroupPolicies — "+
 			"inline policies are never counted (core/aws/iam_groups_related.go:48)",
-			result.Result.Count)
+			result.Result.Count())
 	}
 }
 
@@ -525,7 +525,7 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	var groupResult messages.RelatedCheckResult
 	var found bool
 	for _, leaf := range extractLeafMsgs(batchCmd) {
-		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == "iam-group" {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType() == "iam-group" {
 			groupResult = r
 			found = true
 			break
@@ -539,11 +539,11 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 
 	// Fails until checkPolicyGroup extracts the group from Fields["path"]:
 	// policyARNFromResource returns "" for inline policies → checker returns Count=0 at line 117.
-	if groupResult.Result.Count < 1 {
+	if groupResult.Result.Count() < 1 {
 		t.Errorf("inline policy 'AllowAssumeRole' (path=inline/developers) got IAM Groups Count=%d, want >=1; "+
 			"BUG: checkPolicyGroup returns early when ARN is empty — "+
 			"must extract group name from Fields[\"path\"] for inline policies "+
 			"(core/aws/iam_policies_related.go:116-117)",
-			groupResult.Result.Count)
+			groupResult.Result.Count())
 	}
 }

@@ -74,14 +74,14 @@ func TestContract_TruncatedZeroMatch_ASG_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("ASG checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("ASG checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("ASG checker with truncated cache and 0 matches: want Truncated=true, got false")
 	}
-	if got.TargetType != "asg" {
-		t.Errorf("ASG checker: want TargetType=%q, got %q", "asg", got.TargetType)
+	if got.TargetType() != "asg" {
+		t.Errorf("ASG checker: want TargetType=%q, got %q", "asg", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("ASG checker result failed ValidateRelatedResult: %v", err)
@@ -111,14 +111,14 @@ func TestContract_TruncatedZeroMatch_EIP_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("EIP checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("EIP checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("EIP checker with truncated cache and 0 matches: want Truncated=true, got false")
 	}
-	if got.TargetType != "eip" {
-		t.Errorf("EIP checker: want TargetType=%q, got %q", "eip", got.TargetType)
+	if got.TargetType() != "eip" {
+		t.Errorf("EIP checker: want TargetType=%q, got %q", "eip", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("EIP checker result failed ValidateRelatedResult: %v", err)
@@ -157,14 +157,14 @@ func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("NodeGroups checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("NodeGroups checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("NodeGroups checker with truncated cache and 0 matches: want Truncated=true, got false")
 	}
-	if got.TargetType != "ng" {
-		t.Errorf("NodeGroups checker: want TargetType=%q, got %q", "ng", got.TargetType)
+	if got.TargetType() != "ng" {
+		t.Errorf("NodeGroups checker: want TargetType=%q, got %q", "ng", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("NodeGroups checker result failed ValidateRelatedResult: %v", err)
@@ -198,11 +198,11 @@ func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown(t *testing.
 	checker := ec2CheckerByTarget(t, "ct-events")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.State != domain.RelatedDeferred {
-		t.Errorf("CloudTrail events checker with truncated cache and 0 matches: want State=RelatedDeferred, got State=%v (Count=%d)", got.State, got.Count)
+	if got.State() != domain.RelatedDeferred {
+		t.Errorf("CloudTrail events checker with truncated cache and 0 matches: want State=RelatedDeferred, got State=%v (Count=%d)", got.State(), got.Count())
 	}
-	if got.TargetType != "ct-events" {
-		t.Errorf("CloudTrail events checker: want TargetType=%q, got %q", "ct-events", got.TargetType)
+	if got.TargetType() != "ct-events" {
+		t.Errorf("CloudTrail events checker: want TargetType=%q, got %q", "ct-events", got.TargetType())
 	}
 }
 
@@ -234,8 +234,8 @@ func TestContract_TruncatedWithMatch_ASG_ReturnsCount(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count < 1 {
-		t.Errorf("ASG checker with matching instance in truncated cache: want Count>=1, got Count=%d", got.Count)
+	if got.Count() < 1 {
+		t.Errorf("ASG checker with matching instance in truncated cache: want Count>=1, got Count=%d", got.Count())
 	}
 }
 
@@ -261,8 +261,8 @@ func TestContract_TruncatedWithMatch_EIP_ReturnsCount(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count < 1 {
-		t.Errorf("EIP checker with matching EIP in truncated cache: want Count>=1, got Count=%d", got.Count)
+	if got.Count() < 1 {
+		t.Errorf("EIP checker with matching EIP in truncated cache: want Count>=1, got Count=%d", got.Count())
 	}
 }
 
@@ -292,14 +292,14 @@ func TestContract_TruncatedZeroMatch_TG_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("TG checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("TG checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("TG checker (regression pin): want Truncated=true, got false")
 	}
-	if got.TargetType != "tg" {
-		t.Errorf("TG checker: want TargetType=%q, got %q", "tg", got.TargetType)
+	if got.TargetType() != "tg" {
+		t.Errorf("TG checker: want TargetType=%q, got %q", "tg", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("TG checker result failed ValidateRelatedResult: %v", err)
@@ -330,14 +330,14 @@ func TestContract_TruncatedZeroMatch_Alarm_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("Alarm checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("Alarm checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("Alarm checker (regression pin): want Truncated=true, got false")
 	}
-	if got.TargetType != "alarm" {
-		t.Errorf("Alarm checker: want TargetType=%q, got %q", "alarm", got.TargetType)
+	if got.TargetType() != "alarm" {
+		t.Errorf("Alarm checker: want TargetType=%q, got %q", "alarm", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("Alarm checker result failed ValidateRelatedResult: %v", err)
@@ -366,14 +366,14 @@ func TestContract_TruncatedZeroMatch_CFN_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != 0 {
-		t.Errorf("CFN checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("CFN checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("CFN checker (regression pin): want Truncated=true, got false")
 	}
-	if got.TargetType != "cfn" {
-		t.Errorf("CFN checker: want TargetType=%q, got %q", "cfn", got.TargetType)
+	if got.TargetType() != "cfn" {
+		t.Errorf("CFN checker: want TargetType=%q, got %q", "cfn", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("CFN checker result failed ValidateRelatedResult: %v", err)
@@ -414,14 +414,14 @@ func TestContract_TruncatedZeroMatch_EBSSnap_ReturnsTruncated(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	got := checker(context.Background(), nil, instanceWithVolume, cache)
 
-	if got.Count != 0 {
-		t.Errorf("EBSSnap checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("EBSSnap checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count())
 	}
-	if !got.Truncated {
+	if !got.Truncated() {
 		t.Errorf("EBSSnap checker (regression pin): want Truncated=true, got false")
 	}
-	if got.TargetType != "ebs-snap" {
-		t.Errorf("EBSSnap checker: want TargetType=%q, got %q", "ebs-snap", got.TargetType)
+	if got.TargetType() != "ebs-snap" {
+		t.Errorf("EBSSnap checker: want TargetType=%q, got %q", "ebs-snap", got.TargetType())
 	}
 	if err := resource.ValidateRelatedResult(got); err != nil {
 		t.Errorf("EBSSnap checker result failed ValidateRelatedResult: %v", err)

@@ -45,8 +45,8 @@ func TestRelated_ASGSG_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "my-asg", RawStruct: "not-an-asg"}
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -57,8 +57,8 @@ func TestRelated_ASGSG_NilClients(t *testing.T) {
 	}
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -77,16 +77,16 @@ func TestRelated_ASGSG_LaunchConfigPath_ReturnsSecurityGroups(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	wantIDs := map[string]bool{"sg-0abc1111": true, "sg-0abc2222": true}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if !wantIDs[id] {
-			t.Errorf("unexpected SG ID %q in result %v", id, result.ResourceIDs)
+			t.Errorf("unexpected SG ID %q in result %v", id, result.ResourceIDs())
 		}
 	}
 }
@@ -110,10 +110,10 @@ func TestRelated_ASGSG_LaunchConfigPath_DescribeError(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (DescribeLaunchConfigurations error)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 (DescribeLaunchConfigurations error)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("expected Err to be set")
 	}
 }
@@ -132,8 +132,8 @@ func TestRelated_ASGSG_LaunchConfigPath_EmptyResult(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty LaunchConfigurations result)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty LaunchConfigurations result)", result.Count())
 	}
 }
 
@@ -149,8 +149,8 @@ func TestRelated_ASGSG_NoLCNoLT_ReturnsZero(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no LaunchConfigurationName, no LaunchTemplate)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no LaunchConfigurationName, no LaunchTemplate)", result.Count())
 	}
 }
 
@@ -180,16 +180,16 @@ func TestRelated_ASGSG_DirectLaunchTemplatePath_ReturnsSecurityGroupIDs(t *testi
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3 (1 SecurityGroupIds + 2 NetworkInterfaces.Groups)", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3 (1 SecurityGroupIds + 2 NetworkInterfaces.Groups)", result.Count())
 	}
 	wantIDs := map[string]bool{"sg-lt0001": true, "sg-lt0002": true, "sg-lt0003": true}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if !wantIDs[id] {
-			t.Errorf("unexpected SG ID %q in result %v", id, result.ResourceIDs)
+			t.Errorf("unexpected SG ID %q in result %v", id, result.ResourceIDs())
 		}
 	}
 }
@@ -221,14 +221,14 @@ func TestRelated_ASGSG_MixedInstancesPolicyFallback_ReturnsSecurityGroups(t *tes
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-mip0001" {
-		t.Errorf("ResourceIDs = %v, want [sg-mip0001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-mip0001" {
+		t.Errorf("ResourceIDs = %v, want [sg-mip0001]", result.ResourceIDs())
 	}
 }
 
@@ -254,10 +254,10 @@ func TestRelated_ASGSG_LaunchTemplateVersionsError(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (DescribeLaunchTemplateVersions error)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 (DescribeLaunchTemplateVersions error)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("expected Err to be set")
 	}
 }
@@ -274,8 +274,8 @@ func TestRelated_CbSecrets_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "my-project", RawStruct: "not-a-project"}
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -286,8 +286,8 @@ func TestRelated_CbSecrets_NilEnvironment(t *testing.T) {
 	}
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Environment)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Environment)", result.Count())
 	}
 }
 
@@ -309,11 +309,11 @@ func TestRelated_CbSecrets_ARNWithSecretSegment_ExtractsName(t *testing.T) {
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod/db/password-AbCdEf" {
-		t.Errorf("ResourceIDs = %v, want [prod/db/password-AbCdEf]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod/db/password-AbCdEf" {
+		t.Errorf("ResourceIDs = %v, want [prod/db/password-AbCdEf]", result.ResourceIDs())
 	}
 }
 
@@ -335,11 +335,11 @@ func TestRelated_CbSecrets_ARNWithJSONKeySuffix_StripsSuffix(t *testing.T) {
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod/api/creds-XyZ123" {
-		t.Errorf("ResourceIDs = %v, want [prod/api/creds-XyZ123] (json-key suffix stripped)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod/api/creds-XyZ123" {
+		t.Errorf("ResourceIDs = %v, want [prod/api/creds-XyZ123] (json-key suffix stripped)", result.ResourceIDs())
 	}
 }
 
@@ -357,8 +357,8 @@ func TestRelated_CbSecrets_NilValueSkipped(t *testing.T) {
 	checker := cbCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Value skipped)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Value skipped)", result.Count())
 	}
 }
 
@@ -378,11 +378,11 @@ func TestRelated_DbcSnapVPC_RDSType_ReturnsVpcID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-rds9999" {
-		t.Errorf("ResourceIDs = %v, want [vpc-rds9999]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-rds9999" {
+		t.Errorf("ResourceIDs = %v, want [vpc-rds9999]", result.ResourceIDs())
 	}
 }
 
@@ -394,8 +394,8 @@ func TestRelated_DbcSnapVPC_RDSType_NilVpcID_ReturnsZero(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil VpcId, rds type)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil VpcId, rds type)", result.Count())
 	}
 }
 
@@ -427,11 +427,11 @@ func TestRelated_EIPECSTask_CacheMissNoClients_ReturnsZeroNotUnknown(t *testing.
 	checker := eipCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cache miss, no clients, no match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (cache miss, no clients, no match)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -456,8 +456,8 @@ func TestRelated_EIPECSTask_TruncatedNoMatch_TruncatedResult(t *testing.T) {
 	checker := eipCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 || !result.Truncated {
-		t.Errorf("Count = %d, Truncated = %v, want Count=0, Truncated=true", result.Count, result.Truncated)
+	if result.Count() != 0 || !result.Truncated() {
+		t.Errorf("Count = %d, Truncated = %v, want Count=0, Truncated=true", result.Count(), result.Truncated())
 	}
 }
 
@@ -480,11 +480,11 @@ func TestRelated_EIPECSTask_Match_ReturnsTaskID(t *testing.T) {
 	checker := eipCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "task-0abc1234567890def" {
-		t.Errorf("ResourceIDs = %v, want [task-0abc1234567890def]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "task-0abc1234567890def" {
+		t.Errorf("ResourceIDs = %v, want [task-0abc1234567890def]", result.ResourceIDs())
 	}
 }
 
@@ -508,11 +508,11 @@ func TestRelated_EIPECSSvc_Match_ReturnsServiceName(t *testing.T) {
 	checker := eipCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod-web-svc" {
-		t.Errorf("ResourceIDs = %v, want [prod-web-svc]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod-web-svc" {
+		t.Errorf("ResourceIDs = %v, want [prod-web-svc]", result.ResourceIDs())
 	}
 }
 
@@ -536,8 +536,8 @@ func TestRelated_EIPECSSvc_MatchedTaskNoServiceGroupPrefix_ReturnsZero(t *testin
 	checker := eipCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (Group does not have service: prefix)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (Group does not have service: prefix)", result.Count())
 	}
 }
 
@@ -563,11 +563,11 @@ func TestRelated_EIPECS_Match_ReturnsClusterNameFromArn(t *testing.T) {
 	checker := eipCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != wantClusterName {
-		t.Errorf("ResourceIDs = %v, want [%s] (arnLastSegment extracts cluster name, not full ARN)", result.ResourceIDs, wantClusterName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != wantClusterName {
+		t.Errorf("ResourceIDs = %v, want [%s] (arnLastSegment extracts cluster name, not full ARN)", result.ResourceIDs(), wantClusterName)
 	}
 }
 
@@ -591,8 +591,8 @@ func TestRelated_EIPECS_MatchedTaskNilClusterArn_ReturnsZero(t *testing.T) {
 	checker := eipCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil ClusterArn on matched task)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil ClusterArn on matched task)", result.Count())
 	}
 }
 
@@ -613,10 +613,10 @@ func TestRelated_VPCELogs_DescribeError(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (DescribeFlowLogs error)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 (DescribeFlowLogs error)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("expected Err to be set")
 	}
 }
@@ -633,14 +633,14 @@ func TestRelated_VPCELogs_MatchByExplicitLogGroupName(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/vpc/flow-logs/vpce-abc123" {
-		t.Errorf("ResourceIDs = %v, want [/aws/vpc/flow-logs/vpce-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/vpc/flow-logs/vpce-abc123" {
+		t.Errorf("ResourceIDs = %v, want [/aws/vpc/flow-logs/vpce-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -656,14 +656,14 @@ func TestRelated_VPCELogs_MatchByLogDestinationARN_WithTrailingColon(t *testing.
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/vpc/flow-logs/vpce-abc123" {
-		t.Errorf("ResourceIDs = %v, want [/aws/vpc/flow-logs/vpce-abc123] (trailing colon stripped)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/vpc/flow-logs/vpce-abc123" {
+		t.Errorf("ResourceIDs = %v, want [/aws/vpc/flow-logs/vpce-abc123] (trailing colon stripped)", result.ResourceIDs())
 	}
 }
 
@@ -679,14 +679,14 @@ func TestRelated_VPCELogs_MatchByLogDestinationARN_NoTrailingColon(t *testing.T)
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/vpc/flow-logs/vpce-noColon" {
-		t.Errorf("ResourceIDs = %v, want [/aws/vpc/flow-logs/vpce-noColon]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/vpc/flow-logs/vpce-noColon" {
+		t.Errorf("ResourceIDs = %v, want [/aws/vpc/flow-logs/vpce-noColon]", result.ResourceIDs())
 	}
 }
 
@@ -703,8 +703,8 @@ func TestRelated_VPCELogs_DedupSameNameAcrossFlowLogs(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (deduped log group name)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (deduped log group name)", result.Count())
 	}
 }
 
@@ -716,8 +716,8 @@ func TestRelated_VPCELogs_NoFlowLogsReturnsZero(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no flow logs found)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no flow logs found)", result.Count())
 	}
 }
 

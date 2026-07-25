@@ -118,17 +118,17 @@ func TestBackup_Related_GraphRoot_RoleResolvesAtLeastOne(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("role pivot must resolve >= 1 for graph-root plan (plan-broken-2failed); got Count=%d", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("role pivot must resolve >= 1 for graph-root plan (plan-broken-2failed); got Count=%d", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Fatal("role pivot must return non-empty ResourceIDs when Count >= 1")
 	}
-	if !sliceContainsSubstr(result.ResourceIDs, "AcmeBackupRoleProd") {
-		t.Fatalf("role pivot ResourceIDs must contain 'AcmeBackupRoleProd'; got %v", result.ResourceIDs)
+	if !sliceContainsSubstr(result.ResourceIDs(), "AcmeBackupRoleProd") {
+		t.Fatalf("role pivot ResourceIDs must contain 'AcmeBackupRoleProd'; got %v", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Fatalf("role pivot must not return an error for graph-root: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("role pivot must not return an error for graph-root: %v", result.Err())
 	}
 }
 
@@ -146,18 +146,18 @@ func TestBackup_Related_GraphRoot_KMSResolvesAtLeastOne(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("kms pivot must resolve >= 1 for graph-root plan; got Count=%d", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("kms pivot must resolve >= 1 for graph-root plan; got Count=%d", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Fatal("kms pivot must return non-empty ResourceIDs when Count >= 1")
 	}
-	if !sliceContainsSubstr(result.ResourceIDs, fixtures.BackupProdVaultKMSKeyID) {
+	if !sliceContainsSubstr(result.ResourceIDs(), fixtures.BackupProdVaultKMSKeyID) {
 		t.Fatalf("kms pivot ResourceIDs must contain key ID %q; got %v",
-			fixtures.BackupProdVaultKMSKeyID, result.ResourceIDs)
+			fixtures.BackupProdVaultKMSKeyID, result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Fatalf("kms pivot must not return an error for graph-root: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("kms pivot must not return an error for graph-root: %v", result.Err())
 	}
 }
 
@@ -175,18 +175,18 @@ func TestBackup_Related_GraphRoot_SNSResolvesAtLeastOne(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("sns pivot must resolve >= 1 for graph-root plan; got Count=%d", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("sns pivot must resolve >= 1 for graph-root plan; got Count=%d", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 {
+	if len(result.ResourceIDs()) == 0 {
 		t.Fatal("sns pivot must return non-empty ResourceIDs when Count >= 1")
 	}
-	if !sliceContainsSubstr(result.ResourceIDs, fixtures.BackupAlertsSNSTopicName) {
+	if !sliceContainsSubstr(result.ResourceIDs(), fixtures.BackupAlertsSNSTopicName) {
 		t.Fatalf("sns pivot ResourceIDs must contain topic name %q; got %v",
-			fixtures.BackupAlertsSNSTopicName, result.ResourceIDs)
+			fixtures.BackupAlertsSNSTopicName, result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Fatalf("sns pivot must not return an error for graph-root: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("sns pivot must not return an error for graph-root: %v", result.Err())
 	}
 }
 
@@ -205,8 +205,8 @@ func TestBackup_Related_HealthyPlan_KMS_DefaultVault_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("kms pivot must return Count=0 for healthy plan using acme-default-vault (no customer-managed key): got %d", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("kms pivot must return Count=0 for healthy plan using acme-default-vault (no customer-managed key): got %d", result.Count())
 	}
 }
 
@@ -225,8 +225,8 @@ func TestBackup_Related_HealthyPlan_SNS_DefaultVault_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("sns pivot must return Count=0 for healthy plan using acme-default-vault (no SNS topic configured): got %d", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("sns pivot must return Count=0 for healthy plan using acme-default-vault (no SNS topic configured): got %d", result.Count())
 	}
 }
 
@@ -244,12 +244,12 @@ func TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves(t *testing.
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
+	if result.Count() < 1 {
 		t.Fatal("role pivot must resolve >= 1 for healthy plan (uses AWSBackupDefaultServiceRole)")
 	}
-	if !sliceContainsSubstr(result.ResourceIDs, "AWSBackupDefaultServiceRole") {
+	if !sliceContainsSubstr(result.ResourceIDs(), "AWSBackupDefaultServiceRole") {
 		t.Fatalf("role pivot ResourceIDs must contain 'AWSBackupDefaultServiceRole'; got %v",
-			result.ResourceIDs)
+			result.ResourceIDs())
 	}
 }
 
@@ -275,7 +275,7 @@ func TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown(t *testing.T) {
 		t.Run(pivot, func(t *testing.T) {
 			checker := backupCheckerByTarget(t, pivot)
 			result := checker(context.Background(), clients, emptyRes, resource.ResourceCache{})
-			if result.State != domain.RelatedUnknown {
+			if result.State() != domain.RelatedUnknown {
 				t.Fatalf("pivot %q must return State: RelatedUnknown for empty plan ID (unknown, not resolved)", pivot)
 			}
 		})

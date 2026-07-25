@@ -37,7 +37,7 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	}
 
 	if len(arnSet) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	ids := make([]string, 0, len(arnSet))
 	for arn := range arnSet {
@@ -52,7 +52,7 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 
 	var asgName string
@@ -63,7 +63,7 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if asgName == "" {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")

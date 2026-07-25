@@ -73,14 +73,14 @@ func TestRelated_ENI_EC2_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-test" {
-		t.Errorf("ResourceIDs = %v, want [i-test]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-test" {
+		t.Errorf("ResourceIDs = %v, want [i-test]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -108,8 +108,8 @@ func TestRelated_ENI_EC2_NotFound(t *testing.T) {
 	checker := eniCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
 }
 
@@ -134,11 +134,11 @@ func TestRelated_ENI_EC2_NoAttachment(t *testing.T) {
 	checker := eniCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Attachment)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Attachment)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -156,8 +156,8 @@ func TestRelated_ENI_EC2_CacheMissNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
 
@@ -193,11 +193,11 @@ func TestRelated_ENI_SG_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -224,8 +224,8 @@ func TestRelated_ENI_SG_NotFound(t *testing.T) {
 	checker := eniCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
 }
 
@@ -243,8 +243,8 @@ func TestRelated_ENI_SG_CacheMissNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
 
@@ -273,14 +273,14 @@ func TestRelated_ENI_EIP_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eipalloc-test" {
-		t.Errorf("ResourceIDs = %v, want [eipalloc-test]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eipalloc-test" {
+		t.Errorf("ResourceIDs = %v, want [eipalloc-test]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -305,11 +305,11 @@ func TestRelated_ENI_EIP_NoAssociation(t *testing.T) {
 	checker := eniCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Association)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Association)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -327,7 +327,7 @@ func TestRelated_ENI_EIP_CacheMissNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }

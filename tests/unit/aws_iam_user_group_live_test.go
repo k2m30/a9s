@@ -42,24 +42,24 @@ func TestCheckUserGroup_HappyPath(t *testing.T) {
 	res := resource.Resource{ID: "alice.johnson", Name: "alice.johnson"}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (admins + developers); fixture GroupsForUser[\"alice.johnson\"] has 2 entries", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (admins + developers); fixture GroupsForUser[\"alice.johnson\"] has 2 entries", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 
 	// Verify exact group names are present in IDs.
 	wantGroups := map[string]bool{"admins": false, "developers": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		wantGroups[id] = true
 	}
 	for name, found := range wantGroups {
 		if !found {
-			t.Errorf("group %q not found in ResourceIDs %v", name, result.ResourceIDs)
+			t.Errorf("group %q not found in ResourceIDs %v", name, result.ResourceIDs())
 		}
 	}
 }
@@ -73,11 +73,11 @@ func TestCheckUserGroup_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Name: ""}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty user ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty user ID", result.Count())
 	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
 }
 
@@ -91,13 +91,13 @@ func TestCheckUserGroup_NoGroups(t *testing.T) {
 	res := resource.Resource{ID: "bob.smith", Name: "bob.smith"}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (bob.smith has no groups in fixture)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (bob.smith has no groups in fixture)", result.Count())
 	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	if result.TargetType() != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error for user with no groups: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error for user with no groups: %v", result.Err())
 	}
 }

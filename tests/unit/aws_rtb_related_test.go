@@ -70,11 +70,11 @@ func TestRelated_RTB_Subnet_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -99,11 +99,11 @@ func TestRelated_RTB_Subnet_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -122,8 +122,8 @@ func TestRelated_RTB_Subnet_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
 
@@ -148,11 +148,11 @@ func TestRelated_RTB_Subnet_NoAssociations(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (main assoc has no SubnetId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (main assoc has no SubnetId)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -178,14 +178,14 @@ func TestRelated_RTB_NAT_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "nat-12345" {
-		t.Errorf("ResourceIDs = %v, want [nat-12345]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "nat-12345" {
+		t.Errorf("ResourceIDs = %v, want [nat-12345]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -206,8 +206,8 @@ func TestRelated_RTB_NAT_BlackholeRouteNotCounted(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (blackhole route target is stale/unopenable, must not be advertised)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (blackhole route target is stale/unopenable, must not be advertised)", result.Count())
 	}
 }
 
@@ -231,11 +231,11 @@ func TestRelated_RTB_NAT_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -254,8 +254,8 @@ func TestRelated_RTB_NAT_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
 
@@ -281,14 +281,14 @@ func TestRelated_RTB_IGW_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "igw-12345" {
-		t.Errorf("ResourceIDs = %v, want [igw-12345]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "igw-12345" {
+		t.Errorf("ResourceIDs = %v, want [igw-12345]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -312,11 +312,11 @@ func TestRelated_RTB_IGW_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -335,8 +335,8 @@ func TestRelated_RTB_IGW_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
 
@@ -360,11 +360,11 @@ func TestRelated_RTB_IGW_LocalGateway(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (local gateway must be filtered out)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (local gateway must be filtered out)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -398,14 +398,14 @@ func TestRelated_RTB_CFN_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
-		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -431,8 +431,8 @@ func TestRelated_RTB_CFN_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -455,8 +455,8 @@ func TestRelated_RTB_CFN_NoTag(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no cfn tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn tag)", result.Count())
 	}
 }
 
@@ -474,8 +474,8 @@ func TestRelated_RTB_CFN_CacheMiss(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -496,11 +496,11 @@ func TestRelated_RTB_VPC_Present(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (vpc_id present)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (vpc_id present)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-0123456789abcdef0" {
-		t.Errorf("ResourceIDs = %v, want [vpc-0123456789abcdef0]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-0123456789abcdef0" {
+		t.Errorf("ResourceIDs = %v, want [vpc-0123456789abcdef0]", result.ResourceIDs())
 	}
 }
 
@@ -514,8 +514,8 @@ func TestRelated_RTB_VPC_Absent(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count())
 	}
 }
 
@@ -544,11 +544,11 @@ func TestRelated_RTB_ENI_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eni-0abc1234" {
-		t.Errorf("ResourceIDs = %v, want [eni-0abc1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eni-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [eni-0abc1234]", result.ResourceIDs())
 	}
 }
 
@@ -572,8 +572,8 @@ func TestRelated_RTB_ENI_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
 }
 
@@ -598,8 +598,8 @@ func TestRelated_RTB_ENI_NoRoutes(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no NetworkInterfaceId in routes)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no NetworkInterfaceId in routes)", result.Count())
 	}
 }
 
@@ -628,11 +628,11 @@ func TestRelated_RTB_TGW_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "tgw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "tgw-0abc1234" {
-		t.Errorf("ResourceIDs = %v, want [tgw-0abc1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "tgw-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [tgw-0abc1234]", result.ResourceIDs())
 	}
 }
 
@@ -656,8 +656,8 @@ func TestRelated_RTB_TGW_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "tgw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count())
 	}
 }
 
@@ -682,8 +682,8 @@ func TestRelated_RTB_TGW_NoRoutes(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "tgw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no TransitGatewayId in routes)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no TransitGatewayId in routes)", result.Count())
 	}
 }
 
@@ -718,11 +718,11 @@ func TestRelated_RTB_VPCE_Found(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one endpoint references this RTB)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one endpoint references this RTB)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-0abc1234" {
-		t.Errorf("ResourceIDs = %v, want [vpce-0abc1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpce-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [vpce-0abc1234]", result.ResourceIDs())
 	}
 }
 
@@ -747,8 +747,8 @@ func TestRelated_RTB_VPCE_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no endpoint references this RTB)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no endpoint references this RTB)", result.Count())
 	}
 }
 
@@ -764,7 +764,7 @@ func TestRelated_RTB_VPCE_CacheMiss(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (vpce cache absent, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (vpce cache absent, nil clients)", result.Count())
 	}
 }

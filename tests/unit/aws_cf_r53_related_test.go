@@ -96,13 +96,13 @@ func TestCheckCfR53_MatchesExactZoneName(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (exact zone name match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (exact zone name match)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != zone.ID {
-		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, zone.ID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated must be false when cache is not truncated")
 	}
 }
@@ -121,11 +121,11 @@ func TestCheckCfR53_MatchesSubdomainOfZone(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (subdomain suffix match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (subdomain suffix match)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != zone.ID {
-		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, zone.ID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)
 	}
 }
 
@@ -147,22 +147,22 @@ func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (one zone per alias domain)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (one zone per alias domain)", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs = %v, want 2 entries ([%q, %q])", result.ResourceIDs, zone1.ID, zone2.ID)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs = %v, want 2 entries ([%q, %q])", result.ResourceIDs(), zone1.ID, zone2.ID)
 	}
 	// Verify both zone IDs are present (order may vary).
 	idSet := make(map[string]bool)
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	if !idSet[zone1.ID] {
-		t.Errorf("ResourceIDs missing zone1 %q; got %v", zone1.ID, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing zone1 %q; got %v", zone1.ID, result.ResourceIDs())
 	}
 	if !idSet[zone2.ID] {
-		t.Errorf("ResourceIDs missing zone2 %q; got %v", zone2.ID, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing zone2 %q; got %v", zone2.ID, result.ResourceIDs())
 	}
 }
 
@@ -180,13 +180,13 @@ func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching zone)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching zone)", result.Count())
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Errorf("ResourceIDs = %v, want empty (no match)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want empty (no match)", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated must be false when cache is complete and no match found")
 	}
 }
@@ -210,10 +210,10 @@ func TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 
 	// Must be TruncatedResult — not confirmed-zero, because unscanned pages
 	// might contain a matching zone.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for truncated-cache miss", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for truncated-cache miss", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated must be true when cache is truncated and no match found — more zones may exist")
 	}
 }
@@ -246,8 +246,8 @@ func TestCheckCfR53_NoAliasesReturnsZero(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for distribution with no aliases", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for distribution with no aliases", result.Count())
 	}
 }
 
@@ -267,11 +267,11 @@ func TestCheckCfR53_TrailingDotNormalized(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 — trailing dot must be normalised before matching;"+
-			" zone.Name=%q, alias=%q", result.Count, zone.Name, "example.com")
+			" zone.Name=%q, alias=%q", result.Count(), zone.Name, "example.com")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != zone.ID {
-		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, zone.ID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)
 	}
 }

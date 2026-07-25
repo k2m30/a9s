@@ -23,7 +23,7 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	parts := strings.Split(*asg.VPCZoneIdentifier, ",")
 	var ids []string
@@ -34,7 +34,7 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", ids)
 }
@@ -47,7 +47,7 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("tg")
 	}
 	if len(asg.TargetGroupARNs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 
 	arnSet := map[string]bool{}
@@ -112,7 +112,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	version := aws.String("$Latest")
@@ -156,7 +156,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		asgName = res.ID
 	}
 	if asgName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -208,7 +208,7 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("vpc")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	var subnetIDs []string
 	for s := range strings.SplitSeq(*asg.VPCZoneIdentifier, ",") {
@@ -218,7 +218,7 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if len(subnetIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)

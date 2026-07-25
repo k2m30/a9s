@@ -146,15 +146,15 @@ func TestRelated_SES_EbRule_FixtureGraphRootReturnsRuleNames(t *testing.T) {
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, cache)
 
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0 (at least one rule on the default bus)", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0 (at least one rule on the default bus)", result.Count())
 	}
 
 	knownNames := ebRuleNamesOnDefaultBus()
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		// Guard: no returned ID may be an ARN — that is the regression we're fixing.
 		if len(id) >= 4 && id[:4] == "arn:" {
 			t.Errorf("ResourceID %q starts with 'arn:' — checker must return rule names, not ARNs", id)
@@ -188,14 +188,14 @@ func TestRelated_SES_EbRule_ScopeLimitedToBusName(t *testing.T) {
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, cache)
 
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 
 	// "rule-on-custom" must NOT appear — it is on a different bus.
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "rule-on-custom" {
-			t.Errorf("ResourceIDs = %v, must NOT contain 'rule-on-custom' (wrong bus)", result.ResourceIDs)
+			t.Errorf("ResourceIDs = %v, must NOT contain 'rule-on-custom' (wrong bus)", result.ResourceIDs())
 		}
 	}
 
@@ -203,14 +203,14 @@ func TestRelated_SES_EbRule_ScopeLimitedToBusName(t *testing.T) {
 	wantIDs := []string{"rule-on-default", "another-default-rule"}
 	for _, want := range wantIDs {
 		found := false
-		for _, id := range result.ResourceIDs {
+		for _, id := range result.ResourceIDs() {
 			if id == want {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("ResourceIDs = %v, want to contain %q (rule is on the default bus)", result.ResourceIDs, want)
+			t.Errorf("ResourceIDs = %v, want to contain %q (rule is on the default bus)", result.ResourceIDs(), want)
 		}
 	}
 }
@@ -225,8 +225,8 @@ func TestRelated_SES_EbRule_NonGraphRootIdentityReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, ebRuleCache())
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no config set for non-graph-root identity)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no config set for non-graph-root identity)", result.Count())
 	}
 }
 
@@ -239,8 +239,8 @@ func TestRelated_SES_EbRule_EmptyIDReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, ebRuleCache())
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -254,8 +254,8 @@ func TestRelated_SES_EbRule_NilClientsReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, ebRuleCache())
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil clients → no bus names resolvable → honest 0)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil clients → no bus names resolvable → honest 0)", result.Count())
 	}
 }
 
@@ -272,11 +272,11 @@ func TestRelated_SES_Sns_FixtureGraphRootMatchesOne(t *testing.T) {
 	checker := sesCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one SnsDestination in fixture)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one SnsDestination in fixture)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -289,8 +289,8 @@ func TestRelated_SES_Sns_NonGraphRootIdentityReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no config set for non-graph-root identity)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no config set for non-graph-root identity)", result.Count())
 	}
 }
 
@@ -302,8 +302,8 @@ func TestRelated_SES_Sns_EmptyIDReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -315,8 +315,8 @@ func TestRelated_SES_Sns_NilClientsReturnsNegOne(t *testing.T) {
 	checker := sesCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -335,11 +335,11 @@ func TestRelated_SES_S3_NoSESv1ClientReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (c.SES == nil → no rule set → operator-honest 0)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (c.SES == nil → no rule set → operator-honest 0)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -351,8 +351,8 @@ func TestRelated_SES_S3_NilClientsReturnsNegOne(t *testing.T) {
 	checker := sesCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → type assertion failed)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients → type assertion failed)", result.Count())
 	}
 }
 
@@ -375,8 +375,8 @@ func TestRelated_SES_S3_FixtureAllIdentitiesWithNoSESv1ReturnZero(t *testing.T) 
 			RawStruct: identity,
 		}
 		result := checker(context.Background(), clients, src, resource.ResourceCache{})
-		if result.Count != 0 {
-			t.Errorf("identity %q: Count = %d, want 0 (c.SES == nil → no rule set)", identityName, result.Count)
+		if result.Count() != 0 {
+			t.Errorf("identity %q: Count = %d, want 0 (c.SES == nil → no rule set)", identityName, result.Count())
 		}
 	}
 }
@@ -395,8 +395,8 @@ func TestRelated_SES_Lambda_ValidRawStructReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (SES v1 API unavailable, valid RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (SES v1 API unavailable, valid RawStruct)", result.Count())
 	}
 }
 
@@ -408,8 +408,8 @@ func TestRelated_SES_Lambda_EmptyIDReturnsZero(t *testing.T) {
 	checker := sesCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -433,11 +433,11 @@ func TestRelated_SES_R53_FixtureGraphRootMatchesAcmeCorp(t *testing.T) {
 	checker := sesCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (graph-root domain matches fixture R53 zone)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (graph-root domain matches fixture R53 zone)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/hostedzone/ZFIXTURE" {
-		t.Errorf("ResourceIDs = %v, want [/hostedzone/ZFIXTURE]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/hostedzone/ZFIXTURE" {
+		t.Errorf("ResourceIDs = %v, want [/hostedzone/ZFIXTURE]", result.ResourceIDs())
 	}
 }
 
@@ -464,8 +464,8 @@ func TestRelated_SES_R53_EmailIdentityExtractsDomain(t *testing.T) {
 	checker := sesCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (email address: domain extracted after '@')", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (email address: domain extracted after '@')", result.Count())
 	}
 }
 
@@ -627,39 +627,39 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
 			})
 			result := checker(context.Background(), clients, st.resource, resource.ResourceCache{})
-			if result.Err != nil {
-				t.Fatalf("unexpected error: %v", result.Err)
+			if result.Err() != nil {
+				t.Fatalf("unexpected error: %v", result.Err())
 			}
 			// Verify all expected function NAMES are present (not ARNs).
 			for _, wantName := range st.wantNames {
 				found := false
-				for _, id := range result.ResourceIDs {
+				for _, id := range result.ResourceIDs() {
 					if id == wantName {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("ResourceIDs = %v, want to contain function name %q (not ARN)", result.ResourceIDs, wantName)
+					t.Errorf("ResourceIDs = %v, want to contain function name %q (not ARN)", result.ResourceIDs(), wantName)
 				}
 			}
 			// Verify unwanted name is absent.
 			if st.unwantedName != "" {
-				for _, id := range result.ResourceIDs {
+				for _, id := range result.ResourceIDs() {
 					if id == st.unwantedName {
-						t.Errorf("ResourceIDs = %v, must NOT contain %q (wrong recipient scope)", result.ResourceIDs, st.unwantedName)
+						t.Errorf("ResourceIDs = %v, must NOT contain %q (wrong recipient scope)", result.ResourceIDs(), st.unwantedName)
 					}
 				}
 			}
 			// No returned ID may be an ARN — guards against regression.
-			for _, id := range result.ResourceIDs {
+			for _, id := range result.ResourceIDs() {
 				if len(id) >= 4 && id[:4] == "arn:" {
 					t.Errorf("ResourceIDs contains ARN %q — checker must return function names only", id)
 				}
 			}
 			// Count must equal len(wantNames).
-			if result.Count != len(st.wantNames) {
-				t.Errorf("Count = %d, want %d", result.Count, len(st.wantNames))
+			if result.Count() != len(st.wantNames) {
+				t.Errorf("Count = %d, want %d", result.Count(), len(st.wantNames))
 			}
 		})
 	}
@@ -693,14 +693,14 @@ func TestCheckSESLambda_ExtractsFunctionNameFromARN(t *testing.T) {
 	checker := sesCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Err != nil {
-		t.Fatalf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "billing-webhook" {
-		t.Errorf("ResourceIDs = %v, want [\"billing-webhook\"] (bare function name, not ARN)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "billing-webhook" {
+		t.Errorf("ResourceIDs = %v, want [\"billing-webhook\"] (bare function name, not ARN)", result.ResourceIDs())
 	}
 }
 
@@ -774,30 +774,30 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
 			})
 			result := checker(context.Background(), clients, st.resource, resource.ResourceCache{})
-			if result.Err != nil {
-				t.Fatalf("unexpected error: %v", result.Err)
+			if result.Err() != nil {
+				t.Fatalf("unexpected error: %v", result.Err())
 			}
 			for _, wantBucket := range st.wantBuckets {
 				found := false
-				for _, id := range result.ResourceIDs {
+				for _, id := range result.ResourceIDs() {
 					if id == wantBucket {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs, wantBucket)
+					t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs(), wantBucket)
 				}
 			}
 			if st.unwantedBucket != "" {
-				for _, id := range result.ResourceIDs {
+				for _, id := range result.ResourceIDs() {
 					if id == st.unwantedBucket {
-						t.Errorf("ResourceIDs = %v, must NOT contain %q (wrong recipient scope)", result.ResourceIDs, st.unwantedBucket)
+						t.Errorf("ResourceIDs = %v, must NOT contain %q (wrong recipient scope)", result.ResourceIDs(), st.unwantedBucket)
 					}
 				}
 			}
-			if result.Count != len(st.wantBuckets) {
-				t.Errorf("Count = %d, want %d", result.Count, len(st.wantBuckets))
+			if result.Count() != len(st.wantBuckets) {
+				t.Errorf("Count = %d, want %d", result.Count(), len(st.wantBuckets))
 			}
 		})
 	}
@@ -845,24 +845,24 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 
 	// Call 1: expect error (State: RelatedError) — transient API failure.
 	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result1.State != domain.RelatedError {
-		t.Errorf("call 1: State = %v, want RelatedError (transient API error)", result1.State)
+	if result1.State() != domain.RelatedError {
+		t.Errorf("call 1: State = %v, want RelatedError (transient API error)", result1.State())
 	}
 
 	// Call 2: expect success (Count=1) — error must NOT be cached by sync.Once.
 	// This is the regression pin: current code freezes the error so Count stays -1.
 	result2 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result2.Count != 1 {
-		t.Errorf("call 2: Count = %d, want 1 (error should not be cached — must retry after transient failure)", result2.Count)
+	if result2.Count() != 1 {
+		t.Errorf("call 2: Count = %d, want 1 (error should not be cached — must retry after transient failure)", result2.Count())
 	}
-	if result2.Err != nil {
-		t.Errorf("call 2: unexpected error: %v", result2.Err)
+	if result2.Err() != nil {
+		t.Errorf("call 2: unexpected error: %v", result2.Err())
 	}
 
 	// Call 3: success is memoized — no additional API call.
 	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result3.Count != 1 {
-		t.Errorf("call 3: Count = %d, want 1 (success cached from call 2)", result3.Count)
+	if result3.Count() != 1 {
+		t.Errorf("call 3: Count = %d, want 1 (success cached from call 2)", result3.Count())
 	}
 	// The mock was called exactly twice: once for the error, once for the success.
 	// A third API call would indicate the success is NOT being cached.
@@ -909,21 +909,21 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	checker := sesCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one matching zone in truncated r53 cache)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one matching zone in truncated r53 cache)", result.Count())
 	}
 	// Truncated+matches → must be Truncated=true so UI renders "(1+)" not "(1)".
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated r53 cache with matches must be truncated")
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "/hostedzone/ZTRUNC001" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain \"/hostedzone/ZTRUNC001\"", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want to contain \"/hostedzone/ZTRUNC001\"", result.ResourceIDs())
 	}
 }
 
@@ -952,10 +952,10 @@ func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T
 	checker := sesCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no zone matches in visible page)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no zone matches in visible page)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated cache with zero visible matches must be truncated")
 	}
 }
@@ -982,10 +982,10 @@ func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (one matching eb-rule in truncated cache)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (one matching eb-rule in truncated cache)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated eb-rule cache with matches must be truncated")
 	}
 }
@@ -1009,10 +1009,10 @@ func TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testin
 	checker := sesCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), clients, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no eb-rule on the expected bus in visible page)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no eb-rule on the expected bus in visible page)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated eb-rule cache with zero visible matches must be truncated")
 	}
 }

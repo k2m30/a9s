@@ -32,7 +32,6 @@ import (
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/core/aws" // ensure all related registrations run
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -49,36 +48,23 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 	}{
 		{
 			name: "count zero is valid",
-			r:    resource.RelatedCheckResult{TargetType: "vpc", Count: 0},
+			r:    resource.KnownRelated("vpc", nil, false),
 		},
 		{
 			name: "unknown state is valid",
-			r:    resource.RelatedCheckResult{TargetType: "vpc", State: domain.RelatedUnknown},
+			r:    resource.UnknownRelated("vpc"),
 		},
 		{
 			name: "count 3 with 3 IDs is valid",
-			r: resource.RelatedCheckResult{
-				TargetType:  "vpc",
-				Count:       3,
-				ResourceIDs: []string{"vpc-a", "vpc-b", "vpc-c"},
-			},
+			r:    resource.KnownRelated("vpc", []string{"vpc-a", "vpc-b", "vpc-c"}, false),
 		},
 		{
 			name: "count 0 truncated is valid",
-			r: resource.RelatedCheckResult{
-				TargetType: "vpc",
-				Count:      0,
-				Truncated:  true,
-			},
+			r:    resource.KnownRelated("vpc", nil, true),
 		},
 		{
 			name: "count 5 truncated with 5 IDs is valid",
-			r: resource.RelatedCheckResult{
-				TargetType:  "vpc",
-				Count:       5,
-				Truncated:   true,
-				ResourceIDs: []string{"vpc-1", "vpc-2", "vpc-3", "vpc-4", "vpc-5"},
-			},
+			r:    resource.KnownRelated("vpc", []string{"vpc-1", "vpc-2", "vpc-3", "vpc-4", "vpc-5"}, true),
 		},
 	}
 
@@ -99,6 +85,19 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 
 // TestValidateRelatedResult_Invalid verifies that malformed RelatedCheckResult
 // values return a non-nil error from ValidateRelatedResult.
+//
+// Three of the four original cases here ("count > 0 but no IDs", "unknown
+// state with IDs", "truncated with unknown state") hand-built a
+// RelatedCheckResult violating exactly the invariant they meant to prove
+// ValidateRelatedResult rejects. RelatedCheckResult's fields are now
+// unexported, buildable only via KnownRelated/UnknownRelated/ErrorRelated/
+// DeferredRelated — none of which can produce Count>0 without a matching
+// ResourceIDs list (Count is always len(uniqueIDs)), or attach ResourceIDs or
+// Truncated to an Unknown-state result (UnknownRelated takes only a
+// targetType). Those three shapes are no longer constructible from
+// tests/unit, so the corresponding ValidateRelatedResult checks are no longer
+// exercised here — and, since no real checker can produce these shapes either
+// (identical constructor set), they may now be unreachable in production too.
 func TestValidateRelatedResult_Invalid(t *testing.T) {
 	cases := []struct {
 		name string
@@ -106,27 +105,7 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 	}{
 		{
 			name: "empty target type",
-			r:    resource.RelatedCheckResult{Count: 0},
-		},
-		{
-			name: "count > 0 but no IDs",
-			r:    resource.RelatedCheckResult{TargetType: "vpc", Count: 2, ResourceIDs: nil},
-		},
-		{
-			name: "unknown state with IDs",
-			r: resource.RelatedCheckResult{
-				TargetType:  "vpc",
-				State:       domain.RelatedUnknown,
-				ResourceIDs: []string{"vpc-x"},
-			},
-		},
-		{
-			name: "truncated with unknown state",
-			r: resource.RelatedCheckResult{
-				TargetType: "vpc",
-				State:      domain.RelatedUnknown,
-				Truncated:  true,
-			},
+			r:    resource.KnownRelated("", nil, false),
 		},
 	}
 
@@ -188,13 +167,13 @@ func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 					result := def.Checker(context.Background(), nil, dummyRes, emptyCache)
 
 					// TargetType should be echoed from the def.
-					if result.TargetType == "" {
+					if result.TargetType() == "" {
 						// Tolerate missing TargetType echo — ValidateRelatedResult will catch it.
 					}
 					// Override TargetType from the def if the checker forgot to set it —
 					// we want to catch the semantic invariants, not just the echo.
-					if result.TargetType == "" {
-						result.TargetType = def.TargetType
+					if result.TargetType() == "" {
+						result = result.WithTargetType(def.TargetType)
 					}
 
 					if err := resource.ValidateRelatedResult(result); err != nil {

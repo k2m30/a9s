@@ -234,9 +234,7 @@ func TestHandleRelatedCheckResult_AppendsRelatedCache(t *testing.T) {
 		ResourceType:     "ec2",
 		SourceResourceID: "i-abc",
 		DefDisplayName:   "SecurityGroups",
-		Result: resource.RelatedCheckResult{
-			TargetType: "sg",
-		},
+		Result:           resource.KnownRelated("sg", nil, false),
 	})
 
 	patch, ok := findIntent[PatchRelatedCache](intents)

@@ -86,11 +86,7 @@ func setupEC2DetailWithResultsNarrow(t *testing.T) (tui.Model, resource.Resource
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: firstInstance.ID,
-			Result: resource.RelatedCheckResult{
-				TargetType:  def.TargetType,
-				Count:       stubRelatedCount,
-				ResourceIDs: stubRelatedIDs,
-			},
+			Result:           resource.KnownRelated(def.TargetType, stubRelatedIDs, false),
 		})
 	}
 
@@ -105,11 +101,7 @@ func feedEC2Results(t *testing.T, m tui.Model, srcID string) tui.Model {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: srcID,
-			Result: resource.RelatedCheckResult{
-				TargetType:  def.TargetType,
-				Count:       stubRelatedCount,
-				ResourceIDs: stubRelatedIDs,
-			},
+			Result:           resource.KnownRelated(def.TargetType, stubRelatedIDs, false),
 		})
 	}
 	return m

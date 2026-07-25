@@ -65,7 +65,7 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
@@ -77,12 +77,12 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 	if err != nil {
 		// WAFNonexistentItemException = no logging configured → real 0.
 		if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-			return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+			return resource.KnownRelated("logs", nil, false)
 		}
 		return resource.ErrorRelated("logs", err)
 	}
 	if out.LoggingConfiguration == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	var ids []string
 	for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
@@ -118,7 +118,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	scope := res.Fields["scope"]
 	if scope != string(wafv2types.ScopeCloudfront) {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
@@ -128,7 +128,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		webACLArn = res.ID
 	}
 	if webACLArn == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
@@ -145,7 +145,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.ErrorRelated("cf", err)
 	}
 	if out.DistributionList == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	var ids []string
 	for _, d := range out.DistributionList.Items {

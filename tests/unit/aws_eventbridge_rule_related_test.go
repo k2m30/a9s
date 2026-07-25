@@ -109,11 +109,11 @@ func TestRelated_EbRule_Role_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "EventBridgeDeployRole" {
-		t.Errorf("ResourceIDs = %v, want [EventBridgeDeployRole]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "EventBridgeDeployRole" {
+		t.Errorf("ResourceIDs = %v, want [EventBridgeDeployRole]", result.ResourceIDs())
 	}
 }
 
@@ -122,8 +122,8 @@ func TestRelated_EbRule_Role_NoRole(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no RoleArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no RoleArn)", result.Count())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_EbRule_Role_WrongRawStruct(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -157,11 +157,11 @@ func TestRelated_EbRule_Kinesis_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-stream" {
-		t.Errorf("ResourceIDs = %v, want [my-stream]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-stream" {
+		t.Errorf("ResourceIDs = %v, want [my-stream]", result.ResourceIDs())
 	}
 }
 
@@ -177,8 +177,8 @@ func TestRelated_EbRule_Kinesis_NoMatch(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no kinesis target)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no kinesis target)", result.Count())
 	}
 }
 
@@ -187,8 +187,8 @@ func TestRelated_EbRule_Kinesis_NilClients(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -197,8 +197,8 @@ func TestRelated_EbRule_Kinesis_EmptyID(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty rule ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty rule ID)", result.Count())
 	}
 }
 
@@ -218,12 +218,12 @@ func TestRelated_EbRule_Lambda_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	// :version should be stripped
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "process-events" {
-		t.Errorf("ResourceIDs = %v, want [process-events]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "process-events" {
+		t.Errorf("ResourceIDs = %v, want [process-events]", result.ResourceIDs())
 	}
 }
 
@@ -239,11 +239,11 @@ func TestRelated_EbRule_Lambda_NoVersion(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-func" {
-		t.Errorf("ResourceIDs = %v, want [my-func]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-func" {
+		t.Errorf("ResourceIDs = %v, want [my-func]", result.ResourceIDs())
 	}
 }
 
@@ -263,12 +263,12 @@ func TestRelated_EbRule_Logs_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	// :* suffix should be stripped
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "/aws/my-app" {
-		t.Errorf("ResourceIDs = %v, want [/aws/my-app]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "/aws/my-app" {
+		t.Errorf("ResourceIDs = %v, want [/aws/my-app]", result.ResourceIDs())
 	}
 }
 
@@ -288,11 +288,11 @@ func TestRelated_EbRule_SFN_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "sfn")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-state-machine" {
-		t.Errorf("ResourceIDs = %v, want [my-state-machine]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-state-machine" {
+		t.Errorf("ResourceIDs = %v, want [my-state-machine]", result.ResourceIDs())
 	}
 }
 
@@ -312,11 +312,11 @@ func TestRelated_EbRule_SNS_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "sns")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-alerts-topic" {
-		t.Errorf("ResourceIDs = %v, want [my-alerts-topic]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-alerts-topic" {
+		t.Errorf("ResourceIDs = %v, want [my-alerts-topic]", result.ResourceIDs())
 	}
 }
 
@@ -336,11 +336,11 @@ func TestRelated_EbRule_SQS_Match(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "my-queue" {
-		t.Errorf("ResourceIDs = %v, want [my-queue]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-queue" {
+		t.Errorf("ResourceIDs = %v, want [my-queue]", result.ResourceIDs())
 	}
 }
 
@@ -351,8 +351,8 @@ func TestRelated_EbRule_TargetService_NilClients(t *testing.T) {
 	for _, target := range []string{"kinesis", "lambda", "logs", "sfn", "sns", "sqs"} {
 		checker := ebRuleCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (nil clients)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (nil clients)", target, result.Count())
 		}
 	}
 }

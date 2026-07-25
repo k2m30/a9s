@@ -142,10 +142,10 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 						if !ok {
 							continue
 						}
-						if res.Result.State == domain.RelatedResolved {
+						if res.Result.State() == domain.RelatedResolved {
 							sawCountable = true
 						}
-						if witness == "" && res.Result.Count > 0 {
+						if witness == "" && res.Result.Count() > 0 {
 							witness = def.DisplayName
 						}
 					}
@@ -155,7 +155,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 						// related_view_validation_test.go applies.
 						for _, def := range defs {
 							res, ok := snap[def.DisplayName]
-							if ok && res.Result.State == domain.RelatedDeferred {
+							if ok && res.Result.State() == domain.RelatedDeferred {
 								witness = def.DisplayName
 								break
 							}

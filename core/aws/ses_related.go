@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ses"
@@ -35,7 +36,7 @@ type ruleSetStore interface {
 func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain := sesIdentityDomain(res)
 	if domain == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 
 	r53List, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
@@ -80,22 +81,28 @@ func sesIdentityDomain(res resource.Resource) string {
 }
 
 // sesConfigSetName resolves the ConfigurationSetName for the given SES identity by
-// calling sesv2:GetEmailIdentity. Returns "" if none is configured or on error.
-func sesConfigSetName(ctx context.Context, c *ServiceClients, identityName string) string {
+// calling sesv2:GetEmailIdentity. Returns ("", nil) when the call succeeded and
+// no configuration set is attached — a proven absence. Returns ("", err) when
+// the client/interface is unavailable or the call failed, so callers can tell
+// "genuinely nothing configured" apart from "could not determine".
+func sesConfigSetName(ctx context.Context, c *ServiceClients, identityName string) (string, error) {
 	if c == nil || c.SESv2 == nil || identityName == "" {
-		return ""
+		return "", errClientMissing
 	}
 	api, ok := c.SESv2.(SESv2GetEmailIdentityAPI)
 	if !ok {
-		return ""
+		return "", errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetEmailIdentityOutput, error) {
 		return api.GetEmailIdentity(ctx, &sesv2.GetEmailIdentityInput{EmailIdentity: &identityName})
 	})
-	if err != nil || out == nil || out.ConfigurationSetName == nil {
-		return ""
+	if err != nil {
+		return "", err
 	}
-	return *out.ConfigurationSetName
+	if out == nil || out.ConfigurationSetName == nil {
+		return "", nil
+	}
+	return *out.ConfigurationSetName, nil
 }
 
 // sesEventDestinations calls sesv2:GetConfigurationSetEventDestinations for the
@@ -153,24 +160,32 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		// Without a client we cannot query SESv2 to discover EventBridge bus names.
-		// Return Count=0 (early exit — no-client path cannot produce results).
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.UnknownRelated("eb-rule")
 	}
-	configSetName := sesConfigSetName(ctx, c, identityName)
+	configSetName, csErr := sesConfigSetName(ctx, c, identityName)
+	if csErr != nil {
+		if errors.Is(csErr, errClientMissing) {
+			return resource.UnknownRelated("eb-rule")
+		}
+		return resource.ErrorRelated("eb-rule", csErr)
+	}
 	if configSetName == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		// GetEmailIdentity succeeded and confirmed no configuration set — proven zero.
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
 		return resource.ErrorRelated("eb-rule", err)
 	}
 	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		// sesEventDestinations' (nil, nil) sentinel means the interface was
+		// not satisfied — we could not attempt the call, not a proven zero.
+		return resource.UnknownRelated("eb-rule")
 	}
 
 	// Collect bus names from EventBridge destinations.
@@ -189,7 +204,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(busNames) == 0 {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 
 	// Scan the eb-rule cache for rules on matching buses.
@@ -323,7 +338,7 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
@@ -351,7 +366,7 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
@@ -420,22 +435,31 @@ func sesS3BucketsFromRules(rules []sestypes.ReceiptRule) []string {
 func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.UnknownRelated("sns")
 	}
-	configSetName := sesConfigSetName(ctx, c, identityName)
+	configSetName, csErr := sesConfigSetName(ctx, c, identityName)
+	if csErr != nil {
+		if errors.Is(csErr, errClientMissing) {
+			return resource.UnknownRelated("sns")
+		}
+		return resource.ErrorRelated("sns", csErr)
+	}
 	if configSetName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		// GetEmailIdentity succeeded and confirmed no configuration set — proven zero.
+		return resource.KnownRelated("sns", nil, false)
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
 	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		// sesEventDestinations' (nil, nil) sentinel means the interface was
+		// not satisfied — we could not attempt the call, not a proven zero.
+		return resource.UnknownRelated("sns")
 	}
 	var ids []string
 	for _, dest := range out.EventDestinations {
@@ -453,5 +477,5 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 // target cache is truncated and matches were found. Later pages may contain
 // additional matches, so the displayed count is a lower bound — rendered as "(N+)".
 func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Truncated: true}
+	return resource.KnownRelated(target, ids, true)
 }

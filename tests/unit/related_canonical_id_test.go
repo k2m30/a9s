@@ -15,11 +15,7 @@ import (
 )
 
 func TestValidateRelatedResultAgainstCacheForTest_HappyPath(t *testing.T) {
-	r := resource.RelatedCheckResult{
-		TargetType:  "ec2",
-		Count:       2,
-		ResourceIDs: []string{"i-0a1b2c", "i-0d4e5f"},
-	}
+	r := resource.KnownRelated("ec2", []string{"i-0a1b2c", "i-0d4e5f"}, false)
 	cache := resource.ResourceCache{
 		"ec2": {
 			Resources: []resource.Resource{
@@ -40,11 +36,7 @@ func TestValidateRelatedResultAgainstCacheForTest_WrongIDKind_Fails(t *testing.T
 	// instance ID (i-...). The cache holds canonical instance IDs, so the ARN
 	// has no match and the validator MUST catch it.
 	arn := "arn:aws:ec2:us-east-1:111122223333:instance/i-0a1b2c"
-	r := resource.RelatedCheckResult{
-		TargetType:  "ec2",
-		Count:       1,
-		ResourceIDs: []string{arn},
-	}
+	r := resource.KnownRelated("ec2", []string{arn}, false)
 	cache := resource.ResourceCache{
 		"ec2": {
 			Resources:   []resource.Resource{{ID: "i-0a1b2c"}},
@@ -64,11 +56,7 @@ func TestValidateRelatedResultAgainstCacheForTest_TruncatedCache_Skips(t *testin
 	// Cache is truncated — we cannot prove an ID is missing because the cache
 	// might not have seen it. Validator must skip cross-checking in this case
 	// to avoid false positives.
-	r := resource.RelatedCheckResult{
-		TargetType:  "ec2",
-		Count:       1,
-		ResourceIDs: []string{"i-not-in-cache"},
-	}
+	r := resource.KnownRelated("ec2", []string{"i-not-in-cache"}, false)
 	cache := resource.ResourceCache{
 		"ec2": {
 			Resources:   []resource.Resource{{ID: "i-different"}},
@@ -83,11 +71,7 @@ func TestValidateRelatedResultAgainstCacheForTest_TruncatedCache_Skips(t *testin
 func TestValidateRelatedResultAgainstCacheForTest_NoCacheEntry_Skips(t *testing.T) {
 	// No cache entry for the target type at all. Validator cannot compare;
 	// must skip rather than fail.
-	r := resource.RelatedCheckResult{
-		TargetType:  "ec2",
-		Count:       1,
-		ResourceIDs: []string{"i-0a1b2c"},
-	}
+	r := resource.KnownRelated("ec2", []string{"i-0a1b2c"}, false)
 	cache := resource.ResourceCache{}
 	if err := resource.ValidateRelatedResultAgainstCacheForTest(r, cache); err != nil {
 		t.Fatalf("expected nil error when no cache entry exists, got %v", err)
@@ -97,7 +81,7 @@ func TestValidateRelatedResultAgainstCacheForTest_NoCacheEntry_Skips(t *testing.
 func TestValidateRelatedResultAgainstCacheForTest_ShapeViolation_DelegatesToValidateRelatedResult(t *testing.T) {
 	// Empty TargetType is a shape invariant caught by ValidateRelatedResult.
 	// ValidateRelatedResultAgainstCacheForTest must propagate it.
-	r := resource.RelatedCheckResult{Count: 1, ResourceIDs: []string{"x"}}
+	r := resource.KnownRelated("", []string{"x"}, false)
 	cache := resource.ResourceCache{}
 	err := resource.ValidateRelatedResultAgainstCacheForTest(r, cache)
 	if err == nil {
@@ -107,7 +91,7 @@ func TestValidateRelatedResultAgainstCacheForTest_ShapeViolation_DelegatesToVali
 
 func TestValidateRelatedResultAgainstCacheForTest_ZeroIDs_NoCacheCheck(t *testing.T) {
 	// Count=0 with no IDs is valid and must not require cache inspection.
-	r := resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	r := resource.KnownRelated("ec2", nil, false)
 	cache := resource.ResourceCache{
 		"ec2": {Resources: []resource.Resource{}, IsTruncated: false},
 	}

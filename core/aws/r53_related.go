@@ -64,7 +64,7 @@ func canonicalDNS(s string) string {
 func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -75,7 +75,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	// Only alias records pointing at "*.elb.amazonaws.com" are ELB aliases.
 	wanted := make(map[string]struct{})
@@ -85,18 +85,20 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(wanted) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	elbList, elbTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
 	if elbList == nil {
-		// Fallback: return the alias DNS names as Ids when cache is unavailable.
+		if fetchErr != nil {
+			return resource.ErrorRelated("elb", fetchErr)
+		}
+		// Cache not yet populated (no fetch error) — fall back to the alias
+		// DNS names as IDs rather than a proven count.
 		ids := make([]string, 0, len(wanted))
 		for d := range wanted {
 			ids = append(ids, d)
 		}
-		r := relatedResult("elb", ids)
-		r.Err = fetchErr
-		return r
+		return relatedResult("elb", ids)
 	}
 	var ids []string
 	for _, elbRes := range elbList {
@@ -122,7 +124,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -133,7 +135,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	wanted := make(map[string]struct{})
 	for _, d := range aliases {
@@ -142,17 +144,18 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(wanted) == 0 {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	cfList, cfTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
 	if cfList == nil {
+		if fetchErr != nil {
+			return resource.ErrorRelated("cf", fetchErr)
+		}
 		ids := make([]string, 0, len(wanted))
 		for d := range wanted {
 			ids = append(ids, d)
 		}
-		r := relatedResult("cf", ids)
-		r.Err = fetchErr
-		return r
+		return relatedResult("cf", ids)
 	}
 	var ids []string
 	for _, cfRes := range cfList {
@@ -173,7 +176,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -194,17 +197,18 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(wantedIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 	apigwList, apigwTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
 	if apigwList == nil {
+		if fetchErr != nil {
+			return resource.ErrorRelated("apigw", fetchErr)
+		}
 		ids := make([]string, 0, len(wantedIDs))
 		for id := range wantedIDs {
 			ids = append(ids, id)
 		}
-		r := relatedResult("apigw", ids)
-		r.Err = fetchErr
-		return r
+		return relatedResult("apigw", ids)
 	}
 	var ids []string
 	for _, apigwRes := range apigwList {
@@ -220,7 +224,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -242,17 +246,18 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(wantedBuckets) == 0 {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	s3List, s3Truncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "s3")
 	if s3List == nil {
+		if fetchErr != nil {
+			return resource.ErrorRelated("s3", fetchErr)
+		}
 		ids := make([]string, 0, len(wantedBuckets))
 		for b := range wantedBuckets {
 			ids = append(ids, b)
 		}
-		r := relatedResult("s3", ids)
-		r.Err = fetchErr
-		return r
+		return relatedResult("s3", ids)
 	}
 	var ids []string
 	for _, s3Res := range s3List {
@@ -271,7 +276,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+		return resource.KnownRelated("acm", nil, false)
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -315,7 +320,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
@@ -332,11 +337,14 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if out == nil || len(out.QueryLoggingConfigs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, logsTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
 	if logList == nil {
+		if fetchErr != nil {
+			return resource.ErrorRelated("logs", fetchErr)
+		}
 		// Fallback: return the log-group ARNs as IDs when the cache is unavailable.
 		var ids []string
 		for _, cfg := range out.QueryLoggingConfigs {
@@ -344,9 +352,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 				ids = append(ids, *cfg.CloudWatchLogsLogGroupArn)
 			}
 		}
-		r := relatedResult("logs", ids)
-		r.Err = fetchErr
-		return r
+		return relatedResult("logs", ids)
 	}
 
 	wanted := make(map[string]struct{})
@@ -365,7 +371,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(wanted) == 0 {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	var ids []string
 	for _, logRes := range logList {
@@ -381,11 +387,11 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 // for private zones.
 func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["private_zone"] != "true" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {

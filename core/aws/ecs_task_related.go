@@ -20,11 +20,11 @@ func checkECSTaskService(_ context.Context, _ any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ecs-svc")
 	}
 	if raw.Group == nil || !strings.HasPrefix(*raw.Group, "service:") {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+		return resource.KnownRelated("ecs-svc", nil, false)
 	}
 	serviceName := strings.TrimPrefix(*raw.Group, "service:")
 	if serviceName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+		return resource.KnownRelated("ecs-svc", nil, false)
 	}
 	return relatedResult("ecs-svc", []string{serviceName})
 }
@@ -43,7 +43,7 @@ func checkECSTaskCluster(_ context.Context, _ any, res resource.Resource, _ reso
 	// Fallback: use Fields["cluster"] set by the fetcher (stores full ClusterArn)
 	clusterField := res.Fields["cluster"]
 	if clusterField == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+		return resource.KnownRelated("ecs", nil, false)
 	}
 	clusterName := arnLastSegment(clusterField)
 	if clusterName == "" {
@@ -72,7 +72,7 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 		taskDefARN = *raw.TaskDefinitionArn
 	}
 	if taskDefARN == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
 	family := arnLastSegment(taskDefARN)
@@ -81,7 +81,7 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 		family = family[:idx]
 	}
 	if family == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -119,7 +119,7 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		arns = append(arns, v)
 	}
 	if len(arns) == 0 {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	names := make(map[string]struct{}, len(arns))
@@ -133,7 +133,7 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(names) == 0 {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")

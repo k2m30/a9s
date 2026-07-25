@@ -929,11 +929,7 @@ func TestEC2_059_SessionCachePreventsRecheck(t *testing.T) {
 	// Deliver related check results for this EC2 instance
 	checkResult := messages.RelatedCheckResult{
 		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       1,
-			ResourceIDs: []string{"tg-web-prod"},
-		},
+		Result:       resource.KnownRelated("tg", []string{"tg-web-prod"}, false),
 	}
 	m, _ = chainApplyMsg(m, checkResult)
 

@@ -74,11 +74,11 @@ func TestRelated_VPCE_Subnet_HasIDs(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs len = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs len = %d, want 2: %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
 }
 
@@ -89,8 +89,8 @@ func TestRelated_VPCE_Subnet_Empty(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -103,11 +103,11 @@ func TestRelated_VPCE_SG_HasGroups(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-1" {
-		t.Errorf("ResourceIDs = %v, want [sg-1]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-1" {
+		t.Errorf("ResourceIDs = %v, want [sg-1]", result.ResourceIDs())
 	}
 }
 
@@ -118,8 +118,8 @@ func TestRelated_VPCE_SG_Empty(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -132,11 +132,11 @@ func TestRelated_VPCE_RTB_HasIDs(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs len = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs len = %d, want 2: %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
 }
 
@@ -147,8 +147,8 @@ func TestRelated_VPCE_RTB_Empty(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -162,11 +162,11 @@ func TestRelated_VPCE_ENI_HasIDs(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eni-1" {
-		t.Errorf("ResourceIDs = %v, want [eni-1]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eni-1" {
+		t.Errorf("ResourceIDs = %v, want [eni-1]", result.ResourceIDs())
 	}
 }
 
@@ -177,8 +177,8 @@ func TestRelated_VPCE_ENI_Empty(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -197,8 +197,8 @@ func TestRelated_VPCE_BadRawStruct(t *testing.T) {
 	for _, target := range targets {
 		checker := vpceCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.State == domain.RelatedResolved && result.Count != 0 {
-			t.Errorf("target %q: State=%v Count=%d, want RelatedUnknown or a resolved 0 for bad RawStruct", target, result.State, result.Count)
+		if result.State() == domain.RelatedResolved && result.Count() != 0 {
+			t.Errorf("target %q: State=%v Count=%d, want RelatedUnknown or a resolved 0 for bad RawStruct", target, result.State(), result.Count())
 		}
 	}
 }
@@ -225,11 +225,11 @@ func TestRelated_VPCE_VPC_HasVPCID(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -243,8 +243,8 @@ func TestRelated_VPCE_VPC_EmptyVPCID(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count())
 	}
 }
 
@@ -262,8 +262,8 @@ func TestRelated_VPCE_R53_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := vpceCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -272,8 +272,8 @@ func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (private zones via ListHostedZonesByVPC not in list response)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (private zones via ListHostedZonesByVPC not in list response)", result.State())
 	}
 }
 
@@ -308,11 +308,11 @@ func TestRelated_VPCE_Alarm_MatchByDimension(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-packets-alarm" {
-		t.Errorf("ResourceIDs = %v, want [vpce-packets-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpce-packets-alarm" {
+		t.Errorf("ResourceIDs = %v, want [vpce-packets-alarm]", result.ResourceIDs())
 	}
 }
 
@@ -336,8 +336,8 @@ func TestRelated_VPCE_Alarm_NoMatch(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -349,8 +349,8 @@ func TestRelated_VPCE_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -361,8 +361,8 @@ func TestRelated_VPCE_Alarm_EmptyID(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty endpoint ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty endpoint ID)", result.Count())
 	}
 }
 
@@ -376,8 +376,8 @@ func TestRelated_VPCE_Logs_NilClients(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -388,7 +388,7 @@ func TestRelated_VPCE_Logs_EmptyID(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty endpoint ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty endpoint ID)", result.Count())
 	}
 }

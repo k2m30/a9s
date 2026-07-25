@@ -65,7 +65,7 @@ func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _
 			return relatedResult("codeartifact", []string{val})
 		}
 	}
-	return resource.RelatedCheckResult{TargetType: "codeartifact", Count: 0}
+	return resource.KnownRelated("codeartifact", nil, false)
 }
 
 // checkSecretsEB is a reverse-scan checker for the secrets→eb relationship.
@@ -76,7 +76,7 @@ func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _
 func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
 	if res.RawStruct == nil {
-		return resource.RelatedCheckResult{TargetType: "eb", Count: 0}
+		return resource.KnownRelated("eb", nil, false)
 	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
 		return resource.UnknownRelated("eb")
@@ -84,7 +84,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.RelatedCheckResult{TargetType: "eb", Count: 0}
+		return resource.KnownRelated("eb", nil, false)
 	}
 
 	entry, ok := cache["eb"]
@@ -100,7 +100,6 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
 	var ids []string
 	var failures []string
-	total := len(entry.Resources)
 	for _, ebRes := range entry.Resources {
 		eb, ok := assertStruct[ebtypes.EnvironmentDescription](ebRes.RawStruct)
 		if !ok {
@@ -141,10 +140,17 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	nextEB:
 	}
 
-	result := relatedResult("eb", ids)
-	result.Truncated = entry.IsTruncated
-	result.Err = AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, total)
-	return result
+	if len(ids) == 0 && !entry.IsTruncated {
+		// Nothing was confirmed and the eb cache page was complete: any
+		// failures here are a plain fetch failure, not a truncation signal.
+		if aggErr := AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, len(entry.Resources)); aggErr != nil {
+			return resource.ErrorRelated("eb", aggErr)
+		}
+	}
+	// Some DescribeConfigurationSettings calls may have failed: ids is a proven
+	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
+	// row actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("eb", ids, entry.IsTruncated || len(failures) > 0)
 }
 
 // checkSecretsECSTask is a reverse-scan checker for the secrets→ecs-task relationship.
@@ -155,7 +161,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
 	if res.RawStruct == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
 		return resource.UnknownRelated("ecs-task")
@@ -163,7 +169,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 
 	entry, ok := cache["ecs-task"]
@@ -183,7 +189,6 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	var ids []string
 	var failures []string
-	total := len(entry.Resources)
 	for _, taskRes := range entry.Resources {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
 		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
@@ -226,10 +231,17 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		}
 	}
 
-	result := relatedResult("ecs-task", ids)
-	result.Truncated = entry.IsTruncated
-	result.Err = AggregateFailures("secrets-related: DescribeTaskDefinition", failures, total)
-	return result
+	// Some DescribeTaskDefinition calls may have failed: ids is a proven
+	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
+	// row actionable rather than discarding confirmed matches as a dead end.
+	if len(ids) == 0 && !entry.IsTruncated {
+		// Nothing was confirmed and the ecs-task cache page was complete: any
+		// failures here are a plain fetch failure, not a truncation signal.
+		if aggErr := AggregateFailures("secrets-related: DescribeTaskDefinition", failures, len(entry.Resources)); aggErr != nil {
+			return resource.ErrorRelated("ecs-task", aggErr)
+		}
+	}
+	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0)
 }
 
 // secretsECSTaskRefsSecret returns true if the TaskDefinition references the given
@@ -261,7 +273,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, _
 		return resource.UnknownRelated("logs")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	rotationARN := *secret.RotationLambdaARN
 
@@ -315,7 +327,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 		secretID = secretName
 	}
 	if secretID == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	c, cok := clients.(*ServiceClients)
@@ -324,16 +336,24 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 	}
 
 	var ids []string
+	// partial tracks whether either independent path below could not be
+	// attempted or failed, so ids (whatever the other path found) is reported
+	// as a lower bound rather than an exact count.
+	partial := false
 
 	// Path 1: resource-based policy
 	smAPI, ok := c.SecretsManager.(SecretsManagerGetResourcePolicyAPI)
-	if ok {
+	if !ok {
+		partial = true
+	} else {
 		policyOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*smtypes.GetResourcePolicyOutput, error) {
 			return smAPI.GetResourcePolicy(ctx, &smtypes.GetResourcePolicyInput{
 				SecretId: &secretID,
 			})
 		})
-		if err == nil && policyOut != nil && policyOut.ResourcePolicy != nil && *policyOut.ResourcePolicy != "" {
+		if err != nil {
+			partial = true
+		} else if policyOut != nil && policyOut.ResourcePolicy != nil && *policyOut.ResourcePolicy != "" {
 			ids = append(ids, secretsPolicyRoleARNs(*policyOut.ResourcePolicy)...)
 		}
 	}
@@ -341,13 +361,17 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 	// Path 2: rotation Lambda execution role
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if ok && secret.RotationLambdaARN != nil && *secret.RotationLambdaARN != "" {
-		lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
-		if ok {
+		lambdaAPI, lok := c.Lambda.(LambdaGetFunctionAPI)
+		if !lok {
+			partial = true
+		} else {
 			rotationARN := *secret.RotationLambdaARN
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 				return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 			})
-			if err == nil && out != nil && out.Configuration != nil &&
+			if err != nil {
+				partial = true
+			} else if out != nil && out.Configuration != nil &&
 				out.Configuration.Role != nil && *out.Configuration.Role != "" {
 				ids = append(ids, *out.Configuration.Role)
 			}
@@ -358,7 +382,13 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 	// the rotation lambda. role.ID is a bare RoleName, so normalize and drop
 	// foreign-account principals — a cross-account or full-ARN id fails
 	// iam:GetRole on drill.
-	return relatedResult("role", sameAccountRoleNames(ids, arnAccountID(secretID)))
+	finalIDs := sameAccountRoleNames(ids, arnAccountID(secretID))
+	if len(finalIDs) == 0 && partial {
+		// Neither path could be checked (or both failed): nothing was
+		// confirmed, so this is unresolved, not a proven zero or a lower bound.
+		return resource.UnknownRelated("role")
+	}
+	return relatedResultTrunc("role", finalIDs, partial)
 }
 
 // secretsPolicyRoleARNs parses a Secrets Manager resource policy JSON and returns
@@ -402,7 +432,7 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.UnknownRelated("sns")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	rotationARN := *secret.RotationLambdaARN
 
@@ -419,14 +449,14 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 		return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 	})
 	if err != nil || out == nil || out.Configuration == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	dlc := out.Configuration.DeadLetterConfig
 	if dlc == nil || dlc.TargetArn == nil || *dlc.TargetArn == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	if !strings.HasPrefix(*dlc.TargetArn, "arn:aws:sns:") {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	return relatedResult("sns", []string{*dlc.TargetArn})
 }

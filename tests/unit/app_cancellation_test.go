@@ -279,11 +279,11 @@ func testPolicyCheckerRespectsCancelledContext(t *testing.T, targetType string) 
 	// (State: RelatedError) because the context was cancelled before anything
 	// could succeed — checkPolicyRole/User/Group all route a non-nil API error
 	// (including a propagated context.Canceled) through resource.ErrorRelated.
-	if result.State != domain.RelatedError {
+	if result.State() != domain.RelatedError {
 		t.Errorf(
 			"policy→%s: State=%v after pre-cancelled ctx, want RelatedError — "+
 				"checker must propagate context cancellation as an error",
-			targetType, result.State,
+			targetType, result.State(),
 		)
 	}
 }
@@ -306,8 +306,8 @@ func TestIAMRelatedChecker_RespectsCancelledContext_RolePolicy(t *testing.T) {
 	// Pass nil clients: the guard returns -1 without calling AWS.
 	// This confirms the nil-client path is safe with a cancelled context.
 	result := checker(ctx, nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("role→policy with nil clients: Count=%d, want -1", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("role→policy with nil clients: Count=%d, want -1", result.Count())
 	}
 }
 
@@ -324,8 +324,8 @@ func TestIAMRelatedChecker_RespectsCancelledContext_UserGroup(t *testing.T) {
 	res := resource.Resource{ID: "alice", Name: "alice"}
 	checker := checkerByTarget(t, "iam-user", "iam-group")
 	result := checker(ctx, nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("iam-user→iam-group with nil clients: Count=%d, want -1", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("iam-user→iam-group with nil clients: Count=%d, want -1", result.Count())
 	}
 }
 
@@ -337,8 +337,8 @@ func TestIAMRelatedChecker_RespectsCancelledContext_UserPolicy(t *testing.T) {
 	res := resource.Resource{ID: "alice", Name: "alice"}
 	checker := checkerByTarget(t, "iam-user", "policy")
 	result := checker(ctx, nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("iam-user→policy with nil clients: Count=%d, want -1", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("iam-user→policy with nil clients: Count=%d, want -1", result.Count())
 	}
 }
 
@@ -354,8 +354,8 @@ func TestIAMRelatedChecker_RespectsCancelledContext_GroupUser(t *testing.T) {
 	res := resource.Resource{ID: "eng-team", Name: "eng-team"}
 	checker := checkerByTarget(t, "iam-group", "iam-user")
 	result := checker(ctx, nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("iam-group→iam-user with nil clients: Count=%d, want -1", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("iam-group→iam-user with nil clients: Count=%d, want -1", result.Count())
 	}
 }
 
@@ -367,8 +367,8 @@ func TestIAMRelatedChecker_RespectsCancelledContext_GroupPolicy(t *testing.T) {
 	res := resource.Resource{ID: "eng-team", Name: "eng-team"}
 	checker := checkerByTarget(t, "iam-group", "policy")
 	result := checker(ctx, nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("iam-group→policy with nil clients: Count=%d, want -1", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("iam-group→policy with nil clients: Count=%d, want -1", result.Count())
 	}
 }
 

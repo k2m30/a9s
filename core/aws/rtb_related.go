@@ -19,7 +19,7 @@ import (
 func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	// In-body: RouteTable.Associations[].SubnetId ARE the associated subnets.
 	var ids []string
@@ -36,7 +36,7 @@ func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
+		return resource.KnownRelated("nat", nil, false)
 	}
 	// In-body: RouteTable.Routes[].NatGatewayId ARE the referenced NAT gateways.
 	// Skip blackhole routes — AWS leaves the stale target id on a route after the
@@ -58,7 +58,7 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
+		return resource.KnownRelated("igw", nil, false)
 	}
 	// In-body: RouteTable.Routes[].GatewayId with the igw- prefix ARE the IGWs.
 	// Skip blackhole routes — the target id is stale once the gateway is gone.
@@ -79,7 +79,7 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := rtbCFNStackName(res)
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -119,7 +119,7 @@ func rtbCFNStackName(res resource.Resource) string {
 func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
@@ -129,7 +129,7 @@ func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	// In-body: RouteTable.Routes[].NetworkInterfaceId ARE the referenced ENIs.
 	// Skip blackhole routes — the target id is stale once the ENI is gone.
@@ -150,7 +150,7 @@ func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
+		return resource.KnownRelated("tgw", nil, false)
 	}
 	// In-body: RouteTable.Routes[].TransitGatewayId ARE the referenced TGWs.
 	// Skip blackhole routes — the target id is stale once the TGW is gone.
@@ -171,7 +171,7 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtbID := res.ID
 	if rtbID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+		return resource.KnownRelated("vpce", nil, false)
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")

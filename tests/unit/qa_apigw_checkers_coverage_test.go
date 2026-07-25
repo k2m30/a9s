@@ -38,11 +38,11 @@ func TestRelated_APIGW_ACM_Unknown(t *testing.T) {
 	res := resource.Resource{ID: "abc123xyz", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.TargetType != "acm" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
+	if result.TargetType() != "acm" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "acm")
 	}
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil client hits the client-missing guard before any AWS call)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil client hits the client-missing guard before any AWS call)", result.Count())
 	}
 }
 
@@ -51,8 +51,8 @@ func TestRelated_APIGW_ACM_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID means no resource)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID means no resource)", result.Count())
 	}
 }
 
@@ -99,14 +99,14 @@ func TestRelated_APIGW_Alarm_Match(t *testing.T) {
 	res := resource.Resource{ID: apiID, Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.TargetType != "alarm" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "alarm")
+	if result.TargetType() != "alarm" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "alarm")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "apigw-5xx-alarm" {
-		t.Errorf("ResourceIDs = %v, want [apigw-5xx-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "apigw-5xx-alarm" {
+		t.Errorf("ResourceIDs = %v, want [apigw-5xx-alarm]", result.ResourceIDs())
 	}
 }
 
@@ -130,8 +130,8 @@ func TestRelated_APIGW_Alarm_NoMatch(t *testing.T) {
 	res := resource.Resource{ID: "api-xyz987", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no alarm dimensions match this API)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no alarm dimensions match this API)", result.Count())
 	}
 }
 
@@ -141,8 +141,8 @@ func TestRelated_APIGW_Alarm_CacheNotLoaded(t *testing.T) {
 	res := resource.Resource{ID: "api-xyz987", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (alarm cache not loaded, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (alarm cache not loaded, no clients)", result.Count())
 	}
 }
 
@@ -151,8 +151,8 @@ func TestRelated_APIGW_Alarm_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count())
 	}
 }
 
@@ -211,14 +211,14 @@ func TestRelated_APIGW_CF_Match(t *testing.T) {
 	res := resource.Resource{ID: apiID, Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.TargetType != "cf" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	if result.TargetType() != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cf")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "E1EXAMPLE" {
-		t.Errorf("ResourceIDs = %v, want [E1EXAMPLE]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "E1EXAMPLE" {
+		t.Errorf("ResourceIDs = %v, want [E1EXAMPLE]", result.ResourceIDs())
 	}
 }
 
@@ -248,8 +248,8 @@ func TestRelated_APIGW_CF_NoMatch(t *testing.T) {
 	res := resource.Resource{ID: "api-no-cf", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CF origins point at this API)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CF origins point at this API)", result.Count())
 	}
 }
 
@@ -258,8 +258,8 @@ func TestRelated_APIGW_CF_CacheNotLoaded(t *testing.T) {
 	res := resource.Resource{ID: "api-no-cache", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (CF cache not loaded)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (CF cache not loaded)", result.Count())
 	}
 }
 
@@ -268,8 +268,8 @@ func TestRelated_APIGW_CF_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count())
 	}
 }
 
@@ -282,11 +282,11 @@ func TestRelated_APIGW_ELB_Unknown(t *testing.T) {
 	res := resource.Resource{ID: "api-elb-test", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.TargetType != "elb" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	if result.TargetType() != "elb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "elb")
 	}
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (ELB links via VPC link require GetVpcLinks, not in budget)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (ELB links via VPC link require GetVpcLinks, not in budget)", result.State())
 	}
 }
 
@@ -295,8 +295,8 @@ func TestRelated_APIGW_ELB_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 
@@ -309,11 +309,11 @@ func TestRelated_APIGW_Role_Unknown(t *testing.T) {
 	res := resource.Resource{ID: "api-role-test", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (IAM role refs per route/authorizer, not in GetApis)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (IAM role refs per route/authorizer, not in GetApis)", result.Count())
 	}
 }
 
@@ -322,8 +322,8 @@ func TestRelated_APIGW_Role_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
 

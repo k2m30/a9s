@@ -21,7 +21,7 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 	return func(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		filter := resource.BuildCloudTrailFilter(res, sn)
 		if filter == nil {
-			return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+			return resource.KnownRelated("ct-events", nil, false)
 		}
 		return resource.DeferredRelated("ct-events", filter)
 	}

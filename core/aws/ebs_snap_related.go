@@ -18,7 +18,7 @@ var ebsSnapCreateImageRe = regexp.MustCompile(`Created by CreateImage\((i-[a-zA-
 func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapID := res.ID
 	if snapID == "" {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 
 	amiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ami")
@@ -49,7 +49,7 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 func checkEBSSnapEBS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	volumeID := res.Fields["volume_id"]
 	if volumeID == "" {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
+		return resource.KnownRelated("ebs", nil, false)
 	}
 	return relatedResult("ebs", []string{volumeID})
 }
@@ -59,7 +59,7 @@ func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, _ resource
 	description := res.Fields["description"]
 	matches := ebsSnapCreateImageRe.FindStringSubmatch(description)
 	if len(matches) < 2 {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	return relatedResult("ec2", []string{matches[1]})
 }
@@ -72,7 +72,7 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	val := *snap.KmsKeyId
 	keyID := val
@@ -80,7 +80,7 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 		keyID = val[idx+1:]
 	}
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{keyID})
 }
@@ -113,7 +113,7 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		// No RawStruct, or no Backup signature in Description/Tags — the
 		// parent's own fields definitively rule out coverage; not a
 		// truncated-cache situation.
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 	if sourceARN == "" {
 		// Backup-created signature confirmed via Description alone, but no

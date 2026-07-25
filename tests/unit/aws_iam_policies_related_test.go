@@ -51,11 +51,11 @@ func TestRelated_Policy_Role_NilClients(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no clients)", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
 }
 
@@ -67,8 +67,8 @@ func TestRelated_Policy_Role_EmptyARN(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	// nil clients: must return -1, not panic
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -86,8 +86,8 @@ func TestRelated_Policy_IAMUser_EmptyARN(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "policy", "iam-user")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -105,7 +105,7 @@ func TestRelated_Policy_IAMGroup_EmptyARN(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "policy", "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }

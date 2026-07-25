@@ -68,7 +68,7 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				atomic.AddInt32(&checkerCalls, 1)
 				capturedCache = cache
-				return resource.RelatedCheckResult{TargetType: targetType, Count: 0}
+				return resource.KnownRelated(targetType, nil, false)
 			},
 		},
 	})
@@ -170,7 +170,7 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				atomic.AddInt32(&checkerCalls, 1)
 				capturedCache = cache
-				return resource.RelatedCheckResult{TargetType: targetType, Count: 0}
+				return resource.KnownRelated(targetType, nil, false)
 			},
 		},
 	})

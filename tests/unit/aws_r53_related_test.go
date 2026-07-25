@@ -73,11 +73,11 @@ func TestRelated_R53_ELB_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
 	checker := r53CheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count())
 	}
-	if result.TargetType != "elb" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	if result.TargetType() != "elb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "elb")
 	}
 }
 
@@ -85,8 +85,8 @@ func TestRelated_R53_ELB_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := r53CheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone id)", result.Count())
 	}
 }
 
@@ -96,11 +96,11 @@ func TestRelated_R53_CF_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
 	checker := r53CheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count())
 	}
-	if result.TargetType != "cf" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	if result.TargetType() != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cf")
 	}
 }
 
@@ -108,8 +108,8 @@ func TestRelated_R53_CF_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := r53CheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone id)", result.Count())
 	}
 }
 
@@ -119,11 +119,11 @@ func TestRelated_R53_ACM_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
 	checker := r53CheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown: validation records per-zone)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown: validation records per-zone)", result.Count())
 	}
-	if result.TargetType != "acm" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
+	if result.TargetType() != "acm" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "acm")
 	}
 }
 
@@ -131,7 +131,7 @@ func TestRelated_R53_ACM_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := r53CheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty zone id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty zone id)", result.Count())
 	}
 }

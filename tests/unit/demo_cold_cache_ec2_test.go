@@ -141,7 +141,7 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	var checkResult messages.RelatedCheckResult
 	var found bool
 	for _, leaf := range leaves {
-		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.Count >= 0 {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.Count() >= 0 {
 			checkResult = r
 			found = true
 			break
@@ -157,10 +157,10 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 
 	*m, _ = rootApplyMsg(*m, checkResult)
 
-	if checkResult.Result.Count < 0 {
+	if checkResult.Result.Count() < 0 {
 		t.Errorf("related check for %q returned Count=%d (error sentinel) — "+
 			"fake client not wired or checker returned nil-client error",
-			checkResult.DefDisplayName, checkResult.Result.Count)
+			checkResult.DefDisplayName, checkResult.Result.Count())
 	}
 
 	// Verify the detail view rendered with the instance ID visible.

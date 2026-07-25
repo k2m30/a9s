@@ -104,14 +104,14 @@ func TestRelated_Eb_ELB_MatchByEnvironmentResources(t *testing.T) {
 	checker := ebCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != elbName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, elbName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != elbName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), elbName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -140,8 +140,8 @@ func TestRelated_Eb_ELB_NoLoadBalancers(t *testing.T) {
 	checker := ebCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no load balancers)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no load balancers)", result.Count())
 	}
 }
 
@@ -157,8 +157,8 @@ func TestRelated_Eb_ELB_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -204,22 +204,22 @@ func TestRelated_Eb_Role_MatchByIamInstanceProfile(t *testing.T) {
 	checker := ebCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (role from IamInstanceProfile)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (role from IamInstanceProfile)", result.Count())
 	}
 	wantRoleName := "aws-elasticbeanstalk-ec2-role"
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), wantRoleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -255,8 +255,8 @@ func TestRelated_Eb_Role_NoRoleSettings(t *testing.T) {
 	checker := ebCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no IAM option settings)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no IAM option settings)", result.Count())
 	}
 }
 
@@ -272,8 +272,8 @@ func TestRelated_Eb_Role_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -315,21 +315,21 @@ func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 	checker := ebCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (S3 bucket from SourceBundle)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (S3 bucket from SourceBundle)", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == s3Bucket {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, s3Bucket)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), s3Bucket)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -357,8 +357,8 @@ func TestRelated_Eb_S3_NoApplicationVersions(t *testing.T) {
 	checker := ebCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no application versions)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no application versions)", result.Count())
 	}
 }
 
@@ -374,8 +374,8 @@ func TestRelated_Eb_S3_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -416,21 +416,21 @@ func TestRelated_Eb_SG_MatchByLaunchConfigSecurityGroups(t *testing.T) {
 	checker := ebCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Errorf("Count = %d, want >= 1 (SG from launchconfiguration option)", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("Count = %d, want >= 1 (SG from launchconfiguration option)", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == sgID {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, sgID)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), sgID)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -464,8 +464,8 @@ func TestRelated_Eb_SG_NoSecurityGroupSettings(t *testing.T) {
 	checker := ebCheckerByTarget(t, "sg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SG option settings)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no SG option settings)", result.Count())
 	}
 }
 
@@ -481,8 +481,8 @@ func TestRelated_Eb_SG_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -543,14 +543,14 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	checker := ebCheckerByTarget(t, "tg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != tgARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, tgARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != tgARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tgARN)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -580,8 +580,8 @@ func TestRelated_Eb_TG_NoLoadBalancers(t *testing.T) {
 	checker := ebCheckerByTarget(t, "tg")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no load balancers)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no load balancers)", result.Count())
 	}
 }
 
@@ -597,7 +597,7 @@ func TestRelated_Eb_TG_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }

@@ -58,7 +58,7 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 func checkRoleIamGroup(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
+		return resource.KnownRelated("iam-group", nil, false)
 	}
 	seen := map[string]struct{}{}
 	extractPrincipalsByKind([]byte(doc), ":group/", seen)
@@ -74,7 +74,7 @@ func checkRoleIamGroup(_ context.Context, _ any, res resource.Resource, _ resour
 func checkRoleIamUser(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
+		return resource.KnownRelated("iam-user", nil, false)
 	}
 	seen := map[string]struct{}{}
 	extractPrincipalsByKind([]byte(doc), ":user/", seen)
@@ -295,7 +295,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	if roleName == "" {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
+		return resource.KnownRelated("policy", nil, false)
 	}
 	out, err := c.IAM.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
 		RoleName: &roleName,
@@ -326,7 +326,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if roleName == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")

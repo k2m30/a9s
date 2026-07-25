@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -140,27 +139,7 @@ func backupSelectionTagsMatch(selectionTagsCSV string, resourceTags map[string]s
 }
 
 func relatedResult(target string, ids []string) resource.RelatedCheckResult {
-	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: target, Count: 0}
-	}
-	set := make(map[string]struct{}, len(ids))
-	uniq := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if id == "" {
-			continue
-		}
-		if _, ok := set[id]; ok {
-			continue
-		}
-		set[id] = struct{}{}
-		uniq = append(uniq, id)
-	}
-	sort.Strings(uniq)
-	return resource.RelatedCheckResult{
-		TargetType:  target,
-		Count:       len(uniq),
-		ResourceIDs: uniq,
-	}
+	return resource.KnownRelated(target, ids, false)
 }
 
 // relatedResultTrunc is relatedResult with the truncation flag carried through
@@ -169,9 +148,7 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 // same case (N found so far, list truncated), not two: there is no special
 // zero-truncated result.
 func relatedResultTrunc(target string, ids []string, truncated bool) resource.RelatedCheckResult {
-	r := relatedResult(target, ids)
-	r.Truncated = truncated
-	return r
+	return resource.KnownRelated(target, ids, truncated)
 }
 
 // alarmIDsByDimension is the shared body of every check*Alarm function whose
@@ -184,7 +161,7 @@ func relatedResultTrunc(target string, ids []string, truncated bool) resource.Re
 // all — reported as unknown, never as a proven zero.
 func alarmIDsByDimension(ctx context.Context, clients any, cache resource.ResourceCache, namespace, dimName, dimValue string) resource.RelatedCheckResult {
 	if dimValue == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+		return resource.KnownRelated("alarm", nil, false)
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -288,7 +265,7 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		}
 	}
 	if len(functionArns) == 0 {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	arnToID := make(map[string]string, len(functionArns))

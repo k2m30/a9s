@@ -128,20 +128,20 @@ func TestKinesis_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, cache)
 
-	if result.Count == 0 && !result.Truncated {
-		t.Fatalf("Count = %d (definitive zero), want a non-definitive-zero result — ListEventSourceMappings found a real mapping, the API result is authoritative even with a cold lambda cache", result.Count)
+	if result.Count() == 0 && !result.Truncated() {
+		t.Fatalf("Count = %d (definitive zero), want a non-definitive-zero result — ListEventSourceMappings found a real mapping, the API result is authoritative even with a cold lambda cache", result.Count())
 	}
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (one real event-source mapping found via the API)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (one real event-source mapping found via the API)", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "checkout-consumer" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("ResourceIDs = %v, want to contain %q (bare function name derived from FunctionArn)", result.ResourceIDs, "checkout-consumer")
+		t.Fatalf("ResourceIDs = %v, want to contain %q (bare function name derived from FunctionArn)", result.ResourceIDs(), "checkout-consumer")
 	}
 }
 
@@ -166,20 +166,20 @@ func TestMSK_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 	checker := checkerByTarget(t, "msk", "lambda")
 	result := checker(context.Background(), clients, clusterRes, cache)
 
-	if result.Count == 0 && !result.Truncated {
-		t.Fatalf("Count = %d (definitive zero), want a non-definitive-zero result — ListEventSourceMappings found a real mapping, the API result is authoritative even with a cold lambda cache", result.Count)
+	if result.Count() == 0 && !result.Truncated() {
+		t.Fatalf("Count = %d (definitive zero), want a non-definitive-zero result — ListEventSourceMappings found a real mapping, the API result is authoritative even with a cold lambda cache", result.Count())
 	}
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (one real event-source mapping found via the API)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (one real event-source mapping found via the API)", result.Count())
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == "checkout-consumer" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("ResourceIDs = %v, want to contain %q (bare function name derived from FunctionArn)", result.ResourceIDs, "checkout-consumer")
+		t.Fatalf("ResourceIDs = %v, want to contain %q (bare function name derived from FunctionArn)", result.ResourceIDs(), "checkout-consumer")
 	}
 }
 
@@ -283,8 +283,8 @@ func TestApigw_Related_ELB_GetVpcLinks_FollowsPagination(t *testing.T) {
 	checker := checkerByTarget(t, "apigw", "elb")
 	result := checker(context.Background(), clients, apiRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 — GetVpcLinks must page through to page 2 to find the wanted VpcLink", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 — GetVpcLinks must page through to page 2 to find the wanted VpcLink", result.Count())
 	}
 
 	if fake.calls < 2 {

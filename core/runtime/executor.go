@@ -830,8 +830,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 		}
 	}
 
-	checkResult := def.Checker(checkCtx, op.Clients, op.Resource, localCache)
-	checkResult.TargetType = def.TargetType
+	checkResult := def.Checker(checkCtx, op.Clients, op.Resource, localCache).WithTargetType(def.TargetType)
 
 	var lazyAdded map[string][]resource.Resource
 	var lazyAddError error
@@ -840,9 +839,9 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	// the drill fetches on demand (KindFetchByIDDetail) — so a cross-account
 	// target (an AssumeRole role in another account) does not surface a
 	// "FetchByIDs failed" header error at detail open.
-	if op.ResourceType != "ct-events" && len(checkResult.ResourceIDs) > 0 {
+	if op.ResourceType != "ct-events" && len(checkResult.ResourceIDs()) > 0 {
 		if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
-			missing := MissingFromCache(localCache, def.TargetType, checkResult.ResourceIDs)
+			missing := MissingFromCache(localCache, def.TargetType, checkResult.ResourceIDs())
 			if len(missing) > 0 {
 				extra, fetchErr := ff(checkCtx, op.Clients, missing)
 				if fetchErr != nil {

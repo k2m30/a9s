@@ -42,7 +42,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if rgID == "" && len(memberSet) == 0 {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+		return resource.KnownRelated("alarm", nil, false)
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -92,7 +92,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok || rg.ARN == nil || *rg.ARN == "" {
 		// Without the ARN we cannot call ListTagsForResource to find the CFN stack.
 		// Return 0 rather than -1 so we do not signal an error condition.
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
@@ -115,7 +115,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -165,7 +165,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 		rgID = res.ID
 	}
 	if rgID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
@@ -211,10 +211,10 @@ func checkRedisKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
 		// Without RawStruct we cannot read KmsKeyId — report 0 (no known key).
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	if rg.KmsKeyId == nil || *rg.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*rg.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -226,7 +226,7 @@ func checkRedisKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	var names []string
 	for _, ldc := range rg.LogDeliveryConfigurations {
@@ -241,7 +241,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(names) == 0 {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -291,7 +291,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		rgID = res.ID
 	}
 	if rgID == "" {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -338,8 +338,11 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc := redisMemberCluster(ctx, clients, res)
 	if cc == nil {
-		// Cannot determine SGs without member cluster data — report 0.
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		// redisMemberCluster collapses "no members", "wrong client type", and
+		// "DescribeCacheClusters failed" into nil — we cannot tell which, so
+		// this is unresolved, not a proven zero (mirrors dbc_related.go's
+		// checkDbcSubnet/checkDbcVPC for the same two-hop shape).
+		return resource.UnknownRelated("sg")
 	}
 	sgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
@@ -353,7 +356,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(sgIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	wantedSet := make(map[string]struct{}, len(sgIDs))
@@ -381,10 +384,11 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc := redisMemberCluster(ctx, clients, res)
 	if cc == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		// See checkRedisSG: redisMemberCluster's nil is unresolved, not proven.
+		return resource.UnknownRelated("sns")
 	}
 	if cc.NotificationConfiguration == nil || cc.NotificationConfiguration.TopicArn == nil || *cc.NotificationConfiguration.TopicArn == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	topicARN := *cc.NotificationConfiguration.TopicArn
 
@@ -424,8 +428,11 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sng := redisSubnetGroup(ctx, clients, res)
 	if sng == nil {
-		// Cannot determine subnets without subnet group data — report 0.
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		// redisSubnetGroup collapses "no member cluster", "no subnet group
+		// name", and "DescribeCacheSubnetGroups failed" into nil — we cannot
+		// tell which, so this is unresolved, not a proven zero (mirrors
+		// dbc_related.go's checkDbcSubnet for the same two-hop shape).
+		return resource.UnknownRelated("subnet")
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
@@ -440,7 +447,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(subnetIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 
 	wantedSet := make(map[string]struct{}, len(subnetIDs))
@@ -467,11 +474,11 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng := redisSubnetGroup(ctx, clients, res)
 	if sng == nil {
-		// Cannot determine VPC without subnet group data — report 0.
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		// See checkRedisSubnet: redisSubnetGroup's nil is unresolved, not proven.
+		return resource.UnknownRelated("vpc")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*sng.VpcId})
 }
@@ -530,5 +537,5 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *
 // target cache is truncated and matches were found. Later pages may contain
 // additional matches, so the displayed count is a lower bound — rendered as "(N+)".
 func truncatedResultRedis(target string, ids []string) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Truncated: true}
+	return resource.KnownRelated(target, ids, true)
 }

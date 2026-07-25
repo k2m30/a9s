@@ -32,7 +32,7 @@ func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("subnet")
 	}
 	if fn.VpcConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, s := range fn.VpcConfig.SubnetIds {
@@ -66,7 +66,7 @@ func checkLambdaEFS(_ context.Context, _ any, res resource.Resource, _ resource.
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
+		return resource.KnownRelated("efs", nil, false)
 	}
 	return relatedResult("efs", ids)
 }
@@ -81,7 +81,7 @@ func checkLambdaEFS(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 	apiList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "apigw")
 	if err != nil {
@@ -122,7 +122,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 		fnARN = *fn.FunctionArn
 	}
 	if fnARN == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 	cfList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "cf")
 	if err != nil {
@@ -154,7 +154,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
+		return resource.KnownRelated("ddb", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -199,7 +199,7 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, _ r
 func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
+		return resource.KnownRelated("kinesis", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -236,7 +236,7 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "msk", Count: 0}
+		return resource.KnownRelated("msk", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -275,7 +275,7 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, _ r
 func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	evList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -325,7 +325,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 	tgList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "tg")
 	if err != nil {
@@ -345,7 +345,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 		if truncated {
 			return relatedResultTrunc("tg", nil, true)
 		}
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 
 	c, sok := clients.(*ServiceClients)
@@ -388,9 +388,17 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	result := relatedResultTrunc("tg", ids, truncated)
-	result.Err = AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs))
-	return result
+	if len(ids) == 0 && !truncated {
+		// Nothing was confirmed and the tg cache page was complete: any
+		// failures here are a plain fetch failure, not a truncation signal.
+		if aggErr := AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs)); aggErr != nil {
+			return resource.ErrorRelated("tg", aggErr)
+		}
+	}
+	// Some DescribeTargetHealth calls may have failed: ids is a proven subset,
+	// not necessarily exhaustive. Truncated (not Errored) keeps the row
+	// actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("tg", ids, truncated || len(failures) > 0)
 }
 
 // checkLambdaSNS scans the sns cache and surfaces topics that subscribe this
@@ -403,14 +411,14 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	subList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
 	if subList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	topicSet := make(map[string]struct{})
 	for _, subRes := range subList {
@@ -444,7 +452,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: 0}
+		return resource.KnownRelated("sns-sub", nil, false)
 	}
 	subList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "sns-sub")
 	if err != nil {
@@ -477,7 +485,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	s3List, truncated, err := lambdaRelatedResources(ctx, clients, cache, "s3")
 	if err != nil {
@@ -507,7 +515,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	eniList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
@@ -540,10 +548,10 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	arnSet := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
@@ -552,7 +560,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(arnSet) == 0 {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	secretList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
@@ -582,10 +590,10 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+		return resource.KnownRelated("ssm", nil, false)
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+		return resource.KnownRelated("ssm", nil, false)
 	}
 	candidates := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
@@ -594,7 +602,7 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(candidates) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+		return resource.KnownRelated("ssm", nil, false)
 	}
 	ssmList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "ssm")
 	if err != nil {

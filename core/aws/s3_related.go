@@ -51,16 +51,16 @@ func s3BenignAbsenceErr(err error, code string) bool {
 func checkS3Lambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["notification_lambda"]
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	// Lambda ARN format: arn:aws:lambda:region:account:function:NAME[:VERSION]
 	parts := strings.Split(arn, ":")
 	if len(parts) < 7 {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	name := parts[6]
 	if name == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	return relatedResult("lambda", []string{name})
 }
@@ -73,11 +73,11 @@ func checkS3Lambda(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkS3SNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["notification_sns"]
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	// Basic ARN shape guard — arn:aws:sns:region:account:TopicName has 6 parts.
 	if parts := strings.Split(arn, ":"); len(parts) < 6 || parts[5] == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	return relatedResult("sns", []string{arn})
 }
@@ -87,16 +87,16 @@ func checkS3SNS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkS3SQS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["notification_sqs"]
 	if arn == "" {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
+		return resource.KnownRelated("sqs", nil, false)
 	}
 	// SQS queue ARN: arn:aws:sqs:region:account:QueueName
 	parts := strings.Split(arn, ":")
 	if len(parts) < 6 {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
+		return resource.KnownRelated("sqs", nil, false)
 	}
 	name := parts[5]
 	if name == "" {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
+		return resource.KnownRelated("sqs", nil, false)
 	}
 	return relatedResult("sqs", []string{name})
 }
@@ -107,7 +107,7 @@ func checkS3SQS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -124,7 +124,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		// NoSuchTagSet is a "no tags" response, and a deleted bucket is a
 		// resolved zero — both are a benign absence, not a hard failure.
 		if s3BenignAbsenceErr(err, "NoSuchTagSet") {
-			return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+			return resource.KnownRelated("cfn", nil, false)
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
@@ -141,7 +141,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -170,7 +170,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -187,7 +187,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		// ServerSideEncryptionConfigurationNotFoundError means no encryption,
 		// and a deleted bucket is a resolved zero — both are honest 0s.
 		if s3BenignAbsenceErr(err, "ServerSideEncryptionConfigurationNotFoundError") {
-			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+			return resource.KnownRelated("kms", nil, false)
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
@@ -197,7 +197,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.ErrorRelated("kms", err)
 	}
 	if out.ServerSideEncryptionConfiguration == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	var ids []string
 	for _, rule := range out.ServerSideEncryptionConfiguration.Rules {
@@ -228,7 +228,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -244,7 +244,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 	if err != nil {
 		// A deleted bucket is a resolved zero, not a hard failure.
 		if s3BenignAbsenceErr(err, "") {
-			return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+			return resource.KnownRelated("s3", nil, false)
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
@@ -254,7 +254,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("s3", err)
 	}
 	if out.LoggingEnabled == nil || out.LoggingEnabled.TargetBucket == nil || *out.LoggingEnabled.TargetBucket == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	return relatedResult("s3", []string{*out.LoggingEnabled.TargetBucket})
 }
@@ -266,7 +266,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
+		return resource.KnownRelated("athena", nil, false)
 	}
 	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
 	if err != nil {
@@ -289,7 +289,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: 0}
+		return resource.KnownRelated("glue", nil, false)
 	}
 	jobList, truncated, err := relatedResourcesFor(ctx, clients, cache, "glue")
 	if err != nil {
@@ -324,7 +324,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 	bucketARN := "arn:aws:s3:::" + bucket
 	bkList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
@@ -351,7 +351,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
@@ -387,7 +387,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
@@ -422,7 +422,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -440,7 +440,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		// response, and a deleted bucket is a resolved zero — both are
 		// honest 0s, not errors.
 		if s3BenignAbsenceErr(err, "NoSuchBucketPolicy") {
-			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+			return resource.KnownRelated("role", nil, false)
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
@@ -450,12 +450,12 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("role", err)
 	}
 	if out == nil || out.Policy == nil || *out.Policy == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	principalARNs := extractBucketPolicyAWSPrincipals(*out.Policy)
 	if len(principalARNs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	roleList, truncated, rerr := relatedResourcesFor(ctx, clients, cache, "role")
@@ -537,7 +537,7 @@ func isIAMRoleARN(s string) bool {
 func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+		return resource.KnownRelated("trail", nil, false)
 	}
 
 	trailList, truncated, err := relatedResourcesFor(ctx, clients, cache, "trail")
@@ -572,7 +572,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+		return resource.KnownRelated("cf", nil, false)
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")

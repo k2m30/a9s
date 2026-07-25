@@ -176,14 +176,14 @@ func TestRelated_EFS_KMS_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ProdEFSKmsKeyID); RawStruct = %+v", result.Count, source.RawStruct)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ProdEFSKmsKeyID); RawStruct = %+v", result.Count(), source.RawStruct)
 	}
-	if len(result.ResourceIDs) < 1 {
+	if len(result.ResourceIDs()) < 1 {
 		t.Fatalf("ResourceIDs is empty, want [%s]", fixtures.ProdEFSKmsKeyID)
 	}
-	if result.ResourceIDs[0] != fixtures.ProdEFSKmsKeyID {
-		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs[0], fixtures.ProdEFSKmsKeyID)
+	if result.ResourceIDs()[0] != fixtures.ProdEFSKmsKeyID {
+		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs()[0], fixtures.ProdEFSKmsKeyID)
 	}
 }
 
@@ -201,18 +201,18 @@ func TestRelated_EFS_CFN_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ProdEFSCFNStackName %q)", result.Count, fixtures.ProdEFSCFNStackName)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ProdEFSCFNStackName %q)", result.Count(), fixtures.ProdEFSCFNStackName)
 	}
 	found := false
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id == fixtures.ProdEFSCFNStackName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want it to contain %q", result.ResourceIDs, fixtures.ProdEFSCFNStackName)
+		t.Errorf("ResourceIDs = %v, want it to contain %q", result.ResourceIDs(), fixtures.ProdEFSCFNStackName)
 	}
 }
 
@@ -231,17 +231,17 @@ func TestRelated_EFS_Alarm_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (both EFS alarms); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (both EFS alarms); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantAlarms := []string{fixtures.ProdEFSAlarmAID, fixtures.ProdEFSAlarmBID}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantAlarms {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -266,17 +266,17 @@ func TestRelated_EFS_Lambda_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (ProdEFSLambdaAName + ProdEFSLambdaBName); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (ProdEFSLambdaAName + ProdEFSLambdaBName); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantLambdas := []string{fixtures.ProdEFSLambdaAName, fixtures.ProdEFSLambdaBName}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantLambdas {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -328,17 +328,17 @@ func TestRelated_EFS_Backup_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two plans protect the graph-root EFS); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two plans protect the graph-root EFS); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantPlanIDs := []string{fixtures.HealthyDailyPlanID, fixtures.AppDataPlanID}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantPlanIDs {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -358,17 +358,17 @@ func TestRelated_EFS_ENI_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3 (ProdEFSEniA/B/C); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3 (ProdEFSEniA/B/C); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantENIs := []string{fixtures.ProdEFSEniAID, fixtures.ProdEFSEniBID, fixtures.ProdEFSEniCID}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantENIs {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -388,17 +388,17 @@ func TestRelated_EFS_SG_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (ProdEFSSecurityGroupA/B); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (ProdEFSSecurityGroupA/B); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantSGs := []string{fixtures.ProdEFSSecurityGroupAID, fixtures.ProdEFSSecurityGroupBID}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantSGs {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -418,17 +418,17 @@ func TestRelated_EFS_Subnet_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3 (ProdEFSSubnetA/B/C); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3 (ProdEFSSubnetA/B/C); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantSubnets := []string{fixtures.ProdEFSSubnetAID, fixtures.ProdEFSSubnetBID, fixtures.ProdEFSSubnetCID}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantSubnets {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -447,14 +447,14 @@ func TestRelated_EFS_VPC_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ProdEFSVpcID); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ProdEFSVpcID); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
-	if len(result.ResourceIDs) < 1 {
+	if len(result.ResourceIDs()) < 1 {
 		t.Fatalf("ResourceIDs is empty, want [%s]", fixtures.ProdEFSVpcID)
 	}
-	if result.ResourceIDs[0] != fixtures.ProdEFSVpcID {
-		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs[0], fixtures.ProdEFSVpcID)
+	if result.ResourceIDs()[0] != fixtures.ProdEFSVpcID {
+		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs()[0], fixtures.ProdEFSVpcID)
 	}
 }
 
@@ -475,20 +475,20 @@ func TestRelated_EFS_ECSTask_GraphRoot(t *testing.T) {
 
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (taskA + taskB carry ProdEFSID); ResourceIDs = %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (taskA + taskB carry ProdEFSID); ResourceIDs = %v", result.Count(), result.ResourceIDs())
 	}
 	wantTasks := []string{
 		"arn:aws:ecs:us-east-1:123456789012:task/acme-services/a1b2c3d4e5f6a1b2c3d4e5f6",
 		"arn:aws:ecs:us-east-1:123456789012:task/acme-services/b2c3d4e5f6a1b2c3d4e5f601",
 	}
-	idSet := make(map[string]bool, len(result.ResourceIDs))
-	for _, id := range result.ResourceIDs {
+	idSet := make(map[string]bool, len(result.ResourceIDs()))
+	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
 	}
 	for _, want := range wantTasks {
 		if !idSet[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }

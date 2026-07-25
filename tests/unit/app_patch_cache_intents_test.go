@@ -112,11 +112,7 @@ func TestApplyIntents_PatchRelatedCache_WritesSessionRelatedCache(t *testing.T) 
 			ResourceType:   "ec2",
 			SourceID:       "i-relcache001",
 			DefDisplayName: "Security Groups",
-			Result: resource.RelatedCheckResult{
-				TargetType:  "sg",
-				Count:       3,
-				ResourceIDs: []string{"sg-1", "sg-2", "sg-3"},
-			},
+			Result:         resource.KnownRelated("sg", []string{"sg-1", "sg-2", "sg-3"}, false),
 		},
 	})
 
@@ -131,8 +127,8 @@ func TestApplyIntents_PatchRelatedCache_WritesSessionRelatedCache(t *testing.T) 
 	if cached[0].DefDisplayName != "Security Groups" {
 		t.Errorf("cached[0].DefDisplayName = %q, want %q", cached[0].DefDisplayName, "Security Groups")
 	}
-	if cached[0].Result.Count != 3 {
-		t.Errorf("cached[0].Result.Count = %d, want 3", cached[0].Result.Count)
+	if cached[0].Result.Count() != 3 {
+		t.Errorf("cached[0].Result.Count = %d, want 3", cached[0].Result.Count())
 	}
 }
 
@@ -152,7 +148,7 @@ func TestApplyIntents_PatchRelatedCache_SameDefTwice_ReplacesInPlace(t *testing.
 			ResourceType:   "ec2",
 			SourceID:       "i-relcache002",
 			DefDisplayName: "Security Groups",
-			Result:         resource.RelatedCheckResult{TargetType: "sg", Count: 3, ResourceIDs: []string{"sg-1", "sg-2", "sg-3"}},
+			Result:         resource.KnownRelated("sg", []string{"sg-1", "sg-2", "sg-3"}, false),
 		},
 	})
 	c.ApplyIntents([]runtime.UIIntent{
@@ -160,7 +156,7 @@ func TestApplyIntents_PatchRelatedCache_SameDefTwice_ReplacesInPlace(t *testing.
 			ResourceType:   "ec2",
 			SourceID:       "i-relcache002",
 			DefDisplayName: "Security Groups",
-			Result:         resource.RelatedCheckResult{TargetType: "sg", Count: 5, ResourceIDs: []string{"sg-1", "sg-2", "sg-3", "sg-4", "sg-5"}},
+			Result:         resource.KnownRelated("sg", []string{"sg-1", "sg-2", "sg-3", "sg-4", "sg-5"}, false),
 		},
 	})
 
@@ -171,8 +167,8 @@ func TestApplyIntents_PatchRelatedCache_SameDefTwice_ReplacesInPlace(t *testing.
 	if len(cached) != 1 {
 		t.Fatalf("Core.RelatedCacheGet after two PatchRelatedCache intents for the SAME def: len=%d, want exactly 1 (idempotent replace, not append)", len(cached))
 	}
-	if cached[0].Result.Count != 5 {
-		t.Errorf("cached[0].Result.Count = %d, want 5 (the NEWER value)", cached[0].Result.Count)
+	if cached[0].Result.Count() != 5 {
+		t.Errorf("cached[0].Result.Count = %d, want 5 (the NEWER value)", cached[0].Result.Count())
 	}
 }
 
@@ -189,7 +185,12 @@ func TestApplyIntents_PatchRelatedCache_TwoDifferentDefs_Coexist(t *testing.T) {
 			ResourceType:   "ec2",
 			SourceID:       "i-relcache003",
 			DefDisplayName: "Security Groups",
-			Result:         resource.RelatedCheckResult{TargetType: "sg", Count: 3},
+			// NOTE (RelatedCheckResult migration): Count is now derived as
+			// len(uniqueIDs) by KnownRelated, so the original bare Count:3
+			// (with no backing ResourceIDs) is no longer constructible. Feeding
+			// 3 distinct placeholder IDs preserves the asserted Count==3 below
+			// without changing what this test proves (per-def coexistence).
+			Result: resource.KnownRelated("sg", []string{"sg-x1", "sg-x2", "sg-x3"}, false),
 		},
 	})
 	c.ApplyIntents([]runtime.UIIntent{
@@ -197,7 +198,8 @@ func TestApplyIntents_PatchRelatedCache_TwoDifferentDefs_Coexist(t *testing.T) {
 			ResourceType:   "ec2",
 			SourceID:       "i-relcache003",
 			DefDisplayName: "EBS Volumes",
-			Result:         resource.RelatedCheckResult{TargetType: "ebs", Count: 2},
+			// NOTE: same as above — 2 distinct placeholder IDs preserve Count==2.
+			Result: resource.KnownRelated("ebs", []string{"ebs-x1", "ebs-x2"}, false),
 		},
 	})
 
@@ -210,7 +212,7 @@ func TestApplyIntents_PatchRelatedCache_TwoDifferentDefs_Coexist(t *testing.T) {
 	}
 	byName := map[string]int{}
 	for _, entry := range cached {
-		byName[entry.DefDisplayName] = entry.Result.Count
+		byName[entry.DefDisplayName] = entry.Result.Count()
 	}
 	if byName["Security Groups"] != 3 {
 		t.Errorf("Security Groups Count = %d, want 3", byName["Security Groups"])
@@ -264,7 +266,7 @@ func TestOpenSelectedListDetail_SecondOpen_CacheHit_NoRelatedCheckTask(t *testin
 				ResourceType:     "ec2",
 				SourceResourceID: "i-reopen0001",
 				DefDisplayName:   "Security Groups",
-				Result:           resource.RelatedCheckResult{TargetType: "sg", Count: 2, ResourceIDs: []string{"sg-a", "sg-b"}},
+				Result:           resource.KnownRelated("sg", []string{"sg-a", "sg-b"}, false),
 			},
 		},
 		OperationID: 0, // AcceptZeroGen=true
@@ -395,7 +397,7 @@ func TestHandle_RelatedCheckBatch_AfterDetailPopped_NoPanic_TopScreenUnchanged(t
 					ResourceType:     "ec2",
 					SourceResourceID: "i-popped0001",
 					DefDisplayName:   "Security Groups",
-					Result:           resource.RelatedCheckResult{TargetType: "sg", Count: 1, ResourceIDs: []string{"sg-late"}},
+					Result:           resource.KnownRelated("sg", []string{"sg-late"}, false),
 				},
 			},
 			OperationID: 0,
@@ -452,7 +454,7 @@ func TestHandle_RelatedCheckBatch_StaleOperation_Dropped(t *testing.T) {
 				ResourceType:     "ec2",
 				SourceResourceID: "i-stale0001",
 				DefDisplayName:   "Security Groups",
-				Result:           resource.RelatedCheckResult{TargetType: "sg", Count: 9, ResourceIDs: []string{"sg-stale"}},
+				Result:           resource.KnownRelated("sg", []string{"sg-stale"}, false),
 			},
 		},
 		OperationID: staleOp, // captured before the fresh BeginDetailOperation above — now stale

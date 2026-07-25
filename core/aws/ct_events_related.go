@@ -17,7 +17,7 @@ import (
 func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	username := res.Fields["user"]
 	if username == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
+		return resource.KnownRelated("iam-user", nil, false)
 	}
 
 	userList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "iam-user")
@@ -46,7 +46,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := ctEventsExtractRoleName(res)
 	if roleName == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	roleList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "role")
@@ -256,7 +256,7 @@ func ctJSONStringSlice(m map[string]any, itemKey string, keys ...string) []strin
 func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	// Primary: Resources slice
@@ -274,7 +274,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "ec2", ids)
@@ -284,7 +284,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::S3::Bucket")
@@ -300,7 +300,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "s3", ids)
@@ -310,7 +310,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::Lambda::Function")
@@ -330,7 +330,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "lambda", ids)
@@ -344,7 +344,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+		return resource.KnownRelated("dbi", nil, false)
 	}
 
 	var ids []string
@@ -377,7 +377,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+		return resource.KnownRelated("dbi", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "dbi", ids)
@@ -387,7 +387,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::KMS::Key")
@@ -407,7 +407,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "kms", ids)
@@ -426,7 +426,7 @@ func stripKMSKeyID(id string) string {
 func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::SecretsManager::Secret")
@@ -442,7 +442,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "secrets", ids)
@@ -452,7 +452,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+		return resource.KnownRelated("vpce", nil, false)
 	}
 
 	var ids []string
@@ -464,7 +464,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+		return resource.KnownRelated("vpce", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "vpce", ids)
@@ -474,7 +474,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::EC2::SecurityGroup")
@@ -490,7 +490,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "sg", ids)
@@ -500,7 +500,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
+		return resource.KnownRelated("ddb", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::DynamoDB::Table")
@@ -516,7 +516,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
+		return resource.KnownRelated("ddb", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "ddb", ids)
@@ -532,17 +532,17 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 	ui, _ := parsed["userIdentity"].(map[string]any)
 	uiType, _ := ui["type"].(string)
 	if uiType == "Root" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	accessKeyID, _ := ui["accessKeyId"].(string)
 	if accessKeyID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"AccessKeyId": accessKeyID})
 }
@@ -553,7 +553,7 @@ func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Reso
 func checkCtEventsPivotByUsername(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	username := res.Fields["user"]
 	if username == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"Username": username})
 }
@@ -566,7 +566,7 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 		eventName = res.Name
 	}
 	if eventName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"EventName": eventName})
 }
@@ -577,11 +577,11 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 // same API call.
 func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["_ct.cross_account"] != "true" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 	sharedEventID, _ := parsed["sharedEventID"].(string)
@@ -593,7 +593,7 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 		}
 	}
 	if sharedEventID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"SharedEventId": sharedEventID})
 }
@@ -607,7 +607,7 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+		return resource.KnownRelated("trail", nil, false)
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::CloudTrail::Trail")
@@ -630,7 +630,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+		return resource.KnownRelated("trail", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "trail", ids)
@@ -640,7 +640,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	var ids []string
@@ -665,7 +665,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "cfn", ids)

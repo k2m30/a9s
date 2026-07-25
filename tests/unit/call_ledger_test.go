@@ -246,7 +246,7 @@ func TestLambdaGetFunction_ECRCheckerAndEnricher_Ledger_BothAskersVisible(t *tes
 
 	ecrChecker := coalesceLambdaECRDefByTarget(t)
 	ecrResult := ecrChecker(ctx, sc, res, nil)
-	if ecrResult.State == domain.RelatedUnknown {
+	if ecrResult.State() == domain.RelatedUnknown {
 		t.Fatalf("ecr related check returned Unknown, want a resolved result driving a real GetFunction call: %+v", ecrResult)
 	}
 

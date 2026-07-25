@@ -63,8 +63,8 @@ func TestRelated_Subnet_EC2_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -85,8 +85,8 @@ func TestRelated_Subnet_EC2_NoMatch(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -108,8 +108,8 @@ func TestRelated_Subnet_ENI_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -131,8 +131,8 @@ func TestRelated_Subnet_NAT_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -156,8 +156,8 @@ func TestRelated_Subnet_ELB_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -179,8 +179,8 @@ func TestRelated_Subnet_ELB_NoMatch(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -193,8 +193,8 @@ func TestRelated_Subnet_NilClients(t *testing.T) {
 	for _, target := range []string{"ec2", "eni", "nat", "elb"} {
 		checker := subnetCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count())
 		}
 	}
 }
@@ -218,8 +218,8 @@ func TestRelated_Subnet_RTB_ExplicitAssoc(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (explicit association)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (explicit association)", result.Count())
 	}
 }
 
@@ -242,8 +242,8 @@ func TestRelated_Subnet_RTB_MainRTB(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (main RTB fallback)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (main RTB fallback)", result.Count())
 	}
 }
 
@@ -264,8 +264,8 @@ func TestRelated_Subnet_RTB_NoMatch(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different subnet)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different subnet)", result.Count())
 	}
 }
 
@@ -285,11 +285,11 @@ func TestRelated_Subnet_CFN_HasTag(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (has CFN tag)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (has CFN tag)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
-		t.Errorf("ResourceIDs = %v, want [\"my-stack\"]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [\"my-stack\"]", result.ResourceIDs())
 	}
 }
 
@@ -303,8 +303,8 @@ func TestRelated_Subnet_CFN_NoTag(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count())
 	}
 }
 
@@ -332,11 +332,11 @@ func TestRelated_Subnet_VPC_Found(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (vpc_id present)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (vpc_id present)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-11111111" {
-		t.Errorf("ResourceIDs = %v, want [vpc-11111111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-11111111" {
+		t.Errorf("ResourceIDs = %v, want [vpc-11111111]", result.ResourceIDs())
 	}
 }
 
@@ -349,8 +349,8 @@ func TestRelated_Subnet_VPC_NoVPCID(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count())
 	}
 }
 
@@ -375,11 +375,11 @@ func TestRelated_Subnet_ASG_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-asg" {
-		t.Errorf("ResourceIDs = %v, want [my-asg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-asg" {
+		t.Errorf("ResourceIDs = %v, want [my-asg]", result.ResourceIDs())
 	}
 }
 
@@ -400,8 +400,8 @@ func TestRelated_Subnet_ASG_NoMatch(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (subnet not in vpc_zone_identifier)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (subnet not in vpc_zone_identifier)", result.Count())
 	}
 }
 
@@ -422,11 +422,11 @@ func TestRelated_Subnet_ASG_SubnetsFieldFallback(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (subnets fallback field matched)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (subnets fallback field matched)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "fallback-asg" {
-		t.Errorf("ResourceIDs = %v, want [fallback-asg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "fallback-asg" {
+		t.Errorf("ResourceIDs = %v, want [fallback-asg]", result.ResourceIDs())
 	}
 }
 
@@ -452,11 +452,11 @@ func TestRelated_Subnet_EKS_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (EKS subnets field matches)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (EKS subnets field matches)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-cluster" {
-		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs())
 	}
 }
 
@@ -477,8 +477,8 @@ func TestRelated_Subnet_EKS_SubnetIDsFieldFallback(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (subnet_ids fallback field matched)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (subnet_ids fallback field matched)", result.Count())
 	}
 }
 
@@ -499,8 +499,8 @@ func TestRelated_Subnet_EKS_NoMatch(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (subnet not in EKS subnets)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (subnet not in EKS subnets)", result.Count())
 	}
 }
 
@@ -525,11 +525,11 @@ func TestRelated_Subnet_VPCE_Match(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (subnet in VPCE SubnetIds)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (subnet in VPCE SubnetIds)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs = %v, want [vpce-0a1b2c3d4e5f60001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpce-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs = %v, want [vpce-0a1b2c3d4e5f60001]", result.ResourceIDs())
 	}
 }
 
@@ -550,8 +550,8 @@ func TestRelated_Subnet_VPCE_NoMatch(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (subnet not in VPCE SubnetIds)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (subnet not in VPCE SubnetIds)", result.Count())
 	}
 }
 
@@ -570,8 +570,8 @@ func TestRelated_Subnet_VPCE_WrongRawStruct(t *testing.T) {
 	checker := subnetCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type skipped)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type skipped)", result.Count())
 	}
 }
 

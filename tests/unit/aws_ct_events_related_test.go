@@ -87,11 +87,11 @@ func TestRelated_CtEvents_User_MatchByUsername(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -113,8 +113,8 @@ func TestRelated_CtEvents_User_NoMatch(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_CtEvents_User_EmptyUser(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty user field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty user field)", result.Count())
 	}
 }
 
@@ -154,11 +154,11 @@ func TestRelated_CtEvents_User_NilCache(t *testing.T) {
 
 	// Event-derived: the event names the user in its body, so an empty/cold cache
 	// resolves by identity to a navigable (1) — zero fetch, no scoreless Unknown.
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event names the user; resolved by identity, zero-fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event names the user; resolved by identity, zero-fetch)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "admin-user" {
-		t.Errorf("ResourceIDs = %v, want [admin-user]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "admin-user" {
+		t.Errorf("ResourceIDs = %v, want [admin-user]", result.ResourceIDs())
 	}
 }
 
@@ -190,11 +190,11 @@ func TestRelated_CtEvents_Role_MatchByResource(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -224,8 +224,8 @@ func TestRelated_CtEvents_Role_NoMatch(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -250,11 +250,11 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 
 	// Event-derived: the event names the target role in its body, so an
 	// empty/cold cache resolves by identity to a navigable (1) — zero fetch.
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event names the role; resolved by identity, zero-fetch)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event names the role; resolved by identity, zero-fetch)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs())
 	}
 }
 
@@ -281,14 +281,14 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, iamUser, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0 (event matched)", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0 (event matched)", result.Count())
 	}
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Fatal("FetchFilter is nil, want non-nil")
 	}
-	if result.FetchFilter["Username"] != userName {
-		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter["Username"], userName)
+	if result.FetchFilter()["Username"] != userName {
+		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter()["Username"], userName)
 	}
 }
 
@@ -315,14 +315,14 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_NoMatch_Truncated(t *testing.T)
 	checker := iamUserCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, iamUser, cache)
 
-	if result.State != domain.RelatedDeferred {
-		t.Errorf("Count = %d, want -1 (no match, truncated)", result.Count)
+	if result.State() != domain.RelatedDeferred {
+		t.Errorf("Count = %d, want -1 (no match, truncated)", result.Count())
 	}
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Fatal("FetchFilter is nil, want non-nil")
 	}
-	if result.FetchFilter["Username"] != userName {
-		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter["Username"], userName)
+	if result.FetchFilter()["Username"] != userName {
+		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter()["Username"], userName)
 	}
 }
 
@@ -338,11 +338,11 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_EmptyUsername(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, iamUser, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty username)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty username)", result.Count())
 	}
-	if len(result.FetchFilter) != 0 {
-		t.Errorf("FetchFilter = %v, want nil/empty (no filter for empty username)", result.FetchFilter)
+	if len(result.FetchFilter()) != 0 {
+		t.Errorf("FetchFilter = %v, want nil/empty (no filter for empty username)", result.FetchFilter())
 	}
 }
 
@@ -380,14 +380,14 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, iamUser, cache)
 
-	if result.State != domain.RelatedDeferred {
-		t.Errorf("Count = %d, want -1 (cache truncated, real count unknown)", result.Count)
+	if result.State() != domain.RelatedDeferred {
+		t.Errorf("Count = %d, want -1 (cache truncated, real count unknown)", result.Count())
 	}
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Fatal("FetchFilter is nil, want non-nil")
 	}
-	if result.FetchFilter["Username"] != userName {
-		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter["Username"], userName)
+	if result.FetchFilter()["Username"] != userName {
+		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter()["Username"], userName)
 	}
 }
 
@@ -450,14 +450,14 @@ func TestRelated_CtEvents_EC2_FetchFilterSet(t *testing.T) {
 	checker := ec2CtEventsCheckerByTarget(t)
 	result := checker(context.Background(), nil, ec2Res, cache)
 
-	if result.Count <= 0 {
-		t.Errorf("Count = %d, want > 0 (event matched)", result.Count)
+	if result.Count() <= 0 {
+		t.Errorf("Count = %d, want > 0 (event matched)", result.Count())
 	}
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Fatal("FetchFilter is nil, want non-nil")
 	}
-	if result.FetchFilter["ResourceName"] != instanceID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], instanceID)
+	if result.FetchFilter()["ResourceName"] != instanceID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], instanceID)
 	}
 }
 
@@ -482,14 +482,14 @@ func TestRelated_CtEvents_EC2_FetchFilterSet_NoMatch_Truncated(t *testing.T) {
 	checker := ec2CtEventsCheckerByTarget(t)
 	result := checker(context.Background(), nil, ec2Res, cache)
 
-	if result.State != domain.RelatedDeferred {
-		t.Errorf("Count = %d, want -1 (no match, truncated)", result.Count)
+	if result.State() != domain.RelatedDeferred {
+		t.Errorf("Count = %d, want -1 (no match, truncated)", result.Count())
 	}
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Fatal("FetchFilter is nil, want non-nil")
 	}
-	if result.FetchFilter["ResourceName"] != instanceID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], instanceID)
+	if result.FetchFilter()["ResourceName"] != instanceID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], instanceID)
 	}
 }
 
@@ -516,14 +516,14 @@ func TestRelated_CtEvents_EC2_FetchFilterSet_Match_Truncated(t *testing.T) {
 	checker := ec2CtEventsCheckerByTarget(t)
 	result := checker(context.Background(), nil, ec2Res, cache)
 
-	if result.State != domain.RelatedDeferred {
-		t.Errorf("Count = %d, want -1 (cache truncated, real count unknown)", result.Count)
+	if result.State() != domain.RelatedDeferred {
+		t.Errorf("Count = %d, want -1 (cache truncated, real count unknown)", result.Count())
 	}
-	if result.FetchFilter == nil {
+	if result.FetchFilter() == nil {
 		t.Fatal("FetchFilter is nil, want non-nil")
 	}
-	if result.FetchFilter["ResourceName"] != instanceID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], instanceID)
+	if result.FetchFilter()["ResourceName"] != instanceID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], instanceID)
 	}
 }
 
@@ -560,11 +560,11 @@ func TestRelated_CtEvents_Role_AssumedRoleViaCTEventJSON(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (AssumedRole extracted from CloudTrailEvent JSON)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (AssumedRole extracted from CloudTrailEvent JSON)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -596,8 +596,8 @@ func TestRelated_CtEvents_Role_AssumedRoleNoMatch(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (role not in cache)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (role not in cache)", result.Count())
 	}
 }
 
@@ -632,17 +632,17 @@ func TestRelated_CtEvents_Role_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (named role resolved by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (named role resolved by identity)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false (a named role is exact, never (N+))")
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -672,10 +672,10 @@ func TestRelated_CtEvents_Role_MatchInTruncatedCacheIsExactlyOne(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false (matched exact role is (1), not (1+))")
 	}
 }
@@ -703,13 +703,13 @@ func TestRelated_CtEvents_EC2_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (named instance resolved by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (named instance resolved by identity)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-05dc37e3db4cd5201" {
-		t.Errorf("ResourceIDs = %v, want [i-05dc37e3db4cd5201]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-05dc37e3db4cd5201" {
+		t.Errorf("ResourceIDs = %v, want [i-05dc37e3db4cd5201]", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false")
 	}
 }
@@ -737,13 +737,13 @@ func TestRelated_CtEvents_S3_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (named bucket resolved by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (named bucket resolved by identity)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-bucket" {
-		t.Errorf("ResourceIDs = %v, want [my-bucket]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-bucket" {
+		t.Errorf("ResourceIDs = %v, want [my-bucket]", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false")
 	}
 }
@@ -764,10 +764,10 @@ func TestRelated_CtEvents_Role_TruncatedNoTargetNamed_StillZero(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no role named in event → nothing to resolve)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no role named in event → nothing to resolve)", result.Count())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false")
 	}
 }
@@ -787,13 +787,13 @@ func TestRelated_CtEvents_IAMUser_TruncatedCacheResolvesByIdentity(t *testing.T)
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (named user resolved by identity, not exact 0)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (named user resolved by identity, not exact 0)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alice" {
-		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "alice" {
+		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false")
 	}
 }
@@ -819,17 +819,17 @@ func TestRelated_CtEvents_EC2_TruncatedPartialMatchIncludesAllNamedIDs(t *testin
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (both named instances, not just the cached one)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (both named instances, not just the cached one)", result.Count())
 	}
 	got := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		got[id] = true
 	}
 	if !got["i-aaa"] || !got["i-bbb"] {
-		t.Errorf("ResourceIDs = %v, want both i-aaa and i-bbb", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want both i-aaa and i-bbb", result.ResourceIDs())
 	}
-	if result.Truncated {
+	if result.Truncated() {
 		t.Error("Truncated = true, want false")
 	}
 }
@@ -857,11 +857,11 @@ func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-vpc-stack" {
-		t.Errorf("ResourceIDs = %v, want [acme-vpc-stack] (stack name, not the uuid)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-vpc-stack" {
+		t.Errorf("ResourceIDs = %v, want [acme-vpc-stack] (stack name, not the uuid)", result.ResourceIDs())
 	}
 }
 
@@ -884,8 +884,8 @@ func TestRelated_CtEvents_Role_ExtractsTargetFromRequestRoleArn(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "target-role" {
-		t.Errorf("ResourceIDs = %v, want [target-role] (target roleArn, not the session name)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "target-role" {
+		t.Errorf("ResourceIDs = %v, want [target-role] (target roleArn, not the session name)", result.ResourceIDs())
 	}
 }
 
@@ -914,8 +914,8 @@ func TestRelated_CtEvents_Role_AssumedRoleARNResolvesRoleNotSession(t *testing.T
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role] (role segment of the assumed-role ARN, not the session name)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role] (role segment of the assumed-role ARN, not the session name)", result.ResourceIDs())
 	}
 }
 
@@ -938,8 +938,8 @@ func TestRelated_CtEvents_Role_ProvenEmptyCacheIsZeroNotIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cache proved the role list empty; must not fake an event-derived (1))", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (cache proved the role list empty; must not fake an event-derived (1))", result.Count())
 	}
 }
 
@@ -958,8 +958,8 @@ func TestRelated_CtEvents_RDS_ClusterEventDoesNotFakeDBInstance(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (a DBCluster id is not a DB-instance; must not fake an RDS Instance relation)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (a DBCluster id is not a DB-instance; must not fake an RDS Instance relation)", result.Count())
 	}
 }
 
@@ -978,8 +978,8 @@ func TestRelated_CtEvents_RDS_DBInstanceEventResolves(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 || len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-instance" {
-		t.Errorf("Count=%d ResourceIDs=%v, want 1 [my-instance] (a real DB instance is a dbi relation)", result.Count, result.ResourceIDs)
+	if result.Count() != 1 || len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-instance" {
+		t.Errorf("Count=%d ResourceIDs=%v, want 1 [my-instance] (a real DB instance is a dbi relation)", result.Count(), result.ResourceIDs())
 	}
 }
 
@@ -1134,8 +1134,8 @@ func TestRelated_CtEvents_Role_AssumedRole_NotRoleType(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (IAMUser type should not extract role from JSON)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (IAMUser type should not extract role from JSON)", result.Count())
 	}
 }
 
@@ -1172,11 +1172,11 @@ func TestRelated_CtEvents_SG_MatchByResourcesSlice(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (SG matched via Resources slice)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (SG matched via Resources slice)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -1206,11 +1206,11 @@ func TestRelated_CtEvents_SG_MatchByGroupIdFallback(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (SG matched via groupId JSON fallback)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (SG matched via groupId JSON fallback)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -1243,8 +1243,8 @@ func TestRelated_CtEvents_SG_NoSGReference(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SG referenced in event)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no SG referenced in event)", result.Count())
 	}
 }
 
@@ -1281,8 +1281,8 @@ func TestCtJSONStringSlice_ValidNestedPath(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (instance ID extracted via ctJSONStringSlice)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (instance ID extracted via ctJSONStringSlice)", result.Count())
 	}
 }
 
@@ -1309,8 +1309,8 @@ func TestCtJSONStringSlice_MissingKey(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (missing instancesSet key → no IDs extracted)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (missing instancesSet key → no IDs extracted)", result.Count())
 	}
 }
 
@@ -1336,7 +1336,7 @@ func TestCtJSONStringSlice_NonSliceLeaf(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (non-slice leaf → nil from ctJSONStringSlice → no IDs)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (non-slice leaf → nil from ctJSONStringSlice → no IDs)", result.Count())
 	}
 }

@@ -61,11 +61,11 @@ func TestRelated_EFS_SG_MatchesSGsFromMountTargetENI(t *testing.T) {
 	checker := efsCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, efsSourceResourceWithRaw(fsID), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != sgID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, sgID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != sgID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), sgID)
 	}
 }
 
@@ -82,8 +82,8 @@ func TestRelated_EFS_SG_NoMatchWhenENIBelongsToDifferentFS(t *testing.T) {
 	checker := efsCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, efsSourceResourceWithRaw(fsID), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ENI for different FS)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (ENI for different FS)", result.Count())
 	}
 }
 
@@ -104,11 +104,11 @@ func TestRelated_EFS_SG_DeduplicatesSGsAcrossMultipleENIs(t *testing.T) {
 	checker := efsCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, efsSourceResourceWithRaw(fsID), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (shared SG deduplicated)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (shared SG deduplicated)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != sharedSGID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, sharedSGID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != sharedSGID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), sharedSGID)
 	}
 }
 
@@ -128,11 +128,11 @@ func TestRelated_EFS_Subnet_MatchesSubnetsFromMountTargetENI(t *testing.T) {
 	checker := efsCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, efsSourceResourceWithRaw(fsID), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != subnetID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, subnetID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != subnetID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), subnetID)
 	}
 }
 
@@ -148,8 +148,8 @@ func TestRelated_EFS_Subnet_NoMatchWhenENIBelongsToDifferentFS(t *testing.T) {
 	checker := efsCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, efsSourceResourceWithRaw(fsID), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ENI for different FS)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (ENI for different FS)", result.Count())
 	}
 }
 
@@ -171,16 +171,16 @@ func TestRelated_EFS_Subnet_MultipleSubnetsFromDifferentAZENIs(t *testing.T) {
 	checker := efsCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, efsSourceResourceWithRaw(fsID), cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2; ResourceIDs: %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2; ResourceIDs: %v", result.Count(), result.ResourceIDs())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{subnet1, subnet2} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }

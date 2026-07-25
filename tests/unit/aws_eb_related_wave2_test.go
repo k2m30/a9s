@@ -49,11 +49,11 @@ func TestRelated_Eb_CFN_MatchByEnvIDPrefix(t *testing.T) {
 	checker := ebCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != stackID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, stackID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != stackID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), stackID)
 	}
 }
 
@@ -84,8 +84,8 @@ func TestRelated_Eb_CFN_NoMatchDifferentEnv(t *testing.T) {
 	checker := ebCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -115,11 +115,11 @@ func TestRelated_Eb_CFN_FallsBackToResID(t *testing.T) {
 	checker := ebCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (fallback to res.ID)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (fallback to res.ID)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != stackName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, stackName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != stackName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), stackName)
 	}
 }
 
@@ -151,11 +151,11 @@ func TestRelated_Eb_Logs_MatchByEnvNamePrefix(t *testing.T) {
 	checker := ebCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != logGroupID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, logGroupID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != logGroupID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), logGroupID)
 	}
 }
 
@@ -183,8 +183,8 @@ func TestRelated_Eb_Logs_NoMatchDifferentEnv(t *testing.T) {
 	checker := ebCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -215,8 +215,8 @@ func TestRelated_Eb_Logs_MultipleGroupsSameEnv(t *testing.T) {
 	checker := ebCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -257,11 +257,11 @@ func TestRelated_Eb_ASG_MatchByTag(t *testing.T) {
 	checker := ebCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != asgName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, asgName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != asgName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), asgName)
 	}
 }
 
@@ -298,8 +298,8 @@ func TestRelated_Eb_ASG_NoMatchDifferentTag(t *testing.T) {
 	checker := ebCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -330,8 +330,8 @@ func TestRelated_Eb_ASG_SkipsWrongRawStructASG(t *testing.T) {
 	checker := ebCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (skipped wrong RawStruct ASG)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (skipped wrong RawStruct ASG)", result.Count())
 	}
 }
 
@@ -372,11 +372,11 @@ func TestRelated_Eb_EC2_MatchByTag(t *testing.T) {
 	checker := ebCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != instanceID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, instanceID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != instanceID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), instanceID)
 	}
 }
 
@@ -412,8 +412,8 @@ func TestRelated_Eb_EC2_NoMatchDifferentEnvTag(t *testing.T) {
 	checker := ebCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -447,8 +447,8 @@ func TestRelated_Eb_EC2_SkipsInstanceWithoutEBTag(t *testing.T) {
 	checker := ebCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no EB tag on instance)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no EB tag on instance)", result.Count())
 	}
 }
 
@@ -489,11 +489,11 @@ func TestRelated_Eb_Alarm_MatchByDimension(t *testing.T) {
 	checker := ebCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != alarmName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, alarmName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != alarmName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), alarmName)
 	}
 }
 
@@ -529,8 +529,8 @@ func TestRelated_Eb_Alarm_NoMatchNeitherDimensionNorName(t *testing.T) {
 	checker := ebCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -570,10 +570,10 @@ func TestRelated_Eb_Alarm_FallbackMatchByNameSubstring(t *testing.T) {
 	checker := ebCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (name substring fallback)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (name substring fallback)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != alarmName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, alarmName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != alarmName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), alarmName)
 	}
 }

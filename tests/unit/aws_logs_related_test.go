@@ -52,14 +52,14 @@ func TestRelated_Logs_Lambda_Found(t *testing.T) {
 	checker := logsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != functionName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, functionName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != functionName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), functionName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -84,11 +84,11 @@ func TestRelated_Logs_Lambda_NotLambdaGroup(t *testing.T) {
 	checker := logsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not a lambda log group)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not a lambda log group)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -104,8 +104,8 @@ func TestRelated_Logs_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }
 
@@ -137,14 +137,14 @@ func TestRelated_Logs_Alarms_Found(t *testing.T) {
 	checker := logsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "log-group-error-alarm" {
-		t.Errorf("ResourceIDs = %v, want [log-group-error-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "log-group-error-alarm" {
+		t.Errorf("ResourceIDs = %v, want [log-group-error-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -174,11 +174,11 @@ func TestRelated_Logs_Alarms_NotFound(t *testing.T) {
 	checker := logsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -194,8 +194,8 @@ func TestRelated_Logs_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }
 
@@ -213,11 +213,11 @@ func TestRelated_Logs_KMS_MatchByARN(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abcd-1234" {
-		t.Errorf("ResourceIDs = %v, want [abcd-1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abcd-1234" {
+		t.Errorf("ResourceIDs = %v, want [abcd-1234]", result.ResourceIDs())
 	}
 }
 
@@ -233,11 +233,11 @@ func TestRelated_Logs_KMS_MatchByPlainKeyID(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mrk-abcd1234" {
-		t.Errorf("ResourceIDs = %v, want [mrk-abcd1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "mrk-abcd1234" {
+		t.Errorf("ResourceIDs = %v, want [mrk-abcd1234]", result.ResourceIDs())
 	}
 }
 
@@ -253,8 +253,8 @@ func TestRelated_Logs_KMS_NoKey(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count())
 	}
 }
 
@@ -267,8 +267,8 @@ func TestRelated_Logs_KMS_InvalidRawStruct(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for invalid RawStruct", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -287,11 +287,11 @@ func TestRelated_Logs_APIGW_MatchByExecutionLogName(t *testing.T) {
 	checker := logsCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != apiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, apiID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != apiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
 	}
 }
 
@@ -307,8 +307,8 @@ func TestRelated_Logs_APIGW_NoExecutionLogPrefix(t *testing.T) {
 	checker := logsCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not an execution log group)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not an execution log group)", result.Count())
 	}
 }
 
@@ -318,8 +318,8 @@ func TestRelated_Logs_APIGW_EmptyID(t *testing.T) {
 	checker := logsCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty ID", result.Count())
 	}
 }
 
@@ -331,8 +331,8 @@ func TestRelated_Logs_APIGW_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -359,11 +359,11 @@ func TestRelated_Logs_ECSTask_MatchByFamily(t *testing.T) {
 	checker := logsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "web-task:3" {
-		t.Errorf("ResourceIDs = %v, want [web-task:3]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "web-task:3" {
+		t.Errorf("ResourceIDs = %v, want [web-task:3]", result.ResourceIDs())
 	}
 }
 
@@ -377,8 +377,8 @@ func TestRelated_Logs_ECSTask_NoECSPrefix(t *testing.T) {
 	checker := logsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not an ecs log group)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not an ecs log group)", result.Count())
 	}
 }
 
@@ -388,8 +388,8 @@ func TestRelated_Logs_ECSTask_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -401,8 +401,8 @@ func TestRelated_Logs_Kinesis_NilClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -414,8 +414,8 @@ func TestRelated_Logs_S3_NilClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -442,11 +442,11 @@ func TestRelated_Logs_Kinesis_FoundViaSubscriptionFilter(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != streamName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, streamName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != streamName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), streamName)
 	}
 }
 
@@ -466,8 +466,8 @@ func TestRelated_Logs_Kinesis_NonKinesisFilterReturnsZero(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no kinesis filter)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no kinesis filter)", result.Count())
 	}
 }
 
@@ -482,8 +482,8 @@ func TestRelated_Logs_Kinesis_EmptyFilterListReturnsZero(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty filter list)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty filter list)", result.Count())
 	}
 }
 
@@ -509,11 +509,11 @@ func TestRelated_Logs_S3_FoundViaSubscriptionFilter(t *testing.T) {
 	checker := logsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != bucketName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bucketName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != bucketName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), bucketName)
 	}
 }
 
@@ -533,11 +533,11 @@ func TestRelated_Logs_S3_BucketWithPathPrefixExtractsBucketName(t *testing.T) {
 	checker := logsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != bucketName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bucketName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != bucketName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), bucketName)
 	}
 }
 
@@ -556,7 +556,7 @@ func TestRelated_Logs_S3_NonS3FilterReturnsZero(t *testing.T) {
 	checker := logsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no S3 filter)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no S3 filter)", result.Count())
 	}
 }

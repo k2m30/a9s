@@ -16,10 +16,10 @@ import (
 func checkNATVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	if raw.VpcId == nil || *raw.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	// In-body: the NAT gateway's own VpcId IS the related VPC. Resolve by
 	// identity — no vpc-list fetch to confirm an id the source already carries.
@@ -31,10 +31,10 @@ func checkNATVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkNATSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	// In-body: the NAT gateway's own SubnetId IS the related subnet.
 	return relatedResult("subnet", []string{*raw.SubnetId})
@@ -49,7 +49,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		natID = *raw.NatGatewayId
 	}
 	if natID == "" {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
+		return resource.KnownRelated("rtb", nil, false)
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -81,7 +81,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNATEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+		return resource.KnownRelated("eip", nil, false)
 	}
 	// In-body: NatGatewayAddresses[].AllocationId IS the eip resource id (eip
 	// resources are keyed by AllocationId — see eip.go). Resolve by identity.
@@ -99,7 +99,7 @@ func checkNATEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkNATENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	// In-body: NatGatewayAddresses[].NetworkInterfaceId IS the eni resource id.
 	var ids []string

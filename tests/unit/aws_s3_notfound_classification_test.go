@@ -97,20 +97,20 @@ func TestS3Related_DeletedBucket_BenignAbsence(t *testing.T) {
 				checker := c.checkerFor(t)
 				clients := c.clientsFor(code)
 				got := checker(context.Background(), clients, emptyBucketResource(deletedBucket), nil)
-				if got.TargetType != c.wantTarget {
-					t.Errorf("TargetType = %q, want %q", got.TargetType, c.wantTarget)
+				if got.TargetType() != c.wantTarget {
+					t.Errorf("TargetType = %q, want %q", got.TargetType(), c.wantTarget)
 				}
-				if got.Count != 0 {
-					t.Errorf("Count = %d, want 0", got.Count)
+				if got.Count() != 0 {
+					t.Errorf("Count = %d, want 0", got.Count())
 				}
-				if got.State != domain.RelatedResolved {
-					t.Errorf("State = %v, want RelatedResolved — a deleted bucket is an honest zero, not an error state", got.State)
+				if got.State() != domain.RelatedResolved {
+					t.Errorf("State = %v, want RelatedResolved — a deleted bucket is an honest zero, not an error state", got.State())
 				}
-				if got.Truncated {
+				if got.Truncated() {
 					t.Error("Truncated = true; a deleted bucket is a resolved zero, not a soft-truncated 0+")
 				}
-				if got.Err != nil {
-					t.Errorf("Err = %v, want nil — a deleted bucket must not surface as a related-panel failure", got.Err)
+				if got.Err() != nil {
+					t.Errorf("Err = %v, want nil — a deleted bucket must not surface as a related-panel failure", got.Err())
 				}
 			})
 		}
@@ -177,17 +177,17 @@ func TestS3Related_ExistingBenignCodes_AreCodeBased(t *testing.T) {
 			// message that does not restate the AWS-canonical error text.
 			clients := c.clientsFor(c.code)
 			got := checker(context.Background(), clients, emptyBucketResource("some-bucket"), nil)
-			if got.TargetType != c.wantTarget {
-				t.Errorf("TargetType = %q, want %q", got.TargetType, c.wantTarget)
+			if got.TargetType() != c.wantTarget {
+				t.Errorf("TargetType = %q, want %q", got.TargetType(), c.wantTarget)
 			}
-			if got.Count != 0 {
-				t.Errorf("Count = %d, want 0", got.Count)
+			if got.Count() != 0 {
+				t.Errorf("Count = %d, want 0", got.Count())
 			}
-			if got.State != domain.RelatedResolved {
-				t.Errorf("State = %v, want RelatedResolved for existing benign code %q", got.State, c.code)
+			if got.State() != domain.RelatedResolved {
+				t.Errorf("State = %v, want RelatedResolved for existing benign code %q", got.State(), c.code)
 			}
-			if got.Err != nil {
-				t.Errorf("Err = %v, want nil for existing benign code %q", got.Err, c.code)
+			if got.Err() != nil {
+				t.Errorf("Err = %v, want nil for existing benign code %q", got.Err(), c.code)
 			}
 		})
 	}

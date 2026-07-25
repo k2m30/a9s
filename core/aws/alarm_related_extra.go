@@ -34,7 +34,7 @@ func checkAlarmAPIGW(_ context.Context, _ any, res resource.Resource, _ resource
 	if v := alarmDimension(alarm, "ApiId"); v != "" {
 		return relatedResult("apigw", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+	return resource.KnownRelated("apigw", nil, false)
 }
 
 func checkAlarmCB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -45,7 +45,7 @@ func checkAlarmCB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	if v := alarmDimension(alarm, "ProjectName"); v != "" {
 		return relatedResult("cb", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
+	return resource.KnownRelated("cb", nil, false)
 }
 
 func checkAlarmDBI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -56,7 +56,7 @@ func checkAlarmDBI(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if v := alarmDimension(alarm, "DBInstanceIdentifier"); v != "" {
 		return relatedResult("dbi", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+	return resource.KnownRelated("dbi", nil, false)
 }
 
 func checkAlarmEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -67,7 +67,7 @@ func checkAlarmEC2(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if v := alarmDimension(alarm, "InstanceId"); v != "" {
 		return relatedResult("ec2", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	return resource.KnownRelated("ec2", nil, false)
 }
 
 func checkAlarmECS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -78,7 +78,7 @@ func checkAlarmECS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if v := alarmDimension(alarm, "ClusterName"); v != "" {
 		return relatedResult("ecs", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+	return resource.KnownRelated("ecs", nil, false)
 }
 
 func checkAlarmEKS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -92,7 +92,7 @@ func checkAlarmEKS(_ context.Context, _ any, res resource.Resource, _ resource.R
 			return relatedResult("eks", []string{v})
 		}
 	}
-	return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
+	return resource.KnownRelated("eks", nil, false)
 }
 
 func checkAlarmKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -103,7 +103,7 @@ func checkAlarmKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if v := alarmDimension(alarm, "KeyId"); v != "" {
 		return relatedResult("kms", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	return resource.KnownRelated("kms", nil, false)
 }
 
 func checkAlarmLambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -114,7 +114,7 @@ func checkAlarmLambda(_ context.Context, _ any, res resource.Resource, _ resourc
 	if v := alarmDimension(alarm, "FunctionName"); v != "" {
 		return relatedResult("lambda", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	return resource.KnownRelated("lambda", nil, false)
 }
 
 func checkAlarmLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -125,7 +125,7 @@ func checkAlarmLogs(_ context.Context, _ any, res resource.Resource, _ resource.
 	if v := alarmDimension(alarm, "LogGroupName"); v != "" {
 		return relatedResult("logs", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	return resource.KnownRelated("logs", nil, false)
 }
 
 func checkAlarmS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -136,7 +136,7 @@ func checkAlarmS3(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	if v := alarmDimension(alarm, "BucketName"); v != "" {
 		return relatedResult("s3", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+	return resource.KnownRelated("s3", nil, false)
 }
 
 func checkAlarmSFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -150,7 +150,7 @@ func checkAlarmSFN(_ context.Context, _ any, res resource.Resource, _ resource.R
 		}
 		return relatedResult("sfn", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+	return resource.KnownRelated("sfn", nil, false)
 }
 
 func checkAlarmWAF(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -161,7 +161,7 @@ func checkAlarmWAF(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if v := alarmDimension(alarm, "WebACL"); v != "" {
 		return relatedResult("waf", []string{v})
 	}
-	return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+	return resource.KnownRelated("waf", nil, false)
 }
 
 // checkAlarmCTEvents scans the ct-events cache for events that reference this
@@ -169,7 +169,7 @@ func checkAlarmWAF(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	name := res.ID
 	if name == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	evList, truncated, err := alarmRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {

@@ -183,10 +183,10 @@ func buildDemoTypeCache(t *testing.T) (map[string][]resource.Resource, resource.
 // IsRelatedActionable's RelatedResolved count>0 branch; a resolved zero is
 // genuinely a dead row).
 func isWitnessResult(result resource.RelatedCheckResult) bool {
-	if len(result.FetchFilter) > 0 {
-		return resource.IsRelatedActionable(result.State, result.Count, result.Truncated)
+	if len(result.FetchFilter()) > 0 {
+		return resource.IsRelatedActionable(result.State(), result.Count(), result.Truncated())
 	}
-	return result.Count > 0
+	return result.Count() > 0
 }
 
 // TestDemoPivotCoverage_EveryRegisteredPivotHasAWitness is the standing
@@ -232,8 +232,8 @@ func TestDemoPivotCoverage_EveryRegisteredPivotHasAWitness(t *testing.T) {
 				hasWitness := false
 				for _, res := range fixtures {
 					result := def.Checker(ctx, clients, res, cache)
-					if result.Count > maxCount {
-						maxCount = result.Count
+					if result.Count() > maxCount {
+						maxCount = result.Count()
 					}
 					if isWitnessResult(result) {
 						hasWitness = true

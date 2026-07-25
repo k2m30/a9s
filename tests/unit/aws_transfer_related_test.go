@@ -128,8 +128,8 @@ func TestRelated_Transfer_GraphRootCounts(t *testing.T) {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "transfer", tc.target)
 			result := checker(context.Background(), nil, res, resource.ResourceCache{})
-			if result.Count != tc.want {
-				t.Errorf("Count = %d, want %d (%s)", result.Count, tc.want, tc.field)
+			if result.Count() != tc.want {
+				t.Errorf("Count = %d, want %d (%s)", result.Count(), tc.want, tc.field)
 			}
 		})
 	}
@@ -144,8 +144,8 @@ func TestRelated_Transfer_LambdaOnAuthFixture(t *testing.T) {
 	res := transferResourceByID(t, fixtures.SftpLambdaAuthID)
 	checker := checkerByTarget(t, "transfer", "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (IdentityProviderDetails.Function)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (IdentityProviderDetails.Function)", result.Count())
 	}
 }
 
@@ -174,11 +174,11 @@ func TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent(t *testing.T) {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "transfer", tc.target)
 			result := checker(context.Background(), nil, res, resource.ResourceCache{})
-			if result.Count != tc.want {
-				t.Errorf("Count = %d, want %d", result.Count, tc.want)
+			if result.Count() != tc.want {
+				t.Errorf("Count = %d, want %d", result.Count(), tc.want)
 			}
-			if result.Err != nil {
-				t.Errorf("Err = %v, want nil", result.Err)
+			if result.Err() != nil {
+				t.Errorf("Err = %v, want nil", result.Err())
 			}
 		})
 	}
@@ -200,11 +200,11 @@ func TestRelated_Transfer_EIP_ZeroOnFixturesWithoutAddressAllocation(t *testing.
 	res := transferResourceByID(t, fixtures.SftpLambdaAuthID)
 	checker := checkerByTarget(t, "transfer", "eip")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no EndpointDetails.AddressAllocationIds on %s)", result.Count, fixtures.SftpLambdaAuthID)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no EndpointDetails.AddressAllocationIds on %s)", result.Count(), fixtures.SftpLambdaAuthID)
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil", result.Err())
 	}
 }
 
@@ -214,8 +214,8 @@ func TestRelated_Transfer_EIP_DegradedRowUnknown(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (degraded ListedServer row carries no EndpointDetails field)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (degraded ListedServer row carries no EndpointDetails field)", result.State())
 	}
 }
 
@@ -230,11 +230,11 @@ func TestRelated_Transfer_CtEvents_Drillable(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedDeferred {
+	if result.State() != domain.RelatedDeferred {
 		t.Errorf("State = %v, want RelatedDeferred (ct-events is a universal server-side pivot, drillable by resource name)",
-			result.State)
+			result.State())
 	}
-	if len(result.FetchFilter) == 0 {
+	if len(result.FetchFilter()) == 0 {
 		t.Error("FetchFilter is empty, want a CloudTrail LookupEvents filter keyed on the server id")
 	}
 }

@@ -25,7 +25,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	cfnList, truncated, err := amiRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -62,7 +62,7 @@ func checkAMIKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", ids)
 }
@@ -75,7 +75,7 @@ func checkAMIKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkAMING(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
+		return resource.KnownRelated("ng", nil, false)
 	}
 	ngList, truncated, err := amiRelatedResources(ctx, clients, cache, "ng")
 	if err != nil {

@@ -37,16 +37,16 @@ func TestRelated_EKS_Subnet_ReturnsSubnetIDs(t *testing.T) {
 	checker := eksCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	for _, want := range []string{subnet1, subnet2} {
 		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -64,8 +64,8 @@ func TestRelated_EKS_Subnet_ReturnsZeroWhenNoVpcConfig(t *testing.T) {
 	checker := eksCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil VpcConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil VpcConfig)", result.Count())
 	}
 }
 
@@ -85,8 +85,8 @@ func TestRelated_EKS_Subnet_ReturnsZeroWhenEmptySubnetIDs(t *testing.T) {
 	checker := eksCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty SubnetIds)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty SubnetIds)", result.Count())
 	}
 }
 
@@ -126,11 +126,11 @@ func TestRelated_EKS_ASG_MatchByNodeGroupClusterName(t *testing.T) {
 	checker := eksCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != asgName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, asgName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != asgName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), asgName)
 	}
 }
 
@@ -165,8 +165,8 @@ func TestRelated_EKS_ASG_NoMatchDifferentCluster(t *testing.T) {
 	checker := eksCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different cluster)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different cluster)", result.Count())
 	}
 }
 
@@ -217,18 +217,18 @@ func TestRelated_EKS_ASG_DeduplicatesAcrossNodeGroups(t *testing.T) {
 	checker := eksCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2; ResourceIDs: %v", result.Count, result.ResourceIDs)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2; ResourceIDs: %v", result.Count(), result.ResourceIDs())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	if !seen[asg1] {
-		t.Errorf("ResourceIDs missing %q; got %v", asg1, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing %q; got %v", asg1, result.ResourceIDs())
 	}
 	if !seen[asg2] {
-		t.Errorf("ResourceIDs missing %q; got %v", asg2, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing %q; got %v", asg2, result.ResourceIDs())
 	}
 }
 
@@ -267,11 +267,11 @@ func TestRelated_EKS_CTEvents_MatchByResourceName(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != eventID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, eventID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != eventID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), eventID)
 	}
 }
 
@@ -305,8 +305,8 @@ func TestRelated_EKS_CTEvents_NoMatchDifferentCluster(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (different cluster in event)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (different cluster in event)", result.Count())
 	}
 }
 
@@ -334,8 +334,8 @@ func TestRelated_EKS_CTEvents_SkipsWrongRawStructEvent(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct skipped)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct skipped)", result.Count())
 	}
 }
 
@@ -373,10 +373,10 @@ func TestRelated_EKS_ASG_NilClientFallsBackToCache(t *testing.T) {
 	checker := eksCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (nil client, ng cache used)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (nil client, ng cache used)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != asgName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, asgName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != asgName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), asgName)
 	}
 }

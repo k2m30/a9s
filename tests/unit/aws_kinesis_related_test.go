@@ -65,14 +65,14 @@ func TestRelated_Kinesis_Alarms_Found(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "kinesis-iterator-age" {
-		t.Errorf("ResourceIDs = %v, want [kinesis-iterator-age]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "kinesis-iterator-age" {
+		t.Errorf("ResourceIDs = %v, want [kinesis-iterator-age]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -102,8 +102,8 @@ func TestRelated_Kinesis_Alarms_NotFound(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -119,8 +119,8 @@ func TestRelated_Kinesis_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -159,11 +159,11 @@ func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-clickstream" {
-		t.Errorf("ResourceIDs = %v, want [process-clickstream]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "process-clickstream" {
+		t.Errorf("ResourceIDs = %v, want [process-clickstream]", result.ResourceIDs())
 	}
 	if fake.calls != 1 {
 		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
@@ -210,11 +210,11 @@ func TestRelated_Kinesis_Lambda_MappedFnNotInCache_FallsBackToARNBareName(t *tes
 
 	checker := kinesisCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, source, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (the API-confirmed mapping is authoritative even though its function isn't the one cached — union contract)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (the API-confirmed mapping is authoritative even though its function isn't the one cached — union contract)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-clickstream" {
-		t.Errorf("ResourceIDs = %v, want [process-clickstream] (bare function name parsed from the cache-missing mapping's own ARN, and nothing else)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "process-clickstream" {
+		t.Errorf("ResourceIDs = %v, want [process-clickstream] (bare function name parsed from the cache-missing mapping's own ARN, and nothing else)", result.ResourceIDs())
 	}
 	if fake.calls != 1 {
 		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
@@ -232,8 +232,8 @@ func TestRelated_Kinesis_Lambda_CacheMissNoClients(t *testing.T) {
 	}
 	checker := kinesisCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (cache miss, no clients)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (cache miss, no clients)", result.State())
 	}
 }
 
@@ -246,11 +246,11 @@ func TestRelated_Kinesis_CFN_Unknown(t *testing.T) {
 	}
 	checker := kinesisCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (tags need ListTagsForStream enrichment)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (tags need ListTagsForStream enrichment)", result.Count())
 	}
-	if result.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	if result.TargetType() != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cfn")
 	}
 }
 
@@ -297,14 +297,14 @@ func TestRelated_Kinesis_DDB_Match(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), clients, kinesisSourceResource(streamName, streamARN), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != tableName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, tableName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != tableName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tableName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -328,10 +328,10 @@ func TestRelated_Kinesis_DDB_Match_Truncated(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), clients, kinesisSourceResource(streamName, streamARN), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (cache is truncated)")
 	}
 }
@@ -356,8 +356,8 @@ func TestRelated_Kinesis_DDB_Empty(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), clients, kinesisSourceResource(streamName, streamARN), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (table streams to a different Kinesis stream)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (table streams to a different Kinesis stream)", result.Count())
 	}
 }
 
@@ -373,8 +373,8 @@ func TestRelated_Kinesis_DDB_NoStreamARN(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no stream ARN field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no stream ARN field)", result.Count())
 	}
 }
 
@@ -392,8 +392,8 @@ func TestRelated_Kinesis_DDB_NoClient(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), nil, kinesisSourceResource("clickstream-ingest", streamARN), cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no DynamoDB client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no DynamoDB client)", result.Count())
 	}
 }
 
@@ -412,8 +412,8 @@ func TestRelated_Kinesis_DDB_FetchFilter(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), clients, kinesisSourceResource("clickstream-ingest", streamARN), cache)
 
-	if len(result.FetchFilter) != 0 {
-		t.Errorf("FetchFilter = %v, want empty (reverse-scan checkers must not set FetchFilter)", result.FetchFilter)
+	if len(result.FetchFilter()) != 0 {
+		t.Errorf("FetchFilter = %v, want empty (reverse-scan checkers must not set FetchFilter)", result.FetchFilter())
 	}
 }
 
@@ -441,11 +441,11 @@ func TestRelated_Kinesis_CFN_FoundViaTags(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "data-platform-stack" {
-		t.Errorf("ResourceIDs = %v, want [data-platform-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "data-platform-stack" {
+		t.Errorf("ResourceIDs = %v, want [data-platform-stack]", result.ResourceIDs())
 	}
 }
 
@@ -467,8 +467,8 @@ func TestRelated_Kinesis_CFN_NoMatchingStack(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stack not in cache)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (stack not in cache)", result.Count())
 	}
 }
 
@@ -490,8 +490,8 @@ func TestRelated_Kinesis_CFN_NoTag(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no cfn tag on stream)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn tag on stream)", result.Count())
 	}
 }
 
@@ -517,12 +517,12 @@ func TestRelated_Kinesis_KMS_Present(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (KMS key present)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (KMS key present)", result.Count())
 	}
 	// Bare alias, no ARN prefix: kmsKeyIDFromField returns it unchanged in full.
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alias/aws/kinesis/mrk-abc1234" {
-		t.Errorf("ResourceIDs = %v, want [alias/aws/kinesis/mrk-abc1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "alias/aws/kinesis/mrk-abc1234" {
+		t.Errorf("ResourceIDs = %v, want [alias/aws/kinesis/mrk-abc1234]", result.ResourceIDs())
 	}
 }
 
@@ -538,8 +538,8 @@ func TestRelated_Kinesis_KMS_Absent(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count())
 	}
 }
 
@@ -557,10 +557,10 @@ func TestRelated_Kinesis_KMS_BareKeyID(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (bare key ID)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (bare key ID)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != bareKeyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bareKeyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != bareKeyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), bareKeyID)
 	}
 }

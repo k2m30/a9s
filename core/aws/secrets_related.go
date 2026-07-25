@@ -21,10 +21,10 @@ import (
 func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	val := *secret.KmsKeyId
 	idx := strings.LastIndex(val, "/")
@@ -34,7 +34,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 		// Bare key ID (no ARN prefix)
 		keyID = val
 	case idx == len(val)-1:
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	default:
 		keyID = val[idx+1:]
 	}
@@ -63,15 +63,15 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	arn := *secret.RotationLambdaARN
 	idx := strings.LastIndex(arn, ":")
 	if idx < 0 || idx == len(arn)-1 {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	funcName := arn[idx+1:]
 
@@ -97,7 +97,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := secretsCFNStackName(res)
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -148,7 +148,7 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 		secretARN = res.Fields["arn"]
 	}
 	if secretARN == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+		return resource.KnownRelated("dbi", nil, false)
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
@@ -204,7 +204,7 @@ func secretIdentifiers(res resource.Resource) (arn, name string) {
 func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secretARN, secretName := secretIdentifiers(res)
 	if secretARN == "" && secretName == "" {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
+		return resource.KnownRelated("cb", nil, false)
 	}
 
 	cbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cb")

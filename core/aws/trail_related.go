@@ -17,7 +17,7 @@ import (
 func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.S3BucketName == nil || *trail.S3BucketName == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	bucketName := *trail.S3BucketName
 
@@ -45,12 +45,12 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsLogGroupArn == nil || *trail.CloudWatchLogsLogGroupArn == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logGroupName := parseTrailLogGroupName(*trail.CloudWatchLogsLogGroupArn)
 	if logGroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -75,7 +75,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.SnsTopicARN == nil || *trail.SnsTopicARN == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	topicARN := *trail.SnsTopicARN
 
@@ -101,7 +101,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.KmsKeyId == nil || *trail.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	kmsRef := *trail.KmsKeyId
 
@@ -132,13 +132,13 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 func checkTrailRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsRoleArn == nil || *trail.CloudWatchLogsRoleArn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *trail.CloudWatchLogsRoleArn
 	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
 		return relatedResult("role", []string{arn[idx+1:]})
 	}
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	return resource.KnownRelated("role", nil, false)
 }
 
 // parseTrailLogGroupName extracts the log group name from a CloudWatch Logs ARN.

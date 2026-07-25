@@ -88,14 +88,14 @@ func TestRelated_APIGW_Logs_MatchByExecutionLogPattern(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "API-Gateway-Execution-Logs_abc123/prod" {
-		t.Errorf("ResourceIDs = %v, want [API-Gateway-Execution-Logs_abc123/prod]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "API-Gateway-Execution-Logs_abc123/prod" {
+		t.Errorf("ResourceIDs = %v, want [API-Gateway-Execution-Logs_abc123/prod]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -117,14 +117,14 @@ func TestRelated_APIGW_Logs_MatchByAccessLogPattern(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/apigateway/my-api" {
-		t.Errorf("ResourceIDs = %v, want [/aws/apigateway/my-api]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/apigateway/my-api" {
+		t.Errorf("ResourceIDs = %v, want [/aws/apigateway/my-api]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -146,8 +146,8 @@ func TestRelated_APIGW_Logs_NoMatch(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -162,8 +162,8 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
 
@@ -181,11 +181,11 @@ func TestRelated_APIGW_Lambda_Unknown(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (integration targets via GetIntegrations)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (integration targets via GetIntegrations)", result.State())
 	}
-	if result.TargetType != "lambda" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	if result.TargetType() != "lambda" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "lambda")
 	}
 }
 
@@ -194,8 +194,8 @@ func TestRelated_APIGW_Lambda_EmptyInput(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := apigwCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty API id)", result.Count())
 	}
 }
 
@@ -228,14 +228,14 @@ func TestRelated_Apigw_KMS_Match(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 {
-		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 {
+		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs())
 	}
-	if result.ResourceIDs[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
-		t.Errorf("ResourceIDs[0] = %q, want key UUID", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
+		t.Errorf("ResourceIDs[0] = %q, want key UUID", result.ResourceIDs()[0])
 	}
 }
 
@@ -246,8 +246,8 @@ func TestRelated_Apigw_KMS_EmptyInput(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count())
 	}
 }
 
@@ -261,8 +261,8 @@ func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -358,17 +358,17 @@ func TestCheckApigwACM_ResolvesCertArn(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 {
-		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 {
+		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs())
 	}
-	if result.ResourceIDs[0] != "cert-A" {
-		t.Errorf("ResourceIDs[0] = %q, want \"cert-A\" (last ARN segment)", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "cert-A" {
+		t.Errorf("ResourceIDs[0] = %q, want \"cert-A\" (last ARN segment)", result.ResourceIDs()[0])
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -385,11 +385,11 @@ func TestCheckApigwACM_NoDomains(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no domains → no cert pivots)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no domains → no cert pivots)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -402,8 +402,8 @@ func TestCheckApigwACM_ClientMissing(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil APIGatewayV2 client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil APIGatewayV2 client)", result.Count())
 	}
 }
 

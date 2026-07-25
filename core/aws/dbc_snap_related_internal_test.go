@@ -91,13 +91,13 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheReturnsUnknown(t *testing.T) {
 
 	// Must return UnknownRelated shape: Count=-1, TargetType="backup".
 	// This is the key assertion — current (buggy) code returns Count=0.
-	if result.TargetType != "backup" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
+	if result.TargetType() != "backup" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "backup")
 	}
-	if result.State != domain.RelatedUnknown {
+	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (UnknownRelated — dbc truncated, parent not in visible window)\n"+
 			"NOTE: this test fails until the coder's fix to checkDbcSnapBackup is shipped",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -146,15 +146,15 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheButParentResolved(t *testing.T) {
 
 	// Parent was found in the visible window — backup scan must proceed.
 	// The plan covers the parent ARN → Count=1.
-	if result.TargetType != "backup" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
+	if result.TargetType() != "backup" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "backup")
 	}
-	if result.State == domain.RelatedUnknown {
+	if result.State() == domain.RelatedUnknown {
 		t.Errorf("Count = -1 (Unknown), but parent was resolved — should scan backup plans normally")
 	}
 	// Verify the plan was found (Count should be 1).
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (plan %q covers parent ARN)", result.Count, planID)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (plan %q covers parent ARN)", result.Count(), planID)
 	}
 }
 
@@ -176,14 +176,14 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 		res := resource.Resource{ID: "snap-1", RawStruct: snap}
 		result := checkDbcSnapDBC(context.Background(), nil, res, emptyCache)
-		if result.TargetType != "dbc" {
-			t.Errorf("TargetType = %q, want dbc", result.TargetType)
+		if result.TargetType() != "dbc" {
+			t.Errorf("TargetType = %q, want dbc", result.TargetType())
 		}
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != parentID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, parentID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != parentID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), parentID)
 		}
 	})
 
@@ -193,11 +193,11 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 		res := resource.Resource{ID: "snap-2", RawStruct: snap}
 		result := checkDbcSnapDBC(context.Background(), nil, res, emptyCache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != parentID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, parentID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != parentID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), parentID)
 		}
 	})
 
@@ -205,8 +205,8 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{DBClusterIdentifier: nil}
 		res := resource.Resource{ID: "snap-3", RawStruct: snap}
 		result := checkDbcSnapDBC(context.Background(), nil, res, emptyCache)
-		if result.Count != 0 {
-			t.Errorf("Count = %d, want 0 for nil identifier", result.Count)
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0 for nil identifier", result.Count())
 		}
 	})
 
@@ -215,14 +215,14 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{KmsKeyId: aws.String(kmsARN)}
 		res := resource.Resource{ID: "snap-4", RawStruct: snap}
 		result := checkDbcSnapKMS(context.Background(), nil, res, emptyCache)
-		if result.TargetType != "kms" {
-			t.Errorf("TargetType = %q, want kms", result.TargetType)
+		if result.TargetType() != "kms" {
+			t.Errorf("TargetType = %q, want kms", result.TargetType())
 		}
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != kmsUUID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, kmsUUID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != kmsUUID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), kmsUUID)
 		}
 	})
 
@@ -230,11 +230,11 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		snap := rdstypes.DBClusterSnapshot{KmsKeyId: aws.String(kmsARN)}
 		res := resource.Resource{ID: "snap-5", RawStruct: snap}
 		result := checkDbcSnapKMS(context.Background(), nil, res, emptyCache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != kmsUUID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, kmsUUID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != kmsUUID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), kmsUUID)
 		}
 	})
 
@@ -242,8 +242,8 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{KmsKeyId: nil}
 		res := resource.Resource{ID: "snap-6", RawStruct: snap}
 		result := checkDbcSnapKMS(context.Background(), nil, res, emptyCache)
-		if result.Count != 0 {
-			t.Errorf("Count = %d, want 0 when KmsKeyId nil", result.Count)
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0 when KmsKeyId nil", result.Count())
 		}
 	})
 
@@ -252,14 +252,14 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{VpcId: aws.String(vpcID)}
 		res := resource.Resource{ID: "snap-7", RawStruct: snap}
 		result := checkDbcSnapVPC(context.Background(), nil, res, emptyCache)
-		if result.TargetType != "vpc" {
-			t.Errorf("TargetType = %q, want vpc", result.TargetType)
+		if result.TargetType() != "vpc" {
+			t.Errorf("TargetType = %q, want vpc", result.TargetType())
 		}
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != vpcID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, vpcID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != vpcID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), vpcID)
 		}
 	})
 
@@ -267,11 +267,11 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		snap := rdstypes.DBClusterSnapshot{VpcId: aws.String(vpcID)}
 		res := resource.Resource{ID: "snap-8", RawStruct: snap}
 		result := checkDbcSnapVPC(context.Background(), nil, res, emptyCache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != vpcID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, vpcID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != vpcID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), vpcID)
 		}
 	})
 

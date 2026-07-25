@@ -552,7 +552,7 @@ func (s *fullIntegrationScenario) ExpectRelatedCount(displayName string, want in
 	if !ok {
 		s.failf("related row %q was not observed; got %v", displayName, s.relatedNames())
 	}
-	got := msg.Result.Count
+	got := msg.Result.Count()
 	if got != want {
 		s.failf("related row %q count = %d, expected %d", displayName, got, want)
 	}
@@ -691,8 +691,8 @@ func (s *fullIntegrationScenario) ExpectRelatedRowCountAtLeast(displayName strin
 		s.failf("related row %q was not observed; got %v", displayName, s.relatedNames())
 		return
 	}
-	if msg.Result.Count < n {
-		s.failf("related row %q count = %d, expected at least %d", displayName, msg.Result.Count, n)
+	if msg.Result.Count() < n {
+		s.failf("related row %q count = %d, expected at least %d", displayName, msg.Result.Count(), n)
 	}
 }
 
@@ -887,8 +887,8 @@ func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) message
 		TargetType:     targetType,
 		SourceResource: *s.currentResource,
 		SourceType:     s.currentResourceType,
-		RelatedIDs:     append([]string(nil), msg.Result.ResourceIDs...),
-		FetchFilter:    cloneStringMap(msg.Result.FetchFilter),
+		RelatedIDs:     append([]string(nil), msg.Result.ResourceIDs()...),
+		FetchFilter:    cloneStringMap(msg.Result.FetchFilter()),
 	}
 }
 
@@ -986,7 +986,7 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 	if !ok {
 		s.failf("DrillRelated(%q): row was not observed in lastRelatedByName; got %v", displayName, s.relatedNames())
 	}
-	if msg.Result.Count < 1 && len(msg.Result.ResourceIDs) == 0 && len(msg.Result.FetchFilter) == 0 {
+	if msg.Result.Count() < 1 && len(msg.Result.ResourceIDs()) == 0 && len(msg.Result.FetchFilter()) == 0 {
 		s.failf("DrillRelated(%q): Count=0 and no ResourceIDs/FetchFilter — cannot drill an empty pivot", displayName)
 	}
 

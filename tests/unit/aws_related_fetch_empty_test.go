@@ -109,10 +109,10 @@ func TestRelated_EC2_Alarm_FetchSucceeds_ZeroAlarms_ResolvesToZero(t *testing.T)
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.State != domain.RelatedResolved {
-		t.Errorf("checkEC2Alarms with 0-alarm successful fetch: State = %v, want RelatedResolved (renders \"(0)\")", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("checkEC2Alarms with 0-alarm successful fetch: State = %v, want RelatedResolved (renders \"(0)\")", result.State())
 	}
-	if result.Count != 0 {
-		t.Errorf("checkEC2Alarms with 0-alarm successful fetch: Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("checkEC2Alarms with 0-alarm successful fetch: Count = %d, want 0", result.Count())
 	}
 }

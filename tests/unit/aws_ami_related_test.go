@@ -41,11 +41,11 @@ func TestRelated_AMI_EC2_Found(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0instance1" {
-		t.Errorf("ResourceIDs = %v, want [i-0instance1]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0instance1" {
+		t.Errorf("ResourceIDs = %v, want [i-0instance1]", result.ResourceIDs())
 	}
 }
 
@@ -60,8 +60,8 @@ func TestRelated_AMI_EC2_NotFound(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -70,8 +70,8 @@ func TestRelated_AMI_EC2_CacheMissNoClients(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -80,8 +80,8 @@ func TestRelated_AMI_EC2_EmptyAMIID(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty AMI ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty AMI ID", result.Count())
 	}
 }
 
@@ -100,11 +100,11 @@ func TestRelated_AMI_EBSSnaps_Found(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != snapID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, snapID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != snapID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), snapID)
 	}
 }
 
@@ -118,8 +118,8 @@ func TestRelated_AMI_EBSSnaps_NoSnapshots(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -129,8 +129,8 @@ func TestRelated_AMI_EBSSnaps_InvalidRawStruct(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -175,14 +175,14 @@ func TestRelated_AMI_ASG_MatchViaRunningInstances(t *testing.T) {
 	checker := amiCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "web-asg" {
-		t.Errorf("ResourceIDs = %v, want [web-asg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "web-asg" {
+		t.Errorf("ResourceIDs = %v, want [web-asg]", result.ResourceIDs())
 	}
-	if result.TargetType != "asg" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "asg")
+	if result.TargetType() != "asg" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "asg")
 	}
 }
 
@@ -206,8 +206,8 @@ func TestRelated_AMI_ASG_NoMatch(t *testing.T) {
 	source := resource.Resource{ID: "ami-0abc1234def56789"}
 	checker := amiCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -216,8 +216,8 @@ func TestRelated_AMI_ASG_EmptyAMIID(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := amiCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for empty AMI ID", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for empty AMI ID", result.Count())
 	}
 }
 
@@ -227,8 +227,8 @@ func TestRelated_AMI_ASG_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "ami-0abc1234def56789"}
 	checker := amiCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -253,11 +253,11 @@ func TestRelated_AMI_CFN_MatchByTag(t *testing.T) {
 	checker := amiCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != stackName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, stackName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != stackName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), stackName)
 	}
 }
 
@@ -278,8 +278,8 @@ func TestRelated_AMI_CFN_NoTag(t *testing.T) {
 	checker := amiCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count())
 	}
 }
 
@@ -302,8 +302,8 @@ func TestRelated_AMI_CFN_TagMatchMissCache(t *testing.T) {
 	checker := amiCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stack name not in cache)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (stack name not in cache)", result.Count())
 	}
 }
 
@@ -321,8 +321,8 @@ func TestRelated_AMI_CFN_CacheMissNoClients(t *testing.T) {
 	checker := amiCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 
@@ -343,11 +343,11 @@ func TestRelated_AMI_KMS_MatchByARN(t *testing.T) {
 	checker := amiCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyARN)
 	}
 }
 
@@ -367,8 +367,8 @@ func TestRelated_AMI_KMS_Deduplicated(t *testing.T) {
 	checker := amiCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count())
 	}
 }
 
@@ -384,8 +384,8 @@ func TestRelated_AMI_KMS_NoEncryptedVolumes(t *testing.T) {
 	checker := amiCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no encrypted volumes)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no encrypted volumes)", result.Count())
 	}
 }
 
@@ -397,8 +397,8 @@ func TestRelated_AMI_KMS_InvalidRawStruct(t *testing.T) {
 	checker := amiCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
 
@@ -426,11 +426,11 @@ func TestRelated_AMI_NG_MatchByImageIDField(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-eks-ng" {
-		t.Errorf("ResourceIDs = %v, want [acme-eks-ng]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-eks-ng" {
+		t.Errorf("ResourceIDs = %v, want [acme-eks-ng]", result.ResourceIDs())
 	}
 }
 
@@ -447,8 +447,8 @@ func TestRelated_AMI_NG_NoMatch(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -460,8 +460,8 @@ func TestRelated_AMI_NG_EmptyAMIID(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty AMI ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty AMI ID)", result.Count())
 	}
 }
 
@@ -473,7 +473,7 @@ func TestRelated_AMI_NG_CacheMissNoClients(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }

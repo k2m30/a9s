@@ -65,10 +65,11 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 				atomic.AddInt32(&checkerCallCount, 1)
 				capturedCache = cache
 				entry := cache[targetType]
-				return resource.RelatedCheckResult{
-					TargetType: targetType,
-					Count:      len(entry.Resources),
+				ids := make([]string, len(entry.Resources))
+				for i, r := range entry.Resources {
+					ids[i] = r.ID
 				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -115,12 +116,8 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GE Target",
-		Result: resource.RelatedCheckResult{
-			TargetType:  targetType,
-			Count:       1,
-			ResourceIDs: []string{lazyRes.ID},
-		},
-		OperationID: 0,
+		Result:           resource.KnownRelated(targetType, []string{lazyRes.ID}, false),
+		OperationID:      0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {lazyRes},
 		},
@@ -207,10 +204,12 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				atomic.AddInt32(&checkerCallCount, 1)
 				capturedCache = cache
-				return resource.RelatedCheckResult{
-					TargetType: targetType,
-					Count:      len(cache[targetType].Resources),
+				entry := cache[targetType]
+				ids := make([]string, len(entry.Resources))
+				for i, r := range entry.Resources {
+					ids[i] = r.ID
 				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -261,11 +260,8 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GE2 Target",
-		Result: resource.RelatedCheckResult{
-			TargetType: targetType,
-			Count:      1,
-		},
-		OperationID: 0,
+		Result:           resource.KnownRelated(targetType, []string{"ge2-lazy-001"}, false),
+		OperationID:      0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {{ID: "ge2-lazy-001", Name: "ge2-lazy-001"}},
 		},

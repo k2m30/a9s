@@ -55,9 +55,9 @@ func TestS3_Role_MalformedPolicyJSON_Count0(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — malformed bucket-policy JSON must parse to zero principals, not fail the checker",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -76,8 +76,8 @@ func TestS3_Role_WildcardPrincipal_Count0(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 — Principal:\"*\" at statement root must not resolve to any role", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 — Principal:\"*\" at statement root must not resolve to any role", result.Count())
 	}
 }
 
@@ -96,8 +96,8 @@ func TestS3_Role_ServicePrincipalOnly_Count0(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 — service principals are not IAM roles and must not match", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 — service principals are not IAM roles and must not match", result.Count())
 	}
 }
 
@@ -137,12 +137,12 @@ func TestS3_Role_MixedAWSPrincipalList_FiltersToRolesOnly(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 — only the one role ARN in a mixed principal list should resolve", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 — only the one role ARN in a mixed principal list should resolve", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "target-role" {
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "target-role" {
 		t.Errorf("ResourceIDs = %v, want [target-role] — user/root/wildcard principals must not leak into the role pivot",
-			result.ResourceIDs)
+			result.ResourceIDs())
 	}
 }
 
@@ -162,9 +162,9 @@ func TestS3_Role_RoleARNNotInCache_DroppedFromResults(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count != 0 {
+	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — a role ARN that doesn't resolve in the local cache must be dropped, not surfaced",
-			result.Count)
+			result.Count())
 	}
 }
 
@@ -184,8 +184,8 @@ func TestS3_Role_ServiceRolePath_StripsToBareName(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 — role ARN under /service-role/<name> path must resolve to bare name %q",
-			result.Count, "lambda-s3-reader")
+			result.Count(), "lambda-s3-reader")
 	}
 }

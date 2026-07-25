@@ -87,10 +87,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 			NeedsTargetCache: true,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				atomic.AddInt32(&checkerCallCount, 1)
-				return resource.RelatedCheckResult{
-					TargetType: targetType,
-					Count:      0,
-				}
+				return resource.KnownRelated(targetType, nil, false)
 			},
 		},
 	})
@@ -112,12 +109,8 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GF Target",
-		Result: resource.RelatedCheckResult{
-			TargetType:  targetType,
-			Count:       1,
-			ResourceIDs: []string{lazyRes.ID},
-		},
-		OperationID: 0,
+		Result:           resource.KnownRelated(targetType, []string{lazyRes.ID}, false),
+		OperationID:      0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {lazyRes},
 		},
@@ -220,11 +213,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 			TargetType:  targetType,
 			DisplayName: "GG Target",
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       2,
-					ResourceIDs: []string{"gg-k1", "gg-k2"},
-				}
+				return resource.KnownRelated(targetType, []string{"gg-k1", "gg-k2"}, false)
 			},
 		},
 	})
@@ -250,12 +239,8 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GG Target",
-		Result: resource.RelatedCheckResult{
-			TargetType:  targetType,
-			Count:       2,
-			ResourceIDs: []string{"gg-k1", "gg-k2"},
-		},
-		OperationID: 0,
+		Result:           resource.KnownRelated(targetType, []string{"gg-k1", "gg-k2"}, false),
+		OperationID:      0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {k1Res}, // only k1, k2 is missing
 		},

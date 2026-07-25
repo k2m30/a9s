@@ -54,11 +54,7 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				// Checker emits 5 IDs; only 3 will resolve.
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       5,
-					ResourceIDs: []string{"id-001", "id-002", "id-003", "id-004", "id-005"},
-				}
+				return resource.KnownRelated(targetType, []string{"id-001", "id-002", "id-003", "id-004", "id-005"}, false)
 			},
 		},
 	})
@@ -99,14 +95,14 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 	}
 
 	// Checker-emitted count must pass through unchanged (5, not 3).
-	if resultMsg.Result.Count != 5 {
+	if resultMsg.Result.Count() != 5 {
 		t.Errorf("Result.Count: got %d, want 5 (checker count must not be revised by partial resolution)",
-			resultMsg.Result.Count)
+			resultMsg.Result.Count())
 	}
 
 	// ResourceIDs on the result carry the checker's full declared set.
-	if len(resultMsg.Result.ResourceIDs) != 5 {
-		t.Errorf("Result.ResourceIDs: got %d IDs, want 5", len(resultMsg.Result.ResourceIDs))
+	if len(resultMsg.Result.ResourceIDs()) != 5 {
+		t.Errorf("Result.ResourceIDs(): got %d IDs, want 5", len(resultMsg.Result.ResourceIDs()))
 	}
 
 	// LazyAddedResources must contain only the 3 resolvable entries.
@@ -172,11 +168,7 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 			DisplayName:      "LA-024 Policy Test Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{policyARN},
-				}
+				return resource.KnownRelated(targetType, []string{policyARN}, false)
 			},
 		},
 	})
@@ -221,8 +213,8 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 	}
 
 	// Count must survive.
-	if resultMsg.Result.Count != 1 {
-		t.Errorf("Result.Count: got %d, want 1", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 1 {
+		t.Errorf("Result.Count: got %d, want 1", resultMsg.Result.Count())
 	}
 
 	// LazyAddedResources must contain the partial row.
@@ -306,11 +298,7 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 			DisplayName:      "LA-060 Count Equality Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       7,
-					ResourceIDs: ids,
-				}
+				return resource.KnownRelated(targetType, ids, false)
 			},
 		},
 	})
@@ -343,11 +331,11 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 	}
 
 	// All three cardinalities must agree: declared count, ID list, and fetched rows.
-	if resultMsg.Result.Count != 7 {
-		t.Errorf("Result.Count: got %d, want 7", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 7 {
+		t.Errorf("Result.Count: got %d, want 7", resultMsg.Result.Count())
 	}
-	if len(resultMsg.Result.ResourceIDs) != 7 {
-		t.Errorf("len(Result.ResourceIDs): got %d, want 7", len(resultMsg.Result.ResourceIDs))
+	if len(resultMsg.Result.ResourceIDs()) != 7 {
+		t.Errorf("len(Result.ResourceIDs()): got %d, want 7", len(resultMsg.Result.ResourceIDs()))
 	}
 	lazy, ok := resultMsg.LazyAddedResources[targetType]
 	if !ok {

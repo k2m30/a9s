@@ -26,7 +26,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
+		return resource.KnownRelated("eks", nil, false)
 	}
 
 	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
@@ -51,10 +51,10 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	if ng.NodeRole == nil || *ng.NodeRole == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	// In-body: the node group's NodeRole ARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
@@ -66,10 +66,10 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 	if ng.Resources == nil || len(ng.Resources.AutoScalingGroups) == 0 {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 
 	asgNames := make(map[string]struct{}, len(ng.Resources.AutoScalingGroups))
@@ -79,7 +79,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(asgNames) == 0 {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.KnownRelated("asg", nil, false)
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -111,7 +111,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
@@ -175,7 +175,7 @@ func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 	}
 	if ng.Resources == nil || ng.Resources.RemoteAccessSecurityGroup == nil ||
 		*ng.Resources.RemoteAccessSecurityGroup == "" {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	return relatedResult("sg", []string{*ng.Resources.RemoteAccessSecurityGroup})
 }
@@ -190,7 +190,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
 		// Managed NG without custom LT — AMI resolution via SSM deferred.
-		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		return resource.KnownRelated("ami", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -214,7 +214,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 		// fetch failure: there is no AMI for this NG to relate to.
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidLaunchTemplateId.NotFound" {
-			return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+			return resource.KnownRelated("ami", nil, false)
 		}
 		return resource.ErrorRelated("ami", err)
 	}
@@ -223,7 +223,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 			return relatedResult("ami", []string{*v.LaunchTemplateData.ImageId})
 		}
 	}
-	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+	return resource.KnownRelated("ami", nil, false)
 }
 
 // checkNGEBS scans the EC2 instance cache for instances tagged with this node
@@ -235,7 +235,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
+		return resource.KnownRelated("ebs", nil, false)
 	}
 
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
@@ -275,7 +275,7 @@ func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", ids)
 }

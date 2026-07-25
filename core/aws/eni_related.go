@@ -18,10 +18,10 @@ import (
 func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	if raw.Attachment == nil || raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 	// In-body: the ENI's Attachment.InstanceId IS the related instance.
 	return relatedResult("ec2", []string{*raw.Attachment.InstanceId})
@@ -32,7 +32,7 @@ func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	// In-body: the ENI's own Groups[].GroupId are the related security groups.
 	var ids []string
@@ -49,10 +49,10 @@ func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+		return resource.KnownRelated("eip", nil, false)
 	}
 	if raw.Association == nil || raw.Association.AllocationId == nil || *raw.Association.AllocationId == "" {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+		return resource.KnownRelated("eip", nil, false)
 	}
 	// In-body: Association.AllocationId IS the eip resource id (eip keyed by AllocationId).
 	return relatedResult("eip", []string{*raw.Association.AllocationId})
@@ -63,7 +63,7 @@ func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENIVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
@@ -75,7 +75,7 @@ func checkENISubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", []string{*raw.SubnetId})
 }
@@ -92,7 +92,7 @@ func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	// ELB-owned ENIs are marked by RequesterId "amazon-elb" and their
 	// Description starts with "ELB " — the name segment follows.
 	if raw.RequesterId == nil || *raw.RequesterId != "amazon-elb" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	if raw.Description == nil || *raw.Description == "" {
 		// ENI is owned by ELB but no description — the specific ELB cannot be
@@ -102,12 +102,12 @@ func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	desc := *raw.Description
 	// Example: "ELB app/my-alb/abcdef1234567890"
 	if !strings.HasPrefix(desc, "ELB ") {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	rest := desc[4:]
 	parts := strings.Split(rest, "/")
 	if len(parts) < 2 || parts[1] == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	return relatedResult("elb", []string{parts[1]})
 }
@@ -132,7 +132,7 @@ func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.
 	}
 	// Not Lambda-owned → no relationship.
 	if !isLambdaENI(reqID, desc) {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	// Parse function name from Description: "AWS Lambda VPC ENI-<name>-<uuid>".
 	name := lambdaFunctionNameFromENIDescription(desc)
@@ -173,7 +173,7 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 		eniID = *raw.NetworkInterfaceId
 	}
 	if eniID == "" {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
+		return resource.KnownRelated("nat", nil, false)
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -209,7 +209,7 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		eniID = *raw.NetworkInterfaceId
 	}
 	if eniID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+		return resource.KnownRelated("vpce", nil, false)
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")

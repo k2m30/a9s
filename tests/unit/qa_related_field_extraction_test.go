@@ -84,14 +84,14 @@ func TestRelatedFieldExtraction_EC2_VPC_ReturnsVpcID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -103,11 +103,11 @@ func TestRelatedFieldExtraction_EC2_VPC_ReturnsZeroWhenFieldMissing(t *testing.T
 	checker := fieldExtractionChecker(t, "ec2", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (missing vpc_id field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (missing vpc_id field)", result.Count())
 	}
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
 }
 
@@ -119,8 +119,8 @@ func TestRelatedFieldExtraction_EC2_VPC_ReturnsZeroWhenNilFields(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Fields map)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Fields map)", result.Count())
 	}
 }
 
@@ -135,14 +135,14 @@ func TestRelatedFieldExtraction_ELB_VPC_ReturnsVpcID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "elb", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -154,8 +154,8 @@ func TestRelatedFieldExtraction_ELB_VPC_ReturnsZeroWhenFieldMissing(t *testing.T
 	checker := fieldExtractionChecker(t, "elb", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (missing vpc_id field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (missing vpc_id field)", result.Count())
 	}
 }
 
@@ -175,14 +175,14 @@ func TestRelatedFieldExtraction_DBI_VPC_ReturnsVpcID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbi", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -195,8 +195,8 @@ func TestRelatedFieldExtraction_DBI_VPC_ReturnsZeroWhenNilSubnetGroup(t *testing
 	checker := fieldExtractionChecker(t, "dbi", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil DBSubnetGroup)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil DBSubnetGroup)", result.Count())
 	}
 }
 
@@ -211,8 +211,8 @@ func TestRelatedFieldExtraction_DBI_VPC_ReturnsZeroWhenNilVpcID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbi", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil VpcId in DBSubnetGroup)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil VpcId in DBSubnetGroup)", result.Count())
 	}
 }
 
@@ -224,8 +224,8 @@ func TestRelatedFieldExtraction_DBI_VPC_ReturnsZeroWhenNilRawStruct(t *testing.T
 	checker := fieldExtractionChecker(t, "dbi", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RawStruct yields type assertion failure)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RawStruct yields type assertion failure)", result.Count())
 	}
 }
 
@@ -243,14 +243,14 @@ func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsVpcID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
-		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -263,8 +263,8 @@ func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsZeroWhenNilVpcID(t *testing.T
 	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil VpcId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil VpcId)", result.Count())
 	}
 }
 
@@ -276,8 +276,8 @@ func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsZeroWhenNilRawStruct(t *testi
 	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count())
 	}
 }
 
@@ -301,19 +301,19 @@ func TestRelatedFieldExtraction_EC2_SG_ExtractsGroupIDs(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.TargetType != "sg" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "sg")
+	if result.TargetType() != "sg" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "sg")
 	}
 	wantIDs := map[string]bool{"sg-111aaa": false, "sg-222bbb": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		wantIDs[id] = true
 	}
 	for id, found := range wantIDs {
 		if !found {
-			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs())
 		}
 	}
 }
@@ -329,8 +329,8 @@ func TestRelatedFieldExtraction_EC2_SG_ReturnsZeroWhenEmpty(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty SecurityGroups)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty SecurityGroups)", result.Count())
 	}
 }
 
@@ -349,11 +349,11 @@ func TestRelatedFieldExtraction_EC2_SG_SkipsNilGroupID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only non-empty group IDs)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only non-empty group IDs)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-valid111" {
-		t.Errorf("ResourceIDs = %v, want [sg-valid111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-valid111" {
+		t.Errorf("ResourceIDs = %v, want [sg-valid111]", result.ResourceIDs())
 	}
 }
 
@@ -366,8 +366,8 @@ func TestRelatedFieldExtraction_EC2_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	checker := fieldExtractionChecker(t, "ec2", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
 
@@ -384,19 +384,19 @@ func TestRelatedFieldExtraction_ELB_SG_ExtractsSGIDs(t *testing.T) {
 	checker := fieldExtractionChecker(t, "elb", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.TargetType != "sg" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "sg")
+	if result.TargetType() != "sg" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "sg")
 	}
 	wantIDs := map[string]bool{"sg-111aaa": false, "sg-222bbb": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		wantIDs[id] = true
 	}
 	for id, found := range wantIDs {
 		if !found {
-			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs())
 		}
 	}
 }
@@ -412,8 +412,8 @@ func TestRelatedFieldExtraction_ELB_SG_ReturnsZeroWhenEmpty(t *testing.T) {
 	checker := fieldExtractionChecker(t, "elb", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty SecurityGroups)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty SecurityGroups)", result.Count())
 	}
 }
 
@@ -428,11 +428,11 @@ func TestRelatedFieldExtraction_ELB_SG_SkipsEmptyStringIDs(t *testing.T) {
 	checker := fieldExtractionChecker(t, "elb", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only non-empty IDs)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only non-empty IDs)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-valid222" {
-		t.Errorf("ResourceIDs = %v, want [sg-valid222]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-valid222" {
+		t.Errorf("ResourceIDs = %v, want [sg-valid222]", result.ResourceIDs())
 	}
 }
 
@@ -445,8 +445,8 @@ func TestRelatedFieldExtraction_ELB_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	checker := fieldExtractionChecker(t, "elb", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
 
@@ -465,14 +465,14 @@ func TestRelatedFieldExtraction_EKS_SG_ExtractsClusterSGID(t *testing.T) {
 	checker := fieldExtractionChecker(t, "eks", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "sg" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "sg")
+	if result.TargetType() != "sg" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "sg")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-cluster111" {
-		t.Errorf("ResourceIDs = %v, want [sg-cluster111]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "sg-cluster111" {
+		t.Errorf("ResourceIDs = %v, want [sg-cluster111]", result.ResourceIDs())
 	}
 }
 
@@ -490,16 +490,16 @@ func TestRelatedFieldExtraction_EKS_SG_ExtractsCombinedSGs(t *testing.T) {
 	checker := fieldExtractionChecker(t, "eks", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3 (cluster SG + 2 additional)", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3 (cluster SG + 2 additional)", result.Count())
 	}
 	wantIDs := map[string]bool{"sg-cluster111": false, "sg-extra222": false, "sg-extra333": false}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		wantIDs[id] = true
 	}
 	for id, found := range wantIDs {
 		if !found {
-			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs())
 		}
 	}
 }
@@ -515,8 +515,8 @@ func TestRelatedFieldExtraction_EKS_SG_ReturnsZeroWhenNilVpcConfig(t *testing.T)
 	checker := fieldExtractionChecker(t, "eks", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil ResourcesVpcConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil ResourcesVpcConfig)", result.Count())
 	}
 }
 
@@ -529,8 +529,8 @@ func TestRelatedFieldExtraction_EKS_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	checker := fieldExtractionChecker(t, "eks", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
 
@@ -551,14 +551,14 @@ func TestRelatedFieldExtraction_DBI_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbi", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if result.TargetType() != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "kms")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc-123" {
-		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc-123" {
+		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs())
 	}
 }
 
@@ -571,8 +571,8 @@ func TestRelatedFieldExtraction_DBI_KMS_ReturnsZeroWhenNilKey(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbi", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count())
 	}
 }
 
@@ -585,8 +585,8 @@ func TestRelatedFieldExtraction_DBI_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	checker := fieldExtractionChecker(t, "dbi", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
 
@@ -603,14 +603,14 @@ func TestRelatedFieldExtraction_DbcSnap_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if result.TargetType() != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "kms")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc-123" {
-		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc-123" {
+		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs())
 	}
 }
 
@@ -623,8 +623,8 @@ func TestRelatedFieldExtraction_DbcSnap_KMS_ReturnsZeroWhenNilKey(t *testing.T) 
 	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count())
 	}
 }
 
@@ -637,8 +637,8 @@ func TestRelatedFieldExtraction_DbcSnap_KMS_ReturnsNegOneOnBadRawStruct(t *testi
 	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
 
@@ -655,14 +655,14 @@ func TestRelatedFieldExtraction_EBS_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ebs", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if result.TargetType() != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "kms")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc-123" {
-		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc-123" {
+		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs())
 	}
 }
 
@@ -675,8 +675,8 @@ func TestRelatedFieldExtraction_EBS_KMS_ReturnsZeroWhenNilKey(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ebs", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil KmsKeyId)", result.Count())
 	}
 }
 
@@ -689,8 +689,8 @@ func TestRelatedFieldExtraction_EBS_KMS_ReturnsZeroWhenARNHasNoSlash(t *testing.
 	checker := fieldExtractionChecker(t, "ebs", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ARN without slash)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (ARN without slash)", result.Count())
 	}
 }
 
@@ -703,8 +703,8 @@ func TestRelatedFieldExtraction_EBS_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	checker := fieldExtractionChecker(t, "ebs", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
 
@@ -721,14 +721,14 @@ func TestRelatedFieldExtraction_Lambda_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	checker := fieldExtractionChecker(t, "lambda", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if result.TargetType() != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "kms")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abc-123" {
-		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc-123" {
+		t.Errorf("ResourceIDs = %v, want [abc-123]", result.ResourceIDs())
 	}
 }
 
@@ -741,8 +741,8 @@ func TestRelatedFieldExtraction_Lambda_KMS_ReturnsZeroWhenNilKey(t *testing.T) {
 	checker := fieldExtractionChecker(t, "lambda", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil KMSKeyArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil KMSKeyArn)", result.Count())
 	}
 }
 
@@ -754,8 +754,8 @@ func TestRelatedFieldExtraction_Lambda_KMS_ReturnsZeroWhenNilRawStruct(t *testin
 	checker := fieldExtractionChecker(t, "lambda", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RawStruct — type assertion fails, returns 0)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RawStruct — type assertion fails, returns 0)", result.Count())
 	}
 }
 
@@ -776,14 +776,14 @@ func TestRelatedFieldExtraction_ECSSvc_Role_ExtractsRoleNameFromARN(t *testing.T
 	checker := fieldExtractionChecker(t, "ecs-svc", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs())
 	}
 }
 
@@ -798,8 +798,8 @@ func TestRelatedFieldExtraction_ECSSvc_Role_ReturnsZeroWhenNilRoleArn(t *testing
 	checker := fieldExtractionChecker(t, "ecs-svc", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RoleArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RoleArn)", result.Count())
 	}
 }
 
@@ -811,8 +811,8 @@ func TestRelatedFieldExtraction_ECSSvc_Role_ReturnsZeroWhenNilRawStruct(t *testi
 	checker := fieldExtractionChecker(t, "ecs-svc", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count())
 	}
 }
 
@@ -834,11 +834,11 @@ func TestRelatedFieldExtraction_ECSTask_Role_ReturnsZeroWhenNoRoleFields(t *test
 	checker := fieldExtractionChecker(t, "ecs-task", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no task_role/execution_role fields)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no task_role/execution_role fields)", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
 }
 
@@ -850,8 +850,8 @@ func TestRelatedFieldExtraction_ECSTask_Role_ReturnsZeroForNilRawStruct(t *testi
 	checker := fieldExtractionChecker(t, "ecs-task", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no role fields, regardless of RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no role fields, regardless of RawStruct)", result.Count())
 	}
 }
 
@@ -874,11 +874,11 @@ func TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ecs-task", "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:79 cross-refs the loaded role cache)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:79 cross-refs the loaded role cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "app-task-role" {
-		t.Errorf("ResourceIDs = %v, want [app-task-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "app-task-role" {
+		t.Errorf("ResourceIDs = %v, want [app-task-role]", result.ResourceIDs())
 	}
 }
 
@@ -899,15 +899,15 @@ func TestRelatedFieldExtraction_ECSTask_Role_ExtractsBothRoles(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ecs-task", "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:79 cross-refs the loaded role cache)", result.Count)
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:79 cross-refs the loaded role cache)", result.Count())
 	}
 	got := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		got[id] = true
 	}
 	if !got["app-task-role"] || !got["ecs-task-exec-role"] {
-		t.Errorf("ResourceIDs = %v, want both app-task-role and ecs-task-exec-role", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want both app-task-role and ecs-task-exec-role", result.ResourceIDs())
 	}
 }
 
@@ -929,8 +929,8 @@ func TestRelatedFieldExtraction_ECSTask_Role_ARNAbsentFromLoadedCache(t *testing
 		}},
 	})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (task_role ARN not present in loaded role cache)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (task_role ARN not present in loaded role cache)", result.Count())
 	}
 }
 
@@ -947,14 +947,14 @@ func TestRelatedFieldExtraction_Trail_Role_ExtractsRoleNameFromARN(t *testing.T)
 	checker := fieldExtractionChecker(t, "trail", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	if result.TargetType() != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "role")
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "trail-role" {
-		t.Errorf("ResourceIDs = %v, want [trail-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "trail-role" {
+		t.Errorf("ResourceIDs = %v, want [trail-role]", result.ResourceIDs())
 	}
 }
 
@@ -969,8 +969,8 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenNilRoleArn(t *testing.
 	checker := fieldExtractionChecker(t, "trail", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil CloudWatchLogsRoleArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil CloudWatchLogsRoleArn)", result.Count())
 	}
 }
 
@@ -982,8 +982,8 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenNilRawStruct(t *testin
 	checker := fieldExtractionChecker(t, "trail", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count())
 	}
 }
 
@@ -998,8 +998,8 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenARNHasNoSlash(t *testi
 	checker := fieldExtractionChecker(t, "trail", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ARN without slash cannot extract role name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (ARN without slash cannot extract role name)", result.Count())
 	}
 }
 
@@ -1033,11 +1033,11 @@ func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "backup")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ec2.md:49 selection_tags match against Instance.Tags[])", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ec2.md:49 selection_tags match against Instance.Tags[])", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "plan-tag-selected" {
-		t.Errorf("ResourceIDs = %v, want [plan-tag-selected]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "plan-tag-selected" {
+		t.Errorf("ResourceIDs = %v, want [plan-tag-selected]", result.ResourceIDs())
 	}
 }
 
@@ -1064,7 +1064,7 @@ func TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer(t *testing.T) {
 	checker := fieldExtractionChecker(t, "ec2", "backup")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (selection_tags value mismatch)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (selection_tags value mismatch)", result.Count())
 	}
 }

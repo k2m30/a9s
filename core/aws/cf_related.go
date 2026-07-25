@@ -24,7 +24,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.UnknownRelated("s3")
 	}
 	if dist.Origins == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
@@ -49,7 +49,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(bucketNames) == 0 {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 
 	var ids []string
@@ -70,7 +70,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("elb")
 	}
 	if dist.Origins == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	// Collect ELB domain names from origins.
@@ -84,7 +84,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(elbDomains) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -113,7 +113,7 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("waf")
 	}
 	if dist.WebACLId == nil || *dist.WebACLId == "" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+		return resource.KnownRelated("waf", nil, false)
 	}
 	webACLID := *dist.WebACLId
 
@@ -142,7 +142,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("acm")
 	}
 	if dist.ViewerCertificate == nil || dist.ViewerCertificate.ACMCertificateArn == nil || *dist.ViewerCertificate.ACMCertificateArn == "" {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+		return resource.KnownRelated("acm", nil, false)
 	}
 	certARN := *dist.ViewerCertificate.ACMCertificateArn
 
@@ -176,7 +176,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 // a truncated "(0+)" result.
 func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 
 	// Extract the distribution's aliases. RawStruct is cftypes.DistributionSummary;
@@ -184,7 +184,7 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 	// Fallback: parse Fields["aliases"] (comma-joined in the fetcher).
 	aliases := extractCfAliases(res)
 	if len(aliases) == 0 {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+		return resource.KnownRelated("r53", nil, false)
 	}
 
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
@@ -263,7 +263,7 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	distID := res.ID
 	if distID == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
@@ -276,7 +276,7 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.ErrorRelated("lambda", err)
 	}
 	if out.DistributionConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	cfg := out.DistributionConfig
 
@@ -324,7 +324,7 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ re
 func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	distID := res.ID
 	if distID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
@@ -337,11 +337,11 @@ func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("logs", err)
 	}
 	if out.DistributionConfig == nil || out.DistributionConfig.Logging == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	lg := out.DistributionConfig.Logging
 	if lg.Enabled == nil || !*lg.Enabled || lg.Bucket == nil || *lg.Bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	bucket := *lg.Bucket
 	if idx := strings.Index(bucket, ".s3"); idx > 0 {

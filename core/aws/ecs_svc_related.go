@@ -20,7 +20,7 @@ import (
 func checkECSSvcCluster(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.Fields["cluster"]
 	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+		return resource.KnownRelated("ecs", nil, false)
 	}
 	return relatedResult("ecs", []string{clusterName})
 }
@@ -33,7 +33,7 @@ func checkECSSvcTargetGroups(_ context.Context, _ any, res resource.Resource, _ 
 		return resource.UnknownRelated("tg")
 	}
 	if len(raw.LoadBalancers) == 0 {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+		return resource.KnownRelated("tg", nil, false)
 	}
 
 	var ids []string
@@ -60,7 +60,7 @@ func checkECSSvcAlarms(ctx context.Context, clients any, res resource.Resource, 
 	serviceName := res.ID
 	clusterName := res.Fields["cluster"]
 	if serviceName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+		return resource.KnownRelated("alarm", nil, false)
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -111,7 +111,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -145,10 +145,10 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 	if len(raw.LoadBalancers) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	// Collect TG ARNs from the service definition.
@@ -159,7 +159,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(tgARNs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	// Step 2: scan TG cache for matching target groups.
@@ -168,7 +168,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("elb", err)
 	}
 	if tgList == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	// Step 3: collect ELB ARNs from matched TGs.
@@ -194,7 +194,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		if truncatedTG {
 			return resource.UnknownRelated("elb")
 		}
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	// Step 4: match ELB ARNs against the ELB cache. LoadBalancerArn — not the
@@ -235,14 +235,14 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	taskDefARN := ""
 	if raw.TaskDefinition != nil {
 		taskDefARN = *raw.TaskDefinition
 	}
 	if taskDefARN == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
 	family := arnLastSegment(taskDefARN)
@@ -251,7 +251,7 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 		family = family[:idx]
 	}
 	if family == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -281,7 +281,7 @@ func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 	}
 	if raw.NetworkConfiguration == nil ||
 		raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	var ids []string
 	for _, sgID := range raw.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups {
@@ -298,13 +298,13 @@ func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *raw.RoleArn
 	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
 		return relatedResult("role", []string{arn[idx+1:]})
 	}
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	return resource.KnownRelated("role", nil, false)
 }
 
 // ecsSvcRelatedResources returns the resource list for target from cache or by

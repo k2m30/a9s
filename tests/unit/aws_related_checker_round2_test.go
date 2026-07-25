@@ -80,8 +80,8 @@ func TestAlarm_Related_CTEvents_MatchesBySourceField(t *testing.T) {
 	checker := checkerByTarget(t, "alarm", "ct-events")
 	result := checker(context.Background(), nil, alarmRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (checker must read Fields[\"source\"], the key ct_events.go actually writes)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (checker must read Fields[\"source\"], the key ct_events.go actually writes)", result.Count())
 	}
 }
 
@@ -145,11 +145,11 @@ func TestECR_Related_CFN_ResolvesViaListTagsForResource(t *testing.T) {
 	checker := checkerByTarget(t, "ecr", "cfn")
 	result := checker(context.Background(), clients, repoRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec ecr.md — ListTagsForResource aws:cloudformation:stack-name -> cfn cache)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ecr.md — ListTagsForResource aws:cloudformation:stack-name -> cfn cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "checkout-stack" {
-		t.Fatalf("ResourceIDs = %v, want [checkout-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "checkout-stack" {
+		t.Fatalf("ResourceIDs = %v, want [checkout-stack]", result.ResourceIDs())
 	}
 	if fake.calls == 0 {
 		t.Fatalf("ListTagsForResource was never called — checker must fetch tags per open repo")
@@ -267,11 +267,11 @@ func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {
 	checker := checkerByTarget(t, "ecr", "ecs-task")
 	result := checker(context.Background(), nil, repoRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (checkECRECSTask's existing substring match should resolve once the fetcher emits the image URI)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (checkECRECSTask's existing substring match should resolve once the fetcher emits the image URI)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "task-abc123" {
-		t.Fatalf("ResourceIDs = %v, want [task-abc123]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "task-abc123" {
+		t.Fatalf("ResourceIDs = %v, want [task-abc123]", result.ResourceIDs())
 	}
 }
 
@@ -351,11 +351,11 @@ func TestKinesis_Related_Lambda_ResolvesViaListEventSourceMappingsFilteredByStre
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec kinesis.md §lambda — one ListEventSourceMappings(EventSourceArn=<StreamARN>) call, mapped against the lambda cache)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec kinesis.md §lambda — one ListEventSourceMappings(EventSourceArn=<StreamARN>) call, mapped against the lambda cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "data-pipeline-transform" {
-		t.Fatalf("ResourceIDs = %v, want [data-pipeline-transform]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "data-pipeline-transform" {
+		t.Fatalf("ResourceIDs = %v, want [data-pipeline-transform]", result.ResourceIDs())
 	}
 	if fake.calls != 1 {
 		t.Fatalf("ListEventSourceMappings called %d times, want exactly 1 (budget rule 7 — one call per open stream)", fake.calls)
@@ -384,8 +384,8 @@ func TestKinesis_Related_Lambda_NoMappingsReturnsZero(t *testing.T) {
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, cache)
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 when ListEventSourceMappings returns no mappings for this stream", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("Count = %d, want 0 when ListEventSourceMappings returns no mappings for this stream", result.Count())
 	}
 }
 
@@ -406,10 +406,10 @@ func TestKinesis_Related_Lambda_APIErrorSetsErrAndNegativeCount(t *testing.T) {
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Fatalf("Count = %d, want -1 on ListEventSourceMappings API error (matches sibling checker error convention in this file, e.g. checkKinesisCFN/checkKinesisKMS)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Fatalf("Count = %d, want -1 on ListEventSourceMappings API error (matches sibling checker error convention in this file, e.g. checkKinesisCFN/checkKinesisKMS)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Fatalf("Err = nil, want non-nil on ListEventSourceMappings API error")
 	}
 }
@@ -442,11 +442,11 @@ func TestMSK_Related_Lambda_ResolvesViaListEventSourceMappingsFilteredByClusterA
 	checker := checkerByTarget(t, "msk", "lambda")
 	result := checker(context.Background(), clients, clusterRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec msk.md §lambda — call ListEventSourceMappings(EventSourceArn=<ClusterArn>) once per cluster, mapped against the lambda cache)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec msk.md §lambda — call ListEventSourceMappings(EventSourceArn=<ClusterArn>) once per cluster, mapped against the lambda cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "data-pipeline-transform" {
-		t.Fatalf("ResourceIDs = %v, want [data-pipeline-transform]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "data-pipeline-transform" {
+		t.Fatalf("ResourceIDs = %v, want [data-pipeline-transform]", result.ResourceIDs())
 	}
 	if fake.calls != 1 {
 		t.Fatalf("ListEventSourceMappings called %d times, want exactly 1 (budget rule 7 — one call per open cluster)", fake.calls)
@@ -475,8 +475,8 @@ func TestMSK_Related_Lambda_NoMappingsReturnsZero(t *testing.T) {
 	checker := checkerByTarget(t, "msk", "lambda")
 	result := checker(context.Background(), clients, clusterRes, cache)
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 when ListEventSourceMappings returns no mappings for this cluster", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("Count = %d, want 0 when ListEventSourceMappings returns no mappings for this cluster", result.Count())
 	}
 }
 
@@ -497,10 +497,10 @@ func TestMSK_Related_Lambda_APIErrorSetsErrAndNegativeCount(t *testing.T) {
 	checker := checkerByTarget(t, "msk", "lambda")
 	result := checker(context.Background(), clients, clusterRes, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Fatalf("Count = %d, want -1 on ListEventSourceMappings API error (matches sibling checker error convention in this file, e.g. checkMSKCFN/checkMSKVPC)", result.Count)
+	if result.State() != domain.RelatedError {
+		t.Fatalf("Count = %d, want -1 on ListEventSourceMappings API error (matches sibling checker error convention in this file, e.g. checkMSKCFN/checkMSKVPC)", result.Count())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Fatalf("Err = nil, want non-nil on ListEventSourceMappings API error")
 	}
 }
@@ -536,11 +536,11 @@ func TestLogs_Related_ECSTask_MatchesFamilyFromTaskDefinitionField(t *testing.T)
 	checker := checkerByTarget(t, "logs", "ecs-task")
 	result := checker(context.Background(), nil, logRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec logs.md — family must come from Fields[task_definition], not the bare task UUID)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (spec logs.md — family must come from Fields[task_definition], not the bare task UUID)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != taskRes.ID {
-		t.Fatalf("ResourceIDs = %v, want [%s]", result.ResourceIDs, taskRes.ID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != taskRes.ID {
+		t.Fatalf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), taskRes.ID)
 	}
 }
 
@@ -602,11 +602,11 @@ func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
 	checker := checkerByTarget(t, "pipeline", "eb-rule")
 	result := checker(context.Background(), clients, fetchResult.Resources[0], resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec pipeline.md — Fields[arn] must be populated so ListRuleNamesByTarget resolves)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec pipeline.md — Fields[arn] must be populated so ListRuleNamesByTarget resolves)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "checkout-deploy-trigger" {
-		t.Fatalf("ResourceIDs = %v, want [checkout-deploy-trigger]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "checkout-deploy-trigger" {
+		t.Fatalf("ResourceIDs = %v, want [checkout-deploy-trigger]", result.ResourceIDs())
 	}
 }
 
@@ -678,8 +678,8 @@ func TestSQS_Related_KMS_ResolvesFromGetQueueAttributesKmsMasterKeyId(t *testing
 	}
 	checker := checkerByTarget(t, "sqs", "kms")
 	checkResult := checker(context.Background(), nil, result.Resources[0], cache)
-	if checkResult.Count != 1 {
-		t.Fatalf("checkSQSKMS Count = %d, want 1 once kms_key_id is populated", checkResult.Count)
+	if checkResult.Count() != 1 {
+		t.Fatalf("checkSQSKMS Count = %d, want 1 once kms_key_id is populated", checkResult.Count())
 	}
 }
 
@@ -735,11 +735,11 @@ func TestSubnet_Related_ASG_ResolvesViaRealFetcherOutput(t *testing.T) {
 	checker := checkerByTarget(t, "subnet", "asg")
 	result := checker(context.Background(), nil, subnetRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec — asg fetcher must populate Fields[vpc_zone_identifier] so the reverse subnet:asg checker resolves)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (spec — asg fetcher must populate Fields[vpc_zone_identifier] so the reverse subnet:asg checker resolves)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "checkout-asg" {
-		t.Fatalf("ResourceIDs = %v, want [checkout-asg]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "checkout-asg" {
+		t.Fatalf("ResourceIDs = %v, want [checkout-asg]", result.ResourceIDs())
 	}
 }
 
@@ -799,11 +799,11 @@ func TestSubnet_Related_EKS_ResolvesViaRealFetcherOutput(t *testing.T) {
 	checker := checkerByTarget(t, "subnet", "eks")
 	result := checker(context.Background(), nil, subnetRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec — eks fetcher must populate Fields[subnet_ids] so the reverse subnet:eks checker resolves)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (spec — eks fetcher must populate Fields[subnet_ids] so the reverse subnet:eks checker resolves)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-eks-cluster" {
-		t.Fatalf("ResourceIDs = %v, want [acme-eks-cluster]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-eks-cluster" {
+		t.Fatalf("ResourceIDs = %v, want [acme-eks-cluster]", result.ResourceIDs())
 	}
 }
 
@@ -829,12 +829,12 @@ func TestASG_Related_Role_ReturnsBareRoleName(t *testing.T) {
 	checker := checkerByTarget(t, "asg", "role")
 	result := checker(context.Background(), nil, asgRes, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1", result.Count())
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id != "AWSServiceRoleForAutoScaling" {
-			t.Fatalf("ResourceIDs = %v, want bare role name [AWSServiceRoleForAutoScaling] (iam:GetRole requires RoleName, not an ARN, per FetchRolesByIDs / core/aws/iam_roles.go:173) — got full ARN %q", result.ResourceIDs, id)
+			t.Fatalf("ResourceIDs = %v, want bare role name [AWSServiceRoleForAutoScaling] (iam:GetRole requires RoleName, not an ARN, per FetchRolesByIDs / core/aws/iam_roles.go:173) — got full ARN %q", result.ResourceIDs(), id)
 		}
 	}
 }
@@ -850,12 +850,12 @@ func TestECR_Related_Role_ReturnsBareRoleNameFromPolicy(t *testing.T) {
 	checker := checkerByTarget(t, "ecr", "role")
 	result := checker(context.Background(), clients, repoRes, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1", result.Count())
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if id != "ci-deploy-role" {
-			t.Fatalf("ResourceIDs = %v, want bare role name [ci-deploy-role] (iam:GetRole requires RoleName, not an ARN) — got full ARN %q", result.ResourceIDs, id)
+			t.Fatalf("ResourceIDs = %v, want bare role name [ci-deploy-role] (iam:GetRole requires RoleName, not an ARN) — got full ARN %q", result.ResourceIDs(), id)
 		}
 	}
 }
@@ -881,11 +881,11 @@ func TestECR_Related_Role_DropsCrossAccountPrincipal(t *testing.T) {
 	checker := checkerByTarget(t, "ecr", "role")
 	result := checker(context.Background(), clients, repoRes, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (owner-account role only; cross-account dropped)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (owner-account role only; cross-account dropped)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "local-ci-role" {
-		t.Fatalf("ResourceIDs = %v, want [local-ci-role] (foreign-account foreign-ci-role excluded)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "local-ci-role" {
+		t.Fatalf("ResourceIDs = %v, want [local-ci-role] (foreign-account foreign-ci-role excluded)", result.ResourceIDs())
 	}
 }
 
@@ -955,11 +955,11 @@ func TestGlue_Related_CFN_ResolvesRegionWithoutEnvVar(t *testing.T) {
 	checker := checkerByTarget(t, "glue", "cfn")
 	result := checker(context.Background(), clients, jobRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (region must be resolved from clients/config, not AWS_REGION env var — got State: RelatedUnknown via regionFromEnv())", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (region must be resolved from clients/config, not AWS_REGION env var — got State: RelatedUnknown via regionFromEnv())", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "data-pipeline-stack" {
-		t.Fatalf("ResourceIDs = %v, want [data-pipeline-stack]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "data-pipeline-stack" {
+		t.Fatalf("ResourceIDs = %v, want [data-pipeline-stack]", result.ResourceIDs())
 	}
 }
 
@@ -998,11 +998,11 @@ func TestWAF_Related_CF_CloudfrontScopeResolvesDistribution(t *testing.T) {
 	checker := checkerByTarget(t, "waf", "cf")
 	result := checker(context.Background(), clients, waf, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 for a CLOUDFRONT-scope Web ACL with a bound distribution", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 for a CLOUDFRONT-scope Web ACL with a bound distribution", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "E1234567890ABC" {
-		t.Fatalf("ResourceIDs = %v, want [E1234567890ABC]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "E1234567890ABC" {
+		t.Fatalf("ResourceIDs = %v, want [E1234567890ABC]", result.ResourceIDs())
 	}
 }
 
@@ -1021,8 +1021,8 @@ func TestWAF_Related_CF_RegionalScopeStaysZero(t *testing.T) {
 	checker := checkerByTarget(t, "waf", "cf")
 	result := checker(context.Background(), clients, waf, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 for a REGIONAL-scope Web ACL (CloudFront can only bind CLOUDFRONT-scope ACLs)", result.Count)
+	if result.Count() != 0 {
+		t.Fatalf("Count = %d, want 0 for a REGIONAL-scope Web ACL (CloudFront can only bind CLOUDFRONT-scope ACLs)", result.Count())
 	}
 }
 
@@ -1055,11 +1055,11 @@ func TestWAF_Related_CF_PassesFullARNNotBareID(t *testing.T) {
 	checker := checkerByTarget(t, "waf", "cf")
 	result := checker(context.Background(), clients, waf, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 — checkWAFCF must pass the full WebACL ARN (Fields[\"arn\"]), not the bare ID, to ListDistributionsByWebACLId", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 — checkWAFCF must pass the full WebACL ARN (Fields[\"arn\"]), not the bare ID, to ListDistributionsByWebACLId", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "EARNMATCH0001" {
-		t.Fatalf("ResourceIDs = %v, want [EARNMATCH0001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "EARNMATCH0001" {
+		t.Fatalf("ResourceIDs = %v, want [EARNMATCH0001]", result.ResourceIDs())
 	}
 }
 
@@ -1110,8 +1110,8 @@ func TestEIP_Related_ECSTask_MatchesViaNetworkInterfaceId(t *testing.T) {
 	checker := checkerByTarget(t, "eip", "ecs-task")
 	result := checker(context.Background(), nil, eipRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (zero-call ENI cross-ref against the already-loaded ecs-task cache; checker is a hardcoded -1 stub today)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (zero-call ENI cross-ref against the already-loaded ecs-task cache; checker is a hardcoded -1 stub today)", result.Count())
 	}
 }
 
@@ -1144,8 +1144,8 @@ func TestEIP_Related_ECS_MatchesViaTaskClusterArn(t *testing.T) {
 	checker := checkerByTarget(t, "eip", "ecs")
 	result := checker(context.Background(), nil, eipRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (zero-call cross-ref via the matching task's ClusterArn; checker is a hardcoded -1 stub today)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (zero-call cross-ref via the matching task's ClusterArn; checker is a hardcoded -1 stub today)", result.Count())
 	}
 }
 
@@ -1198,11 +1198,11 @@ func TestR53_Related_Logs_ResolvesViaListQueryLoggingConfigs(t *testing.T) {
 	checker := checkerByTarget(t, "r53", "logs")
 	result := checker(context.Background(), clients, zoneRes, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (spec — one ListQueryLoggingConfigs call per open zone, matching CloudWatchLogsLogGroupArn)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (spec — one ListQueryLoggingConfigs call per open zone, matching CloudWatchLogsLogGroupArn)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/route53/example.com" {
-		t.Fatalf("ResourceIDs = %v, want [/aws/route53/example.com]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/route53/example.com" {
+		t.Fatalf("ResourceIDs = %v, want [/aws/route53/example.com]", result.ResourceIDs())
 	}
 }
 
@@ -1256,11 +1256,11 @@ func TestVPCE_Related_R53_ResolvesViaListHostedZonesByVPC(t *testing.T) {
 	checker := checkerByTarget(t, "vpce", "r53")
 	result := checker(context.Background(), clients, vpceRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec — one ListHostedZonesByVPC call per open endpoint, matched against the r53 cache)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (spec — one ListHostedZonesByVPC call per open endpoint, matched against the r53 cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "Z1234567890ABC" {
-		t.Fatalf("ResourceIDs = %v, want [Z1234567890ABC]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "Z1234567890ABC" {
+		t.Fatalf("ResourceIDs = %v, want [Z1234567890ABC]", result.ResourceIDs())
 	}
 }
 
@@ -1293,8 +1293,8 @@ func TestSubnet_Related_EFS_MatchesViaMountTargetENIScan(t *testing.T) {
 	checker := checkerByTarget(t, "subnet", "efs")
 	result := checker(context.Background(), nil, subnetRes, cache)
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want >=1 (zero-call ENI-description scan mirroring checkEFSSubnet's reverse direction; checker is a hardcoded -1 stub today)", result.Count)
+	if result.Count() < 1 {
+		t.Fatalf("Count = %d, want >=1 (zero-call ENI-description scan mirroring checkEFSSubnet's reverse direction; checker is a hardcoded -1 stub today)", result.Count())
 	}
 }
 

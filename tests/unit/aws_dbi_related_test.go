@@ -90,11 +90,11 @@ func TestDBI_Related_SG_ReturnsVpcSecurityGroupIDs(t *testing.T) {
 	}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "sg-0ccc333333333333c" {
-		t.Errorf("ResourceIDs = %v, want [sg-0ccc333333333333c]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "sg-0ccc333333333333c" {
+		t.Errorf("ResourceIDs = %v, want [sg-0ccc333333333333c]", result.ResourceIDs())
 	}
 }
 
@@ -103,8 +103,8 @@ func TestDBI_Related_SG_NilRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "x", RawStruct: nil}
 	checker := dbiCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for nil RawStruct", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for nil RawStruct", result.Count())
 	}
 }
 
@@ -126,11 +126,11 @@ func TestDBI_Related_KMS_ReturnsKeyUUID(t *testing.T) {
 	}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != wantUUID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wantUUID)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != wantUUID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wantUUID)
 	}
 }
 
@@ -146,8 +146,8 @@ func TestDBI_Related_KMS_UnencryptedInstance(t *testing.T) {
 	checker := dbiCheckerByTarget(t, "kms")
 
 	got := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if got.Count != 0 {
-		t.Errorf("Count = %d, want 0 for unencrypted instance", got.Count)
+	if got.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for unencrypted instance", got.Count())
 	}
 }
 
@@ -171,8 +171,8 @@ func TestDBI_Related_Subnets_ReturnsBothSubnetIDs(t *testing.T) {
 	}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -193,11 +193,11 @@ func TestDBI_Related_VPC_ReturnsVpcID(t *testing.T) {
 	}
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != wantVPC {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wantVPC)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != wantVPC {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wantVPC)
 	}
 }
 
@@ -240,11 +240,11 @@ func TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension(t *testing.T) 
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "rds-cpu-utilization" {
-		t.Errorf("ResourceIDs = %v, want [rds-cpu-utilization]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "rds-cpu-utilization" {
+		t.Errorf("ResourceIDs = %v, want [rds-cpu-utilization]", result.ResourceIDs())
 	}
 }
 
@@ -264,8 +264,8 @@ func TestDBI_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State())
 	}
 }
 
@@ -301,8 +301,8 @@ func TestDBI_Related_DBISnap_MatchesByDBInstanceIdentifier(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -327,8 +327,8 @@ func TestDBI_Related_Logs_MatchesByRDSNamingConvention(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -368,11 +368,11 @@ func TestDBI_Related_Secrets_MatchesByMasterUserSecretARN(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "rds!db-prod-dbi-1-ABCDEF" {
-		t.Errorf("ResourceIDs = %v, want [rds!db-prod-dbi-1-ABCDEF]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "rds!db-prod-dbi-1-ABCDEF" {
+		t.Errorf("ResourceIDs = %v, want [rds!db-prod-dbi-1-ABCDEF]", result.ResourceIDs())
 	}
 }
 
@@ -396,8 +396,8 @@ func TestDBI_Related_Secrets_NoMasterUserSecret(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no MasterUserSecret)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no MasterUserSecret)", result.Count())
 	}
 }
 
@@ -420,11 +420,11 @@ func TestDBI_Related_DBC_Aurora_ReturnsClusterID(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 for Aurora member", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 for Aurora member", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != clusterID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, clusterID)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != clusterID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), clusterID)
 	}
 }
 
@@ -436,8 +436,8 @@ func TestDBI_Related_DBC_NonAurora_ReturnsZero(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for non-Aurora instance", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 for non-Aurora instance", result.Count())
 	}
 }
 
@@ -462,17 +462,17 @@ func TestDBI_Related_Role_ReturnsAssociatedAndMonitoringRoles(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (AssociatedRoles + MonitoringRoleArn)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (AssociatedRoles + MonitoringRoleArn)", result.Count())
 	}
 
 	found := make(map[string]bool)
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}
 	for _, want := range []string{"rds-monitoring-role", "rds-enhanced-monitoring"} {
 		if !found[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
 }
@@ -516,11 +516,11 @@ func TestDBI_Related_ENI_ReturnsNetworkInterfaceID(t *testing.T) {
 
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "eni-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs = %v, want [eni-0a1b2c3d4e5f60001]", result.ResourceIDs)
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "eni-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs = %v, want [eni-0a1b2c3d4e5f60001]", result.ResourceIDs())
 	}
 }
 
@@ -532,8 +532,8 @@ func TestDBI_Related_ENI_NilEC2Client(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 for nil EC2 client", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 for nil EC2 client", result.Count())
 	}
 }
 
@@ -595,11 +595,11 @@ func TestDBI_Related_CTEvents_MatchesByResourceName(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count < 2 {
-		t.Errorf("Count = %d, want >=2 (events matching prod-dbi-1)", result.Count)
+	if result.Count() < 2 {
+		t.Errorf("Count = %d, want >=2 (events matching prod-dbi-1)", result.Count())
 	}
-	if result.FetchFilter == nil || result.FetchFilter["ResourceName"] != fixtures.ProdDbiID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], fixtures.ProdDbiID)
+	if result.FetchFilter() == nil || result.FetchFilter()["ResourceName"] != fixtures.ProdDbiID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], fixtures.ProdDbiID)
 	}
 }
 
@@ -614,10 +614,10 @@ func TestDBI_Related_CTEvents_NoMatchEmptyCache(t *testing.T) {
 	// RelatedUnknown (cache miss, no clients) OR RelatedDeferred (FetchFilter set
 	// for navigation) is acceptable; the key invariant is the result must not be
 	// a definite RelatedResolved zero (which would claim definite absence).
-	if result.State == domain.RelatedResolved {
-		t.Errorf("State = RelatedResolved (Count=%d) on empty cache — should be RelatedUnknown or RelatedDeferred when cache has no ct-events entry", result.Count)
+	if result.State() == domain.RelatedResolved {
+		t.Errorf("State = RelatedResolved (Count=%d) on empty cache — should be RelatedUnknown or RelatedDeferred when cache has no ct-events entry", result.Count())
 	}
-	if result.FetchFilter == nil || result.FetchFilter["ResourceName"] != fixtures.ProdDbiID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q even on cache miss", result.FetchFilter["ResourceName"], fixtures.ProdDbiID)
+	if result.FetchFilter() == nil || result.FetchFilter()["ResourceName"] != fixtures.ProdDbiID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q even on cache miss", result.FetchFilter()["ResourceName"], fixtures.ProdDbiID)
 	}
 }

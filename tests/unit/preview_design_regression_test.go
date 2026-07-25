@@ -119,7 +119,7 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res.ID,
 			OperationID:      activeOp,
-			Result:           resource.RelatedCheckResult{TargetType: tc.target, Count: tc.count, ResourceIDs: tc.ids},
+			Result:           resource.KnownRelated(tc.target, tc.ids, false),
 		})
 	}
 
@@ -237,7 +237,7 @@ func TestPreview_RightColumnFocus_HLAndTabToggleFocus(t *testing.T) {
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res.ID,
 			OperationID:      activeOp,
-			Result:           resource.RelatedCheckResult{TargetType: tc.target, Count: tc.count, ResourceIDs: tc.ids},
+			Result:           resource.KnownRelated(tc.target, tc.ids, false),
 		})
 	}
 

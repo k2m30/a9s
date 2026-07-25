@@ -109,11 +109,11 @@ func TestRelated_CF_S3_MatchByOriginDomain(t *testing.T) {
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -143,8 +143,8 @@ func TestRelated_CF_S3_NoMatch(t *testing.T) {
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -167,8 +167,8 @@ func TestRelated_CF_S3_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
 
@@ -202,11 +202,11 @@ func TestRelated_CF_ELB_MatchByOriginDomain(t *testing.T) {
 	checker := cfCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -238,8 +238,8 @@ func TestRelated_CF_ELB_NoMatch(t *testing.T) {
 	checker := cfCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -262,8 +262,8 @@ func TestRelated_CF_ELB_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
 
@@ -292,11 +292,11 @@ func TestRelated_CF_WAF_MatchByWebACLId(t *testing.T) {
 	checker := cfCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -323,8 +323,8 @@ func TestRelated_CF_WAF_NoWebACL(t *testing.T) {
 	checker := cfCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil WebACLId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil WebACLId)", result.Count())
 	}
 }
 
@@ -342,8 +342,8 @@ func TestRelated_CF_WAF_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
 
@@ -372,11 +372,11 @@ func TestRelated_CF_ACM_MatchByCertARN(t *testing.T) {
 	checker := cfCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -399,8 +399,8 @@ func TestRelated_CF_ACM_NoCert(t *testing.T) {
 	checker := cfCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil ViewerCertificate)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil ViewerCertificate)", result.Count())
 	}
 }
 
@@ -420,8 +420,8 @@ func TestRelated_CF_ACM_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
 
@@ -436,11 +436,11 @@ func TestRelated_CF_R53_NoAliasesReturnsZero(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (distribution has no aliases — nothing to match)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (distribution has no aliases — nothing to match)", result.Count())
 	}
-	if result.TargetType != "r53" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
+	if result.TargetType() != "r53" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "r53")
 	}
 }
 
@@ -449,8 +449,8 @@ func TestRelated_CF_R53_EmptyInput(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty distribution id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty distribution id)", result.Count())
 	}
 }
 
@@ -482,11 +482,11 @@ func TestRelated_CF_R53_MatchByRawStructAlias(t *testing.T) {
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/hostedzone/Z123456ABCDEF" {
-		t.Errorf("ResourceIDs = %v, want [/hostedzone/Z123456ABCDEF]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/hostedzone/Z123456ABCDEF" {
+		t.Errorf("ResourceIDs = %v, want [/hostedzone/Z123456ABCDEF]", result.ResourceIDs())
 	}
 }
 
@@ -511,11 +511,11 @@ func TestRelated_CF_R53_MatchByFieldsFallback(t *testing.T) {
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/hostedzone/ZFALLBACK" {
-		t.Errorf("ResourceIDs = %v, want [/hostedzone/ZFALLBACK]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/hostedzone/ZFALLBACK" {
+		t.Errorf("ResourceIDs = %v, want [/hostedzone/ZFALLBACK]", result.ResourceIDs())
 	}
 }
 
@@ -534,8 +534,8 @@ func TestRelated_CF_R53_NilCacheWithAliases(t *testing.T) {
 
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (aliases present but nil zone cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (aliases present but nil zone cache)", result.Count())
 	}
 }
 
@@ -567,7 +567,7 @@ func TestRelated_CF_R53_TruncatedCacheNoMatch(t *testing.T) {
 
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, cache)
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
@@ -596,8 +596,8 @@ func TestRelated_CF_R53_ExactMatch(t *testing.T) {
 
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (exact alias == zone name)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (exact alias == zone name)", result.Count())
 	}
 }
 
@@ -632,11 +632,11 @@ func TestRelated_CF_Alarm_MatchByDistributionId(t *testing.T) {
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "cf-error-rate-alarm" {
-		t.Errorf("ResourceIDs = %v, want [cf-error-rate-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "cf-error-rate-alarm" {
+		t.Errorf("ResourceIDs = %v, want [cf-error-rate-alarm]", result.ResourceIDs())
 	}
 }
 
@@ -661,8 +661,8 @@ func TestRelated_CF_Alarm_WrongDimension(t *testing.T) {
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (dimension mismatch)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (dimension mismatch)", result.Count())
 	}
 }
 
@@ -671,8 +671,8 @@ func TestRelated_CF_Alarm_EmptyDistID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count())
 	}
 }
 
@@ -681,8 +681,8 @@ func TestRelated_CF_Alarm_NilCache(t *testing.T) {
 	res := resource.Resource{ID: "E1TESTDISTID", Fields: map[string]string{}}
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty alarm cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty alarm cache)", result.Count())
 	}
 }
 
@@ -704,7 +704,7 @@ func TestRelated_CF_Alarm_TruncatedCacheNoMatch(t *testing.T) {
 	res := resource.Resource{ID: "E1TESTDISTID", Fields: map[string]string{}}
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, cache)
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
@@ -732,8 +732,8 @@ func TestRelated_CF_Alarm_AlarmWithNoRawStruct(t *testing.T) {
 	res := resource.Resource{ID: distID, Fields: map[string]string{}}
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (only matching alarm should be returned)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (only matching alarm should be returned)", result.Count())
 	}
 }
 
@@ -744,11 +744,11 @@ func TestRelated_CF_Lambda_NilClients(t *testing.T) {
 	res := resource.Resource{ID: "E1A2B3C4D5E6F7", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no CloudFront client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no CloudFront client)", result.Count())
 	}
-	if result.TargetType != "lambda" {
-		t.Errorf("TargetType = %q, want lambda", result.TargetType)
+	if result.TargetType() != "lambda" {
+		t.Errorf("TargetType = %q, want lambda", result.TargetType())
 	}
 }
 
@@ -757,8 +757,8 @@ func TestRelated_CF_Lambda_EmptyDistID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count())
 	}
 }
 
@@ -769,8 +769,8 @@ func TestRelated_CF_Logs_EmptyDistID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count())
 	}
 }
 
@@ -785,8 +785,8 @@ func TestRelated_CF_S3_NoOrigins(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Origins)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Origins)", result.Count())
 	}
 }
 
@@ -809,8 +809,8 @@ func TestRelated_CF_S3_OriginWithNilDomainName(t *testing.T) {
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 	// nil domain name → no bucket name extracted → Count: 0
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil DomainName in origin)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil DomainName in origin)", result.Count())
 	}
 }
 
@@ -835,8 +835,8 @@ func TestRelated_CF_S3_RegionalOriginFormat(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (regional S3 origin format)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (regional S3 origin format)", result.Count())
 	}
 }
 
@@ -849,8 +849,8 @@ func TestRelated_CF_S3_WrongRawStruct(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -865,8 +865,8 @@ func TestRelated_CF_ELB_NoOrigins(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Origins)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Origins)", result.Count())
 	}
 }
 
@@ -887,8 +887,8 @@ func TestRelated_CF_ELB_NonELBOriginsOnly(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (non-ELB origin, no cache lookup needed)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (non-ELB origin, no cache lookup needed)", result.Count())
 	}
 }
 
@@ -903,8 +903,8 @@ func TestRelated_CF_WAF_EmptyWebACLId(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty WebACLId string)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty WebACLId string)", result.Count())
 	}
 }
 
@@ -934,8 +934,8 @@ func TestRelated_CF_ACM_MatchByID(t *testing.T) {
 
 	checker := cfCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (ID fallback match)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (ID fallback match)", result.Count())
 	}
 }
 
@@ -968,11 +968,11 @@ func TestRelated_CF_Lambda_DefaultBehaviorAssociation(t *testing.T) {
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-edge-fn" {
-		t.Errorf("ResourceIDs = %v, want [my-edge-fn]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-edge-fn" {
+		t.Errorf("ResourceIDs = %v, want [my-edge-fn]", result.ResourceIDs())
 	}
 }
 
@@ -1006,11 +1006,11 @@ func TestRelated_CF_Lambda_CacheBehaviorAssociation(t *testing.T) {
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "cb-edge-fn" {
-		t.Errorf("ResourceIDs = %v, want [cb-edge-fn]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "cb-edge-fn" {
+		t.Errorf("ResourceIDs = %v, want [cb-edge-fn]", result.ResourceIDs())
 	}
 }
 
@@ -1029,8 +1029,8 @@ func TestRelated_CF_Lambda_NoAssociations(t *testing.T) {
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no Lambda@Edge associations)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no Lambda@Edge associations)", result.Count())
 	}
 }
 
@@ -1045,8 +1045,8 @@ func TestRelated_CF_Lambda_NilDistributionConfig(t *testing.T) {
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil DistributionConfig)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil DistributionConfig)", result.Count())
 	}
 }
 
@@ -1061,10 +1061,10 @@ func TestRelated_CF_Lambda_APIError(t *testing.T) {
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (API error)", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (API error)", result.State())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Error("Err = nil, want non-nil on API error")
 	}
 }
@@ -1091,11 +1091,11 @@ func TestRelated_CF_Logs_LoggingEnabled(t *testing.T) {
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "cf-access-logs" {
-		t.Errorf("ResourceIDs = %v, want [cf-access-logs]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "cf-access-logs" {
+		t.Errorf("ResourceIDs = %v, want [cf-access-logs]", result.ResourceIDs())
 	}
 }
 
@@ -1116,8 +1116,8 @@ func TestRelated_CF_Logs_LoggingDisabled(t *testing.T) {
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (logging disabled)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (logging disabled)", result.Count())
 	}
 }
 
@@ -1133,8 +1133,8 @@ func TestRelated_CF_Logs_NilLoggingConfig(t *testing.T) {
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Logging)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Logging)", result.Count())
 	}
 }
 
@@ -1143,7 +1143,7 @@ func TestRelated_CF_Logs_NilClientPath(t *testing.T) {
 	res := resource.Resource{ID: "E1NILCLIENT", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }

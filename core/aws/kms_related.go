@@ -27,7 +27,7 @@ func kmsKeyID(res resource.Resource) string {
 func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
+		return resource.KnownRelated("ebs", nil, false)
 	}
 
 	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
@@ -58,7 +58,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+		return resource.KnownRelated("dbi", nil, false)
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
@@ -90,7 +90,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 
 	secretsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -185,7 +185,7 @@ func kmsRoleNamesFromPolicyJSON(policyJSON string) []string {
 func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.KMS == nil {

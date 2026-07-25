@@ -74,8 +74,8 @@ func TestRelated_SSM_KMS_Match(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, ssmSecureRes(), ssmKMSCache())
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -102,8 +102,8 @@ func TestRelated_SSM_KMS_NoMatch(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, ssmSecureRes(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -125,8 +125,8 @@ func TestRelated_SSM_KMS_NotSecureString(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, ssmKMSCache())
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (non-SecureString has no KMS key)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (non-SecureString has no KMS key)", result.Count())
 	}
 }
 
@@ -148,8 +148,8 @@ func TestRelated_SSM_KMS_NilKeyId(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, ssmKMSCache())
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil KeyId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil KeyId)", result.Count())
 	}
 }
 
@@ -157,8 +157,8 @@ func TestRelated_SSM_NilClients(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, ssmSecureRes(), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients, empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients, empty cache)", result.Count())
 	}
 }
 
@@ -166,8 +166,8 @@ func TestRelated_SSM_EmptyCache(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, ssmSecureRes(), resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
 

@@ -58,8 +58,8 @@ func TestRelated_MSK_SG_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -82,11 +82,11 @@ func TestRelated_MSK_KMS_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "mrk-abc1234567890123456789012345678" {
-		t.Errorf("ResourceIDs[0] = %q, want mrk-abc1234567890123456789012345678", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "mrk-abc1234567890123456789012345678" {
+		t.Errorf("ResourceIDs[0] = %q, want mrk-abc1234567890123456789012345678", result.ResourceIDs()[0])
 	}
 }
 
@@ -98,8 +98,8 @@ func TestRelated_MSK_KMS_NilProvisioned(t *testing.T) {
 	checker := mskCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Provisioned)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Provisioned)", result.Count())
 	}
 }
 
@@ -118,8 +118,8 @@ func TestRelated_MSK_KMS_NilEncryptionAtRest(t *testing.T) {
 	checker := mskCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil EncryptionAtRest)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil EncryptionAtRest)", result.Count())
 	}
 }
 
@@ -128,8 +128,8 @@ func TestRelated_MSK_KMS_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct: assertStruct fails → default 0)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct: assertStruct fails → default 0)", result.Count())
 	}
 }
 
@@ -150,11 +150,11 @@ func TestRelated_MSK_Subnet_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 3 {
-		t.Errorf("Count = %d, want 3", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("Count = %d, want 3", result.Count())
 	}
-	if result.ResourceIDs[0] != "subnet-aaa111" {
-		t.Errorf("ResourceIDs[0] = %q, want subnet-aaa111", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "subnet-aaa111" {
+		t.Errorf("ResourceIDs[0] = %q, want subnet-aaa111", result.ResourceIDs()[0])
 	}
 }
 
@@ -169,8 +169,8 @@ func TestRelated_MSK_Subnet_NilBrokerNodeGroupInfo(t *testing.T) {
 	checker := mskCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil BrokerNodeGroupInfo)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil BrokerNodeGroupInfo)", result.Count())
 	}
 }
 
@@ -179,8 +179,8 @@ func TestRelated_MSK_Subnet_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -211,11 +211,11 @@ func TestRelated_MSK_VPC_FoundViaSubnetCache(t *testing.T) {
 	checker := mskCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "vpc-kafkavpc001" {
-		t.Errorf("ResourceIDs[0] = %q, want vpc-kafkavpc001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "vpc-kafkavpc001" {
+		t.Errorf("ResourceIDs[0] = %q, want vpc-kafkavpc001", result.ResourceIDs()[0])
 	}
 }
 
@@ -227,8 +227,8 @@ func TestRelated_MSK_VPC_NilProvisioned(t *testing.T) {
 	checker := mskCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil Provisioned)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil Provisioned)", result.Count())
 	}
 }
 
@@ -247,8 +247,8 @@ func TestRelated_MSK_VPC_EmptySubnets(t *testing.T) {
 	checker := mskCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no subnets)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no subnets)", result.Count())
 	}
 }
 
@@ -268,8 +268,8 @@ func TestRelated_MSK_VPC_SubnetNotInCache(t *testing.T) {
 	checker := mskCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -295,11 +295,11 @@ func TestRelated_MSK_Logs_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "/msk/analytics-kafka-cluster/broker" {
-		t.Errorf("ResourceIDs[0] = %q, want /msk/analytics-kafka-cluster/broker", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "/msk/analytics-kafka-cluster/broker" {
+		t.Errorf("ResourceIDs[0] = %q, want /msk/analytics-kafka-cluster/broker", result.ResourceIDs()[0])
 	}
 }
 
@@ -322,8 +322,8 @@ func TestRelated_MSK_Logs_DisabledCloudWatch(t *testing.T) {
 	checker := mskCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (CloudWatch logging disabled)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (CloudWatch logging disabled)", result.Count())
 	}
 }
 
@@ -338,8 +338,8 @@ func TestRelated_MSK_Logs_NilLoggingInfo(t *testing.T) {
 	checker := mskCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil LoggingInfo)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil LoggingInfo)", result.Count())
 	}
 }
 
@@ -348,8 +348,8 @@ func TestRelated_MSK_Logs_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -375,11 +375,11 @@ func TestRelated_MSK_S3_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "my-msk-logs-bucket" {
-		t.Errorf("ResourceIDs[0] = %q, want my-msk-logs-bucket", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "my-msk-logs-bucket" {
+		t.Errorf("ResourceIDs[0] = %q, want my-msk-logs-bucket", result.ResourceIDs()[0])
 	}
 }
 
@@ -403,8 +403,8 @@ func TestRelated_MSK_S3_Disabled(t *testing.T) {
 	checker := mskCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (S3 logging disabled)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (S3 logging disabled)", result.Count())
 	}
 }
 
@@ -423,8 +423,8 @@ func TestRelated_MSK_S3_NilS3Config(t *testing.T) {
 	checker := mskCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil S3 config)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil S3 config)", result.Count())
 	}
 }
 
@@ -433,8 +433,8 @@ func TestRelated_MSK_S3_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -460,14 +460,14 @@ func TestRelated_MSK_Secrets_Found(t *testing.T) {
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.ResourceIDs[0] != "AmazonMSK_kafka-scram-secret-abc123" {
-		t.Errorf("ResourceIDs[0] = %q, want AmazonMSK_kafka-scram-secret-abc123", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "AmazonMSK_kafka-scram-secret-abc123" {
+		t.Errorf("ResourceIDs[0] = %q, want AmazonMSK_kafka-scram-secret-abc123", result.ResourceIDs()[0])
 	}
-	if result.ResourceIDs[1] != "AmazonMSK_kafka-user2-xyz456" {
-		t.Errorf("ResourceIDs[1] = %q, want AmazonMSK_kafka-user2-xyz456", result.ResourceIDs[1])
+	if result.ResourceIDs()[1] != "AmazonMSK_kafka-user2-xyz456" {
+		t.Errorf("ResourceIDs[1] = %q, want AmazonMSK_kafka-user2-xyz456", result.ResourceIDs()[1])
 	}
 }
 
@@ -486,8 +486,8 @@ func TestRelated_MSK_Secrets_EmptyList(t *testing.T) {
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SCRAM secrets)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no SCRAM secrets)", result.Count())
 	}
 }
 
@@ -500,8 +500,8 @@ func TestRelated_MSK_Secrets_NilClusterARN(t *testing.T) {
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no cluster ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no cluster ARN)", result.Count())
 	}
 }
 
@@ -517,8 +517,8 @@ func TestRelated_MSK_Secrets_NilClients(t *testing.T) {
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -527,7 +527,7 @@ func TestRelated_MSK_Secrets_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct — assertStruct fails, empty ClusterArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct — assertStruct fails, empty ClusterArn)", result.Count())
 	}
 }

@@ -32,7 +32,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 		projectName = res.ID
 	}
 	if projectName == "" {
-		return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
+		return resource.KnownRelated("pipeline", nil, false)
 	}
 
 	entry, ok := cache["pipeline"]
@@ -64,9 +64,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, pipelineName)
 		}
 	}
-	result := relatedResult("pipeline", ids)
-	result.Truncated = entry.IsTruncated
-	return result
+	return relatedResultTrunc("pipeline", ids, entry.IsTruncated)
 }
 
 // cbPipelineHasProject returns true if any action across the given stages has

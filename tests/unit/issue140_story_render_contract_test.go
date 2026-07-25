@@ -7,8 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/app"
+	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -175,7 +175,7 @@ func issue140SetupRightColumnFocus(t *testing.T, counts map[string]int) (m tui.M
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res.ID,
 			OperationID:      activeOp,
-			Result:           resource.RelatedCheckResult{TargetType: target, Count: counts[target], ResourceIDs: ids},
+			Result:           resource.KnownRelated(target, ids, false),
 		})
 	}
 

@@ -65,7 +65,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.UnknownRelated("kms")
 	}
 	if len(vaults) == 0 {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
@@ -109,7 +109,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("sns")
 	}
 	if len(vaults) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
@@ -148,7 +148,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		if aggErr != nil {
 			return resource.ErrorRelated("sns", aggErr)
 		}
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 
 	// Resolve topic names against sns cache (topic name is last segment of ARN).
@@ -179,9 +179,16 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 	if len(ids) == 0 && truncated {
 		return relatedResultTrunc("sns", nil, true)
 	}
-	result := relatedResult("sns", ids)
-	result.Err = aggErr
-	return result
+	if len(ids) == 0 && aggErr != nil {
+		// Nothing was confirmed and the sns cache page was complete: the
+		// vault-notification failures are a plain fetch failure, not a
+		// truncation signal.
+		return resource.ErrorRelated("sns", aggErr)
+	}
+	// Some GetBackupVaultNotifications calls may have failed: ids is a proven
+	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
+	// row actionable rather than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("sns", ids, truncated || aggErr != nil)
 }
 
 // backupPlanVaults returns the unique TargetBackupVaultName values from the

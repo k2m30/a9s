@@ -20,10 +20,10 @@ import (
 func checkLambdaRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	if fn.Role == nil || *fn.Role == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	// In-body: the execution Role ARN normalizes to the role name, which IS the
 	// role's Resource.ID (roles keyed by name; role FetchByIDs drives the drill).
@@ -49,7 +49,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	// Check for custom log group via LoggingConfig
@@ -85,7 +85,7 @@ func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 		return resource.UnknownRelated("sg")
 	}
 	if fn.VpcConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	var ids []string
 	for _, sgID := range fn.VpcConfig.SecurityGroupIds {
@@ -105,7 +105,7 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("vpc")
 	}
 	if fn.VpcConfig == nil || fn.VpcConfig.VpcId == nil || *fn.VpcConfig.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*fn.VpcConfig.VpcId})
 }
@@ -116,7 +116,7 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*fn.KMSKeyArn, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -133,7 +133,7 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ r
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
+		return resource.KnownRelated("sqs", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -176,7 +176,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("cfn")
 	}
 	if fn.FunctionArn == nil || *fn.FunctionArn == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.Lambda == nil {
@@ -190,7 +190,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	stackName := tagsOut.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -217,7 +217,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 // follow the pattern <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>].
 func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["package_type"] != "Image" {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+		return resource.KnownRelated("ecr", nil, false)
 	}
 	fnName := res.ID
 	if fnName == "" {
@@ -283,7 +283,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		functionName = res.ID
 	}
 	if functionARN == "" && functionName == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.EventBridge == nil {
@@ -327,7 +327,16 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		ids = append(ids, id)
 	}
 	if aggErr := AggregateFailures("lambda-related: ListTargetsByRule", failures, len(ruleList)); aggErr != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: len(ids), ResourceIDs: ids, Err: aggErr}
+		if len(ids) == 0 {
+			// Nothing was confirmed: the failures establish nothing about the
+			// population size, only that the attempt failed.
+			return resource.ErrorRelated("eb-rule", aggErr)
+		}
+		// Some ListTargetsByRule calls failed: ids is a proven subset, not the
+		// exhaustive answer. Truncated (not Errored) keeps the row actionable —
+		// "at least N, could not verify the rest" — rather than discarding the
+		// confirmed matches as a dead end.
+		return resource.KnownRelated("eb-rule", ids, true)
 	}
 	return relatedResultTrunc("eb-rule", ids, truncated)
 }

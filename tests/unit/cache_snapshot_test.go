@@ -55,10 +55,10 @@ func TestBuildResourceCacheSnapshot_IncludesTruncation(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, truncatedCache)
 
-	if result.Count != 0 {
-		t.Errorf("alarm checker with truncated cache (IsTruncated=true) and 0 local matches: want Count=0, got Count=%d", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("alarm checker with truncated cache (IsTruncated=true) and 0 local matches: want Count=0, got Count=%d", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("alarm checker with truncated cache (IsTruncated=true) and 0 local matches: want Truncated=true, got false")
 	}
 }
@@ -95,7 +95,7 @@ func TestBuildResourceCacheSnapshot_TruncatedWithMatch_ReturnsMatches(t *testing
 	result := checker(context.Background(), nil, instance, truncatedCacheWithMatch)
 
 	// Found a match — count must be positive even though cache is truncated.
-	if result.Count < 1 {
-		t.Errorf("alarm checker with truncated cache and 1 local match: want Count>=1, got Count=%d", result.Count)
+	if result.Count() < 1 {
+		t.Errorf("alarm checker with truncated cache and 1 local match: want Count>=1, got Count=%d", result.Count())
 	}
 }

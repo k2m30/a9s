@@ -93,11 +93,11 @@ func TestRelated_ELB_SG_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.ResourceIDs[0] != "sg-alb001" {
-		t.Errorf("ResourceIDs[0] = %q, want sg-alb001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "sg-alb001" {
+		t.Errorf("ResourceIDs[0] = %q, want sg-alb001", result.ResourceIDs()[0])
 	}
 }
 
@@ -117,8 +117,8 @@ func TestRelated_ELB_SG_NLBHasNoSGs(t *testing.T) {
 	checker := elbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (NLB has no SGs)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (NLB has no SGs)", result.Count())
 	}
 }
 
@@ -127,8 +127,8 @@ func TestRelated_ELB_SG_WrongRawStruct(t *testing.T) {
 	checker := elbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -143,11 +143,11 @@ func TestRelated_ELB_VPC_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "vpc-prod001" {
-		t.Errorf("ResourceIDs[0] = %q, want vpc-prod001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "vpc-prod001" {
+		t.Errorf("ResourceIDs[0] = %q, want vpc-prod001", result.ResourceIDs()[0])
 	}
 }
 
@@ -159,8 +159,8 @@ func TestRelated_ELB_VPC_EmptyVPCField(t *testing.T) {
 	checker := elbCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count())
 	}
 }
 
@@ -190,11 +190,11 @@ func TestRelated_ELB_CFN_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "prod-alb-stack" {
-		t.Errorf("ResourceIDs[0] = %q, want prod-alb-stack", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "prod-alb-stack" {
+		t.Errorf("ResourceIDs[0] = %q, want prod-alb-stack", result.ResourceIDs()[0])
 	}
 }
 
@@ -222,8 +222,8 @@ func TestRelated_ELB_CFN_NoCFNTag(t *testing.T) {
 	checker := elbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no CFN stack tag)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN stack tag)", result.Count())
 	}
 }
 
@@ -250,11 +250,11 @@ func TestRelated_ELB_ACM_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != certARN {
-		t.Errorf("ResourceIDs[0] = %q, want %s", result.ResourceIDs[0], certARN)
+	if result.ResourceIDs()[0] != certARN {
+		t.Errorf("ResourceIDs[0] = %q, want %s", result.ResourceIDs()[0], certARN)
 	}
 }
 
@@ -284,8 +284,8 @@ func TestRelated_ELB_ACM_DeduplicatesCerts(t *testing.T) {
 	checker := elbCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (deduplicated cert)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (deduplicated cert)", result.Count())
 	}
 }
 
@@ -307,8 +307,8 @@ func TestRelated_ELB_ACM_HTTPListenerNoCerts(t *testing.T) {
 	checker := elbCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (HTTP-only listener, no certs)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (HTTP-only listener, no certs)", result.Count())
 	}
 }
 
@@ -321,8 +321,8 @@ func TestRelated_ELB_ACM_NilClients(t *testing.T) {
 	checker := elbCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -351,11 +351,11 @@ func TestRelated_ELB_CF_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "E1EXAMPLE1234" {
-		t.Errorf("ResourceIDs[0] = %q, want E1EXAMPLE1234", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "E1EXAMPLE1234" {
+		t.Errorf("ResourceIDs[0] = %q, want E1EXAMPLE1234", result.ResourceIDs()[0])
 	}
 }
 
@@ -381,8 +381,8 @@ func TestRelated_ELB_CF_NoMatch(t *testing.T) {
 	checker := elbCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching origin domain)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching origin domain)", result.Count())
 	}
 }
 
@@ -391,8 +391,8 @@ func TestRelated_ELB_CF_EmptyDNSName(t *testing.T) {
 	checker := elbCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty dns_name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty dns_name)", result.Count())
 	}
 }
 
@@ -420,11 +420,11 @@ func TestRelated_ELB_ENI_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "eni-alb001" {
-		t.Errorf("ResourceIDs[0] = %q, want eni-alb001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "eni-alb001" {
+		t.Errorf("ResourceIDs[0] = %q, want eni-alb001", result.ResourceIDs()[0])
 	}
 }
 
@@ -448,8 +448,8 @@ func TestRelated_ELB_ENI_WrongRequester(t *testing.T) {
 	checker := elbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RequesterId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RequesterId)", result.Count())
 	}
 }
 
@@ -458,8 +458,8 @@ func TestRelated_ELB_ENI_EmptyName(t *testing.T) {
 	checker := elbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty name)", result.Count())
 	}
 }
 
@@ -486,11 +486,11 @@ func TestRelated_ELB_S3_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "my-elb-access-logs" {
-		t.Errorf("ResourceIDs[0] = %q, want my-elb-access-logs", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "my-elb-access-logs" {
+		t.Errorf("ResourceIDs[0] = %q, want my-elb-access-logs", result.ResourceIDs()[0])
 	}
 }
 
@@ -514,8 +514,8 @@ func TestRelated_ELB_S3_LogsNotEnabled(t *testing.T) {
 	checker := elbCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (access logs disabled)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (access logs disabled)", result.Count())
 	}
 }
 
@@ -539,8 +539,8 @@ func TestRelated_ELB_Subnet_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -563,8 +563,8 @@ func TestRelated_ELB_Subnet_DeduplicatesSubnets(t *testing.T) {
 	checker := elbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count())
 	}
 }
 
@@ -573,8 +573,8 @@ func TestRelated_ELB_Subnet_WrongRawStruct(t *testing.T) {
 	checker := elbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -601,11 +601,11 @@ func TestRelated_ELB_WAF_Found(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != wafID {
-		t.Errorf("ResourceIDs[0] = %q, want %s", result.ResourceIDs[0], wafID)
+	if result.ResourceIDs()[0] != wafID {
+		t.Errorf("ResourceIDs[0] = %q, want %s", result.ResourceIDs()[0], wafID)
 	}
 }
 
@@ -623,8 +623,8 @@ func TestRelated_ELB_WAF_NoWebACL(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no WAF attached)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no WAF attached)", result.Count())
 	}
 }
 
@@ -639,7 +639,7 @@ func TestRelated_ELB_WAF_EmptyARN(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count())
 	}
 }

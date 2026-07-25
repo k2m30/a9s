@@ -192,7 +192,7 @@ func TestListFilter_MatchesFindingsPhrase_CaseInsensitive(t *testing.T) {
 func wave3VPCSGChecker(_ context.Context, _ any, src resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	entry, ok := cache["sg"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	var matched []string
 	for _, r := range entry.Resources {
@@ -201,9 +201,9 @@ func wave3VPCSGChecker(_ context.Context, _ any, src resource.Resource, cache re
 		}
 	}
 	if len(matched) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
-	return resource.RelatedCheckResult{TargetType: "sg", Count: len(matched), ResourceIDs: matched}
+	return resource.KnownRelated("sg", matched, false)
 }
 
 func wave3SG(id, vpcID string) resource.Resource {
@@ -289,13 +289,13 @@ func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 	alwaysMatch := func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 		entry, ok := cache["sg"]
 		if !ok {
-			return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+			return resource.KnownRelated("sg", nil, false)
 		}
 		ids := make([]string, len(entry.Resources))
 		for i, r := range entry.Resources {
 			ids[i] = r.ID
 		}
-		return resource.RelatedCheckResult{TargetType: "sg", Count: len(ids), ResourceIDs: ids}
+		return resource.KnownRelated("sg", ids, false)
 	}
 	c.PatchListReapplyChecker(alwaysMatch, resource.Resource{ID: "vpc-target"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "group_name"})
@@ -445,7 +445,7 @@ type wave3AssertT interface {
 // touching *testing.T's internals or aborting the calling goroutine.
 type wave3FailSpy struct{ failed bool }
 
-func (s *wave3FailSpy) Helper() {}
+func (s *wave3FailSpy) Helper()                           {}
 func (s *wave3FailSpy) Errorf(format string, args ...any) { s.failed = true }
 func (s *wave3FailSpy) Fatalf(format string, args ...any) { s.failed = true }
 

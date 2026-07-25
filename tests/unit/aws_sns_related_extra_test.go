@@ -63,11 +63,11 @@ func TestRelated_SNS_Sub_FoundByTopicARN(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "arn:aws:sns:us-east-1:123456789012:order-events:sub-001" {
-		t.Errorf("ResourceIDs[0] = %q, unexpected", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "arn:aws:sns:us-east-1:123456789012:order-events:sub-001" {
+		t.Errorf("ResourceIDs[0] = %q, unexpected", result.ResourceIDs()[0])
 	}
 }
 
@@ -89,8 +89,8 @@ func TestRelated_SNS_Sub_MultipleSubscribers(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -100,8 +100,8 @@ func TestRelated_SNS_Sub_EmptyTopicARN(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no ARN)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no ARN)", result.Count())
 	}
 }
 
@@ -123,8 +123,8 @@ func TestRelated_SNS_Sub_FallsBackToID(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (fallback to res.ID)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (fallback to res.ID)", result.Count())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_SNS_Sub_NilCacheNoClients(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -160,11 +160,11 @@ func TestRelated_SNS_KMS_FoundFromAttributes(t *testing.T) {
 	checker := snsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "sns-key-001" {
-		t.Errorf("ResourceIDs[0] = %q, want sns-key-001 (last ARN segment)", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "sns-key-001" {
+		t.Errorf("ResourceIDs[0] = %q, want sns-key-001 (last ARN segment)", result.ResourceIDs()[0])
 	}
 }
 
@@ -183,8 +183,8 @@ func TestRelated_SNS_KMS_NotEncrypted(t *testing.T) {
 	checker := snsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not encrypted)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not encrypted)", result.Count())
 	}
 }
 
@@ -196,8 +196,8 @@ func TestRelated_SNS_KMS_NilClientsReturnsUnknown(t *testing.T) {
 	checker := snsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -206,8 +206,8 @@ func TestRelated_SNS_KMS_EmptyTopicARNReturnsZero(t *testing.T) {
 	checker := snsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count())
 	}
 }
 
@@ -235,11 +235,11 @@ func TestRelated_SNS_Role_ExtractsFromPolicy(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "sns-publisher" {
-		t.Errorf("ResourceIDs[0] = %q, want sns-publisher", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "sns-publisher" {
+		t.Errorf("ResourceIDs[0] = %q, want sns-publisher", result.ResourceIDs()[0])
 	}
 }
 
@@ -268,8 +268,8 @@ func TestRelated_SNS_Role_MultipleRoles(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
 
@@ -286,8 +286,8 @@ func TestRelated_SNS_Role_NoPolicyEntries(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no role ARNs in policy)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no role ARNs in policy)", result.Count())
 	}
 }
 
@@ -304,8 +304,8 @@ func TestRelated_SNS_Role_EmptyPolicyString(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty policy attribute)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty policy attribute)", result.Count())
 	}
 }
 
@@ -317,8 +317,8 @@ func TestRelated_SNS_Role_NilClientsReturnsUnknown(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
 
@@ -356,8 +356,8 @@ func TestRelated_SNS_Alarm_OKActions(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct entries skipped)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct entries skipped)", result.Count())
 	}
 }
 
@@ -384,8 +384,8 @@ func TestRelated_SNS_Role_PrincipalWithUserARNIgnored(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (user ARN, not role)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (user ARN, not role)", result.Count())
 	}
 }
 
@@ -404,10 +404,10 @@ func TestRelated_SNS_Role_UsesTopicARNFromID(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (fallback to res.ID for ARN)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (fallback to res.ID for ARN)", result.Count())
 	}
-	if result.ResourceIDs[0] != "reader" {
-		t.Errorf("ResourceIDs[0] = %q, want reader", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "reader" {
+		t.Errorf("ResourceIDs[0] = %q, want reader", result.ResourceIDs()[0])
 	}
 }

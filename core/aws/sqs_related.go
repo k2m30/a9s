@@ -62,7 +62,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 		if truncated {
 			return relatedResultTrunc("sns", nil, true)
 		}
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+		return resource.KnownRelated("sns", nil, false)
 	}
 
 	var ids []string
@@ -208,7 +208,7 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	queueARN := row.Attributes["QueueArn"]
 	if queueARN == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -238,7 +238,7 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ r
 func checkSQSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := res.Fields["kms_key_id"]
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{keyID})
 }
@@ -253,7 +253,7 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 		queueARN = raw.Attributes["QueueArn"]
 	}
 	if queueARN == "" {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+		return resource.KnownRelated("eb-rule", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {

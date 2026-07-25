@@ -29,7 +29,7 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	return relatedResult("sg", ids)
 }
@@ -42,11 +42,11 @@ func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("kms")
 	}
 	if db.KmsKeyId == nil || *db.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*db.KmsKeyId, res.Type)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{keyID})
 }
@@ -59,7 +59,7 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if db.DBSubnetGroup == nil || len(db.DBSubnetGroup.Subnets) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, subnet := range db.DBSubnetGroup.Subnets {
@@ -68,7 +68,7 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	return relatedResult("subnet", ids)
 }
@@ -86,7 +86,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbIdentifier := res.ID
 	if dbIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: 0}
+		return resource.KnownRelated("dbi-snap", nil, false)
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi-snap")
@@ -115,7 +115,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 
 	prefix := "/aws/rds/instance/" + dbID + "/"
@@ -147,10 +147,10 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		// Parent isn't a DBInstance — cannot read MasterUserSecret.
 		// Returning -1 here drops the honest lower bound; 0 is correct because
 		// without a recognizable parent shape there are no DBInstance-secret links to find.
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	secretARN := *db.MasterUserSecret.SecretArn
 
@@ -179,7 +179,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	inst, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok || inst.DBSubnetGroup == nil || inst.DBSubnetGroup.VpcId == nil || *inst.DBSubnetGroup.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
 }
@@ -190,10 +190,10 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+		return resource.KnownRelated("dbc", nil, false)
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+		return resource.KnownRelated("dbc", nil, false)
 	}
 	// In-body: DBClusterIdentifier IS the cluster's resource id (dbc keyed by identifier).
 	return relatedResult("dbc", []string{*db.DBClusterIdentifier})
@@ -247,7 +247,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if len(sgIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EC2 == nil {
@@ -282,14 +282,12 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 	fetchFilter := map[string]string{"ResourceName": dbID}
 	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
-		r := resource.ErrorRelated("ct-events", err)
-		r.FetchFilter = fetchFilter
-		return r
+		return resource.ErrorRelated("ct-events", err).WithFetchFilter(fetchFilter)
 	}
 	if eventList == nil {
 		return resource.DeferredRelated("ct-events", fetchFilter)
@@ -315,14 +313,7 @@ func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		r := relatedResultTrunc("ct-events", nil, true)
-		r.FetchFilter = fetchFilter
-		return r
+		return relatedResultTrunc("ct-events", nil, true).WithFetchFilter(fetchFilter)
 	}
-	result := relatedResult("ct-events", ids)
-	if truncated {
-		result.Truncated = true
-	}
-	result.FetchFilter = fetchFilter
-	return result
+	return relatedResultTrunc("ct-events", ids, truncated).WithFetchFilter(fetchFilter)
 }

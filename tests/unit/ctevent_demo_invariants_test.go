@@ -423,18 +423,18 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 
 			for _, result := range results {
 				rowLabel := fmt.Sprintf("event=%s targetType=%s count=%d fetchFilter=%v ids=%v",
-					res.ID, result.TargetType, result.Count, result.FetchFilter, result.ResourceIDs)
+					res.ID, result.TargetType(), result.Count(), result.FetchFilter(), result.ResourceIDs())
 
 				// G3 (Bug A): Root events must have Count=0 for the role checker.
-				if isRoot && result.TargetType == "role" && result.Count != 0 {
+				if isRoot && result.TargetType() == "role" && result.Count() != 0 {
 					t.Errorf("G3 (Bug A) FAIL: Root event has Count=%d for role checker, want 0 — %s",
-						result.Count, rowLabel)
+						result.Count(), rowLabel)
 				}
 
 				// G1: Count>0 resource IDs must each exist in the fake cache for TargetType.
-				if result.Count > 0 {
-					fixtureIDs := fixtureIDsForType(cache, result.TargetType)
-					for _, rid := range result.ResourceIDs {
+				if result.Count() > 0 {
+					fixtureIDs := fixtureIDsForType(cache, result.TargetType())
+					for _, rid := range result.ResourceIDs() {
 						// Strip compound key to first segment for child types.
 						lookupID := rid
 						if before, _, ok := strings.Cut(rid, "|"); ok {
@@ -442,7 +442,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 						}
 						if len(fixtureIDs) > 0 && !fixtureIDs[rid] {
 							// Try the stripped ID (for s3_objects composite keys).
-							entry := cache[result.TargetType]
+							entry := cache[result.TargetType()]
 							foundInFixtures := false
 							for _, r := range entry.Resources {
 								if r.ID == rid || r.ID == lookupID || r.Name == lookupID {
@@ -452,7 +452,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 							}
 							if !foundInFixtures {
 								t.Errorf("G1 FAIL: ResourceID %q not found in fake cache for %q — %s",
-									rid, result.TargetType, rowLabel)
+									rid, result.TargetType(), rowLabel)
 							}
 						}
 					}
@@ -460,10 +460,10 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 
 				// G2 (Bug C): State: RelatedDeferred (+ non-empty FetchFilter) must
 				// route to NavigationKindFilteredList or NavigationKindEnterChildView.
-				if result.State == domain.RelatedDeferred {
+				if result.State() == domain.RelatedDeferred {
 					navMsg := runtime.RelatedNavigateEvent{
-						TargetType:  result.TargetType,
-						FetchFilter: result.FetchFilter,
+						TargetType:  result.TargetType(),
+						FetchFilter: result.FetchFilter(),
 					}
 					navResult := runtime.ResolveRelatedNavigate(navMsg, resolveCache)
 					switch navResult.Kind {
@@ -522,10 +522,10 @@ func TestCtEventsDemoRightColumnCheckers_RealCheckers(t *testing.T) {
 			// returns nil, false when clients is not *ServiceClients, so Count=-1
 			// without error — that's OK, we just need Count != positive integer).
 			result := roleChecker(ctx, nil, res, cache)
-			if result.Count > 0 {
+			if result.Count() > 0 {
 				t.Errorf("G3 (Bug A) FAIL: Real role checker returned Count=%d (IDs=%v) for Root event %q, want 0 — "+
 					"Root events have no assumed role to match",
-					result.Count, result.ResourceIDs, res.ID)
+					result.Count(), result.ResourceIDs(), res.ID)
 			}
 		})
 	}

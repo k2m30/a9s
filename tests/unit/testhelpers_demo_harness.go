@@ -13,7 +13,7 @@ import (
 // RelatedDef structs when the test only needs the def to be non-nil
 // (e.g. to trigger right-column rendering) but doesn't need real data.
 var noopChecker resource.RelatedChecker = func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{Count: 0}
+	return resource.KnownRelated("", nil, false)
 }
 
 // replaceEC2Related registers defs for "ec2" and restores the originals on

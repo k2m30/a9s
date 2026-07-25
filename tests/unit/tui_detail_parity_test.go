@@ -321,19 +321,11 @@ func seedRelatedCache(core *runtime.Core, resourceType, resourceID string) {
 	core.RelatedCacheSet(key, []runtime.RelatedCacheResult{
 		{
 			DefDisplayName: "Security Groups",
-			Result: resource.RelatedCheckResult{
-				TargetType:  "sg",
-				Count:       2,
-				ResourceIDs: []string{"sg-replay1", "sg-replay2"},
-			},
+			Result:         resource.KnownRelated("sg", []string{"sg-replay1", "sg-replay2"}, false),
 		},
 		{
 			DefDisplayName: "IAM Roles",
-			Result: resource.RelatedCheckResult{
-				TargetType:  "role",
-				Count:       1,
-				ResourceIDs: []string{"role-replay1"},
-			},
+			Result:         resource.KnownRelated("role", []string{"role-replay1"}, false),
 		},
 	})
 }

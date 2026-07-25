@@ -308,7 +308,7 @@ func TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStranded
 	}
 	def0 := defs[0]
 	core.RelatedCacheSet(runtime.RelatedCacheKey(sfnInterleavingType, id), []runtime.RelatedCacheResult{
-		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+		{DefDisplayName: def0.DisplayName, Result: resource.KnownRelated(def0.TargetType, []string{"partial-cache-1", "partial-cache-2", "partial-cache-3"}, false)},
 	})
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: sfnInterleavingType})

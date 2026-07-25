@@ -30,8 +30,11 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
-	_ "github.com/k2m30/a9s/v3/core/aws" // ensure all related registrations run
+	awsclient "github.com/k2m30/a9s/v3/core/aws" // ensure all related registrations run
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -42,24 +45,31 @@ import (
 
 // TestTruncatedResult_ReturnsTruncatedResult verifies that TruncatedResult
 // returns a fully-populated RelatedCheckResult with Count=0, Truncated=true,
-// the given TargetType, and nil ResourceIDs / Err.
+// the given TargetType, empty ResourceIDs, and nil Err.
+//
+// KnownRelated always allocates its internal ID slice via make([]string, 0,
+// len(ids)), so ResourceIDs() is never a literal nil for a KnownRelated
+// result — only empty. The "nil" pin this test used to check was an
+// implementation detail of the pre-encapsulation zero-value struct literal,
+// not a documented contract (ValidateRelatedResult/EffectiveState/
+// IsRelatedActionable treat nil and empty ResourceIDs identically).
 func TestTruncatedResult_ReturnsTruncatedResult(t *testing.T) {
-	result := resource.RelatedCheckResult{TargetType: "vpc", Truncated: true}
+	result := resource.KnownRelated("vpc", nil, true)
 
-	if result.TargetType != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
+	if result.TargetType() != "vpc" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true")
 	}
-	if result.ResourceIDs != nil {
-		t.Errorf("ResourceIDs = %v, want nil", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil", result.Err())
 	}
 }
 
@@ -71,13 +81,13 @@ func TestTruncatedResult_ReturnsTruncatedResult(t *testing.T) {
 // result with an empty TargetType, which ValidateRelatedResult reports as invalid.
 // This lets callers detect the empty-TargetType invariant at validation time.
 func TestTruncatedResult_EmptyTargetType(t *testing.T) {
-	result := resource.RelatedCheckResult{TargetType: "", Truncated: true}
+	result := resource.KnownRelated("", nil, true)
 
 	// The struct is returned (TruncatedResult does not panic on empty input).
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true")
 	}
 
@@ -104,7 +114,7 @@ func TestTruncatedResult_PassesValidation(t *testing.T) {
 	for _, tt := range targetTypes {
 		tt := tt
 		t.Run(tt, func(t *testing.T) {
-			result := resource.RelatedCheckResult{TargetType: tt, Truncated: true}
+			result := resource.KnownRelated(tt, nil, true)
 			if err := resource.ValidateRelatedResult(result); err != nil {
 				t.Errorf("TruncatedResult(%q) fails ValidateRelatedResult: %v", tt, err)
 			}
@@ -160,18 +170,18 @@ func TestCheckVPC_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 
 	result := checker(context.Background(), nil, vpcResource, cache)
 
-	if result.State != domain.RelatedResolved {
+	if result.State() != domain.RelatedResolved {
 		t.Errorf("checkVPCSubnet with truncated-empty cache returned State=%s "+
-			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State, result)
+			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State(), result)
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
 	}
-	if result.TargetType != "subnet" {
-		t.Errorf("TargetType = %q, want \"subnet\"", result.TargetType)
+	if result.TargetType() != "subnet" {
+		t.Errorf("TargetType = %q, want \"subnet\"", result.TargetType())
 	}
 }
 
@@ -218,18 +228,18 @@ func TestCheckSG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 
 	result := checker(context.Background(), nil, sgResource, cache)
 
-	if result.State != domain.RelatedResolved {
+	if result.State() != domain.RelatedResolved {
 		t.Errorf("checkSGEC2 with truncated-empty cache returned State=%s "+
-			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State, result)
+			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State(), result)
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
 	}
-	if result.TargetType != "ec2" {
-		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType)
+	if result.TargetType() != "ec2" {
+		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType())
 	}
 }
 
@@ -276,18 +286,18 @@ func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.State != domain.RelatedResolved {
+	if result.State() != domain.RelatedResolved {
 		t.Errorf("checkAMING with truncated-empty NG cache returned State=%s "+
-			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State, result)
+			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State(), result)
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
 	}
-	if result.TargetType != "ng" {
-		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType)
+	if result.TargetType() != "ng" {
+		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType())
 	}
 }
 
@@ -518,6 +528,12 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Fields: map[string]string{
 				"status": "available",
 			},
+			// checkRedisSG/SNS/Subnet all require this RawStruct shape to reach
+			// redisMemberCluster's DescribeCacheClusters hop at all (see
+			// clientsOverride["redis"] below for the matching fake).
+			RawStruct: elasticachetypes.ReplicationGroup{
+				MemberClusters: []string{"test-redis-member-1"},
+			},
 		},
 		"docdb": {
 			ID:   "test-docdb",
@@ -579,6 +595,53 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 		},
 	}
 
+	// clientsOverride supplies a real *ServiceClients for the handful of
+	// NeedsTargetCache checkers that are genuinely two-hop: they need a live
+	// AWS call to resolve an intermediate reference (redis's member cluster,
+	// ses's configuration set) BEFORE ever reaching the target-cache
+	// truncation logic this test exists to exercise. Every other checker in
+	// the sweep is single-hop (its only prerequisite is the cache parameter),
+	// so nil clients correctly drives it straight to that logic. Reuses the
+	// same fakes aws_redis_related_test.go / fakes_ses_secrets_related_test.go
+	// already define for this package.
+	clientsOverride := map[string]any{
+		"redis": &awsclient.ServiceClients{
+			ElastiCache: &mockElastiCacheFullAPI{
+				cacheClustersOutput: &elasticache.DescribeCacheClustersOutput{
+					CacheClusters: []elasticachetypes.CacheCluster{{
+						CacheClusterId: aws.String("test-redis-member-1"),
+						SecurityGroups: []elasticachetypes.SecurityGroupMembership{
+							{SecurityGroupId: aws.String("sg-redis-truncated-test"), Status: aws.String("active")},
+						},
+						NotificationConfiguration: &elasticachetypes.NotificationConfiguration{
+							TopicArn:    aws.String("arn:aws:sns:us-east-1:123456789012:redis-truncated-test"),
+							TopicStatus: aws.String("active"),
+						},
+						CacheSubnetGroupName: aws.String("redis-truncated-test-subnet-group"),
+					}},
+				},
+				cacheSubnetGroupsOutput: &elasticache.DescribeCacheSubnetGroupsOutput{
+					CacheSubnetGroups: []elasticachetypes.CacheSubnetGroup{{
+						Subnets: []elasticachetypes.Subnet{
+							{SubnetIdentifier: aws.String("subnet-redis-truncated-test")},
+						},
+					}},
+				},
+			},
+		},
+		"ses": &awsclient.ServiceClients{
+			SESv2: newFakeSESv2WithEventDestinations(
+				"test@example.com",
+				"ses-truncated-test-config-set",
+				[]sesv2types.EventDestination{{
+					EventBridgeDestination: &sesv2types.EventBridgeDestination{
+						EventBusArn: aws.String("arn:aws:events:us-east-1:123456789012:event-bus/ses-truncated-test-bus"),
+					},
+				}},
+			),
+		},
+	}
+
 	// fallbackParent is used for any source type not in the above map.
 	fallbackParent := resource.Resource{
 		ID:   "test-resource-id",
@@ -614,6 +677,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 		if p, ok := minimalParents[sourceType]; ok {
 			parent = p
 		}
+		var clients any
+		if c, ok := clientsOverride[sourceType]; ok {
+			clients = c
+		}
 
 		for _, def := range defs {
 			if !def.NeedsTargetCache {
@@ -641,7 +708,7 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 					},
 				}
 
-				result := def.Checker(context.Background(), nil, parent, cache)
+				result := def.Checker(context.Background(), clients, parent, cache)
 
 				// The checker MAY legitimately return Count=0 non-truncated (e.g.,
 				// when it determines from the parent's own fields that there can be
@@ -651,10 +718,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				// provided a real cache entry (not nil). A non-Resolved State
 				// combined with IsTruncated=true is the anti-pattern that drops the
 				// honest lower bound.
-				if result.State != domain.RelatedResolved {
+				if result.State() != domain.RelatedResolved {
 					t.Errorf("checker %s with truncated-empty %q cache returned State=%s "+
 						"(anti-pattern: drops honest lower bound); want RelatedResolved with Count=0, Truncated=true. "+
-						"Result: %+v", key, def.TargetType, result.State, result)
+						"Result: %+v", key, def.TargetType, result.State(), result)
 				}
 
 				// When Count==0, Truncated must be true if the truncated path was hit.
@@ -663,9 +730,9 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				// Count >= 0 is required (already checked above).
 				//
 				// Additionally, validate the overall result shape.
-				if result.TargetType == "" {
+				if result.TargetType() == "" {
 					// Tolerate missing echo — fill it for validation.
-					result.TargetType = def.TargetType
+					result = result.WithTargetType(def.TargetType)
 				}
 				if err := resource.ValidateRelatedResult(result); err != nil {
 					t.Errorf("checker %s returned invalid result: %v; result: %+v",

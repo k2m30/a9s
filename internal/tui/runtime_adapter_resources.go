@@ -268,21 +268,21 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 	cmd := m.dispatchTaskRequests(tasks)
 
 	errMsg := ""
-	if msg.Result.Err != nil {
-		errMsg = msg.Result.Err.Error()
+	if err := msg.Result.Err(); err != nil {
+		errMsg = err.Error()
 	}
 	m.ctrl.ApplyDetailRelatedResultForResource(
 		msg.ResourceType,
 		msg.SourceResourceID,
 		msg.DefDisplayName,
-		msg.Result.TargetType,
+		msg.Result.TargetType(),
 		msg.Result.EffectiveState(),
-		msg.Result.Count,
+		msg.Result.Count(),
 		false,
 		errMsg,
-		msg.Result.Truncated,
-		msg.Result.ResourceIDs,
-		msg.Result.FetchFilter,
+		msg.Result.Truncated(),
+		msg.Result.ResourceIDs(),
+		msg.Result.FetchFilter(),
 	)
 	return m, tea.Batch(flashCmd, cmd)
 }

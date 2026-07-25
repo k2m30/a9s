@@ -146,16 +146,16 @@ func TestRelated_VpcPeer_GraphRootRTBCount(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "rtb")
 	result := checker(context.Background(), nil, res, cache)
-	if result.State != domain.RelatedResolved {
-		t.Fatalf("State = %v, want RelatedResolved", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Fatalf("State = %v, want RelatedResolved", result.State())
 	}
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	want := []string{"rtb-0aaa111111111111a", "rtb-0ccc333333333333c"}
 	sort.Strings(want)
-	if !reflect.DeepEqual(result.ResourceIDs, want) {
-		t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs, want)
+	if !reflect.DeepEqual(result.ResourceIDs(), want) {
+		t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs(), want)
 	}
 }
 
@@ -170,11 +170,11 @@ func TestRelated_VpcPeer_RTB_BlackholedRouteStillCounted(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "rtb")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (a blackholed route is still a route reference)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (a blackholed route is still a route reference)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "rtb-0ddd444444444444d" {
-		t.Errorf("ResourceIDs = %v, want [rtb-0ddd444444444444d]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "rtb-0ddd444444444444d" {
+		t.Errorf("ResourceIDs = %v, want [rtb-0ddd444444444444d]", result.ResourceIDs())
 	}
 }
 
@@ -184,11 +184,11 @@ func TestRelated_VpcPeer_RTB_NoRouteZero(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "rtb")
 	result := checker(context.Background(), nil, res, cache)
-	if result.State != domain.RelatedResolved {
-		t.Errorf("State = %v, want RelatedResolved (rtb cache present and typed, just zero matches)", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (rtb cache present and typed, just zero matches)", result.State())
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -198,8 +198,8 @@ func TestRelated_VpcPeer_RTB_AbsentCacheUnknown(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)
 	checker := checkerByTarget(t, "vpc-peer", "rtb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (no rtb cache entry at all)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (no rtb cache entry at all)", result.State())
 	}
 }
 
@@ -217,13 +217,13 @@ func TestRelated_VpcPeer_RTB_TruncatedCacheResolvedNotUnknown(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "rtb")
 	result := checker(context.Background(), nil, res, cache)
-	if result.State != domain.RelatedResolved {
-		t.Errorf("State = %v, want RelatedResolved (a present, typed rtb cache is trusted even when truncated)", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (a present, typed rtb cache is trusted even when truncated)", result.State())
 	}
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (the two known routes are still visible in the truncated cache)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (the two known routes are still visible in the truncated cache)", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Error("Truncated = false, want true (cache IsTruncated must carry through so the row renders \"N+\")")
 	}
 }
@@ -241,14 +241,14 @@ func TestRelated_VpcPeer_GraphRootVPCGate(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "vpc")
 	result := checker(context.Background(), nil, res, cache)
-	if result.State != domain.RelatedResolved {
-		t.Fatalf("State = %v, want RelatedResolved", result.State)
+	if result.State() != domain.RelatedResolved {
+		t.Fatalf("State = %v, want RelatedResolved", result.State())
 	}
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (only the local requester side is a cache member; the cross-account accepter side is never in the local vpc cache)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (only the local requester side is a cache member; the cross-account accepter side is never in the local vpc cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-0abc123def456789a" {
-		t.Errorf("ResourceIDs = %v, want [vpc-0abc123def456789a] (fixtProdVPCID)", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-0abc123def456789a" {
+		t.Errorf("ResourceIDs = %v, want [vpc-0abc123def456789a] (fixtProdVPCID)", result.ResourceIDs())
 	}
 }
 
@@ -268,11 +268,11 @@ func TestRelated_VpcPeer_VPCGate_SymmetricNotRequesterHardcoded(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "vpc")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (the accepter side alone must resolve when it's the one present in the cache)", result.Count)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (the accepter side alone must resolve when it's the one present in the cache)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != accepterVpcID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, accepterVpcID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != accepterVpcID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), accepterVpcID)
 	}
 }
 
@@ -293,8 +293,8 @@ func TestRelated_VpcPeer_VPCGate_BothSidesResolve(t *testing.T) {
 
 	checker := checkerByTarget(t, "vpc-peer", "vpc")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (both sides are cache members)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (both sides are cache members)", result.Count())
 	}
 }
 
@@ -302,8 +302,8 @@ func TestRelated_VpcPeer_VPC_AbsentCacheUnknown(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)
 	checker := checkerByTarget(t, "vpc-peer", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (no vpc cache entry at all)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (no vpc cache entry at all)", result.State())
 	}
 }
 
@@ -318,10 +318,10 @@ func TestRelated_VpcPeer_CtEvents_Drillable(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedDeferred {
-		t.Errorf("State = %v, want RelatedDeferred (ct-events is a universal server-side pivot, drillable by resource id)", result.State)
+	if result.State() != domain.RelatedDeferred {
+		t.Errorf("State = %v, want RelatedDeferred (ct-events is a universal server-side pivot, drillable by resource id)", result.State())
 	}
-	if len(result.FetchFilter) == 0 {
+	if len(result.FetchFilter()) == 0 {
 		t.Error("FetchFilter is empty, want a CloudTrail LookupEvents filter keyed on the vpc peering connection id")
 	}
 }

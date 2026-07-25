@@ -173,17 +173,17 @@ func TestS3Related_CrossRegion_SoftTruncates(t *testing.T) {
 				checker := c.checkerFor(t)
 				clients := c.clientsFor(code)
 				got := checker(context.Background(), clients, emptyBucketResource(xRegionBucket), nil)
-				if got.TargetType != c.wantTarget {
-					t.Errorf("TargetType = %q, want %q", got.TargetType, c.wantTarget)
+				if got.TargetType() != c.wantTarget {
+					t.Errorf("TargetType = %q, want %q", got.TargetType(), c.wantTarget)
 				}
-				if got.Count != 0 {
-					t.Errorf("Count = %d, want 0 (soft-truncate)", got.Count)
+				if got.Count() != 0 {
+					t.Errorf("Count = %d, want 0 (soft-truncate)", got.Count())
 				}
-				if !got.Truncated {
+				if !got.Truncated() {
 					t.Error("Truncated = false, want true (rendered as 0+)")
 				}
-				if got.Err != nil {
-					t.Errorf("Err = %v, want nil (cross-region is operational, not a failure)", got.Err)
+				if got.Err() != nil {
+					t.Errorf("Err = %v, want nil (cross-region is operational, not a failure)", got.Err())
 				}
 			})
 		}
@@ -202,16 +202,16 @@ func TestS3Related_CrossRegion_PreservesUnknownContract(t *testing.T) {
 
 	checker := s3CheckerByTarget(t, "cfn")
 	got := checker(context.Background(), clients, emptyBucketResource(xRegionBucket), nil)
-	if got.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", got.TargetType, "cfn")
+	if got.TargetType() != "cfn" {
+		t.Errorf("TargetType = %q, want %q", got.TargetType(), "cfn")
 	}
-	if got.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (real failure must NOT be swallowed)", got.Count)
+	if got.State() != domain.RelatedError {
+		t.Errorf("Count = %d, want -1 (real failure must NOT be swallowed)", got.Count())
 	}
-	if got.Truncated {
+	if got.Truncated() {
 		t.Error("Truncated = true; AccessDenied must remain a hard unknown, not a truncated count")
 	}
-	if got.Err == nil {
+	if got.Err() == nil {
 		t.Error("Err = nil; AccessDenied must surface the underlying error for diagnosis")
 	}
 }

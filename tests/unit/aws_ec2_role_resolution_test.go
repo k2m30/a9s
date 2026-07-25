@@ -88,11 +88,11 @@ func TestEC2Role_ResolvesRealRoleName_ViaGetInstanceProfile(t *testing.T) {
 	checker := ec2RoleCheckerByTarget(t)
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (Err=%v)", result.Count, result.Err)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (Err=%v)", result.Count(), result.Err())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eks-test-node-role" {
-		t.Fatalf("ResourceIDs = %v, want [eks-test-node-role]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eks-test-node-role" {
+		t.Fatalf("ResourceIDs = %v, want [eks-test-node-role]", result.ResourceIDs())
 	}
 	if fake.calls != 1 {
 		t.Fatalf("GetInstanceProfile calls = %d, want exactly 1", fake.calls)
@@ -122,11 +122,11 @@ func TestEC2Role_FastPath_CacheHit_ZeroAPICalls(t *testing.T) {
 	checker := ec2RoleCheckerByTarget(t)
 	result := checker(context.Background(), clients, res, cache)
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (Err=%v)", result.Count, result.Err)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (Err=%v)", result.Count(), result.Err())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-shared-name" {
-		t.Fatalf("ResourceIDs = %v, want [my-shared-name]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-shared-name" {
+		t.Fatalf("ResourceIDs = %v, want [my-shared-name]", result.ResourceIDs())
 	}
 	if fake.calls != 0 {
 		t.Fatalf("GetInstanceProfile calls = %d, want 0 (fast path via cache)", fake.calls)
@@ -146,10 +146,10 @@ func TestEC2Role_GetInstanceProfileError_ReturnsNegativeOneWithErr(t *testing.T)
 	checker := ec2RoleCheckerByTarget(t)
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.State != domain.RelatedError {
-		t.Fatalf("State = %v, want RelatedError", result.State)
+	if result.State() != domain.RelatedError {
+		t.Fatalf("State = %v, want RelatedError", result.State())
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Fatal("Err = nil, want non-nil API error")
 	}
 }
@@ -171,7 +171,7 @@ func TestEC2Role_ZeroRolesOnProfile_ReturnsZero(t *testing.T) {
 	checker := ec2RoleCheckerByTarget(t)
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 (Err=%v, IDs=%v)", result.Count, result.Err, result.ResourceIDs)
+	if result.Count() != 0 {
+		t.Fatalf("Count = %d, want 0 (Err=%v, IDs=%v)", result.Count(), result.Err(), result.ResourceIDs())
 	}
 }

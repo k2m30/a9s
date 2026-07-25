@@ -19,7 +19,7 @@ import (
 func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
@@ -29,7 +29,7 @@ func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+		return resource.KnownRelated("ec2", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -61,7 +61,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+		return resource.KnownRelated("eni", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -93,7 +93,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+		return resource.KnownRelated("elb", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -126,7 +126,7 @@ func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	return relatedResult("cfn", []string{stackName})
 }
@@ -137,7 +137,7 @@ func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
@@ -169,7 +169,7 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")

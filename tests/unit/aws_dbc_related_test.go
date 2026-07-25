@@ -107,18 +107,18 @@ func TestRelated_DBC_SG_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	if !seen["sg-0aaa111111111111a"] {
-		t.Errorf("ResourceIDs missing sg-0aaa111111111111a; got %v", result.ResourceIDs)
+		t.Errorf("ResourceIDs missing sg-0aaa111111111111a; got %v", result.ResourceIDs())
 	}
 	if !seen["sg-0bbb222222222222b"] {
-		t.Errorf("ResourceIDs missing sg-0bbb222222222222b; got %v", result.ResourceIDs)
+		t.Errorf("ResourceIDs missing sg-0bbb222222222222b; got %v", result.ResourceIDs())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_DBC_SG_Empty(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no security groups)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no security groups)", result.Count())
 	}
 }
 
@@ -152,8 +152,8 @@ func TestRelated_DBC_SG_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -187,11 +187,11 @@ func TestRelated_DBC_Alarm_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alarm-docdb-prod-cpu" {
-		t.Errorf("ResourceIDs = %v, want [alarm-docdb-prod-cpu]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "alarm-docdb-prod-cpu" {
+		t.Errorf("ResourceIDs = %v, want [alarm-docdb-prod-cpu]", result.ResourceIDs())
 	}
 }
 
@@ -220,8 +220,8 @@ func TestRelated_DBC_Alarm_NotFound(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (dimension mismatch)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (dimension mismatch)", result.Count())
 	}
 }
 
@@ -245,8 +245,8 @@ func TestRelated_DBC_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State())
 	}
 }
 
@@ -261,8 +261,8 @@ func TestRelated_DBC_Alarm_EmptyID(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID short-circuits)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID short-circuits)", result.Count())
 	}
 }
 
@@ -291,18 +291,18 @@ func TestRelated_DBC_Logs_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (audit + profiler log groups)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (audit + profiler log groups)", result.Count())
 	}
 	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
 	if !seen[auditLog.ID] {
-		t.Errorf("ResourceIDs missing %q; got %v", auditLog.ID, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing %q; got %v", auditLog.ID, result.ResourceIDs())
 	}
 	if !seen[profilerLog.ID] {
-		t.Errorf("ResourceIDs missing %q; got %v", profilerLog.ID, result.ResourceIDs)
+		t.Errorf("ResourceIDs missing %q; got %v", profilerLog.ID, result.ResourceIDs())
 	}
 }
 
@@ -323,8 +323,8 @@ func TestRelated_DBC_Logs_NoMatch(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching log groups)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching log groups)", result.Count())
 	}
 }
 
@@ -363,11 +363,11 @@ func TestRelated_DBC_DBI_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-docdb-prod-instance-1" {
-		t.Errorf("ResourceIDs = %v, want [acme-docdb-prod-instance-1]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-docdb-prod-instance-1" {
+		t.Errorf("ResourceIDs = %v, want [acme-docdb-prod-instance-1]", result.ResourceIDs())
 	}
 }
 
@@ -381,8 +381,8 @@ func TestRelated_DBC_DBI_EmptyID(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
 	}
 }
 
@@ -421,11 +421,11 @@ func TestRelated_DBC_DbcSnap_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "dbc-snap")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "dbc-snap-acme-prod-20240101" {
-		t.Errorf("ResourceIDs = %v, want [dbc-snap-acme-prod-20240101]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "dbc-snap-acme-prod-20240101" {
+		t.Errorf("ResourceIDs = %v, want [dbc-snap-acme-prod-20240101]", result.ResourceIDs())
 	}
 }
 
@@ -451,8 +451,8 @@ func TestRelated_DBC_DbcSnap_Empty(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "dbc-snap")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching snapshots)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching snapshots)", result.Count())
 	}
 }
 
@@ -491,11 +491,11 @@ func TestRelated_DBC_Secrets_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != secretARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, secretARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != secretARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), secretARN)
 	}
 }
 
@@ -513,8 +513,8 @@ func TestRelated_DBC_Secrets_NoMasterUserSecret(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no MasterUserSecret)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no MasterUserSecret)", result.Count())
 	}
 }
 
@@ -532,8 +532,8 @@ func TestRelated_DBC_Secrets_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no MasterUserSecret on unrecognised parent shape)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no MasterUserSecret on unrecognised parent shape)", result.Count())
 	}
 }
 
@@ -558,11 +558,11 @@ func TestRelated_DBC_KMS_Found(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyID)
 	}
 }
 
@@ -579,8 +579,8 @@ func TestRelated_DBC_KMS_NoKey(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count())
 	}
 }
 
@@ -594,8 +594,8 @@ func TestRelated_DBC_KMS_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct defaults to 0 for Pattern F)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct defaults to 0 for Pattern F)", result.Count())
 	}
 }
 
@@ -618,8 +618,8 @@ func TestRelated_DBC_Subnet_NilDocDB(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count())
 	}
 }
 
@@ -640,8 +640,8 @@ func TestRelated_DBC_VPC_NilDocDB(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count())
 	}
 }
 
@@ -658,8 +658,8 @@ func TestRelated_DBC_VPC_NoSubnetGroup(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no DBSubnetGroup → dbcSubnetGroup nil)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (no DBSubnetGroup → dbcSubnetGroup nil)", result.Count())
 	}
 }
 
@@ -673,7 +673,7 @@ func TestRelated_DBC_VPC_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type → dbcSubnetGroup nil)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type → dbcSubnetGroup nil)", result.Count())
 	}
 }

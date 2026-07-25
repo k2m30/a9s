@@ -127,35 +127,95 @@ type RelatedChecker func(ctx context.Context, clients any, res Resource, cache R
 
 // RelatedCheckResult is returned by a RelatedChecker.
 // Kept here alongside RelatedChecker to avoid a circular dependency.
+//
+// Every field is unexported. This is deliberate, not incidental: a
+// RelatedChecker must report one of four outcomes — a proven count (0..N,
+// optionally a truncated lower bound), "could not determine", "the lookup
+// errored", or "resolved via a deferred server-side filter" — and those four
+// are mutually exclusive by construction only if nothing outside this package
+// can populate the fields directly. With exported fields, any of the ~136
+// checker files could (and did) write `RelatedCheckResult{TargetType: t,
+// Count: 0}` after a swallowed error or a denied call, reporting a confident
+// zero for what was actually "we don't know". Unexporting the fields makes
+// that literal a compile error from every other package; the only way to
+// build a value is through KnownRelated / UnknownRelated / ErrorRelated /
+// DeferredRelated (see related_result.go), each of which can express exactly
+// one outcome. No constructor accepts both a count/ids and an error, so
+// "count alongside a failure" has no expressible shape.
 type RelatedCheckResult struct {
-	TargetType string
-	// State classifies how Count should be interpreted; see RelatedRowState.
-	// The zero value (RelatedResolved) means Count (0..N) is authoritative.
-	State       RelatedRowState
-	Count       int      // authoritative only when State == RelatedResolved
-	ResourceIDs []string // IDs of found related resources
-	Err         error
-	FetchFilter map[string]string
-	// Truncated stays orthogonal to State: it modifies a RelatedResolved
-	// result derived from a truncated cache page ("N+"), never the other states.
-	Truncated bool
+	targetType string
+	// state classifies how count should be interpreted; see RelatedRowState.
+	// The zero value (RelatedResolved) means count (0..N) is authoritative.
+	state       RelatedRowState
+	count       int      // authoritative only when state == RelatedResolved
+	resourceIDs []string // IDs of found related resources
+	err         error
+	fetchFilter map[string]string
+	// truncated stays orthogonal to state: it modifies a RelatedResolved
+	// result derived from a truncated cache page, or a partial-success union
+	// of calls where some failed ("N+"), never the other states.
+	truncated bool
 }
 
-// EffectiveState returns the row-disposition state consumers must act on. A
-// checker can return a partial success — a positive Count with real
-// ResourceIDs — alongside an aggregate Err (e.g. the lambda→eb-rule checker
-// when some ListTargetsByRule calls fail). The error dominates: Err != nil
-// forces RelatedError over whatever State the checker left (typically the
-// zero-value RelatedResolved), so the row renders blank and dimmed — a dead
-// end — rather than showing a Count that could not be trusted. The failure is
-// surfaced separately (Flash{IsError:true} + "!" log) and the user retries with
-// Ctrl+R. Results already constructed as RelatedError are unaffected. Every
-// site that derives a mirror-row State or actionability from a result must go
-// through this rather than reading State directly, so IsRelatedActionable stays
-// the single source of truth.
+// TargetType returns the related resource type this result describes.
+func (r RelatedCheckResult) TargetType() string { return r.targetType }
+
+// State returns the raw resolution state the checker (or constructor) set.
+// Consumers deriving a row disposition should prefer EffectiveState.
+func (r RelatedCheckResult) State() RelatedRowState { return r.state }
+
+// Count returns the resolved count. Authoritative only when EffectiveState
+// returns RelatedResolved.
+func (r RelatedCheckResult) Count() int { return r.count }
+
+// ResourceIDs returns the IDs of found related resources.
+func (r RelatedCheckResult) ResourceIDs() []string { return r.resourceIDs }
+
+// Err returns the error that caused RelatedError, or nil.
+func (r RelatedCheckResult) Err() error { return r.err }
+
+// FetchFilter returns the server-side filter for a RelatedDeferred result, or nil.
+func (r RelatedCheckResult) FetchFilter() map[string]string { return r.fetchFilter }
+
+// Truncated reports whether Count is a lower bound rather than an exact count.
+func (r RelatedCheckResult) Truncated() bool { return r.truncated }
+
+// WithTargetType returns a copy of r retargeted to targetType. Checkers built
+// from shared, target-agnostic logic (e.g. a two-hop lookup reused across
+// pivots) may leave targetType unset; the executor stamps it from the
+// RelatedDef that invoked the checker. Every other field is preserved
+// unchanged, so this cannot be used to smuggle a count alongside an error.
+func (r RelatedCheckResult) WithTargetType(targetType string) RelatedCheckResult {
+	r.targetType = targetType
+	return r
+}
+
+// WithFetchFilter returns a copy of r carrying filter as its server-side
+// FetchFilter, alongside whatever count/truncated state r already has. A
+// windowed pivot (e.g. ct-events) can be both locally resolved AND carry a
+// filter so Enter can re-fetch the full, unwindowed answer server-side —
+// this is a legitimate composite, unlike count-alongside-an-error, which no
+// constructor can express.
+func (r RelatedCheckResult) WithFetchFilter(filter map[string]string) RelatedCheckResult {
+	r.fetchFilter = filter
+	return r
+}
+
+// EffectiveState returns the row-disposition state consumers must act on. No
+// exported constructor can build a result carrying both a count and an err
+// (a partial-success union of calls where some failed is expressed via
+// KnownRelated's truncated flag instead — see related_result.go), so err != nil
+// implies count == 0 in every value this package can produce. The err != nil
+// → RelatedError branch below is a defensive fallback, not a live path: err
+// dominates whatever state is set, so the row renders blank and dimmed — a
+// dead end — rather than showing a count that could not be trusted. The
+// failure is surfaced separately (Flash{IsError:true} + "!" log) and the user
+// retries with Ctrl+R. Every site that derives a mirror-row state or
+// actionability from a result must go through this rather than reading State
+// directly, so IsRelatedActionable stays the single source of truth.
 func (r RelatedCheckResult) EffectiveState() RelatedRowState {
-	if r.Err != nil {
+	if r.err != nil {
 		return RelatedError
 	}
-	return r.State
+	return r.state
 }

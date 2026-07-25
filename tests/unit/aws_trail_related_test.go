@@ -63,8 +63,8 @@ func TestRelated_Trail_S3_Match(t *testing.T) {
 	checker := trailCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, trailSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -82,8 +82,8 @@ func TestRelated_Trail_S3_NoMatch(t *testing.T) {
 	checker := trailCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, trailSrcResource(), cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -105,8 +105,8 @@ func TestRelated_Trail_Logs_Match(t *testing.T) {
 	checker := trailCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, trailSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRelated_Trail_Logs_NilArn(t *testing.T) {
 	checker := trailCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil CloudWatchLogsLogGroupArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil CloudWatchLogsLogGroupArn)", result.Count())
 	}
 }
 
@@ -164,8 +164,8 @@ func TestRelated_Trail_SNS_Match(t *testing.T) {
 	checker := trailCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, trailSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -199,8 +199,8 @@ func TestRelated_Trail_SNS_NilArn(t *testing.T) {
 	checker := trailCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil SnsTopicARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil SnsTopicARN)", result.Count())
 	}
 }
 
@@ -221,8 +221,8 @@ func TestRelated_Trail_KMS_Match(t *testing.T) {
 	checker := trailCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, trailSrcResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
 
@@ -238,8 +238,8 @@ func TestRelated_Trail_NilClients(t *testing.T) {
 	for _, target := range targets {
 		checker := trailCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("target=%s: Count = %d, want -1 (empty cache, nil clients)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("target=%s: Count = %d, want -1 (empty cache, nil clients)", target, result.Count())
 		}
 	}
 }

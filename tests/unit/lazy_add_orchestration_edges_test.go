@@ -71,12 +71,18 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 			TargetType:       targetType,
 			DisplayName:      "Dedup Test Target",
 			NeedsTargetCache: false,
+			// NOTE (RelatedCheckResult migration): KnownRelated dedupes ids
+			// internally (domain.KnownRelated), so a checker can no longer
+			// return duplicate ResourceIDs at all — the raw ["idA","idA",
+			// "idB","idB","idA"] this test used to feed missingFromCache is no
+			// longer constructible. Deduped to the 2 unique IDs; Count()==2
+			// (not the original arbitrary Count:3, which relied on Count and
+			// ResourceIDs being independently settable — now structurally
+			// impossible, Count is always len(uniqueIDs)). This narrows what
+			// this test can prove: it no longer exercises missingFromCache's
+			// OWN dedup logic, since KnownRelated already deduped upstream.
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       3,
-					ResourceIDs: []string{"idA", "idA", "idB", "idB", "idA"},
-				}
+				return resource.KnownRelated(targetType, []string{"idA", "idA", "idB", "idB", "idA"}, false)
 			},
 		},
 	})
@@ -115,9 +121,12 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 	if !found {
 		t.Fatal("no RelatedCheckResultMsg received")
 	}
-	// Checker's count must pass through unchanged.
-	if resultMsg.Result.Count != 3 {
-		t.Errorf("Result.Count: got %d, want 3", resultMsg.Result.Count)
+	// Count is now derived (len of deduped IDs) rather than an independently
+	// settable field — the original "must pass through unchanged" premise
+	// (Count:3 alongside a 5-element, 2-unique ResourceIDs list) is no longer
+	// expressible; see the NOTE on the checker above.
+	if resultMsg.Result.Count() != 2 {
+		t.Errorf("Result.Count: got %d, want 2", resultMsg.Result.Count())
 	}
 
 	// The dedup assertion — this is the core of Gap 2.
@@ -161,11 +170,7 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 			DisplayName:      "Error Swallow Test Target",
 			NeedsTargetCache: false,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				return resource.RelatedCheckResult{
-					TargetType:  targetType,
-					Count:       1,
-					ResourceIDs: []string{"id-not-in-cache"},
-				}
+				return resource.KnownRelated(targetType, []string{"id-not-in-cache"}, false)
 			},
 		},
 	})
@@ -196,8 +201,8 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 	}
 
 	// Checker's original count must survive the FetchByIDs error.
-	if resultMsg.Result.Count != 1 {
-		t.Errorf("Result.Count: got %d, want 1 (checker result must survive FetchByIDs error)", resultMsg.Result.Count)
+	if resultMsg.Result.Count() != 1 {
+		t.Errorf("Result.Count: got %d, want 1 (checker result must survive FetchByIDs error)", resultMsg.Result.Count())
 	}
 
 	// No partial lazy data should appear.

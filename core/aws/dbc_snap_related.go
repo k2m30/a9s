@@ -19,12 +19,12 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 	var clusterID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-			return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+			return resource.KnownRelated("dbc", nil, false)
 		}
 		clusterID = *snap.DBClusterIdentifier
 	} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-			return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+			return resource.KnownRelated("dbc", nil, false)
 		}
 		clusterID = *snap.DBClusterIdentifier
 	} else {
@@ -62,12 +62,12 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	var keyID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+			return resource.KnownRelated("kms", nil, false)
 		}
 		keyID = *snap.KmsKeyId
 	} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+			return resource.KnownRelated("kms", nil, false)
 		}
 		keyID = *snap.KmsKeyId
 	} else {
@@ -75,7 +75,7 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	}
 	keyID = kmsKeyIDFromField(keyID, res.Type)
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{keyID})
 }
@@ -85,17 +85,17 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.VpcId == nil || *snap.VpcId == "" {
-			return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+			return resource.KnownRelated("vpc", nil, false)
 		}
 		return relatedResult("vpc", []string{*snap.VpcId})
 	}
 	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.VpcId == nil || *snap.VpcId == "" {
-			return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+			return resource.KnownRelated("vpc", nil, false)
 		}
 		return relatedResult("vpc", []string{*snap.VpcId})
 	}
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	return resource.KnownRelated("vpc", nil, false)
 }
 
 // checkDbcSnapBackup resolves AWS Backup PLANS that cover this DocumentDB or
@@ -120,7 +120,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	parentName, parentARN := dbcSnapParentRefs(res.RawStruct)
 	if parentName == "" {
 		// No parent reference — can't pivot.
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 
 	// If the snapshot's RawStruct already exposes the parent cluster ARN we
@@ -148,7 +148,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 				return resource.UnknownRelated("backup")
 			}
 			// Cache is complete — parent is genuinely absent (orphan or no ARN field).
-			return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+			return resource.KnownRelated("backup", nil, false)
 		}
 	}
 

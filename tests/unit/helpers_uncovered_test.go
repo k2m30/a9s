@@ -91,11 +91,11 @@ func TestRelated_SQS_SQS_RedrivePolicy_ForwardDLQ(t *testing.T) {
 	checker := sqsSQSCheckerForTest(t)
 	result := checker(context.Background(), nil, thisRes, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (forward DLQ relationship)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (forward DLQ relationship)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != dlqName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, dlqName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != dlqName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), dlqName)
 	}
 }
 
@@ -123,11 +123,11 @@ func TestRelated_SQS_SQS_RedrivePolicy_ReverseDLQ(t *testing.T) {
 	checker := sqsSQSCheckerForTest(t)
 	result := checker(context.Background(), nil, dlqRes, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (reverse DLQ: orders uses this as DLQ)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (reverse DLQ: orders uses this as DLQ)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "orders" {
-		t.Errorf("ResourceIDs = %v, want [orders]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "orders" {
+		t.Errorf("ResourceIDs = %v, want [orders]", result.ResourceIDs())
 	}
 }
 
@@ -153,8 +153,8 @@ func TestRelated_SQS_SQS_RedrivePolicy_InvalidJSON(t *testing.T) {
 	checker := sqsSQSCheckerForTest(t)
 	result := checker(context.Background(), nil, thisRes, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (invalid JSON must not match anything)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (invalid JSON must not match anything)", result.Count())
 	}
 }
 
@@ -170,8 +170,8 @@ func TestRelated_SQS_SQS_RedrivePolicy_EmptyCache(t *testing.T) {
 	checker := sqsSQSCheckerForTest(t)
 	result := checker(context.Background(), nil, thisRes, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache = unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache = unknown)", result.Count())
 	}
 }
 
@@ -196,8 +196,8 @@ func TestRelated_SQS_SQS_NoRelationship(t *testing.T) {
 	checker := sqsSQSCheckerForTest(t)
 	result := checker(context.Background(), nil, res1, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no DLQ relationship)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no DLQ relationship)", result.Count())
 	}
 }
 

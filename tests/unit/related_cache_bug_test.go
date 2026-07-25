@@ -196,11 +196,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res[0].ID,
 			DefDisplayName:   def.DisplayName,
-			Result: resource.RelatedCheckResult{
-				TargetType:  def.TargetType,
-				Count:       stubRelatedCount,
-				ResourceIDs: stubRelatedIDs,
-			},
+			Result:           resource.KnownRelated(def.TargetType, stubRelatedIDs, false),
 		})
 	}
 

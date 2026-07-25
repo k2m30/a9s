@@ -22,7 +22,7 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("role")
 	}
 	if project.ServiceRole == nil || *project.ServiceRole == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	// In-body: the project's ServiceRole ARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
@@ -73,7 +73,7 @@ func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 		return resource.UnknownRelated("sg")
 	}
 	if project.VpcConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	var ids []string
 	for _, sgID := range project.VpcConfig.SecurityGroupIds {
@@ -93,7 +93,7 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("vpc")
 	}
 	if project.VpcConfig == nil || project.VpcConfig.VpcId == nil || *project.VpcConfig.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*project.VpcConfig.VpcId})
 }
@@ -104,7 +104,7 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*project.EncryptionKey, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -118,7 +118,7 @@ func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 		return resource.UnknownRelated("subnet")
 	}
 	if project.VpcConfig == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, sid := range project.VpcConfig.Subnets {
@@ -152,7 +152,7 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(candidates) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+		return resource.KnownRelated("ecr", nil, false)
 	}
 
 	ecrList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecr")
@@ -224,7 +224,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 	}
 
 	if len(buckets) == 0 {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
@@ -256,7 +256,7 @@ func checkCbSecrets(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("secrets")
 	}
 	if project.Environment == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	var ids []string
 	for _, env := range project.Environment.EnvironmentVariables {
@@ -288,7 +288,7 @@ func checkCbSSM(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("ssm")
 	}
 	if project.Environment == nil {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+		return resource.KnownRelated("ssm", nil, false)
 	}
 	var ids []string
 	for _, env := range project.Environment.EnvironmentVariables {

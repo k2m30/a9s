@@ -68,14 +68,14 @@ func TestRelated_Lambda_Role_Found(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != roleName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, roleName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != roleName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), roleName)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -104,8 +104,8 @@ func TestRelated_Lambda_Role_NotFound(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count())
 	}
 }
 
@@ -125,8 +125,8 @@ func TestRelated_Lambda_Role_CacheMissNoClients(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -162,14 +162,14 @@ func TestRelated_Lambda_Alarms_Found(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "lambda-error-alarm" {
-		t.Errorf("ResourceIDs = %v, want [lambda-error-alarm]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "lambda-error-alarm" {
+		t.Errorf("ResourceIDs = %v, want [lambda-error-alarm]", result.ResourceIDs())
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Err() != nil {
+		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
@@ -203,8 +203,8 @@ func TestRelated_Lambda_Alarms_NotFound(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -224,8 +224,8 @@ func TestRelated_Lambda_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
 
@@ -268,11 +268,11 @@ func TestRelated_Lambda_ECR_Match(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (spec lambda.md:72 GetFunction Code.ImageUri -> ecr repo)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (spec lambda.md:72 GetFunction Code.ImageUri -> ecr repo)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-ecr-repo" {
-		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-ecr-repo" {
+		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs())
 	}
 }
 
@@ -291,8 +291,8 @@ func TestRelated_Lambda_ECR_Empty(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (Zip package type, no ECR)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (Zip package type, no ECR)", result.Count())
 	}
 }
 
@@ -311,8 +311,8 @@ func TestRelated_Lambda_ECR_NoClientReturnsUnknown(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (no live Lambda client to call GetFunction)", result.State)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (no live Lambda client to call GetFunction)", result.State())
 	}
 }
 
@@ -332,8 +332,8 @@ func TestRelated_Lambda_ECR_ImageTypeNoURI(t *testing.T) {
 
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (Image type but GetFunction returned no ImageUri)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (Image type but GetFunction returned no ImageUri)", result.Count())
 	}
 }
 
@@ -361,11 +361,11 @@ func TestRelated_Lambda_ECR_ImageURIWithDigest(t *testing.T) {
 
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, src, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-ecr-repo" {
-		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-ecr-repo" {
+		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs())
 	}
 }
 
@@ -391,11 +391,11 @@ func TestRelated_Lambda_Logs_DefaultLogGroup(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (default log group)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (default log group)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/lambda/my-function" {
-		t.Errorf("ResourceIDs = %v, want [/aws/lambda/my-function]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/lambda/my-function" {
+		t.Errorf("ResourceIDs = %v, want [/aws/lambda/my-function]", result.ResourceIDs())
 	}
 }
 
@@ -420,11 +420,11 @@ func TestRelated_Lambda_Logs_CustomLogGroupViaLoggingConfig(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (custom LoggingConfig group)", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (custom LoggingConfig group)", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != customGroup {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, customGroup)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != customGroup {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), customGroup)
 	}
 }
 
@@ -445,8 +445,8 @@ func TestRelated_Lambda_Logs_NoMatch(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no matching log group)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no matching log group)", result.Count())
 	}
 }
 
@@ -460,8 +460,8 @@ func TestRelated_Lambda_Logs_NilCache(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache, no clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil cache, no clients)", result.Count())
 	}
 }
 
@@ -473,8 +473,8 @@ func TestRelated_Lambda_Logs_EmptyFunctionName(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty function name)", result.Count())
 	}
 }
 
@@ -495,11 +495,11 @@ func TestRelated_Lambda_SG_VPCFunction(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs = %v, want [sg-aaa111 sg-bbb222]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 2 {
+		t.Errorf("ResourceIDs = %v, want [sg-aaa111 sg-bbb222]", result.ResourceIDs())
 	}
 }
 
@@ -514,8 +514,8 @@ func TestRelated_Lambda_SG_NoVPC(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no VPC config)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no VPC config)", result.Count())
 	}
 }
 
@@ -526,8 +526,8 @@ func TestRelated_Lambda_SG_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -548,11 +548,11 @@ func TestRelated_Lambda_VPC_VPCFunction(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-12345678" {
-		t.Errorf("ResourceIDs = %v, want [vpc-12345678]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "vpc-12345678" {
+		t.Errorf("ResourceIDs = %v, want [vpc-12345678]", result.ResourceIDs())
 	}
 }
 
@@ -567,8 +567,8 @@ func TestRelated_Lambda_VPC_NoVPCConfig(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no VPC config)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no VPC config)", result.Count())
 	}
 }
 
@@ -585,8 +585,8 @@ func TestRelated_Lambda_VPC_EmptyVPCId(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count())
 	}
 }
 
@@ -597,8 +597,8 @@ func TestRelated_Lambda_VPC_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -617,11 +617,11 @@ func TestRelated_Lambda_KMS_WithKMSKey(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abcd-1234" {
-		t.Errorf("ResourceIDs = %v, want [abcd-1234]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abcd-1234" {
+		t.Errorf("ResourceIDs = %v, want [abcd-1234]", result.ResourceIDs())
 	}
 }
 
@@ -636,8 +636,8 @@ func TestRelated_Lambda_KMS_NoKMSKey(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count())
 	}
 }
 
@@ -652,8 +652,8 @@ func TestRelated_Lambda_KMS_EmptyKMSArn(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty KMS ARN)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty KMS ARN)", result.Count())
 	}
 }
 
@@ -676,11 +676,11 @@ func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	// Bare alias, no ARN prefix: kmsKeyIDFromField returns it unchanged in full.
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alias/aws/lambda" {
-		t.Errorf("ResourceIDs = %v, want [alias/aws/lambda]", result.ResourceIDs)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "alias/aws/lambda" {
+		t.Errorf("ResourceIDs = %v, want [alias/aws/lambda]", result.ResourceIDs())
 	}
 }
 
@@ -698,8 +698,8 @@ func TestRelated_Lambda_SQS_NilClients(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil Lambda client)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (nil Lambda client)", result.Count())
 	}
 }
 
@@ -711,8 +711,8 @@ func TestRelated_Lambda_SQS_EmptyFunctionName(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty function name)", result.Count())
 	}
 }
 
@@ -727,8 +727,8 @@ func TestRelated_Lambda_CFN_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -743,8 +743,8 @@ func TestRelated_Lambda_CFN_NoFunctionArn(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no FunctionArn)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no FunctionArn)", result.Count())
 	}
 }
 
@@ -759,8 +759,8 @@ func TestRelated_Lambda_EBRule_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
 
@@ -775,8 +775,8 @@ func TestRelated_Lambda_EBRule_EmptyARNAndName(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ARN and no name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no ARN and no name)", result.Count())
 	}
 }
 
@@ -811,7 +811,7 @@ func TestRelated_Lambda_Alarms_TruncatedCacheNoMatch(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
@@ -824,8 +824,7 @@ func TestRelated_Lambda_Alarms_EmptyFunctionName(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty function name)", result.Count())
 	}
 }
-

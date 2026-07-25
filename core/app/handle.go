@@ -604,8 +604,8 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 	c.applyIntents(intents)
 
 	errMsg := ""
-	if result.Result.Err != nil {
-		errMsg = result.Result.Err.Error()
+	if err := result.Result.Err(); err != nil {
+		errMsg = err.Error()
 	}
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
@@ -615,8 +615,8 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 		if ds == nil || ds.ResourceType != result.ResourceType || ds.Resource.ID != result.SourceResourceID {
 			continue
 		}
-		mergeDetailRelatedRow(ds, result.DefDisplayName, result.Result.TargetType,
-			result.Result.EffectiveState(), result.Result.Count, false, errMsg, result.Result.Truncated, result.Result.ResourceIDs, result.Result.FetchFilter)
+		mergeDetailRelatedRow(ds, result.DefDisplayName, result.Result.TargetType(),
+			result.Result.EffectiveState(), result.Result.Count(), false, errMsg, result.Result.Truncated(), result.Result.ResourceIDs(), result.Result.FetchFilter())
 	}
 }
 

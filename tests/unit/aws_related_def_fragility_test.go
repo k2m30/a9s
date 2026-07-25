@@ -102,22 +102,22 @@ func TestCheckEKSAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 1 {
+	if result.Count() != 1 {
 		t.Fatalf("Count = %d, want 1 (good NG contributes AMI even though deleted-LT NG was skipped); ResourceIDs=%v Err=%v",
-			result.Count, result.ResourceIDs, result.Err)
+			result.Count(), result.ResourceIDs(), result.Err())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != amiGood {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, amiGood)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != amiGood {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), amiGood)
 	}
-	if result.Err == nil {
+	if result.Err() == nil {
 		// Acceptable: the issue allows Err nil OR a soft-skip note.
 		return
 	}
-	if !strings.Contains(result.Err.Error(), "launch template deleted") {
-		t.Errorf("Err = %v; expected nil or a 'launch template deleted' soft-skip note", result.Err)
+	if !strings.Contains(result.Err().Error(), "launch template deleted") {
+		t.Errorf("Err = %v; expected nil or a 'launch template deleted' soft-skip note", result.Err())
 	}
-	if !strings.Contains(result.Err.Error(), "ng-deleted-lt") {
-		t.Errorf("Err = %v; expected the soft-skip note to name 'ng-deleted-lt'", result.Err)
+	if !strings.Contains(result.Err().Error(), "ng-deleted-lt") {
+		t.Errorf("Err = %v; expected the soft-skip note to name 'ng-deleted-lt'", result.Err())
 	}
 }
 
@@ -148,14 +148,14 @@ func TestCheckEKSAMI_HardFailsOnOtherErrors(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Err == nil {
+	if result.Err() == nil {
 		t.Fatal("Err = nil, want non-nil for non-NotFound error")
 	}
-	if strings.Contains(result.Err.Error(), "launch template deleted") {
-		t.Errorf("Err = %v; non-NotFound error should not be classified as a soft skip", result.Err)
+	if strings.Contains(result.Err().Error(), "launch template deleted") {
+		t.Errorf("Err = %v; non-NotFound error should not be classified as a soft skip", result.Err())
 	}
-	if !strings.Contains(result.Err.Error(), "ng-throttled") {
-		t.Errorf("Err = %v; expected failure note to name 'ng-throttled'", result.Err)
+	if !strings.Contains(result.Err().Error(), "ng-throttled") {
+		t.Errorf("Err = %v; expected failure note to name 'ng-throttled'", result.Err())
 	}
 }
 
@@ -183,11 +183,11 @@ func TestCheckNGAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ami")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (deleted LT is a true zero); Err=%v", result.Count, result.Err)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (deleted LT is a true zero); Err=%v", result.Count(), result.Err())
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil (NotFound is soft-skipped to a true zero)", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil (NotFound is soft-skipped to a true zero)", result.Err())
 	}
 }
 
@@ -233,11 +233,11 @@ func TestCheckELBWAF_SkipsNetworkLoadBalancer(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (NLB is not WAFv2-compatible)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (NLB is not WAFv2-compatible)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil (skip is a true zero)", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil (skip is a true zero)", result.Err())
 	}
 }
 
@@ -256,11 +256,11 @@ func TestCheckELBWAF_SkipsGatewayLoadBalancer(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (GWLB is not WAFv2-compatible)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (GWLB is not WAFv2-compatible)", result.Count())
 	}
-	if result.Err != nil {
-		t.Errorf("Err = %v, want nil (skip is a true zero)", result.Err)
+	if result.Err() != nil {
+		t.Errorf("Err = %v, want nil (skip is a true zero)", result.Err())
 	}
 }
 
@@ -289,11 +289,11 @@ func TestCheckELBWAF_CallsAPIForApplicationLB(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1; ResourceIDs=%v Err=%v", result.Count, result.ResourceIDs, result.Err)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1; ResourceIDs=%v Err=%v", result.Count(), result.ResourceIDs(), result.Err())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != wafID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wafID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != wafID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wafID)
 	}
 }
 
@@ -329,10 +329,10 @@ func TestCheckELBWAF_EmptyTypeFallbackToRawStruct(t *testing.T) {
 	checker := elbCheckerByTarget(t, "waf")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (RawStruct fallback should have surfaced ALB type); ResourceIDs=%v Err=%v", result.Count, result.ResourceIDs, result.Err)
+	if result.Count() != 1 {
+		t.Fatalf("Count = %d, want 1 (RawStruct fallback should have surfaced ALB type); ResourceIDs=%v Err=%v", result.Count(), result.ResourceIDs(), result.Err())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != wafID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wafID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != wafID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wafID)
 	}
 }

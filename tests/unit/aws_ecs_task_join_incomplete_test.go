@@ -274,10 +274,10 @@ func TestCheckEFSECSTask_JoinIncompleteTask_MarksTruncated(t *testing.T) {
 
 	result := checker(context.Background(), nil, sourceEFS, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count: want 0 (no task matches fs-bar), got %d", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count: want 0 (no task matches fs-bar), got %d", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("Truncated: want true (task2 has join error → result is a lower bound, not definitive zero); got false. " +
 			"This means the checker is not propagating joinIncomplete into result.Truncated.")
 	}

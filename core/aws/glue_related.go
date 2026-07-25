@@ -25,7 +25,7 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("role")
 	}
 	if job.Role == nil || *job.Role == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	// In-body: the job's Role ARN normalizes to the role name (== the role's
 	// Resource.ID). Resolve by identity — no role-list fetch.
@@ -69,7 +69,7 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
@@ -97,7 +97,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	stackName := out.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -129,11 +129,11 @@ func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("s3")
 	}
 	if job.Command == nil || job.Command.ScriptLocation == nil || *job.Command.ScriptLocation == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	bucket := bucketFromS3URI(*job.Command.ScriptLocation)
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	return relatedResult("s3", []string{bucket})
 }
@@ -148,7 +148,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.UnknownRelated("kms")
 	}
 	if job.SecurityConfiguration == nil || *job.SecurityConfiguration == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
@@ -165,7 +165,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.ErrorRelated("kms", err)
 	}
 	if out.SecurityConfiguration == nil || out.SecurityConfiguration.EncryptionConfiguration == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	enc := out.SecurityConfiguration.EncryptionConfiguration
 	seen := make(map[string]struct{})
@@ -201,7 +201,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ res
 func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
+		return resource.KnownRelated("athena", nil, false)
 	}
 	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
 	if err != nil {
@@ -230,7 +230,7 @@ func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("secrets")
 	}
 	if len(job.DefaultArguments) == 0 {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	seen := make(map[string]struct{})
 	var ids []string

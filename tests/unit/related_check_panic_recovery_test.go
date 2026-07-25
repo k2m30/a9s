@@ -83,12 +83,12 @@ func TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown(t *test
 	// every field but TargetType/State at its zero value.
 	wantResult := resource.UnknownRelated(targetType)
 	got := resultMsg.Result
-	if got.TargetType != wantResult.TargetType ||
-		got.State != wantResult.State ||
-		got.Count != wantResult.Count ||
-		got.Truncated != wantResult.Truncated ||
-		len(got.ResourceIDs) != 0 ||
-		len(got.FetchFilter) != 0 {
+	if got.TargetType() != wantResult.TargetType() ||
+		got.State() != wantResult.State() ||
+		got.Count() != wantResult.Count() ||
+		got.Truncated() != wantResult.Truncated() ||
+		len(got.ResourceIDs()) != 0 ||
+		len(got.FetchFilter()) != 0 {
 		t.Errorf("Result = %+v, want %+v — the UnknownRelated rendering fallback must be preserved on a checker panic", got, wantResult)
 	}
 }

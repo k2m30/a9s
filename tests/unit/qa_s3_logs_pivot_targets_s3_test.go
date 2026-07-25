@@ -90,14 +90,14 @@ func TestS3_AccessLogChecker_ReturnsS3TargetType(t *testing.T) {
 	}
 
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), nil)
-	if result.TargetType != "s3" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "s3")
+	if result.TargetType() != "s3" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType(), "s3")
 	}
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (healthy bucket logs to %q)", result.Count, fixtures.LogsBucketName)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (healthy bucket logs to %q)", result.Count(), fixtures.LogsBucketName)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != fixtures.LogsBucketName {
-		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, fixtures.LogsBucketName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.LogsBucketName {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), fixtures.LogsBucketName)
 	}
 }
 

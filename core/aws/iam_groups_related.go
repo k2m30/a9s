@@ -19,7 +19,7 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	groupName := res.ID
 	if groupName == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
+		return resource.KnownRelated("iam-user", nil, false)
 	}
 	out, err := c.IAM.GetGroup(ctx, &iam.GetGroupInput{
 		GroupName: &groupName,
@@ -44,7 +44,7 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 	}
 	groupName := res.ID
 	if groupName == "" {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
+		return resource.KnownRelated("policy", nil, false)
 	}
 	var ids []string
 	// Attached managed policies
@@ -60,5 +60,7 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 	if err != nil && err2 != nil {
 		return resource.ErrorRelated("policy", err)
 	}
-	return relatedResult("policy", ids)
+	// If exactly one of the two independent calls failed, ids only reflects
+	// the side that succeeded — a proven subset, not the exhaustive answer.
+	return relatedResultTrunc("policy", ids, err != nil || err2 != nil)
 }

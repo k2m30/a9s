@@ -106,7 +106,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
@@ -114,7 +114,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	keyID := attrs["KmsMasterKeyId"]
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{arnLastSegment(keyID)})
 }
@@ -128,7 +128,7 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, _ res
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
@@ -136,7 +136,7 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	policy := attrs["Policy"]
 	if policy == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	seen := map[string]struct{}{}
 	extractRoleNamesFromPolicy([]byte(policy), seen)

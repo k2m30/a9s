@@ -31,7 +31,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		tgwID = *raw.TransitGatewayId
 	}
 	if tgwID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
@@ -66,7 +66,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
+		return resource.KnownRelated("rtb", nil, false)
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -99,7 +99,7 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 // (NoSuchEntity); unknown state on unexpected errors.
 func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -120,12 +120,12 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ res
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntity" {
-			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+			return resource.KnownRelated("role", nil, false)
 		}
 		return resource.ErrorRelated("role", err)
 	}
 	if out.Role == nil || out.Role.Arn == nil || *out.Role.Arn == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		return resource.KnownRelated("role", nil, false)
 	}
 	return relatedResult("role", []string{*out.Role.Arn})
 }
@@ -136,7 +136,7 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ res
 func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {

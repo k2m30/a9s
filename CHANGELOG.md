@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   indefinitely. Both are closed, with regression coverage for identity,
   revealed values and costs.
 
+### Fixed
+
+- A related-resource pivot no longer reports a confident `0` when the
+  AWS call behind it failed or was denied. Fifteen checkers turned an
+  error into a proven dead end — a log group actively streaming to
+  Kinesis showed `(0)` if `logs:DescribeSubscriptionFilters` was not
+  granted, a Redis replication group showed `(0)` across four pivots
+  when one lookup was throttled, an IAM group with three inline
+  policies showed `(0)` when only one of two list calls was permitted.
+  These now render as unknown, which is the truth: we could not look.
+  Where several calls back one pivot and only some succeed, the count
+  renders as `N+` instead of a false exact total. A throttled
+  EventBridge enrichment also no longer invents a critical "enabled
+  rule has no targets" alarm for a healthy rule.
+
 ### Added
 
 - Detail views fetch what the list APIs don't return (#261). Opening a

@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -24,12 +25,12 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 
 	const prefix = "/aws/lambda/"
 	if !strings.HasPrefix(logGroupName, prefix) {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	functionName := strings.TrimPrefix(logGroupName, prefix)
 	if functionName == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -61,7 +62,7 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 func checkLogsKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct)
 	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*lg.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
@@ -73,16 +74,16 @@ func checkLogsKMS(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 	const prefix = "API-Gateway-Execution-Logs_"
 	if !strings.HasPrefix(logGroupName, prefix) {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 	rest := strings.TrimPrefix(logGroupName, prefix)
 	apiID, _, _ := strings.Cut(rest, "/")
 	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+		return resource.KnownRelated("apigw", nil, false)
 	}
 
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
@@ -106,18 +107,18 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 	const prefix = "/ecs/"
 	if !strings.HasPrefix(logGroupName, prefix) {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 	family := strings.TrimPrefix(logGroupName, prefix)
 	if idx := strings.Index(family, "/"); idx >= 0 {
 		family = family[:idx]
 	}
 	if family == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
@@ -145,42 +146,46 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 }
 
 // logsSubscriptionFilters fetches the log group's subscription filters via a
-// single DescribeSubscriptionFilters call. Returns nil on any failure.
-func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName string) []cloudwatchlogstypes.SubscriptionFilter {
+// single DescribeSubscriptionFilters call. Returns (nil, errClientMissing)
+// when the client/interface isn't wired, (nil, err) when the call itself
+// failed, and (filters, nil) — possibly an empty slice — on success, so
+// callers can tell "genuinely no filters" apart from "could not check".
+func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName string) ([]cloudwatchlogstypes.SubscriptionFilter, error) {
 	if logGroupName == "" {
-		return nil
+		return nil, errClientMissing
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudWatchLogs == nil {
-		return nil
+		return nil, errClientMissing
 	}
 	filterAPI, ok := c.CloudWatchLogs.(CWLogsDescribeSubscriptionFiltersAPI)
 	if !ok {
-		return nil
+		return nil, errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error) {
 		return filterAPI.DescribeSubscriptionFilters(ctx, &cloudwatchlogs.DescribeSubscriptionFiltersInput{
 			LogGroupName: aws.String(logGroupName),
 		})
 	})
-	if err != nil || out == nil {
-		return nil
+	if err != nil {
+		return nil, err
 	}
-	return out.SubscriptionFilters
+	if out == nil {
+		return nil, nil
+	}
+	return out.SubscriptionFilters, nil
 }
 
 // checkLogsKinesis calls cloudwatchlogs:DescribeSubscriptionFilters and
 // returns the Kinesis stream names whose ARNs appear as subscription-filter
 // destinations on this log group. Pattern C — single API call.
 func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	filters := logsSubscriptionFilters(ctx, clients, res.ID)
-	if filters == nil {
-		// Distinguish "no filters" from "API failed / cannot call".
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil || c.CloudWatchLogs == nil {
+	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
+	if err != nil {
+		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("kinesis")
 		}
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
+		return resource.ErrorRelated("kinesis", err)
 	}
 	var ids []string
 	for _, f := range filters {
@@ -201,13 +206,12 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, _
 // Firehose delivery stream that fans out to S3, or direct S3 destination for
 // newer filter features). Pattern C — single API call.
 func checkLogsS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	filters := logsSubscriptionFilters(ctx, clients, res.ID)
-	if filters == nil {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil || c.CloudWatchLogs == nil {
+	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
+	if err != nil {
+		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("s3")
 		}
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.ErrorRelated("s3", err)
 	}
 	var ids []string
 	for _, f := range filters {

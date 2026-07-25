@@ -21,7 +21,7 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	userName := res.ID
 	if userName == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
+		return resource.KnownRelated("iam-group", nil, false)
 	}
 	out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
 		UserName: &userName,
@@ -47,7 +47,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	userName := res.ID
 	if userName == "" {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
+		return resource.KnownRelated("policy", nil, false)
 	}
 	out, err := c.IAM.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
 		UserName: &userName,
@@ -65,7 +65,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	userName := res.ID
 	if userName == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.KnownRelated("ct-events", nil, false)
 	}
 
 	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
@@ -94,7 +94,5 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 		// Cache is partial — the filtered fetch will determine the real count.
 		return resource.DeferredRelated("ct-events", fetchFilter)
 	}
-	result := relatedResult("ct-events", ids)
-	result.FetchFilter = fetchFilter
-	return result
+	return relatedResult("ct-events", ids).WithFetchFilter(fetchFilter)
 }

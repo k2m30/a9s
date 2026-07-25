@@ -175,11 +175,11 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, osGraphRootResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != acmDomainName {
-		t.Errorf("ResourceIDs = %v, want [%s] (ACM fetcher indexes by DomainName, not bare cert ID)", result.ResourceIDs, acmDomainName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != acmDomainName {
+		t.Errorf("ResourceIDs = %v, want [%s] (ACM fetcher indexes by DomainName, not bare cert ID)", result.ResourceIDs(), acmDomainName)
 	}
 }
 
@@ -230,8 +230,8 @@ func TestRelated_OpenSearch_Alarm(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, osGraphRootResource(), cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two alarms match DomainName=%s)", result.Count, fixtures.GraphRootDomain)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two alarms match DomainName=%s)", result.Count(), fixtures.GraphRootDomain)
 	}
 }
 
@@ -268,11 +268,11 @@ func TestRelated_OpenSearch_CFN(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, osGraphRootResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != fixtures.OpenSearchCFNStackName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OpenSearchCFNStackName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.OpenSearchCFNStackName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OpenSearchCFNStackName)
 	}
 }
 
@@ -294,11 +294,11 @@ func TestRelated_OpenSearch_KMS(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, osGraphRootResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != fixtures.OpenSearchKMSKeyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OpenSearchKMSKeyID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.OpenSearchKMSKeyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OpenSearchKMSKeyID)
 	}
 	_ = kmsRes // kms checker uses forward-lookup from DomainStatus, not cache scan
 }
@@ -322,8 +322,8 @@ func TestRelated_OpenSearch_Logs(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, osGraphRootResource(), cache)
 
-	if result.Count < 3 {
-		t.Errorf("Count = %d, want >= 3 (three log groups in graph-root fixture)", result.Count)
+	if result.Count() < 3 {
+		t.Errorf("Count = %d, want >= 3 (three log groups in graph-root fixture)", result.Count())
 	}
 
 	wantIDs := map[string]bool{
@@ -331,14 +331,14 @@ func TestRelated_OpenSearch_Logs(t *testing.T) {
 		fixtures.OpenSearchLogGroupIndexSlow:  false,
 		fixtures.OpenSearchLogGroupAudit:      false,
 	}
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		if _, expected := wantIDs[id]; expected {
 			wantIDs[id] = true
 		}
 	}
 	for id, found := range wantIDs {
 		if !found {
-			t.Errorf("ResourceIDs = %v — missing expected log group ID %q", result.ResourceIDs, id)
+			t.Errorf("ResourceIDs = %v — missing expected log group ID %q", result.ResourceIDs(), id)
 		}
 	}
 }
@@ -355,19 +355,19 @@ func TestRelated_OpenSearch_SG(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, osGraphRootResource(), cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two SGs in graph-root VPCOptions)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two SGs in graph-root VPCOptions)", result.Count())
 	}
 
 	ids := make(map[string]bool)
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		ids[id] = true
 	}
 	if !ids[fixtures.OpenSearchSGA] {
-		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs, fixtures.OpenSearchSGA)
+		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs(), fixtures.OpenSearchSGA)
 	}
 	if !ids[fixtures.OpenSearchSGB] {
-		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs, fixtures.OpenSearchSGB)
+		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs(), fixtures.OpenSearchSGB)
 	}
 }
 
@@ -383,19 +383,19 @@ func TestRelated_OpenSearch_Subnet(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, osGraphRootResource(), cache)
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two subnets in graph-root VPCOptions)", result.Count)
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (two subnets in graph-root VPCOptions)", result.Count())
 	}
 
 	ids := make(map[string]bool)
-	for _, id := range result.ResourceIDs {
+	for _, id := range result.ResourceIDs() {
 		ids[id] = true
 	}
 	if !ids[fixtures.OpenSearchSubnetA] {
-		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs, fixtures.OpenSearchSubnetA)
+		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs(), fixtures.OpenSearchSubnetA)
 	}
 	if !ids[fixtures.OpenSearchSubnetB] {
-		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs, fixtures.OpenSearchSubnetB)
+		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs(), fixtures.OpenSearchSubnetB)
 	}
 	_, _ = subnetA, subnetB // subnet checker uses forward-lookup from DomainStatus, not cache scan
 }
@@ -411,11 +411,11 @@ func TestRelated_OpenSearch_VPC(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, osGraphRootResource(), cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != fixtures.OpenSearchVPCID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OpenSearchVPCID)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.OpenSearchVPCID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OpenSearchVPCID)
 	}
 	_ = vpcRes // VPC checker uses forward-lookup from DomainStatus, not cache scan
 }
@@ -453,11 +453,11 @@ func TestRelated_OpenSearch_PublicDomain_VPCPivotsZero(t *testing.T) {
 	for _, target := range []string{"vpc", "sg", "subnet"} {
 		checker := opensearchCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, publicRes, cache)
-		if result.Count != 0 {
-			t.Errorf("%s: Count = %d, want 0 for public domain (no VPCOptions)", target, result.Count)
+		if result.Count() != 0 {
+			t.Errorf("%s: Count = %d, want 0 for public domain (no VPCOptions)", target, result.Count())
 		}
-		if result.State != domain.RelatedResolved {
-			t.Errorf("%s: State = %v, want RelatedResolved — public domain has no VPC, not unknown", target, result.State)
+		if result.State() != domain.RelatedResolved {
+			t.Errorf("%s: State = %v, want RelatedResolved — public domain has no VPC, not unknown", target, result.State())
 		}
 	}
 }
@@ -500,8 +500,8 @@ func TestRelated_OpenSearch_Adversarial_NilRawStruct(t *testing.T) {
 	for _, target := range []string{"sg", "subnet", "vpc", "logs"} {
 		checker := opensearchCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, nilRes, cache)
-		if result.State != domain.RelatedUnknown {
-			t.Errorf("%s: Count = %d, want -1 (nil RawStruct → unknown)", target, result.Count)
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("%s: Count = %d, want -1 (nil RawStruct → unknown)", target, result.Count())
 		}
 	}
 }
@@ -523,8 +523,8 @@ func TestRelated_OpenSearch_Adversarial_ListTagsError(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, osGraphRootResource(), cache)
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (ListTags error)", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (ListTags error)", result.State())
 	}
 }
 
@@ -543,7 +543,7 @@ func TestRelated_OpenSearch_Adversarial_DescribeDomainConfigError(t *testing.T) 
 	checker := opensearchCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, osGraphRootResource(), cache)
 
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (DescribeDomainConfig error)", result.State)
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (DescribeDomainConfig error)", result.State())
 	}
 }

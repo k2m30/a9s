@@ -29,11 +29,11 @@ func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("sg")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	ids := cluster.Provisioned.BrokerNodeGroupInfo.SecurityGroups
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+		return resource.KnownRelated("sg", nil, false)
 	}
 	return relatedResult("sg", ids)
 }
@@ -46,7 +46,7 @@ func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+		return resource.KnownRelated("lambda", nil, false)
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *cluster.ClusterArn, cache)
 }
@@ -61,7 +61,7 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	stackName := cluster.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+		return resource.KnownRelated("cfn", nil, false)
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -94,7 +94,7 @@ func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	ids := cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets
 	return relatedResult("subnet", ids)
@@ -109,11 +109,11 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("vpc")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	subnets := cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets
 	if len(subnets) == 0 {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		return resource.KnownRelated("vpc", nil, false)
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
@@ -140,7 +140,7 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		// dropped page; answer is unknown rather than a definitive non-match.
 		return resource.UnknownRelated("vpc")
 	}
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	return resource.KnownRelated("vpc", nil, false)
 }
 
 // checkMSKLogs would resolve the CloudWatch log group configured for broker
@@ -156,11 +156,11 @@ func checkMSKLogs(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		cluster.Provisioned.LoggingInfo == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs.CloudWatchLogs == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	cw := cluster.Provisioned.LoggingInfo.BrokerLogs.CloudWatchLogs
 	if cw.Enabled == nil || !*cw.Enabled || cw.LogGroup == nil || *cw.LogGroup == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.KnownRelated("logs", nil, false)
 	}
 	return relatedResult("logs", []string{*cw.LogGroup})
 }
@@ -176,11 +176,11 @@ func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		cluster.Provisioned.LoggingInfo == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs.S3 == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	s3Log := cluster.Provisioned.LoggingInfo.BrokerLogs.S3
 	if s3Log.Enabled == nil || !*s3Log.Enabled || s3Log.Bucket == nil || *s3Log.Bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		return resource.KnownRelated("s3", nil, false)
 	}
 	return relatedResult("s3", []string{*s3Log.Bucket})
 }
@@ -191,7 +191,7 @@ func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+		return resource.KnownRelated("secrets", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.MSK == nil {
@@ -228,7 +228,7 @@ func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		cluster.Provisioned.EncryptionInfo.EncryptionAtRest == nil ||
 		cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == nil ||
 		*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }

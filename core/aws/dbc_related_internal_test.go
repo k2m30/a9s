@@ -229,14 +229,14 @@ func TestCheckDbcKMS_DualShape(t *testing.T) {
 			RawStruct: docdbtypes.DBCluster{KmsKeyId: aws.String(kmsARN)},
 		}
 		result := checkDbcKMS(context.Background(), nil, res, emptyCache)
-		if result.TargetType != "kms" {
-			t.Errorf("TargetType = %q, want kms", result.TargetType)
+		if result.TargetType() != "kms" {
+			t.Errorf("TargetType = %q, want kms", result.TargetType())
 		}
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != kmsUUID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, kmsUUID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != kmsUUID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), kmsUUID)
 		}
 	})
 
@@ -246,11 +246,11 @@ func TestCheckDbcKMS_DualShape(t *testing.T) {
 			RawStruct: rdstypes.DBCluster{KmsKeyId: aws.String(kmsARN)},
 		}
 		result := checkDbcKMS(context.Background(), nil, res, emptyCache)
-		if result.Count != 1 {
-			t.Errorf("Count = %d, want 1", result.Count)
+		if result.Count() != 1 {
+			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != kmsUUID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs, kmsUUID)
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != kmsUUID {
+			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), kmsUUID)
 		}
 	})
 
@@ -260,8 +260,8 @@ func TestCheckDbcKMS_DualShape(t *testing.T) {
 			RawStruct: docdbtypes.DBCluster{KmsKeyId: nil},
 		}
 		result := checkDbcKMS(context.Background(), nil, res, emptyCache)
-		if result.Count != 0 {
-			t.Errorf("Count = %d, want 0 when KmsKeyId nil", result.Count)
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0 when KmsKeyId nil", result.Count())
 		}
 	})
 
@@ -271,8 +271,8 @@ func TestCheckDbcKMS_DualShape(t *testing.T) {
 			RawStruct: rdstypes.DBCluster{KmsKeyId: nil},
 		}
 		result := checkDbcKMS(context.Background(), nil, res, emptyCache)
-		if result.Count != 0 {
-			t.Errorf("Count = %d, want 0 when KmsKeyId nil", result.Count)
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0 when KmsKeyId nil", result.Count())
 		}
 	})
 }

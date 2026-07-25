@@ -82,11 +82,7 @@ func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.
 				ResourceType:     "ec2",
 				SourceResourceID: res.ID,
 				DefDisplayName:   "Security Groups",
-				Result: resource.RelatedCheckResult{
-					Count:       1,
-					TargetType:  "sg",
-					ResourceIDs: []string{updatedID},
-				},
+				Result:           resource.KnownRelated("sg", []string{updatedID}, false),
 			},
 		},
 	}
@@ -139,13 +135,9 @@ func TestHandleRelatedCheckBatch_ResourceIDs_InsertPath(t *testing.T) {
 				ResourceType:     "ec2",
 				SourceResourceID: res.ID,
 				DefDisplayName:   "IAM Roles",
-				Result: resource.RelatedCheckResult{
-					Count:      1,
-					TargetType: "iam-role",
-					ResourceIDs: []string{
-						"arn:aws:iam::123456789012:role/test-role",
-					},
-				},
+				Result: resource.KnownRelated("iam-role", []string{
+					"arn:aws:iam::123456789012:role/test-role",
+				}, false),
 			},
 		},
 	}

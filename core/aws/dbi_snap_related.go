@@ -21,7 +21,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("dbi")
 	}
 	if snap.DBInstanceIdentifier == nil || *snap.DBInstanceIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+		return resource.KnownRelated("dbi", nil, false)
 	}
 	dbName := *snap.DBInstanceIdentifier
 
@@ -51,7 +51,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	val := *snap.KmsKeyId
 	keyID := val
@@ -59,7 +59,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		keyID = val[idx+1:]
 	}
 	if keyID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 
 	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
@@ -108,7 +108,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 	if parentName == "" {
 		// No parent reference on the snapshot — can't pivot.
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 
 	// Resolve parent DBInstanceArn via the dbi cache. If the cache isn't loaded,
@@ -138,7 +138,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 		}
 		// Cache is complete — parent is genuinely absent (orphan) — Backup
 		// tracks the parent so this pivot has no answer for orphan snapshots.
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		return resource.KnownRelated("backup", nil, false)
 	}
 
 	planList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")

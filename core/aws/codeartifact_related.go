@@ -31,7 +31,7 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 		return resource.UnknownRelated("kms")
 	}
 	if repo.DomainName == nil || *repo.DomainName == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.CodeArtifact == nil {
@@ -52,7 +52,7 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 		return resource.UnknownRelated("kms")
 	}
 	if out.Domain.EncryptionKey == nil || *out.Domain.EncryptionKey == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := arnLastSegment(*out.Domain.EncryptionKey)
 	return relatedResult("kms", []string{keyID})

@@ -92,7 +92,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 	}
 
 	for _, leaf := range extractLeafMsgs(refreshCmd) {
-		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == targetType {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType() == targetType {
 			return r.Result, true
 		}
 	}
@@ -162,7 +162,7 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 2},
+		Result:           resource.KnownRelated("ecs-task", nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"ecs-task": {
 				Resources:   []resource.Resource{taskA, taskB},
@@ -190,7 +190,7 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 2},
+		Result:           resource.KnownRelated("ecs-task", nil, false),
 		LazyAddedResources: map[string][]resource.Resource{
 			"ecs-task": {taskNew, taskDup},
 		},
@@ -208,8 +208,8 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	result := checker(context.Background(), nil, efsSource, cache)
 
 	// All three unique tasks match the source fs ID, so count must be 3.
-	if result.Count != 3 {
-		t.Errorf("LazyAdd merge: want Count=3 (3 unique tasks after dedup), got Count=%d", result.Count)
+	if result.Count() != 3 {
+		t.Errorf("LazyAdd merge: want Count=3 (3 unique tasks after dedup), got Count=%d", result.Count())
 	}
 }
 
@@ -306,7 +306,7 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		DefDisplayName:   ecsTaskDisplayName,
-		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
+		Result:           resource.KnownRelated("ecs-task", nil, false),
 		LazyAddedResources: map[string][]resource.Resource{
 			"ecs-task": {lazyTask},
 		},
@@ -326,10 +326,10 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	result := checker(context.Background(), nil, efsSource, cache)
 
 	// The task matches efsSource.ID, so Count=1 and Truncated=true (IsTruncated).
-	if result.Count != 1 {
-		t.Errorf("LazyAdd no-entry: want Count=1, got Count=%d", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("LazyAdd no-entry: want Count=1, got Count=%d", result.Count())
 	}
-	if !result.Truncated {
+	if !result.Truncated() {
 		t.Errorf("LazyAdd no-entry: new entry must be IsTruncated=true so checker returns Truncated=true; got Truncated=false")
 	}
 
@@ -345,7 +345,7 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		DefDisplayName:   ecsTaskDisplayName,
-		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
+		Result:           resource.KnownRelated("ecs-task", nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"ecs-task": {
 				Resources:   []resource.Resource{differentTask},
@@ -367,8 +367,8 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 		t.Log("ecs-task related checker for efs not found in batch — skipping indirect cache check")
 		return
 	}
-	if got.Count != 1 {
-		t.Errorf("LazyAdd no-entry indirect check: want Count=1, got Count=%d", got.Count)
+	if got.Count() != 1 {
+		t.Errorf("LazyAdd no-entry indirect check: want Count=1, got Count=%d", got.Count())
 	}
 }
 
@@ -390,7 +390,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "tg", Count: 0},
+		Result:           resource.KnownRelated("tg", nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
 				Resources:   []resource.Resource{existingTG},
@@ -408,7 +408,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "tg", Count: 0},
+		Result:           resource.KnownRelated("tg", nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
 				Resources:   []resource.Resource{freshTG},
@@ -451,7 +451,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "tg"},
+		Result:           resource.KnownRelated("tg", nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
 				Resources:   []resource.Resource{},
@@ -467,7 +467,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 
 	// If CachedPages correctly preserved the first entry (IsTruncated=false),
 	// the checker must return Truncated=false (definitive, not truncated).
-	if got.Truncated {
+	if got.Truncated() {
 		t.Errorf("CachedPages must not overwrite existing cache entry. " +
 			"Got Truncated=true, which means the IsTruncated=true entry was inserted " +
 			"(overwriting the original IsTruncated=false entry). " +
@@ -488,7 +488,7 @@ func TestLazyAdd_EmptyResources_NoOp(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0},
+		Result:           resource.KnownRelated("ecs-task", nil, false),
 		LazyAddedResources: map[string][]resource.Resource{
 			"ecs-task": {}, // empty — must be a no-op
 		},
@@ -505,7 +505,7 @@ func TestLazyAdd_EmptyResources_NoOp(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
-		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
+		Result:           resource.KnownRelated("ecs-task", nil, false),
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"ecs-task": {
 				Resources:   []resource.Resource{markerTask},
@@ -529,8 +529,8 @@ func TestLazyAdd_EmptyResources_NoOp(t *testing.T) {
 		},
 	}
 	result := checker(context.Background(), nil, efsSource, cacheIfCorrect)
-	if result.Count != 1 {
-		t.Errorf("setup error: checker with markerTask in cache should return Count=1, got Count=%d", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("setup error: checker with markerTask in cache should return Count=1, got Count=%d", result.Count())
 		return
 	}
 
@@ -550,10 +550,10 @@ func TestLazyAdd_EmptyResources_NoOp(t *testing.T) {
 
 	// If the checker did fire, it should see markerTask (1 match) — not the empty
 	// entry that would result from a buggy empty-LazyAdd creating an empty cache.
-	if got.Count != 1 {
+	if got.Count() != 1 {
 		t.Errorf("LazyAdd empty slice must be a no-op (no entry created). "+
 			"Expected CachedPages to insert markerTask → Count=1, got Count=%d. "+
 			"If Count=0, the empty LazyAdd created a bogus empty cache entry "+
-			"that blocked the CachedPages insert.", got.Count)
+			"that blocked the CachedPages insert.", got.Count())
 	}
 }

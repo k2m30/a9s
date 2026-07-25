@@ -26,11 +26,11 @@ func TestRelated_ENI_VPC_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "vpc-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs[0] = %q, want vpc-0a1b2c3d4e5f60001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "vpc-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs[0] = %q, want vpc-0a1b2c3d4e5f60001", result.ResourceIDs()[0])
 	}
 }
 
@@ -42,8 +42,8 @@ func TestRelated_ENI_VPC_EmptyVPCId(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty vpc_id field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty vpc_id field)", result.Count())
 	}
 }
 
@@ -52,8 +52,8 @@ func TestRelated_ENI_VPC_NoFields(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count())
 	}
 }
 
@@ -70,11 +70,11 @@ func TestRelated_ENI_Subnet_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "subnet-0abc001" {
-		t.Errorf("ResourceIDs[0] = %q, want subnet-0abc001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "subnet-0abc001" {
+		t.Errorf("ResourceIDs[0] = %q, want subnet-0abc001", result.ResourceIDs()[0])
 	}
 }
 
@@ -89,8 +89,8 @@ func TestRelated_ENI_Subnet_NilSubnetId(t *testing.T) {
 	checker := eniCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil SubnetId)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (nil SubnetId)", result.Count())
 	}
 }
 
@@ -99,8 +99,8 @@ func TestRelated_ENI_Subnet_WrongRawStruct(t *testing.T) {
 	checker := eniCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -118,11 +118,11 @@ func TestRelated_ENI_ELB_ALBDescription(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "acme-prod-web" {
-		t.Errorf("ResourceIDs[0] = %q, want acme-prod-web", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "acme-prod-web" {
+		t.Errorf("ResourceIDs[0] = %q, want acme-prod-web", result.ResourceIDs()[0])
 	}
 }
 
@@ -138,8 +138,8 @@ func TestRelated_ENI_ELB_NotELBOwned(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not ELB-owned)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not ELB-owned)", result.Count())
 	}
 }
 
@@ -155,8 +155,8 @@ func TestRelated_ENI_ELB_ELBOwnedNoDescription(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (ELB-owned but no description)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (ELB-owned but no description)", result.Count())
 	}
 }
 
@@ -172,8 +172,8 @@ func TestRelated_ENI_ELB_DescriptionNotELBPrefix(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (description lacks 'ELB ' prefix)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (description lacks 'ELB ' prefix)", result.Count())
 	}
 }
 
@@ -182,8 +182,8 @@ func TestRelated_ENI_ELB_WrongRawStruct(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -202,11 +202,11 @@ func TestRelated_ENI_Lambda_ExtractsFunctionName(t *testing.T) {
 	checker := eniCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "process-orders" {
-		t.Errorf("ResourceIDs[0] = %q, want process-orders", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "process-orders" {
+		t.Errorf("ResourceIDs[0] = %q, want process-orders", result.ResourceIDs()[0])
 	}
 }
 
@@ -222,8 +222,8 @@ func TestRelated_ENI_Lambda_NotLambdaOwnedReturnsZero(t *testing.T) {
 	checker := eniCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (not Lambda-owned)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (not Lambda-owned)", result.Count())
 	}
 }
 
@@ -232,8 +232,8 @@ func TestRelated_ENI_Lambda_WrongRawStruct(t *testing.T) {
 	checker := eniCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
 
@@ -263,11 +263,11 @@ func TestRelated_ENI_NAT_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "nat-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs[0] = %q, want nat-0a1b2c3d4e5f60001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "nat-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs[0] = %q, want nat-0a1b2c3d4e5f60001", result.ResourceIDs()[0])
 	}
 }
 
@@ -292,8 +292,8 @@ func TestRelated_ENI_NAT_NoMatch(t *testing.T) {
 	checker := eniCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -305,8 +305,8 @@ func TestRelated_ENI_NAT_EmptyIDReturnsZero(t *testing.T) {
 	checker := eniCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ENI ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ENI ID)", result.Count())
 	}
 }
 
@@ -318,8 +318,8 @@ func TestRelated_ENI_NAT_NilCacheNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
 
@@ -345,11 +345,11 @@ func TestRelated_ENI_VPCE_Found(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.ResourceIDs[0] != "vpce-0a1b2c3d4e5f60001" {
-		t.Errorf("ResourceIDs[0] = %q, want vpce-0a1b2c3d4e5f60001", result.ResourceIDs[0])
+	if result.ResourceIDs()[0] != "vpce-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs[0] = %q, want vpce-0a1b2c3d4e5f60001", result.ResourceIDs()[0])
 	}
 }
 
@@ -372,8 +372,8 @@ func TestRelated_ENI_VPCE_NoMatch(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -382,8 +382,8 @@ func TestRelated_ENI_VPCE_EmptyIDReturnsZero(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ENI ID)", result.Count)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (empty ENI ID)", result.Count())
 	}
 }
 
@@ -395,7 +395,7 @@ func TestRelated_ENI_VPCE_NilCacheNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }

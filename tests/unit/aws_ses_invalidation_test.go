@@ -93,11 +93,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 
 	// ---- Call 1: first call; must hit the API. ----
 	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result1.Err != nil {
-		t.Fatalf("call 1: unexpected error: %v", result1.Err)
+	if result1.Err() != nil {
+		t.Fatalf("call 1: unexpected error: %v", result1.Err())
 	}
-	if result1.Count != 1 {
-		t.Errorf("call 1: Count = %d, want 1", result1.Count)
+	if result1.Count() != 1 {
+		t.Errorf("call 1: Count = %d, want 1", result1.Count())
 	}
 	if v1Mock.calls != 1 {
 		t.Errorf("after call 1: mock.calls = %d, want 1", v1Mock.calls)
@@ -105,11 +105,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 
 	// ---- Call 2: cache hit; must NOT call the API again. ----
 	result2 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result2.Err != nil {
-		t.Fatalf("call 2: unexpected error: %v", result2.Err)
+	if result2.Err() != nil {
+		t.Fatalf("call 2: unexpected error: %v", result2.Err())
 	}
-	if result2.Count != 1 {
-		t.Errorf("call 2: Count = %d, want 1 (cached)", result2.Count)
+	if result2.Count() != 1 {
+		t.Errorf("call 2: Count = %d, want 1 (cached)", result2.Count())
 	}
 	if v1Mock.calls != 1 {
 		t.Errorf("after call 2: mock.calls = %d, want 1 (cache must absorb call 2)", v1Mock.calls)
@@ -123,11 +123,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 
 	// ---- Call 3: cache miss after invalidation; API must be called again. ----
 	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result3.Err != nil {
-		t.Fatalf("call 3: unexpected error: %v", result3.Err)
+	if result3.Err() != nil {
+		t.Fatalf("call 3: unexpected error: %v", result3.Err())
 	}
-	if result3.Count != 1 {
-		t.Errorf("call 3: Count = %d, want 1 (fresh fetch after invalidation)", result3.Count)
+	if result3.Count() != 1 {
+		t.Errorf("call 3: Count = %d, want 1 (fresh fetch after invalidation)", result3.Count())
 	}
 	if v1Mock.calls != 2 {
 		t.Errorf("after call 3: mock.calls = %d, want 2 (invalidation must force a new API call)", v1Mock.calls)
@@ -189,8 +189,8 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// ---- Call 1: seed the cache. ----
 	r1 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if r1.Count != 1 {
-		t.Errorf("call 1: Count = %d, want 1", r1.Count)
+	if r1.Count() != 1 {
+		t.Errorf("call 1: Count = %d, want 1", r1.Count())
 	}
 	if v1Mock.calls != 1 {
 		t.Fatalf("pre-condition: expected 1 API call after seeding cache, got %d", v1Mock.calls)
@@ -198,8 +198,8 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// ---- Call 2: cache hit. ----
 	r2 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if r2.Count != 1 {
-		t.Errorf("call 2: Count = %d, want 1 (cached)", r2.Count)
+	if r2.Count() != 1 {
+		t.Errorf("call 2: Count = %d, want 1 (cached)", r2.Count())
 	}
 	if v1Mock.calls != 1 {
 		t.Fatalf("pre-condition: cache miss on call 2, mock.calls = %d, want 1", v1Mock.calls)
@@ -242,8 +242,8 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// ---- Call 3: cache must be invalidated. ----
 	r3 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if r3.Count != 1 {
-		t.Errorf("call 3: Count = %d, want 1 (fresh fetch)", r3.Count)
+	if r3.Count() != 1 {
+		t.Errorf("call 3: Count = %d, want 1 (fresh fetch)", r3.Count())
 	}
 	if v1Mock.calls != 2 {
 		t.Errorf("after Ctrl+R on ses detail view: mock.calls = %d, want 2 "+
