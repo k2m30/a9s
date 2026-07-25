@@ -9,7 +9,32 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/trace"
 )
+
+// traceFoldAcceptance emits a trace.KindFold event recording whether a
+// GenStamped detail-operation result (RelatedCheckBatch, RelatedCheckResult,
+// EnrichDetailResult) was accepted or rejected by the OperationID acceptance
+// check immediately preceding each call site below — the invisible half of
+// every "action B landed while action A was still in flight" defect this
+// package's fold logic exists to get right. Guarded by trace.Enabled() so
+// the rejection-reason string is never built when tracing is off.
+func (c *Controller) traceFoldAcceptance(eventType string, operationID domain.Gen, accepted bool) {
+	if !trace.Enabled() {
+		return
+	}
+	reason := ""
+	if !accepted {
+		reason = fmt.Sprintf("operation %d superseded by active %d", operationID, c.core.ActiveDetailOp())
+	}
+	trace.Emit(trace.Event{
+		Kind:        trace.KindFold,
+		EventType:   eventType,
+		OperationID: uint64(operationID),
+		Accepted:    accepted,
+		Reason:      reason,
+	})
+}
 
 // Handle feeds an event through runtime.Core.HandleEvent, applies the returned
 // UIIntents to the screen stack, enqueues returned TaskRequests, and returns
@@ -137,15 +162,23 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// DetailOperation (messages.AspectDetailOp) — a batch dispatched under an
 	// operation the session has since moved past (a fresh open or an
 	// explicit refresh bumped DetailOpGen) is dropped whole.
-	if batch, ok := ev.(messages.RelatedCheckBatch); ok && !messages.IsStale(batch, c.core) {
-		c.handleRelatedCheckBatch(batch)
+	if batch, ok := ev.(messages.RelatedCheckBatch); ok {
+		accepted := !messages.IsStale(batch, c.core)
+		c.traceFoldAcceptance("RelatedCheckBatch", batch.OperationID, accepted)
+		if accepted {
+			c.handleRelatedCheckBatch(batch)
+		}
 	}
 
 	// messages.RelatedCheckResult is the TUI's per-def progressive-rendering
 	// counterpart to RelatedCheckBatch — both lanes fold through the same
 	// method, gated by the same OperationID acceptance check.
-	if res, ok := ev.(messages.RelatedCheckResult); ok && !messages.IsStale(res, c.core) {
-		c.foldRelatedCheckResultLocked(res)
+	if res, ok := ev.(messages.RelatedCheckResult); ok {
+		accepted := !messages.IsStale(res, c.core)
+		c.traceFoldAcceptance("RelatedCheckResult", res.OperationID, accepted)
+		if accepted {
+			c.foldRelatedCheckResultLocked(res)
+		}
 	}
 
 	// messages.EnrichDetailResult delivers a completed on-demand
@@ -153,10 +186,14 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// the session's active DetailOperation — Rotate() bumping/clearing that
 	// operation makes every in-flight enrichment result from an earlier
 	// operation unacceptable, the same rule RelatedCheckResult/Batch use.
-	if msg, ok := ev.(messages.EnrichDetailResult); ok && !messages.IsStale(msg, c.core) {
-		foldIntents, foldTasks := c.foldEnrichDetailResultLocked(msg)
-		c.applyIntents(foldIntents)
-		tasks = append(tasks, foldTasks...)
+	if msg, ok := ev.(messages.EnrichDetailResult); ok {
+		accepted := !messages.IsStale(msg, c.core)
+		c.traceFoldAcceptance("EnrichDetailResult", msg.OperationID, accepted)
+		if accepted {
+			foldIntents, foldTasks := c.foldEnrichDetailResultLocked(msg)
+			c.applyIntents(foldIntents)
+			tasks = append(tasks, foldTasks...)
+		}
 	}
 
 	// messages.APIError: routed entirely through runtime.Core.HandleEvent

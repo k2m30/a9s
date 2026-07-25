@@ -14,6 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/jsonyaml"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/trace"
 )
 
 // docCache is the minimal cache contract shared by PolicyDocumentCache and
@@ -49,6 +50,20 @@ func detailDocsCache(dctx *DetailEnrichmentCtx) docCache {
 		return nil
 	}
 	return dctx.DetailDocs
+}
+
+// cacheDisplayName names cache for the trace stream — the two concrete
+// types docCache abstracts over are otherwise indistinguishable to
+// enrichDetail once behind the interface.
+func cacheDisplayName(cache docCache) string {
+	switch cache.(type) {
+	case *PolicyDocumentCache:
+		return "policy"
+	case *DetailDocCache:
+		return "detail"
+	default:
+		return "unknown"
+	}
 }
 
 // unwrapEnriched builds the standard two-case RawStruct unwrap: accept the
@@ -154,17 +169,29 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	}
 
 	var cacheKey string
+	var cacheName string
 	if cache != nil {
 		cacheKey = spec.cacheKey(id, item, res)
+		cacheName = cacheDisplayName(cache)
 		// dctx.SkipCache (set for an explicit refresh) bypasses only the
 		// READ — cacheKey is still computed and the fetch result below is
 		// still WRITTEN under it, so a subsequent non-refresh open benefits
 		// from the freshly-refreshed entry.
 		if !dctx.SkipCache {
 			if cached, hit := cache.Get(cacheKey).(P); hit {
+				if trace.Enabled() {
+					trace.Emit(trace.Event{Kind: trace.KindCache, OperationID: uint64(dctx.OpID), Cache: cacheName, Key: cacheKey, CacheOutcome: "hit"})
+				}
 				res.RawStruct = spec.wrap(item, cached)
 				return res, nil
 			}
+		}
+		if trace.Enabled() {
+			reason := ""
+			if dctx.SkipCache {
+				reason = "refresh-skip"
+			}
+			trace.Emit(trace.Event{Kind: trace.KindCache, OperationID: uint64(dctx.OpID), Cache: cacheName, Key: cacheKey, CacheOutcome: "miss", Reason: reason})
 		}
 	}
 
@@ -188,7 +215,14 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 		// operation strictly older than the recorded writer is refused rather
 		// than silently overwriting a fresher entry a newer operation (or an
 		// explicit refresh) already wrote.
-		cache.SetIfNewer(cacheKey, payload, dctx.OpID)
+		accepted := cache.SetIfNewer(cacheKey, payload, dctx.OpID)
+		if trace.Enabled() {
+			reason := "accepted"
+			if !accepted {
+				reason = "refused-stale-writer"
+			}
+			trace.Emit(trace.Event{Kind: trace.KindCache, OperationID: uint64(dctx.OpID), Cache: cacheName, Key: cacheKey, CacheOutcome: "write", Reason: reason})
+		}
 	}
 
 	res.RawStruct = spec.wrap(item, payload)

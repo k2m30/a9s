@@ -43,6 +43,13 @@
 // tests (tests/unit, an exported-symbols-only package) can construct one —
 // the decorator struct types themselves stay unexported implementation
 // detail.
+//
+// Each decorator also records every call it makes (executed vs served from
+// the memo) to two independent, off-by-default observers: an optional
+// *CallLedger (call_ledger.go) a test opts into via the ...WithLedger
+// constructor variant, and the process-wide core/trace stream (on only when
+// trace.Enabled(), e.g. cmd/a9s's --trace flag). Neither adds a lock or an
+// allocation on the live bootstrap's undecorated path.
 package aws
 
 import (
@@ -58,6 +65,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/trace"
 
 	"golang.org/x/sync/singleflight"
 )
@@ -208,8 +216,9 @@ func (m *completedResultMemo) set(key string, value any) {
 // bounded, per-operation memoization, not a general-purpose cache.
 type coalescingSFN struct {
 	SFNAPI
-	g    singleflight.Group
-	memo *completedResultMemo
+	g      singleflight.Group
+	memo   *completedResultMemo
+	ledger *CallLedger
 }
 
 // NewCoalescingSFN wraps api with in-flight DescribeStateMachine call
@@ -217,14 +226,28 @@ type coalescingSFN struct {
 // (client.go) and from external tests; the concrete decorator type stays
 // unexported.
 func NewCoalescingSFN(api SFNAPI) SFNAPI {
-	return &coalescingSFN{SFNAPI: api, memo: newCompletedResultMemo()}
+	return NewCoalescingSFNWithLedger(api, nil)
+}
+
+// NewCoalescingSFNWithLedger is NewCoalescingSFN plus an explicit
+// *CallLedger (nil behaves identically to NewCoalescingSFN) — the test
+// harness's opt-in to per-call recording, additive over the production
+// constructor above.
+func NewCoalescingSFNWithLedger(api SFNAPI, ledger *CallLedger) SFNAPI {
+	return &coalescingSFN{SFNAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
 }
 
 func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.DescribeStateMachineInput, optFns ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
+	const api = "sfn.DescribeStateMachine"
 	opID := DetailOpFromContext(ctx)
-	key := coalesceKey(ctx, aws.ToString(params.StateMachineArn))
+	argKey := aws.ToString(params.StateMachineArn)
+	key := coalesceKey(ctx, argKey)
 	if opID != 0 {
 		if v, ok := c.memo.get(key); ok {
+			c.ledger.record(opID, api, argKey, CallServed)
+			if trace.Enabled() {
+				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+			}
 			return v.(*sfn.DescribeStateMachineOutput), nil
 		}
 	}
@@ -233,13 +256,31 @@ func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.De
 	// "flight done" and "memo populated" would otherwise slip past both layers
 	// and issue a second AWS call, violating the at-most-once-per-operation
 	// contract this memo exists to keep.
-	v, err, _ := c.g.Do(key, func() (any, error) {
+	var executed bool
+	v, err, shared := c.g.Do(key, func() (any, error) {
+		executed = true
 		out, err := c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
+		c.ledger.record(opID, api, argKey, CallExecuted)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
+		}
 		if err == nil && opID != 0 {
 			c.memo.set(key, out)
 		}
 		return out, err
 	})
+	if shared && !executed {
+		// Joined another goroutine's already-in-flight identical call
+		// (checkSFNRole/checkSFNKMS/checkSFNLambda/enrichSfn racing on the
+		// same StateMachineArn): no second AWS request, so this caller's ask
+		// is recorded too, as served — the ledger must be able to see BOTH
+		// askers to prove dedup happened, not just infer it from a single
+		// executed entry.
+		c.ledger.record(opID, api, argKey, CallServed)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -273,8 +314,9 @@ type SNSFullAPI interface {
 // coalescingSFN's doc comment; the same reasoning applies verbatim.
 type coalescingSNS struct {
 	SNSFullAPI
-	g    singleflight.Group
-	memo *completedResultMemo
+	g      singleflight.Group
+	memo   *completedResultMemo
+	ledger *CallLedger
 }
 
 // NewCoalescingSNS wraps api with in-flight GetTopicAttributes call
@@ -282,26 +324,56 @@ type coalescingSNS struct {
 // (client.go) and from external tests; the concrete decorator type stays
 // unexported.
 func NewCoalescingSNS(api SNSFullAPI) SNSFullAPI {
-	return &coalescingSNS{SNSFullAPI: api, memo: newCompletedResultMemo()}
+	return NewCoalescingSNSWithLedger(api, nil)
+}
+
+// NewCoalescingSNSWithLedger is NewCoalescingSNS plus an explicit
+// *CallLedger (nil behaves identically to NewCoalescingSNS) — the test
+// harness's opt-in to per-call recording, additive over the production
+// constructor above.
+func NewCoalescingSNSWithLedger(api SNSFullAPI, ledger *CallLedger) SNSFullAPI {
+	return &coalescingSNS{SNSFullAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
 }
 
 func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+	const api = "sns.GetTopicAttributes"
 	opID := DetailOpFromContext(ctx)
-	key := coalesceKey(ctx, aws.ToString(params.TopicArn))
+	argKey := aws.ToString(params.TopicArn)
+	key := coalesceKey(ctx, argKey)
 	if opID != 0 {
 		if v, ok := c.memo.get(key); ok {
+			c.ledger.record(opID, api, argKey, CallServed)
+			if trace.Enabled() {
+				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+			}
 			return v.(*sns.GetTopicAttributesOutput), nil
 		}
 	}
 	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
 	// DescribeStateMachine for why (the race this closes).
-	v, err, _ := c.g.Do(key, func() (any, error) {
+	var executed bool
+	v, err, shared := c.g.Do(key, func() (any, error) {
+		executed = true
 		out, err := c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
+		c.ledger.record(opID, api, argKey, CallExecuted)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
+		}
 		if err == nil && opID != 0 {
 			c.memo.set(key, out)
 		}
 		return out, err
 	})
+	if shared && !executed {
+		// Joined another goroutine's already-in-flight identical call
+		// (checkSNSKMS/checkSNSRole/enrichSns racing on the same TopicArn) —
+		// see coalescingSFN's DescribeStateMachine for why this must still
+		// be recorded, as served.
+		c.ledger.record(opID, api, argKey, CallServed)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -345,15 +417,23 @@ type S3FullAPI interface {
 // coalescingSFN's doc comment; the same reasoning applies verbatim.
 type coalescingS3 struct {
 	S3FullAPI
-	g    singleflight.Group
-	memo *completedResultMemo
+	g      singleflight.Group
+	memo   *completedResultMemo
+	ledger *CallLedger
 }
 
 // NewCoalescingS3 wraps api with in-flight GetBucketPolicy call coalescing.
 // Exported for construction at the live client bootstrap (client.go) and
 // from external tests; the concrete decorator type stays unexported.
 func NewCoalescingS3(api S3FullAPI) S3FullAPI {
-	return &coalescingS3{S3FullAPI: api, memo: newCompletedResultMemo()}
+	return NewCoalescingS3WithLedger(api, nil)
+}
+
+// NewCoalescingS3WithLedger is NewCoalescingS3 plus an explicit *CallLedger
+// (nil behaves identically to NewCoalescingS3) — the test harness's opt-in
+// to per-call recording, additive over the production constructor above.
+func NewCoalescingS3WithLedger(api S3FullAPI, ledger *CallLedger) S3FullAPI {
+	return &coalescingS3{S3FullAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
 }
 
 // s3BucketPolicyResult is the memoized value for GetBucketPolicy: it wraps
@@ -368,23 +448,45 @@ type s3BucketPolicyResult struct {
 }
 
 func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
+	const api = "s3.GetBucketPolicy"
 	opID := DetailOpFromContext(ctx)
-	key := coalesceKey(ctx, aws.ToString(params.Bucket))
+	argKey := aws.ToString(params.Bucket)
+	key := coalesceKey(ctx, argKey)
 	if opID != 0 {
 		if v, ok := c.memo.get(key); ok {
+			c.ledger.record(opID, api, argKey, CallServed)
+			if trace.Enabled() {
+				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+			}
 			r := v.(s3BucketPolicyResult)
 			return r.out, r.err
 		}
 	}
 	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
 	// DescribeStateMachine for why (the race this closes).
-	v, err, _ := c.g.Do(key, func() (any, error) {
+	var executed bool
+	v, err, shared := c.g.Do(key, func() (any, error) {
+		executed = true
 		out, err := c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
+		c.ledger.record(opID, api, argKey, CallExecuted)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
+		}
 		if opID != 0 && (err == nil || s3BenignAbsenceErr(err, "NoSuchBucketPolicy")) {
 			c.memo.set(key, s3BucketPolicyResult{out: out, err: err})
 		}
 		return out, err
 	})
+	if shared && !executed {
+		// Joined another goroutine's already-in-flight identical call (the
+		// s3→role related checker and enrichS3 racing on the same Bucket) —
+		// see coalescingSFN's DescribeStateMachine for why this must still
+		// be recorded, as served.
+		c.ledger.record(opID, api, argKey, CallServed)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -413,34 +515,65 @@ func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucket
 // GetFunction errors are never memoized, exactly like SFN/SNS.
 type coalescingLambda struct {
 	LambdaAPI
-	g    singleflight.Group
-	memo *completedResultMemo
+	g      singleflight.Group
+	memo   *completedResultMemo
+	ledger *CallLedger
 }
 
 // NewCoalescingLambda wraps api with in-flight GetFunction call coalescing.
 // Exported for construction at the live client bootstrap (client.go) and
 // from external tests; the concrete decorator type stays unexported.
 func NewCoalescingLambda(api LambdaAPI) LambdaAPI {
-	return &coalescingLambda{LambdaAPI: api, memo: newCompletedResultMemo()}
+	return NewCoalescingLambdaWithLedger(api, nil)
+}
+
+// NewCoalescingLambdaWithLedger is NewCoalescingLambda plus an explicit
+// *CallLedger (nil behaves identically to NewCoalescingLambda) — the test
+// harness's opt-in to per-call recording, additive over the production
+// constructor above.
+func NewCoalescingLambdaWithLedger(api LambdaAPI, ledger *CallLedger) LambdaAPI {
+	return &coalescingLambda{LambdaAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
 }
 
 func (c *coalescingLambda) GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
+	const api = "lambda.GetFunction"
 	opID := DetailOpFromContext(ctx)
-	key := coalesceKey(ctx, aws.ToString(params.FunctionName))
+	argKey := aws.ToString(params.FunctionName)
+	key := coalesceKey(ctx, argKey)
 	if opID != 0 {
 		if v, ok := c.memo.get(key); ok {
+			c.ledger.record(opID, api, argKey, CallServed)
+			if trace.Enabled() {
+				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+			}
 			return v.(*lambda.GetFunctionOutput), nil
 		}
 	}
 	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
 	// DescribeStateMachine for why (the race this closes).
-	v, err, _ := c.g.Do(key, func() (any, error) {
+	var executed bool
+	v, err, shared := c.g.Do(key, func() (any, error) {
+		executed = true
 		out, err := c.LambdaAPI.GetFunction(ctx, params, optFns...)
+		c.ledger.record(opID, api, argKey, CallExecuted)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
+		}
 		if err == nil && opID != 0 {
 			c.memo.set(key, out)
 		}
 		return out, err
 	})
+	if shared && !executed {
+		// Joined another goroutine's already-in-flight identical call
+		// (checkLambdaECR and enrichLambda racing on the same FunctionName)
+		// — see coalescingSFN's DescribeStateMachine for why this must
+		// still be recorded, as served.
+		c.ledger.record(opID, api, argKey, CallServed)
+		if trace.Enabled() {
+			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

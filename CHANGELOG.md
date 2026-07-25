@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single AWS request per API (an SFN refresh performs one
   `DescribeStateMachine` in total); rotation invalidates everything
   in flight.
+- `--trace <path>` writes a structured, JSON-lines diagnostic stream of
+  the detail-operation lifecycle — an operation beginning, each AWS
+  call as executed or served without a new request, an enrichment
+  cache hit/miss/write, and a result fold's accept/reject decision
+  (#488). Off by default; writes only to the given file, never stdout.
 
 ### Fixed
 

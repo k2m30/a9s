@@ -13,6 +13,7 @@ a9s --version             # print version
 a9s --demo                # run with synthetic demo data (no AWS credentials needed)
 a9s --no-cache            # disable resource availability cache
 a9s --log-file /tmp/a9s.log   # write diagnostics to a file; off by default
+a9s --trace /tmp/a9s-trace.jsonl  # write detail-operation trace events (one JSON object per line: detail_op_begin/aws_call/cache/fold) to a file; diagnostic aid, not a stable format; off by default
 a9s --reset-views         # delete view configs and regenerate defaults
 a9s --reset-themes        # delete theme files and regenerate defaults
 ```

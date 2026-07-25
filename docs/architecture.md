@@ -1010,6 +1010,14 @@ Gated by `//go:build integration`. Two modes:
 
 Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestName -count=1 -v -timeout 600s`
 
+### Diagnosing Concurrency Defects: Call Ledger and Trace Stream
+
+Two off-by-default, zero-cost-when-disabled facilities make detail-operation concurrency invariants (the same AWS operation fetched twice while one logical operation is in flight; a stale async result silently accepted) mechanically checkable instead of something a reviewer has to re-derive from reading code.
+
+**Call ledger** (`core/aws/call_ledger.go`) — each of the four coalescing decorators (SFN, SNS, S3, Lambda; `core/aws/coalesce.go`) can record every call it makes as `CallExecuted` (the real AWS call fired) or `CallServed` (answered with no new request, either from the operation-scoped memo or by joining another goroutine's already-in-flight `singleflight.Group` call for the same key). Off by default: the production constructors (`NewCoalescingSFN`, etc.) construct with a nil `*CallLedger`, which every recording method tolerates as a no-op — no lock, no allocation on the undecorated path. A test opts in via the `...WithLedger` constructor variant (`NewCoalescingSFNWithLedger(api, ledger)` and its three siblings — SNS, S3, Lambda), drives calls through the decorator, then asserts on `ledger.Records()` (the full ordered call log) or `ledger.Duplicates()` (every `(operation, api, args)` key that executed more than once — the "at most one call per operation" invariant, made directly assertable; a correctly-deduped join or memo hit is `CallServed` and never counts as a duplicate).
+
+**Trace stream** (`core/trace`) — a process-wide JSON-lines event stream covering four moments: a detail operation beginning (`core/runtime.Core.BeginDetailOperation`), an AWS call (executed vs served, the same call sites the ledger hooks), a cache read/write in the on-demand enrich engine (`core/aws/detail_enrich_engine.go`), and a result fold's accept/reject decision (`core/app/handle.go`). Off by default — `trace.Enabled()` is a single atomic bool read, checked before any event field is even built. Enabled by `cmd/a9s --trace <path>`, or directly in a test via `trace.Enable(io.Writer)` / `trace.EnableFile(path)`. Always writes to a file (or whatever `io.Writer` a test supplies) — never `os.Stdout` — so it can run alongside a live TUI session without corrupting the rendered frame.
+
 ---
 
 ## Design Decisions

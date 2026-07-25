@@ -6,6 +6,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/trace"
 )
 
 // DetailOperation is the single identity for one detail-view lifecycle: the
@@ -72,6 +73,16 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 		Resource:     res,
 		Clients:      c.session.Clients,
 		Refresh:      refresh,
+	}
+
+	if trace.Enabled() {
+		trace.Emit(trace.Event{
+			Kind:         trace.KindDetailOpBegin,
+			OperationID:  uint64(op.ID),
+			ResourceType: op.ResourceType,
+			ResourceID:   op.Resource.ID,
+			Refresh:      op.Refresh,
+		})
 	}
 
 	scope := op.ResourceType + "/" + op.Resource.ID

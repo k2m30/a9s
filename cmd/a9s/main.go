@@ -20,6 +20,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/logging"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/trace"
 	"github.com/k2m30/a9s/v3/core/web"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -72,6 +73,7 @@ func main() {
 		webAddr        string
 		webAllowReveal bool
 		logFile        string
+		traceFile      string
 	)
 
 	// A9S_MODE=web activates the web server without requiring --web on the CLI.
@@ -98,6 +100,7 @@ func main() {
 	flag.StringVar(&webAddr, "web-addr", "127.0.0.1:7682", "Listen address for web mode (127.0.0.1 only)")
 	flag.BoolVar(&webAllowReveal, "web-allow-reveal", false, "Allow ActionReveal in web mode (off by default)")
 	flag.StringVar(&logFile, "log-file", "", "Write JSON debug logs to this file (also: A9S_LOG_FILE; --log-file wins)")
+	flag.StringVar(&traceFile, "trace", "", "Write structured detail-operation trace events (JSON lines) to this file (diagnostic, off by default)")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
@@ -114,6 +117,7 @@ func main() {
 		fmt.Println("      --web-addr        Listen address for web mode (default 127.0.0.1:7682)")
 		fmt.Println("      --web-allow-reveal Allow secret reveal in web mode (default off)")
 		fmt.Println("      --log-file        Write JSON debug logs to this file (also: A9S_LOG_FILE)")
+		fmt.Println("      --trace           Write structured detail-operation trace events (JSON lines) to this file (off by default)")
 		fmt.Println("  -v, --version         Print version and exit")
 		fmt.Println("  -h, --help            Print this help")
 	}
@@ -173,6 +177,19 @@ func main() {
 		// Pre-TUI: stderr is still safe to write to here.
 		fmt.Fprintf(os.Stderr, "Error: --log-file: %v\n", logErr)
 		os.Exit(1)
+	}
+
+	// --trace writes to a plain file, never os.Stdout, and is installed
+	// before the TUI takes the terminal or the web server starts accepting
+	// connections (same ordering rule as logging.Setup above) — so trace
+	// output can never interleave with a rendered TUI frame or an HTTP
+	// response body. No defer on the returned close func, for the same
+	// reason logging.Setup's call above has none.
+	if traceFile != "" {
+		if _, traceErr := trace.EnableFile(traceFile); traceErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: --trace: %v\n", traceErr)
+			os.Exit(1)
+		}
 	}
 
 	// Validate -c/--command flag: resolve to a canonical resource short name
