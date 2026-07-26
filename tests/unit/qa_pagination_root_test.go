@@ -163,7 +163,7 @@ func TestQA_PaginationRoot_InitialLoadShowsTruncated(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -206,10 +206,11 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Press M to trigger load more
+
 	m, cmd := rootApplyMsg(m, rootKeyPress("M"))
 
 	// The resource list view must return a non-nil command when M is pressed on
@@ -228,7 +229,7 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: true,
+		Append: true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -277,10 +278,11 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Step 3: Press M to load more
+
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
 
 	// Step 4: Load page 2 (final)
@@ -292,10 +294,11 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: true,
+		Append: true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Verify 100 resources are loaded before navigating away
+
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Fatalf("precondition: expected 'ct-events(100...)' before Esc, got:\n%s", plain)
@@ -359,10 +362,11 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Step 2: Press Esc to go back to main menu
+
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: Re-enter ct-events (should use cache — no fetch)
@@ -410,7 +414,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -427,7 +431,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2TestResources(30),
 		Pagination: &resource.PaginationMeta{
@@ -532,10 +536,11 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Press M — this sets loadingMore=true on the resource list.
+
 	m, cmd := rootApplyMsg(m, rootKeyPress("M"))
 	if cmd == nil {
 		t.Fatal("pressing M on a truncated list must return a non-nil command")
@@ -594,10 +599,11 @@ func TestPagination_DoubleLoadIgnored(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// First M press — must produce a command (LoadMoreMsg) and set loadingMore=true.
+
 	m, firstCmd := rootApplyMsg(m, rootKeyPress("M"))
 	if firstCmd == nil {
 		t.Fatal("first M press on truncated list must return a non-nil command")
@@ -648,10 +654,11 @@ func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Press M — sets loadingMore=true and dispatches a LoadMoreMsg.
+
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
 
 	// Precondition: confirm we are mid-load.

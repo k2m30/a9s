@@ -59,7 +59,7 @@ func navigateToDetailWithRDS(t *testing.T, res resource.Resource) tui.Model {
 	m, _ = m2.(tui.Model)
 
 	// Load resources into the list.
-	m2, _ = m.Update(messages.ResourcesLoaded{
+	m2, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "rds",
 		Resources:    []resource.Resource{res},
 	})

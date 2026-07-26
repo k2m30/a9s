@@ -799,23 +799,16 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 		cs.DrillRefusedReason = out.Reason
 		return nil
 	case screen.OpenResource:
-		// The SAME lane-neutral by-ID seam the related panel's own
-		// single-target drill uses (core/app/navigate.go's
-		// applyRelatedNavResult, NavigationKindFilteredList's TargetID
-		// branch): push a placeholder ScreenResourceList flagged
-		// AutoOpenSingle so autoOpenSingleDetail (handle.go) replaces it
-		// with the real detail once the KindFetchByIDDetail delivery
-		// lands — reachable from every caller of Controller.Handle
-		// (web/headless), not only a screen-specific adapter special case.
-		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
-			ID:      runtime.ScreenResourceList,
-			Context: runtime.ScreenContext{ResourceType: out.Locator.Type},
-		}})
-		c.ensureListState()
-		if ls := c.topListState(); ls != nil {
-			ls.RelatedIDSet = map[string]struct{}{out.Locator.ID: {}}
-			ls.AutoOpenSingle = true
-		}
+		// The SAME by-ID placeholder constructor the related panel's own
+		// single-target drill uses (pushByIDPlaceholderList, list_state.go):
+		// pushes a placeholder ScreenResourceList flagged AutoOpenSingle so
+		// autoOpenSingleDetail (handle.go) replaces it with the real detail
+		// once the KindFetchByIDDetail delivery lands — reachable from every
+		// caller of Controller.Handle (web/headless), not only a
+		// screen-specific adapter special case. out.Locator.Type always has a
+		// FetchByIDs helper registered (costsResourceTypeForService's own
+		// gate below), so the constructor always applies the by-ID flags.
+		c.pushByIDPlaceholderList(out.Locator.Type, out.Locator.ID)
 		return &runtime.TaskRequest{
 			Key:     runtime.TaskKey{Kind: runtime.KindFetchByIDDetail, Scope: out.Locator.Type},
 			Cache:   runtime.CacheNone,

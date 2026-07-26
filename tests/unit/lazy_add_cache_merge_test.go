@@ -123,7 +123,7 @@ func setupLiveModeEFSDetail(t *testing.T) (tui.Model, resource.Resource) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "efs",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "efs",
 		Resources:    []resource.Resource{efsRes},
 	})

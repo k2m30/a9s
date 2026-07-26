@@ -294,7 +294,7 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    freshRows,
-		Gen:          core.AvailabilityGen(),
+		Gen:          core.AvailabilityGen(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	postReplay := ctrl.Snapshot().Body.List

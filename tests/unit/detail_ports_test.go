@@ -223,7 +223,7 @@ func Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget(t *testing.
 			"vpc_id":      "vpc-entertest0001",
 		},
 	}
-	m, _ = tuitest.Step(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = tuitest.Step(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := tuitest.Step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -343,7 +343,12 @@ func Test_FooterHints_YAML_CloudTrailHint(t *testing.T) {
 	c := newTestController(t)
 
 	res := resource.Resource{ID: "i-yaml-ct-0001", Name: "yaml-ct-instance"}
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	// Provenance: CanonicalList declares what this seed always implicitly
+	// meant — the resource must already be in the cache before the YAML
+	// screen is pushed below, exactly as if an earlier top-level ec2 list
+	// had loaded it. This is the only way findCachedResourceByID (footer.go)
+	// can resolve it; no related/filtered/by-ID/child path is exercised here.
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}, Provenance: messages.FetchProvenanceCanonicalList})
 
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenYAML,

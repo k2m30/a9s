@@ -250,7 +250,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-partial-001", Name: "web-server",

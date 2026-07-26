@@ -157,7 +157,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})

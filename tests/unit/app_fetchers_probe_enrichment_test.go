@@ -58,7 +58,7 @@ func setupEnrichmentDispatch(t *testing.T, resources []resource.Resource) (tui.M
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Deliver ResourcesLoadedMsg{TypeGen=1} → tail branch fires probeEnrichment.
-	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    resources,
 		TypeGen:      1,
@@ -124,7 +124,7 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
-	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    rerunDBIResources(),
 		TypeGen:      1,
@@ -182,7 +182,7 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	m := newRootSizedModel()
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
-	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    rerunDBIResources(),
 		TypeGen:      1,
@@ -207,7 +207,7 @@ func TestProbeEnrichment_EmptyResources_StillDispatches(t *testing.T) {
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	// Deliver empty resource list with TypeGen=1.
-	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    []resource.Resource{}, // empty
 		TypeGen:      1,

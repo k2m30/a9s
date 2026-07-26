@@ -379,7 +379,7 @@ func Test_LA_061_FooterSuppressed_WhenAllRelatedIDsResolved(t *testing.T) {
 	}
 
 	// Load resources into cache with IsTruncated=true (upstream has more pages).
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: targetType,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "some-token"},
@@ -432,7 +432,7 @@ func Test_LA_062_FooterSuppressed_UpstreamTruncatedDrillResolved(t *testing.T) {
 	}
 
 	// Load with IsTruncated=true — simulates an account with >1000 KMS keys.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: targetType,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "truncated-token"},

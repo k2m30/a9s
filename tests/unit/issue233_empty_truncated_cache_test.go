@@ -66,7 +66,7 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})

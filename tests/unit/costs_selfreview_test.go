@@ -49,6 +49,26 @@ import (
 // lane ever converts a successful KindFetchByIDDetail delivery into a
 // detail navigation. The TUI's own special-cased m.fetchByIDDetail (fixed
 // in an earlier round) is TUI-only and never reached here.
+//
+// RECONCILED: costs_state.go's screen.OpenResource case has since gained
+// the placeholder-list/AutoOpenSingle wiring this finding asked for (it now
+// mirrors navigate.go's applyRelatedNavResult TargetID branch) — but not
+// byte-for-byte: it never sets ls.EscPops = true the way navigate.go's
+// sibling does. Before fix/resourcesloaded-provenance (D) that omission was
+// harmless (nothing read EscPops at row-population time). D's
+// handleResourcesLoadedEvent now requires msg.Provenance.CanonicalList()
+// for any topLevelCanonical screen (EscPops false, ParentContext nil)
+// before applying rows; the real executor tags this delivery
+// Provenance: FetchProvenanceByID (executor.go, correctly), so the gate
+// blocks the placeholder's row-population, ls.Loading never clears, and
+// autoOpenSingleDetail bails before ever reaching the target row. Reverting
+// handle.go's gate makes this test pass again, confirming causation — same
+// root cause as costs_codex_test.go's TestCostsCodex_X1. The one-line fix
+// (out of QA's scope: `ls.EscPops = true` in costs_state.go's
+// screen.OpenResource case) is a coder task. Do not "fix" this test by
+// stamping its ResourcesLoaded literal Provenance: FetchProvenanceCanonicalList
+// — that would be false (a real KindFetchByIDDetail result is never
+// canonical) and would hide the bug instead of pinning it.
 // ===========================================================================
 
 func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.T) {
@@ -106,7 +126,7 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 	// kind — runtime_adapter_related.go's own doc comment confirms this).
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    []resource.Resource{{ID: demoEC2InstanceID, Name: "web-prod-01", Fields: map[string]string{"instance_id": demoEC2InstanceID}}},
+		Resources:    []resource.Resource{{ID: demoEC2InstanceID, Name: "web-prod-01", Fields: map[string]string{"instance_id": demoEC2InstanceID}}}, Provenance: messages.FetchProvenanceByID,
 	})
 
 	vs := c.Snapshot()

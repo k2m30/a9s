@@ -222,7 +222,7 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
 
 	// Navigate into the bucket (child view) — execute the returned cmd to actually push the child view
 	var cmd tea.Cmd
@@ -239,7 +239,7 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 			"key": "file.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: objects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild, ResourceType: "s3_objects", Resources: objects})
 
 	// Resize multiple times
 	for _, width := range []int{80, 120, 60, 200} {
@@ -320,7 +320,7 @@ func TestQa67_H11_H12_ExtremeSizes_WithResourceList_NoCrash(t *testing.T) {
 					"lifecycle":   "",
 				}},
 			}
-			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 			// Must not panic; View() must be non-empty
 			out := rootViewContent(m)
 			if out == "" {

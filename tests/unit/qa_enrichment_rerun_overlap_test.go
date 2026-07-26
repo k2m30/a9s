@@ -236,7 +236,7 @@ func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 
 	// Simulate the wrapped fetch cmd returning ResourcesLoadedMsg{TypeGen:1}.
 	// This is what the wrapped cmd would produce on a successful fetch.
-	loadedMsg := messages.ResourcesLoaded{
+	loadedMsg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ebs",
 		Resources:    rerunEBSResources(),
 		TypeGen:      1, // matches enrichmentTypeGen["ebs"]=1 after Ctrl+R
@@ -277,7 +277,7 @@ func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
 	loadedMsg := messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
-		TypeGen:      1,
+		TypeGen:      1, Provenance: messages.FetchProvenanceCanonicalList,
 	}
 	m, _ = rootApplyMsg(m, loadedMsg)
 
@@ -325,7 +325,8 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	m, firstCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    firstResources,
-		TypeGen:      1, // stale (current=2)
+		TypeGen:      1, Provenance: // stale (current=2)
+		messages.FetchProvenanceCanonicalList,
 	})
 
 	// LIST UPDATE MUST APPLY: view should reflect the 1 resource from first fetch.
@@ -362,7 +363,8 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	m, secondCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    secondResources,
-		TypeGen:      2, // matches current per-type gen=2
+		TypeGen:      2, Provenance: // matches current per-type gen=2
+		messages.FetchProvenanceCanonicalList,
 	})
 
 	// LIST UPDATE MUST APPLY: view should now reflect 2 resources from second fetch.
@@ -454,7 +456,7 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Deliver successful ResourcesLoadedMsg{TypeGen:2} — simulates wrapped fetch success.
-	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ebs",
 		Resources:    rerunEBSResources(),
 		TypeGen:      2,
@@ -568,7 +570,7 @@ func TestListCtrlR_NormalFetch_TypeGenZeroDoesNotCorruptRerunGen(t *testing.T) {
 	// The plain list-open Wave-2 dispatch fires here (ec2 is issue-capable);
 	// that cmd is allowed to be non-nil and to resolve to EnrichmentChecked —
 	// this is the defect fix, not a regression.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    rerunEC2Resources(),
 		TypeGen:      0, // normal fetch, no rerun intent
@@ -580,7 +582,7 @@ func TestListCtrlR_NormalFetch_TypeGenZeroDoesNotCorruptRerunGen(t *testing.T) {
 	// must still dispatch a rerun probe cleanly — exactly the behavior a
 	// corrupted/stale gen would break.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
-	_, rerunCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	_, rerunCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    rerunEC2Resources(),
 		TypeGen:      1, // matches enrichmentTypeGen["ec2"]=1 after Ctrl+R

@@ -334,7 +334,7 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 		Resources:    page1,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
 		Append:       false,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	page2 := []resource.Resource{
 		{ID: "bucket-stage2-3", Name: "bucket-stage2-3", Type: "s3"},
@@ -344,7 +344,7 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 		Resources:    page2,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Append:       true,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	lb := c.Snapshot().Body.List

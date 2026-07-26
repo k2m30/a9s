@@ -37,7 +37,7 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 	m, _ = m.Init()
 
 	// Load buckets
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources: []resource.Resource{
 			{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
@@ -86,7 +86,7 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "r53",
 		Resources: []resource.Resource{
 			{ID: "/hostedzone/ZTEST", Name: "example.com.", Fields: map[string]string{"zone_id": "/hostedzone/ZTEST", "name": "example.com."}},
@@ -137,7 +137,7 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 	m, _ = m.Init()
 
 	// Load a file (not a folder)
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "data/file.txt", Name: "data/file.txt", Fields: map[string]string{"status": "file", "key": "data/file.txt"}},
@@ -179,7 +179,7 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 	m, _ = m.Init()
 
 	// Load a folder
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "data/", Name: "data/", Fields: map[string]string{"status": "folder", "key": "data/"}},
@@ -222,7 +222,7 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
@@ -264,7 +264,7 @@ func TestBuildChildContext_ID(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources: []resource.Resource{
 			{ID: "test-bucket", Name: "test-bucket", Fields: map[string]string{}},
@@ -297,7 +297,7 @@ func TestBuildChildContext_Name(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "r53",
 		Resources: []resource.Resource{
 			{ID: "/hostedzone/Z1", Name: "test.com.", Fields: map[string]string{}},
@@ -331,7 +331,7 @@ func TestBuildChildContext_AtParent(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "folder1/", Name: "folder1/", Fields: map[string]string{"status": "folder", "key": "folder1/"}},
@@ -367,7 +367,7 @@ func TestBuildChildContext_FieldsKey(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "test",
 		Resources: []resource.Resource{
 			{ID: "1", Name: "one", Fields: map[string]string{"custom_field": "custom-value"}},
@@ -409,7 +409,7 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 	m, _ = m.Init()
 
 	// Load a resource
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "test_parent_events",
 		Resources: []resource.Resource{
 			{ID: "res-123", Name: "my-resource", Fields: map[string]string{"status": "active", "id": "res-123", "name": "my-resource"}},
@@ -453,7 +453,7 @@ func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2_no_events",
 		Resources: []resource.Resource{
 			{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},

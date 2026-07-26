@@ -54,7 +54,7 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 	// Seed three rows via Gen=0 (AcceptZeroGen=true passes the staleness guard).
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values intentionally ignored
 		ResourceType: "ec2",
-		Resources:    fakeEC2Resources(),
+		Resources:    fakeEC2Resources(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	lb := listBodyOrFail(t, c)
 	if len(lb.Rows) != 3 {
@@ -67,7 +67,7 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values intentionally ignored
 		ResourceType: "ec2",
 		Resources:    fakeEC2Resources()[:1],
-		Gen:          domain.Gen(99),
+		Gen:          domain.Gen(99), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	lb2 := listBodyOrFail(t, c)
 	if len(lb2.Rows) != 3 {
@@ -78,7 +78,7 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values intentionally ignored
 		ResourceType: "ec2",
 		Resources:    fakeEC2Resources()[:1],
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	lb3 := listBodyOrFail(t, c)
 	if len(lb3.Rows) != 1 {

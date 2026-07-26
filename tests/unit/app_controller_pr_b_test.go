@@ -78,7 +78,7 @@ import (
 func TestController_Handle_PRB_ResourcesLoaded_DispatchesProbeEnrichForIssueCapableType(t *testing.T) {
 	c := newTestController(t)
 
-	ev := messages.ResourcesLoaded{
+	ev := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-0fakeec2111", Type: "ec2", Fields: map[string]string{"state": "running"}},
@@ -456,7 +456,7 @@ func TestController_Handle_PRB_StaleResourcesLoaded_DroppedNoPanic(t *testing.T)
 
 	// Gen=999 will not match the session's AvailabilityGen (which starts at 1 per
 	// session.New); AcceptZeroGen=true so zero passes, but 999 does not.
-	ev := messages.ResourcesLoaded{
+	ev := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-0stale", Type: "ec2"}},
 		Gen:          999,
@@ -1030,7 +1030,7 @@ func TestController_Handle_PRB_ResultLane_ConsistencyAfterMultipleEvents(t *test
 	c := newTestController(t)
 
 	events := []runtime.Event{
-		messages.ResourcesLoaded{ResourceType: "lambda", Gen: 0},
+		messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "lambda", Gen: 0},
 		messages.APIError{ResourceType: "ecs", Err: errors.New("fake error"), Gen: 0},
 		messages.ClearFlash{Gen: 0},
 		messages.EnrichDetailResult{ResourceType: "rds", ResourceID: "db-fake-01", OperationID: 0},

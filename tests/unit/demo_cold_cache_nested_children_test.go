@@ -93,7 +93,7 @@ func enterChildAndFetch(t *testing.T, m *tui.Model, childType string, parentCtx 
 		return v
 	}
 	t.Fatalf("unexpected message type %T from %q fetch", raw, childType)
-	return messages.ResourcesLoaded{}
+	return messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown}
 }
 
 // enterChildExpectError dispatches EnterChildViewMsg with a known-unknown parent

@@ -78,7 +78,7 @@ func navigateToEC2DetailRelated(t *testing.T, m tui.Model, res resource.Resource
 
 // applyRelatedResourcesLoaded delivers a ResourcesLoadedMsg for the given type.
 func applyRelatedResourcesLoaded(m tui.Model, resourceType string, resources []resource.Resource) tui.Model {
-	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: resourceType,
 		Resources:    resources,
 	})
@@ -194,7 +194,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 	})
 
 	// Fetch result contains multiple AMIs; related ID filter leaves one.
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "ami",
 		Resources: []resource.Resource{
 			{ID: "ami-single-1", Name: "ami-single", Fields: map[string]string{"status": "available"}},
@@ -240,7 +240,7 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 		RelatedIDs:     []string{"asg-single-1"},
 	})
 
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "asg",
 		Resources: []resource.Resource{
 			{ID: "asg-single-1", Name: "asg-single", Fields: map[string]string{"status": "InService"}},
@@ -284,7 +284,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 		TargetID:       "alarm-page2-target",
 	})
 
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-page1-other", Name: "page1-other", Fields: map[string]string{"status": "ok"}},
@@ -308,7 +308,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 		t.Fatalf("LoadMoreMsg continuation token = %q, want %q", loadMore.ContinuationToken, "page-2")
 	}
 
-	m2, cmd = relatedApplyMsg(m, messages.ResourcesLoaded{
+	m2, cmd = relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-page2-target", Name: "page2-target", Fields: map[string]string{"status": "alarm"}},
@@ -419,7 +419,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 		{ID: "alarm-related-1", Name: "related-one", Fields: map[string]string{"status": "alarm"}},
 		{ID: "alarm-unrelated-1", Name: "unrelated-one", Fields: map[string]string{"status": "ok"}},
 	})
-	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-related-1", Name: "related-one", Fields: map[string]string{"status": "alarm"}},
@@ -446,7 +446,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 		RelatedIDs:     []string{"alarm-related-1", "alarm-related-2"},
 	})
 
-	m2, _ := relatedApplyMsg(m, messages.ResourcesLoaded{
+	m2, _ := relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceFilteredList,
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-related-2", Name: "related-two", Fields: map[string]string{"status": "alarm"}},

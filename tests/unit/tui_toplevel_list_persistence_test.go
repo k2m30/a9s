@@ -84,11 +84,12 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 		ResourceType: "s3",
 		Resources:    firstPage,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
-		Append:       false,
+		Append:       false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Load-more appends a second page and exhausts pagination (the "open +
 	// append" shape the pin requires).
+
 	secondPage := []resource.Resource{
 		{ID: "bucket-3", Name: "bucket-3", Type: "s3", Fields: map[string]string{"name": "bucket-3"}},
 	}
@@ -96,7 +97,7 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 		ResourceType: "s3",
 		Resources:    secondPage,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
-		Append:       true,
+		Append:       true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	_ = m
 
@@ -251,7 +252,7 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 		ResourceType: "s3",
 		Resources:    realRows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
-		Append:       false,
+		Append:       false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	afterFetchPlain := stripANSITL(tuitest.Render(m))

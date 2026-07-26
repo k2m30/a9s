@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -14,11 +15,73 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// ecsSvcTasksCursor encodes the two independent ListTasks continuation
+// cursors (RUNNING and STOPPED) into a single opaque token, since one
+// invocation of FetchEcsSvcTasks combines one page of each status. Done
+// marks a status as fully drained so a later page neither re-fetches nor
+// re-appends its already-seen first page.
+type ecsSvcTasksCursor struct {
+	RunningNext string `json:"rn,omitempty"`
+	RunningDone bool   `json:"rd,omitempty"`
+	StoppedNext string `json:"sn,omitempty"`
+	StoppedDone bool   `json:"sd,omitempty"`
+}
+
+// decodeEcsSvcTasksCursor decodes a compound continuation token previously
+// produced by ecsSvcTasksCursor.encode(). An empty token legitimately means
+// "first page" and returns the zero cursor. A non-empty token that fails to
+// decode has no legitimate origin other than this same encoder, so it is
+// always a bug elsewhere (a foreign cursor, a caller wiring mistake, a token
+// that outlived a field-tag change) — never external input worth tolerating
+// silently. Restarting from page 1 in that case would duplicate or drop
+// tasks with no signal, so it is reported as an error instead.
+func decodeEcsSvcTasksCursor(token string) (ecsSvcTasksCursor, error) {
+	var cur ecsSvcTasksCursor
+	if token == "" {
+		return cur, nil
+	}
+	if err := json.Unmarshal([]byte(token), &cur); err != nil {
+		return ecsSvcTasksCursor{}, fmt.Errorf("decoding ecs svc tasks continuation token: %w", err)
+	}
+	return cur, nil
+}
+
+func (c ecsSvcTasksCursor) encode() string {
+	b, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// fetchEcsTaskArnsPage fetches a single ListTasks page for one DesiredStatus,
+// resuming from nextToken when non-empty. done is true when AWS reported no
+// further NextToken for this status.
+func fetchEcsTaskArnsPage(ctx context.Context, listAPI ECSListTasksAPI, cluster, serviceName string, status ecstypes.DesiredStatus, nextToken string) (arns []string, newNextToken string, done bool, err error) {
+	input := &ecs.ListTasksInput{
+		Cluster:       aws.String(cluster),
+		ServiceName:   aws.String(serviceName),
+		DesiredStatus: status,
+	}
+	if nextToken != "" {
+		input.NextToken = aws.String(nextToken)
+	}
+
+	output, err := listAPI.ListTasks(ctx, input)
+	if err != nil {
+		return nil, "", false, err
+	}
+	if output.NextToken != nil {
+		return output.TaskArns, *output.NextToken, false, nil
+	}
+	return output.TaskArns, "", true, nil
+}
+
 // FetchEcsSvcTasks calls ListTasks for RUNNING and STOPPED statuses (one page
 // each), then DescribeTasks for full details. A single ListTasks call is made
-// per status per invocation. If either status has more pages, IsTruncated is
-// set to true. The continuationToken is not used for per-status resumption in
-// this implementation — it's accepted for interface compatibility.
+// per status per invocation. continuationToken is a compound cursor (see
+// ecsSvcTasksCursor) that resumes each status independently; a status already
+// marked done is skipped rather than re-fetched.
 func FetchEcsSvcTasks(
 	ctx context.Context,
 	listAPI ECSListTasksAPI,
@@ -26,38 +89,32 @@ func FetchEcsSvcTasks(
 	cluster, serviceName string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
+	cur, err := decodeEcsSvcTasksCursor(continuationToken)
+	if err != nil {
+		return resource.FetchResult{}, err
+	}
+	next := cur
+
 	var allTaskArns []string
-	isTruncated := false
 
-	// Fetch one page of RUNNING tasks, then one page of STOPPED tasks.
-	for _, status := range []ecstypes.DesiredStatus{ecstypes.DesiredStatusRunning, ecstypes.DesiredStatusStopped} {
-		input := &ecs.ListTasksInput{
-			Cluster:       aws.String(cluster),
-			ServiceName:   aws.String(serviceName),
-			DesiredStatus: status,
-		}
-
-		output, err := listAPI.ListTasks(ctx, input)
+	if !cur.RunningDone {
+		arns, nextTok, done, err := fetchEcsTaskArnsPage(ctx, listAPI, cluster, serviceName, ecstypes.DesiredStatusRunning, cur.RunningNext)
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, err)
 		}
-
-		allTaskArns = append(allTaskArns, output.TaskArns...)
-		if output.NextToken != nil {
-			isTruncated = true
+		allTaskArns = append(allTaskArns, arns...)
+		next.RunningNext, next.RunningDone = nextTok, done
+	}
+	if !cur.StoppedDone {
+		arns, nextTok, done, err := fetchEcsTaskArnsPage(ctx, listAPI, cluster, serviceName, ecstypes.DesiredStatusStopped, cur.StoppedNext)
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, err)
 		}
+		allTaskArns = append(allTaskArns, arns...)
+		next.StoppedNext, next.StoppedDone = nextTok, done
 	}
 
-	if len(allTaskArns) == 0 {
-		return resource.FetchResult{
-			Resources: []resource.Resource{},
-			Pagination: &resource.PaginationMeta{
-				IsTruncated: false,
-				TotalHint:   0,
-				PageSize:    0,
-			},
-		}, nil
-	}
+	isTruncated := !next.RunningDone || !next.StoppedDone
 
 	// DescribeTasks API accepts max 100 ARNs per call — batch if needed.
 	const descBatchSize = 100
@@ -80,14 +137,17 @@ func FetchEcsSvcTasks(
 	}
 
 	totalHint := len(resources)
+	nextToken := ""
 	if isTruncated {
 		totalHint = -1
+		nextToken = next.encode()
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
 			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},

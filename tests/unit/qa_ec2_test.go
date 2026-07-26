@@ -43,14 +43,15 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    fixtureEC2Instances(),
+		Resources:    fixtureEC2Instances(), Provenance: messages.
+
+			// ===========================================================================
+			// A. EC2 Instance List View
+			// ===========================================================================
+			FetchProvenanceCanonicalList,
 	})
 	return m
 }
-
-// ===========================================================================
-// A. EC2 Instance List View
-// ===========================================================================
 
 // A.1 Column Layout
 
@@ -222,7 +223,7 @@ func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    []resource.Resource{stoppedInstance},
+		Resources:    []resource.Resource{stoppedInstance}, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	content := rootViewContent(m)
@@ -715,7 +716,7 @@ func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    []resource.Resource{},
+		Resources:    []resource.Resource{}, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -1137,7 +1138,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    fixtureEC2Instances(),
+		Resources:    fixtureEC2Instances(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ec2(6") {

@@ -291,7 +291,7 @@ func TestTransientUnknownDrill_EnterRecomputesInPlace(t *testing.T) {
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: ec2Res})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: ec2Res})
 
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	m, _ = drainCmds(t, m, cmd, 8)

@@ -242,7 +242,7 @@ func scenarioEC2028RightFilterCleared(t *testing.T) string {
 func scenarioEC2029FilteredAlarmsList(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 30)
 	source := mustDemoEC2(t)[0]
-	m = issue140ApplyMsg(m, messages.ResourcesLoaded{ResourceType: "alarm", Resources: []resource.Resource{
+	m = issue140ApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "alarm", Resources: []resource.Resource{
 		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "alarm"}},
 		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "ok"}},
 		{ID: "unrelated-alarm", Name: "unrelated-alarm", Fields: map[string]string{"status": "ok"}},

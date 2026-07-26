@@ -57,7 +57,7 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 	})
 
 	// Simulate loaded target list.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "ami",
 		Resources:    amis,
 	})

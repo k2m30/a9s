@@ -264,7 +264,7 @@ func scenario119EC2ListEmpty(t *testing.T) string {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m = issue119ApplyMsg(m, messages.ResourcesLoaded{
+	m = issue119ApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    nil,
 	})
@@ -369,7 +369,7 @@ func issue119LoadEC2List(t *testing.T, m tui.Model) tui.Model {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m = issue119ApplyMsg(m, messages.ResourcesLoaded{
+	m = issue119ApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    mustDemoEC2(t),
 	})

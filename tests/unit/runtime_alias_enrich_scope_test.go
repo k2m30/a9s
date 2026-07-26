@@ -144,7 +144,7 @@ func TestControllerHandle_AliasOpenedList_ProbeEnrichScopedToCanonical(t *testin
 	ctrl := app.New(core)
 	ctrl.SetUIMode("web")
 
-	_, tasks := ctrl.Handle(messages.ResourcesLoaded{
+	_, tasks := ctrl.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: aliasEnrichScopeAlias,
 		Resources:    []resource.Resource{{ID: "bucket-1"}, {ID: "bucket-2"}},
 		Gen:          0,

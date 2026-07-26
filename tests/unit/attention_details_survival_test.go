@@ -190,7 +190,7 @@ func deliverAttnResourcesLoaded(ctrl *app.Controller, resources []resource.Resou
 		ResourceType: attnSurvivalType,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: truncated},
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	return vs, tasks, nil
 }

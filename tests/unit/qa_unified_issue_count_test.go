@@ -45,11 +45,12 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    resources,
+		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Deliver Wave-2 enrichment: 1 finding for the first instance.
 	// Gen=0 and TypeGen=0 match a fresh model's initial generation counters.
+
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Truncated:    false,

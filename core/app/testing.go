@@ -30,7 +30,7 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	}
 	ls := c.topListState()
 	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)
-	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, topLevelCanonical)
+	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, topLevelCanonical, false)
 	if topLevelCanonical {
 		c.maybeSaveResourceListCache(ls, canon)
 	}

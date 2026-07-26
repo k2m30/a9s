@@ -392,10 +392,11 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	resources := rerunEC2Resources()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    resources,
+		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Step 4: send Gen=0 injection message — must bypass session guard.
+
 	injected := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Truncated:    false,

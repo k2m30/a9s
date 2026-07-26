@@ -20,9 +20,10 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 	oldResources := []resource.Resource{
 		{ID: "i-old", Name: "old-server", Fields: map[string]string{"instance_id": "i-old", "name": "old-server", "state": "running"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: oldResources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: oldResources, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Verify old data is visible
+
 	content := rootViewContent(m)
 	if !strings.Contains(content, "old-server") {
 		t.Fatal("should show old-server before profile switch")
@@ -82,7 +83,7 @@ func TestBug_RegionSwitch_RefreshesResourceList(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "i-123", Name: "server", Fields: map[string]string{"instance_id": "i-123"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 
 	// Switch region
 	m, cmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
@@ -208,7 +209,7 @@ func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "i-123", Name: "srv", Fields: map[string]string{"instance_id": "i-123"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 
 	// Switch profile — process the FlashMsg from the batch
 	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "test-prod"})
@@ -275,7 +276,7 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 	m := newRootSizedModel()
 	// Navigate to resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-1", Fields: map[string]string{"instance_id": "i-1"}}},
 	})
@@ -294,7 +295,7 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 	}
 
 	// Now resources arrive — flash should be cleared
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-2", Fields: map[string]string{"instance_id": "i-2"}}},
 	})
@@ -309,7 +310,7 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-1", Fields: map[string]string{"instance_id": "i-1"}}},
 	})
@@ -324,7 +325,7 @@ func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 	}
 
 	// Resources arrive — flash should clear
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-2", Fields: map[string]string{"instance_id": "i-2"}}},
 	})

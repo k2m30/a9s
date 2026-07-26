@@ -43,7 +43,7 @@ func rdsLoadedModel(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(160, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -640,7 +640,7 @@ func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 	// Load RDS data.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
-		Resources:    fixtureRDSInstances(),
+		Resources:    fixtureRDSInstances(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -677,7 +677,7 @@ func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -727,7 +727,7 @@ func TestQA_RDS_CrossView_FilterHeaderDisplay(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})

@@ -58,7 +58,7 @@ func loadDemoEC2List(m tui.Model) tui.Model {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-0abc123", Name: "web-server", Fields: map[string]string{"instance_id": "i-0abc123", "state": "running"}},
@@ -378,7 +378,7 @@ func TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL(t *testing
 	// TUI side: press 'O' on the same resource in a real Bubble Tea Update loop.
 	m := newDemoConsoleModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{ec2Row}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{ec2Row}})
 
 	// handleOpenConsole(copyOnly=true) -> copyToClipboard always returns
 	// messages.Flash (a constant success/failure label, never the copied

@@ -16,26 +16,12 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// lastAutoIsolatedConfigFolder records the value newRootSizedModel itself
-// last wrote to A9S_CONFIG_FOLDER via its own auto-isolation (below), so a
-// later call can tell "still my own auto-isolated dir from an earlier call in
-// this same test, or nobody has repointed it since" apart from "some OTHER
-// caller (this test's own t.Setenv, e.g. to seed a themes/ dir the theme
-// selector reads from disk) repointed it after my last call, and that
-// override must win, not be clobbered". Comparing against a single recorded
-// TestMain default (rather than this last-self-written value) breaks the
-// first time ANY test's t.Setenv rotates the var away from that default —
-// every subsequent default-relying call would then wrongly skip isolation
-// for the rest of the binary. Tracking "did *I* set the current value" stays
-// correct call over call regardless of how many tests in between used their
-// own t.Setenv.
-var lastAutoIsolatedConfigFolder string
-
-// lastAutoIsolatedModel is the tui.Model (if any) newRootSizedModel handed
-// back on its previous call. Retained solely so this function can flush that
-// model's headless controller (CloseController, nil-safe) before abandoning
-// its auto-isolated directory below — see the Close call's comment for why.
-var lastAutoIsolatedModel *tui.Model
+// prevRootModel is the tui.Model (if any) newRootSizedModel handed back on
+// its previous call in this binary. Retained solely so this function can
+// flush that model's headless controller (CloseController, nil-safe) before
+// abandoning its config directory below — see the Close call's comment for
+// why.
+var prevRootModel *tui.Model
 
 // helper: create a model with a size set so View() actually renders.
 //
@@ -51,14 +37,30 @@ var lastAutoIsolatedModel *tui.Model
 // *testing.T through today, and retrofitting one is a much larger, riskier
 // diff than isolating at this single shared constructor — so a fresh,
 // unique A9S_CONFIG_FOLDER is set via plain os.Setenv (not t.Setenv, since
-// there is no *testing.T parameter here) on every call, UNLESS the calling
-// test already redirected A9S_CONFIG_FOLDER itself since this helper's last
-// call (see lastAutoIsolatedConfigFolder above) — that per-test override
-// must win, e.g. so a seeded themes/ directory the theme selector reads from
-// disk is not silently swapped out for an empty one. Every caller in this
-// package runs sequentially (no t.Parallel() call site here also invokes
-// this helper — see tui_stack_sync_test.go), so a later call's Setenv safely
-// lands before that caller's own I/O runs.
+// there is no *testing.T parameter here) UNCONDITIONALLY on every call, full
+// stop. An earlier version tried to skip rotating whenever the current env
+// value still looked like this function's own last write, so a caller that
+// had redirected A9S_CONFIG_FOLDER itself (e.g. to seed a themes/ directory
+// the theme selector reads from disk) wouldn't get clobbered. That guard
+// compared os.Getenv("A9S_CONFIG_FOLDER") against a remembered "last dir I
+// set" — a comparison that silently and permanently breaks the first time
+// ANY test anywhere in the binary calls t.Setenv("A9S_CONFIG_FOLDER", ...):
+// Go restores the env at that test's cleanup to whatever was live before
+// its call, which need not be (and in practice stops being) the value this
+// function last remembered, desyncing the two for the rest of the binary
+// and silently disabling isolation for every later caller. There is no
+// weaker version of that comparison that survives an external t.Setenv,
+// because the state it depends on (the live env var) is not under this
+// function's control. Isolating unconditionally has no history to fall out
+// of sync with. A caller that needs the constructed model to read specific
+// pre-seeded files (e.g. a themes/ directory) must call this function
+// FIRST, then seed those files into the directory THIS call resolved
+// (os.Getenv("A9S_CONFIG_FOLDER") after the call returns) — never the other
+// way around; see TestStackSync_SelectorFlow / TestStackSync_DoublePopGuard
+// in tui_stack_sync_test.go. Every caller in this package runs sequentially
+// (no t.Parallel() call site here also invokes this helper — see
+// tui_stack_sync_test.go), so a later call's Setenv safely lands before
+// that caller's own I/O runs.
 //
 // Task #41: any caller that delivers messages.ResourcesLoaded (or otherwise
 // reaches Controller.persistMenuAvailabilityCache) through the returned
@@ -86,19 +88,15 @@ var lastAutoIsolatedModel *tui.Model
 // binary" to "until this helper is next called" — which in this suite is
 // almost always within the same or next test.
 func newRootSizedModel() tui.Model {
-	if lastAutoIsolatedModel != nil {
-		lastAutoIsolatedModel.CloseController()
-		lastAutoIsolatedModel = nil
+	if prevRootModel != nil {
+		prevRootModel.CloseController()
+		prevRootModel = nil
 	}
-	current := os.Getenv("A9S_CONFIG_FOLDER")
-	if lastAutoIsolatedConfigFolder == "" || current == lastAutoIsolatedConfigFolder {
-		if dir, err := os.MkdirTemp("", "a9s-roottest-config-*"); err == nil {
-			os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // best-effort per-call isolation, not test-critical
-			lastAutoIsolatedConfigFolder = dir
-		}
+	if dir, err := os.MkdirTemp("", "a9s-roottest-config-*"); err == nil {
+		os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // best-effort per-call isolation, not test-critical
 	}
 	m := tuitest.Sized("testprofile", "us-east-1")
-	lastAutoIsolatedModel = &m
+	prevRootModel = &m
 	return m
 }
 
@@ -679,7 +677,7 @@ func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
 	// Press Enter on the bucket — returns a cmd that produces EnterChildViewMsg
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	// Execute the cmd to get the EnterChildViewMsg and process it
@@ -709,8 +707,10 @@ func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets, Provenance: messages.FetchProvenanceCanonicalList})
+
 	// Enter bucket — execute returned cmd
+
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {

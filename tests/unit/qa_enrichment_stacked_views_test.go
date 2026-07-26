@@ -74,11 +74,12 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "rds",
-		Resources:    rdsResources,
+		Resources:    rdsResources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Step 3: Navigate to detail view for the first instance.
 	// DetailModel is now active; ResourceListModel is below it in m.stack.
+
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "rds",
@@ -170,7 +171,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 		ID: "db-stacked-b-001", Name: "db-stacked-b-001",
 		Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "rds",
 		Resources:    []resource.Resource{resourceA, resourceB},
 	})

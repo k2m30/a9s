@@ -71,7 +71,7 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	partialErr := errors.New("partial: 1 of 3 IDs failed: throttled")
-	_, cmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	_, cmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "test-handler-route",
 		Resources: []resource.Resource{
 			{ID: "managed-001", Name: "managed-001"},
@@ -110,7 +110,7 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 // forcing the dispatcher back to "either resources OR error". This test
 // fails to compile if the field is removed.
 func TestResourcesLoadedMsg_HasErrField(t *testing.T) {
-	msg := messages.ResourcesLoaded{
+	msg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown,
 		Err: errors.New("compile-time pin"),
 	}
 	if msg.Err == nil {

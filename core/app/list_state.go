@@ -50,6 +50,39 @@ func isTopLevelCanonicalList(screenID runtime.ScreenID, ls *ListState) bool {
 	return !ls.EscPops && ls.ParentContext == nil
 }
 
+// pushByIDPlaceholderList pushes a placeholder ScreenResourceList for
+// targetType and always sets EscPops (this screen is a related/filtered/by-ID
+// drill, never the type's canonical top-level list — isTopLevelCanonicalList
+// above). When targetType has a FetchByIDs helper registered, it additionally
+// flags the placeholder as an auto-open-single-detail drill for targetID —
+// RelatedIDSet keyed on targetID plus AutoOpenSingle — so Handle's
+// autoOpenSingleDetail (handle.go) replaces it with the resolved detail once
+// the by-ID fetch delivery lands.
+//
+// The single constructor for the by-ID placeholder invariant, shared by the
+// two lane-neutral by-ID drill seams: the related panel's own single-target
+// drill (navigate.go's applyRelatedNavResult, NavigationKindFilteredList
+// case) and the costs pivot's resource-open drill (costs_state.go's
+// screen.OpenResource case). Returns nil if the push leaves no top list
+// screen.
+func (c *Controller) pushByIDPlaceholderList(targetType, targetID string) *ListState {
+	c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenResourceList,
+		Context: runtime.ScreenContext{ResourceType: targetType},
+	}})
+	c.ensureListState()
+	ls := c.topListState()
+	if ls == nil {
+		return nil
+	}
+	ls.EscPops = true
+	if targetID != "" && resource.GetFetchByIDs(targetType) != nil {
+		ls.RelatedIDSet = map[string]struct{}{targetID: {}}
+		ls.AutoOpenSingle = true
+	}
+	return ls
+}
+
 // EnsureListState is the exported surface that TUI builders call immediately
 // after a ScreenResourceList/ScreenChildList PushScreen intent has already
 // been applied (e.g. via ApplyIntents) so that State.List is non-nil before
@@ -425,9 +458,22 @@ func (c *Controller) SetListLoadingMore(v bool) {
 	ls.LoadingMore = v
 }
 
-// ClearListLoading clears both the Loading and LoadingMore flags on the top list
-// screen. Called when a fetch or load-more operation fails (error handler path)
-// so the title reverts from "name loading..." back to the resource count title.
+// clearFetchInFlight resets every in-flight fetch-activity flag (Loading,
+// LoadingMore, Refreshing) to false. This is the single point both a landed
+// fetch result (applyResourcesLoaded, success or partial-failure) and a
+// fetch-failure path (ClearListLoading, the headless/web
+// ClearActiveListLoadingIntent case in intents.go) route through, so a
+// load-more or refresh failure can never strand a flag the other lane already
+// knew to clear.
+func (ls *ListState) clearFetchInFlight() {
+	ls.Loading = false
+	ls.LoadingMore = false
+	ls.Refreshing = false
+}
+
+// ClearListLoading clears the top list screen's in-flight fetch flags. Called
+// when a fetch or load-more operation fails (error handler path) so the title
+// reverts from "name loading..." back to the resource count title.
 func (c *Controller) ClearListLoading() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -435,8 +481,7 @@ func (c *Controller) ClearListLoading() {
 	if ls == nil {
 		return
 	}
-	ls.Loading = false
-	ls.LoadingMore = false
+	ls.clearFetchInFlight()
 }
 
 // SetListFetchError records a failed fetch's error text on the top list

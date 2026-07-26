@@ -289,7 +289,7 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 	buckets := []resource.Resource{
 		{ID: "my-data-bucket", Name: "my-data-bucket", Fields: map[string]string{"name": "my-data-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
 
 	// Enter bucket
 	var cmd tea.Cmd
@@ -305,7 +305,7 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 			"key": "file1.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: objects})
 
 	// Verify we're in the objects view
 	plain := stripANSI(rootViewContent(m))
@@ -363,7 +363,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	buckets := []resource.Resource{
 		{ID: "deep-bucket", Name: "deep-bucket", Fields: map[string]string{"name": "deep-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Enter bucket
 	var cmd tea.Cmd
@@ -379,7 +379,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 			"key": "data/", "size": "", "last_modified": "", "storage_class": "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Navigate into the prefix
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -394,7 +394,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 			"key": "data/file.csv", "size": "2048", "last_modified": "2025-02-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: prefixObjects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: prefixObjects, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Press Ctrl+R to refresh
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -436,7 +436,7 @@ func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 	buckets := []resource.Resource{
 		{ID: "bucket-a", Name: "bucket-a", Fields: map[string]string{"name": "bucket-a"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Press Ctrl+R to refresh at bucket level
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -473,6 +473,7 @@ func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
 				Resources: []resource.Resource{
 					{ID: "test-resource", Name: "test-resource", Fields: map[string]string{}},
 				},
+				Provenance: messages.FetchProvenanceCanonicalList,
 			})
 
 			_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -544,6 +545,7 @@ func TestQa67_A9_RefreshAfterError_TriggersNewFetch(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    []resource.Resource{},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "dbi",
@@ -601,7 +603,7 @@ func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
 			"creation_date": "2025-01-01",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: s3Resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: s3Resources, Provenance: messages.FetchProvenanceCanonicalList})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "independent-bucket") {
@@ -636,6 +638,7 @@ func navigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 				},
 			},
 		},
+		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Press Enter to open the detail view.

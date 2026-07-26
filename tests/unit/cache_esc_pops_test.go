@@ -72,7 +72,7 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})
@@ -106,7 +106,7 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 	// With the bug, line 246 sees ParentContext()==nil and overwrites cache["ec2"].
 
 	partialList := ec2Res[0:1] // only the first EC2 instance
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceFilteredList,
 		ResourceType: "ec2",
 		Resources:    partialList,
 	})

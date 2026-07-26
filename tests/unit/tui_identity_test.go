@@ -373,7 +373,7 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 					Target:       messages.TargetResourceList,
 					ResourceType: "ec2",
 				})
-				m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+				m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 					ResourceType: "ec2",
 					Resources: []resource.Resource{
 						{

@@ -270,7 +270,7 @@ func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 	// Load fixtures
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
-		Resources:    fixtures,
+		Resources:    fixtures, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -298,7 +298,7 @@ func TestQA_Redis_NavigateToDetail(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -331,7 +331,7 @@ func TestQA_Redis_NavigateToYAML(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -360,7 +360,7 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -419,7 +419,7 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -458,7 +458,7 @@ func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -511,7 +511,7 @@ func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    multiStatusRedisFixtures(),
 	})

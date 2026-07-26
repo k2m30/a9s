@@ -48,7 +48,7 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 	if err != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
-	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{
+	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2,
 	})
@@ -101,7 +101,7 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))
 
 	// Simulate loaded target resources so single-match related navigation can resolve.
-	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{
+	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ami",
 		Resources:    amis,
 	})
@@ -195,7 +195,7 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 
 	// Simulate the current live failure mode: the generic ami list fetch returns
 	// no rows for a referenced external image ID.
-	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{
+	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ami",
 		Resources:    nil,
 	})

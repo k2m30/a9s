@@ -108,7 +108,7 @@ func TestSyncExactTotalToMenu_DoesNotClearEnrichmentTruncation_OnEqualExactRows(
 			rows[i].Findings = []domain.Finding{broken[i]}
 		}
 	}
-	c.Handle(messages.ResourcesLoaded{
+	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -156,7 +156,7 @@ func TestSyncExactTotalToMenu_ClearsPriorRowsDerivedTruncation_OnEqualExactRows(
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	if got := c.GetMenuIssueCounts()["s3"]; got != 5 {

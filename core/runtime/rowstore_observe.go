@@ -26,12 +26,13 @@ import (
 
 // observeResourcesLoadedRows feeds RowStore the same canonicalization +
 // Fetch-origin write HandleResourcesLoaded's ProbeResources reseed performs,
-// without applying any of HandleResourcesLoaded's intents/tasks. A
-// top-level ResourcesLoaded is always a genuine live-fetch result —
-// OriginFetch — replacing on append=false, appending (dedup-by-ID) on
-// append=true, mirroring the canonical list-screen lane's own semantics.
+// without applying any of HandleResourcesLoaded's intents/tasks. Only
+// msg.Provenance.CanonicalList() is eligible: a filtered drill, a by-ID
+// lookup, or a child fetch shares this same message shape but is never the
+// type's global population, and must not replace (append=false) or extend
+// (append=true) the shared per-type RowStore entry a canonical fetch owns.
 func (c *Core) observeResourcesLoadedRows(msg messages.ResourcesLoaded) {
-	if msg.ResourceType == "" {
+	if msg.ResourceType == "" || !msg.Provenance.CanonicalList() {
 		return
 	}
 	canon := msg.ResourceType

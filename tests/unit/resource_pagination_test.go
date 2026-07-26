@@ -209,7 +209,7 @@ func TestLoadMoreMsg_WithParentContext(t *testing.T) {
 }
 
 func TestResourcesLoadedMsg_PaginationFields(t *testing.T) {
-	msg := messages.ResourcesLoaded{
+	msg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    []resource.Resource{{ID: "r1"}},
 		Pagination: &resource.PaginationMeta{
@@ -242,7 +242,7 @@ func TestResourcesLoadedMsg_PaginationFields(t *testing.T) {
 }
 
 func TestResourcesLoadedMsg_LegacyNilPagination(t *testing.T) {
-	msg := messages.ResourcesLoaded{
+	msg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-123"}},
 		Pagination:   nil,

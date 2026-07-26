@@ -11,12 +11,69 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// FetchProvenance identifies which fetch pipeline produced a ResourcesLoaded
+// event: the type's own top-level population, a server-side filtered drill,
+// a single by-ID lookup, or a nested child-resource fetch. A consumer that
+// needs to know whether a result IS the type's canonical population — the
+// shared per-type RowStore, the persisted disk cache, the menu badge sync,
+// the C6 FilteredRowsSet seed — calls CanonicalList() instead of inferring
+// it from fields a given consumer happens to have access to (ScreenID,
+// ListState.EscPops/ParentContext) and that another consumer of the same
+// event (runtime.Core, which owns no screen stack) never can.
+type FetchProvenance uint8
+
+const (
+	// FetchProvenanceUnknown is the zero value — a ResourcesLoaded literal
+	// that never set Provenance. CanonicalList() returns false for it: an
+	// omitted provenance fails closed rather than being silently read as the
+	// type's canonical population.
+	FetchProvenanceUnknown FetchProvenance = iota
+	// FetchProvenanceCanonicalList is the type's own top-level list fetch, or
+	// its load-more continuation — the only provenance eligible to replace
+	// the shared per-type RowStore entry or the persisted disk cache.
+	FetchProvenanceCanonicalList
+	// FetchProvenanceFilteredList is a server-side filtered drill into the
+	// same resource type, or its load-more continuation.
+	FetchProvenanceFilteredList
+	// FetchProvenanceByID is a single-resource by-ID lookup.
+	FetchProvenanceByID
+	// FetchProvenanceChild is a nested child-resource-type fetch, or its
+	// load-more continuation.
+	FetchProvenanceChild
+)
+
+// CanonicalList reports whether a ResourcesLoaded event carrying this
+// provenance is the resource type's canonical top-level population.
+func (p FetchProvenance) CanonicalList() bool { return p == FetchProvenanceCanonicalList }
+
+// ProvenanceForContinuation resolves the FetchProvenance for a KindFetchMore
+// continuation from the same ParentContext/FetchFilter mutual-exclusivity
+// FetchMorePayload documents: a non-empty parentContext continues a child
+// list, a non-empty fetchFilter continues a filtered list, neither continues
+// the canonical top-level list. Shared by the executor and the TUI adapter's
+// own KindFetchMore construction so the two producers of the same
+// continuation cannot resolve it differently.
+func ProvenanceForContinuation(parentContext, fetchFilter map[string]string) FetchProvenance {
+	if len(parentContext) > 0 {
+		return FetchProvenanceChild
+	}
+	if len(fetchFilter) > 0 {
+		return FetchProvenanceFilteredList
+	}
+	return FetchProvenanceCanonicalList
+}
+
 // ResourcesLoaded is sent when AWS resources have been fetched.
 type ResourcesLoaded struct {
 	ResourceType string
 	Resources    []resource.Resource
 	Pagination   *resource.PaginationMeta // nil when result has no pagination info
 	Append       bool                     // true = append to existing list
+	// Provenance identifies which fetch pipeline produced this event. Every
+	// production construction site sets it explicitly (executor.go,
+	// internal/tui/fetch_adapter.go) — see FetchProvenance for why the zero
+	// value must never be read as canonical.
+	Provenance FetchProvenance
 	// TypeGen is the enrichment-rerun token. 0 on normal fetches (no rerun
 	// intent). Non-zero only when the message originates from the
 	// Ctrl+R-for-rerun wrapped fetch: it carries the per-type enrichment

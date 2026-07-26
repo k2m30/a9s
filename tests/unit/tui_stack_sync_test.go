@@ -164,24 +164,24 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 // behind or double-pops past the menu.
 func TestStackSync_SelectorFlow(t *testing.T) {
 	withTuiVersion(t, "test")
-	tmp := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	cfgPath := writeAWSConfig(t, []string{"default", "staging", "prod"})
 	t.Setenv("AWS_CONFIG_FILE", cfgPath)
 
-	// NavigateKindPushTheme (runtime_adapter_navigate.go) lists
-	// <A9S_CONFIG_FOLDER>/themes/*.yaml from disk before pushing the selector
-	// — an empty/missing dir flashes "No theme files found" instead of
-	// pushing, so seed one real theme file.
-	themesDir := tmp + "/themes"
+	// newRootSizedModel isolates A9S_CONFIG_FOLDER unconditionally on every
+	// call — seed the theme file into the directory IT resolved (not a
+	// directory this test pre-picked), so the seed cannot be clobbered by
+	// that isolation. NavigateKindPushTheme (runtime_adapter_navigate.go)
+	// lists <A9S_CONFIG_FOLDER>/themes/*.yaml from disk before pushing the
+	// selector — an empty/missing dir flashes "No theme files found" instead
+	// of pushing, so seed one real theme file.
+	m := newRootSizedModel()
+	themesDir := os.Getenv("A9S_CONFIG_FOLDER") + "/themes"
 	if err := os.MkdirAll(themesDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(themes): %v", err)
 	}
 	if err := os.WriteFile(themesDir+"/stacksync-theme.yaml", []byte("name: stacksync-theme\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile(theme seed): %v", err)
 	}
-
-	m := newRootSizedModel()
 	assertStackInSync(t, m, "baseline")
 	baseline := stripANSI(rootViewContent(m))
 	if !strings.Contains(baseline, "resource-types") {
@@ -372,16 +372,18 @@ func TestStackSync_ChildListFlow(t *testing.T) {
 // exactly one level up, not two (which would land on the list instead).
 func TestStackSync_DoublePopGuard(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	tmp := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmp)
-	themesDir := tmp + "/themes"
+	// newRootSizedModel isolates A9S_CONFIG_FOLDER unconditionally on every
+	// call — seed the theme file into the directory IT resolved (not a
+	// directory this test pre-picked), so the seed cannot be clobbered by
+	// that isolation.
+	m := newRootSizedModel()
+	themesDir := os.Getenv("A9S_CONFIG_FOLDER") + "/themes"
 	if err := os.MkdirAll(themesDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(themes): %v", err)
 	}
 	if err := os.WriteFile(themesDir+"/doublepop-theme.yaml", []byte("name: doublepop-theme\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile(theme seed): %v", err)
 	}
-	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

@@ -61,7 +61,7 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 	}
 
 	// Load ONLY the first EC2 resource with truncated pagination.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res[0:1],
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-stored-001"},
@@ -123,7 +123,7 @@ func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
 		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
 	// Load ALL resources, non-truncated.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

@@ -79,7 +79,7 @@ func TestPort_JSONCopy_UncoloredContent(t *testing.T) {
 		ID: "i-jsonport1", Name: "json-port-server",
 		Fields: map[string]string{"instance_id": "i-jsonport1", "state": "running"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	// Navigate to the JSON view (mirrors qa_copy_test.go's YAML case).
 	m, cmd := rootApplyMsg(m, rootKeyPress("J"))
@@ -114,7 +114,7 @@ func TestPort_YAMLCopy_UncoloredContent(t *testing.T) {
 		ID: "i-yamlport1", Name: "yaml-port-server",
 		Fields: map[string]string{"instance_id": "i-yamlport1", "state": "stopped"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd == nil {
@@ -257,7 +257,7 @@ func TestPort_YAML_TKey_LiveCTEventsNavigate(t *testing.T) {
 	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{ctEventsEC2Resource()},
 	})
@@ -385,7 +385,7 @@ func TestPort_YAMLToJSON_LiveToggle(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-toggle1", Name: "toggle-server", Fields: map[string]string{"state": "running"}}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd == nil {
@@ -411,7 +411,7 @@ func TestPort_JSONToYAML_LiveToggle(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-toggle2", Name: "toggle-server-2", Fields: map[string]string{"state": "stopped"}}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("J"))
 	if cmd == nil {
@@ -448,7 +448,7 @@ func TestPort_YAMLToggle_SurvivesAsyncEnrichment(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-enrichtoggle1", Name: "enrich-toggle-server", Fields: map[string]string{"state": "running"}}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd == nil {
@@ -593,7 +593,7 @@ func TestPort_RevealCopy_CopiesExactValue(t *testing.T) {
 	// fetch path reads session.Clients, populated by a live ClientsReady.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: shortName,
 		Resources:    []resource.Resource{{ID: "wave3-secret-arn", Name: "wave3-secret"}},
 	})
@@ -632,7 +632,7 @@ func TestPort_RevealCopy_JSONValueStaysRaw(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: shortName,
 		Resources:    []resource.Resource{{ID: "wave3-json-secret-arn", Name: "wave3-json-secret"}},
 	})
@@ -673,7 +673,7 @@ func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: shortName,
 		Resources:    []resource.Resource{{ID: "wave3-empty-secret-arn", Name: "wave3-empty-secret"}},
 	})
@@ -711,7 +711,7 @@ func TestPort_YAML_DKey_LiveNavigateToDetail(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-dkey1", Name: "dkey-server", Fields: map[string]string{"state": "running"}}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd == nil {
@@ -742,7 +742,7 @@ func TestPort_JSON_DKey_LiveNavigateToDetail(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-dkey2", Name: "dkey-server-2", Fields: map[string]string{"state": "stopped"}}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("J"))
 	if cmd == nil {
@@ -1016,7 +1016,7 @@ func wave3EnterYAML(t *testing.T, w, h int) tui.Model {
 	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{wave3CtrlInteractionResource()}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{wave3CtrlInteractionResource()}})
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd == nil {
 		t.Fatal("y on resource list should return a navigate command")
@@ -1032,7 +1032,7 @@ func wave3EnterJSON(t *testing.T, w, h int) tui.Model {
 	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{wave3CtrlInteractionResource()}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{wave3CtrlInteractionResource()}})
 	m, cmd := rootApplyMsg(m, rootKeyPress("J"))
 	if cmd == nil {
 		t.Fatal("J on resource list should return a navigate command")

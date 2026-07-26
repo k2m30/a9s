@@ -245,7 +245,8 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 			PageSize:    50,
 		},
 		Append: false,
-		Gen:    0, // AcceptZeroGen=true
+		Gen:    0, Provenance: // AcceptZeroGen=true
+		messages.FetchProvenanceCanonicalList,
 	})
 
 	page2 := page2Resources(50, 5)
@@ -259,7 +260,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 			PageSize:    5,
 		},
 		Append: true,
-		Gen:    0,
+		Gen:    0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	preSnap := ctrl.Snapshot()
@@ -289,7 +290,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 			PageSize:    50,
 		},
 		Append: false,
-		Gen:    0,
+		Gen:    0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	snap := ctrl.Snapshot()

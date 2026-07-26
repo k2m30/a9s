@@ -26,6 +26,12 @@ func TestAutoOpenSingleDetail_ByIDPlaceholderOpensDetail(t *testing.T) {
 	ls := c.topListState()
 	ls.AutoOpenSingle = true
 	ls.RelatedIDSet = map[string]struct{}{"i-0target00000001": {}}
+	// A by-ID placeholder is never the canonical top-level list — EscPops
+	// marks it as such (navigate.go's applyRelatedNavResult sets this same
+	// field for every by-ID/filtered/child placeholder it pushes), which is
+	// what isTopLevelCanonicalList (list_state.go) keys on to exempt it from
+	// the canonical-only Provenance gate (handle.go).
+	ls.EscPops = true
 
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ec2",
@@ -33,7 +39,7 @@ func TestAutoOpenSingleDetail_ByIDPlaceholderOpensDetail(t *testing.T) {
 		Resources: []resource.Resource{
 			{ID: "i-0target00000001", Name: "target", Type: "ec2",
 				Fields: map[string]string{"instance_id": "i-0target00000001"}},
-		},
+		}, Provenance: messages.FetchProvenanceByID,
 	})
 
 	snap := c.Snapshot()

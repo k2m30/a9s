@@ -348,7 +348,7 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 		ResourceType: stage4PinType,
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	listLaneTF := stage4PinReadTypeFile(t, "stage4-pin-profile", "us-east-1", stage4PinType)

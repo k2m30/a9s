@@ -280,6 +280,38 @@ func TestFetchEcsSvcTasks_Empty(t *testing.T) {
 	}
 }
 
+// TestFetchEcsSvcTasks_EmptyPageWithNextToken pins the truncation-honesty
+// fix: a ListTasks page with zero TaskArns but a NextToken must still report
+// IsTruncated=true. Before the fix, an early return for
+// len(allTaskArns) == 0 unconditionally reported a proven zero, discarding
+// the NextToken and hiding every task on the pages that followed.
+func TestFetchEcsSvcTasks_EmptyPageWithNextToken(t *testing.T) {
+	const cluster = "arn:aws:ecs:us-east-1:123456789012:cluster/quiet-cluster"
+	listTasksMock := &mockECSListTasksClient{
+		outputs: map[string]*ecs.ListTasksOutput{
+			cluster: {TaskArns: []string{}, NextToken: aws.String("ecs-quiet-next")},
+		},
+	}
+	describeTasksMock := &mockECSDescribeTasksClient{}
+
+	result, err := awsclient.FetchEcsSvcTasks(context.Background(), listTasksMock, describeTasksMock, cluster, "quiet-service", "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true: an empty page with a NextToken is not a proven zero")
+	}
+	if result.Pagination.NextToken == "" {
+		t.Error("expected a non-empty continuation cursor")
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
+	}
+}
+
 // TestFetchEcsSvcTasks_ListTasksError verifies that ListTasks errors propagate.
 func TestFetchEcsSvcTasks_ListTasksError(t *testing.T) {
 	listTasksMock := &mockECSListTasksClient{
@@ -726,26 +758,33 @@ func TestEcsSvcTasks_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcTasks_ContinuationToken verifies that a non-empty continuation
-// token is accepted without error. FetchEcsSvcTasks fetches RUNNING and STOPPED
-// tasks in a single invocation (dual-status pattern); the continuation token
-// parameter is accepted for interface compatibility but is not forwarded to the
-// ListTasks API — per-status resumption is not supported in this implementation.
+// TestFetchEcsSvcTasks_ContinuationToken previously fed a plain string
+// ("my-continuation-token") that is not valid JSON, so the compound-cursor
+// decoder introduced by the truncation-honesty fix could never parse it — it
+// silently fell back to "start fresh", and the assertion "the token should
+// NOT be forwarded" held only because of that fallback, not because
+// forwarding was actually absent. That made the test vacuous: it could never
+// fail even if forwarding were completely broken, which is worse than no
+// test at all. It now round-trips a REAL cursor — obtained from an actual
+// FetchEcsSvcTasks call, the only legitimate source of this token — through
+// a second call, and asserts the AWS-side continuation token embedded in it
+// IS forwarded verbatim to ListTasks. Do NOT restore the old "should NOT be
+// forwarded" assertion, and do NOT feed it a hand-written string; both
+// defeat the point of this test.
 func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
+	const cluster = "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	wrapper := &tokenCapturingECSListTasksMock{
-		inner: &mockECSListTasksClient{
-			outputs: map[string]*ecs.ListTasksOutput{
-				"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster": {
-					TaskArns: []string{
-						"arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456",
-					},
-				},
+	// Step 1: produce a REAL continuation cursor the way the app actually
+	// gets one — from a truncated first page.
+	firstPageList := &mockECSListTasksClient{
+		outputs: map[string]*ecs.ListTasksOutput{
+			cluster: {
+				TaskArns:  []string{"arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"},
+				NextToken: aws.String("aws-side-continuation-token"),
 			},
 		},
 	}
-
 	describeMock := &mockECSDescribeTasksClient{
 		output: &ecs.DescribeTasksOutput{
 			Tasks: []ecstypes.Task{
@@ -760,29 +799,31 @@ func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
 		},
 	}
 
-	// The function must accept a non-empty continuation token without error.
-	result, err := awsclient.FetchEcsSvcTasks(
-		context.Background(),
-		wrapper,
-		describeMock,
-		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
-		"my-service",
-		"my-continuation-token",
-	)
+	page1, err := awsclient.FetchEcsSvcTasks(context.Background(), firstPageList, describeMock, cluster, "my-service", "")
 	if err != nil {
-		t.Fatalf("expected no error with continuation token, got %v", err)
+		t.Fatalf("expected no error building the real cursor, got %v", err)
+	}
+	realCursor := page1.Pagination.NextToken
+	if realCursor == "" {
+		t.Fatal("expected a non-empty continuation cursor from a truncated first page")
 	}
 
-	// The function should still return results regardless of the token.
-	if len(result.Resources) == 0 {
-		t.Fatal("expected at least 1 resource when continuation token provided")
+	// Step 2: feed the REAL cursor back and assert the AWS-side token it
+	// carries is forwarded to ListTasks, not dropped.
+	wrapper := &tokenCapturingECSListTasksMock{
+		inner: &mockECSListTasksClient{
+			outputs: map[string]*ecs.ListTasksOutput{cluster: {TaskArns: []string{}}},
+		},
 	}
-
-	// The continuation token is NOT forwarded to ListTasks in this implementation
-	// (accepted for interface compatibility only — dual-status pattern fetches
-	// one page of RUNNING + one page of STOPPED per invocation).
-	if wrapper.capturedNextToken != nil {
-		t.Errorf("continuation token should NOT be forwarded to ListTasks API, got %q", *wrapper.capturedNextToken)
+	_, err = awsclient.FetchEcsSvcTasks(context.Background(), wrapper, describeMock, cluster, "my-service", realCursor)
+	if err != nil {
+		t.Fatalf("expected no error with a real continuation token, got %v", err)
+	}
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("continuation token was NOT forwarded to ListTasks — expected the cursor's embedded AWS token to be forwarded")
+	}
+	if *wrapper.capturedNextToken != "aws-side-continuation-token" {
+		t.Errorf("forwarded NextToken: expected %q, got %q", "aws-side-continuation-token", *wrapper.capturedNextToken)
 	}
 }
 
@@ -800,4 +841,56 @@ func (m *tokenCapturingECSListTasksMock) ListTasks(ctx context.Context, params *
 	}
 	m.callCount++
 	return m.inner.ListTasks(ctx, params, optFns...)
+}
+
+// TestFetchEcsSvcTasks_MalformedContinuationToken pins both halves of the
+// decodeEcsSvcTasksCursor contract. A non-empty token that isn't valid JSON
+// has no legitimate origin (see decodeEcsSvcTasksCursor's doc comment in
+// core/aws/ecs_svc_tasks.go) and must return an error without returning any
+// page-1 rows — silently restarting would duplicate or drop tasks with no
+// signal. The empty-token subtest is the positive control: it must still
+// fetch page 1 with no error, proving the malformed-token guard didn't also
+// break the legitimate "first page" path.
+func TestFetchEcsSvcTasks_MalformedContinuationToken(t *testing.T) {
+	const cluster = "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"
+
+	t.Run("non_empty_undecodable_token_errors_without_rows", func(t *testing.T) {
+		listMock := &mockECSListTasksClient{
+			outputs: map[string]*ecs.ListTasksOutput{
+				cluster: {TaskArns: []string{"arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/should-not-be-fetched"}},
+			},
+		}
+		describeMock := &mockECSDescribeTasksClient{output: &ecs.DescribeTasksOutput{}}
+
+		result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, cluster, "my-service", "not-valid-json")
+		if err == nil {
+			t.Fatal("expected an error for a non-empty, undecodable continuation token")
+		}
+		if len(result.Resources) != 0 {
+			t.Errorf("expected 0 resources alongside the error, got %d (page 1 must not be silently fetched)", len(result.Resources))
+		}
+	})
+
+	t.Run("empty_token_still_fetches_page_1", func(t *testing.T) {
+		listMock := &mockECSListTasksClient{
+			outputs: map[string]*ecs.ListTasksOutput{
+				cluster: {TaskArns: []string{"arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/task001"}},
+			},
+		}
+		describeMock := &mockECSDescribeTasksClient{
+			output: &ecs.DescribeTasksOutput{
+				Tasks: []ecstypes.Task{
+					{TaskArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/task001"), LastStatus: aws.String("RUNNING")},
+				},
+			},
+		}
+
+		result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, cluster, "my-service", "")
+		if err != nil {
+			t.Fatalf("expected no error for an empty (first-page) token, got %v", err)
+		}
+		if len(result.Resources) != 1 || result.Resources[0].ID != "task001" {
+			t.Fatalf("expected page 1 to fetch [task001], got %v", result.Resources)
+		}
+	})
 }

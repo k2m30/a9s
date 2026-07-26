@@ -73,16 +73,24 @@ type ListState struct {
 	TitleSuffix    string            `json:"title_suffix,omitempty"`
 	EscPops        bool              `json:"esc_pops,omitempty"`
 
-	// Loading tracks whether the initial fetch is still in flight.
+	// Loading tracks whether the initial fetch is still in flight. Renderers
+	// treat it as the top-priority gate (RenderList/buildListFrameTitle return
+	// early on Loading before looking at LoadingMore/Refreshing).
 	Loading bool `json:"loading,omitempty"`
-	// LoadingMore tracks whether an m-key load-more fetch is in flight.
+	// LoadingMore tracks whether an m-key/target-chase load-more fetch is in
+	// flight. NOT mutually exclusive with Refreshing: a Ctrl+R refresh can
+	// land while a load-more page is still outstanding (activeListRefreshTasks
+	// sets Refreshing without checking LoadingMore), and RenderList renders
+	// both the load-more hint and the refreshing marker in that case.
 	LoadingMore bool `json:"loading_more,omitempty"`
 	// Refreshing is true when the screen opened with rows seeded from a
 	// cache-first source (session ProbeResources, a previous visit's
 	// ResourceCache, or the on-disk availability cache) while a fresh fetch
-	// is still in flight to confirm/replace them. Cleared once the fetch's
+	// is still in flight to confirm/replace them, or when an explicit Ctrl+R
+	// refresh is confirming the currently-shown rows. Cleared once the fetch's
 	// ResourcesLoaded result lands. Distinct from Loading, which gates the
-	// no-rows-known spinner path.
+	// no-rows-known spinner path; see LoadingMore for why this is not
+	// mutually exclusive with it.
 	Refreshing bool `json:"refreshing,omitempty"`
 	// LastFetchError is the error marker text for the most recent failed
 	// fetch over this screen, or "" when no error is outstanding (C4).

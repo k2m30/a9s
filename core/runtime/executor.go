@@ -342,6 +342,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Err:          err,
 			Gen:          gen,
 			TypeGen:      typeGen,
+			Provenance:   messages.FetchProvenanceCanonicalList,
 		}, nil
 
 	// --- fetch filtered resources ---
@@ -362,6 +363,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.FetchProvenanceFilteredList,
 		}, nil
 
 	// --- fetch more (pagination) ---
@@ -388,6 +390,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Append:       true,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter),
 		}, nil
 
 	// --- fetch child resources ---
@@ -407,6 +410,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.FetchProvenanceChild,
 		}, nil
 
 	// --- fetch reveal value ---
@@ -450,6 +454,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			ResourceType: p.TargetType,
 			Resources:    res,
 			Gen:          gen,
+			Provenance:   messages.FetchProvenanceByID,
 		}, nil
 
 	// --- fetch costs (Cost Explorer) ---
@@ -830,6 +835,11 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 		}
 	}
 
+	// A checker built from shared, target-agnostic logic may return a result
+	// with no TargetType set; this always overwrites it with def.TargetType,
+	// which catalog.SetTypes/SetChildTypes (core/catalog/catalog.go) guarantee
+	// is never empty for any registered RelatedDef. This is the containment
+	// that keeps an empty-TargetType result from ever reaching rendering.
 	checkResult := def.Checker(checkCtx, op.Clients, op.Resource, localCache).WithTargetType(def.TargetType)
 
 	var lazyAdded map[string][]resource.Resource

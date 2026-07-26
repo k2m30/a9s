@@ -219,7 +219,7 @@ func TestAllTypes_SilentSwap(t *testing.T) {
 			}
 			postSwap, _ := ctrl.Handle(messages.ResourcesLoaded{
 				ResourceType: td.ShortName,
-				Resources:    newRows,
+				Resources:    newRows, Provenance: messages.FetchProvenanceCanonicalList,
 			})
 
 			lb := postSwap.Body.List

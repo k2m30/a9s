@@ -18,7 +18,7 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	m := tui.New("test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{
 		{ID: "i-0abc123", Name: "web-server", Fields: map[string]string{"instance_id": "i-0abc123"}},
 	}})
 
@@ -54,7 +54,7 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 			"state": "running", "type": "t3.micro", "private_ip": "10.0.1.5",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	// Navigate to detail
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
@@ -92,7 +92,7 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 		ID: "i-yaml123", Name: "yaml-server",
 		Fields: map[string]string{"instance_id": "i-yaml123", "state": "running"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	// Navigate to YAML via y key
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'y'})
@@ -147,7 +147,7 @@ func TestQA_Copy_AllResourceTypes(t *testing.T) {
 			m := tui.New("test", "us-east-1")
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 			m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: tt.name})
-			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 				ResourceType: tt.name,
 				Resources:    []resource.Resource{{ID: tt.id, Name: tt.id, Fields: map[string]string{"name": tt.id}}},
 			})

@@ -291,7 +291,7 @@ func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {
 		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "ok"}},
 		{ID: "unrelated-alarm", Name: "unrelated-alarm", Fields: map[string]string{"status": "ok"}},
 	}
-	m2, _ = m.Update(messages.ResourcesLoaded{ResourceType: "alarm", Resources: alarms})
+	m2, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "alarm", Resources: alarms})
 	m = m2.(tui.Model)
 
 	source := resource.Resource{ID: "i-0a1b2c3d4e5f60001", Name: "web-prod-01"}

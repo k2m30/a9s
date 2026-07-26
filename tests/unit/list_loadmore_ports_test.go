@@ -40,12 +40,14 @@
 package unit_test
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -328,5 +330,206 @@ func TestRenderList_LoadMoreHint_HiddenAfterAllPagesLoaded(t *testing.T) {
 	out := wave3RenderListBody(t, c, "ec2")
 	if strings.Contains(out, "load more") {
 		t.Errorf("RenderList after all pages loaded must NOT show the load-more hint, got:\n%s", out)
+	}
+}
+
+// ===========================================================================
+// ResourcesLoaded-provenance fixes (branch fix/resourcesloaded-provenance,
+// wave C): clearFetchInFlight choke point + hadErr-gated LastFetchError clear.
+// ===========================================================================
+
+// errLoadMoreAPIFailed is a fixed sentinel used to simulate a failed
+// KindFetchMore/KindFetchResources execution delivered as a real
+// messages.APIError, mirroring errTUIFetchFailed in
+// tui_error_marker_parity_test.go (different package, not importable here).
+type errLoadMoreAPIFailed struct{}
+
+func (errLoadMoreAPIFailed) Error() string { return "load-more ports pin: simulated fetch failure" }
+
+// TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane is a
+// BUG CATCH. Before core/app/list_state.go's clearFetchInFlight choke point,
+// the headless/web ClearActiveListLoadingIntent case (core/app/intents.go)
+// only cleared ls.Loading (and ls.Refreshing conditionally on v.Err != "") —
+// it never touched ls.LoadingMore. A failed load-more on the headless/web
+// lane left the "── loading... ──" indicator stuck forever with no user
+// recovery: handleActionLoadMore's own debounce guard (core/app/actions_list.go)
+// is `if ls.LoadingMore { return nil, nil }`, so every subsequent 'm' press
+// after the failure was silently swallowed. This is the highest-value pin in
+// this file — a permanently stuck UI state, not a transient glitch.
+func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *testing.T) {
+	c := openListController(t, "ec2")
+	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(50, 0), &resource.PaginationMeta{
+		IsTruncated: true, NextToken: "tok-p2",
+	}, false)
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionLoadMore})
+	if len(tasks) == 0 {
+		t.Fatal("precondition: ActionLoadMore must produce a task before the simulated failure")
+	}
+	pre := c.Snapshot().Body.List
+	if pre == nil || !pre.LoadingMore {
+		t.Fatal("precondition: LoadingMore must be true after ActionLoadMore dispatched a fetch")
+	}
+
+	// Simulate the headless/web task-result lane: the in-flight load-more
+	// fetch failed, delivered as a real messages.APIError through
+	// Controller.Handle — the same event HandleAPIError/
+	// ClearActiveListLoadingIntent produce for any failed
+	// KindFetchResources/KindFetchMore execution (core/runtime/handlers.go).
+	vs, _ := c.Handle(messages.APIError{ResourceType: "ec2", Err: errLoadMoreAPIFailed{}})
+
+	got := vs.Body.List
+	if got == nil {
+		t.Fatal("Body.List is nil after APIError landed")
+	}
+	if got.LoadingMore {
+		t.Error("LoadingMore = true after a failed load-more's APIError landed, want false — the load-more indicator would be stuck forever with ActionLoadMore permanently debounced")
+	}
+	if got.Loading {
+		t.Error("Loading = true after APIError landed, want false")
+	}
+	if got.Refreshing {
+		t.Error("Refreshing = true after APIError landed, want false")
+	}
+
+	// Confirm the stuck state is actually gone: a retry must produce a task.
+	_, retry := c.Apply(app.Action{Kind: app.ActionLoadMore})
+	if len(retry) == 0 {
+		t.Error("after the failure clears LoadingMore, ActionLoadMore must produce a task again (retry) — a stranded LoadingMore=true would debounce this forever")
+	}
+}
+
+// TestApplyResourcesLoaded_PartialSuccessErr_PreservesExistingLastFetchError
+// is a BUG CATCH. Before applyResourcesLoaded (core/app/list_body.go) gained
+// its hadErr parameter, EVERY landed ResourcesLoaded — including a
+// partial-success composite-error result (some rows came back AND something
+// failed, e.g. one paginated sub-call throttled) — unconditionally cleared
+// ls.LastFetchError. That silently erased a genuine outstanding error marker
+// left by a still-unresolved fetch problem, even though the fetch that just
+// landed did not actually resolve cleanly (cache contract C4: rows stay on
+// screen, the marker is not wiped for a result that itself carries an error).
+// Pins both halves: the new rows still land, AND the marker is not erased.
+func TestApplyResourcesLoaded_PartialSuccessErr_PreservesExistingLastFetchError(t *testing.T) {
+	c := openListController(t, "ec2")
+	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(2, 0), &resource.PaginationMeta{
+		IsTruncated: true, NextToken: "tok",
+	}, false)
+
+	const priorErr = "prior fetch failure: throttled"
+	c.SetListFetchError(priorErr)
+	if got := c.Snapshot().Body.List.LastFetchError; got != priorErr {
+		t.Fatalf("precondition: LastFetchError = %q, want %q", got, priorErr)
+	}
+
+	partialErr := errors.New("partial: 1 of 3 IDs failed: throttled")
+	newRows := wave3LoadMoreResources(3, 100)
+	vs, _ := c.Handle(messages.ResourcesLoaded{
+		ResourceType: "ec2",
+		Resources:    newRows,
+		Provenance:   messages.FetchProvenanceCanonicalList,
+		Err:          partialErr,
+	})
+
+	lb := vs.Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after a partial-success ResourcesLoaded landed")
+	}
+	if len(lb.Rows) != len(newRows) {
+		t.Errorf("rows must land despite the partial error: got %d rows, want %d", len(lb.Rows), len(newRows))
+	}
+	if lb.LastFetchError != priorErr {
+		t.Errorf("LastFetchError = %q after a partial-success (Err-carrying) result landed, want it preserved as %q — a result that itself carries an error must not erase an outstanding error marker", lb.LastFetchError, priorErr)
+	}
+}
+
+// TestClearListLoading_AlsoClearsRefreshing_ContractLock is a CONTRACT LOCK,
+// not a live-bug catch. ClearListLoading's only production caller
+// (internal/tui/runtime_adapter.go's ClearActiveListLoadingIntent case)
+// always follows this call with SetListFetchError(v.Err), and the intent's
+// one construction site (core/runtime/handlers.go's HandleAPIError) never
+// leaves text empty — so SetListFetchError already forces Refreshing=false on
+// that lane today regardless of what ClearListLoading itself does. This pin
+// exists so a FUTURE caller that invokes ClearListLoading without a following
+// SetListFetchError (e.g. a bare "stop everything, nothing to report" clear)
+// cannot reintroduce a stranded Refreshing marker — not because the
+// divergence is live now.
+func TestClearListLoading_AlsoClearsRefreshing_ContractLock(t *testing.T) {
+	c := openListController(t, "ec2")
+	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(3, 0), &resource.PaginationMeta{
+		IsTruncated: true, NextToken: "tok",
+	}, false)
+	c.SetListRefreshing(true)
+
+	pre := c.Snapshot().Body.List
+	if pre == nil || !pre.Refreshing {
+		t.Fatal("precondition: Refreshing must be true before ClearListLoading")
+	}
+
+	c.ClearListLoading()
+
+	lb := c.Snapshot().Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after ClearListLoading")
+	}
+	if lb.Refreshing {
+		t.Error("Refreshing = true after ClearListLoading, want false — ClearListLoading must stop every in-flight fetch indicator, not just Loading/LoadingMore")
+	}
+}
+
+// TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently is a
+// DESIGN-DECISION LOCK, not a bug catch. The collapse of Loading/LoadingMore/
+// Refreshing into a single enum was proposed and refused: LoadingMore and
+// Refreshing are legitimately simultaneous (Ctrl+R fired while an m-key
+// load-more is still in flight), and internal/tui/views/resourcelist.go
+// renders both indicator lines independently and deliberately — the
+// load-more hint block ("── loading... ──" / "m: load more", gated on
+// body.LoadingMore/body.Truncated) and the separate "── refreshing... ──"
+// line (gated on body.Refreshing) never interact. This pin exists so the
+// next person who looks at three booleans and reaches for an enum does not
+// silently drop one indicator.
+//
+// NOT RED-revertable against the current diff: there is no single line in
+// this branch's change to revert, since this invariant predates it and the
+// pin guards a hypothetical future refactor, not something wave C touched.
+// Verified instead by temporarily editing core/app/actions_list.go's
+// activeListRefreshTasks to add `ls.LoadingMore = false` right after
+// `ls.Refreshing = true` — simulating the exact clobber a naive single-enum
+// collapse would introduce — confirming this test failed (LoadingMore=false
+// where it must be true), then restoring the file byte-identically (verified
+// via `git diff`, exit 0). See the QA session notes for that run; the edit
+// was never left in the tree.
+func TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently(t *testing.T) {
+	c := openListController(t, "ec2")
+	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
+		IsTruncated: true, NextToken: "tok",
+	}, false)
+
+	_, loadMoreTasks := c.Apply(app.Action{Kind: app.ActionLoadMore})
+	if len(loadMoreTasks) == 0 {
+		t.Fatal("precondition: ActionLoadMore must produce a task")
+	}
+
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if len(refreshTasks) == 0 {
+		t.Fatal("precondition: ActionRefresh must produce a task even with a load-more in flight")
+	}
+
+	lb := c.Snapshot().Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil")
+	}
+	if !lb.LoadingMore {
+		t.Error("LoadingMore = false after ActionRefresh landed on top of an in-flight load-more, want true — LoadingMore and Refreshing must coexist, neither may clobber the other")
+	}
+	if !lb.Refreshing {
+		t.Error("Refreshing = false after ActionRefresh, want true")
+	}
+
+	out := wave3RenderListBody(t, c, "ec2")
+	if !strings.Contains(out, "loading...") {
+		t.Errorf("RenderList must show the load-more 'loading...' hint while LoadingMore=true, got:\n%s", out)
+	}
+	if !strings.Contains(out, "── refreshing... ──") {
+		t.Errorf("RenderList must ALSO show the separate refreshing marker while Refreshing=true — both indicators must render independently, got:\n%s", out)
 	}
 }

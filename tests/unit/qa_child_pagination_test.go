@@ -1555,70 +1555,157 @@ func (m *mockECSDescribeTasksAPIChildPaginated) DescribeTasks(_ context.Context,
 	return m.PageFunc(m.calls)
 }
 
+// TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage previously asserted
+// Pagination.NextToken == "" whenever IsTruncated, commented "ECS tasks
+// fetch two statuses (RUNNING + STOPPED) in one call, so per-page
+// continuation isn't supported" — that comment stated the defect as the
+// intended contract: a page could be truncated with NO way to ever fetch
+// the rest. That was the bug this file's production fix removes. This test
+// now asserts the fix instead: NextToken is a real, working compound cursor,
+// and feeding it back resumes the RUNNING axis rather than re-fetching page
+// 1 — page 2 returns a DIFFERENT task, not a dedup-collapsed repeat of page
+// 1 (the "task 101 is unreachable by any keystroke" bug). Do NOT restore the
+// old NextToken == "" assertion when reading this test — that was the bug,
+// not the contract.
 func TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage(t *testing.T) {
-	startedAt := time.Date(2025, 3, 1, 8, 0, 0, 0, time.UTC)
+	startedAt1 := time.Date(2025, 3, 1, 8, 0, 0, 0, time.UTC)
+	startedAt2 := time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)
+
 	listMock := &mockECSListTasksAPIChildPaginated{
-		PageFunc: func(_ int) (*ecs.ListTasksOutput, error) {
-			return &ecs.ListTasksOutput{
-				TaskArns:  []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid001"},
-				NextToken: aws.String("ecs-next-token-2"),
-			}, nil
+		PageFunc: func(call int) (*ecs.ListTasksOutput, error) {
+			switch call {
+			case 1: // RUNNING, page 1
+				return &ecs.ListTasksOutput{
+					TaskArns:  []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid101"},
+					NextToken: aws.String("aws-running-page2"),
+				}, nil
+			case 2: // STOPPED, page 1 (drained immediately)
+				return &ecs.ListTasksOutput{TaskArns: []string{}}, nil
+			case 3: // RUNNING, page 2 — resumed via the compound cursor
+				return &ecs.ListTasksOutput{
+					TaskArns: []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid102"},
+				}, nil
+			default:
+				t.Fatalf("unexpected ListTasks call #%d", call)
+				return nil, nil
+			}
 		},
 	}
 	describeMock := &mockECSDescribeTasksAPIChildPaginated{
-		PageFunc: func(_ int) (*ecs.DescribeTasksOutput, error) {
-			return &ecs.DescribeTasksOutput{
-				Tasks: []ecstypes.Task{
-					{TaskArn: aws.String("arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid001"), LastStatus: aws.String("RUNNING"), StartedAt: &startedAt},
-				},
-			}, nil
+		PageFunc: func(call int) (*ecs.DescribeTasksOutput, error) {
+			switch call {
+			case 1:
+				return &ecs.DescribeTasksOutput{Tasks: []ecstypes.Task{
+					{TaskArn: aws.String("arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid101"), LastStatus: aws.String("RUNNING"), StartedAt: &startedAt1},
+				}}, nil
+			case 2:
+				return &ecs.DescribeTasksOutput{Tasks: []ecstypes.Task{
+					{TaskArn: aws.String("arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid102"), LastStatus: aws.String("RUNNING"), StartedAt: &startedAt2},
+				}}, nil
+			default:
+				t.Fatalf("unexpected DescribeTasks call #%d", call)
+				return nil, nil
+			}
 		},
 	}
-	result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "")
+
+	page1, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Pagination == nil {
+	if page1.Pagination == nil {
 		t.Fatal("expected Pagination, got nil")
 	}
-	if !result.Pagination.IsTruncated {
+	if !page1.Pagination.IsTruncated {
 		t.Error("expected IsTruncated=true")
 	}
-	// ECS tasks fetch two statuses (RUNNING + STOPPED) in one call,
-	// so per-page continuation isn't supported — NextToken is empty
-	// but IsTruncated signals that more tasks exist.
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty (dual-status fetch), got %q", result.Pagination.NextToken)
+	if page1.Pagination.NextToken == "" {
+		t.Fatal("expected a non-empty continuation cursor when truncated — a dual-status fetch must still support per-page continuation")
 	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	if len(page1.Resources) != 1 || page1.Resources[0].ID != "taskid101" {
+		t.Fatalf("page1 resources: expected [taskid101], got %v", page1.Resources)
 	}
-	if result.Resources[0].ID != "taskid001" {
-		t.Errorf("resource ID: expected %q, got %q", "taskid001", result.Resources[0].ID)
+
+	page2, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", page1.Pagination.NextToken)
+	if err != nil {
+		t.Fatalf("expected no error on page 2, got %v", err)
+	}
+	if len(page2.Resources) != 1 || page2.Resources[0].ID != "taskid102" {
+		t.Fatalf("page2 resources: expected [taskid102] (a DIFFERENT task from page 1, not a re-fetch of page 1), got %v", page2.Resources)
+	}
+	if page2.Resources[0].ID == page1.Resources[0].ID {
+		t.Fatal("page2 returned the SAME task as page1 — the cursor resumed nothing, it re-fetched page 1")
+	}
+	if page2.Pagination == nil || page2.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=false once both RUNNING and STOPPED are drained")
 	}
 }
 
+// TestQA_ChildPagination_FetchEcsSvcTasks_Continuation previously fed a
+// hand-written, non-JSON string ("ecs-next-token-2") as the continuation
+// token. decodeEcsSvcTasksCursor now rejects any non-empty token that fails
+// to parse as JSON, so that literal would return a decode error — the old
+// assertion "continuation resumes and returns taskid002" passed only because
+// the REMOVED leniency (Unmarshal failure -> silently reset to the zero
+// cursor, i.e. re-fetch page 1) made the malformed token behave exactly like
+// "". It never exercised resumption at all. This now round-trips a REAL
+// cursor obtained from an actual FetchEcsSvcTasks call (the only legitimate
+// source of this token) through a second call, resuming the STOPPED axis
+// (FirstPage, above, already covers resuming RUNNING) while RUNNING — already
+// done on page 1 — is correctly skipped rather than re-fetched. Do NOT
+// restore the hand-written string token; that was the bug, not the contract.
 func TestQA_ChildPagination_FetchEcsSvcTasks_Continuation(t *testing.T) {
 	startedAt := time.Date(2025, 3, 2, 8, 0, 0, 0, time.UTC)
+
 	listMock := &mockECSListTasksAPIChildPaginated{
-		PageFunc: func(_ int) (*ecs.ListTasksOutput, error) {
-			return &ecs.ListTasksOutput{
-				TaskArns:  []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid002"},
-				NextToken: nil,
-			}, nil
+		PageFunc: func(call int) (*ecs.ListTasksOutput, error) {
+			switch call {
+			case 1: // RUNNING, page 1 — drained immediately
+				return &ecs.ListTasksOutput{TaskArns: []string{}}, nil
+			case 2: // STOPPED, page 1 — truncated
+				return &ecs.ListTasksOutput{
+					TaskArns:  []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid001"},
+					NextToken: aws.String("aws-stopped-page2"),
+				}, nil
+			case 3: // STOPPED, page 2 — resumed via the compound cursor; RUNNING is
+				// already done, so it is not re-fetched here.
+				return &ecs.ListTasksOutput{
+					TaskArns: []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid002"},
+				}, nil
+			default:
+				t.Fatalf("unexpected ListTasks call #%d", call)
+				return nil, nil
+			}
 		},
 	}
 	describeMock := &mockECSDescribeTasksAPIChildPaginated{
-		PageFunc: func(_ int) (*ecs.DescribeTasksOutput, error) {
-			return &ecs.DescribeTasksOutput{
-				Tasks: []ecstypes.Task{
+		PageFunc: func(call int) (*ecs.DescribeTasksOutput, error) {
+			switch call {
+			case 1:
+				return &ecs.DescribeTasksOutput{Tasks: []ecstypes.Task{
+					{TaskArn: aws.String("arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid001"), LastStatus: aws.String("STOPPED"), StartedAt: &startedAt},
+				}}, nil
+			case 2:
+				return &ecs.DescribeTasksOutput{Tasks: []ecstypes.Task{
 					{TaskArn: aws.String("arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid002"), LastStatus: aws.String("STOPPED"), StartedAt: &startedAt},
-				},
-			}, nil
+				}}, nil
+			default:
+				t.Fatalf("unexpected DescribeTasks call #%d", call)
+				return nil, nil
+			}
 		},
 	}
-	result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "ecs-next-token-2")
-	assertContinuation(t, result, err, []string{"taskid002"})
+
+	page1, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "")
+	if err != nil {
+		t.Fatalf("expected no error building the real cursor, got %v", err)
+	}
+	if page1.Pagination == nil || !page1.Pagination.IsTruncated || page1.Pagination.NextToken == "" {
+		t.Fatalf("expected page1 truncated with a real continuation cursor, got %+v", page1.Pagination)
+	}
+
+	page2, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", page1.Pagination.NextToken)
+	assertContinuation(t, page2, err, []string{"taskid002"})
 }
 
 func TestQA_ChildPagination_FetchEcsSvcTasks_Empty(t *testing.T) {

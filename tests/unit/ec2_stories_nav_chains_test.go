@@ -101,7 +101,7 @@ func chainNavigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 // chainPreloadResources injects a ResourcesLoadedMsg to pre-populate the model's
 // resource cache for a given type before sending navigation messages.
 func chainPreloadResources(m tui.Model, resType string, resources []resource.Resource) tui.Model {
-	m, _ = chainApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = chainApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: resType,
 		Resources:    resources,
 	})

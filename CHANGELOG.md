@@ -21,6 +21,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Drilling into a related resource no longer overwrites the full list it
+  came from. After loading all 200 instances of a type, opening a pivot
+  that matched 3 of them replaced the cached list with just those 3 —
+  the main menu then reported `3` as an exact count, and the wrong count
+  was written to the on-disk cache, so it survived a restart. Lookups by
+  ID and child lists corrupted the same way. Each fetch now states which
+  kind it is, and only a full list of a type may replace that type's
+  cached rows. The same corruption was reachable by a second route — a
+  late drill or by-ID result arriving while that type's full list was
+  open on screen — which is closed too; such a result now finds the view
+  it actually belongs to instead of overwriting the list it merely
+  shares a type with.
+
+- A failed "load more" no longer leaves a resource list stuck. In the
+  web UI, when loading the next page failed, the list kept showing its
+  loading indicator indefinitely with no way to retry — only that one
+  failure path forgot to switch it off. Every path that ends a fetch now
+  clears all of its indicators together.
+
+- A fetch that partly failed no longer erases its own error message.
+  When a result came back with some rows and an error, the rows landing
+  cleared the error marker, so the failure went unreported.
+
+- Fixed a crash and occasional wrong rows in resource lists. A list
+  screen and the shared cache held the same rows in memory while
+  guarding them with separate locks, so loading another page could
+  overwrite what the cache held without it noticing, and a background
+  refresh landing at the wrong moment could take the app down. Each now
+  keeps its own copy.
+
 - A related-resource pivot no longer reports a confident `0` when the
   AWS call behind it failed or was denied. Fifteen checkers turned an
   error into a proven dead end — a log group actively streaming to
@@ -33,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renders as `N+` instead of a false exact total. A throttled
   EventBridge enrichment also no longer invents a critical "enabled
   rule has no targets" alarm for a healthy rule.
+
+  The pipeline pivots on CodeBuild projects and ECR repositories were
+  the last two holdouts: they inspect each pipeline in turn, and a
+  lookup that failed was quietly skipped, so a project used by five
+  pipelines reported an exact `2` when three lookups were throttled.
+  The ECR one was worse — without permission to read pipelines at all
+  it reported an exact `0`, a definitive "nothing uses this
+  repository" arrived at without a single successful call.
 
 ### Added
 

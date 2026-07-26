@@ -82,7 +82,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	// We simulate this by delivering the message directly rather than executing the
 	// cmd (which would fail due to nil clients). We use TypeGen=1 matching the gen
 	// that was bumped at Ctrl+R time.
-	loadedMsg := messages.ResourcesLoaded{
+	loadedMsg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ebs",
 		Resources:    rerunEBSResources(),
 		TypeGen:      1, // matches enrichmentTypeGen["ebs"]=1 set during Ctrl+R

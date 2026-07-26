@@ -193,26 +193,28 @@ func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, tru
 		ResourceType: lifecycleShortName,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: truncated},
-		Gen:          0,
+		Gen:          0, Provenance: messages.
+
+			// deliverEnrichment applies wave-2 findings via Controller.ApplyEnrichmentState
+			// — the seam buildListBody's glyph rendering actually reads from
+			// (c.enrichmentStore, see core/app/list_filter.go's
+			// listEnrichmentFindings). This is NOT the same store
+			// messages.EnrichmentChecked populates: that event only mutates
+			// runtime.Core's session-level ResourceCache/ProbeResources
+			// (core/runtime/helpers.go's applyEnrichment) — a distinct cache in a
+			// distinct package from app.Controller's own resourceCache/enrichmentStore.
+			// In production, ApplyEnrichmentState is called by the TUI's own
+			// ResourceListModel (internal/tui/views/resourcelist.go) after it runs its
+			// own enrichment probe drive; a headless/web Controller session (this test's
+			// shape, and qa_cache_field_completeness_test.go's SilentSwap test) has no
+			// other wiring that copies EnrichmentChecked's findings into
+			// Controller.enrichmentStore, so this seam is the correct one to drive
+			// glyph-visible wave-2 state on a bare app.Controller.
+			FetchProvenanceCanonicalList,
 	})
 	return vs
 }
 
-// deliverEnrichment applies wave-2 findings via Controller.ApplyEnrichmentState
-// — the seam buildListBody's glyph rendering actually reads from
-// (c.enrichmentStore, see core/app/list_filter.go's
-// listEnrichmentFindings). This is NOT the same store
-// messages.EnrichmentChecked populates: that event only mutates
-// runtime.Core's session-level ResourceCache/ProbeResources
-// (core/runtime/helpers.go's applyEnrichment) — a distinct cache in a
-// distinct package from app.Controller's own resourceCache/enrichmentStore.
-// In production, ApplyEnrichmentState is called by the TUI's own
-// ResourceListModel (internal/tui/views/resourcelist.go) after it runs its
-// own enrichment probe drive; a headless/web Controller session (this test's
-// shape, and qa_cache_field_completeness_test.go's SilentSwap test) has no
-// other wiring that copies EnrichmentChecked's findings into
-// Controller.enrichmentStore, so this seam is the correct one to drive
-// glyph-visible wave-2 state on a bare app.Controller.
 func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string][]domain.Finding) {
 	ctrl.ApplyEnrichmentState(lifecycleShortName, issues, false, findings, nil)
 }

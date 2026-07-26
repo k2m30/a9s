@@ -83,7 +83,7 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 			Target:       messages.TargetResourceList,
 			ResourceType: "ec2",
 		})
-		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 			ResourceType: "ec2",
 			Resources: []resource.Resource{
 				{ID: "i-fuzz", Name: "fuzz-instance", Fields: map[string]string{
@@ -129,7 +129,7 @@ func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 			"lifecycle":   "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
@@ -179,9 +179,10 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 			"launch_type":   "FARGATE",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ecs-svc", Resources: services})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ecs-svc", Resources: services, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Open Events child view (key 'e') — execute the returned cmd to actually push the child view
+
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "e"})
 	if cmd != nil {
@@ -228,9 +229,10 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 			"lifecycle":   "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Press ctrl+r three times rapidly
+
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -242,7 +244,7 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 	}
 
 	// Deliver resources for the last refresh — should not corrupt state
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 	out = rootViewContent(m)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "rapid-refresh") {
@@ -257,7 +259,7 @@ func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-filter", Name: "filter-test", Fields: map[string]string{
@@ -331,7 +333,7 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 		}
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 
 	out = rootViewContent(m)
 	plain = stripANSI(out)
@@ -373,9 +375,10 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 			"lifecycle":   "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 
 	// Enter filter mode and type something that matches nothing
+
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "zzzzz" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -409,7 +412,7 @@ func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
 		ResourceType: "ec2",
 	})
 	// Load empty resources
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -429,7 +432,7 @@ func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -451,7 +454,7 @@ func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -475,7 +478,7 @@ func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -501,7 +504,7 @@ func TestQa67_K13_YAMLOnEmptyList_IsNoOp(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -538,7 +541,7 @@ func TestQa67_K9_K13_EmptyListOps_AllResourceTypes(t *testing.T) {
 					Target:       messages.TargetResourceList,
 					ResourceType: rt,
 				})
-				m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+				m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 					ResourceType: rt,
 					Resources:    []resource.Resource{},
 				})

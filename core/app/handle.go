@@ -255,6 +255,20 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 // so a late result for type X lands on X's screen regardless of which screen
 // is currently on top. Staleness is the caller's responsibility — Handle drops
 // stale ResourcesLoaded via messages.IsStale before invoking this.
+//
+// A screen match alone is not sufficient: a genuinely canonical top-level
+// list screen (isTopLevelCanonicalList) only ever accepts a result whose
+// msg.Provenance.CanonicalList() is true. A by-ID, filtered, or child result
+// sharing this ResourceType is never that screen's data — its actual target
+// is always a screen pushed AFTER (and therefore found before, in this
+// top-down scan) the canonical list it happens to share a type with, since
+// every by-ID/filtered/child navigation pushes its own screen on top of
+// whatever it navigated from (applyRelatedNavResult). When that mismatch
+// occurs, the canonical screen is skipped — never applied to, never adopted
+// into ls.Rows — and the scan continues deeper in the stack rather than
+// returning immediately: the true target, if its screen is still open, is
+// necessarily found further down, and if it already popped there is nothing
+// to strand — a screen that no longer exists has no Rows left to apply to.
 func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	if msg.ResourceType == "" {
 		return
@@ -280,7 +294,11 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		if screenType != canon {
 			continue
 		}
-		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, isTopLevelCanonicalList(s.ID, s.State.List))
+		topLevelCanonical := isTopLevelCanonicalList(s.ID, s.State.List)
+		if topLevelCanonical && !msg.Provenance.CanonicalList() {
+			continue
+		}
+		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, topLevelCanonical, msg.Err != nil)
 		// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
 		// availability badge here, at the controller level, so both the TUI and
 		// web renderer get it — this replaces the TUI-only sync-back that used
@@ -298,7 +316,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		// complete. ls.Rows already holds the append-accumulated, materialized
 		// set.
 		if ls := s.State.List; ls != nil && msg.Err == nil && len(ls.FetchFilter) > 0 &&
-			!isTopLevelCanonicalList(s.ID, ls) {
+			!topLevelCanonical {
 			c.core.FilteredRowsSet(canon, ls.FetchFilter, ls.Rows, ls.HasPagination, ls.PaginationCursor)
 		}
 		return

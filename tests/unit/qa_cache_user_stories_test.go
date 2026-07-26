@@ -21,7 +21,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2TestResources(30),
 		Pagination: &resource.PaginationMeta{
@@ -79,7 +79,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 			NextToken:   "page2-token",
 			PageSize:    50,
 			TotalHint:   -1,
-		},
+		}, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
@@ -92,7 +92,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: true,
+		Append: true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
@@ -152,7 +152,7 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 		Resource:     &src,
 	})
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "tg",
 		Resources:    []resource.Resource{tg1, tg2},
 	})
@@ -197,7 +197,7 @@ func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 	alarm2 := resource.Resource{ID: "alarm-cache-2", Name: "status-check"}
 	alarm3 := resource.Resource{ID: "alarm-cache-3", Name: "unrelated"}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "alarm",
 		Resources:    []resource.Resource{alarm1, alarm2, alarm3},
 	})
@@ -247,7 +247,7 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 		ParentContext: map[string]string{"stack_name": stack.ID, "Name": stack.Name},
 		DisplayName:   stack.Name,
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild,
 		ResourceType: "cfn_events",
 		Resources:    childResources,
 	})
@@ -294,7 +294,7 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ct-events",
 		Resources:    topLevelEvents,
 		Pagination: &resource.PaginationMeta{
@@ -315,7 +315,7 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 		ParentContext: map[string]string{"stack_name": stack.ID, "Name": stack.Name},
 		DisplayName:   stack.Name,
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild,
 		ResourceType: "cfn_events",
 		Resources:    childResources,
 	})

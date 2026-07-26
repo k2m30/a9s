@@ -272,7 +272,7 @@ func TestQA_DocDB_LoadAndDisplayList(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
-		Resources:    fixtures,
+		Resources:    fixtures, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -295,7 +295,7 @@ func TestQA_DocDB_NavigateToDetail(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -326,7 +326,7 @@ func TestQA_DocDB_NavigateToYAML(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -353,7 +353,7 @@ func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -477,7 +477,7 @@ func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -514,7 +514,7 @@ func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -567,7 +567,7 @@ func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    multiStatusDocDBFixtures(),
 	})

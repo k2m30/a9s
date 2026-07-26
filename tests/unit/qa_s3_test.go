@@ -46,12 +46,14 @@ func s3LoadedBucketModel() tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
-		Resources:    fixtureS3Buckets(),
+		Resources:    fixtureS3Buckets(), Provenance: messages.
+
+			// s3LoadedObjectModel creates a root TUI model navigated to S3 -> bucket -> objects loaded.
+			FetchProvenanceCanonicalList,
 	})
 	return m
 }
 
-// s3LoadedObjectModel creates a root TUI model navigated to S3 -> bucket -> objects loaded.
 func s3LoadedObjectModel() tui.Model {
 	m := s3LoadedBucketModel()
 	// Press Enter to drill into first bucket
@@ -62,7 +64,7 @@ func s3LoadedObjectModel() tui.Model {
 		m, _ = rootApplyMsg(m, msg)
 	}
 	// Load objects (child list type is s3_objects)
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild,
 		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
@@ -76,7 +78,7 @@ func s3RLBucketModel() views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    fixtureS3Buckets(),
 	})
@@ -101,7 +103,7 @@ func s3RLObjectModel(bucket string) views.ResourceListModel {
 	m := views.NewChildResourceList(childDef, map[string]string{"bucket": bucket}, bucket, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild,
 		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
@@ -328,7 +330,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
-		Resources:    fixtureS3Buckets(),
+		Resources:    fixtureS3Buckets(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain = stripANSI(rootViewContent(m))
@@ -345,7 +347,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
-		Resources:    fixtureS3Objects(),
+		Resources:    fixtureS3Objects(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain = stripANSI(rootViewContent(m))

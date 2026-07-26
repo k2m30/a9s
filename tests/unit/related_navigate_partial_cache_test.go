@@ -57,7 +57,7 @@ func setupEC2ListWithTruncatedCache(t *testing.T) (tui.Model, []resource.Resourc
 	}
 
 	// Load only the FIRST resource with truncated pagination.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res[0:1],
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "token123"},
@@ -93,7 +93,7 @@ func setupEC2ListWithCompleteCache(t *testing.T) (tui.Model, []resource.Resource
 	}
 
 	// Load ALL resources with no truncation.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

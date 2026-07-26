@@ -79,7 +79,7 @@ func buildAvailSaveRaceController(profile, region string) *app.Controller {
 			Findings:  []domain.Finding{{Code: "canary", Phrase: "canary", Severity: domain.SevBroken, Source: "wave1"}},
 		},
 	}
-	c.Handle(messages.ResourcesLoaded{
+	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: availSaveRaceShortName,
 		Resources:    res,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -219,7 +219,7 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 			},
 		},
 		Pagination: &resource.PaginationMeta{IsTruncated: false},
-		Gen:        0,
+		Gen:        0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Give the writer a fair chance to have actually run before this test
@@ -227,6 +227,7 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	// Close call (rather than just its ordering) would also be caught by a
 	// leftover-file assertion here rather than depending entirely on
 	// RemoveAll's own error surfacing.
+
 	deadline := time.Now().Add(2 * time.Second)
 	saved := false
 	for time.Now().Before(deadline) {

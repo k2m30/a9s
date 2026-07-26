@@ -131,10 +131,11 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	resources := rerunEC2Resources()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    resources,
+		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Populate a finding for i-0abc1111aaa111111 via the live-update path.
+
 	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
 
 	var visible bool

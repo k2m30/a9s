@@ -59,7 +59,7 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 		t.Fatalf("demo s3 fixtures missing (err=%v, len=%d)", err, len(s3Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    s3Res,
 	})

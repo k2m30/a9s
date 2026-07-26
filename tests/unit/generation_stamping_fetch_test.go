@@ -66,7 +66,7 @@ func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
 	sentinel := []resource.Resource{
 		{ID: "i-before-rotate", Name: "before-rotate-server"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    sentinel,
 		Gen:          m.Core().Session().AvailabilityGen, // current non-zero gen — matches
@@ -85,7 +85,7 @@ func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
 	m.Core().Session().Rotate()
 
 	// Dispatch a stale ResourcesLoaded (Gen == staleGen, current is staleGen+1).
-	staleMsg := messages.ResourcesLoaded{
+	staleMsg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-stale-account", Name: "stale-server"}},
 		Gen:          staleGen,
@@ -203,7 +203,7 @@ func TestHappyPath_MatchingGen_ResourcesLoaded(t *testing.T) {
 		ResourceType: "ec2",
 	})
 	currentGen := m.Core().Session().AvailabilityGen
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-fresh", Name: "fresh-server"}},
 		Gen:          currentGen,
@@ -286,7 +286,7 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 			Target:       messages.TargetResourceList,
 			ResourceType: "ec2",
 		})
-		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 			ResourceType: "ec2",
 			Resources:    []resource.Resource{{ID: "i-zero-gen", Name: "zero-gen-server"}},
 			Gen:          domain.Gen(0),

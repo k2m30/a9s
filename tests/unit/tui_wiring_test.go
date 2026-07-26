@@ -28,7 +28,7 @@ func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
 	})
 
 	// Load some resources
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-abc123", Name: "web-server", Fields: map[string]string{"instance_id": "i-abc123"}},
@@ -530,7 +530,7 @@ func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
 	})
 
 	// Load a secret
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "secrets",
 		Resources: []resource.Resource{
 			{ID: "my-secret", Name: "my-secret", Fields: map[string]string{"secret_name": "my-secret"}},
@@ -566,7 +566,7 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 	})
 
 	// Load a resource
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-abc123", Name: "web-server", Fields: map[string]string{"instance_id": "i-abc123"}},

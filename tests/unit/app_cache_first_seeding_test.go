@@ -287,7 +287,8 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 		ResourceType: "ec2",
 		Resources:    fresh,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
-		Gen:          0, // AcceptZeroGen=true — always passes the staleness guard
+		Gen:          0, Provenance: // AcceptZeroGen=true — always passes the staleness guard
+		messages.FetchProvenanceCanonicalList,
 	})
 
 	lb := vs.Body.List

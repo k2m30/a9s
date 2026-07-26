@@ -48,7 +48,7 @@ func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 		},
 	}
 	// Must not panic
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	if plain == "" {
@@ -77,7 +77,7 @@ func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 				Fields: map[string]string{},
 			}
 			// Must not panic
-			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 				ResourceType: rt,
 				Resources:    []resource.Resource{empty},
 			})
@@ -126,8 +126,10 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
+
 	// Must not crash
+
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	// The normal instance should be visible; application should not crash
@@ -159,7 +161,7 @@ func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	// The row must render without crashing and display the resource
@@ -192,7 +194,7 @@ func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "malformed-arn-secret") {
@@ -232,7 +234,7 @@ func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 			},
 		})
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 	// Must not panic; output must be non-empty
 	out := rootViewContent(m)
 	if out == "" {
@@ -263,7 +265,7 @@ func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 	out := rootViewContent(m)
 	if out == "" {
 		t.Error("C.6: View() returned empty after loading resource with zero timestamp")
@@ -316,7 +318,7 @@ func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	// The resource row should still appear

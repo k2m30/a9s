@@ -423,7 +423,7 @@ func TestFetchRevealValue_NilClients(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "secrets",
 		Resources: []resource.Resource{
 			{ID: "my-secret-arn", Name: "my-secret"},
@@ -470,7 +470,7 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-0abc111", Name: "web-server-1", Fields: map[string]string{"State": "running"}},

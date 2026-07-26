@@ -66,9 +66,9 @@ func TestMain(m *testing.M) {
 	// this run has no later call to trigger that drain — flush it here,
 	// before cleanupDir (which its own auto-isolated directory may still be,
 	// or may itself be a still-live A9S_CONFIG_FOLDER target) is removed.
-	if lastAutoIsolatedModel != nil {
-		lastAutoIsolatedModel.CloseController()
-		lastAutoIsolatedModel = nil
+	if prevRootModel != nil {
+		prevRootModel.CloseController()
+		prevRootModel = nil
 	}
 	if cleanupDir != "" {
 		os.RemoveAll(cleanupDir) //nolint:errcheck // best-effort cleanup, process is exiting regardless

@@ -45,10 +45,11 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Confirm the data is present before Esc.
+
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(50") {
 		t.Fatalf("precondition: expected 'ct-events(50...)' before profile switch, got:\n%s", plain)
@@ -97,10 +98,11 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Confirm data is present.
+
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(50") {
 		t.Fatalf("precondition: expected 'ct-events(50...)' before region switch, got:\n%s", plain)
@@ -141,7 +143,7 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -158,7 +160,7 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    ec2TestResources(30),
 		Pagination: &resource.PaginationMeta{
@@ -225,10 +227,11 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: false,
+		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Confirm truncated indicator is shown.
+
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "50+") {
 		t.Fatalf("precondition: expected '50+' after page 1, got:\n%s", plain)
@@ -261,10 +264,11 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 			PageSize:    50,
 			TotalHint:   -1,
 		},
-		Append: true,
+		Append: true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Confirm 100 items are shown.
+
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Fatalf("precondition: expected 'ct-events(100...)' after page 2, got:\n%s", plain)

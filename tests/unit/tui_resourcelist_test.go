@@ -42,7 +42,7 @@ func TestResourceListView_ExactRelatedTargetID_SingleID_TriggersLoadMore(t *test
 		{ID: "vol-other-2", Fields: map[string]string{"volume_id": "vol-other-2"}},
 	}
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoaded{
+	m, got = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ebs",
 		Resources:    nonMatching,
 		Pagination: &resource.PaginationMeta{
@@ -88,7 +88,7 @@ func TestResourceListView_ExactRelatedTargetID_MultipleIDs_NoLoadMore(t *testing
 		{ID: "vol-other-x", Fields: map[string]string{"volume_id": "vol-other-x"}},
 	}
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoaded{
+	m, got = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ebs",
 		Resources:    nonMatching,
 		Pagination: &resource.PaginationMeta{
@@ -129,7 +129,7 @@ func TestResourceListView_ExactRelatedTargetID_EmptyID_NoLoadMore(t *testing.T) 
 		{ID: "vol-other-y", Fields: map[string]string{"volume_id": "vol-other-y"}},
 	}
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoaded{
+	m, got = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ebs",
 		Resources:    nonMatching,
 		Pagination: &resource.PaginationMeta{

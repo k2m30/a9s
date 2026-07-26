@@ -29,7 +29,7 @@ func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-clip-test", Name: "clip-test", Fields: map[string]string{
@@ -87,7 +87,7 @@ func TestQa67_I2_RevealDeletedSecret_ShowsError(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: secrets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "secrets", Resources: secrets})
 
 	// Simulate the reveal result: ResourceNotFoundException
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
@@ -130,7 +130,7 @@ func TestQa67_I3_RevealSecretNoCurrentVersion_ShowsError(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: secrets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "secrets", Resources: secrets})
 
 	// ValueRevealedMsg with error (no current version)
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
@@ -247,7 +247,7 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "sns", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "sns", Resources: resources})
 
 	// Press S to sort by status — should be no-op or graceful
 	m, _ = rootApplyMsg(m, rootKeyPress("S"))
@@ -281,7 +281,7 @@ func TestQa67_I9_HorizontalScroll_FewColumns_IsNoOp(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "sns", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "sns", Resources: resources})
 
 	// Press l to scroll right — should stop at the last column (no crash)
 	for range 10 {
@@ -325,7 +325,7 @@ func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: secrets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "secrets", Resources: secrets})
 
 	// Navigate to reveal view via ValueRevealedMsg (success path)
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{

@@ -50,6 +50,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.FetchProvenanceCanonicalList,
 		}
 	}
 }
@@ -69,6 +70,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.FetchProvenanceFilteredList,
 		}
 	}
 }
@@ -126,6 +128,7 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.FetchProvenanceChild,
 		}
 	}
 }
@@ -154,6 +157,7 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 			Append:       true,
 			Err:          err,
 			Gen:          gen,
+			Provenance:   messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter),
 		}
 	}
 }

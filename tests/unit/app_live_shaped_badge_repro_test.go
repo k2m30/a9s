@@ -186,7 +186,7 @@ func TestLiveShapedBadgeRepro_S3_SurvivesEscapeToMenu(t *testing.T) {
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    buckets,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	snapAfterLoad := ctrl.Snapshot()
@@ -284,7 +284,7 @@ func TestLiveShapedBadgeRepro_S3_LateDiskCacheReplayDoesNotClobberFreshBadge(t *
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    buckets,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	findings := liveShapedBadgeReproWave2Findings(4)

@@ -200,9 +200,12 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 // name, or adjacent ID kind instead of the target type's canonical Resource.ID
 // — the class of drill-in regressions called out in the architecture audit.
 //
-// Test-only: no production caller — production relies on the checker
-// contract itself plus ValidateRelatedResult's shape invariants; this cache
-// cross-check runs only from test invariants today.
+// Test-only: no production caller. Production has no runtime call to
+// ValidateRelatedResult either; the shape invariants it checks are instead
+// structurally enforced by construction — see the constructors in
+// core/domain/related_result.go and the RelatedDef.TargetType guard in
+// core/catalog/catalog.go. This cache cross-check runs only from test
+// invariants today.
 func ValidateRelatedResultAgainstCacheForTest(r RelatedCheckResult, cache ResourceCache) error {
 	if err := ValidateRelatedResult(r); err != nil {
 		return err
@@ -317,9 +320,13 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, truncated bool
 // FormatRelatedCount, so every Enter path (live TUI app_stack, headless
 // keyboard/click actions) and the Tab drillable-cursor predicate share one rule
 // and can never drift. Critically, a truncated lower bound is ALWAYS
-// RelatedResolved (ValidateRelatedResult enforces it), so "(0+)" and "(N+)"
-// produce the IDENTICAL action — there is no count-based special case for the
-// zero lower bound.
+// RelatedResolved: KnownRelated is the only constructor that sets truncated,
+// and it leaves state at its zero value RelatedResolved; the other three
+// constructors (UnknownRelated, ErrorRelated, DeferredRelated) never set
+// truncated, and WithTargetType/WithFetchFilter preserve whatever state and
+// truncated a result already carries. So "(0+)" and "(N+)" produce the
+// IDENTICAL action — there is no count-based special case for the zero lower
+// bound.
 type RelatedEnterAction int
 
 const (

@@ -43,7 +43,7 @@ func TestRelatedNavigate_NoStubCreator_EmptyResult_NoDetailAutoOpen(t *testing.T
 		TargetID:       "asg-does-not-exist",
 	})
 
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "asg",
 		Resources:    []resource.Resource{},
 	})

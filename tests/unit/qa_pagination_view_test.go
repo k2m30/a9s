@@ -100,7 +100,7 @@ func pgLoadResources(
 	pagination *resource.PaginationMeta,
 	appendMode bool,
 ) views.ResourceListModel {
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    resources,
 		Pagination:   pagination,

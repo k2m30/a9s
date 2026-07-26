@@ -788,7 +788,7 @@ func TestRowStoreControllerPin_ListOpen_ThenLoadMore_AppendsIntoRowStore(t *test
 		Resources:    page1,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
 		Append:       false,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	assertRowStoreControllerPinHasIDs(t, s, "s3", "bucket-1", "bucket-2")
 
@@ -800,7 +800,7 @@ func TestRowStoreControllerPin_ListOpen_ThenLoadMore_AppendsIntoRowStore(t *test
 		Resources:    page2,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Append:       true,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	final := s.RowStore.Snapshot("s3")
@@ -988,5 +988,268 @@ func TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore(t *
 				t.Error("lazy-added row leaked into the canonical (non-partial) RowStore view — violates C6 scope boundary")
 			}
 		}
+	}
+}
+
+// -----------------------------------------------------------------------
+// Pin 10 — Observe/ObservePartial/Amend clone-on-ingress/egress (D13's
+// two-mutex aliasing fix): rows is deep-copied (cloneRows) on entry to
+// Observe/ObservePartial and Amend's fn receives a deep copy too, and every
+// returned/retained row set is likewise a deep copy — the store's own
+// backing array/Fields maps are never the same allocation as what a caller
+// passed in or received back. Before this fix, the caller's per-screen
+// ListState.Rows and RowStore.mu each held a reference into the SAME
+// backing array; a caller mutating either side (including an append into
+// spare capacity) silently corrupted the other with no Gen bump, and two
+// goroutines touching the two sides raced under `go test -race`. Pin 6
+// above covers Snapshot/SnapshotAll's PRE-EXISTING clone immunity; these
+// pin the NEW ingress/egress clones this fix adds to Observe/ObservePartial/
+// Amend specifically.
+// -----------------------------------------------------------------------
+
+// TestRowStore_Observe_MutatingPassedInSliceAfterCallDoesNotAffectStore pins
+// clone-on-ingress: mutating the slice (including a row's Fields map) the
+// caller passed INTO Observe, after the call returns, must never reach the
+// store's retained rows.
+func TestRowStore_Observe_MutatingPassedInSliceAfterCallDoesNotAffectStore(t *testing.T) {
+	store := session.NewRowStore()
+
+	rows := []resource.Resource{
+		{ID: "i-1", Name: "original-name", Type: "ec2", Fields: map[string]string{"state": "running"}},
+	}
+	store.Observe("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+
+	// Mutate the caller's own slice AFTER the call — including the row's
+	// Fields map, which cloneRows must give its own backing map too.
+	rows[0].Name = "MUTATED-AFTER-OBSERVE"
+	rows[0].Fields["state"] = "poisoned"
+	rows[0].Fields["poison"] = "yes"
+
+	snap := store.Snapshot("ec2")
+	if len(snap.Rows) != 1 {
+		t.Fatalf("precondition: Snapshot(ec2).Rows = %d, want 1", len(snap.Rows))
+	}
+	if snap.Rows[0].Name != "original-name" {
+		t.Errorf("Snapshot(ec2).Rows[0].Name = %q after the caller mutated its own passed-in slice post-call, want %q unchanged", snap.Rows[0].Name, "original-name")
+	}
+	if snap.Rows[0].Fields["state"] != "running" {
+		t.Errorf("Snapshot(ec2).Rows[0].Fields[state] = %q, want %q unchanged — Observe must clone the Fields map on ingress too", snap.Rows[0].Fields["state"], "running")
+	}
+	if _, poisoned := snap.Rows[0].Fields["poison"]; poisoned {
+		t.Error("Snapshot(ec2).Rows[0].Fields[poison] leaked from the caller's post-call mutation of its passed-in slice")
+	}
+}
+
+// TestRowStore_Observe_MutatingReturnedSliceAndAppendIntoSpareCapacityDoesNotAffectStore
+// pins clone-on-egress: mutating the slice Observe RETURNED — including a
+// row's Fields map, AND an append that fits in the returned slice's spare
+// capacity (the classic shared-backing-array corruption shape: slicing the
+// returned slice down by one leaves cap > len, so appending a new row
+// reuses that same backing array without reallocating) — must never affect
+// the store's retained rows or bump its Gen.
+func TestRowStore_Observe_MutatingReturnedSliceAndAppendIntoSpareCapacityDoesNotAffectStore(t *testing.T) {
+	store := session.NewRowStore()
+
+	returned, gen1 := store.Observe("ec2", []resource.Resource{
+		{ID: "i-1", Name: "row-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
+		{ID: "i-2", Name: "row-2", Type: "ec2"},
+	}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+	if len(returned) != 2 {
+		t.Fatalf("precondition: Observe returned %d rows, want 2", len(returned))
+	}
+
+	// Mutate a returned row's Fields map directly.
+	if returned[0].Fields == nil {
+		t.Fatal("precondition: returned[0].Fields must be non-nil (seeded above)")
+	}
+	returned[0].Fields["state"] = "poisoned"
+
+	// Append into the returned slice's spare capacity: slicing down by one
+	// leaves cap(sub) == cap(returned) > len(sub), so this append reuses
+	// the SAME backing array as `returned` without reallocating — silently
+	// overwriting returned[1] in the caller's own copy. Since `returned` is
+	// already a private clone (not the store's own slice), this must be
+	// invisible to the store.
+	sub := returned[:len(returned)-1]
+	appended := append(sub, resource.Resource{ID: "poison-append", Name: "poison-append", Type: "ec2"})
+	if appended[len(appended)-1].ID != "poison-append" {
+		t.Fatal("test setup problem: append into spare capacity did not land as expected")
+	}
+
+	snap := store.Snapshot("ec2")
+	if len(snap.Rows) != 2 {
+		t.Fatalf("Snapshot(ec2).Rows = %d rows after a caller mutated its returned slice, want 2 unchanged (a poisoned 3rd row must never reach the store)", len(snap.Rows))
+	}
+	if snap.Rows[0].Fields["state"] != "running" {
+		t.Errorf("Snapshot(ec2).Rows[0].Fields[state] = %q, want %q unchanged — Observe must clone the Fields map on egress too", snap.Rows[0].Fields["state"], "running")
+	}
+	if snap.Rows[1].ID == "poison-append" {
+		t.Error("Snapshot(ec2).Rows[1] is the caller's spare-capacity append — the store must never alias the slice it returns")
+	}
+	if snap.Gen != gen1 {
+		t.Errorf("Snapshot(ec2).Gen = %d, want %d (the original Observe's Gen) — a caller-side mutation of the returned slice must never bump Gen on its own", snap.Gen, gen1)
+	}
+}
+
+// TestRowStore_ObservePartial_MutatingPassedInSliceAfterCallDoesNotAffectStore
+// mirrors the Observe ingress pin above for ObservePartial.
+func TestRowStore_ObservePartial_MutatingPassedInSliceAfterCallDoesNotAffectStore(t *testing.T) {
+	store := session.NewRowStore()
+
+	rows := []resource.Resource{
+		{ID: "key-1", Name: "original-name", Type: "kms", Fields: map[string]string{"state": "enabled"}},
+	}
+	store.ObservePartial("kms", rows)
+
+	rows[0].Name = "MUTATED-AFTER-OBSERVE-PARTIAL"
+	rows[0].Fields["state"] = "poisoned"
+
+	snap := store.Snapshot("kms")
+	if len(snap.Rows) != 1 || snap.Rows[0].Name != "original-name" {
+		t.Errorf("Snapshot(kms).Rows = %+v after the caller mutated its passed-in slice post-call, want Name %q unchanged", snap.Rows, "original-name")
+	}
+	if snap.Rows[0].Fields["state"] != "enabled" {
+		t.Errorf("Snapshot(kms).Rows[0].Fields[state] = %q, want %q unchanged — ObservePartial must clone the Fields map on ingress too", snap.Rows[0].Fields["state"], "enabled")
+	}
+}
+
+// TestRowStore_ObservePartial_MutatingReturnedSliceAndAppendIntoSpareCapacityDoesNotAffectStore
+// mirrors the Observe egress + spare-capacity-append pin above for
+// ObservePartial.
+func TestRowStore_ObservePartial_MutatingReturnedSliceAndAppendIntoSpareCapacityDoesNotAffectStore(t *testing.T) {
+	store := session.NewRowStore()
+
+	returned, gen1 := store.ObservePartial("kms", []resource.Resource{
+		{ID: "key-1", Name: "key-1", Type: "kms", Fields: map[string]string{"state": "enabled"}},
+		{ID: "key-2", Name: "key-2", Type: "kms"},
+	})
+	if len(returned) != 2 {
+		t.Fatalf("precondition: ObservePartial returned %d rows, want 2", len(returned))
+	}
+	returned[0].Fields["state"] = "poisoned"
+	sub := returned[:len(returned)-1]
+	_ = append(sub, resource.Resource{ID: "poison-append", Name: "poison-append", Type: "kms"})
+
+	snap := store.Snapshot("kms")
+	if len(snap.Rows) != 2 {
+		t.Fatalf("Snapshot(kms).Rows = %d rows after a caller mutated its returned slice, want 2 unchanged", len(snap.Rows))
+	}
+	if snap.Rows[0].Fields["state"] != "enabled" {
+		t.Errorf("Snapshot(kms).Rows[0].Fields[state] = %q, want %q unchanged — ObservePartial must clone the Fields map on egress too", snap.Rows[0].Fields["state"], "enabled")
+	}
+	if snap.Gen != gen1 {
+		t.Errorf("Snapshot(kms).Gen = %d, want %d unchanged — a caller-side mutation of the returned slice must never bump Gen on its own", snap.Gen, gen1)
+	}
+}
+
+// TestRowStore_Amend_FnMutatesInputSliceInPlace_RetainedRowsAndPriorSnapshotUnaffected
+// pins Amend's clone-on-ingress: fn receives a deep copy (cloneRows) of the
+// existing retained slice, so an fn that mutates its input IN PLACE
+// (returning that same, now-mutated slice — exactly the shape
+// core/runtime/helpers.go and internal/tui/app_enrich_fold.go's own
+// enrich-fold implementations use, each already defensively copying before
+// calling Amend) must never corrupt the store's retained rows relative to a
+// Snapshot taken BEFORE the Amend call.
+func TestRowStore_Amend_FnMutatesInputSliceInPlace_RetainedRowsAndPriorSnapshotUnaffected(t *testing.T) {
+	store := session.NewRowStore()
+
+	// The prior reference MUST come from Observe's own return value, not
+	// Snapshot's: Snapshot has always cloned (Pin 6, pre-D), so a
+	// Snapshot-derived "before" would stay protected even without this
+	// fix's Amend-ingress clone and this pin would be accidentally-green.
+	// Observe's return was the actual unprotected reference pre-D — exactly
+	// what a caller assigns onto its own ListState.Rows.
+	before, _ := store.Observe("s3", []resource.Resource{
+		{ID: "bucket-1", Name: "bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+	}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+	if len(before) != 1 {
+		t.Fatalf("precondition: Observe returned %d rows, want 1", len(before))
+	}
+
+	store.Amend("s3", func(rows []resource.Resource) []resource.Resource {
+		// Mutate the fn's input slice in place — including its Fields map —
+		// and return that SAME slice, exactly the "didn't bother to copy"
+		// shape Amend's clone-on-ingress exists to make harmless. Pre-fix,
+		// rows here WAS the store's own backing array, which WAS also
+		// `before`'s backing array (Observe returned it directly) — so this
+		// in-place mutation would silently corrupt `before` too.
+		rows[0].Name = "MUTATED-IN-PLACE-BY-FN"
+		rows[0].Fields["region"] = "eu-west-1"
+		return rows
+	})
+
+	// The slice returned by the EARLIER Observe call must be completely
+	// unaffected by the in-place mutation Amend's fn performed on its
+	// (cloned) input.
+	if before[0].Name != "bucket-1" {
+		t.Errorf("pre-Amend Observe-returned Rows[0].Name = %q after Amend's fn mutated its input in place, want %q unchanged — Amend must clone before handing rows to fn", before[0].Name, "bucket-1")
+	}
+	if before[0].Fields["region"] != "us-east-1" {
+		t.Errorf("pre-Amend Observe-returned Rows[0].Fields[region] = %q, want %q unchanged", before[0].Fields["region"], "us-east-1")
+	}
+
+	// The store's own retained rows DO reflect the fn's returned (mutated)
+	// result — Amend applies whatever fn returns; only the EARLIER
+	// Observe-returned reference and the fn's own input clone are protected.
+	after := store.Snapshot("s3")
+	if after.Rows[0].Name != "MUTATED-IN-PLACE-BY-FN" {
+		t.Errorf("post-Amend Snapshot.Rows[0].Name = %q, want %q — Amend must still apply fn's returned replacement", after.Rows[0].Name, "MUTATED-IN-PLACE-BY-FN")
+	}
+}
+
+// TestRowStore_ConcurrentReturnedSliceWrite_vs_SnapshotObserve_NoRace pins
+// the actual crash mechanism directly, distinct from the existing Pin 8
+// concurrency test above: Pin 8 only exercises concurrent CALLS to
+// Observe/Amend/Snapshot (each internally mutex-guarded, so nothing there
+// ever raced even before this fix). The real crash mechanism this fix
+// closes is a goroutine writing through a slice/map an EARLIER
+// Observe/ObservePartial call had returned — entirely OUTSIDE the store's
+// mutex — while a second goroutine concurrently called Observe/Snapshot
+// against the SAME type. Before clone-on-egress, that returned slice/map
+// WAS the store's own backing allocation, so the two goroutines raced on
+// the same memory with no lock between them; go test -race must report
+// nothing here.
+func TestRowStore_ConcurrentReturnedSliceWrite_vs_SnapshotObserve_NoRace(t *testing.T) {
+	store := session.NewRowStore()
+	const iterations = 200
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine A: repeatedly Observe, then mutate the slice/map it got
+	// back — entirely outside any lock, exactly like a caller assigning an
+	// Observe result onto its own ListState.Rows and then editing it.
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			returned, _ := store.Observe("ec2", []resource.Resource{
+				{ID: idFor(i % 10), Name: idFor(i % 10), Type: "ec2", Fields: map[string]string{"k": "v"}},
+			}, &resource.PaginationMeta{IsTruncated: true}, session.OriginFetch, true)
+			for j := range returned {
+				returned[j].Name = "writer-A"
+				if returned[j].Fields != nil {
+					returned[j].Fields["k"] = "writer-A"
+				}
+			}
+		}
+	}()
+
+	// Goroutine B: concurrently Snapshot and Observe the SAME type — if
+	// goroutine A's returned slice ever aliased the store's own backing
+	// array, this races with A's unguarded writes above.
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = store.Snapshot("ec2")
+			store.Observe("ec2", []resource.Resource{
+				{ID: idFor((i + 1) % 10), Name: idFor((i + 1) % 10), Type: "ec2"},
+			}, &resource.PaginationMeta{IsTruncated: true}, session.OriginFetch, true)
+		}
+	}()
+
+	wg.Wait()
+
+	if got := store.Snapshot("ec2"); len(got.Rows) == 0 {
+		t.Error("final Snapshot(ec2).Rows is empty after the concurrent returned-slice-write/Snapshot-Observe run — expected at least the deduped rows to survive")
 	}
 }

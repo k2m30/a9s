@@ -76,7 +76,7 @@ func TestTUI_APIError_OverListWithRows_RendersErrorMarker_KeepsRows(t *testing.T
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
-		Resources:    rows,
+		Resources:    rows, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	beforeContent := stripANSI(rootViewContent(m))

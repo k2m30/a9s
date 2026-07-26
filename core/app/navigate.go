@@ -130,7 +130,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// confirmed/replaced (cache-first seeding never skips the
 		// live fetch, it only removes the visible wait for it).
 		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List))
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List), false)
 			top.State.List.Refreshing = true
 			// Seed-time provisional total (#17 wave 2): set AFTER applyResourcesLoaded, same ordering as
 			// Refreshing above — applyResourcesLoaded unconditionally clears
@@ -153,8 +153,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// does, so the list still renders instantly instead of falling back to
 		// the no-rows-known Loading=true path ensureListState already applied.
 		if res.Kind == runtime.NavigateKindPushResourceList && res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List))
-			top.State.List.Loading = false
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List), false)
 			top.State.List.Refreshing = true
 			// Seed-time provisional total: same set-after-seed ordering as the cache-hit branch
 			// above.
@@ -582,13 +581,18 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 		c.ensureListState()
 
 	case runtime.NavigationKindFilteredList:
-		intent := runtime.PushScreen{
-			ID:      runtime.ScreenResourceList,
-			Context: runtime.ScreenContext{ResourceType: res.TargetType},
-		}
-		c.applyIntents([]runtime.UIIntent{intent})
-		c.ensureListState()
-		if ls := c.topListState(); ls != nil {
+		// pushByIDPlaceholderList (list_state.go) pushes the screen and always
+		// sets EscPops so isTopLevelCanonicalList excludes this screen from
+		// the shared RowStore write, the disk-cache persist gate, and the C6
+		// FilteredRowsSet seed — mirroring the TUI's own rl.SetEscPops(true)
+		// (internal/tui/runtime_adapter_related.go) — across every sub-case
+		// below (FetchFilter, exact-ID, truncated, TargetID). When TargetID
+		// resolves to a registered FetchByIDs helper it also flags the
+		// by-ID auto-open-single-detail drill (RelatedIDSet + AutoOpenSingle),
+		// which is mutually exclusive with the TargetID == "" branch below —
+		// ResolveRelatedNavigate never sets both TargetID and FetchFilter on
+		// the same NavigationResult, so the gate order does not matter.
+		if ls := c.pushByIDPlaceholderList(res.TargetType, res.TargetID); ls != nil {
 			if res.FilterText != "" {
 				ls.Filter = res.FilterText
 			}
@@ -626,18 +630,6 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 					}
 					ls.RelatedIDSet = set
 				}
-			}
-			// By-ID single-target drill (web/headless): when the target type has a
-			// FetchByIDs helper, HandleRelatedNavigate returns a KindFetchByIDDetail
-			// task. Flag the placeholder list so Handle replaces it with the
-			// target's detail once the fetched row arrives — the TUI drills to
-			// by-ID detail in its own adapter and never reaches this path.
-			if res.TargetID != "" && resource.GetFetchByIDs(res.TargetType) != nil {
-				// Always key on TargetID: autoOpenSingleDetail matches ls.Rows
-				// against this set and the KindFetchByIDDetail task fetches by
-				// TargetID, so the set must reference that same ID.
-				ls.RelatedIDSet = map[string]struct{}{res.TargetID: {}}
-				ls.AutoOpenSingle = true
 			}
 		}
 

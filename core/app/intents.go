@@ -258,15 +258,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			c.flash = Flash{}
 
 		case runtime.ClearActiveListLoadingIntent:
-			// A failed AWS fetch must drop the spinner on the active list rather
-			// than leaving it stuck Loading=true (emitted by HandleAPIError).
+			// A failed AWS fetch must drop every in-flight indicator on the
+			// active list (Loading, LoadingMore, Refreshing) rather than
+			// stranding one of them set forever (emitted by HandleAPIError;
+			// mirrors ClearListLoading, the TUI-lane equivalent).
 			if ls := c.topListState(); ls != nil {
-				ls.Loading = false
+				ls.clearFetchInFlight()
 				// Per cache contract C4: a fetch failure over cached content stops the
 				// refreshing marker and swaps in an error marker instead —
 				// nothing goes blank, rows stay on screen.
 				if v.Err != "" {
-					ls.Refreshing = false
 					ls.LastFetchError = v.Err
 				}
 			}

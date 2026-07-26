@@ -227,7 +227,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
 		wave3SG("sg-1", "vpc-other-1"),
 		wave3SG("sg-2", "vpc-other-2"),
-	}})
+	}, Provenance: messages.FetchProvenanceCanonicalList})
 	lb := *c.Snapshot().Body.List
 	if len(lb.Rows) != 0 {
 		t.Fatalf("after page1 (no matches): want 0 visible rows, got %d", len(lb.Rows))
@@ -237,7 +237,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-3", "vpc-target"),
 		wave3SG("sg-4", "vpc-other-3"),
-	}})
+	}, Provenance: messages.FetchProvenanceCanonicalList})
 	lb = *c.Snapshot().Body.List
 	if len(lb.Rows) != 1 {
 		t.Fatalf("after page2 (1 match): want 1 visible row, got %d", len(lb.Rows))
@@ -250,7 +250,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-5", "vpc-target"),
 		wave3SG("sg-6", "vpc-target"),
-	}})
+	}, Provenance: messages.FetchProvenanceCanonicalList})
 	lb = *c.Snapshot().Body.List
 	if len(lb.Rows) != 3 {
 		t.Fatalf("after page3 (2 more matches): want 3 visible rows (grown, not reset), got %d", len(lb.Rows))
@@ -270,7 +270,7 @@ func TestRelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
 		t.Fatalf("precondition: RelatedIDSet size = %d, want 2", got)
 	}
 
-	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
+	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-c", "vpc-target"),
 	}})
 
@@ -306,7 +306,7 @@ func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 		wave3SG("sg-zeta", "vpc-target"),
 		wave3SG("sg-mu", "vpc-target"),
 		wave3SG("sg-alpha", "vpc-target"),
-	}})
+	}, Provenance: messages.FetchProvenanceCanonicalList})
 
 	lb := *c.Snapshot().Body.List
 	if len(lb.Rows) != 3 {
@@ -329,7 +329,7 @@ func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 	c.PatchListRelatedIDSet([]string{"i-1", "i-2"})
 	// No PatchListReapplyChecker call.
 
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{
+	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{
 		{ID: "i-3", Name: "i-3", Type: "ec2", Fields: map[string]string{"instance_id": "i-3"}},
 	}})
 
@@ -791,7 +791,7 @@ func TestResourcesLoaded_DropsMismatchedType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := openListController(t, tc.listShortName)
 
-			c.Handle(messages.ResourcesLoaded{
+			c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 				ResourceType: tc.staleType,
 				Resources: []resource.Resource{
 					{ID: "x-0001", Name: "x-0001", Fields: map[string]string{"id": "x-0001"}},
@@ -828,7 +828,7 @@ func TestResourcesLoaded_AppliesMatchingType(t *testing.T) {
 				Resources: []resource.Resource{
 					{ID: "res-a", Name: "res-a", Fields: map[string]string{"id": "res-a"}},
 					{ID: "res-b", Name: "res-b", Fields: map[string]string{"id": "res-b"}},
-				},
+				}, Provenance: messages.FetchProvenanceCanonicalList,
 			})
 
 			lb := c.Snapshot().Body.List

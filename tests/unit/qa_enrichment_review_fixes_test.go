@@ -72,11 +72,12 @@ func TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment(t *testing.T) {
 	resources := rerunEC2Resources()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    resources,
+		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Deliver a successful EnrichmentCheckedMsg to populate findings on the
 	// active list via the handler's live-update path.
+
 	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
 
 	// Sanity: the impaired instance survives the ctrl+z attention filter

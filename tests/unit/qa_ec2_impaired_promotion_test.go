@@ -454,10 +454,11 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	// Load the resources into the active ResourceListModel.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    promotedResources,
+		Resources:    promotedResources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Verify both rows are visible before toggling ctrl+z.
+
 	plainBefore := stripANSI(rootViewContent(m))
 	if !strings.Contains(plainBefore, "web-server-impaired") {
 		t.Error("impaired row should be visible before ctrl+z")
@@ -547,7 +548,7 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    mixedResources,
+		Resources:    mixedResources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Spec §4 + S1 contract (docs/attention-signals.md): "issues:N" is the MENU
@@ -555,6 +556,7 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 	// "!" broken) counts; i-stopped-001 (Wave-1 "~" warn — Wave-1 issue-colored
 	// rows count) counts; i-initializing-001 (Wave-2 "~" warn) does NOT. So the
 	// badge reads "issues:2".
+
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "issues:2") {

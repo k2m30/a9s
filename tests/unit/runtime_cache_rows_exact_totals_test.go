@@ -96,8 +96,10 @@ func TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI(t *testing.T) {
 		Resources:    moreRows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Append:       true,
-		Gen:          0, // AcceptZeroGen=true
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
+
+	// AcceptZeroGen=true
 	_ = vs
 
 	avail := c.GetMenuAvailability()
@@ -134,13 +136,14 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 		Resources:    []resource.Resource{{ID: "bucket-3", Type: "s3"}},
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Append:       true,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Pop back to the menu — a plain controller-level ActionBack, not a TUI
 	// popRS call. If the sync-back is correctly moved to the controller, the
 	// exact total set above must already be in MenuState and popping must
 	// not need to (re)compute it.
+
 	c.Apply(app.Action{Kind: app.ActionBack})
 
 	avail := c.GetMenuAvailability()
@@ -189,7 +192,7 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 			Resources:    []resource.Resource{{ID: "i-only2", Type: "ec2"}},
 			Pagination:   &resource.PaginationMeta{IsTruncated: false},
 			Append:       true,
-			Gen:          0,
+			Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 		})
 
 		avail := c.GetMenuAvailability()
@@ -214,7 +217,7 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 			Resources:    []resource.Resource{{ID: "i-c"}, {ID: "i-d"}, {ID: "i-e"}},
 			Pagination:   &resource.PaginationMeta{IsTruncated: false},
 			Append:       true,
-			Gen:          0,
+			Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 		})
 
 		avail := c.GetMenuAvailability()
@@ -262,7 +265,7 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 		Resources:    []resource.Resource{{ID: "i-extra-1"}, {ID: "i-extra-2"}},
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Append:       true,
-		Gen:          0,
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	avail := c.GetMenuAvailability()

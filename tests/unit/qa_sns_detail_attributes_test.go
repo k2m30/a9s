@@ -54,7 +54,7 @@ func TestSNSDetail_AttributesPath_RendersAfterEnrichment(t *testing.T) {
 		t.Fatalf("demo sns fixtures missing (err=%v, len=%d)", err, len(snsRes))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "sns",
 		Resources:    snsRes,
 	})

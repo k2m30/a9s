@@ -2,7 +2,10 @@
 
 package catalog
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // registry is the installed top-level catalog. Populated exactly once by
 // SetTypes (called from aws.Install at program start / TestMain). All Find /
@@ -33,6 +36,7 @@ var childInstalled bool //nolint:gochecknoglobals // process-scope catalog: set 
 // on identical input; panics on a second call with different data
 // (defensive against accidental re-install with diverging slices in tests).
 func SetTypes(types []ResourceTypeDef) {
+	validateRelatedDefs(types)
 	if installed {
 		if !sameTypes(registry, types) {
 			panic("catalog.SetTypes called twice with different data — refusing to overwrite installed catalog")
@@ -46,6 +50,7 @@ func SetTypes(types []ResourceTypeDef) {
 // SetChildTypes installs the child-type catalog. Same lifecycle as SetTypes.
 // Idempotent on identical input; panics on a second call with different data.
 func SetChildTypes(children []ResourceTypeDef) {
+	validateRelatedDefs(children)
 	if childInstalled {
 		if !sameChildren(childRegistry, children) {
 			panic("catalog.SetChildTypes called twice with different data — refusing to overwrite installed child catalog")
@@ -132,6 +137,28 @@ func AllChildren() []ResourceTypeDef {
 		out = append(out, c)
 	}
 	return out
+}
+
+// validateRelatedDefs panics if any type declares a RelatedDef with an empty
+// TargetType. domain.RelatedCheckResult's fields are unexported, but Go still
+// permits an empty composite literal or the bare zero value from any package;
+// its zero value renders as a dimmed, non-navigable "(0)" with no evidence
+// behind it — the exact failure mode a missing TargetType would produce
+// undetected. Catalog registration is developer data installed once at
+// process start (aws.Install), not user input, so failing fast here — before
+// any resource list or detail view can render — is preferable to a live
+// panic or a silently wrong badge.
+func validateRelatedDefs(types []ResourceTypeDef) {
+	for _, t := range types {
+		for _, rd := range t.Related {
+			if rd.TargetType == "" {
+				panic(fmt.Sprintf(
+					"catalog: %q declares a RelatedDef with empty TargetType (DisplayName=%q) — every RelatedDef must name a target",
+					t.ShortName, rd.DisplayName,
+				))
+			}
+		}
+	}
 }
 
 // requireInstalled panics with a clear message if SetTypes has not yet been

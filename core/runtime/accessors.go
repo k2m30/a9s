@@ -657,15 +657,14 @@ func (c *Core) HasIssueEnricher(shortName string) bool {
 	return ok
 }
 
-// ObserveRows is the thin dual-write chokepoint every rows-carrying write to
-// ProbeResources/ResourceCache feeds alongside its existing map write (task
-// #17 wave 1 — row-store unification, Stage 1: dual-write scaffolding, zero
-// behavior change). canon must already be the canonicalized resource short
-// name — callers resolve aliases before calling, matching every other
-// canon-keyed write in this package. Returns the accepted rows + Gen so a
-// future caller can compare it against the legacy map write during the
-// Stage-1 differential harness; today's callers only need the side effect
-// and may discard the result.
+// ObserveRows is the sole chokepoint for a rows-carrying write to the
+// session-scoped RowStore. canon must already be the canonicalized resource
+// short name — callers resolve aliases before calling, matching every other
+// canon-keyed write in this package. Returns the accepted rows (a deep copy,
+// independent of the store's own retained slice — see RowStore.Observe) plus
+// the resulting Gen; core/app's applyResourcesLoaded assigns the returned
+// rows directly onto the calling screen's ListState.Rows, so the value is
+// load-bearing, not a diagnostic-only by-product.
 func (c *Core) ObserveRows(canon string, rows []resource.Resource, pagination *resource.PaginationMeta, origin session.Origin, appendPage bool) ([]resource.Resource, domain.Gen) {
 	return c.session.RowStore.Observe(canon, rows, pagination, origin, appendPage)
 }

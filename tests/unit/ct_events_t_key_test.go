@@ -38,7 +38,7 @@ func ctEventsLoadedEC2List(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(*td, nil, k)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{ctEventsEC2Resource()},
 	})
@@ -100,7 +100,7 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 	m := views.NewResourceList(*td, nil, k)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
+	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "iam-user",
 		Resources: []resource.Resource{
 			{
@@ -138,7 +138,7 @@ func TestResourceList_TKey_NoopOnCtEventsList(t *testing.T) {
 	rl := views.NewResourceList(*td, nil, keys.Default())
 	rl.SetSize(120, 40)
 	// Load one event
-	rl, _ = rl.Update(messages.ResourcesLoaded{
+	rl, _ = rl.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ct-events",
 		Resources: []resource.Resource{{
 			ID:     "evt-001",
@@ -172,7 +172,7 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 		}
 		rl := views.NewResourceList(*td, nil, k)
 		rl.SetSize(120, 40)
-		rl, _ = rl.Update(messages.ResourcesLoaded{
+		rl, _ = rl.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 			ResourceType: "ec2",
 			Resources:    []resource.Resource{res},
 		})
@@ -219,7 +219,7 @@ func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 
 	// Key should be no-op
 	rl.SetSize(120, 40)
-	rl, _ = rl.Update(messages.ResourcesLoaded{
+	rl, _ = rl.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{{
 			ID: "file.txt", Name: "file.txt", Fields: map[string]string{},

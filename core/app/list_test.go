@@ -1436,7 +1436,7 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 	// Gen=0 passes AcceptZeroGen guard; ResourceType="ec2" routes to the single list.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "ec2",
-		Resources:    rowsA,
+		Resources:    rowsA, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	lb1 := listBodyOrFail(t, c)
@@ -1471,10 +1471,12 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 	}
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "ec2",
-		Resources:    singleRow,
+		Resources:    singleRow, Provenance:
+
+		// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
+		messages.FetchProvenanceCanonicalList,
 	})
 
-	// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
 	lb2 := listBodyOrFail(t, c)
 	if len(lb2.Rows) != 1 {
 		t.Fatalf("screen 2 after Handle: want 1 row, got %d", len(lb2.Rows))
@@ -1531,7 +1533,7 @@ func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
 	underlying := []resource.Resource{fakeRDSResource()}
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "rds",
-		Resources:    underlying,
+		Resources:    underlying, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	lb := listBodyOrFail(t, c)
@@ -1545,7 +1547,7 @@ func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
 	// that found zero matching RDS instances).
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "rds",
-		Resources:    []resource.Resource{},
+		Resources:    []resource.Resource{}, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	lb2 := listBodyOrFail(t, c)

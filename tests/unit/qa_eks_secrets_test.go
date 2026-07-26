@@ -31,7 +31,7 @@ func TestQA_EKS_ListColumns(t *testing.T) {
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
-		Resources:    clusters,
+		Resources:    clusters, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -142,7 +142,7 @@ func TestQA_EKS_FrameTitle(t *testing.T) {
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
-		Resources:    clusters,
+		Resources:    clusters, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -169,7 +169,7 @@ func TestQA_EKS_DetailView(t *testing.T) {
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
@@ -279,7 +279,7 @@ func TestQA_Secrets_ListColumns(t *testing.T) {
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
-		Resources:    secrets,
+		Resources:    secrets, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -354,7 +354,7 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
-		Resources:    secrets,
+		Resources:    secrets, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -381,7 +381,7 @@ func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -408,7 +408,7 @@ func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 	})
 
 	instances := fixtureEC2Instances()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    instances,
 	})
@@ -440,7 +440,7 @@ func TestQA_Secrets_XKeyDoesNothingOnRDS(t *testing.T) {
 	})
 
 	instances := fixtureRDSInstances()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    instances,
 	})
@@ -464,7 +464,7 @@ func TestQA_Secrets_XKeyDoesNothingOnS3(t *testing.T) {
 	})
 
 	buckets := fixtureS3Buckets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    buckets,
 	})
@@ -488,7 +488,7 @@ func TestQA_Secrets_XKeyDoesNothingOnEKS(t *testing.T) {
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
@@ -512,7 +512,7 @@ func TestQA_Secrets_XKeyDoesNothingOnRedis(t *testing.T) {
 	})
 
 	clusters := fixtureRedisClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "redis",
 		Resources:    clusters,
 	})
@@ -536,7 +536,7 @@ func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 	})
 
 	clusters := fixtureDocDBClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbc",
 		Resources:    clusters,
 	})
@@ -565,7 +565,7 @@ func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -603,7 +603,7 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -644,7 +644,7 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -679,10 +679,11 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
-		Resources:    secrets,
+		Resources:    secrets, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Open reveal view
+
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
@@ -827,10 +828,11 @@ func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
-		Resources:    clusters,
+		Resources:    clusters, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Push detail view
+
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &clusters[0],
@@ -860,10 +862,11 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
-		Resources:    clusters,
+		Resources:    clusters, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// Push YAML view
+
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &clusters[0],
@@ -897,7 +900,7 @@ func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 	})
 
 	params := fixtureSSMParameters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ssm",
 		Resources:    params,
 	})
@@ -925,7 +928,7 @@ func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
 	})
 
 	params := fixtureSSMParameters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ssm",
 		Resources:    params,
 	})

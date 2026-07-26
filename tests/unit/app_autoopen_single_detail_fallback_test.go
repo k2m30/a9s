@@ -41,11 +41,17 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsWithPagination_QueuesFetchMore(t *te
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{"i-0target00000001"})
+	// A by-ID/related placeholder is never the canonical top-level list —
+	// PatchListEscPops mirrors the EscPops stamp navigate.go's
+	// applyRelatedNavResult sets on every real by-ID/filtered/child
+	// placeholder it pushes, which isTopLevelCanonicalList (list_state.go)
+	// keys on to exempt it from the canonical-only Provenance gate (handle.go).
+	c.PatchListEscPops(true)
 
 	_, tasks := c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    nil,
-		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-1"},
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-1"}, Provenance: messages.FetchProvenanceFilteredList,
 	})
 
 	var fetchMore *runtime.TaskRequest
@@ -85,11 +91,12 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationWithStubCreator_OpensSyn
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
+	c.PatchListEscPops(true)
 
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    nil,
-		Pagination:   nil,
+		Pagination:   nil, Provenance: messages.FetchProvenanceByID,
 	})
 
 	snap := c.Snapshot()
@@ -119,7 +126,7 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_Placeholde
 				t.Fatalf("Handle panicked on zero-row/no-pagination/no-StubCreator auto-open: %v", r)
 			}
 		}()
-		c.Handle(messages.ResourcesLoaded{
+		c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 			ResourceType: "ec2",
 			Resources:    nil,
 			Pagination:   nil,
@@ -148,13 +155,14 @@ func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetc
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
+	c.PatchListEscPops(true)
 
 	_, tasks := c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		// Non-empty page, but none of these rows is the target — the target
 		// is somewhere on a LATER page.
 		Resources:  []resource.Resource{{ID: "i-0other0000000001", Type: "ec2"}},
-		Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-2"},
+		Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-2"}, Provenance: messages.FetchProvenanceFilteredList,
 	})
 
 	var fetchMore *runtime.TaskRequest
@@ -209,7 +217,7 @@ func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreati
 				t.Fatalf("Handle panicked while a chase was already in flight: %v", r)
 			}
 		}()
-		c.Handle(messages.ResourcesLoaded{
+		c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 			ResourceType: "ec2",
 			Resources:    nil,
 			Pagination:   nil,
@@ -243,7 +251,7 @@ func TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen(
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
 
-	c.Handle(messages.ResourcesLoaded{
+	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-unrelated0001", Type: "ec2"}},
 		Pagination:   nil,
@@ -265,9 +273,10 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFi
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
+	c.PatchListEscPops(true)
 
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil})
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ami", Resources: nil, Pagination: nil})
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceCanonicalList})
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ami", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceByID})
 
 	snap := c.Snapshot()
 	if snap.Body.Kind != app.BodyKindDetail {
@@ -289,12 +298,13 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallback
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
+	c.PatchListEscPops(true)
 
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil})
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceCanonicalList})
 	_, tasks := c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    nil,
-		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-guard"},
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-guard"}, Provenance: messages.FetchProvenanceFilteredList,
 	})
 
 	var fetchMore *runtime.TaskRequest
@@ -329,12 +339,13 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeRealResult_OpensRealReso
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
+	c.PatchListEscPops(true)
 
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil})
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceCanonicalList})
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    []resource.Resource{{ID: targetID, Name: realName, Type: "ami"}},
-		Pagination:   nil,
+		Pagination:   nil, Provenance: messages.FetchProvenanceByID,
 	})
 
 	snap := c.Snapshot()

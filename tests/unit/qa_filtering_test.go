@@ -31,12 +31,14 @@ func loadEC2Resources(m tui.Model, resources []resource.Resource) tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    resources,
+		Resources:    resources, Provenance: messages.
+
+			// sampleEC2Resources returns a set of test EC2 resources.
+			FetchProvenanceCanonicalList,
 	})
 	return m
 }
 
-// sampleEC2Resources returns a set of test EC2 resources.
 func sampleEC2Resources() []resource.Resource {
 	return []resource.Resource{
 		{ID: "i-abc001", Name: "api-prod-01", Fields: map[string]string{"instance_id": "i-abc001", "name": "api-prod-01", "state": "running", "type": "t3.medium"}},
@@ -773,7 +775,7 @@ func TestQA_Filter_11_27_FilterOnEmptyList(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})

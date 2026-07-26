@@ -43,7 +43,7 @@ func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 
 	// Simulate: resource "deleted" in AWS, but user pressed d to view detail
 	// using the stale list data — this is the list-cached resource, no new API call.
@@ -87,7 +87,7 @@ func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
 
 	// Navigate into the bucket (child view)
 	var cmd tea.Cmd
@@ -144,7 +144,7 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: resources})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &resources[0],
@@ -185,7 +185,7 @@ func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 	}
 
 	// Now if late ResourcesLoadedMsg arrives, it should be discarded or benign
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-late", Name: "late-instance", Fields: map[string]string{
@@ -232,7 +232,7 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: initial})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: initial, Provenance: messages.FetchProvenanceCanonicalList})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "running") {
@@ -258,7 +258,7 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: updated})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: updated, Provenance: messages.FetchProvenanceCanonicalList})
 
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "stopped") {

@@ -240,7 +240,7 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 		Target:       messages.TargetResourceList,
 		ResourceType: targetType,
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: targetType,
 		Resources: []resource.Resource{
 			{ID: "ge2-main-001", Name: "ge2-main-001"},
