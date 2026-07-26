@@ -230,6 +230,44 @@ func TestFetchCBBuilds_EmptyProject(t *testing.T) {
 	}
 }
 
+// TestFetchCBBuilds_EmptyPageWithNextToken pins the truncation-honesty fix:
+// a ListBuildsForProject page with zero Ids but a NextToken must still
+// report IsTruncated=true. Before the fix, an early return for
+// len(pageIDs) == 0 unconditionally reported a proven zero, silently
+// discarding the NextToken and hiding every build on the pages that
+// followed.
+func TestFetchCBBuilds_EmptyPageWithNextToken(t *testing.T) {
+	listMock := &mockCodeBuildListBuildsForProjectClient{
+		outputs: []*codebuild.ListBuildsForProjectOutput{
+			{Ids: []string{}, NextToken: aws.String("cb-next-page")},
+		},
+	}
+	batchMock := &mockCodeBuildBatchGetBuildsClient{}
+
+	result, err := awsclient.FetchCBBuilds(
+		context.Background(),
+		listMock,
+		batchMock,
+		map[string]string{"project_name": "quiet-project"},
+		"",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true: an empty page with a NextToken is not a proven zero")
+	}
+	if result.Pagination.NextToken != "cb-next-page" {
+		t.Errorf("NextToken: expected %q, got %q", "cb-next-page", result.Pagination.NextToken)
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
+	}
+}
+
 // TestFetchCBBuilds_ListError verifies that ListBuildsForProject errors
 // are propagated.
 func TestFetchCBBuilds_ListError(t *testing.T) {

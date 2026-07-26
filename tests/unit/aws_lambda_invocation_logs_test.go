@@ -668,6 +668,38 @@ func TestFetchLambdaInvocationLogs_MultipleEmptyPages(t *testing.T) {
 	}
 }
 
+// TestFetchLambdaInvocationLogs_PageCapStopsScanAndReportsTruncated pins the
+// 100-page FilterLogEvents scan cap: a request ID with no matching lines
+// scans the full 24h lookback window as an unbounded run of empty pages,
+// each carrying a NextToken (the documented normal case for this scan), so
+// maxInvocationLogLines alone never fires. It must stop at exactly
+// maxInvocationLogScanPages (100) calls and report the result as truncated
+// — not present the empty result as a complete answer.
+func TestFetchLambdaInvocationLogs_PageCapStopsScanAndReportsTruncated(t *testing.T) {
+	const pageCap = 100
+	outputs := make([]*cloudwatchlogs.FilterLogEventsOutput, pageCap+20)
+	for i := range outputs {
+		outputs[i] = &cloudwatchlogs.FilterLogEventsOutput{NextToken: aws.String(fmt.Sprintf("tok-%d", i+1))}
+	}
+	mock := &mockCWLogsFilterLogEventsClient{outputs: outputs}
+
+	result, err := awsclient.FetchLambdaInvocationLogs(
+		context.Background(), mock, "/aws/lambda/quiet-func", "no-such-request-id", "",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if mock.callIdx != pageCap {
+		t.Errorf("FilterLogEvents called %d times, want exactly %d (the page cap must fire, not run past it)", mock.callIdx, pageCap)
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true — a capped scan must not be presented as a complete (empty) answer")
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources (no matching lines), got %d", len(result.Resources))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Clean-Name tests (bug fix): Name must be a clean, human-readable summary —
 // never a raw-JSON prefix or a byte-sliced multibyte string. Fields["message"]

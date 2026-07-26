@@ -777,6 +777,88 @@ func TestRelated_R53_ELB_NoMatch(t *testing.T) {
 	}
 }
 
+// TestRelated_R53_ELB_NoMatch_TruncatedScan pins the truncation-honesty fix
+// on the DANGEROUS path: when the hosted zone's record scan itself came back
+// truncated (ListResourceRecordSets IsTruncated=true), a "no ELB alias
+// found" result must say so — "(0+)", not "(0)". Before the fix this path
+// always returned resource.KnownRelated(..., false): a confident, false
+// "elb (0)" from a scan that never saw the rest of the zone's records. This
+// is the dangerous case: the user reads "elb (0)" as "nothing points at this
+// ELB" and moves on, a dead end they trust.
+func TestRelated_R53_ELB_NoMatch_TruncatedScan(t *testing.T) {
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("api.example.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String("abc123.execute-api.us-east-1.amazonaws.com"),
+						EvaluateTargetHealth: false,
+					},
+				},
+			},
+			IsTruncated: true,
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+	cache := resource.ResourceCache{
+		"elb": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{{ID: "some-elb", Fields: map[string]string{"dns_name": "some-elb.us-east-1.elb.amazonaws.com"}}},
+		},
+	}
+
+	checker := r53CheckerByTarget(t, "elb")
+	source := resource.Resource{ID: "ZELB004", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (alias does not point at .elb.amazonaws.com)", result.Count())
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true: the record scan was truncated, so \"no match\" is not proven — must render (0+), not (0)")
+	}
+}
+
+// TestRelated_R53_ELB_Match_TruncatedScan pins the same fix on the
+// found-a-match path: a truncated record scan must report the matches found
+// SO FAR as truncated, not as the exhaustive set.
+func TestRelated_R53_ELB_Match_TruncatedScan(t *testing.T) {
+	const elbDNS = "myalb-123456789.us-east-1.elb.amazonaws.com"
+	const elbID = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/myalb/abc123"
+
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("app.example.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String(elbDNS),
+						EvaluateTargetHealth: true,
+					},
+				},
+			},
+			IsTruncated: true,
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	elbRes := resource.Resource{ID: elbID, Name: "myalb", Fields: map[string]string{"dns_name": elbDNS}}
+	cache := resource.ResourceCache{"elb": resource.ResourceCacheEntry{Resources: []resource.Resource{elbRes}}}
+
+	checker := r53CheckerByTarget(t, "elb")
+	source := resource.Resource{ID: "ZELB005", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true: the record scan was truncated, so this match set is not proven exhaustive")
+	}
+}
+
 // TestRelated_R53_ELB_NilClients verifies that nil clients → State: RelatedUnknown.
 func TestRelated_R53_ELB_NilClients(t *testing.T) {
 	checker := r53CheckerByTarget(t, "elb")

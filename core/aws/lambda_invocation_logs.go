@@ -16,6 +16,13 @@ import (
 // maxInvocationLogLines caps the result set for a single invocation's logs.
 const maxInvocationLogLines = 500
 
+// maxInvocationLogScanPages caps the number of FilterLogEvents calls. Empty
+// pages carrying a NextToken are the documented normal case here (scanning
+// across log streams that don't match the request ID), so maxInvocationLogLines
+// alone never fires while that happens; without this cap a request ID with no
+// matching logs scans the full 24h lookback window page by page forever.
+const maxInvocationLogScanPages = 100
+
 // FetchLambdaInvocationLogs calls the CloudWatchLogs FilterLogEvents API with
 // a filter pattern containing the request ID, returning individual log lines
 // for a specific Lambda invocation as a FetchResult. It paginates through
@@ -32,6 +39,7 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 
 	var resources []resource.Resource
 
+	pages := 0
 	for {
 		input := &cloudwatchlogs.FilterLogEventsInput{
 			LogGroupName:  &logGroup,
@@ -44,6 +52,7 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("fetching lambda invocation logs: %w", err)
 		}
+		pages++
 
 		for _, event := range output.Events {
 			message := ""
@@ -89,7 +98,7 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 			})
 		}
 
-		if len(resources) >= maxInvocationLogLines {
+		if len(resources) >= maxInvocationLogLines || pages >= maxInvocationLogScanPages {
 			apiNextToken := ""
 			if output.NextToken != nil {
 				apiNextToken = *output.NextToken

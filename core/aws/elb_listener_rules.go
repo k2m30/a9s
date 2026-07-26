@@ -13,9 +13,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchELBListenerRules calls the ELBv2 DescribeRules API and converts the
-// response into a FetchResult. This is a single-call API (no pagination from AWS),
-// but uses FetchResult for consistency with the paginated child fetcher interface.
+// FetchELBListenerRules calls the ELBv2 DescribeRules API for one page of
+// rules and converts the response into a FetchResult. DescribeRules paginates
+// via Marker/NextMarker like other ELBv2 List/Describe calls; continuationToken
+// round-trips through Marker. maxRules additionally caps the resources
+// converted from a single response, independent of whether AWS itself
+// paginated — IsTruncated reports true for either cause.
 func FetchELBListenerRules(
 	ctx context.Context,
 	api ELBv2DescribeRulesAPI,
@@ -29,6 +32,9 @@ func FetchELBListenerRules(
 	input := &elbv2.DescribeRulesInput{
 		ListenerArn: &listenerArn,
 	}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
 
 	output, err := api.DescribeRules(ctx, input)
 	if err != nil {
@@ -36,18 +42,33 @@ func FetchELBListenerRules(
 	}
 
 	var resources []resource.Resource
+	cappedLocally := false
 	for _, rule := range output.Rules {
-		resources = append(resources, convertRule(rule))
 		if len(resources) >= maxRules {
+			cappedLocally = true
 			break
 		}
+		resources = append(resources, convertRule(rule))
+	}
+
+	nextToken := ""
+	isTruncated := cappedLocally
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			TotalHint:   totalHint,
 			PageSize:    len(resources),
 		},
 	}, nil

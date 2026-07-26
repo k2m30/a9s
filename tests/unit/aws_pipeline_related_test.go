@@ -154,6 +154,24 @@ func TestRelated_Pipeline_CB_NilClients(t *testing.T) {
 	}
 }
 
+// TestRelated_Pipeline_CB_FailedLookup_ReturnsUnknown pins that
+// pipelineGetDeclaration's nil-to-error signature change did not alter this
+// single-call caller's behavior: a failed GetPipeline still collapses to
+// UnknownRelated, exactly as a nil declaration did before.
+func TestRelated_Pipeline_CB_FailedLookup_ReturnsUnknown(t *testing.T) {
+	const pipelineName = "missing-pipeline"
+	src := resource.Resource{ID: pipelineName, Fields: map[string]string{}}
+	clients := &awsclient.ServiceClients{
+		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // GetPipeline misses -> fails
+	}
+	checker := pipelineCheckerByTarget(t, "cb")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (failed lookup)", result.State())
+	}
+}
+
 // ---------------------------------------------------------------------------
 // checkPipelineRole — IAM role name extraction from RoleArn
 // ---------------------------------------------------------------------------
@@ -193,6 +211,24 @@ func TestRelated_Pipeline_Role_NoRole(t *testing.T) {
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (no RoleArn set)", result.Count())
+	}
+}
+
+// TestRelated_Pipeline_Role_FailedLookup_ReturnsUnknown pins that
+// pipelineGetDeclaration's nil-to-error signature change did not alter this
+// single-call caller's behavior: a failed GetPipeline still collapses to
+// UnknownRelated, exactly as a nil declaration did before.
+func TestRelated_Pipeline_Role_FailedLookup_ReturnsUnknown(t *testing.T) {
+	const pipelineName = "missing-pipeline"
+	src := resource.Resource{ID: pipelineName, Fields: map[string]string{}}
+	clients := &awsclient.ServiceClients{
+		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // GetPipeline misses -> fails
+	}
+	checker := pipelineCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (failed lookup)", result.State())
 	}
 }
 

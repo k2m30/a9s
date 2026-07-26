@@ -154,3 +154,43 @@ func TestFetchECSClusters_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
+
+// TestFetchECSClusters_EmptyPageSkipsDescribeClustersAndReportsTruncated pins
+// two behaviors of the truncation-honesty fix in one page:
+//  1. Zero ClusterArns must NOT call DescribeClusters — AWS treats an
+//     empty/omitted Clusters list on DescribeClusters as "describe the
+//     default cluster", so calling it here would invent a resource that was
+//     never in the list. describeMock is configured to error if invoked at
+//     all, so a regression that resurrects the unconditional call fails this
+//     test via that error, not via a silently wrong answer.
+//  2. IsTruncated must still be true when ListClusters reports a NextToken,
+//     even though this page found no ARNs to describe — an empty page is
+//     not a proven zero.
+func TestFetchECSClusters_EmptyPageSkipsDescribeClustersAndReportsTruncated(t *testing.T) {
+	listMock := &mockECSListClustersClient{
+		output: &ecs.ListClustersOutput{
+			ClusterArns: []string{},
+			NextToken:   aws.String("ecs-clusters-next"),
+		},
+	}
+	describeMock := &mockECSDescribeClustersClient{
+		err: fmt.Errorf("DescribeClusters must not be called when ClusterArns is empty"),
+	}
+
+	result, err := awsclient.FetchECSClustersPage(context.Background(), listMock, describeMock, "")
+	if err != nil {
+		t.Fatalf("expected no error (DescribeClusters should have been skipped), got %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true: an empty page with a NextToken is not a proven zero")
+	}
+	if result.Pagination.NextToken != "ecs-clusters-next" {
+		t.Errorf("NextToken: expected %q, got %q", "ecs-clusters-next", result.Pagination.NextToken)
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
+	}
+}

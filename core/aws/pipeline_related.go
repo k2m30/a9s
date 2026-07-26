@@ -11,6 +11,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"slices"
 
@@ -21,24 +22,39 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// pipelineGetDeclaration wraps GetPipeline in RetryOnThrottle. Returns the declaration
-// or nil on any error / unsupported client.
-func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName string) *cptypes.PipelineDeclaration {
+// errPipelineNotConfigured means no usable CodePipeline client was available
+// to attempt the call at all.
+var errPipelineNotConfigured = errors.New("codepipeline client not configured")
+
+// pipelineGetDeclaration wraps GetPipeline in RetryOnThrottle. A nil error
+// means the declaration was resolved; any non-nil error (errPipelineNotConfigured,
+// a RetryOnThrottle failure, or an empty response) means it was not, and the
+// caller must not treat that the same as a definitive "not found". A checker
+// resolving a single pipeline (its own res.ID) can collapse any error to
+// UnknownRelated, since either reason leaves it unable to answer. A checker
+// looping over many pipelines must instead count failures across the loop:
+// if every lookup in the loop failed, nothing could be determined at all
+// (UnknownRelated); if only some failed, the count found so far is partial,
+// not exact (relatedResultTrunc with truncated=true).
+func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName string) (*cptypes.PipelineDeclaration, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CodePipeline == nil {
-		return nil
+		return nil, errPipelineNotConfigured
 	}
 	api, ok := c.CodePipeline.(CodePipelineGetPipelineAPI)
 	if !ok {
-		return nil
+		return nil, errPipelineNotConfigured
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codepipeline.GetPipelineOutput, error) {
 		return api.GetPipeline(ctx, &codepipeline.GetPipelineInput{Name: &pipelineName})
 	})
-	if err != nil || out == nil || out.Pipeline == nil {
-		return nil
+	if err != nil {
+		return nil, err
 	}
-	return out.Pipeline
+	if out == nil || out.Pipeline == nil {
+		return nil, errors.New("codepipeline GetPipeline returned no pipeline declaration")
+	}
+	return out.Pipeline, nil
 }
 
 // pipelineActions iterates every action across every stage and invokes fn. The
@@ -70,8 +86,8 @@ func actionProvider(a cptypes.ActionDeclaration) string {
 // checkPipelineCB resolves CodeBuild projects referenced by this pipeline's actions.
 // Action Provider=CodeBuild → Configuration["ProjectName"] holds the project name.
 func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("cb")
 	}
 	seen := map[string]struct{}{}
@@ -89,8 +105,8 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 // checkPipelineRole returns the pipeline's service role by extracting the role name
 // from Pipeline.RoleArn. Pattern C: GetPipeline + ARN last-segment extraction.
 func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("role")
 	}
 	var names []string
@@ -111,8 +127,8 @@ func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, 
 // checkPipelineCFN resolves CloudFormation stacks deployed by this pipeline.
 // Provider=CloudFormation → Configuration["StackName"].
 func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("cfn")
 	}
 	seen := map[string]struct{}{}
@@ -132,8 +148,8 @@ func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _
 // is common; CodeArtifact as a direct Source provider is rare but possible.
 // Configuration["RepositoryName"] is inspected for CodeArtifact providers.
 func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("codeartifact")
 	}
 	seen := map[string]struct{}{}
@@ -151,8 +167,8 @@ func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Re
 // checkPipelineECR resolves ECR repositories referenced as Source action inputs.
 // Provider=ECR (source action) → Configuration["RepositoryName"].
 func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("ecr")
 	}
 	seen := map[string]struct{}{}
@@ -171,8 +187,8 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 // Provider=ECS → Configuration["ServiceName"] (ClusterName is also present but
 // the ecs-svc type is keyed by service name).
 func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("ecs-svc")
 	}
 	seen := map[string]struct{}{}
@@ -191,8 +207,8 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 // checkPipelineKMS resolves the artifact-store KMS key. Pipeline.ArtifactStore.EncryptionKey
 // (or per-region ArtifactStores) carries the key ARN/alias.
 func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("kms")
 	}
 	seen := map[string]struct{}{}
@@ -214,8 +230,8 @@ func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _
 // checkPipelineLambda resolves Lambda functions invoked by Lambda deploy/invoke actions.
 // Provider=Lambda → Configuration["FunctionName"].
 func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("lambda")
 	}
 	seen := map[string]struct{}{}
@@ -234,8 +250,8 @@ func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource
 // Pipeline.ArtifactStore.Location and per-region ArtifactStores[].Location hold
 // bucket names.
 func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("s3")
 	}
 	seen := map[string]struct{}{}
@@ -264,8 +280,8 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 // checkPipelineSNS resolves SNS approval topics configured on Approval actions.
 // Provider=Manual (Category=Approval) → Configuration["NotificationArn"].
 func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p := pipelineGetDeclaration(ctx, clients, res.ID)
-	if p == nil {
+	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
+	if err != nil {
 		return resource.UnknownRelated("sns")
 	}
 	seen := map[string]struct{}{}

@@ -17,6 +17,14 @@ import (
 // maxLogEvents caps the total number of log events fetched per service.
 const maxLogEvents = 200
 
+// maxLogScanPages caps the number of FilterLogEvents calls per invocation.
+// This scan has no FilterPattern and no start-time bound, so a page carrying
+// zero events plus a NextToken (CloudWatch Logs' normal signal for "no writes
+// in this time slice, keep scanning") is expected, not exceptional — the
+// maxLogEvents item cap alone never fires while that happens, and without a
+// page cap a quiet-but-long-retention log group scans forever.
+const maxLogScanPages = 100
+
 // FetchEcsSvcLogs is a cross-service child fetcher. It first calls
 // DescribeTaskDefinition to extract the awslogs-group and awslogs-stream-prefix
 // from the task definition's first container, then calls FilterLogEvents to
@@ -68,6 +76,7 @@ func FetchEcsSvcLogs(
 		nextToken = &continuationToken
 	}
 
+	pages := 0
 	for {
 		input := &cloudwatchlogs.FilterLogEventsInput{
 			LogGroupName: &logGroup,
@@ -78,6 +87,7 @@ func FetchEcsSvcLogs(
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("fetching log events for %s: %w", serviceName, err)
 		}
+		pages++
 
 		for _, event := range output.Events {
 			id := ""
@@ -130,7 +140,7 @@ func FetchEcsSvcLogs(
 			resources = append(resources, r)
 		}
 
-		if len(resources) >= maxLogEvents {
+		if len(resources) >= maxLogEvents || pages >= maxLogScanPages {
 			apiNextToken := ""
 			if output.NextToken != nil {
 				apiNextToken = *output.NextToken

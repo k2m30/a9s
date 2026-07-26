@@ -72,6 +72,14 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		if !aliasOutput.Truncated {
 			break
 		}
+		if aliasOutput.NextMarker == nil {
+			// Truncated=true with no marker violates the ListAliases contract.
+			// Restarting from aliasMarker=nil would page 1 forever, so treat
+			// it the same as any other alias-fetch failure: stop and surface
+			// it via the composite error, keeping the (already-fetched) keys.
+			failures = append(failures, "ListAliases: truncated response with no NextMarker")
+			break
+		}
 		aliasMarker = aliasOutput.NextMarker
 	}
 
@@ -187,6 +195,12 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			}
 		}
 		if !out.Truncated {
+			break
+		}
+		if out.NextMarker == nil {
+			// See the identical guard in FetchKMSKeysPage: Truncated=true with
+			// no marker would otherwise restart the page-1 fetch forever.
+			failures = append(failures, "ListAliases: truncated response with no NextMarker")
 			break
 		}
 		aliasMarker = out.NextMarker

@@ -51,20 +51,28 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	var ids []string
+	attempted, failed := 0, 0
 	for _, pipelineRes := range entry.Resources {
 		pipelineName := pipelineRes.ID
 		if pipelineName == "" {
 			continue
 		}
-		p := pipelineGetDeclaration(ctx, clients, pipelineName)
-		if p == nil {
+		attempted++
+		p, err := pipelineGetDeclaration(ctx, clients, pipelineName)
+		if err != nil {
+			failed++
 			continue
 		}
 		if cbPipelineHasProject(p.Stages, projectName) {
 			ids = append(ids, pipelineName)
 		}
 	}
-	return relatedResultTrunc("pipeline", ids, entry.IsTruncated)
+	// Every lookup in the loop failed (throttled, denied, deleted mid-scan):
+	// nothing was actually resolved, so this is not a proven zero.
+	if attempted > 0 && failed == attempted {
+		return resource.UnknownRelated("pipeline")
+	}
+	return relatedResultTrunc("pipeline", ids, entry.IsTruncated || failed > 0)
 }
 
 // cbPipelineHasProject returns true if any action across the given stages has

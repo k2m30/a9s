@@ -497,12 +497,22 @@ func TestFetchLambdaInvocations_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchLambdaInvocations_LogGroupNotFound verifies that a
+// TestFetchLambdaInvocations_LogGroupNotFound verifies that a genuine typed
 // ResourceNotFoundException (log group doesn't exist because the function was
 // never invoked) returns an empty slice, not an error.
+//
+// Previously this built its error with fmt.Errorf embedding the exception
+// name as a plain substring of the message. ClassifyAWSError classifies via
+// errors.As(smithy.APIError), not string matching, so that fabricated error
+// never actually exercised the real classification path — it only proved
+// fmt.Errorf-with-a-recognizable-substring produced an empty list, which is a
+// different (and no longer supported) mechanism. Do NOT go back to
+// fmt.Errorf here; only a real typed error proves this branch. See
+// TestFetchLambdaInvocations_UnrelatedErrorContainingExceptionNameIsNotSwallowed
+// below for the negative control this fix exists to guarantee.
 func TestFetchLambdaInvocations_LogGroupNotFound(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
-		err: fmt.Errorf("operation error CloudWatch Logs: FilterLogEvents, https response error StatusCode: 400, ResourceNotFoundException: The specified log group does not exist."),
+		err: &cwlogstypes.ResourceNotFoundException{Message: aws.String("The specified log group does not exist.")},
 	}
 
 	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "never-invoked", "/aws/lambda/never-invoked", "")
@@ -513,6 +523,59 @@ func TestFetchLambdaInvocations_LogGroupNotFound(t *testing.T) {
 	resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources for non-existent log group, got %d", len(resources))
+	}
+}
+
+// TestFetchLambdaInvocations_UnrelatedErrorContainingExceptionNameIsNotSwallowed
+// pins the negative half of the ResourceNotFoundException classification: an
+// unrelated, untyped error whose MESSAGE merely contains the substring
+// "ResourceNotFoundException" must surface as an error, not be misclassified
+// into "log group doesn't exist" and rendered as a confident empty list.
+// ClassifyAWSError only recognizes a genuine smithy.APIError (the positive
+// control above) — this untyped error classifies as "Unknown" and must
+// propagate.
+func TestFetchLambdaInvocations_UnrelatedErrorContainingExceptionNameIsNotSwallowed(t *testing.T) {
+	mock := &mockCWLogsFilterLogEventsClient{
+		err: fmt.Errorf("some transport failure mentioning ResourceNotFoundException in passing, but not actually one"),
+	}
+
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "never-invoked", "/aws/lambda/never-invoked", "")
+	if err == nil {
+		t.Fatal("expected the unrelated error to propagate, got nil error (a confident empty list)")
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources alongside the error, got %d", len(result.Resources))
+	}
+}
+
+// TestFetchLambdaInvocations_PageCapStopsScanAndReportsTruncated pins the
+// 100-page FilterLogEvents scan cap: a function with no invocations in the
+// lookback window sees an unbounded run of empty pages, each carrying a
+// NextToken (CloudWatch Logs' normal "no matches in this slice, keep
+// scanning" signal), so maxInvocations alone never fires. Without the page
+// cap the scan never stops. It must stop at exactly maxInvocationScanPages
+// (100) calls and report the result as truncated — not present the empty
+// result as a complete answer.
+func TestFetchLambdaInvocations_PageCapStopsScanAndReportsTruncated(t *testing.T) {
+	const pageCap = 100
+	outputs := make([]*cloudwatchlogs.FilterLogEventsOutput, pageCap+20)
+	for i := range outputs {
+		outputs[i] = &cloudwatchlogs.FilterLogEventsOutput{NextToken: aws.String(fmt.Sprintf("tok-%d", i+1))}
+	}
+	mock := &mockCWLogsFilterLogEventsClient{outputs: outputs}
+
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "quiet-func", "/aws/lambda/quiet-func", "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if mock.callIdx != pageCap {
+		t.Errorf("FilterLogEvents called %d times, want exactly %d (the page cap must fire, not run past it)", mock.callIdx, pageCap)
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true — a capped scan must not be presented as a complete (empty) answer")
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources (no REPORT lines seen), got %d", len(result.Resources))
 	}
 }
 

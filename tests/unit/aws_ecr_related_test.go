@@ -588,6 +588,126 @@ func TestRelated_ECR_Pipeline_Empty(t *testing.T) {
 	}
 }
 
+// TestRelated_ECR_Pipeline_PartialFailure_RendersInflatedTruncated verifies
+// that when some (not all) GetPipeline calls in the reverse-scan loop fail,
+// the survivors found so far are not rendered as an exact count. "2 matches,
+// 2 failures" must render "(2+)", never a confident "(2)".
+func TestRelated_ECR_Pipeline_PartialFailure_RendersInflatedTruncated(t *testing.T) {
+	const repoName = "acme/api-service"
+
+	fakeCp := newFakeCodePipelineWithDeclarations(map[string]*cptypes.PipelineDeclaration{
+		"matching-pipeline-1": pipelineDeclarationWithECRSourceAction("matching-pipeline-1", repoName),
+		"matching-pipeline-2": pipelineDeclarationWithECRSourceAction("matching-pipeline-2", repoName),
+		// "failing-pipeline-1"/"-2" deliberately absent: GetPipeline for a
+		// name missing from declarationsByName returns an empty output (no
+		// Pipeline field), which pipelineGetDeclaration now reports as an
+		// error instead of a silent nil.
+	})
+	clients := &awsclient.ServiceClients{CodePipeline: fakeCp}
+
+	cache := resource.ResourceCache{
+		"pipeline": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "matching-pipeline-1", Name: "matching-pipeline-1"},
+				{ID: "matching-pipeline-2", Name: "matching-pipeline-2"},
+				{ID: "failing-pipeline-1", Name: "failing-pipeline-1"},
+				{ID: "failing-pipeline-2", Name: "failing-pipeline-2"},
+			},
+		},
+	}
+	source := resource.Resource{
+		ID:        repoName,
+		Name:      repoName,
+		RawStruct: ecrtypes.Repository{RepositoryName: aws.String(repoName)},
+	}
+
+	checker := ecrCheckerByTarget(t, "pipeline")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count() != 2 {
+		t.Fatalf("Count = %d, want 2 (the two survivors)", result.Count())
+	}
+	if !result.Truncated() {
+		t.Fatal("Truncated = false, want true (2 of 4 lookups failed)")
+	}
+	display := resource.FormatRelatedCount(result.State(), result.Count(), result.Truncated())
+	if display != "(2+)" {
+		t.Errorf("rendered display = %q, want %q — a partial-failure count must never look exact", display, "(2+)")
+	}
+}
+
+// TestRelated_ECR_Pipeline_AllFail_UnknownRelated verifies that when every
+// GetPipeline call in the reverse-scan loop fails, the result is
+// UnknownRelated — not a confident, silent "(0)".
+func TestRelated_ECR_Pipeline_AllFail_UnknownRelated(t *testing.T) {
+	const repoName = "acme/api-service"
+
+	clients := &awsclient.ServiceClients{
+		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // every lookup misses -> fails
+	}
+
+	cache := resource.ResourceCache{
+		"pipeline": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "failing-pipeline-1", Name: "failing-pipeline-1"},
+				{ID: "failing-pipeline-2", Name: "failing-pipeline-2"},
+			},
+		},
+	}
+	source := resource.Resource{
+		ID:        repoName,
+		Name:      repoName,
+		RawStruct: ecrtypes.Repository{RepositoryName: aws.String(repoName)},
+	}
+
+	checker := ecrCheckerByTarget(t, "pipeline")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.State() != domain.RelatedUnknown {
+		t.Fatalf("State = %v, want RelatedUnknown (every lookup failed)", result.State())
+	}
+	display := resource.FormatRelatedCount(result.State(), result.Count(), result.Truncated())
+	if display != "" {
+		t.Errorf("rendered display = %q, want %q — an all-failed scan must never render a confident zero", display, "")
+	}
+}
+
+// TestRelated_ECR_Pipeline_NilCodePipelineClient_NotConfidentZeroWithoutASingleCall
+// is the worst case in this set: with pipelines to check but no CodePipeline
+// client at all, the checker must never produce a definitive "nothing uses
+// this repository" — a confident exact 0 — without having made a single
+// successful GetPipeline call.
+func TestRelated_ECR_Pipeline_NilCodePipelineClient_NotConfidentZeroWithoutASingleCall(t *testing.T) {
+	const repoName = "acme/api-service"
+
+	clients := &awsclient.ServiceClients{CodePipeline: nil}
+
+	cache := resource.ResourceCache{
+		"pipeline": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "some-pipeline-1", Name: "some-pipeline-1"},
+				{ID: "some-pipeline-2", Name: "some-pipeline-2"},
+			},
+		},
+	}
+	source := resource.Resource{
+		ID:        repoName,
+		Name:      repoName,
+		RawStruct: ecrtypes.Repository{RepositoryName: aws.String(repoName)},
+	}
+
+	checker := ecrCheckerByTarget(t, "pipeline")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.State() != domain.RelatedUnknown {
+		t.Fatalf("State = %v, want RelatedUnknown (no CodePipeline client — nothing was ever checked)", result.State())
+	}
+	display := resource.FormatRelatedCount(result.State(), result.Count(), result.Truncated())
+	if display != "" {
+		t.Errorf("rendered display = %q, want %q — must not claim a definitive zero-pipelines-use-this-repo without a single successful call", display, "")
+	}
+}
+
 // TestRelated_ECR_Pipeline_WrongRawStruct verifies that a wrong parent RawStruct
 // type returns Count=-1.
 func TestRelated_ECR_Pipeline_WrongRawStruct(t *testing.T) {
@@ -687,6 +807,43 @@ func TestRelated_ECR_Role_Empty(t *testing.T) {
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (no policy → no roles)", result.Count())
+	}
+}
+
+// TestRelated_ECR_Role_UnrelatedErrorContainingExceptionNameIsNotSwallowed
+// pins the negative half of the RepositoryPolicyNotFoundException
+// classification: an unrelated, untyped error whose MESSAGE merely contains
+// the substring "RepositoryPolicyNotFoundException" must surface as
+// RelatedError (Err() != nil), not be misclassified into "no policy" and
+// rendered as a confident Count=0. checkECRRole classifies via
+// ClassifyAWSError's errors.As(smithy.APIError) check — see
+// TestRelated_ECR_Role_Empty above for the positive control using a genuine
+// typed ecrtypes.RepositoryPolicyNotFoundException.
+func TestRelated_ECR_Role_UnrelatedErrorContainingExceptionNameIsNotSwallowed(t *testing.T) {
+	fakeECR := &fakeECRForRole{
+		getPolicyErr: errors.New("throttled while calling ecr:GetRepositoryPolicy (an unrelated log line happens to mention RepositoryPolicyNotFoundException)"),
+	}
+	clients := &awsclient.ServiceClients{ECR: fakeECR}
+
+	source := resource.Resource{
+		ID:   "acme/api-service",
+		Name: "acme/api-service",
+		Fields: map[string]string{
+			"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
+		},
+		RawStruct: ecrtypes.Repository{
+			RepositoryName: aws.String("acme/api-service"),
+		},
+	}
+
+	checker := ecrCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, source, nil)
+
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (an unrelated error must not become a confident zero)", result.State())
+	}
+	if result.Err() == nil {
+		t.Error("expected Err() to be non-nil")
 	}
 }
 

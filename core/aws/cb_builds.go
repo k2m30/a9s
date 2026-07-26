@@ -66,17 +66,6 @@ func FetchCBBuilds(
 
 	pageIDs := listOutput.Ids
 
-	if len(pageIDs) == 0 {
-		return resource.FetchResult{
-			Resources: []resource.Resource{},
-			Pagination: &resource.PaginationMeta{
-				IsTruncated: false,
-				TotalHint:   0,
-				PageSize:    0,
-			},
-		}, nil
-	}
-
 	// Step 2: BatchGetBuilds in chunks of 100
 	var resources []resource.Resource
 

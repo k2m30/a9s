@@ -29,71 +29,66 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 		return resource.FetchResult{}, fmt.Errorf("listing ECS clusters: %w", err)
 	}
 
-	if len(listOutput.ClusterArns) == 0 {
-		return resource.FetchResult{
-			Resources: nil,
-			Pagination: &resource.PaginationMeta{
-				IsTruncated: false,
-				TotalHint:   0,
-				PageSize:    0,
-			},
-		}, nil
-	}
-
-	descOutput, err := describeAPI.DescribeClusters(ctx, &ecs.DescribeClustersInput{
-		Clusters: listOutput.ClusterArns,
-	})
-	if err != nil {
-		return resource.FetchResult{}, fmt.Errorf("describing ECS clusters: %w", err)
-	}
-
 	var resources []resource.Resource
 
-	for _, cluster := range descOutput.Clusters {
-		clusterName := ""
-		if cluster.ClusterName != nil {
-			clusterName = *cluster.ClusterName
+	// AWS treats an empty/omitted Clusters list on DescribeClusters as "describe
+	// the default cluster" rather than "describe nothing" — so this call must be
+	// skipped, not made with a possibly-empty ClusterArns, when this page found
+	// no cluster ARNs to describe.
+	if len(listOutput.ClusterArns) > 0 {
+		descOutput, err := describeAPI.DescribeClusters(ctx, &ecs.DescribeClustersInput{
+			Clusters: listOutput.ClusterArns,
+		})
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("describing ECS clusters: %w", err)
 		}
 
-		status := ""
-		if cluster.Status != nil {
-			status = *cluster.Status
+		for _, cluster := range descOutput.Clusters {
+			clusterName := ""
+			if cluster.ClusterName != nil {
+				clusterName = *cluster.ClusterName
+			}
+
+			status := ""
+			if cluster.Status != nil {
+				status = *cluster.Status
+			}
+
+			runningTasks := fmt.Sprintf("%d", cluster.RunningTasksCount)
+			pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
+			servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
+
+			// emit wave1 Findings for non-healthy lifecycle states.
+			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
+			// so the existing structural Color path works as fallback.
+			var findings []domain.Finding
+			switch status {
+			case "PROVISIONING":
+				findings = []domain.Finding{{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
+			case "DEPROVISIONING":
+				findings = []domain.Finding{{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
+			case "FAILED":
+				findings = []domain.Finding{{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+			case "INACTIVE":
+				findings = []domain.Finding{{Code: CodeECSStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
+			}
+
+			r := resource.Resource{
+				ID:   clusterName,
+				Name: clusterName,
+				Fields: map[string]string{
+					"cluster_name":   clusterName,
+					"status":         status,
+					"running_tasks":  runningTasks,
+					"pending_tasks":  pendingTasks,
+					"services_count": servicesCount,
+				},
+				Findings:  findings,
+				RawStruct: cluster,
+			}
+
+			resources = append(resources, r)
 		}
-
-		runningTasks := fmt.Sprintf("%d", cluster.RunningTasksCount)
-		pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
-		servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
-
-		// emit wave1 Findings for non-healthy lifecycle states.
-		// ACTIVE → no Finding (healthy). Fields["status"] is still populated
-		// so the existing structural Color path works as fallback.
-		var findings []domain.Finding
-		switch status {
-		case "PROVISIONING":
-			findings = []domain.Finding{{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
-		case "DEPROVISIONING":
-			findings = []domain.Finding{{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
-		case "FAILED":
-			findings = []domain.Finding{{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
-		case "INACTIVE":
-			findings = []domain.Finding{{Code: CodeECSStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
-		}
-
-		r := resource.Resource{
-			ID:   clusterName,
-			Name: clusterName,
-			Fields: map[string]string{
-				"cluster_name":   clusterName,
-				"status":         status,
-				"running_tasks":  runningTasks,
-				"pending_tasks":  pendingTasks,
-				"services_count": servicesCount,
-			},
-			Findings:  findings,
-			RawStruct: cluster,
-		}
-
-		resources = append(resources, r)
 	}
 
 	nextToken := ""

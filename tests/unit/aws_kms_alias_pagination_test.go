@@ -22,6 +22,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -251,5 +252,98 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 	// Verify ListAliases was called 3 times (all pages consumed).
 	if fake.aliasCallIdx != 3 {
 		t.Errorf("ListAliases called %d times, want 3 (full pagination)", fake.aliasCallIdx)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestFetchKMSKeysPage_TruncatedAliasesWithNilMarkerTerminates
+//
+// Pins a real production defect: before the fix, a ListAliases response with
+// Truncated=true and a nil NextMarker reset the marker to nil and restarted
+// pagination from page 1 — since kmsRunawayAliasFake always returns that
+// exact malformed response regardless of the Marker it was called with, the
+// pre-fix code would call it forever. kmsRunawayAliasFake bounds that risk
+// itself: it fails the test the instant ListAliases is called more times
+// than the fixed code could ever need, instead of letting a reverted fix
+// spin the suite for real. Against the fixed code the cap is never
+// approached — the nil-marker guard breaks out on the very first call.
+// ---------------------------------------------------------------------------
+
+// kmsRunawayAliasFake implements awsclient.KMSAPI. Its ListAliases always
+// reports Truncated=true with a nil NextMarker — the malformed response
+// FetchKMSKeysPage's nil-marker guard must treat as "stop, record a
+// failure", never "retry from page 1". callCap is the hang-prevention
+// backstop described above, not the assertion itself.
+type kmsRunawayAliasFake struct {
+	t              *testing.T
+	calls          int
+	callCap        int
+	listKeysOutput *kms.ListKeysOutput
+	describeOutput *kms.DescribeKeyOutput
+}
+
+func (f *kmsRunawayAliasFake) ListKeys(_ context.Context, _ *kms.ListKeysInput, _ ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
+	return f.listKeysOutput, nil
+}
+
+func (f *kmsRunawayAliasFake) ListAliases(_ context.Context, _ *kms.ListAliasesInput, _ ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
+	f.calls++
+	if f.calls > f.callCap {
+		f.t.Fatalf("ListAliases called %d times (cap %d) — a reverted nil-NextMarker guard would loop here forever; refusing to spin the suite for real", f.calls, f.callCap)
+	}
+	return &kms.ListAliasesOutput{Truncated: true, NextMarker: nil}, nil
+}
+
+func (f *kmsRunawayAliasFake) DescribeKey(_ context.Context, _ *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+	return f.describeOutput, nil
+}
+
+func (f *kmsRunawayAliasFake) GetKeyRotationStatus(_ context.Context, _ *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error) {
+	return &kms.GetKeyRotationStatusOutput{}, nil
+}
+
+func (f *kmsRunawayAliasFake) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options)) (*kms.ListGrantsOutput, error) {
+	return &kms.ListGrantsOutput{}, nil
+}
+
+func (f *kmsRunawayAliasFake) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error) {
+	return &kms.GetKeyPolicyOutput{}, nil
+}
+
+// Compile-time check: kmsRunawayAliasFake satisfies awsclient.KMSAPI.
+var _ awsclient.KMSAPI = (*kmsRunawayAliasFake)(nil)
+
+func TestFetchKMSKeysPage_TruncatedAliasesWithNilMarkerTerminates(t *testing.T) {
+	const keyID = "aaaa0000-0000-0000-0000-000000000099"
+
+	fake := &kmsRunawayAliasFake{
+		t:       t,
+		callCap: 5,
+		listKeysOutput: &kms.ListKeysOutput{
+			Keys: []kmstypes.KeyListEntry{{KeyId: aws.String(keyID)}},
+		},
+		describeOutput: &kms.DescribeKeyOutput{
+			KeyMetadata: &kmstypes.KeyMetadata{
+				KeyId:      aws.String(keyID),
+				KeyState:   kmstypes.KeyStateEnabled,
+				KeyManager: kmstypes.KeyManagerTypeCustomer,
+			},
+		},
+	}
+
+	clients := &awsclient.ServiceClients{KMS: fake}
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), clients, "")
+
+	if fake.calls != 1 {
+		t.Errorf("ListAliases called %d times, want exactly 1 (terminate on the first Truncated=true/nil-NextMarker response, not retry)", fake.calls)
+	}
+	if err == nil {
+		t.Fatal("expected the malformed ListAliases response to surface as an error via AggregateFailures")
+	}
+	if !strings.Contains(err.Error(), "NextMarker") {
+		t.Errorf("error %q does not mention the NextMarker contract violation", err.Error())
+	}
+	if len(result.Resources) != 1 {
+		t.Errorf("expected the already-fetched key to remain visible despite the alias failure, got %d resources", len(result.Resources))
 	}
 }

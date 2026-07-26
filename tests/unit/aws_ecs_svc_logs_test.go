@@ -789,6 +789,61 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 	}
 }
 
+// TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated pins the 100-page
+// FilterLogEvents scan cap. This scan has no FilterPattern and no start-time
+// bound, so a page carrying zero events plus a NextToken (CloudWatch Logs'
+// normal "no writes in this time slice, keep scanning" signal) is expected,
+// not exceptional — maxLogEvents alone never fires while that happens. It
+// must stop at exactly maxLogScanPages (100) calls and report the result as
+// truncated, not present the empty result as a complete answer.
+func TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated(t *testing.T) {
+	taskDefMock := &mockECSDescribeTaskDefinitionClient{
+		output: &ecs.DescribeTaskDefinitionOutput{
+			TaskDefinition: &ecstypes.TaskDefinition{
+				ContainerDefinitions: []ecstypes.ContainerDefinition{
+					{
+						Name: aws.String("web"),
+						LogConfiguration: &ecstypes.LogConfiguration{
+							LogDriver: ecstypes.LogDriverAwslogs,
+							Options: map[string]string{
+								"awslogs-group":         "/ecs/web-service",
+								"awslogs-stream-prefix": "ecs",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	const pageCap = 100
+	outputs := make([]*cloudwatchlogs.FilterLogEventsOutput, pageCap+20)
+	for i := range outputs {
+		outputs[i] = &cloudwatchlogs.FilterLogEventsOutput{NextToken: aws.String(fmt.Sprintf("tok-%d", i+1))}
+	}
+	cwLogsMock := &mockCWLogsFilterLogEventsClient{outputs: outputs}
+
+	results, err := awsclient.FetchEcsSvcLogs(
+		context.Background(), taskDefMock, cwLogsMock,
+		"arn:aws:ecs:us-east-1:123456789012:cluster/prod",
+		"web-service",
+		"arn:aws:ecs:us-east-1:123456789012:task-definition/web:1",
+		"",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cwLogsMock.callIdx != pageCap {
+		t.Errorf("FilterLogEvents called %d times, want exactly %d (the page cap must fire, not run past it)", cwLogsMock.callIdx, pageCap)
+	}
+	if !results.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true — a capped scan must not be presented as a complete (empty) answer")
+	}
+	if len(results.Resources) != 0 {
+		t.Errorf("expected 0 resources (no events matched), got %d", len(results.Resources))
+	}
+}
+
 // TestEcsSvcLogs_PaginatedChildFetcherRegistered verifies that the paginated
 // child fetcher is
 // registered under the correct short name.

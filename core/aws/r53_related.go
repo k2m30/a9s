@@ -24,19 +24,22 @@ var errClientMissing = errors.New("AWS service client not initialized")
 
 // r53ListRecordsFirstPage makes a single ListResourceRecordSets call for the
 // given hosted zone via RetryOnThrottle. Zone ID may be in the raw form
-// ("Z1ABCD") or canonical "/hostedzone/Z1ABCD"; the API accepts both.
-func r53ListRecordsFirstPage(ctx context.Context, clients any, zoneID string) ([]r53types.ResourceRecordSet, error) {
+// ("Z1ABCD") or canonical "/hostedzone/Z1ABCD"; the API accepts both. AWS
+// defaults this call to at most 100 records per page (no MaxItems is set
+// here), so truncated reports whether out.IsTruncated came back true — a
+// zone with more than 100 records has records this single call never saw.
+func r53ListRecordsFirstPage(ctx context.Context, clients any, zoneID string) (sets []r53types.ResourceRecordSet, truncated bool, err error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
 		return c.Route53.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID})
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return out.ResourceRecordSets, nil
+	return out.ResourceRecordSets, out.IsTruncated, nil
 }
 
 // r53AliasDNSNames returns every AliasTarget.DNSName found across the record
@@ -66,7 +69,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if zoneID == "" {
 		return resource.KnownRelated("elb", nil, false)
 	}
-	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("elb")
@@ -75,7 +78,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return relatedResultTrunc("elb", nil, recordsTruncated)
 	}
 	// Only alias records pointing at "*.elb.amazonaws.com" are ELB aliases.
 	wanted := make(map[string]struct{})
@@ -85,7 +88,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(wanted) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return relatedResultTrunc("elb", nil, recordsTruncated)
 	}
 	elbList, elbTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
 	if elbList == nil {
@@ -98,7 +101,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 		for d := range wanted {
 			ids = append(ids, d)
 		}
-		return relatedResult("elb", ids)
+		return relatedResultTrunc("elb", ids, recordsTruncated)
 	}
 	var ids []string
 	for _, elbRes := range elbList {
@@ -115,7 +118,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	return relatedResultTrunc("elb", ids, elbTruncated)
+	return relatedResultTrunc("elb", ids, recordsTruncated || elbTruncated)
 }
 
 // checkR53CF reports CloudFront distributions referenced by AliasTarget.DNSName
@@ -126,7 +129,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	if zoneID == "" {
 		return resource.KnownRelated("cf", nil, false)
 	}
-	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("cf")
@@ -135,7 +138,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
-		return resource.KnownRelated("cf", nil, false)
+		return relatedResultTrunc("cf", nil, recordsTruncated)
 	}
 	wanted := make(map[string]struct{})
 	for _, d := range aliases {
@@ -144,7 +147,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(wanted) == 0 {
-		return resource.KnownRelated("cf", nil, false)
+		return relatedResultTrunc("cf", nil, recordsTruncated)
 	}
 	cfList, cfTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
 	if cfList == nil {
@@ -155,7 +158,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 		for d := range wanted {
 			ids = append(ids, d)
 		}
-		return relatedResult("cf", ids)
+		return relatedResultTrunc("cf", ids, recordsTruncated)
 	}
 	var ids []string
 	for _, cfRes := range cfList {
@@ -167,7 +170,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfRes.ID)
 		}
 	}
-	return relatedResultTrunc("cf", ids, cfTruncated)
+	return relatedResultTrunc("cf", ids, recordsTruncated || cfTruncated)
 }
 
 // checkR53APIGW reports API Gateways fronted by AliasTarget.DNSName in this
@@ -178,7 +181,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if zoneID == "" {
 		return resource.KnownRelated("apigw", nil, false)
 	}
-	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("apigw")
@@ -197,7 +200,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(wantedIDs) == 0 {
-		return resource.KnownRelated("apigw", nil, false)
+		return relatedResultTrunc("apigw", nil, recordsTruncated)
 	}
 	apigwList, apigwTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
 	if apigwList == nil {
@@ -208,7 +211,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		for id := range wantedIDs {
 			ids = append(ids, id)
 		}
-		return relatedResult("apigw", ids)
+		return relatedResultTrunc("apigw", ids, recordsTruncated)
 	}
 	var ids []string
 	for _, apigwRes := range apigwList {
@@ -216,7 +219,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, apigwRes.ID)
 		}
 	}
-	return relatedResultTrunc("apigw", ids, apigwTruncated)
+	return relatedResultTrunc("apigw", ids, recordsTruncated || apigwTruncated)
 }
 
 // checkR53S3 reports S3 buckets referenced by AliasTarget.DNSName (S3 website
@@ -226,7 +229,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	if zoneID == "" {
 		return resource.KnownRelated("s3", nil, false)
 	}
-	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("s3")
@@ -246,7 +249,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(wantedBuckets) == 0 {
-		return resource.KnownRelated("s3", nil, false)
+		return relatedResultTrunc("s3", nil, recordsTruncated)
 	}
 	s3List, s3Truncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "s3")
 	if s3List == nil {
@@ -257,7 +260,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 		for b := range wantedBuckets {
 			ids = append(ids, b)
 		}
-		return relatedResult("s3", ids)
+		return relatedResultTrunc("s3", ids, recordsTruncated)
 	}
 	var ids []string
 	for _, s3Res := range s3List {
@@ -265,7 +268,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, s3Res.ID)
 		}
 	}
-	return relatedResultTrunc("s3", ids, s3Truncated)
+	return relatedResultTrunc("s3", ids, recordsTruncated || s3Truncated)
 }
 
 // checkR53ACM reports ACM certificates whose DNS validation CNAME records
@@ -278,7 +281,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	if zoneID == "" {
 		return resource.KnownRelated("acm", nil, false)
 	}
-	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("acm")
@@ -311,7 +314,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 			}
 		}
 	}
-	return relatedResult("acm", ids)
+	return relatedResultTrunc("acm", ids, recordsTruncated)
 }
 
 // checkR53Logs reports CloudWatch log groups receiving query-log traffic for

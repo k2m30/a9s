@@ -149,6 +149,91 @@ func TestFetchELBListenerRules_NilFields(t *testing.T) {
 	}
 }
 
+// markerCapturingELBv2DescribeRulesMock wraps a fixed DescribeRules response
+// and records the Marker it was called with, so a test can assert that
+// continuationToken round-trips through Marker.
+type markerCapturingELBv2DescribeRulesMock struct {
+	output         *elbv2.DescribeRulesOutput
+	err            error
+	capturedMarker *string
+}
+
+func (m *markerCapturingELBv2DescribeRulesMock) DescribeRules(_ context.Context, params *elbv2.DescribeRulesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error) {
+	m.capturedMarker = params.Marker
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.output, nil
+}
+
+// TestFetchELBListenerRules_MarkerForwarded pins that continuationToken is
+// forwarded as DescribeRules' Marker. DescribeRules DOES paginate via
+// Marker/NextMarker like other ELBv2 List/Describe calls — the function's
+// own doc comment used to (wrongly) claim there was no pagination from AWS.
+func TestFetchELBListenerRules_MarkerForwarded(t *testing.T) {
+	mock := &markerCapturingELBv2DescribeRulesMock{output: &elbv2.DescribeRulesOutput{Rules: []elbtypes.Rule{}}}
+	_, err := awsclient.FetchELBListenerRules(context.Background(), mock, map[string]string{"listener_arn": "arn:listener/marker"}, "page2-marker-token")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if mock.capturedMarker == nil {
+		t.Fatal("expected continuationToken to be forwarded as Marker, got nil")
+	}
+	if *mock.capturedMarker != "page2-marker-token" {
+		t.Errorf("Marker: expected %q, got %q", "page2-marker-token", *mock.capturedMarker)
+	}
+}
+
+// TestFetchELBListenerRules_TruncatedByNextMarker pins that a real AWS-side
+// NextMarker reports IsTruncated=true and round-trips as NextToken.
+func TestFetchELBListenerRules_TruncatedByNextMarker(t *testing.T) {
+	mock := &mockELBv2DescribeRulesClient{output: &elbv2.DescribeRulesOutput{
+		Rules:      []elbtypes.Rule{{RuleArn: aws.String("arn:rule/page1-only"), Priority: aws.String("1")}},
+		NextMarker: aws.String("next-marker-xyz"),
+	}}
+	result, err := awsclient.FetchELBListenerRules(context.Background(), mock, map[string]string{"listener_arn": "arn:listener/truncated"}, "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true when AWS returns a NextMarker")
+	}
+	if result.Pagination.NextToken != "next-marker-xyz" {
+		t.Errorf("NextToken: expected %q, got %q", "next-marker-xyz", result.Pagination.NextToken)
+	}
+}
+
+// TestFetchELBListenerRules_TruncatedByMaxRulesCap pins the SECOND
+// truncation cause: even when AWS reports no NextMarker (AWS itself has no
+// more pages), the client-side maxRules=200 cap can still truncate the
+// response converted to resources. Before the fix, IsTruncated was
+// hardcoded false, so a listener with more than 200 rules silently reported
+// an exact, complete rule count that was 200+ short of the truth.
+func TestFetchELBListenerRules_TruncatedByMaxRulesCap(t *testing.T) {
+	const maxRules = 200
+	rules := make([]elbtypes.Rule, maxRules+1)
+	for i := range rules {
+		rules[i] = elbtypes.Rule{RuleArn: aws.String(fmt.Sprintf("arn:rule/cap-%d", i)), Priority: aws.String(fmt.Sprintf("%d", i))}
+	}
+	mock := &mockELBv2DescribeRulesClient{output: &elbv2.DescribeRulesOutput{Rules: rules}} // NextMarker nil: AWS itself has no more pages
+	result, err := awsclient.FetchELBListenerRules(context.Background(), mock, map[string]string{"listener_arn": "arn:listener/capped"}, "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if len(result.Resources) != maxRules {
+		t.Fatalf("expected %d resources (capped), got %d", maxRules, len(result.Resources))
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true from the local maxRules cap, even though AWS itself reported no NextMarker")
+	}
+}
+
 func TestBuildConditionsSummary_PathPattern(t *testing.T) {
 	s := awsclient.BuildConditionsSummary([]elbtypes.RuleCondition{{Field: aws.String("path-pattern"), PathPatternConfig: &elbtypes.PathPatternConditionConfig{Values: []string{"/api/*"}}}})
 	if !strings.Contains(s, "/api/*") {

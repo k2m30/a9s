@@ -23,6 +23,13 @@ const maxInvocations = 50
 // invocationLookbackHours limits the FilterLogEvents scan window.
 const invocationLookbackHours = 24
 
+// maxInvocationScanPages caps the number of FilterLogEvents calls. Empty
+// pages carrying a NextToken are the normal case here too (scanning across
+// log streams with no REPORT lines in a given slice), so maxInvocations alone
+// never fires while that happens; without this cap a function with few or no
+// invocations scans the full lookback window page by page forever.
+const maxInvocationScanPages = 100
+
 // reportRegex matches the standard REPORT line from Lambda runtime.
 var reportRegex = regexp.MustCompile(
 	`REPORT RequestId:\s*([0-9a-zA-Z-]+)` +
@@ -57,6 +64,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 	startTime := time.Now().Add(-invocationLookbackHours * time.Hour).UnixMilli()
 	limit := int32(maxInvocations)
 
+	pages := 0
 	for {
 		input := &cloudwatchlogs.FilterLogEventsInput{
 			LogGroupName:  &logGroup,
@@ -68,11 +76,13 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 
 		output, err := api.FilterLogEvents(ctx, input)
 		if err != nil {
-			if strings.Contains(err.Error(), "ResourceNotFoundException") {
+			// ResourceNotFoundException means the log group doesn't exist → 0
+			if code, _, _ := ClassifyAWSError(err); code == "ResourceNotFoundException" {
 				return resource.FetchResult{}, nil
 			}
 			return resource.FetchResult{}, fmt.Errorf("fetching invocations for %s: %w", functionName, err)
 		}
+		pages++
 
 		for _, event := range output.Events {
 			if r, ok := convertReportEvent(event, logGroup); ok {
@@ -80,7 +90,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 			}
 		}
 
-		if len(resources) >= maxInvocations {
+		if len(resources) >= maxInvocations || pages >= maxInvocationScanPages {
 			apiNextToken := ""
 			if output.NextToken != nil {
 				apiNextToken = *output.NextToken
