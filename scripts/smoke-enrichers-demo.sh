@@ -38,7 +38,24 @@ cleanup() {
 trap cleanup EXIT
 
 tmux new-session -d -s "$SESSION" -x 220 -y 50 "$BIN --demo"
-sleep 4
+
+# A keystroke sent before the menu accepts input is dropped silently, and the
+# first step then runs against the menu instead of its own screen. Boot is
+# slowest exactly when the gate runs the smokes back to back, so poll for
+# probe data rather than assuming a duration.
+wait_boot() {
+	i=0
+	while [ "$i" -lt 30 ]; do
+		if tmux capture-pane -t "$SESSION" -p 2>/dev/null | grep -qE 'issues:[0-9]+'; then
+			return 0
+		fi
+		sleep 1
+		i=$((i + 1))
+	done
+	echo "smoke-enrichers: app did not reach a populated menu within 30s"
+	exit 1
+}
+wait_boot
 
 wait_for() {
 	# $1 = capture file, $2 = marker substring to poll for, $3 = human label.

@@ -32,7 +32,18 @@ cleanup() {
 trap cleanup EXIT
 
 tmux new-session -d -s "$SESSION" -x 220 -y 50 "$BIN --demo"
-sleep 4
+
+# A keystroke sent before the menu accepts input is dropped silently. Boot is
+# slowest exactly when the gate runs the smokes back to back, so poll for
+# probe data rather than assuming a duration.
+i=0
+while [ "$i" -lt 30 ]; do
+	if tmux capture-pane -t "$SESSION" -p 2>/dev/null | grep -qE 'issues:[0-9]+'; then
+		break
+	fi
+	sleep 1
+	i=$((i + 1))
+done
 
 open_and_capture() {
 	# $1 = command alias, $2 = capture file, $3 = settle seconds
