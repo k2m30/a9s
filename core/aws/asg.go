@@ -15,6 +15,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// asgDeleting reports a group AWS is tearing down. Its capacity is on its
+// way to zero and nothing about it can be reconfigured. The single lifecycle
+// guard for every asg posture finding — the fetcher's Wave-1 rules and the
+// launch-configuration pass in the Wave-2 enricher both call it.
+func asgDeleting(status string) bool {
+	return status == "Delete in progress"
+}
+
 // FetchAutoScalingGroupsPage fetches a single page of Auto Scaling groups.
 func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingGroupsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &autoscaling.DescribeAutoScalingGroupsInput{
@@ -131,6 +139,44 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 				Code: CodeASGScalingSuspended, Phrase: "scaling suspended",
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
+		}
+
+		// Posture signals, each evaluated independently of the health switch
+		// above and of one another.
+		if asgDeleting(status) {
+			resources = append(resources, r)
+			continue
+		}
+		if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code: CodeASGLegacyLaunchConfig, Phrase: "uses a launch configuration",
+				Detail:   asgLegacyLaunchConfigDetail,
+				Severity: domain.SevWarn, Source: "wave1",
+			})
+			addWave1Rows(&r, CodeASGLegacyLaunchConfig, domain.DetailRow{
+				Label: "Launch configuration", Value: *asg.LaunchConfigurationName, Tier: "~",
+			})
+		}
+		if len(asg.AvailabilityZones) < 2 {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code: CodeASGSingleAZ, Phrase: "single availability zone",
+				Detail:   asgSingleAZDetail,
+				Severity: domain.SevWarn, Source: "wave1",
+			})
+			addWave1Rows(&r, CodeASGSingleAZ, domain.DetailRow{
+				Label: "AZs", Value: strings.Join(asg.AvailabilityZones, ", "), Tier: "~",
+			})
+		}
+		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&
+			aws.ToString(asg.HealthCheckType) != "ELB" {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code: CodeASGNoELBHealthCheck, Phrase: "no load balancer health check",
+				Detail:   asgNoELBHealthCheckDetail,
+				Severity: domain.SevWarn, Source: "wave1",
+			})
+			addWave1Rows(&r, CodeASGNoELBHealthCheck, domain.DetailRow{
+				Label: "HealthCheckType", Value: aws.ToString(asg.HealthCheckType), Tier: "~",
+			})
 		}
 
 		resources = append(resources, r)

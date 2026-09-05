@@ -5,8 +5,13 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,6 +20,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // ec2 canonical FindingCodes. Each condition gets its OWN code so
@@ -26,6 +32,16 @@ const (
 	ec2CodeInstanceStatusInitializing domain.FindingCode = "ec2.instance-status.initializing"
 	ec2CodeInstanceStatusInsufficient domain.FindingCode = "ec2.instance-status.insufficient-data"
 	ec2CodeScheduledEvent             domain.FindingCode = "ec2.scheduled-event"
+	ec2CodeInternetExposed            domain.FindingCode = "ec2.internet-exposed"
+	//nolint:gosec // G101 false positive: a finding code, not a credential
+	ec2CodeUserDataSecret domain.FindingCode = "ec2.user-data-secret"
+)
+
+// S5 operator sentences for the Wave-2 posture codes above.
+const (
+	ec2InternetExposedDetail = "Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion."
+	//nolint:gosec // G101 false positive: operator prose about a credential, not one
+	ec2UserDataSecretDetail = "A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it."
 )
 
 // ec2StatusFinding is the (code, tier, phrase, detail) quadruple for a
@@ -82,14 +98,30 @@ func classifyEC2Status(status ec2types.SummaryStatus) (ec2StatusFinding, bool) {
 // OWN Finding under its own FindingCode — an instance with both an impaired status check and a
 // scheduled event gets two Findings, not one merged Finding.
 // Pagination uses NextToken; walks up to EnrichmentCap pages.
-func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		Findings:         make(map[string][]domain.Finding),
+		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
+		TruncatedIDs:     make(map[string]bool),
 	}
 	if clients.EC2 == nil {
 		return result, nil
 	}
+	// Cache-only cross-ref: costs nothing and must survive a
+	// DescribeInstanceStatus outage, so it runs before the API passes.
+	ec2InternetExposure(&result, resources, cache)
+	userDataErr := ec2UserDataSecrets(ctx, clients, resources, &result)
+	statusResult, statusErr := ec2InstanceStatusFindings(ctx, clients, resources, &result)
+	if statusErr != nil {
+		return statusResult, errors.Join(statusErr, userDataErr)
+	}
+	return statusResult, userDataErr
+}
+
+// ec2InstanceStatusFindings is the DescribeInstanceStatus pass: status checks
+// and imminent scheduled events, merged into the caller's result.
+func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, resources []resource.Resource, resultp *IssueEnricherResult) (IssueEnricherResult, error) {
+	result := *resultp
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
 	for _, r := range resources {
@@ -112,7 +144,13 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
+			// One account-wide call answers for every row on screen, so its
+			// failure leaves every row's status uninspected. Each input ID is
+			// marked so the list renders "?" rather than inspected-and-healthy
+			// — same contract as the ebs-snap public-share query. The findings
+			// the cache-only and user-data passes already produced survive.
+			markAllUninspected(&result, resources)
+			return result, err
 		}
 		allInstanceStatuses = append(allInstanceStatuses, out.InstanceStatuses...)
 		if out.NextToken == nil {
@@ -209,6 +247,149 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		}
 	}
 
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, nil
+}
+
+// ec2InternetExposure is the ec2 ↔ sg cross-reference: an instance holding a
+// public IP whose security groups already carry sg.go's risk verdict is
+// reachable from the internet on the ports that verdict names. It makes NO
+// API call and re-derives nothing — the sensitive-port set and the exposure
+// rules stay owned by sg.go, this pass only joins them to the instance.
+// An unloaded "sg" cache is silence, not a clean bill of health.
+func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resource, cache resource.ResourceCache) {
+	sgEntry, ok := cache["sg"]
+	if !ok {
+		return
+	}
+	type sgRisk struct {
+		wideOpen bool
+		ports    string
+	}
+	risk := make(map[string]sgRisk, len(sgEntry.Resources))
+	for _, sg := range sgEntry.Resources {
+		risk[sg.ID] = sgRisk{
+			wideOpen: sg.Fields["wide_open"] == "true",
+			ports:    sgPortsFromRiskSummary(sg.Fields["risk_summary"]),
+		}
+	}
+
+	for _, r := range resources {
+		publicIP := r.Fields["public_ip"]
+		if publicIP == "" || ec2InstanceGone(r.Fields["state"]) || r.Fields["state"] != "running" {
+			continue
+		}
+		inst, ok := assertStruct[ec2types.Instance](r.RawStruct)
+		if !ok {
+			continue
+		}
+		var groupIDs []string
+		wideOpen := false
+		portSet := map[string]bool{}
+		for _, g := range inst.SecurityGroups {
+			id := aws.ToString(g.GroupId)
+			ri, known := risk[id]
+			if !known {
+				continue
+			}
+			groupIDs = append(groupIDs, id)
+			if ri.wideOpen {
+				wideOpen = true
+			}
+			for p := range strings.SplitSeq(ri.ports, ", ") {
+				if p != "" {
+					portSet[p] = true
+				}
+			}
+		}
+		portList := "all"
+		if !wideOpen {
+			if len(portSet) == 0 {
+				continue
+			}
+			ports := make([]string, 0, len(portSet))
+			for p := range portSet {
+				ports = append(ports, p)
+			}
+			sort.Slice(ports, func(i, j int) bool {
+				a, _ := strconv.Atoi(ports[i])
+				b, _ := strconv.Atoi(ports[j])
+				return a < b
+			})
+			portList = strings.Join(ports, ", ")
+		}
+		sort.Strings(groupIDs)
+		setWave2Finding(result, r.ID, ec2CodeInternetExposed,
+			"port(s) "+portList+" reachable from the internet", "!", "ec2",
+			[]domain.DetailRow{
+				{Label: "Public address", Value: publicIP, Tier: "!"},
+				{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
+				{Label: "Ports", Value: portList, Tier: "!"},
+			}, ec2InternetExposedDetail)
+	}
+}
+
+// ec2UserDataSecrets reads each instance's user-data script via
+// DescribeInstanceAttribute and reports plaintext credentials found in it.
+// Terminated and shutting-down instances are skipped: their user data can no
+// longer be changed and the host is gone. The call is not part of the EC2API
+// aggregate (see ec2_interfaces.go), so a client that cannot serve it — every
+// narrow test double — yields no findings rather than an error.
+func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
+	api, ok := clients.EC2.(EC2DescribeInstanceAttributeAPI)
+	if !ok {
+		return nil
+	}
+	var targets []resource.Resource
+	for _, r := range resources {
+		if r.ID == "" {
+			continue
+		}
+		if ec2InstanceGone(r.Fields["state"]) {
+			continue
+		}
+		targets = append(targets, r)
+	}
+	if len(targets) > EnrichmentCap {
+		result.Truncated = true
+		targets = targets[:EnrichmentCap]
+	}
+
+	const op = "ec2-enrich: DescribeInstanceAttribute(userData)"
+	var mu sync.Mutex
+	var failures []string
+	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {
+		r := targets[i]
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeInstanceAttributeOutput, error) {
+			return api.DescribeInstanceAttribute(ctx, &ec2svc.DescribeInstanceAttributeInput{
+				InstanceId: aws.String(r.ID),
+				Attribute:  ec2types.InstanceAttributeNameUserData,
+			})
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			if IsNotFoundErr(err) {
+				result.TruncatedIDs[r.ID] = true
+				return
+			}
+			MarkSkipped(result, r.ID, &failures, op, err)
+			return
+		}
+		if out == nil || out.UserData == nil || aws.ToString(out.UserData.Value) == "" {
+			return
+		}
+		hits := secretscan.ScanText(decodeUserData(*out.UserData.Value))
+		if len(hits) == 0 {
+			return
+		}
+		rows := make([]domain.DetailRow, 0, len(hits))
+		for _, h := range hits {
+			rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+		}
+		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "credential in user data", "!", "ec2",
+			rows, ec2UserDataSecretDetail)
+	})
+	sort.Strings(failures)
+	return Finish(result, failures, len(targets), op)
 }

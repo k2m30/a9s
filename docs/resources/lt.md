@@ -126,6 +126,7 @@ Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave�
 | EBS encryption off | 2 | Warning | n/a | S2, S4, S5 | `EBS encryption disabled` | `A block device explicitly sets Encrypted=false; launched instances get unencrypted volumes.` |
 | deprecated AMI | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `deprecated AMI` | `The default version references an AMI past its deprecation time.` |
 | `DescribeLaunchTemplateVersions` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` | `Access to the default version was denied; only the listed fields are visible.` |
+| credential in the `$Default` version's `UserData` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` | `A credential is pasted into the default version's user data, so it is readable by anyone who can call ec2:DescribeLaunchTemplateVersions and lands on every instance launched from this template. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it.` |
 
 Notes:
 
@@ -173,6 +174,7 @@ lt — COMPUTE. Lifecycle key: `status`.
 | lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 |
 | lt.warn.unencrypted | EBS encryption disabled | warn | wave1 |
 | lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 |
+| lt.user-data-secret | credential in user data | broken | wave2 |
 | lt.warn.details\_denied | details denied | warn | wave1 |
 | lt.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->

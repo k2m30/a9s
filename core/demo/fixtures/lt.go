@@ -7,6 +7,7 @@
 package fixtures
 
 import (
+	"encoding/base64"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -60,6 +61,10 @@ const (
 	// WarnLTDeprecatedAMIID references the existing deprecated ami fixture
 	// (ec2.go's ami-0deprecated0ubuntu1, DeprecationTime in the past).
 	WarnLTDeprecatedAMIID = "lt-0warndeprecated1a"
+	// LTUserDataSecret is the only launch template whose default version
+	// pastes a credential into user data; every other template leaves
+	// UserData unset.
+	LTUserDataSecret = "lt-0warnuserdata111a"
 )
 
 // ltPrimaryKMSKeyID mirrors the same bare key ID reused across every other
@@ -67,6 +72,16 @@ const (
 // "a1b2c3d4-5678-90ab-cdef-111111111111") — house convention is a local
 // unexported const per file rather than one shared export.
 const ltPrimaryKMSKeyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+// ltSecretUserData is the warn-lt-user-data-secret bootstrap script — the
+// lt.user-data-secret witness, with the API token pasted in rather than
+// fetched from Parameter Store at boot.
+const ltSecretUserData = `#!/bin/bash
+set -euo pipefail
+yum install -y amazon-cloudwatch-agent
+export SERVICE_API_KEY=svc-7a2e91c4dd6b3f08
+/opt/acme/bin/agent --endpoint https://telemetry.example.com
+`
 
 const ltCreatedBy = "arn:aws:iam::123456789012:user/acme-platform-admin"
 
@@ -150,6 +165,7 @@ func buildLaunchTemplates() []ec2types.LaunchTemplate {
 		entry(WarnLTMultiID, "warn-lt-multi", 1, 1, "2025-05-04T08:00:00Z", "staging"),
 		entry(WarnLTDeniedID, "warn-lt-denied", 2, 2, "2025-05-05T08:00:00Z", "staging"),
 		entry(WarnLTDeprecatedAMIID, "warn-lt-deprecated-ami", 1, 1, "2025-05-06T08:00:00Z", "staging"),
+		entry(LTUserDataSecret, "warn-lt-user-data-secret", 1, 1, "2025-05-07T08:00:00Z", "staging"),
 	}
 }
 
@@ -256,6 +272,16 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 			BlockDeviceMappings: ltEncryptedRootVolume(ltPrimaryKMSKeyID),
 			MetadataOptions:     ltHealthyMetadataOptions(),
 		}, "2025-05-06T08:00:00Z"),
+
+		// warn-lt-user-data-secret: healthy in every other respect so the
+		// user-data credential is the row's only signal.
+		LTUserDataSecret: version(LTUserDataSecret, 1, &ec2types.ResponseLaunchTemplateData{
+			ImageId:             aws.String(fixtProdAMIID1),
+			InstanceType:        ec2types.InstanceTypeT3Medium,
+			BlockDeviceMappings: ltEncryptedRootVolume(ltPrimaryKMSKeyID),
+			MetadataOptions:     ltHealthyMetadataOptions(),
+			UserData:            aws.String(base64.StdEncoding.EncodeToString([]byte(ltSecretUserData))),
+		}, "2025-05-07T08:00:00Z"),
 
 		// WarnLTDeniedID intentionally absent — DescribeLaunchTemplateVersions
 		// is denied for this id (see LTFixtures.DeniedIDs).

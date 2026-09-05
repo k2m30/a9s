@@ -174,6 +174,20 @@ func MarkSkipped(result *IssueEnricherResult, id string, failures *[]string, op 
 	*failures = append(*failures, fmt.Sprintf("%s: %v", id, err))
 }
 
+// markAllUninspected records that a single account-wide call answered for
+// every row and failed, so none of them was inspected. Without it the rows
+// render as inspected-and-healthy, which is the one thing a failed check must
+// never claim. Enrichers whose calls are per-item use MarkSkipped instead —
+// only the row whose own call failed is uninspected there.
+func markAllUninspected(result *IssueEnricherResult, resources []resource.Resource) {
+	result.Truncated = true
+	for _, r := range resources {
+		if r.ID != "" {
+			result.TruncatedIDs[r.ID] = true
+		}
+	}
+}
+
 // Finish folds a Wave 2 enricher's accumulated per-batch failures into result
 // and returns the composite error via AggregateFailures. Truncated is only
 // ever set to true here, never reset to false, so a call with zero failures

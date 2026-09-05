@@ -130,6 +130,7 @@ One row per signal from §3:
 | `State == disabled` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled` | AMI is disabled in this account; launches are blocked until re-enabled. |
 | `DeprecationTime < now()` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deprecated <Nd> ago` | AWS marked this AMI deprecated on `<DeprecationTime>`; replace with current image. |
 | Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` | One or more EBS snapshots in `BlockDeviceMappings` are absent — AMI cannot be used to launch. |
+| `Public == true` | 1 | Broken | `!` | S2, S4, S5 | `shared with all AWS accounts` | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
 
 ## 4.1 UX review (two sentences)
 
@@ -173,6 +174,7 @@ ami — COMPUTE. Lifecycle key: `state`.
 | ami.state.failed | failed | broken | wave1 |
 | ami.state.dim | deregistered | dim | wave1 |
 | ami.deprecated | deprecated | warn | wave1 |
+| ami.public | shared with all AWS accounts | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

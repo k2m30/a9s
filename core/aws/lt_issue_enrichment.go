@@ -23,6 +23,7 @@ package aws
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // EnrichLTDeprecatedAMI cross-references each Launch Template's "$Default"
@@ -44,6 +46,33 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 		Findings:         make(map[string][]domain.Finding),
 		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
 		TruncatedIDs:     make(map[string]bool),
+	}
+
+	// The default version is already in hand from Wave 1 — no API call — so
+	// the user-data scan runs whether or not the ami cache is loaded.
+	for _, res := range resources {
+		raw, ok := assertStruct[LTRaw](res.RawStruct)
+		if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
+			continue
+		}
+		userData := aws.ToString(raw.DefaultVersion.LaunchTemplateData.UserData)
+		if userData == "" {
+			continue
+		}
+		hits := secretscan.ScanText(decodeUserData(userData))
+		if len(hits) == 0 {
+			continue
+		}
+		rows := []domain.DetailRow{{
+			Label: "Version",
+			Value: strconv.FormatInt(aws.ToInt64(raw.DefaultVersion.VersionNumber), 10),
+			Tier:  "!",
+		}}
+		for _, h := range hits {
+			rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+		}
+		setWave2Finding(&result, res.ID, ltCodeUserDataSecret, "credential in user data", "!", "lt",
+			rows, ltUserDataSecretDetail)
 	}
 
 	amiEntry, amiLoaded := cache["ami"]

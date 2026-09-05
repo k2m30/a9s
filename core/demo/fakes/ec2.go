@@ -151,8 +151,22 @@ func (f *EC2Fake) DescribeVolumes(_ context.Context, _ *ec2.DescribeVolumesInput
 	return &ec2.DescribeVolumesOutput{Volumes: f.fix.Volumes}, nil
 }
 
-func (f *EC2Fake) DescribeSnapshots(_ context.Context, _ *ec2.DescribeSnapshotsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {
-	return &ec2.DescribeSnapshotsOutput{Snapshots: f.fix.Snapshots}, nil
+// DescribeSnapshots honours RestorableByUserIds, the filter the ebs-snap
+// Wave-2 enricher uses to ask, in one account-wide call, which snapshots are
+// restorable by everyone. Without it the caller would see every snapshot as
+// public.
+func (f *EC2Fake) DescribeSnapshots(_ context.Context, input *ec2.DescribeSnapshotsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {
+	if input == nil || !slices.Contains(input.RestorableByUserIds, "all") {
+		return &ec2.DescribeSnapshotsOutput{Snapshots: f.fix.Snapshots}, nil
+	}
+	public := toSet(f.fix.PublicSnapshotIDs)
+	var out []ec2types.Snapshot
+	for _, snap := range f.fix.Snapshots {
+		if snap.SnapshotId != nil && public[*snap.SnapshotId] {
+			out = append(out, snap)
+		}
+	}
+	return &ec2.DescribeSnapshotsOutput{Snapshots: out}, nil
 }
 
 func (f *EC2Fake) DescribeImages(_ context.Context, input *ec2.DescribeImagesInput, _ ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error) {
@@ -291,7 +305,11 @@ func (f *EC2Fake) DescribeInstanceAttribute(_ context.Context, input *ec2.Descri
 	if input == nil || input.Attribute != ec2types.InstanceAttributeNameUserData {
 		return &ec2.DescribeInstanceAttributeOutput{}, nil
 	}
-	encoded := base64.StdEncoding.EncodeToString([]byte(demoUserData))
+	script := demoUserData
+	if custom, ok := f.fix.UserDataByInstanceID[aws.ToString(input.InstanceId)]; ok {
+		script = custom
+	}
+	encoded := base64.StdEncoding.EncodeToString([]byte(script))
 	return &ec2.DescribeInstanceAttributeOutput{
 		InstanceId: input.InstanceId,
 		UserData:   &ec2types.AttributeValue{Value: &encoded},

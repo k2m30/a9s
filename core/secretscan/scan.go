@@ -36,11 +36,20 @@ var (
 
 // ScanKV inspects a name→value map. A credential-named key with a real value
 // is a keyword hit; every value is also scanned as text.
+//
+// A value that is wholly a reference or a placeholder is skipped outright.
+// Scanning inside one is what turns the RECOMMENDED shape into a false
+// positive: "arn:aws:secretsmanager:…:secret:acme/db-AbCdEf" contains the
+// literal "secret:" followed by a plausible value, so a per-line keyword
+// scan reports the very indirection that fixes the leak.
 func ScanKV(kv map[string]string) []Hit {
 	var hits []Hit
 	for key, value := range kv {
+		if !isRealValue(value) {
+			continue
+		}
 		kinds := scanValue(value)
-		if len(kinds) == 0 && kvKeyRe.MatchString(key) && isRealValue(value) {
+		if len(kinds) == 0 && kvKeyRe.MatchString(key) {
 			kinds = append(kinds, "keyword")
 			if isHighEntropy(value) {
 				kinds = append(kinds, "high-entropy")

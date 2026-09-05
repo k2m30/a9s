@@ -178,6 +178,11 @@ One row per signal from §3:
 | `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped: user initiated` | `Task was stopped intentionally — no action needed.` |
 | `healthStatus==UNHEALTHY` | 1 | Broken | n/a | S2, S4 | `running but unhealthy` | `Task is RUNNING but an essential container failed its health check.` |
 | Wave 2: `ExitCode!=0` on essential container (on an already-Broken row) | 2 | Broken | `!` (counted) | S1, S4 (dedup), S5 | `stopped: exit N` (merged with existing cause) | `Essential container <name> exited with code <N> — reason: "<Container.Reason or StoppedReason>".` |
+| any container `privileged` (task definition) | 2 | Broken | `!` | S1, S3, S4, S5 | `privileged container` | `A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise.` |
+| `networkMode == host` or `pidMode == host` | 2 | Warning | `~` | S2, S3, S4, S5 | `shares the host network or process namespace` | `This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance.` |
+| any container without `readonlyRootFilesystem` | 2 | Warning | `~` | S2, S3, S4, S5 | `writable root filesystem` | `A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task.` |
+| any container without `logConfiguration` | 2 | Warning | `~` | S2, S3, S4, S5 | `container without log driver` | `A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping.` |
+| credential in a container `environment[]` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in container environment` | `A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition.` |
 
 Rules for filling list and detail text:
 
@@ -237,6 +242,11 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 |
 | ecs-task.health.unhealthy | unhealthy | broken | wave1 |
 | ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
+| ecs-task.privileged | privileged container | broken | wave2 |
+| ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 |
+| ecs-task.writable-root | writable root filesystem | warn | wave2 |
+| ecs-task.no-logging | container without log driver | warn | wave2 |
+| ecs-task.env-secret | credential in container environment | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

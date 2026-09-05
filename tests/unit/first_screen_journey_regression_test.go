@@ -94,9 +94,16 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 		Resource:     &ec2[0],
 	})
 
-	// Move cursor to ImageId row (default EC2 detail: index 4).
-	for range 4 {
+	// Walk to the ImageId row rather than counting presses: how many rows sit
+	// above it depends on whether this instance opens with an Attention block.
+	for range 40 {
+		if strings.Contains(selectedDetailLine(rootViewContent(m)), "ImageId:") {
+			break
+		}
 		m = applyRootAndCmd(t, m, rootKeyPress("j"))
+	}
+	if !strings.Contains(selectedDetailLine(rootViewContent(m)), "ImageId:") {
+		t.Fatalf("never reached the ImageId row; got:\n%s", stripANSI(rootViewContent(m)))
 	}
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))
 
@@ -204,4 +211,15 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 	if strings.Contains(view, "No resources found") || strings.Contains(view, "ami(0)") {
 		t.Fatalf("Enter on ImageId should not strand the user in an empty ami list for an exact target image ID; got:\n%s", view)
 	}
+}
+
+// selectedDetailLine returns the rendered line carrying the cursor highlight,
+// or "" when nothing is highlighted.
+func selectedDetailLine(view string) string {
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "\x1b[48") {
+			return line
+		}
+	}
+	return ""
 }

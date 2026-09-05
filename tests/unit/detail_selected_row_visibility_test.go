@@ -17,9 +17,17 @@ func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
 	tuitest.ForceColor(t)
 
 	c := makePreviewEC2Detail(t, 120, 35)
-	line := findLineContaining(previewDetailView(t, c, 120, 35), "InstanceId:")
-	if line == "" {
-		t.Fatalf("selected row line not found")
+	// Walk to InstanceId rather than assuming it is the first row: this
+	// fixture opens with an Attention block above the field list.
+	for range 80 {
+		if strings.Contains(findSelectedLine(previewDetailView(t, c, 120, 35)), "InstanceId:") {
+			break
+		}
+		c.Apply(app.Action{Kind: app.ActionMoveDown})
+	}
+	line := findSelectedLine(previewDetailView(t, c, 120, 35))
+	if !strings.Contains(line, "InstanceId:") {
+		t.Fatalf("selected line should be the InstanceId row; line=%q", line)
 	}
 	if !strings.Contains(line, "\x1b[48;") {
 		t.Fatalf("selected row must include background highlight; line=%q", line)

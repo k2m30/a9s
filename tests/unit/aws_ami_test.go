@@ -51,7 +51,7 @@ func TestFetchAMIs_ParsesMultipleImages(t *testing.T) {
 					PlatformDetails: aws.String("Linux/UNIX"),
 					RootDeviceType:  ec2types.DeviceTypeEbs,
 					CreationDate:    aws.String("2025-02-01T08:00:00.000Z"),
-					Public:          aws.Bool(true),
+					Public:          aws.Bool(false),
 				},
 			},
 		},

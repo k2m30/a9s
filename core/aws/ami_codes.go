@@ -23,4 +23,11 @@ const (
 	// CodeAMIDeprecated — AMI's DeprecationTime has passed; AWS Console no
 	// longer recommends it for new launches. Severity: SevWarn.
 	CodeAMIDeprecated domain.FindingCode = "ami.deprecated"
+
+	// CodeAMIPublic — the AMI's launch permission includes every AWS
+	// account. Severity: SevBroken.
+	CodeAMIPublic domain.FindingCode = "ami.public"
 )
+
+// amiPublicDetail is the S5 operator sentence for CodeAMIPublic.
+const amiPublicDetail = "This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission."

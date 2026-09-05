@@ -156,6 +156,12 @@ Wave → surface mapping applied below. Wave 1 Healthy (`Status == ""`) is omitt
 | `InService < MinSize` | 1 | Broken | n/a | S2, S4 | `below min: K of MinSize` | `Only K instances InService, below MinSize — capacity breached.` |
 | `SuspendedProcesses` contains `Launch`/`Terminate`/`HealthCheck` | 1 | Warning | n/a | S2, S4 | `suspended: <process list>` | `Scaling paused — Launch/Terminate/HealthCheck processes suspended by operator.` |
 | Latest `DescribeScalingActivities.StatusCode == Failed` | 2 | Broken | n/a (row is already red) | S1, S4 (dedup), S5 | `launch failed: <StatusMessage>` | `Most recent scaling activity failed: <StatusMessage> — new instances are not coming up.` |
+| `LaunchConfigurationName` set | 1 | Warning | `~` | S2, S4, S5 | `uses a launch configuration` | `The group launches from a launch configuration, an immutable legacy resource AWS no longer develops; copy it to a launch template.` |
+| fewer than two `AvailabilityZones` | 1 | Warning | `~` | S2, S4, S5 | `single availability zone` | `Every instance in this group sits in one availability zone, so a single zone failure takes the whole group down.` |
+| behind a load balancer with `HealthCheckType != ELB` | 1 | Warning | `~` | S2, S4, S5 | `no load balancer health check` | `The group only watches EC2 status checks, so an instance whose application has stopped answering stays in service.` |
+| launch configuration `MetadataOptions` absent or `HttpTokens != required` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration allows IMDSv1` | `Instances this group launches answer metadata requests without a session token; a launch configuration without the block defaults to permitting IMDSv1.` |
+| launch configuration `AssociatePublicIpAddress == true` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration assigns public IPs` | `Every instance this group launches gets a routable public address.` |
+| credential in launch configuration `UserData` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in launch configuration user data` | `A credential is pasted into the launch configuration user data and lands on every instance the group starts.` |
 
 Notes:
 
@@ -202,6 +208,12 @@ asg — COMPUTE. Lifecycle key: `status`.
 | asg.instances.unhealthy | <N> unhealthy instance(s) | warn | wave1 |
 | asg.scaling.suspended | scaling suspended | warn | wave1 |
 | asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
+| asg.launch-config.legacy | uses a launch configuration | warn | wave1 |
+| asg.single-az | single availability zone | warn | wave1 |
+| asg.no-elb-health-check | no load balancer health check | warn | wave1 |
+| asg.launch-config.imdsv1 | launch configuration allows IMDSv1 | warn | wave2 |
+| asg.launch-config.public-ip | launch configuration assigns public IPs | warn | wave2 |
+| asg.launch-config.secret | credential in launch configuration user data | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -31,4 +31,14 @@ const (
 	// CodeLambdaInactive — function has been evicted from memory after
 	// extended idle time. Severity: SevDim (lifecycle, not an issue).
 	CodeLambdaInactive domain.FindingCode = "lambda.state.inactive"
+
+	// CodeLambdaEnvSecret — a plaintext credential sits in the function's
+	// environment variables. Severity: SevBroken.
+	//nolint:gosec // G101 false positive: a finding code, not a credential
+	CodeLambdaEnvSecret domain.FindingCode = "lambda.env-secret"
 )
+
+// lambdaEnvSecretDetail is the S5 operator sentence for CodeLambdaEnvSecret.
+//
+//nolint:gosec // G101 false positive: operator prose about a credential, not one
+const lambdaEnvSecretDetail = "A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one."

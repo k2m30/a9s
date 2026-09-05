@@ -41,6 +41,45 @@ func NewECSFixtures() *ECSFixtures {
 	return sharedECSFixtures()
 }
 
+// ECS posture witnesses. Task definitions are shared by design — every task
+// running a revision sees the same containers — so a definition-level signal
+// necessarily lands on every task of that definition; the constant names the
+// canonical witness task and the comment names the definition.
+const (
+	// ECSServicePublicIP — the only service whose awsvpc configuration
+	// assigns public IPs; every other service leaves AssignPublicIp unset.
+	ECSServicePublicIP = "api-gateway"
+	// ECSTaskPrivileged runs web-frontend:7, the only definition with a
+	// privileged container.
+	ECSTaskPrivileged = "e1f2a7b8c9d0e1f2a8b9c0d1"
+	// The four remaining witnesses are tasks still running a SUPERSEDED
+	// revision of their family — the shape a mid-deployment cluster really
+	// has, and the reason each posture signal lands on exactly one task
+	// while its family's current revision stays clean.
+	//
+	// ECSTaskHostNamespace runs order-worker:4, the only definition on the
+	// host network and process namespace.
+	ECSTaskHostNamespace = "c9d0e1f2a7b8c9d0e1f2a8b9"
+	// ECSTaskWritableRoot runs web-frontend:6, the only definition leaving a
+	// container's root filesystem writable.
+	ECSTaskWritableRoot = "b8c9d0e1f2a7b8c9d0e1f2a8"
+	// ECSTaskNoLogging runs batch-etl-runner:2, the only definition with a
+	// container that has no log driver.
+	ECSTaskNoLogging = "d0e1f2a7b8c9d0e1f2a8b9c0"
+	// ECSTaskEnvSecret runs order-worker:3, the only definition with a
+	// plaintext credential in a container environment.
+	ECSTaskEnvSecret = "c3d4e5f6a1b2c3d4e5f60102"
+)
+
+// Superseded revisions the witness tasks above still run.
+const (
+	ecsDefOrderWorkerOld    = "arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:4"
+	ecsDefWebFrontendOld    = "arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:6"
+	ecsDefBatchETLOld       = "arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:2"
+	ecsDefOrderWorkerSecret = "arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:3"
+	ecsDefWebFrontendPriv   = "arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:7"
+)
+
 const (
 	ecsClusterArnServices = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"
 	ecsClusterArnBatch    = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"
@@ -213,6 +252,9 @@ func buildECSServices() []ecstypes.Service {
 				AwsvpcConfiguration: &ecstypes.AwsVpcConfiguration{
 					SecurityGroups: []string{"sg-0bbb222222222222b"},
 					Subnets:        []string{"subnet-0aaa111111111111a"},
+					// The ecs-svc.public-ip witness — the only demo service
+					// that hands its tasks routable addresses.
+					AssignPublicIp: ecstypes.AssignPublicIpEnabled,
 				},
 			},
 			// aws:cloudformation:stack-name tag — required for ecs-svc→cfn
@@ -436,7 +478,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("PENDING"),
 			DesiredStatus:     aws.String("RUNNING"),
-			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:5"),
+			TaskDefinitionArn: aws.String(ecsDefOrderWorkerSecret),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("1024"),
 			Memory:            aws.String("2048"),
@@ -523,7 +565,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("ACTIVATING"),
 			DesiredStatus:     aws.String("RUNNING"),
-			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
+			TaskDefinitionArn: aws.String(ecsDefWebFrontendOld),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("256"),
 			Memory:            aws.String("512"),
@@ -540,7 +582,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("DEACTIVATING"),
 			DesiredStatus:     aws.String("STOPPED"),
-			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:5"),
+			TaskDefinitionArn: aws.String(ecsDefOrderWorkerOld),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("1024"),
 			Memory:            aws.String("2048"),
@@ -558,7 +600,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnBatch),
 			LastStatus:        aws.String("STOPPING"),
 			DesiredStatus:     aws.String("STOPPED"),
-			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:3"),
+			TaskDefinitionArn: aws.String(ecsDefBatchETLOld),
 			LaunchType:        ecstypes.LaunchTypeEc2,
 			Cpu:               aws.String("2048"),
 			Memory:            aws.String("4096"),
@@ -574,7 +616,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("PROVISIONING"),
 			DesiredStatus:     aws.String("RUNNING"),
-			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
+			TaskDefinitionArn: aws.String(ecsDefWebFrontendPriv),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("256"),
 			Memory:            aws.String("512"),
@@ -740,6 +782,121 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 		},
 	}
 
+	// The four superseded revisions the posture witness tasks still run —
+	// each carries exactly one of the task-definition signals, so no signal
+	// ever lands on more than the one task pinned to that revision.
+	defs[ecsDefOrderWorkerSecret] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String(ecsDefOrderWorkerSecret),
+		Family:            aws.String("order-worker"),
+		Revision:          3,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		NetworkMode:       ecstypes.NetworkModeAwsvpc,
+		Cpu:               aws.String("1024"),
+		Memory:            aws.String("2048"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("worker"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/order-worker:1.3.0"),
+				Cpu:   1024,
+				// The ecs-task.env-secret witness: revision 5 moved this
+				// token into the Secrets block, revision 3 still pastes it.
+				Environment: []ecstypes.KeyValuePair{
+					{Name: aws.String("LOG_LEVEL"), Value: aws.String("info")},
+					{Name: aws.String("LEGACY_API_TOKEN"), Value: aws.String("t0kEn-9f3a71c4bb2e5d80")},
+				},
+			},
+		},
+	}
+	defs[ecsDefWebFrontendPriv] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String(ecsDefWebFrontendPriv),
+		Family:            aws.String("web-frontend"),
+		Revision:          7,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		NetworkMode:       ecstypes.NetworkModeAwsvpc,
+		Cpu:               aws.String("256"),
+		Memory:            aws.String("512"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("web"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/web-frontend:1.7.0"),
+				Cpu:   256,
+				// The ecs-task.privileged witness: revision 7 was rolled back
+				// to a privileged sidecar-debugging image.
+				Privileged: aws.Bool(true),
+			},
+		},
+	}
+	defs[ecsDefWebFrontendOld] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String(ecsDefWebFrontendOld),
+		Family:            aws.String("web-frontend"),
+		Revision:          6,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		NetworkMode:       ecstypes.NetworkModeAwsvpc,
+		Cpu:               aws.String("256"),
+		Memory:            aws.String("512"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("web"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/web-frontend:1.6.0"),
+				Cpu:   256,
+			},
+		},
+	}
+	defs[ecsDefOrderWorkerOld] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String(ecsDefOrderWorkerOld),
+		Family:            aws.String("order-worker"),
+		Revision:          4,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		// The ecs-task.host-namespace witness.
+		NetworkMode: ecstypes.NetworkModeHost,
+		PidMode:     ecstypes.PidModeHost,
+		Cpu:         aws.String("1024"),
+		Memory:      aws.String("2048"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("worker"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/order-worker:1.4.0"),
+				Cpu:   1024,
+			},
+		},
+	}
+	defs[ecsDefBatchETLOld] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String(ecsDefBatchETLOld),
+		Family:            aws.String("batch-etl-runner"),
+		Revision:          2,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		NetworkMode:       ecstypes.NetworkModeBridge,
+		Cpu:               aws.String("2048"),
+		Memory:            aws.String("4096"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("etl"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/batch-etl:1.2.0"),
+				Cpu:   2048,
+			},
+		},
+	}
+
+	// acme-svc-degraded:3 backs the TaskFailedToStart task above. Registered
+	// for the same reason as the filler definitions below: a demo graph never
+	// points a task at a definition the fake cannot describe.
+	defs["arn:aws:ecs:us-east-1:123456789012:task-definition/acme-svc-degraded:3"] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/acme-svc-degraded:3"),
+		Family:            aws.String("acme-svc-degraded"),
+		Revision:          3,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		NetworkMode:       ecstypes.NetworkModeAwsvpc,
+		Cpu:               aws.String("512"),
+		Memory:            aws.String("1024"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("degraded"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/degraded:latest"),
+				Cpu:   512,
+			},
+		},
+	}
+
 	// The generated filler services (ecsServiceNamePool) reference task-def
 	// "<name>:<i+1>" (matching buildECSServices' tdVersion = i+1). Register a
 	// minimal task-def for each so DescribeTaskDefinition resolves them instead
@@ -763,5 +920,36 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 			},
 		}
 	}
+	applyECSContainerDefaults(defs)
 	return defs
+}
+
+// applyECSContainerDefaults gives every container a read-only root filesystem
+// and an awslogs driver, leaving exactly one witness definition without each:
+// web-frontend:6 keeps a writable root, batch-etl-runner:2 keeps a container
+// with no log driver. Applied here rather than inline so the healthy default
+// can never be forgotten on a definition added later.
+func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
+	const (
+		writableRootDef = ecsDefWebFrontendOld
+		noLoggingDef    = ecsDefBatchETLOld
+	)
+	for arn, def := range defs {
+		for i := range def.ContainerDefinitions {
+			c := &def.ContainerDefinitions[i]
+			if arn != writableRootDef {
+				c.ReadonlyRootFilesystem = aws.Bool(true)
+			}
+			if arn != noLoggingDef {
+				c.LogConfiguration = &ecstypes.LogConfiguration{
+					LogDriver: ecstypes.LogDriverAwslogs,
+					Options: map[string]string{
+						"awslogs-group":         "/ecs/" + aws.ToString(def.Family),
+						"awslogs-region":        "us-east-1",
+						"awslogs-stream-prefix": "ecs",
+					},
+				}
+			}
+		}
+	}
 }

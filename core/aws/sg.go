@@ -198,6 +198,23 @@ func sgDangerousPortsPhrase(ports string) string {
 	return "ports " + ports + " open to 0.0.0.0/0"
 }
 
+// sgPortsFromRiskSummary is the inverse of sgDangerousPortsPhrase: it recovers
+// the comma-separated port list a security group's risk_summary field encodes.
+// It lives beside the formatter so the two can never drift, and it is the only
+// way a consumer outside sg.go (the ec2 internet-exposure cross-ref) learns
+// which ports a group leaves open — the sensitive-port set stays owned here.
+// Returns "" for a summary that names no specific ports.
+func sgPortsFromRiskSummary(summary string) string {
+	if !strings.HasPrefix(summary, "ports ") {
+		return ""
+	}
+	ports := strings.TrimSuffix(strings.TrimPrefix(summary, "ports "), " open to 0.0.0.0/0")
+	if ports == summary || ports == "unspecified" {
+		return ""
+	}
+	return ports
+}
+
 // sgRiskFindings ranks wide-open ahead of dangerous ports so the list Status
 // cell / detail Attention block explain the Broken color with the same
 // owner-worded phrase risk_summary carries for display. The row color derives

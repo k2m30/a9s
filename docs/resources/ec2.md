@@ -226,6 +226,10 @@ One row per signal from §3:
 | `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 | `initializing: checks in progress` | `Instance status checks have not yet passed since start.` |
 | `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4, S5 | `status unknown: AWS insufficient-data` | `AWS cannot determine status — insufficient data from the hypervisor.` |
 | `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `!` | S1, S3, S4, S5 | `retires in 3d` (or `reboot in 5d`) | `AWS scheduled <instance-retirement|system-reboot> starting <NotBefore>.` |
+| `MetadataOptions.HttpTokens == optional` | 1 | Warning | `~` | S2, S4, S5 | `IMDSv1 allowed` | `Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Set MetadataOptions.HttpTokens to required on the instance.` |
+| `PublicIpAddress` set | 1 | Warning | `~` | S2, S4, S5 | `public address` | `The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly.` |
+| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S3, S4, S5 | `port(s) 22 reachable from the internet` | `Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion.` |
+| credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` | `A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it.` |
 
 Notes on list-text construction:
 
@@ -306,6 +310,10 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 | ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 |
 | ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 |
 | ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 |
+| ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 |
+| ec2.public-ip | public address | warn | wave1 |
+| ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 |
+| ec2.user-data-secret | credential in user data | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

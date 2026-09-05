@@ -1,5 +1,5 @@
  a9s v  demo:us-east-1                                                                                             :ec2 
-┌───────────────────────────────────────────────── resource-types(66) ─────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────── resource-types(71) ─────────────────────────────────────────────────┐
 │  COMPUTE                                                                                                             │
 │    EC2 Instances                                                                                    :ec2             │
 │    ECS Services                                                                                     :ecs-svc         │
@@ -10,6 +10,7 @@
 │    EBS Volumes                                                                                      :ebs             │
 │    EBS Snapshots                                                                                    :ebs-snap        │
 │    AMIs                                                                                             :ami             │
+│    Launch Templates                                                                                 :lt              │
 │  CONTAINERS                                                                                                          │
 │    EKS Clusters                                                                                     :eks             │
 │    EKS Node Groups                                                                                  :ng              │
@@ -26,5 +27,4 @@
 │    VPC Endpoints                                                                                    :vpce            │
 │    Transit Gateways                                                                                 :tgw             │
 │    Network Interfaces                                                                               :eni             │
-│  DATABASES & STORAGE                                                                                                 │
 └──────────────────────────────────────────────────────────────────────────────────ctrl+z Issues only──ctrl+r Refresh──┘

@@ -66,6 +66,14 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 	}, nil
 }
 
+// ec2InstanceGone reports an instance no operator can still reconfigure.
+// It is the single lifecycle guard for every ec2 posture finding — the
+// fetcher's Wave-1 rules and the Wave-2 enricher both call it, so the two
+// waves can never disagree about which instances are still worth reporting.
+func ec2InstanceGone(state string) bool {
+	return state == "terminated" || state == "shutting-down"
+}
+
 // ec2InstanceToResource builds the canonical EC2 instance Resource (same
 // Fields keys, Findings rules) from one SDK Instance — shared by
 // FetchEC2InstancesPage and FetchEC2InstancesByIDs so the two paths can
@@ -183,6 +191,31 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 			Code: CodeEC2StateTerminated, Phrase: "terminated",
 			Severity: domain.SevDim, Source: "wave1",
 		}}
+	}
+
+	// Posture signals. Independently evaluated and appended, so an instance
+	// that is both IMDSv1-permissive and publicly addressed carries both.
+	if !ec2InstanceGone(state) {
+		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code: CodeEC2IMDSv1Allowed, Phrase: "IMDSv1 allowed",
+				Detail:   ec2IMDSv1AllowedDetail,
+				Severity: domain.SevWarn, Source: "wave1",
+			})
+			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
+				Label: "HttpTokens", Value: "optional", Tier: "~",
+			})
+		}
+		if publicIP != "" {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code: CodeEC2PublicIP, Phrase: "public address",
+				Detail:   ec2PublicIPDetail,
+				Severity: domain.SevWarn, Source: "wave1",
+			})
+			addWave1Rows(&r, CodeEC2PublicIP, domain.DetailRow{
+				Label: "Public address", Value: publicIP, Tier: "~",
+			})
+		}
 	}
 
 	return r

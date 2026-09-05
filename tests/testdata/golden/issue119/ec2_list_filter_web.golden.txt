@@ -1,11 +1,14 @@
  a9s v  demo:us-east-1                                                                                                           ? for help 
-┌─────────────────────────────────────────────────────────────── ec2(5/27) ────────────────────────────────────────────────────────────────┐
-│ 1:Name                    2:State       3:Lifecycle   4:Type          5:Private IP      6:Public IP       7:Instance ID                  │
-│ web-prod-01               running       on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e5f60001            │
-│ web-prod-02               running       on-demand     t3.large        10.0.1.11         54.210.33.113     i-0a1b2c3d4e5f60002            │
-│ web-staging-01            pending       spot          t3.medium       10.0.2.70                           i-0a1b2c3d4e5f60007            │
-│ web-13                    running       on-demand     c5.large        10.0.2.23                           i-0a1b2c3d4e5f60013            │
-│ web-23                    running       on-demand     t3.medium       10.0.3.33                           i-0a1b2c3d4e5f60023            │
+┌───────────────────────────────────────────────────────────── ec2(8/40) !15 ──────────────────────────────────────────────────────────────┐
+│ 1:Name                    2:Status          3:Health      4:Lifecycle   5:Type          6:Private IP      7:Public IP       8:Instance…  │
+│ web-prod-01               public address    ok            on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d…  │
+│ web-prod-02               running           ok            on-demand     t3.large        10.0.1.11                           i-0a1b2c3d…  │
+│ web-staging-01            pending                         spot          t3.medium       10.0.2.70                           i-0a1b2c3d…  │
+│ web-worker-01             running           ok            on-demand     t3.large        10.0.10.30                          i-0eee5555…  │
+│ web-worker-02             running           ok            on-demand     t3.large        10.0.10.31                          i-0fff6666…  │
+│ web-worker-03             running           ok            on-demand     t3.large        10.0.10.32                          i-0aaa7777…  │
+│ web-13                    running           ok            on-demand     c5.large        10.0.2.23                           i-0a1b2c3d…  │
+│ web-23                    running           ok            on-demand     t3.medium       10.0.3.33                           i-0a1b2c3d…  │
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
@@ -24,7 +27,4 @@
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-└─────────────────────────────────────────────────────────────────────────────y YAML──J JSON──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘
+└─────────────────────────────────────────────────────────────────────y YAML──J JSON──o Open──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘

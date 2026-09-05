@@ -46,7 +46,14 @@ const (
 	ltCodeIMDSv1        domain.FindingCode = "lt.warn.imdsv1"
 	ltCodeUnencrypted   domain.FindingCode = "lt.warn.unencrypted"
 	ltCodeDeprecatedAMI domain.FindingCode = "lt.warn.deprecated_ami"
+	//nolint:gosec // G101 false positive: a finding code, not a credential
+	ltCodeUserDataSecret domain.FindingCode = "lt.user-data-secret"
 )
+
+// ltUserDataSecretDetail is the S5 operator sentence for ltCodeUserDataSecret.
+//
+//nolint:gosec // G101 false positive: operator prose about a credential, not one
+const ltUserDataSecretDetail = "A credential is pasted into the default version's user data, so it is readable by anyone who can call ec2:DescribeLaunchTemplateVersions and lands on every instance launched from this template. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it."
 
 // ltDetailsDeniedDetail is lt's own §4 S5 sentence for the details-denied
 // finding — deliberately NOT the generic degraded_resource.go text, matching

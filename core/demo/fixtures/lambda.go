@@ -31,7 +31,27 @@ type LambdaFixtures struct {
 	// entirely unless PutFunctionConcurrency was called — most functions
 	// have none, so only one fixture function carries it.
 	ReservedConcurrency map[string]int32
+	// Policies maps function name -> the resource policy GetPolicy returns.
+	// A function absent from this map has no policy at all, which real
+	// Lambda reports as ResourceNotFoundException.
+	Policies map[string]string
+	// FunctionURLConfigs maps function name -> the configs
+	// ListFunctionUrlConfigs returns. Absent means the function has no URL.
+	FunctionURLConfigs map[string][]lambdatypes.FunctionUrlConfig
 }
+
+// Lambda posture witnesses — one function per Prowler-derived finding.
+const (
+	// LambdaEnvSecret is the only function with a plaintext credential in
+	// its environment; every other function stores references, not values.
+	LambdaEnvSecret = "payment-webhook"
+	// LambdaPublicPolicy is the only function whose resource policy allows a
+	// wildcard principal.
+	LambdaPublicPolicy = "image-thumbnail-gen"
+	// LambdaFunctionURLPublic is the only function with a function URL whose
+	// AuthType is NONE.
+	LambdaFunctionURLPublic = "cloudwatch-slack-notifier"
+)
 
 // NewLambdaFixtures builds and returns a fully-populated LambdaFixtures struct.
 var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
@@ -54,6 +74,32 @@ var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 			// process-orders is throttled to protect the downstream SQS
 			// consumer from over-scaling.
 			lambdaProcessOrders: 10,
+		},
+		Policies: map[string]string{
+			// The lambda.public-policy witness: lambda:InvokeFunction granted
+			// to every principal with no condition narrowing it.
+			LambdaPublicPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPublicInvoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:image-thumbnail-gen"}]}`,
+			// A healthy counterpart: the same grant scoped to one service
+			// principal, so the enricher's Public verdict is exercised both ways.
+			lambdaProcessOrders: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowSQS","Effect":"Allow","Principal":{"Service":"sqs.amazonaws.com"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:process-orders"}]}`,
+		},
+		FunctionURLConfigs: map[string][]lambdatypes.FunctionUrlConfig{
+			// The lambda.function-url-public witness: AuthType NONE with a
+			// wildcard CORS origin.
+			LambdaFunctionURLPublic: {{
+				FunctionUrl:  aws.String("https://abcd1234efgh5678.lambda-url.us-east-1.on.aws/"),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:cloudwatch-slack-notifier"),
+				AuthType:     lambdatypes.FunctionUrlAuthTypeNone,
+				Cors:         &lambdatypes.Cors{AllowOrigins: []string{"*"}},
+				CreationTime: aws.String("2026-02-01T09:00:00.000000Z"),
+			}},
+			// A healthy counterpart: same feature, IAM-authorized.
+			"api-gateway-authorizer": {{
+				FunctionUrl:  aws.String("https://ijkl9012mnop3456.lambda-url.us-east-1.on.aws/"),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"),
+				AuthType:     lambdatypes.FunctionUrlAuthTypeAwsIam,
+				CreationTime: aws.String("2026-02-01T09:05:00.000000Z"),
+			}},
 		},
 	}
 })
@@ -235,6 +281,15 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			LoggingConfig: &lambdatypes.LoggingConfig{
 				LogGroup:  aws.String("/aws/lambda/payment-webhook"),
 				LogFormat: lambdatypes.LogFormatText,
+			},
+			// The lambda.env-secret witness: the provider token pasted into
+			// the environment instead of resolved from Secrets Manager.
+			Environment: &lambdatypes.EnvironmentResponse{
+				Variables: map[string]string{
+					"ENV":               "production",
+					"PROVIDER_ENDPOINT": "https://payments.example.com/hooks",
+					"PROVIDER_API_KEY":  "pk-live-4c81b7e2af9d6035",
+				},
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},

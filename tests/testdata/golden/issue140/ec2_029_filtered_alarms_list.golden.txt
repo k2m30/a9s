@@ -1,8 +1,8 @@
  a9s v  demo:us-east-1                                                                                       ? for help 
 ┌─────────────────────────────────── alarms(2) -- i-0a1b2c3d4e5f60001 (web-prod-01) ───────────────────────────────────┐
-│ 1:Alarm Name↓                         2:State       3:Actions On  4:Metric                  5:Namespace              │
-│ web-prod-status-check                                             web-prod-status-check     web-prod-status-check    │
-│ web-prod-cpu-high                                                 web-prod-cpu-high         web-prod-cpu-high        │
+│ 1:Alarm Name                          2:Status      3:Actions On  4:Metric                  5:Namespace              │
+│ web-prod-cpu-high                     alarm                       web-prod-cpu-high         web-prod-cpu-high        │
+│ web-prod-status-check                 ok                          web-prod-status-check     web-prod-status-check    │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -27,4 +27,4 @@
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-└────────────────esc Back──enter Alarm History──d Detail──y YAML──J JSON──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘
+└────────esc Back──enter Alarm History──d Detail──y YAML──J JSON──o Open──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘

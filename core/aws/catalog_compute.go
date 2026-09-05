@@ -437,6 +437,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: ec2CodeInstanceStatusInitializing, Phrase: "initializing: checks in progress", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: ec2CodeInstanceStatusInsufficient, Phrase: "status unknown: AWS insufficient-data", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: ec2CodeScheduledEvent, Phrase: "scheduled event: <code> at <date>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeEC2IMDSv1Allowed, Phrase: "IMDSv1 allowed", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEC2PublicIP, Phrase: "public address", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ec2CodeInternetExposed, Phrase: "port(s) <list> reachable from the internet", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ec2CodeUserDataSecret, Phrase: "credential in user data", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -519,6 +523,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ecsSvcCodeDeploymentFailed, Phrase: "deployment failed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ecsSvcCodePublicIP, Phrase: "tasks get public IPs", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -628,6 +633,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <stop code>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: ecsTaskCodeTaskFailed, Phrase: "<stop code or container> failed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ecsTaskCodePrivileged, Phrase: "privileged container", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ecsTaskCodeHostNamespace, Phrase: "shares the host network or process namespace", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ecsTaskCodeWritableRoot, Phrase: "writable root filesystem", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ecsTaskCodeNoLogging, Phrase: "container without log driver", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ecsTaskCodeEnvSecret, Phrase: "credential in container environment", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -692,6 +702,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkLambdaSecrets, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkLambdaSSM, NeedsTargetCache: true, Truncated: true},
 		},
+		Wave2:        IssueEnricher{Fn: EnrichLambdaPosture, Priority: 100},
 		DetailEnrich: enrichLambda,
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Role", TargetType: "role"},
@@ -707,6 +718,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeLambdaEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: lambdaCodePublicPolicy, Phrase: "invokable by anyone", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: lambdaCodeFunctionURLPublic, Phrase: "function endpoint open without authentication", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -764,6 +778,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeASGUnhealthyInstances, Phrase: "<N> unhealthy instance(s)", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeASGScalingSuspended, Phrase: "scaling suspended", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: asgCodeScalingActivityFailed, Phrase: "latest scaling activity failed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeASGLegacyLaunchConfig, Phrase: "uses a launch configuration", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeASGSingleAZ, Phrase: "single availability zone", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeASGNoELBHealthCheck, Phrase: "no load balancer health check", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: asgCodeLaunchConfigIMDSv1, Phrase: "launch configuration allows IMDSv1", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: asgCodeLaunchConfigPublicIP, Phrase: "launch configuration assigns public IPs", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: asgCodeLaunchConfigSecret, Phrase: "credential in launch configuration user data", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -861,6 +881,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeEBSSnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBSSnapAgedAutomated, Phrase: "automated, <N>d old", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBSSnapOrphan, Phrase: "orphan: source volume deleted", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebsSnapCodePublic, Phrase: "shared with all AWS accounts", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -922,6 +943,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeAMIStateDim, Phrase: "deregistered", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeAMIDeprecated, Phrase: "deprecated", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeAMIPublic, Phrase: "shared with all AWS accounts", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{
@@ -967,6 +989,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: ltCodeIMDSv1, Phrase: "IMDSv1 allowed", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ltCodeUnencrypted, Phrase: "EBS encryption disabled", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ltCodeDeprecatedAMI, Phrase: "deprecated AMI", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ltCodeUserDataSecret, Phrase: "credential in user data", Severity: domain.SevBroken, Source: "wave2"},
 			DetailsDeniedFindingDef("lt"),
 			DetailsUnavailableFindingDef("lt"),
 		},

@@ -86,6 +86,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - KMS keys now report a key policy that lets any AWS principal decrypt with
   the key. Closes Prowler `kms_key_not_publicly_accessible`.
+- EC2 instances now flag three security-posture problems on the list row
+  itself: instance metadata that still answers without a session token, a
+  routable public address, and a credential pasted into user data. A running
+  instance with a public address whose security groups leave a sensitive port
+  open to the world is reported as reachable from the internet, with the
+  ports named — read entirely from data a9s already holds, at no extra API
+  cost. Closes Prowler `ec2_instance_imdsv2_enabled`,
+  `ec2_instance_public_ip`, `ec2_instance_secrets_user_data` and
+  `ec2_instance_port_ssh_exposed_to_internet` with its sixteen sibling port
+  checks.
+- AMIs owned by the account and shared with every AWS account are now
+  reported. Closes Prowler `ec2_ami_public`.
+- ECS services that hand their tasks routable public addresses are now
+  flagged. Closes Prowler `ecs_service_no_assign_public_ip`.
+- ECS tasks now report what their task definition bakes in: a privileged
+  container, the host network or process namespace, a container that can
+  write its own root filesystem, a container with no log driver, and a
+  credential stored as a plaintext environment variable. Closes Prowler
+  `ecs_task_definitions_no_privileged_containers`,
+  `ecs_task_definitions_host_namespace_not_shared`,
+  `ecs_task_definitions_containers_readonly_access`,
+  `ecs_task_definitions_logging_enabled` and
+  `ecs_task_definitions_no_environment_secrets`.
+- Lambda functions now report a credential in their environment variables, a
+  resource policy any caller can invoke, and a function URL that requires no
+  authentication. Closes Prowler
+  `awslambda_function_no_secrets_in_variables`,
+  `awslambda_function_not_publicly_accessible`, `awslambda_function_url_public`
+  and `awslambda_function_url_cors_policy`.
+- Auto Scaling groups now report a legacy launch configuration, a single
+  availability zone, and a group behind a load balancer that still decides
+  health from EC2 status checks. For groups that still reference a launch
+  configuration, one batched call reports whether it permits IMDSv1, assigns
+  public addresses, or carries a credential in its user data. Closes Prowler
+  `autoscaling_group_using_ec2_launch_template`,
+  `autoscaling_group_multiple_az`,
+  `autoscaling_group_elb_health_check_enabled`,
+  `autoscaling_group_launch_configuration_requires_imdsv2`,
+  `autoscaling_group_launch_configuration_no_public_ip` and
+  `autoscaling_find_secrets_ec2_launch_configuration`.
+- EBS snapshots restorable by every AWS account are now reported, from one
+  account-wide call rather than a per-snapshot query. Closes Prowler
+  `ec2_ebs_public_snapshot`.
+- Launch templates now report a credential pasted into the default version's
+  user data. Closes Prowler `ec2_launch_template_no_secrets`.
 
 ### Fixed (security)
 

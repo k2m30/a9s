@@ -43,6 +43,13 @@ type EC2Fixtures struct {
 	// ec2:DescribeFlowLogs for the vpce:logs related-panel pivot
 	// (checkVPCELogs).
 	FlowLogsByResourceID map[string][]ec2types.FlowLog
+	// PublicSnapshotIDs is the set DescribeSnapshots returns when asked for
+	// RestorableByUserIds=["all"] — the snapshots shared with every account.
+	PublicSnapshotIDs []string
+	// UserDataByInstanceID overrides the fake's default bootstrap script for
+	// the instances that need their own. Backs ec2:DescribeInstanceAttribute
+	// (userData) for the ec2.user-data-secret witness.
+	UserDataByInstanceID map[string]string
 }
 
 // shared constants (mirrors core/demo/constants_shared.go — no import allowed)
@@ -71,6 +78,31 @@ const (
 	// names no sibling fixture defines.
 	fixtProdEKSClusterName      = "acme-prod"
 	fixtRelatedEC2NGNodeGroupID = "general-pool"
+	// EC2 posture witnesses — one demo instance per Prowler-derived finding,
+	// every other instance explicitly set to the healthy counterpart so the
+	// demo bench shows exactly one row per signal.
+	//
+	// EC2InstanceIMDSv1 is the only instance whose MetadataOptions leave
+	// HttpTokens optional; every other instance requires a session token.
+	EC2InstanceIMDSv1 = "i-0a1b2c3d4e5f60006"
+	// EC2InstancePublicIPOnly holds a public address behind acme-web-alb-sg,
+	// which opens 443/80 only — a public address with no sensitive port
+	// behind it. It is also the instance the Addresses fixture associates an
+	// Elastic IP with, so the address is the one it would really have.
+	EC2InstancePublicIPOnly = "i-0a1b2c3d4e5f60001"
+	// EC2InstanceInternetExposed holds a public address AND carries
+	// public-ssh-bad (sg-0public0ssh000001, port 22 open to 0.0.0.0/0).
+	EC2InstanceInternetExposed = "i-0a1b2c3d4e5f60005"
+	// EBSSnapPublic is the only demo snapshot restorable by every AWS
+	// account; every other snapshot is private to this account.
+	EBSSnapPublic = "snap-0a1b2c3d4e5f60002"
+	// AMIPublic is the only demo image whose launch permission includes every
+	// AWS account; every other image sets Public=false.
+	AMIPublic = "ami-0public00000000001"
+	// EC2InstanceUserDataSecret is the only instance whose user data carries
+	// a plaintext credential; every other instance returns demoUserData.
+	EC2InstanceUserDataSecret = "i-0a1b2c3d4e5f60002"
+
 	// HealthyTGWID is the only demo Transit Gateway with a single VPC
 	// attachment left in the Available state — the sole witness for the tgw
 	// Healthy color bucket.
@@ -147,6 +179,17 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	// The staging VPC's own ACTIVE flow log is the only demo witness for the
 	// vpc Healthy color bucket (EnrichVPCFlowLogs raises vpc.no-flow-logs for
 	// every VPC without one).
+	f.PublicSnapshotIDs = []string{EBSSnapPublic}
+	f.UserDataByInstanceID = map[string]string{
+		// The only demo instance whose bootstrap script pastes a credential
+		// instead of resolving one from Secrets Manager.
+		EC2InstanceUserDataSecret: `#!/bin/bash
+set -euo pipefail
+yum update -y
+export DB_PASSWORD=hunter2hunter2
+/opt/acme/bin/api-server --db-user acme
+`,
+	}
 	f.FlowLogsByResourceID = map[string][]ec2types.FlowLog{
 		"vpce-0aaa111111111111a": {
 			{
@@ -484,7 +527,7 @@ func makeInstance(
 		MetadataOptions: &ec2types.InstanceMetadataOptionsResponse{
 			State:                   ec2types.InstanceMetadataOptionsStateApplied,
 			HttpEndpoint:            ec2types.InstanceMetadataEndpointStateEnabled,
-			HttpTokens:              ec2types.HttpTokensStateRequired,
+			HttpTokens:              httpTokensFor(instanceID),
 			HttpPutResponseHopLimit: aws.Int32(2),
 		},
 		PrivateDnsName: aws.String(privateDNS(privateIP)),
@@ -563,10 +606,27 @@ func makeInstance(
 			ec2types.Tag{Key: aws.String("aws:ec2launchtemplate:id"), Value: aws.String(ProdWebLTID)},
 		)
 	}
+	// The bastion is the sole internet-exposure witness: a public address in
+	// front of public-ssh-bad, whose port 22 is open to 0.0.0.0/0.
+	if instanceID == EC2InstanceInternetExposed {
+		inst.SecurityGroups = append(inst.SecurityGroups, ec2types.GroupIdentifier{
+			GroupId:   aws.String("sg-0public0ssh000001"),
+			GroupName: aws.String("public-ssh-bad"),
+		})
+	}
 	if publicIP != "" {
 		inst.PublicIpAddress = aws.String(publicIP)
 	}
 	return inst
+}
+
+// httpTokensFor keeps EC2InstanceIMDSv1 the single demo instance that still
+// answers IMDSv1; every other instance requires a session token.
+func httpTokensFor(instanceID string) ec2types.HttpTokensState {
+	if instanceID == EC2InstanceIMDSv1 {
+		return ec2types.HttpTokensStateOptional
+	}
+	return ec2types.HttpTokensStateRequired
 }
 
 func buildReservations() []ec2types.Reservation {
@@ -600,7 +660,7 @@ func buildReservations() []ec2types.Reservation {
 
 	named := []instSpec{
 		{"i-0a1b2c3d4e5f60001", "web-prod-01", "running", ec2types.InstanceTypeT3Large, "10.0.1.10", "54.210.33.112", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 11, 15, 8, 30, 0, 0, time.UTC), ""},
-		{"i-0a1b2c3d4e5f60002", "web-prod-02", "running", ec2types.InstanceTypeT3Large, "10.0.1.11", "54.210.33.113", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 11, 15, 8, 32, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60002", "web-prod-02", "running", ec2types.InstanceTypeT3Large, "10.0.1.11", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 11, 15, 8, 32, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60003", "api-staging-01", "running", ec2types.InstanceTypeM5Xlarge, "10.0.2.50", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2026, 1, 20, 14, 15, 0, 0, time.UTC), ec2types.InstanceLifecycleTypeSpot},
 		{"i-0a1b2c3d4e5f60004", "worker-batch-03", "stopped", ec2types.InstanceTypeC5Xlarge, "10.0.3.100", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2025, 9, 5, 11, 0, 0, 0, time.UTC), ec2types.InstanceLifecycleTypeSpot},
 		{"i-0a1b2c3d4e5f60005", "bastion-prod", "running", ec2types.InstanceTypeT3Micro, "10.0.0.5", "52.87.221.44", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC), ""},
@@ -653,10 +713,9 @@ func buildReservations() []ec2types.Reservation {
 		name := fmt.Sprintf("%s-%02d", namePool[i%len(namePool)], idx)
 		state := statePool[i%len(statePool)]
 		ip := fmt.Sprintf("10.0.%d.%d", (idx/10)+1, 10+idx)
+		// No generated instance carries a public address: ec2.public-ip and
+		// ec2.internet-exposed each keep a single named witness above.
 		publicIP := ""
-		if i%5 == 0 {
-			publicIP = fmt.Sprintf("54.210.%d.%d", 34+i, 100+i)
-		}
 		instanceID := fmt.Sprintf("i-0a1b2c3d4e5f6%04d", idx)
 		inst := makeInstance(
 			instanceID, name, state,
@@ -3424,6 +3483,22 @@ func buildImages() []ec2types.Image {
 			EnaSupport: aws.Bool(true),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-eks-worker-al2-1.29")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		// Public=true → the ami.public witness: an account-owned image whose
+		// launch permission was left open to every AWS account.
+		{
+			ImageId: aws.String(AMIPublic), Name: aws.String("acme-demo-appliance-public"),
+			State: ec2types.ImageStateAvailable, Architecture: ec2types.ArchitectureValuesX8664,
+			PlatformDetails: aws.String("Linux/UNIX"), RootDeviceType: ec2types.DeviceTypeEbs,
+			RootDeviceName: aws.String("/dev/xvda"), Hypervisor: ec2types.HypervisorTypeXen,
+			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,
+			CreationDate: aws.String("2026-03-02T09:15:00.000Z"), Public: aws.Bool(true),
+			OwnerId: aws.String("123456789012"), Description: aws.String("Shared appliance image — launch permission left open to all accounts"),
+			EnaSupport: aws.Bool(true),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-demo-appliance-public")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},

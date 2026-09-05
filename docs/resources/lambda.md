@@ -246,6 +246,9 @@ One row per signal from §3:
 | `LastUpdateStatus==Failed` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `update failed: <LastUpdateStatusReasonCode>` | — |
 | `Runtime` deprecated — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `runtime deprecated: <Runtime>` | — |
 | `DeadLetterConfig==nil` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no DLQ — async failures dropped` | — |
+| credential in `Environment.Variables` | 1 | Broken | `!` | S2, S4, S5 | `credential in environment variables` | `A credential is stored as a plaintext environment variable on this function; move it to Secrets Manager and rotate it.` |
+| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S3, S4, S5 | `invokable by anyone` | `The function's resource policy allows a wildcard principal, so any AWS caller can invoke it.` |
+| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S3, S4, S5 | `function endpoint open without authentication` | `The function has a web endpoint that requires no authentication; anyone who learns the address can invoke it.` |
 
 Rules for filling list and detail text:
 
@@ -350,6 +353,9 @@ lambda — COMPUTE. Lifecycle key: `state`.
 | lambda.state.failed | failed | broken | wave1 |
 | lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 |
 | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 |
+| lambda.env-secret | credential in environment variables | broken | wave1 |
+| lambda.public-policy | invokable by anyone | broken | wave2 |
+| lambda.function-url-public | function endpoint open without authentication | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

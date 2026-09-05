@@ -32,4 +32,19 @@ const (
 	// CodeEC2StateTerminated — instance is in the "terminated" lifecycle
 	// state (permanent, no further action possible). Severity: SevDim.
 	CodeEC2StateTerminated domain.FindingCode = "ec2.state.terminated"
+
+	// CodeEC2IMDSv1Allowed — instance metadata is reachable without a
+	// session token (MetadataOptions.HttpTokens == optional).
+	// Severity: SevWarn.
+	CodeEC2IMDSv1Allowed domain.FindingCode = "ec2.imdsv1-allowed"
+
+	// CodeEC2PublicIP — instance holds a routable public IPv4 address.
+	// Severity: SevWarn.
+	CodeEC2PublicIP domain.FindingCode = "ec2.public-ip"
+)
+
+// S5 operator sentences stamped onto Finding.Detail for the posture codes above.
+const (
+	ec2IMDSv1AllowedDetail = "Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Set MetadataOptions.HttpTokens to required on the instance."
+	ec2PublicIPDetail      = "The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly."
 )

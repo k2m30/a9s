@@ -12,6 +12,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchLambdaFunctionsPage calls the Lambda ListFunctions API and returns
@@ -147,6 +148,22 @@ func FetchLambdaFunctionsPageWithEventSources(
 				Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured",
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
+		}
+
+		// Independent of the lifecycle switch above: ListFunctions already
+		// carries the environment, so a pasted credential is readable in
+		// Wave 1 and colours the row on its own.
+		if fn.Environment != nil {
+			if hits := secretscan.ScanKV(fn.Environment.Variables); len(hits) > 0 {
+				r.Findings = append(r.Findings, domain.Finding{
+					Code: CodeLambdaEnvSecret, Phrase: "credential in environment variables",
+					Detail:   lambdaEnvSecretDetail,
+					Severity: domain.SevBroken, Source: "wave1",
+				})
+				for _, h := range hits {
+					addWave1Rows(&r, CodeLambdaEnvSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+				}
+			}
 		}
 
 		resources = append(resources, r)

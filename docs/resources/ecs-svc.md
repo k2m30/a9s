@@ -209,6 +209,7 @@ One row per signal from §3:
 | `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `unable to place` | `Scheduler cannot place tasks — check subnet IPs, capacity providers, constraints.` |
 | `events[]` matches `ELB health checks failed` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `ELB health checks failed` | `Tasks killed by load balancer — target group health-check is failing.` |
 | deployment circuit-breaker triggered | 2 | Broken | `!` | S2, S4, S5, S1 | `circuit breaker` | `Circuit breaker halted the rollout after repeated task failures.` |
+| `awsvpcConfiguration.assignPublicIp == ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks get public IPs` | `Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway.` |
 
 Rules for filling list and detail text:
 
@@ -278,6 +279,7 @@ ecs-svc — COMPUTE. Lifecycle key: `status`.
 | ecs-svc.state.inactive | inactive | broken | wave1 |
 | ecs-svc.state.draining | draining | warn | wave1 |
 | ecs-svc.deployment-failed | deployment failed | broken | wave2 |
+| ecs-svc.public-ip | tasks get public IPs | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

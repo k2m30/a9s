@@ -29,6 +29,28 @@ type LambdaGetFunctionAPI interface {
 	GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error)
 }
 
+// LambdaGetPolicyAPI defines the interface for the Lambda GetPolicy
+// operation — the function's resource policy. Deliberately NOT part of the
+// LambdaAPI aggregate: only the Wave-2 posture enricher needs it, and it
+// type-asserts (mirroring EC2DescribeInstanceAttributeAPI's precedent) so a
+// narrow client that cannot serve it degrades to no findings.
+type LambdaGetPolicyAPI interface {
+	GetPolicy(ctx context.Context, params *lambda.GetPolicyInput, optFns ...func(*lambda.Options)) (*lambda.GetPolicyOutput, error)
+}
+
+// LambdaListFunctionUrlConfigsAPI defines the interface for the Lambda
+// ListFunctionUrlConfigs operation. Same aggregate-exclusion rationale as
+// LambdaGetPolicyAPI.
+type LambdaListFunctionUrlConfigsAPI interface {
+	ListFunctionUrlConfigs(ctx context.Context, params *lambda.ListFunctionUrlConfigsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionUrlConfigsOutput, error)
+}
+
+// LambdaPostureAPI is the pair of read-only calls EnrichLambdaPosture makes.
+type LambdaPostureAPI interface {
+	LambdaGetPolicyAPI
+	LambdaListFunctionUrlConfigsAPI
+}
+
 // LambdaAPI is the aggregate interface covering all Lambda operations used by a9s fetchers.
 // *lambda.Client structurally satisfies this interface.
 type LambdaAPI interface {

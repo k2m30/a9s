@@ -328,6 +328,10 @@ func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 				MinSize:              aws.Int32(2),
 				MaxSize:              aws.Int32(10),
 				DesiredCapacity:      aws.Int32(4),
+				// Two zones so the single-AZ resilience rule stays silent; the
+				// group is behind no load balancer and uses no launch
+				// configuration, so those two rules do not apply here.
+				AvailabilityZones: []string{"us-east-1a", "us-east-1b"},
 				// Status is nil → healthy (no "Delete in progress").
 				// 4 healthy InService instances so in_service_count(4) >= min_size(2)
 				// and instances_unhealthy_count == 0 — otherwise the underprovisioned

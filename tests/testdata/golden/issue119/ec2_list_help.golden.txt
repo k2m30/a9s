@@ -2,15 +2,15 @@
 ┌────────────────────────────────────────────────────────────────── help ──────────────────────────────────────────────────────────────────┐
 │ NAVIGATION            ACTIONS               SORT                  FILTER                OTHER                 COMMANDS                   │
 │                                                                                                                                          │
-│ j/k      up/down      enter/d  detail       1-0      sort col 1-10ctrl+z   Toggle attention filter (hide healthy/dim rows)ctrl+r   refresh      :q       exit│
+│ j/k      up/down      enter/d  detail       1-0      sort col 1-10  ctrl+z   Toggle attention filter (hide healthy/dim rows)  ctrl+r   refresh      :q       exit│
 │ g/G      top/bottom   y        yaml                                                     esc      back         :ctx     switch profile    │
 │ pgup     page up      J        json                                                     q        quit         :profile switch profile    │
-│ pgdn     page down    t        cloudtrail events                                            i        identity     :region  switch region │
+│ pgdn     page down    t        cloudtrail events                                              i        identity     :region  switch region│
 │ h/l      scroll cols  c        copy id                                                  !        error log    :theme   switch theme      │
-│                       /        filter                                                   ?        help         :help    show help         │
-│                       :        command                                                                        :root    main menu         │
-│                                                                                                               :main    main menu         │
-│                                                                                                               :<res>   e.g. :ec2 :s3 :lambda│
+│                       o        open console                                             ?        help         :help    show help         │
+│                       O        copy console url                                                                    :root    main menu    │
+│                       /        filter                                                                         :main    main menu         │
+│                       :        command                                                                        :<res>   e.g. :ec2 :s3 :lambda│
 │                                                                                                                                          │
 │                                                         Theme: Tokyo Night Dark                                                          │
 │                                                          Press any key to close                                                          │

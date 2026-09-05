@@ -4,6 +4,8 @@
 package fixtures
 
 import (
+	"encoding/base64"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -77,13 +79,59 @@ func NewASGFixtures() *ASGFixtures {
 	return sharedASGFixtures()
 }
 
+// ASG posture witnesses — one demo group per Prowler-derived finding.
+const (
+	// ASGLegacyLaunchConfig is the only group still launching from a launch
+	// configuration; every other group uses a launch template. It is
+	// therefore also the only group the launch-configuration checks below
+	// can apply to.
+	ASGLegacyLaunchConfig = "acme-web-prod-asg"
+	// ASGSingleAZ is the only group confined to one availability zone.
+	ASGSingleAZ = "acme-staging-asg"
+	// ASGNoELBHealthCheck is the only group attached to a target group while
+	// still deciding health from EC2 status checks alone.
+	ASGNoELBHealthCheck = "asg-unhealthy-instance"
+	// ASGLaunchConfigIMDSv1 / ASGLaunchConfigPublicIP / ASGLaunchConfigSecret
+	// all name the same group: acme-web-prod-lc is the only launch
+	// configuration in the demo, so all three signals land on its group.
+	ASGLaunchConfigIMDSv1   = ASGLegacyLaunchConfig
+	ASGLaunchConfigPublicIP = ASGLegacyLaunchConfig
+	ASGLaunchConfigSecret   = ASGLegacyLaunchConfig
+)
+
 const (
 	asgSubnetA = "subnet-0aaa111111111111a"
 	asgSubnetB = "subnet-0bbb222222222222b"
 	asgSubnetC = "subnet-0ccc333333333333c"
 )
 
+// asgAZsFor maps a group's VPCZoneIdentifier to the availability zones its
+// subnets sit in, so AvailabilityZones can never drift from the subnet list.
+// asg-staging is the single-AZ witness purely because it has one subnet.
+func asgAZsFor(vpcZoneIdentifier string) []string {
+	azBySubnet := map[string]string{
+		asgSubnetA: "us-east-1a",
+		asgSubnetB: "us-east-1b",
+		asgSubnetC: "us-east-1c",
+	}
+	var azs []string
+	for subnet := range strings.SplitSeq(vpcZoneIdentifier, ",") {
+		if az, ok := azBySubnet[strings.TrimSpace(subnet)]; ok {
+			azs = append(azs, az)
+		}
+	}
+	return azs
+}
+
 func buildASGGroups() []asgtypes.AutoScalingGroup {
+	groups := buildASGGroupsRaw()
+	for i := range groups {
+		groups[i].AvailabilityZones = asgAZsFor(aws.ToString(groups[i].VPCZoneIdentifier))
+	}
+	return groups
+}
+
+func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 	return []asgtypes.AutoScalingGroup{
 		{
 			AutoScalingGroupName:    aws.String("acme-web-prod-asg"),
@@ -231,7 +279,7 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			DesiredCapacity:        aws.Int32(2),
 			HealthCheckType:        aws.String("ELB"),
 			HealthCheckGracePeriod: aws.Int32(120),
-			VPCZoneIdentifier:      aws.String(asgSubnetA),
+			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-04-20T08:00:00Z")),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0ccc333333333333c"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -258,7 +306,10 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			HealthCheckType:        aws.String("EC2"),
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
-			CreatedTime:            aws.Time(mustTime("2025-05-12T08:00:00Z")),
+			// The asg.no-elb-health-check witness: registered behind the web
+			// target group yet still deciding health from EC2 status checks.
+			TargetGroupARNs: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"},
+			CreatedTime:     aws.Time(mustTime("2025-05-12T08:00:00Z")),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0eee555555555555e"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0fff666666666666f"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -353,9 +404,25 @@ func buildLaunchConfigurations() map[string]asgtypes.LaunchConfiguration {
 			// asgInstanceProfileToRoles → iam:GetInstanceProfile). Resolves to
 			// acme-ec2-instance-role via fixtures/iam.go's InstanceProfiles map.
 			IamInstanceProfile: aws.String("acme-ec2-instance-profile"),
+			// The three launch-configuration witnesses. MetadataOptions is
+			// deliberately absent: a launch configuration without it defaults
+			// to IMDSv1-permitted, and launch configurations cannot be edited
+			// to add it — that immutability is the point of the finding.
+			AssociatePublicIpAddress: aws.Bool(true),
+			UserData:                 aws.String(base64.StdEncoding.EncodeToString([]byte(asgLegacyUserData))),
 		},
 	}
 }
+
+// asgLegacyUserData is the acme-web-prod-lc bootstrap script — the
+// asg.launch-config.secret witness, with the database password pasted in
+// rather than resolved from Secrets Manager at boot.
+const asgLegacyUserData = `#!/bin/bash
+set -euo pipefail
+yum install -y httpd
+export DB_PASSWORD=Pr0dWebLegacy2024
+/opt/acme/bin/web-server --db-user acme
+`
 
 func buildActivitiesFor(asgName string) []asgtypes.Activity {
 	return []asgtypes.Activity{

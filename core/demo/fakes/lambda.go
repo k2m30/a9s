@@ -82,6 +82,28 @@ func (f *LambdaFake) GetFunction(_ context.Context, input *lambda.GetFunctionInp
 	}
 }
 
+// GetPolicy returns the fixture-registered resource policy for the function.
+// A function with no registered policy answers ResourceNotFoundException,
+// exactly as real Lambda does — that is the healthy shape, not an outage.
+func (f *LambdaFake) GetPolicy(_ context.Context, input *lambda.GetPolicyInput, _ ...func(*lambda.Options)) (*lambda.GetPolicyOutput, error) {
+	name := aws.ToString(input.FunctionName)
+	if policy, ok := f.fix.Policies[name]; ok {
+		return &lambda.GetPolicyOutput{Policy: aws.String(policy)}, nil
+	}
+	return nil, &smithy.GenericAPIError{
+		Code:    "ResourceNotFoundException",
+		Message: "The resource you requested does not exist.",
+	}
+}
+
+// ListFunctionUrlConfigs returns the fixture-registered function URLs.
+// Unlike GetPolicy, real Lambda answers with an empty list rather than an
+// error when a function has none.
+func (f *LambdaFake) ListFunctionUrlConfigs(_ context.Context, input *lambda.ListFunctionUrlConfigsInput, _ ...func(*lambda.Options)) (*lambda.ListFunctionUrlConfigsOutput, error) {
+	name := aws.ToString(input.FunctionName)
+	return &lambda.ListFunctionUrlConfigsOutput{FunctionUrlConfigs: f.fix.FunctionURLConfigs[name]}, nil
+}
+
 func (f *LambdaFake) ListTags(_ context.Context, input *lambda.ListTagsInput, _ ...func(*lambda.Options)) (*lambda.ListTagsOutput, error) {
 	if input == nil || input.Resource == nil {
 		// No specific ARN requested — surface any fixture-registered tag set

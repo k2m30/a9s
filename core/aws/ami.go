@@ -116,6 +116,14 @@ func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationTo
 	}, nil
 }
 
+// amiLaunchable reports an image someone can still launch. Deregistered and
+// disabled images are gone in every sense that matters to a posture check:
+// nobody can launch them, so nothing they are shared with can reach them.
+// The single lifecycle guard for every ami posture finding.
+func amiLaunchable(state ec2types.ImageState) bool {
+	return state != ec2types.ImageStateDeregistered && state != ec2types.ImageStateDisabled
+}
+
 func imageResource(img ec2types.Image) resource.Resource {
 	imageID := ""
 	if img.ImageId != nil {
@@ -219,6 +227,19 @@ func imageResource(img ec2types.Image) resource.Resource {
 				}}
 			}
 		}
+	}
+
+	// Launch permission is evaluated independently of the state switch above,
+	// but not independently of the state itself: an image nobody can launch
+	// exposes nothing, however open its permission reads. The fetcher asks
+	// for Owners=self, so a public image here is one this account owns.
+	if amiLaunchable(img.State) && img.Public != nil && *img.Public {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeAMIPublic, Phrase: "shared with all AWS accounts",
+			Detail:   amiPublicDetail,
+			Severity: domain.SevBroken, Source: "wave1",
+		})
+		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "true", Tier: "!"})
 	}
 
 	return r

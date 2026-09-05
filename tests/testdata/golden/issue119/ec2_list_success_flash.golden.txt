@@ -1,30 +1,30 @@
  a9s v  demo:us-east-1                                                                                                        Copied ec2 id 
-┌──────────────────────────────────────────────────────────────── ec2(27) ─────────────────────────────────────────────────────────────────┐
-│ 1:Name                    2:State       3:Lifecycle   4:Type          5:Private IP      6:Public IP       7:Instance ID                  │
-│ web-prod-01               running       on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e5f60001            │
-│ web-prod-02               running       on-demand     t3.large        10.0.1.11         54.210.33.113     i-0a1b2c3d4e5f60002            │
-│ api-staging-01            ! running     spot          m5.xlarge       10.0.2.50                           i-0a1b2c3d4e5f60003            │
-│ worker-batch-03           stopped       spot          c5.xlarge       10.0.3.100                          i-0a1b2c3d4e5f60004            │
-│ bastion-prod              running       on-demand     t3.micro        10.0.0.5          52.87.221.44      i-0a1b2c3d4e5f60005            │
-│ db-proxy-01               ~ running     on-demand     r5.large        10.0.4.200                          i-0a1b2c3d4e5f60006            │
-│ web-staging-01            pending       spot          t3.medium       10.0.2.70                           i-0a1b2c3d4e5f60007            │
-│ ml-trainer-gpu            stopping      spot          g4dn.xlarge     10.0.5.30                           i-0a1b2c3d4e5f60008            │
-│ temp-load-test            shutting-do…  on-demand     c5.large        10.0.3.55                           i-0a1b2c3d4e5f60009            │
-│ old-migration-worker      terminated    on-demand     t3.small                                            i-0a1b2c3d4e5f60010            │
-│ dev-sandbox-01            stopped       on-demand     t3.medium       10.1.0.20                           i-0a1b2c3d4e5f60030            │
-│ dev-sandbox-02            stopped       on-demand     t3.small        10.1.0.21                           i-0a1b2c3d4e5f60031            │
-│ worker-11                 running       on-demand     t3.medium       10.0.2.21         54.210.34.100     i-0a1b2c3d4e5f60011            │
-│ api-12                    stopped       on-demand     m5.large        10.0.2.22                           i-0a1b2c3d4e5f60012            │
-│ web-13                    running       on-demand     c5.large        10.0.2.23                           i-0a1b2c3d4e5f60013            │
-│ db-14                     running       on-demand     r5.large        10.0.2.24                           i-0a1b2c3d4e5f60014            │
-│ cache-15                  stopped       on-demand     t3.large        10.0.2.25                           i-0a1b2c3d4e5f60015            │
-│ monitor-16                running       on-demand     m5.xlarge       10.0.2.26         54.210.39.105     i-0a1b2c3d4e5f60016            │
-│ proxy-17                  stopped       on-demand     c5.xlarge       10.0.2.27                           i-0a1b2c3d4e5f60017            │
-│ queue-18                  running       on-demand     t3.small        10.0.2.28                           i-0a1b2c3d4e5f60018            │
-│ search-19                 running       on-demand     r5.xlarge       10.0.2.29                           i-0a1b2c3d4e5f60019            │
-│ batch-20                  stopped       on-demand     t3.micro        10.0.3.30                           i-0a1b2c3d4e5f60020            │
-│ worker-21                 running       on-demand     m5.large        10.0.3.31         54.210.44.110     i-0a1b2c3d4e5f60021            │
-│ api-22                    stopped       on-demand     c5.large        10.0.3.32                           i-0a1b2c3d4e5f60022            │
-│ web-23                    running       on-demand     t3.medium       10.0.3.33                           i-0a1b2c3d4e5f60023            │
-│ db-24                     running       on-demand     r5.large        10.0.3.34                           i-0a1b2c3d4e5f60024            │
-└─────────────────────────────────────────────────────────────────────────────y YAML──J JSON──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘
+┌────────────────────────────────────────────────────────────── ec2(40) !15 ───────────────────────────────────────────────────────────────┐
+│ 1:Name                    2:Status          3:Health      4:Lifecycle   5:Type          6:Private IP      7:Public IP       8:Instance…  │
+│ web-prod-01               public address    ok            on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d…  │
+│ web-prod-02               running           ok            on-demand     t3.large        10.0.1.11                           i-0a1b2c3d…  │
+│ api-staging-01            ! running         impaired      spot          m5.xlarge       10.0.2.50                           i-0a1b2c3d…  │
+│ worker-batch-03           stopped                         spot          c5.xlarge       10.0.3.100                          i-0a1b2c3d…  │
+│ bastion-prod              public address    ok            on-demand     t3.micro        10.0.0.5          52.87.221.44      i-0a1b2c3d…  │
+│ db-proxy-01               IMDSv1 allowed    initializing  on-demand     r5.large        10.0.4.200                          i-0a1b2c3d…  │
+│ web-staging-01            pending                         spot          t3.medium       10.0.2.70                           i-0a1b2c3d…  │
+│ ml-trainer-gpu            stopping                        spot          g4dn.xlarge     10.0.5.30                           i-0a1b2c3d…  │
+│ temp-load-test            shutting down                   on-demand     c5.large        10.0.3.55                           i-0a1b2c3d…  │
+│ old-migration-worker      terminated                      on-demand     t3.small                                            i-0a1b2c3d…  │
+│ api-worker-01             running           insufficien…  on-demand     m5.large        10.0.10.10                          i-0aaa1111…  │
+│ api-worker-02             running           ok            on-demand     m5.large        10.0.10.11                          i-0bbb2222…  │
+│ batch-processor-01        running           ok            on-demand     c5.large        10.0.10.20                          i-0ccc3333…  │
+│ batch-processor-02        running           ok            on-demand     c5.large        10.0.10.21                          i-0ddd4444…  │
+│ web-worker-01             running           ok            on-demand     t3.large        10.0.10.30                          i-0eee5555…  │
+│ web-worker-02             running           ok            on-demand     t3.large        10.0.10.31                          i-0fff6666…  │
+│ web-worker-03             running           ok            on-demand     t3.large        10.0.10.32                          i-0aaa7777…  │
+│ payments-worker-01        running           ok            on-demand     c5.xlarge       10.0.10.40                          i-0bbb8888…  │
+│ payments-worker-02        running           ok            on-demand     c5.xlarge       10.0.10.41                          i-0ccc9999…  │
+│ batch-etl-host-01         running           ok            on-demand     m5.large        10.0.10.50                          e1f2a3b4c5…  │
+│ dev-sandbox-01            stopped                         on-demand     t3.medium       10.1.0.20                           i-0a1b2c3d…  │
+│ dev-sandbox-02            stopped                         on-demand     t3.small        10.1.0.21                           i-0a1b2c3d…  │
+│ ml-inference-01           running           ok            on-demand     g5.xlarge       10.0.6.10                           i-0a1b2c3d…  │
+│ ml-inference-02           running           ok            on-demand     g5.xlarge       10.0.6.11                           i-0a1b2c3d…  │
+│ ml-inference-03           running           ok            on-demand     g5.xlarge       10.0.6.12                           i-0a1b2c3d…  │
+│ worker-11                 running           ok            on-demand     t3.medium       10.0.2.21                           i-0a1b2c3d…  │
+└─────────────────────────────────────────────────────────────────────y YAML──J JSON──o Open──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘
