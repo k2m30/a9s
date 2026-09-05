@@ -43,15 +43,22 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return result, nil
 	}
 
-	// Paginate with a cap.
+	// Paginate with a cap. A page that fails ends the walk but keeps the pages
+	// already read: the instances they name have real pending maintenance
+	// whatever happened afterwards. A failed page does lower-bound the walk,
+	// unlike the cap, which bounds only informational coverage for this
+	// "~"-only pass.
 	var allActions []rdstypes.ResourcePendingMaintenanceActions
 	var marker *string
+	var walkErr error
 	pages := 0
 	for pages < EnrichmentCap {
 		out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
 		pages++
 		if err != nil {
-			return result, err
+			walkErr = err
+			result.Truncated = true
+			break
 		}
 		allActions = append(allActions, out.PendingMaintenanceActions...)
 		if out.Marker == nil || *out.Marker == "" {
@@ -59,6 +66,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		}
 		marker = out.Marker
 	}
+
 
 	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
 	// parallel statusByID map: the merged S4 phrase (single-finding or
@@ -132,7 +140,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	// Pending maintenance is "~"-only: EnrichmentCap bounds informational
 	// coverage, never the issue count. The engine-deprecated pass below is
 	// "!", and sets Truncated itself when its walk is cut short.
-	return result, nil
+	return result, walkErr
 }
 
 // enrichDBIEngineVersions calls DescribeDBEngineVersions once per distinct

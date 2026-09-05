@@ -130,25 +130,23 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			return
 		}
 
-		adminPolicy := ""
-		attached, aerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedUserPoliciesOutput, error) {
-			return clients.IAM.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
-				UserName: aws.String(userName),
-			})
-		})
+		attachedUser, aerr := listAttachedUserPolicies(ctx, clients.IAM, userName)
+		adminPolicy := adminAttachedPolicyName(attachedUser)
 		if aerr != nil {
 			mu.Lock()
 			result.TruncatedIDs[r.ID] = true
 			mu.Unlock()
-		} else {
-			adminPolicy = adminAttachedPolicyName(attached.AttachedPolicies)
 		}
 
 		activeKeys := activeAccessKeys(keysOut.AccessKeyMetadata)
-		unusedKeys := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
+		unusedKeys, keyUseKnown := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
 
 		mu.Lock()
 		defer mu.Unlock()
+
+		if !keyUseKnown {
+			result.TruncatedIDs[r.ID] = true
+		}
 
 		mfaVal := "false"
 		if hasMFA || !hasConsolePassword {
@@ -163,7 +161,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if hasConsolePassword && !hasMFA {
 			riskLabel = riskNoMFA
 			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, "console user without MFA", "!", "iam-user",
-				[]domain.DetailRow{{Label: "MFA", Value: "console user without MFA", Tier: "!"}}, iamUserNoMFADetail)
+				[]domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: "!"}}, iamUserNoMFADetail)
 		}
 
 		if hasConsolePassword && r.Fields["password_last_used"] == "Never" &&
@@ -184,7 +182,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			}
 			phrase := fmt.Sprintf("key %s >90d (rotation)", lastFourOfKeyID(aws.ToString(key.AccessKeyId)))
 			setWave2Finding(&result, r.ID, iamUserCodeOldKey, phrase, "~", "iam-user",
-				[]domain.DetailRow{{Label: "Access Key", Value: phrase, Tier: "~"}}, iamUserOldKeyDetail)
+				[]domain.DetailRow{{Label: "Access key", Value: lastFourOfKeyID(aws.ToString(key.AccessKeyId)), Tier: "~"}}, iamUserOldKeyDetail)
 			break
 		}
 
@@ -266,13 +264,15 @@ type idleKey struct {
 
 // unusedAccessKeys calls GetAccessKeyLastUsed per active key and returns the
 // keys whose last use (or, absent any use, whose creation) is older than
-// unusedCredentialAge. A client that does not serve the API, or a per-key
-// error, yields no finding rather than a false one.
-func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys []iamtypes.AccessKeyMetadata) []idleKey {
+// unusedCredentialAge. ok is false when any key's last use could not be read:
+// the user is then unknown for this check, not clean, since the unread key is
+// exactly the one that might be idle. A client that does not serve the API
+// reports no keys and stays ok — nothing was attempted, so nothing is unknown.
+func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys []iamtypes.AccessKeyMetadata) (out []idleKey, ok bool) {
 	if api == nil {
-		return nil
+		return nil, true
 	}
-	var out []idleKey
+	ok = true
 	for _, k := range keys {
 		keyID := aws.ToString(k.AccessKeyId)
 		if keyID == "" {
@@ -282,6 +282,7 @@ func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys 
 			return api.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: aws.String(keyID)})
 		})
 		if err != nil {
+			ok = false
 			continue
 		}
 		var lastUsedAt *time.Time
@@ -308,7 +309,7 @@ func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys 
 			idleDays: int(idle.Hours() / 24),
 		})
 	}
-	return out
+	return out, ok
 }
 
 // lastFourOfKeyID renders an access key ID as its last four characters only.

@@ -291,6 +291,20 @@ type w4RoleGetFake struct {
 	roles map[string]iamtypes.Role
 }
 
+// The drill path walks inline policies now, so a fake that claims the whole
+// IAM API has to answer for them; the embedded nil interface would panic.
+func (f *w4RoleGetFake) ListRolePolicies(
+	_ context.Context, _ *iam.ListRolePoliciesInput, _ ...func(*iam.Options),
+) (*iam.ListRolePoliciesOutput, error) {
+	return &iam.ListRolePoliciesOutput{}, nil
+}
+
+func (f *w4RoleGetFake) GetRolePolicy(
+	_ context.Context, _ *iam.GetRolePolicyInput, _ ...func(*iam.Options),
+) (*iam.GetRolePolicyOutput, error) {
+	return &iam.GetRolePolicyOutput{}, nil
+}
+
 func (f *w4RoleGetFake) GetRole(
 	_ context.Context, in *iam.GetRoleInput, _ ...func(*iam.Options),
 ) (*iam.GetRoleOutput, error) {

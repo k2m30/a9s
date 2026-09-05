@@ -435,7 +435,7 @@ func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
 		getPolicyVersionResults: map[string]*iam.GetPolicyVersionOutput{
 			policyARN: {
 				PolicyVersion: &iamtypes.PolicyVersion{
-					Document: aws.String(url.QueryEscape(adminDoc)),
+					Document: aws.String(url.PathEscape(adminDoc)),
 				},
 			},
 		},

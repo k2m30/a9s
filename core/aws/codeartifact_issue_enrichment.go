@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,6 +13,7 @@ import (
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -23,12 +23,17 @@ const (
 	codeartifactCodeNoPermissionsPolicy domain.FindingCode = "codeartifact.no-permissions-policy"
 )
 
+// codeartifactPublicAccessPolicyDetail is the S5 operator sentence for
+// codeartifactCodePublicAccessPolicy.
+const codeartifactPublicAccessPolicyDetail = "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or scope the grant with a condition."
+
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
 // EnrichmentCap) to surface IAM policy findings.
 //
 // Findings:
 //   - ResourceNotFoundException → "~" severity, "no permissions policy" (default open within domain).
-//   - Policy.Document contains `"Principal":"*"` → "!" severity, "public access policy".
+//   - the resource policy grants a wildcard principal with no restrictive
+//     condition → "!" severity, "public access policy".
 //
 // Per-repo errors other than ResourceNotFoundException mark Truncated=true and are skipped.
 // Skip when clients.CodeArtifact == nil.
@@ -41,6 +46,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	if clients.CodeArtifact == nil {
 		return result, nil
 	}
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
@@ -122,12 +128,15 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if out.Policy == nil || out.Policy.Document == nil {
 			return
 		}
-		doc := *out.Policy.Document
-		if strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`) {
+		parsed, perr := iampolicy.Parse(*out.Policy.Document)
+		if perr != nil {
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+			return
+		}
+		if ex := iampolicy.Evaluate(parsed, ownAccount); ex.Public {
 			setWave2Finding(&result, key, codeartifactCodePublicAccessPolicy, "public access policy", "!", "codeartifact",
-				[]domain.DetailRow{
-					{Label: "Principal", Value: "*", Tier: "!"},
-				}, "")
+				publicPolicyRows(ex), codeartifactPublicAccessPolicyDetail)
 		}
 	})
 	result.Truncated = truncated

@@ -23,6 +23,10 @@ const (
 	ecsSvcCodePublicIP         domain.FindingCode = "ecs-svc.public-ip"
 )
 
+// ecsSvcDeploymentFailedDetail is the S5 operator sentence for
+// ecsSvcCodeDeploymentFailed.
+const ecsSvcDeploymentFailedDetail = "This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them."
+
 // ecsSvcPublicIPDetail is the S5 operator sentence for ecsSvcCodePublicIP.
 const ecsSvcPublicIPDetail = "Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway."
 
@@ -145,8 +149,11 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					if ev.CreatedAt == nil || ev.Message == nil {
 						continue
 					}
+					// The service event list is capped at 100 entries and its
+					// order is not part of the API contract, so an old event
+					// ends this event, not the scan.
 					if now.Sub(*ev.CreatedAt) > 10*time.Minute {
-						break // Events are newest-first; stop once outside the 10m window.
+						continue
 					}
 					msg := strings.ToLower(*ev.Message)
 					if strings.Contains(msg, "unable to place") {
@@ -193,7 +200,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					summary = eventIssues[0]
 				}
 
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows, "")
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows, ecsSvcDeploymentFailedDetail)
 			}
 		}
 	}

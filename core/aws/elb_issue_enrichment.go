@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -213,9 +214,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if r.ID == "" || lbARN == "" {
 			return
 		}
-		listeners, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (resource.FetchResult, error) {
-			return FetchELBListeners(ctx, clients.ELBv2, map[string]string{"load_balancer_arn": lbARN}, "")
-		})
+		listeners, err := allELBListeners(ctx, clients.ELBv2, lbARN)
 		mu.Lock()
 		defer mu.Unlock()
 		total++
@@ -223,26 +222,60 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			MarkSkipped(&result, r.ID, &failures, "DescribeListeners", err)
 			return
 		}
-		seen := make(map[domain.FindingCode]bool, 2)
-		for _, lr := range listeners.Resources {
-			listener, ok := assertStruct[elbtypes.Listener](lr.RawStruct)
-			if !ok {
-				continue
-			}
+		var cleartextPorts []string
+		var cleartextRows []domain.DetailRow
+		weakSeen := false
+		for _, listener := range listeners {
 			code, phrase, row, bad := elbListenerExposure(r.Fields["type"], listener)
-			if !bad || seen[code] {
-				continue
+			switch {
+			case !bad:
+			case code == elbCodePlainHTTPListener:
+				cleartextPorts = append(cleartextPorts, strconv.Itoa(int(aws.ToInt32(listener.Port))))
+				cleartextRows = append(cleartextRows, row)
+			case !weakSeen:
+				weakSeen = true
+				setWave2Finding(&result, r.ID, code, phrase, "~", "elb",
+					[]domain.DetailRow{row}, elbWeakTLSPolicyDetail)
 			}
-			seen[code] = true
-			detail := elbPlainHTTPListenerDetail
-			if code == elbCodeWeakTLSPolicy {
-				detail = elbWeakTLSPolicyDetail
-			}
-			setWave2Finding(&result, r.ID, code, phrase, "~", "elb", []domain.DetailRow{row}, detail)
+		}
+		if len(cleartextPorts) > 0 {
+			// Every port in the clear is a port to close, so the phrase names
+			// all of them rather than sending the operator back to the console
+			// for the rest.
+			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener,
+				"ports "+strings.Join(cleartextPorts, ", ")+" in the clear", "~", "elb",
+				cleartextRows, elbPlainHTTPListenerDetail)
 		}
 	})
 	sort.Strings(failures)
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
+}
+
+// allELBListeners reads a balancer's listeners to the end. DescribeListeners
+// pages, and a cleartext listener on the second page is as exposed as one on
+// the first; the walk is bounded by PerParentPageCap like every other
+// per-parent sweep.
+func allELBListeners(ctx context.Context, api ELBv2DescribeListenersAPI, lbARN string) ([]elbtypes.Listener, error) {
+	var out []elbtypes.Listener
+	token := ""
+	for range PerParentPageCap {
+		page, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (resource.FetchResult, error) {
+			return FetchELBListeners(ctx, api, map[string]string{"load_balancer_arn": lbARN}, token)
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, lr := range page.Resources {
+			if listener, ok := assertStruct[elbtypes.Listener](lr.RawStruct); ok {
+				out = append(out, listener)
+			}
+		}
+		if page.Pagination == nil || page.Pagination.NextToken == "" {
+			break
+		}
+		token = page.Pagination.NextToken
+	}
+	return out, nil
 }

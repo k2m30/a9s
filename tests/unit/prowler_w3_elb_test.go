@@ -346,7 +346,7 @@ func TestW3ELBPlainHTTP_ALBHTTPListenerFlagged(t *testing.T) {
 	if !ok {
 		t.Fatalf("HTTP listener forwarding to a target group produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
-	if want := "listener without TLS on port 80"; f.Phrase != want {
+	if want := "ports 80 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 	if f.Severity != domain.SevWarn {
@@ -405,7 +405,7 @@ func TestW3ELBPlainHTTP_NLBPort443WithoutTLS(t *testing.T) {
 	if !ok {
 		t.Fatalf("NLB TCP listener on 443 produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
-	if want := "listener without TLS on port 443"; f.Phrase != want {
+	if want := "ports 443 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 	w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBPlainHTTP].Rows, [][2]string{

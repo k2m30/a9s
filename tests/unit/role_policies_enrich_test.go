@@ -744,10 +744,17 @@ func TestEnrichRolePolicy_DetailEnrichmentCtx_NilPolicyDocs(t *testing.T) {
 // decodePolicyDocument additional tests (exercised via FetchManagedPolicyDocument)
 // ---------------------------------------------------------------------------
 
-func TestDecodePolicyDocument_QueryUnescapeFallback(t *testing.T) {
-	// PathUnescape("%7B%22a%22%3A+1%7D") → {"a":+1}  — INVALID JSON (+ before number)
-	// QueryUnescape("%7B%22a%22%3A+1%7D") → {"a": 1} — VALID JSON   (+ → space)
-	// The decodePolicyDocument fallback branch should parse {"a":1} successfully.
+// TestDecodePolicyDocument_QueryStyleEncodingIsNotRescued is the INVERTED
+// former TestDecodePolicyDocument_QueryUnescapeFallback: it used to assert
+// that a query-style document was rescued by a second QueryUnescape pass.
+// That fallback is what silently turned a literal '+' inside a policy — a
+// resource name, a regex — into a space, so d3 row 12 removed it and every
+// site now decodes path-style only. Do not "restore" this to the old
+// expectation: a document that only parses after '+' becomes a space is not a
+// document IAM produced.
+func TestDecodePolicyDocument_QueryStyleEncodingIsNotRescued(t *testing.T) {
+	// PathUnescape("%7B%22a%22%3A+1%7D") → {"a":+1} — invalid JSON, and that
+	// is the honest answer.
 	encoded := "%7B%22a%22%3A+1%7D"
 
 	getPolicyMock := &enrichGetPolicyClient{
@@ -759,23 +766,12 @@ func TestDecodePolicyDocument_QueryUnescapeFallback(t *testing.T) {
 		},
 	}
 
-	doc, err := awsclient.FetchManagedPolicyDocument(
+	_, err := awsclient.FetchManagedPolicyDocument(
 		context.Background(), getPolicyMock, getVersionMock,
 		"arn:aws:iam::123456789012:policy/fallback-test",
 	)
-	if err != nil {
-		t.Fatalf("expected QueryUnescape fallback to succeed, got error: %v", err)
-	}
-	m, ok := doc.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any, got %T", doc)
-	}
-	val, exists := m["a"]
-	if !exists {
-		t.Fatal("expected key 'a' in decoded document")
-	}
-	if val != float64(1) {
-		t.Errorf("expected float64(1) for key 'a', got %v (%T)", val, val)
+	if err == nil {
+		t.Fatal("query-style encoding was rescued; the literal '+' contract is gone")
 	}
 }
 
@@ -799,8 +795,10 @@ func TestDecodePolicyDocument_PathUnescapeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for malformed percent-encoding, got nil")
 	}
-	if !strings.Contains(err.Error(), "URL decode") {
-		t.Errorf("expected 'URL decode' in error, got: %v", err)
+	// An unescape that cannot run leaves the document as it arrived, so the
+	// JSON parse is the one place that reports the problem.
+	if !strings.Contains(err.Error(), "JSON parse") {
+		t.Errorf("expected 'JSON parse' in error, got: %v", err)
 	}
 }
 

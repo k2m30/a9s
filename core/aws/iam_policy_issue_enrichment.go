@@ -92,13 +92,13 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		if isAdminStarPolicy(doc) {
 			riskVal = riskAdminPolicy
 			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (allows * on *)", "!", "iam-policy", []domain.DetailRow{
-				{Label: "Action", Value: "*", Tier: "!"},
-				{Label: "Resource", Value: "*", Tier: "!"},
+				{Label: "Allowed actions", Value: "all (*)", Tier: "!"},
+				{Label: "On resources", Value: "all (*)", Tier: "!"},
 			}, iamPolicyAdminStarDetail)
 		} else if combos := policyPrivEscCombos(doc); len(combos) > 0 {
 			// An admin policy matches nearly every combination; reporting it
 			// twice would say the same thing in two voices, so admin wins.
-			riskVal = "PRIV_ESC"
+			riskVal = riskPrivEsc
 			setWave2Finding(&result, r.ID, iamPolicyCodePrivEsc,
 				"allows privilege escalation: "+combos[0], "!", "iam-policy",
 				privEscComboRows(combos), iamPolicyPrivEscDetail)

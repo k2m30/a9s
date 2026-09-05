@@ -8,10 +8,12 @@
 package aws
 
 import (
+	"context"
 	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -23,6 +25,55 @@ import (
 var adminManagedPolicyARNs = []string{ //nolint:gochecknoglobals // static AWS-managed ARN set
 	"arn:aws:iam::aws:policy/AdministratorAccess",
 	"arn:aws:iam::aws:policy/PowerUserAccess",
+}
+
+// listAttachedRolePolicies walks every page of a role's attached managed
+// policies. IAM caps a principal at 20 managed policies today, which fits one
+// page, but a quota is not a contract and the group sweep already paginates
+// its equivalent — one shape for all three principals.
+func listAttachedRolePolicies(ctx context.Context, api IAMListAttachedRolePoliciesAPI, roleName string) ([]iamtypes.AttachedPolicy, error) {
+	var all []iamtypes.AttachedPolicy
+	var marker *string
+	for range PerParentPageCap {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedRolePoliciesOutput, error) {
+			return api.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+				RoleName: aws.String(roleName),
+				Marker:   marker,
+			})
+		})
+		if err != nil {
+			return all, err
+		}
+		all = append(all, out.AttachedPolicies...)
+		if !out.IsTruncated {
+			return all, nil
+		}
+		marker = out.Marker
+	}
+	return all, nil
+}
+
+// listAttachedUserPolicies is listAttachedRolePolicies for a user.
+func listAttachedUserPolicies(ctx context.Context, api IAMListAttachedUserPoliciesAPI, userName string) ([]iamtypes.AttachedPolicy, error) {
+	var all []iamtypes.AttachedPolicy
+	var marker *string
+	for range PerParentPageCap {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedUserPoliciesOutput, error) {
+			return api.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
+				UserName: aws.String(userName),
+				Marker:   marker,
+			})
+		})
+		if err != nil {
+			return all, err
+		}
+		all = append(all, out.AttachedPolicies...)
+		if !out.IsTruncated {
+			return all, nil
+		}
+		marker = out.Marker
+	}
+	return all, nil
 }
 
 // adminAttachedPolicyName returns the name of the first admin-equivalent

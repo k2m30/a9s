@@ -43,9 +43,15 @@ func vpcePolicyExposure(policyDocument string) ([]domain.DetailRow, bool) {
 	}, true
 }
 
-// isWildcardAction reports whether an IAM action string grants every action.
+// isWildcardAction reports whether an IAM action string grants every action
+// the endpoint can reach. An endpoint only ever fronts one service, so
+// "s3:*" withholds nothing that "*" would have granted through it.
 func isWildcardAction(action string) bool {
-	return action == "*" || action == "*:*"
+	_, verb, hasService := strings.Cut(action, ":")
+	if hasService {
+		return verb == "*"
+	}
+	return action == "*"
 }
 
 // FetchVPCEndpointsPage fetches a single page of VPC endpoints.

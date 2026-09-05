@@ -169,7 +169,7 @@ resource-list frame title. The frame-title rules:
 | `pipeline` | CodePipelines | None — `ListPipelines` is config-only | `GetPipelineState` per pipeline: any `stageStates[].latestExecution.status==Failed` → Broken (first failed stage; the failing action's error message surfaces as detail). `Stopped`/`Cancelled` → Broken — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-19); stage `InProgress` >2h → Warning — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-19) | `ListPipelineExecutions` trend; dormant-pipeline detection | [GetPipelineState](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_GetPipelineState.html) |
 | `cb` | CodeBuild Projects | None — `ListProjects` is config-only | Latest build status per project (via `ListBuildsForProject(maxResults=1)` + batched `BatchGetBuilds`): latest `buildStatus` in `FAILED`/`FAULT`/`TIMED_OUT` → Broken (excluding user-initiated `STOPPED`) | Stale-project (>90d); cache-config + perf signals | [BatchGetBuilds](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_BatchGetBuilds.html) |
 | `ecr` | ECR Repositories | `imageScanningConfiguration.scanOnPush==false` → Warning (no vulnerability scanning) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | One `DescribeImages(maxResults=10)` call per repository (AWS returns the most recent images; `imageScanFindingsSummary` arrives inline): aggregated across the sampled images, `findingSeverityCounts.CRITICAL>0` → Broken, else `HIGH>0` → Warning — one `ecr.vulnerabilities` finding (summary present only when scan has run) | `DescribeImageScanFindings` per image; `GetLifecyclePolicy` per repo | [DescribeImages](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImages.html) |
-| `codeartifact` | CodeArtifact Repos | None — `ListRepositories` is config-only | `GetRepositoryPermissionsPolicy` per repo: no policy (`ResourceNotFoundException`) → Warning (default open within the domain); policy document contains `"Principal":"*"` → Broken (public access policy). `ListPackages` (all pages) feeds the `package_count` column only; empty repo with age >30d → Warning (unused) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-19) | `DescribeRepository` encryption check | [ListPackages](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackages.html) |
+| `codeartifact` | CodeArtifact Repos | None — `ListRepositories` is config-only | `GetRepositoryPermissionsPolicy` per repo: no policy (`ResourceNotFoundException`) → Warning (default open within the domain); the policy grants a wildcard principal with no restrictive condition, read through `core/iampolicy` → Broken (public access policy). `ListPackages` (all pages) feeds the `package_count` column only; empty repo with age >30d → Warning (unused) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-19) | `DescribeRepository` encryption check | [ListPackages](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackages.html) |
 
 ### Data & Analytics
 
@@ -288,7 +288,7 @@ resource-list frame title. The frame-title rules:
 | elb | elb.misconfigured | deletion protection disabled | warn | wave2 |
 | elb | elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 |
 | elb | elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 |
-| elb | elb.plain-http-listener | listener without TLS on port <port> | warn | wave2 |
+| elb | elb.plain-http-listener | ports <ports> in the clear | warn | wave2 |
 | elb | elb.weak-tls-policy | weak TLS policy on listener <port> | warn | wave2 |
 | tg | tg.unhealthy-targets | unhealthy targets: <N>/<M> | broken | wave2 |
 | sg | sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 |
@@ -320,7 +320,7 @@ resource-list frame title. The frame-title rules:
 | vpce | vpce.state.expired | expired | broken | wave1 |
 | vpce | vpce.state.partial | partial | broken | wave1 |
 | vpce | vpce.state.deleted | deleted | dim | wave1 |
-| vpce | vpce.policy-open | endpoint policy allows any principal | warn | wave1 |
+| vpce | vpce.policy-open | endpoint policy open to any principal | warn | wave1 |
 | tgw | tgw.state.pending | pending | warn | wave1 |
 | tgw | tgw.state.modifying | modifying | warn | wave1 |
 | tgw | tgw.state.deleting | deleting | warn | wave1 |

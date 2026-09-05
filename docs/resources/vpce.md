@@ -207,7 +207,7 @@ sentence would restate it. Their S5 cell reads `—`.
 | `State == Rejected` | 1 | Broken | n/a | S2, S4 | `rejected by service owner` | — |
 | `State == Expired` | 1 | Broken | n/a | S2, S4 | `expired` | — |
 | `State == Partial` | 1 | Broken | n/a | S2, S4 | `partial: some AZ ENIs missing` | — |
-| `PolicyDocument` grants a wildcard action to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy allows any principal` | `The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach.` |
+| `PolicyDocument` grants a wildcard action — `*` or a service-wide `s3:*` — to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy open to any principal` | `The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach.` |
 | `LastError` non-empty | 1 | Broken | n/a | S2, S4 | `<LastError.Code>: <LastError.Message>` | — |
 | interface, `NetworkInterfaceIds == []` | 1 | Broken | n/a | S2, S4 | `interface: no ENIs — unreachable` | — |
 | gateway, `RouteTableIds == []` | 1 | Warning | n/a | S2, S4 | `gateway: no route tables attached` | — |
@@ -217,7 +217,7 @@ Note: S4 cells pair the state with a cause per the "state keywords are not expla
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreachable` or `failed: <LastError.Message>` tells the operator exactly why the endpoint is down without opening detail; a yellow row with `gateway: no route tables attached` points them straight at the route-table pivot. A yellow `endpoint policy allows any principal` row says the endpoint is still on the open policy AWS supplies by default. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreachable` or `failed: <LastError.Message>` tells the operator exactly why the endpoint is down without opening detail; a yellow row with `gateway: no route tables attached` points them straight at the route-table pivot. A yellow `endpoint policy open to any principal` row says the endpoint is still on the open policy AWS supplies by default. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -275,7 +275,7 @@ vpce — NETWORKING. Lifecycle key: `state`.
 | vpce.state.expired | expired | broken | wave1 |
 | vpce.state.partial | partial | broken | wave1 |
 | vpce.state.deleted | deleted | dim | wave1 |
-| vpce.policy-open | endpoint policy allows any principal | warn | wave1 |
+| vpce.policy-open | endpoint policy open to any principal | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

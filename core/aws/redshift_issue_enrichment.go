@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -55,7 +56,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 	}
 	var failures []string
 	var mu sync.Mutex
-	requireSSLByGroup := map[string]string{}
+	var requireSSLByGroup redshiftParamGroupCache
 
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -68,8 +69,13 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			})
 		})
 
+		sslValue, sslKnown, sslErr := redshiftRequireSSL(ctx, clients, r, &requireSSLByGroup)
+
 		mu.Lock()
 		defer mu.Unlock()
+		if sslErr != nil {
+			MarkSkipped(&result, r.ID, &failures, "DescribeClusterParameters", sslErr)
+		}
 		switch {
 		case logErr != nil && IsNotFoundErr(logErr):
 			result.TruncatedIDs[r.ID] = true
@@ -82,9 +88,8 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 				nil, redshiftAuditLoggingOffDetail)
 		}
 
-		value, ok := redshiftRequireSSL(ctx, clients, r, requireSSLByGroup, &result, &failures)
-		if ok && !strings.EqualFold(value, "true") {
-			shown := value
+		if sslKnown && !strings.EqualFold(sslValue, "true") {
+			shown := sslValue
 			if shown == "" {
 				shown = "unset"
 			}
@@ -100,73 +105,93 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 	return result, err
 }
 
-// redshiftRequireSSL returns the effective require_ssl value for a cluster,
-// reading each parameter group at most once per run. ok is false when no
-// parameter group could be read, in which case no finding is emitted:
-// an unread setting is unknown, not disabled.
-//
-// The caller must hold the mutex guarding result, failures and cache; the
-// AWS call inside runs under it, which serializes the parameter-group walk.
-// That is deliberate — it is what makes the per-group cache a cache rather
-// than a race, and the group count is small by construction.
+// redshiftParamGroupCache reads each parameter group at most once per run.
+// singleflight collapses the clusters that share a group into one call
+// without any of them waiting on a cluster that shares nothing with them,
+// which is what a mutex around the whole read would have cost.
+type redshiftParamGroupCache struct {
+	sf     singleflight.Group
+	values sync.Map // parameter-group name -> require_ssl value
+}
+
+// redshiftRequireSSL returns the effective require_ssl value for a cluster.
+// ok is false when no parameter group could be read, in which case no finding
+// is emitted: an unread setting is unknown, not disabled. err carries the
+// first read failure so the caller can mark the cluster under its own lock.
 func redshiftRequireSSL(
 	ctx context.Context,
 	clients *ServiceClients,
 	r resource.Resource,
-	cache map[string]string,
-	result *IssueEnricherResult,
-	failures *[]string,
-) (string, bool) {
+	groups *redshiftParamGroupCache,
+) (string, bool, error) {
 	cluster, isCluster := assertStruct[redshifttypes.Cluster](r.RawStruct)
 	if !isCluster {
-		return "", false
+		return "", false, nil
 	}
 	found := false
 	value := ""
+	var firstErr error
 	for _, pg := range cluster.ClusterParameterGroups {
 		name := aws.ToString(pg.ParameterGroupName)
 		if name == "" {
 			continue
 		}
-		v, cached := cache[name]
-		if !cached {
-			// A parameter group holds dozens of parameters and AWS pages
-			// them, so require_ssl can land past the first page.
-			var marker *string
-			failed := false
-			for range PerParentPageCap {
-				out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeClusterParametersOutput, error) {
-					return clients.Redshift.DescribeClusterParameters(ctx, &redshift.DescribeClusterParametersInput{
-						ParameterGroupName: aws.String(name),
-						Marker:             marker,
-					})
-				})
-				if err != nil {
-					MarkSkipped(result, r.ID, failures, "DescribeClusterParameters", err)
-					failed = true
-					break
-				}
-				for _, param := range out.Parameters {
-					if strings.EqualFold(aws.ToString(param.ParameterName), "require_ssl") {
-						v = aws.ToString(param.ParameterValue)
-					}
-				}
-				if v != "" || out.Marker == nil || *out.Marker == "" {
-					break
-				}
-				marker = out.Marker
+		v, err := groups.requireSSL(ctx, clients, name)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
 			}
-			if failed {
-				continue
-			}
-			cache[name] = v
+			continue
 		}
 		found = true
 		// Any group that requires SSL settles the question for the cluster.
 		if strings.EqualFold(v, "true") {
-			return v, true
+			return v, true, firstErr
 		}
 		value = v
 	}
-	return value, found
+	return value, found, firstErr
+}
+
+// requireSSL reads one parameter group's require_ssl, once per run however
+// many clusters ask for it.
+func (g *redshiftParamGroupCache) requireSSL(ctx context.Context, clients *ServiceClients, name string) (string, error) {
+	if cached, ok := g.values.Load(name); ok {
+		return cached.(string), nil
+	}
+	v, err, _ := g.sf.Do(name, func() (any, error) {
+		if cached, ok := g.values.Load(name); ok {
+			return cached, nil
+		}
+		value := ""
+		var marker *string
+		// A parameter group holds dozens of parameters and AWS pages them, so
+		// require_ssl can land past the first page.
+		for range PerParentPageCap {
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeClusterParametersOutput, error) {
+				return clients.Redshift.DescribeClusterParameters(ctx, &redshift.DescribeClusterParametersInput{
+					ParameterGroupName: aws.String(name),
+					Marker:             marker,
+				})
+			})
+			if err != nil {
+				return "", err
+			}
+			for _, param := range out.Parameters {
+				if strings.EqualFold(aws.ToString(param.ParameterName), "require_ssl") {
+					value = aws.ToString(param.ParameterValue)
+				}
+			}
+			if value != "" || out.Marker == nil || *out.Marker == "" {
+				break
+			}
+			marker = out.Marker
+		}
+		g.values.Store(name, value)
+		return value, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return v.(string), nil
 }

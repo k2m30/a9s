@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -147,12 +146,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 
 		assumeRolePolicyDoc := ""
 		if role.AssumeRolePolicyDocument != nil {
-			decoded, err := url.QueryUnescape(*role.AssumeRolePolicyDocument)
-			if err == nil {
-				assumeRolePolicyDoc = decoded
-			} else {
-				assumeRolePolicyDoc = *role.AssumeRolePolicyDocument
-			}
+			assumeRolePolicyDoc = iampolicy.Decode(*role.AssumeRolePolicyDocument)
 		}
 
 		trust := analyseRoleTrust(assumeRolePolicyDoc, path)
@@ -255,15 +249,17 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 			failures = append(failures, fmt.Sprintf("%s: %s", id, err.Error()))
 			continue
 		}
-		resources = append(resources, roleToResource(*output.Role))
+		resources = append(resources, roleToResource(ctx, api, *output.Role))
 	}
 	return resources, AggregateFailures("role FetchByIDs", failures, len(ids))
 }
 
 // roleToResource converts a single iam.Role (as returned by GetRole) into the
 // same resource.Resource shape FetchIAMRolesPage produces from ListRoles, so
-// a lazily-fetched role is indistinguishable from a paginated one.
-func roleToResource(role iamtypes.Role) resource.Resource {
+// a lazily-fetched role is indistinguishable from a paginated one — including
+// its inline policies, which GetRole does not return and which api is walked
+// for when it serves the two inline-policy operations.
+func roleToResource(ctx context.Context, api any, role iamtypes.Role) resource.Resource {
 	roleName := ""
 	if role.RoleName != nil {
 		roleName = *role.RoleName
@@ -291,15 +287,26 @@ func roleToResource(role iamtypes.Role) resource.Resource {
 
 	assumeRolePolicyDoc := ""
 	if role.AssumeRolePolicyDocument != nil {
-		decoded, err := url.QueryUnescape(*role.AssumeRolePolicyDocument)
-		if err == nil {
-			assumeRolePolicyDoc = decoded
-		} else {
-			assumeRolePolicyDoc = *role.AssumeRolePolicyDocument
-		}
+		assumeRolePolicyDoc = iampolicy.Decode(*role.AssumeRolePolicyDocument)
 	}
 
 	trust := analyseRoleTrust(assumeRolePolicyDoc, path)
+	findings, details := trust.findings, trust.details
+
+	listPoliciesAPI, okList := api.(IAMListRolePoliciesAPI)
+	getPolicyAPI, okGet := api.(IAMGetRolePolicyAPI)
+	policyResources := ""
+	if okList && okGet && roleName != "" {
+		var inline inlinePolicyScan
+		policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
+		if inline.finding != nil {
+			findings = append(findings, *inline.finding)
+			if details == nil {
+				details = map[domain.FindingCode]domain.AttentionDetail{}
+			}
+			details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: inline.rows}
+		}
+	}
 
 	return resource.Resource{
 		ID:   roleName,
@@ -314,14 +321,10 @@ func roleToResource(role iamtypes.Role) resource.Resource {
 			"assume_role_policy_document": assumeRolePolicyDoc,
 			"trust_wildcard":              trust.wildcard,
 			"trust_summary":               trust.summary,
-			// GetRole does not return inline-policy resources; leaving this
-			// empty on a lazily-fetched role (vs. a ListRoles page fetch)
-			// mirrors how other by-ID fetchers omit list-only enrichment
-			// fields rather than pay for it on every single-ID drill.
-			"policy_resources": "",
+			"policy_resources":            policyResources,
 		},
-		Findings:         trust.findings,
-		AttentionDetails: trust.details,
+		Findings:         findings,
+		AttentionDetails: details,
 		RawStruct:        role,
 	}
 }
@@ -367,10 +370,7 @@ func enumerateRoleInlinePolicies(
 		if getErr != nil || getOut == nil || getOut.PolicyDocument == nil {
 			continue
 		}
-		doc := *getOut.PolicyDocument
-		if decoded, decErr := url.QueryUnescape(doc); decErr == nil {
-			doc = decoded
-		}
+		doc := iampolicy.Decode(*getOut.PolicyDocument)
 		allResources = append(allResources, extractPolicyResources(doc)...)
 		if scan.finding != nil {
 			continue

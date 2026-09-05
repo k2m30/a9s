@@ -203,6 +203,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A load balancer with several listeners in the clear now names every port
+  rather than the first one, and its listeners are read to the end instead of
+  one page deep, so a cleartext listener no longer hides behind whichever
+  listeners AWS returned first.
+
+- An IAM user whose access-key last use could not be read now reads as
+  unknown rather than clean. The key that could not be read is exactly the
+  one that might be idle.
+
+- A role opened from another view now reports the same problems as the same
+  role in its list. The drill skipped inline policies, so a privilege-
+  escalation policy was visible one way and invisible the other.
+
+- Pending-maintenance results survive a failed page. A later page failing
+  used to discard the instances the earlier pages had already named.
+
+- CodeArtifact repository policies are read by parsing them, not by matching
+  text, so a pretty-printed policy is no longer missed and one scoped to an
+  organisation is no longer called public.
+
+- A VPC endpoint that grants every action of its own service to every
+  principal now reports as open. The endpoint only ever fronts that service,
+  so the narrower wildcard withholds nothing.
+
+- Policy documents decode one way everywhere. A literal "+" inside a policy
+  survived at one site and became a space at another, so the same document
+  read differently depending on which view asked.
+
+- Redshift parameter groups are read once each and concurrently, instead of
+  serialising every cluster in the pass behind one lock.
+
+- An ECS service event newer than the window is no longer missed because an
+  older event preceded it in the list.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's

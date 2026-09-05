@@ -59,18 +59,12 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		if strings.HasPrefix(r.Fields["path"], awsServiceRolePathPrefix) {
 			return
 		}
-		adminPolicy := ""
-		attached, aerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedRolePoliciesOutput, error) {
-			return clients.IAM.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-				RoleName: aws.String(roleName),
-			})
-		})
+		attachedRole, aerr := listAttachedRolePolicies(ctx, clients.IAM, roleName)
+		adminPolicy := adminAttachedPolicyName(attachedRole)
 		if aerr != nil {
 			mu.Lock()
 			result.TruncatedIDs[r.ID] = true
 			mu.Unlock()
-		} else {
-			adminPolicy = adminAttachedPolicyName(attached.AttachedPolicies)
 		}
 		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String(roleName),

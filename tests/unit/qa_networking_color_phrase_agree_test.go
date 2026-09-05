@@ -151,7 +151,7 @@ func TestNetworkingColorAndPhrase_WarnThenBrokenRow(t *testing.T) {
 				"vpce_id": "vpce-0mixedseverity0", "service_name": "com.amazonaws.us-east-1.s3",
 				"type": "Gateway", "state": "Failed", "vpc_id": "vpc-0abc123",
 			},
-			warn:   domain.Finding{Code: "vpce.policy-open", Phrase: "endpoint policy allows any principal", Severity: domain.SevWarn, Source: "wave1"},
+			warn:   domain.Finding{Code: "vpce.policy-open", Phrase: "endpoint policy open to any principal", Severity: domain.SevWarn, Source: "wave1"},
 			broken: domain.Finding{Code: "vpce.state.failed", Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	}

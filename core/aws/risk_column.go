@@ -13,6 +13,7 @@ const (
 	riskKeyUnused        = "key unused"
 	riskTwoActiveKeys    = "two active keys"
 	riskAdminPolicy      = "admin policy"
+	riskPrivEsc          = "privilege escalation"
 	riskUnattached       = "unattached"
 	riskStaleValue       = "stale"
 	riskPlaintextValue   = "plaintext"
