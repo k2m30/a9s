@@ -153,7 +153,10 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 			t.Fatalf("%s has no catalog Fetcher", short)
 		}
 		page, err := td.Fetcher(context.Background(), clients, "")
-		if err != nil {
+		// Rows and a composite error together are the designed partial-success
+		// outcome — lt's details-denied witness is fetched exactly that way.
+		// Only a row-less error is a harness failure.
+		if err != nil && len(page.Resources) == 0 {
 			t.Fatalf("demo %s fetch: %v", short, err)
 		}
 		res := awsclient.IssueEnricherResult{}
@@ -240,5 +243,40 @@ func TestProwlerW1_WitnessCarriesExactlyOneIssue(t *testing.T) {
 			t.Errorf("%s/%s carries %d issue-severity findings, want 1: %v",
 				w.typeName, w.id, len(issues), issues)
 		}
+	}
+}
+
+// TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned pins the selector on the
+// one demo row where the defect was actually reachable: the internet-exposed
+// instance carries the wave-1 public-address warning first and the wave-2
+// exposure finding second, so slice order and severity disagree. Its row is
+// red; taking findings[0] made the cell read as the warning.
+func TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned(t *testing.T) {
+	rows := pw1ComputeBench(t)
+	r := pw1BenchRowFor(t, rows, "ec2", fixtures.EC2InstanceInternetExposed)
+
+	var sawWarnFirst bool
+	for _, f := range r.Findings {
+		if f.Code == pw1EC2CodePublicIP {
+			sawWarnFirst = true
+		}
+		if f.Code == pw1EC2CodeInternetExposed {
+			break
+		}
+	}
+	if !sawWarnFirst {
+		t.Fatalf("fixture no longer stacks the warning ahead of the exposure, so this "+
+			"pins nothing; findings = %+v", r.Findings)
+	}
+
+	got, ok := domain.TopFinding(r.Findings)
+	if !ok {
+		t.Fatal("the exposed instance carries no finding")
+	}
+	if got.Severity != domain.SevBroken {
+		t.Errorf("Status cell shows %q (%v), want the broken exposure finding", got.Phrase, got.Severity)
+	}
+	if got.Code != pw1EC2CodeInternetExposed {
+		t.Errorf("Status cell shows %q, want %q", got.Code, pw1EC2CodeInternetExposed)
 	}
 }
