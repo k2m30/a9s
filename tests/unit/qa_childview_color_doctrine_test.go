@@ -314,7 +314,7 @@ func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.
 // knownColorlessChildTypes is the burn-down allowlist for the GENERIC census
 // below: every registered child ResourceTypeDef whose catalog Findings table
 // (catalog.FindingDef entries, the declarative source ResolveColor's
-// colorWave1OrHealthy-style classifiers are meant to read) contains at least
+// colorAnyFindingOrHealthy-style classifiers are meant to read) contains at least
 // one issue-severity (SevWarn/SevBroken) entry, yet the type's own Color func
 // does not derive from Findings at all (Color == nil, so ResolveColor uses
 // colorFallback on a structural field instead of ever consulting Findings).
@@ -346,7 +346,7 @@ func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.
 // Findings at all.
 var knownColorlessChildTypes = map[string]bool{
 	// tg_health: this PR's own bug — Findings will be added by the coder in
-	// the SAME change that must also set Color (colorWave1OrHealthy or
+	// the SAME change that must also set Color (colorAnyFindingOrHealthy or
 	// equivalent). Present here as a starting inventory entry so the
 	// generic census below does not immediately fail on the very type this
 	// PR exists to fix; the concrete tests above are what pin the fix itself.
@@ -404,7 +404,7 @@ func TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc(t 
 				t.Skipf("KNOWN GAP (allowlisted): child type %q declares %d issue-severity Findings but has no Color func — pre-existing debt, see knownColorlessChildTypes", key, len(ct.Findings))
 			default:
 				newlyRegressed = append(newlyRegressed, key)
-				t.Errorf("NEW REGRESSION (not allowlisted): child type %q declares %d issue-severity Findings but Color is nil — ResolveColor will use colorFallback(Fields[\"status\"]) and never consult Findings at all; either set Color (e.g. colorWave1OrHealthy) or add %q to knownColorlessChildTypes", key, len(ct.Findings), key)
+				t.Errorf("NEW REGRESSION (not allowlisted): child type %q declares %d issue-severity Findings but Color is nil — ResolveColor will use colorFallback(Fields[\"status\"]) and never consult Findings at all; either set Color (e.g. colorAnyFindingOrHealthy) or add %q to knownColorlessChildTypes", key, len(ct.Findings), key)
 			}
 		})
 	}

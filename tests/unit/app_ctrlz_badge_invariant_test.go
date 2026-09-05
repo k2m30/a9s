@@ -133,8 +133,8 @@ var appCtrlZHealthyFieldOverrides = map[string]map[string]string{
 // to comparing two empty sets. colorSES only recognizes Source "wave2:ses"
 // (never bare "wave1"), so it gets its own Finding source distinct from the
 // generic wave1 Finding every other Finding-driven Color func recognizes
-// (colorFromAnyFinding / colorFromWave1, both verified to check "wave1" as
-// their first branch across every registered type's Color func).
+// (colorFromAnyFinding accepts any Source, so the bare wave1 Finding colours
+// every other registered type).
 func appCtrlZPerTypeResources(shortName string) (issue, healthy resource.Resource) {
 	issue = resource.Resource{ID: "issue-" + shortName, Name: "issue-" + shortName}
 	healthy = resource.Resource{ID: "healthy-" + shortName, Name: "healthy-" + shortName}

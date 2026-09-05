@@ -29,7 +29,7 @@ import (
 // signal disappeared for all child types whose ResourceTypeDef had no Color
 // func (cb_builds, cfn_resources, glue_runs, log_events,
 // lambda_invocation_logs, role_policies). The fix emits wave1 domain.Findings
-// + adds Color: colorWave1OrHealthy to each catalog entry; the tests below
+// + adds Color: colorAnyFindingOrHealthy to each catalog entry; the tests below
 // pin both halves so a future regression fails loudly instead of silently
 // rendering FAILED rows green.
 // ---------------------------------------------------------------------------

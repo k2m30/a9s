@@ -31,12 +31,11 @@
 // Findings would need this divergence list to shrink to reflect real
 // conversions, not silently drift.
 //
-// No exemption is carved out for "lifecycle dim without findings": the only
-// two exported functions in core/resource/severity_color.go
-// (ColorFromSeverity, ColorFromWave1) define no such carve-out —
-// ColorFromWave1's ok=false path (no wave1 Finding present) returns
-// (ColorHealthy, false), not Dim. Per-type helpers like colorFallback /
-// colorWave1OrHealthy / cfnStackColor / acmColor / r53Color in
+// No exemption is carved out for "lifecycle dim without findings": the one
+// exported function in core/resource/severity_color.go (ColorFromSeverity)
+// defines no such carve-out, and colorFromAnyFinding's ok=false path (no
+// Finding present) returns (ColorHealthy, false), not Dim. Per-type helpers
+// like colorFallback / cfnStackColor / acmColor / r53Color in
 // core/aws/catalog_color_helpers.go are exactly the raw-field classifiers
 // this gate is designed to catch — they are not "the shared severity
 // functions" the owner's exemption clause refers to.

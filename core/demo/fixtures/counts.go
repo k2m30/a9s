@@ -119,7 +119,7 @@ func countEKSNodegroups(f *EKSFixtures) int {
 
 func countCustomerManagedKMSKeys(f *KMSFixtures) int {
 	total := 0
-	for _, meta := range f.Keys {
+	for _, meta := range f.KeyList {
 		if meta != nil && meta.KeyManager == kmstypes.KeyManagerTypeCustomer {
 			total++
 		}
