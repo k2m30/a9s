@@ -17,8 +17,18 @@ code. This file parses that shape and nothing else, so the recipe and the
 parser cannot drift apart. Within a section the LAST exit line wins -- an
 `EXIT=0` quoted inside a test transcript must never rescue a red gate.
 
+The same hook enforces the other line a round cannot end without: `deferred:`.
+When the first team was asked what it had left open it produced 65 items, a
+dozen of them never written anywhere and most of the rest parked under
+"pre-existing" or "out of batch". So a dev or QA entry that ends a round
+(DONE, FINDINGS, SIGN-OFF) must carry a `deferred:` line -- `none`, or one
+item per line with file:line and an owner -- and an acceptance verdict
+(ACCEPT, REJECT) must carry an `observed, out of scope:` line. The orchestrator
+routes those lines; the hook only makes sure they exist.
+
 The hook never blocks when it has no reliable information — no parseable
-payload, no TASKDIR, no DONE claim. A gate that guesses is worse than no gate.
+payload, no round-ending status. A DONE it cannot locate is refused, because an
+unlocatable gate is an unproven one.
 """
 
 import json
@@ -29,6 +39,18 @@ import time
 
 AGENT = "a9s-dev"
 REQUIRED_GATES = ("make test", "make lint")
+
+# Statuses that end a round, per agent, and the line each such entry must carry.
+ROUND_END = {
+    "a9s-dev": ("DONE",),
+    "a9s-qa": ("DONE", "FINDINGS", "SIGN-OFF"),
+    "a9s-acceptance": ("ACCEPT", "REJECT"),
+}
+REQUIRED_LINE = {
+    "a9s-dev": "deferred:",
+    "a9s-qa": "deferred:",
+    "a9s-acceptance": "observed, out of scope:",
+}
 
 # A gate older than this is from an earlier round no matter what else is true.
 MAX_GATE_AGE_SECONDS = 6 * 60 * 60
@@ -172,16 +194,40 @@ def failure(gate_path, worktree):
     return None
 
 
+def has_line(message, key):
+    """True when some line of the entry starts with `key` and says something
+    after it; `- deferred:` with nothing behind it is not a deferral line."""
+    for line in message.splitlines():
+        stripped = line.strip().lstrip("-*# ").strip()
+        if stripped.lower().startswith(key) and stripped[len(key) :].strip():
+            return True
+    return False
+
+
 def main():
     payload = read_payload()
     if payload is None:
         return
 
-    if payload.get("agent_type") and payload["agent_type"] != AGENT:
+    agent = payload.get("agent_type") or AGENT
+    if agent not in ROUND_END:
         return
 
     message = str(payload.get("last_assistant_message") or "")
-    if "DONE" not in message:
+    if not any(status in message for status in ROUND_END[agent]):
+        return
+
+    required = REQUIRED_LINE[agent]
+    if not has_line(message, required):
+        sys.stderr.write(
+            "Round entry ends a round but carries no `%s` line. Add it: `none`, "
+            "or one item per line as file:line — what — why left — owner. "
+            "Anything noticed and not written there is a defect of the round.\n"
+            % required
+        )
+        sys.exit(2)
+
+    if agent != AGENT or "DONE" not in message:
         return
 
     taskdir, worktree = resolve_paths(message, str(payload.get("cwd") or ""))

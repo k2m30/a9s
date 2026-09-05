@@ -177,7 +177,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "a9s-dev",
+        "matcher": "a9s-dev|a9s-qa|a9s-acceptance",
         "hooks": [
           {
             "type": "command",

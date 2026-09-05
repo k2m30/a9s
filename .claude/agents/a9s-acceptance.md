@@ -50,7 +50,10 @@ criteria: <n> checked, <m> witnessed, <k> failed
 1. <criterion> → FAIL — capture: TASKDIR/acceptance/<file>:<line> shows "<exact text>"; expected: <what a user needs to see>; where: <file:line if known>
 2. …
 gates: make test EXIT=0 · make lint EXIT=0 · check-catalogen EXIT=0 · check-no-real-data EXIT=0
+observed, out of scope: none | <file:line — what — what closing it takes>, one per line
 ```
+
+The `observed, out of scope:` line is required; the stop hook refuses a verdict without it.
 
 `ACCEPT` requires zero failed criteria and all gates green. Do not accept "with notes"; a note is a defect or it is nothing.
 

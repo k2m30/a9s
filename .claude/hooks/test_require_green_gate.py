@@ -51,8 +51,48 @@ DONE_MESSAGE = """## a9s-dev · round 1 · DONE
 
 TASKDIR={taskdir}
 WORKTREE=/private/tmp/a9s-wt/w10
+- deferred: none
 
 Landed the enricher and the FindingDef row. Gate captured to gate.txt.
+"""
+
+DONE_NO_DEFERRED = """## a9s-dev · round 1 · DONE
+
+TASKDIR={taskdir}
+WORKTREE=/private/tmp/a9s-wt/w10
+
+Landed the enricher and the FindingDef row. Gate captured to gate.txt.
+"""
+
+DONE_EMPTY_DEFERRED = """## a9s-dev · round 1 · DONE
+
+TASKDIR={taskdir}
+- deferred:
+
+Landed it.
+"""
+
+QA_FINDINGS_NO_DEFERRED = """## a9s-qa · round 3 · FINDINGS
+- TASKDIR={taskdir}
+- from: 4f1a9c2
+1. core/aws/sqs.go:77 — deleting queues reach the posture pass
+"""
+
+QA_SIGNOFF_WITH_DEFERRED = """## a9s-qa · round 4 · SIGN-OFF
+- TASKDIR={taskdir}
+- from: 9c2d1e0
+- deferred: core/aws/sqs.go:91 — first-match phrase loop — out of batch — owner: d1
+"""
+
+ACCEPT_NO_OBSERVED = """## a9s-acceptance · round 1 · ACCEPT
+criteria: 3 checked, 3 witnessed, 0 failed
+gates: make test EXIT=0
+"""
+
+REJECT_WITH_OBSERVED = """## a9s-acceptance · round 1 · REJECT
+criteria: 3 checked, 3 witnessed, 1 failed
+1. row 2 → FAIL — capture acceptance/x.txt:4
+observed, out of scope: core/aws/ses.go:105 — phrase from findings[0]
 """
 
 WIP_MESSAGE = """## a9s-dev · round 1 · FINDINGS
@@ -110,9 +150,55 @@ class GreenGateHookTest(unittest.TestCase):
         self.assertIn("gate.txt", reason)
 
     def test_done_with_green_gate_passes(self):
-        """Both gates captured at EXIT=0 is the whole requirement; let it stop."""
+        """Both gates captured at EXIT=0 plus a deferred line is the whole
+        requirement; let it stop."""
         self.write_gate(GREEN_GATE)
         code, reason = run_hook(payload(DONE_MESSAGE, self.taskdir))
+        self.assertEqual(0, code, reason)
+
+    def test_done_without_deferred_line_blocks(self):
+        """A green gate does not excuse a missing deferred line: the first team
+        left 65 items unwritten behind green gates."""
+        self.write_gate(GREEN_GATE)
+        code, reason = run_hook(payload(DONE_NO_DEFERRED, self.taskdir))
+        self.assertEqual(2, code)
+        self.assertIn("deferred:", reason)
+
+    def test_done_with_empty_deferred_line_blocks(self):
+        """`- deferred:` with nothing after it is not a deferral line."""
+        self.write_gate(GREEN_GATE)
+        code, reason = run_hook(payload(DONE_EMPTY_DEFERRED, self.taskdir))
+        self.assertEqual(2, code)
+        self.assertIn("deferred:", reason)
+
+    def test_qa_findings_without_deferred_line_blocks(self):
+        """QA rounds end with FINDINGS or SIGN-OFF and carry the same line."""
+        p = payload(QA_FINDINGS_NO_DEFERRED, self.taskdir)
+        p["agent_type"] = "a9s-qa"
+        code, reason = run_hook(p)
+        self.assertEqual(2, code)
+        self.assertIn("deferred:", reason)
+
+    def test_qa_signoff_with_deferred_line_passes(self):
+        """QA has no gate.txt contract; the deferred line is its whole check."""
+        p = payload(QA_SIGNOFF_WITH_DEFERRED, self.taskdir)
+        p["agent_type"] = "a9s-qa"
+        code, reason = run_hook(p)
+        self.assertEqual(0, code, reason)
+
+    def test_acceptance_verdict_without_observed_line_blocks(self):
+        """Two acceptance agents kept observations in their heads across two
+        rounds each; the verdict now has to say what it saw out of scope."""
+        p = payload(ACCEPT_NO_OBSERVED, self.taskdir)
+        p["agent_type"] = "a9s-acceptance"
+        code, reason = run_hook(p)
+        self.assertEqual(2, code)
+        self.assertIn("observed, out of scope:", reason)
+
+    def test_acceptance_verdict_with_observed_line_passes(self):
+        p = payload(REJECT_WITH_OBSERVED, self.taskdir)
+        p["agent_type"] = "a9s-acceptance"
+        code, reason = run_hook(p)
         self.assertEqual(0, code, reason)
 
     def test_done_with_failing_lint_blocks(self):
@@ -154,7 +240,7 @@ class GreenGateHookTest(unittest.TestCase):
         the entry carried no TASKDIR= line), so a red gate.txt was never seen.
         An unlocatable gate is an unproven gate."""
         p = payload(DONE_MESSAGE, self.taskdir)
-        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n\nno taskdir line here\n"
+        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n- deferred: none\n\nno taskdir line here\n"
         empty = tempfile.mkdtemp(prefix="w10-cwd-")
         self.addCleanup(shutil.rmtree, empty, True)
         code, reason = run_hook(p, cwd=empty)
@@ -173,7 +259,7 @@ class GreenGateHookTest(unittest.TestCase):
 
         p = payload(DONE_MESSAGE, self.taskdir)
         p["cwd"] = cwd
-        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n\nlanded it\n"
+        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n- deferred: none\n\nlanded it\n"
 
         code, reason = run_hook(p, cwd=cwd)
         self.assertEqual(2, code)
