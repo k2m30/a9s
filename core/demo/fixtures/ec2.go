@@ -136,7 +136,13 @@ const (
 	SGDefaultWithRules = "sg-0default000000001"
 	// SGUnused is the only demo group no network interface references.
 	SGUnused = "sg-0unused0000000001"
-	// SubnetAutoPublicIP is the only demo subnet that auto-assigns public IPs.
+	// SubnetMixedSeverity is the only demo row of the five networking types
+	// carrying findings of two different severities: its broken lifecycle
+	// state plus the auto-assign warning. It is the witness that a row's
+	// colour and its Status phrase both come from the WORST finding.
+	SubnetMixedSeverity = "subnet-0failed111111c"
+	// SubnetAutoPublicIP is the only healthy-lifecycle demo subnet that
+	// auto-assigns public addresses.
 	SubnetAutoPublicIP = fixtProdPublicSubnetA
 	// TGWAutoAccept is the only demo transit gateway that auto-accepts
 	// shared attachments.
@@ -1843,7 +1849,7 @@ func buildSubnets() []ec2types.Subnet {
 			AvailabilityZone:        aws.String("us-east-1c"),
 			State:                   ec2types.SubnetState("failed"),
 			AvailableIpAddressCount: aws.Int32(0),
-			MapPublicIpOnLaunch:     aws.Bool(false),
+			MapPublicIpOnLaunch:     aws.Bool(true),
 			DefaultForAz:            aws.Bool(false),
 			OwnerId:                 aws.String("123456789012"),
 			Tags: []ec2types.Tag{
