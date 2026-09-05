@@ -137,6 +137,15 @@
         ]
       },
       {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/require-arch-verdict.py"
+          }
+        ]
+      },
+      {
         "matcher": "Read|Glob",
         "hooks": [
           {

@@ -18,7 +18,7 @@ End-to-end pipeline for taking a GitHub issue from open to released. Covers anal
 | 2. QA Stories | `a9s-qa-stories` agent | `docs/qa/issue-{N}-{slug}.md` | Stories exist |
 | 3. Design | `tui-designer` agent (if needed) | Design spec update or new design doc | Design approved |
 | 4. Scope | Architect | CODER TASK + QA TASK with exact files | User approves tasks |
-| 5. Implement | `a9s-qa` + `a9s-coder` agents | Tests + production code | All tests pass |
+| 5. Implement | `a9s-qa` + `a9s-dev` agents | Tests + production code | All tests pass |
 | 6. Verify | Pre-release checks | Clean lint, tests, arch score | All green |
 | 7. Docs | Architect + coder | Updated shared docs, README, website | Docs in sync |
 | 8. Release | `release` skill | Tag, release notes, changelog | User triggers |
@@ -244,17 +244,17 @@ Parallelization: {parallel-safe | sequential (before coder)}
 
 ## Phase 5: Implement
 
-**The architect NEVER writes code in this phase.** The architect spins off `a9s-coder` and `a9s-qa` agents with the scoped task specs. The user should not have to manually pass tasks to agents — dispatching IS the architect's job.
+**The architect NEVER writes code in this phase.** The architect spins off `a9s-dev` and `a9s-qa` agents with the scoped task specs. The user should not have to manually pass tasks to agents — dispatching IS the architect's job.
 
 Dispatch tasks to agents. Order depends on parallelization assessment.
 
 ### For `parallel-safe` tasks:
-Spin off `a9s-qa` and `a9s-coder` simultaneously with their respective task specs.
+Spin off `a9s-qa` and `a9s-dev` simultaneously with their respective task specs.
 
 ### For `sequential` tasks:
 1. Spin off `a9s-qa` first — write tests
 2. Verify tests compile (or fail with expected missing-implementation errors)
-3. Spin off `a9s-coder` — write implementation to make tests pass
+3. Spin off `a9s-dev` — write implementation to make tests pass
 
 ### Step 5.1: Verify after both complete
 

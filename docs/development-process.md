@@ -19,15 +19,17 @@ Surviving subagents and their write boundaries:
 
 | Subagent | Writes to | Use for |
 |---|---|---|
-| `a9s-coder` | `core/`, `internal/`, `cmd/`, `.a9s/` | Go production code — **no tests** |
-| `a9s-qa` | `tests/unit/` | Go test code — **no production code** |
+| `a9s-dev` | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, generated docs | Go production code, fixtures, catalog, doc regeneration — **no tests** |
+| `a9s-qa` | `tests/` | Red tests first, adversarial verify, findings / sign-off — **no production code** |
+| `a9s-facilitator` | `TASKDIR/spec.md`, `TASKDIR/log.md` | Binding ruling when dev/qa log `OFF` / `LOOP` / `BLOCKED` or pass round 3 |
+| `a9s-acceptance` | `TASKDIR/` | Skeptical end-user acceptance on rendered surfaces, docs and gates |
 | `a9s-qa-stories` | Nothing (read-only) | Given/when/then stories from the design spec, zero source knowledge |
 | `a9s-consistency-checker` | Nothing (read-only) | Cross-file drift: code ↔ docs ↔ website ↔ config |
 | `a9s-fixtures` | `core/demo/` | Test/demo fixtures from real AWS via the AWS MCP tool |
 | `a9s-devops` | All | AWS-practitioner consult: resource priorities, real-world workflows |
 | `tui-designer` | Design artifacts | TUI wireframes, color schemes, preview mockups |
 
-The coder/QA write split is the TDD guardrail: the coder cannot edit tests, the QA cannot edit production code. Keep it.
+The dev/QA write split is the TDD guardrail: dev cannot edit tests, QA cannot edit production code. Keep it. The loop itself — task workspace, round log, statuses, escalation to the facilitator, final acceptance — is defined once in `.claude/skills/a9s-team-loop/SKILL.md`.
 
 ## Definitions
 

@@ -1,6 +1,6 @@
 ---
 name: a9s-implement-resource
-description: Implement (or re-implement) an a9s resource type from its golden UX/UI spec at `docs/resources/<shortName>.md`. Use whenever the user asks to "implement", "wire up", "finish", "fix", or "rebuild" a resource that already has a spec doc — including cases where partial, stubbed, or buggy code exists and must be replaced. Treats the spec doc as the contract and the existing implementation as disposable. Reads ONLY the spec doc and four contract-surface files (`<shortName>_interfaces.go`, `<shortName>_related.go`, `<shortName>_issue_enrichment.go`, `<shortName>_detail_enrichment.go`); never reads existing tests or fetchers. Dispatches `a9s-qa` and `a9s-coder` with scoped file lists. Cleans up stubs and "pretend to work" code tied to TBDs. Trigger this for any request that names a resource shortName and asks for implementation, tests, fixtures, or cleanup — even if the user doesn't explicitly mention the spec doc.
+description: Implement (or re-implement) an a9s resource type from its golden UX/UI spec at `docs/resources/<shortName>.md`. Use whenever the user asks to "implement", "wire up", "finish", "fix", or "rebuild" a resource that already has a spec doc — including cases where partial, stubbed, or buggy code exists and must be replaced. Treats the spec doc as the contract and the existing implementation as disposable. Reads ONLY the spec doc and four contract-surface files (`<shortName>_interfaces.go`, `<shortName>_related.go`, `<shortName>_issue_enrichment.go`, `<shortName>_detail_enrichment.go`); never reads existing tests or fetchers. Dispatches `a9s-qa` and `a9s-dev` with scoped file lists. Cleans up stubs and "pretend to work" code tied to TBDs. Trigger this for any request that names a resource shortName and asks for implementation, tests, fixtures, or cleanup — even if the user doesn't explicitly mention the spec doc.
 argument-hint: <shortName>
 allowed-tools:
   - Read
@@ -17,14 +17,14 @@ allowed-tools:
   - Bash(go test *)
   - AskUserQuestion
   - Agent(a9s-qa)
-  - Agent(a9s-coder)
+  - Agent(a9s-dev)
 ---
 
 # a9s Resource Implementation Skill
 
 Take a resource that already has a golden UX/UI spec at `docs/resources/<shortName>.md` and make the code match. Assume the current code is partial, stubbed, or bug-ridden. Assume the existing tests are disposable. The spec is the contract.
 
-This skill must be invoked from the main Claude Code session, because it dispatches `a9s-qa` and `a9s-coder` subagents (Claude Code does not allow subagents to spawn other subagents). If the skill discovers at phase 6 that `Agent` dispatch is unavailable, stop and report:
+This skill must be invoked from the main Claude Code session, because it dispatches `a9s-qa` and `a9s-dev` subagents (Claude Code does not allow subagents to spawn other subagents). If the skill discovers at phase 6 that `Agent` dispatch is unavailable, stop and report:
 
 ```text
 phase 6 blocked: Agent dispatch unavailable. Re-invoke the skill from the main Claude Code session.
@@ -437,7 +437,7 @@ rm -f tests/unit/aws_<shortName>_test.go \
 
 Do NOT use a trailing-glob (`aws_<shortName>*.go`) — some resources have child-view tests (`aws_<shortName>_events_test.go`, etc.) or unrelated neighbours that would match and vanish. Stale legacy versions of the above four files produce duplicate `Test*` declarations once 6b lands; that's a compile error, not a warning.
 
-**Precondition:** verify `Agent(a9s-qa)` and `Agent(a9s-coder)` are callable. If not:
+**Precondition:** verify `Agent(a9s-qa)` and `Agent(a9s-dev)` are callable. If not:
 
 ```text
 phase 6 blocked: Agent dispatch unavailable. Re-invoke the skill from the main Claude Code session.
@@ -445,7 +445,7 @@ phase 6 blocked: Agent dispatch unavailable. Re-invoke the skill from the main C
 
 #### 6a. Coder — fixtures only (blocks 6b and 7)
 
-Dispatch `Agent(a9s-coder)` with a narrow, fixture-only task. The coder uses the `a9s-create-demo-fixture` skill to build a graph-connected fixture file at `core/demo/fixtures/<shortName>.go` (single file per service — no `_fixtures` suffix; fold any existing `<shortName>_fixtures.go`).
+Dispatch `Agent(a9s-dev)` with a narrow, fixture-only task. The coder uses the `a9s-create-demo-fixture` skill to build a graph-connected fixture file at `core/demo/fixtures/<shortName>.go` (single file per service — no `_fixtures` suffix; fold any existing `<shortName>_fixtures.go`).
 
 ```text
 ## CODER TASK: <shortName> demo fixtures (phase 6a)

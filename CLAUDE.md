@@ -89,11 +89,44 @@ specs/           # feature specifications
 - govulncheck (`go install golang.org/x/vuln/cmd/govulncheck@latest`)
 - markdownlint-cli2 (`brew install markdownlint-cli2`) — for markdown linting
 
-## CodeRabbit (AI Code Reviewer)
+## Bug Protocol
 
-- Use `@coderabbitai ignore` on PRs where you don't need further review
-- Use `[skip ci]` in commit messages for trivial follow-ups (CodeRabbit still reviews unless ignored)
-- CodeRabbit reviews are triggered per-push, not per-commit — batch small fixes into one push
+Applies to every defect — one you found, one a review reported, one a test caught.
+
+1. **Ask whether the bug is architectural BEFORE writing the red test or the fix.** If two places compute the same fact, if a comment asserts an invariant nothing enforces, or if the same mistake is possible at a site nobody has visited yet, the instance fix is the wrong fix. Fix the shape.
+2. **Decide autonomously.** Architectural changes do not need approval. Estimate, choose, execute, and report what you chose and why.
+3. **Order fixes so no work gets rewritten.** If an architectural change will rewrite the lines a smaller fix touches, do the architectural one first or fold them together. Never fix the same lines twice.
+4. **No confidence filter.** Every finding is either fixed or explicitly disproved with `file:line` evidence. "Probably fine", "pre-existing", and "minor" are not dispositions. A stale or misattributed finding is *disproved*, not dropped.
+5. **Fix the class, not the report.** A reviewer names the symptom it happened to see. Before closing, check whether the same defect exists in sibling fields, sibling call sites, or the other lane.
+6. **A test that encodes a defect as intent is worse than no test** — it makes the fix look like a regression. When a test must be inverted, say so in its comment so the next reader does not "restore" it.
+7. **Re-derive numbers, never relay them.** Counts from a grep, a subagent, or a prior report are unverified until you reproduce them. Report only what you have run.
+
+## External Review Protocol
+
+**Nothing merges to `main` without an external pass resolved.** Local gates prove the code runs; they do not prove it is right. Three independent reviewers are available and they find different classes of defect:
+
+```bash
+codex exec --skip-git-repo-check "<review prompt naming the range and the production files>"
+coderabbit review --plain --type committed --base-commit <base>
+```
+
+Plus `/ponytail-review` for over-engineering (delete/simplify only — it does not hunt correctness).
+
+Rules:
+
+- **Batch. Never per fix.** Codex is expensive: one pass per phase boundary or pre-merge.
+- **Review the committed range**, not the working tree — `--base-commit <base>` for CodeRabbit, an explicit range for Codex.
+- **A reviewer's suggested patch is a proposal, not verified code.** Read every snippet against the actual file before applying it; patches routinely reference helpers that do not exist in that file's package. The finding can be correct while the patch does not compile.
+- **Point reviewers at production code.** A large mechanical test migration will drown the signal otherwise.
+- Never tag a release without CodeRabbit and Codex resolved on the range.
+
+On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` for trivial follow-ups; reviews trigger per-push, so batch small fixes into one push.
+
+## Gate Results Are Samples, Not Verdicts
+
+- `make test-race` runs `-shuffle=on` with a **fresh random seed each invocation**. One green run is one ordering. When something order-dependent is suspected, sweep 10+ seeds and report the rate.
+- Comparing "the same seed" across two trees is **not** a controlled experiment — shuffle permutes the whole test list, so a different test count yields a different order. Compare the same tests in the same order.
+- Read the gate's exit code from captured output (`make ... > /tmp/x.txt; echo "EXIT=$?" >> /tmp/x.txt`), not from a wrapper's status. Never `tail -5` a gate log; the diagnostic is usually above the fold.
 
 ## Architecture Principles
 
@@ -108,7 +141,7 @@ specs/           # feature specifications
 
 ## Skills and Subagents — in-session tooling
 
-> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. They sign off on nothing and own no stage — the developer owns the work end to end and uses these as scoped helpers. The coder/QA write split (coder ≠ tests, QA ≠ production code) is the TDD guardrail; keep it.
+> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. Work runs as the team loop defined in `.claude/skills/a9s-team-loop/SKILL.md`: `a9s-qa` writes red tests → `a9s-dev` implements → `a9s-qa` verifies → `a9s-acceptance` accepts; `a9s-facilitator` rules whenever the loop stalls. The main session orchestrates only. The dev/QA write split (dev ≠ tests, QA ≠ production code) is the TDD guardrail; keep it.
 
 ## Skills
 
@@ -126,8 +159,10 @@ specs/           # feature specifications
 
 | Agent | Role | Writes to | Rejects without |
 |-------|------|-----------|-----------------|
-| `a9s-coder` | Implementation only — no tests | `core/`, `internal/`, `cmd/`, `.a9s/` | Exact file scope |
-| `a9s-qa` | Tests only — no production code | `tests/unit/` | Exact file scope |
+| `a9s-dev` | Developer in the team loop — production code, fixtures, fakes, catalog, generated docs; no tests | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, docs it regenerates | `WORKTREE` + `TASKDIR/spec.md` |
+| `a9s-qa` | QA in the team loop — red tests first, adversarial verify, findings or sign-off; no production code | `tests/` | `WORKTREE` + `TASKDIR/spec.md` |
+| `a9s-facilitator` | Rules when dev/qa log `OFF`, `LOOP`, `BLOCKED`, or a task passes round 3 — rewrites the spec or names the fix; no code | `TASKDIR/spec.md`, `TASKDIR/log.md` | A stalled loop |
+| `a9s-acceptance` | Skeptical end user — final acceptance on rendered surfaces, docs, gates; blind to the log until verdict | `TASKDIR/` only | Criteria + integrated worktree |
 | `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
