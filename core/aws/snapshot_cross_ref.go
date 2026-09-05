@@ -20,7 +20,7 @@
 // in-memory ResourceCache only. Both signals route through
 // `IssueEnricherResult.Findings` (which surfaces in S5 Attention and, via
 // `applyEnrichment` → `applyWave2ToRow`, in the S4 status column via
-// `phraseFromFindings(r.Findings)` at render time). Re-runs are idempotent:
+// `domain.StatusPhrase(r.Findings)` at render time). Re-runs are idempotent:
 // Findings is map-keyed so a second pass overwrites the first.
 //
 // Retention-rule-disabled mode: when a future consumer's parent type has no
@@ -256,7 +256,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			// setWave2Finding is the sole append-only builder for both Findings
 			// and AttentionDetails (core/aws/issue_enrichment.go) — it
 			// drives the detail-view Attention section AND the S4 status
-			// column at render time via phraseFromFindings(r.Findings).
+			// column at render time via domain.StatusPhrase(r.Findings).
 			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows, "")
 		}
 

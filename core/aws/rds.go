@@ -91,7 +91,7 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 		}
 
 		findings, attentionDetails := computeDBIFindings(db, now)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 		if statusPhrase == "" {
 			// Unknown / undocumented RDS status: keep the raw value visible in
 			// the table so colorDBI's legacy classifier (which inspects
@@ -149,18 +149,6 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// phraseFromFindings returns the display phrase for a slice of findings.
-// Returns "" for empty, the single phrase, or "top (+N)" for multiple.
-func phraseFromFindings(findings []domain.Finding) string {
-	if len(findings) == 0 {
-		return ""
-	}
-	if len(findings) == 1 {
-		return findings[0].Phrase
-	}
-	return fmt.Sprintf("%s (+%d)", findings[0].Phrase, len(findings)-1)
 }
 
 // transitionalStatusSet contains RDS instance statuses that indicate a

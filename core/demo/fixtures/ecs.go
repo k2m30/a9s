@@ -41,34 +41,31 @@ func NewECSFixtures() *ECSFixtures {
 	return sharedECSFixtures()
 }
 
-// ECS posture witnesses. Task definitions are shared by design — every task
-// running a revision sees the same containers — so a definition-level signal
-// necessarily lands on every task of that definition; the constant names the
-// canonical witness task and the comment names the definition.
+// ECS posture witnesses.
 const (
 	// ECSServicePublicIP — the only service whose awsvpc configuration
 	// assigns public IPs; every other service leaves AssignPublicIp unset.
 	ECSServicePublicIP = "api-gateway"
+	// The five task-definition signals each get their own RUNNING task on its
+	// own revision. A task carries exactly one issue-severity finding that way:
+	// a transitional or stopped task would add its lifecycle finding on top,
+	// and a stopped one emits no posture finding at all (see ecsTaskGone).
+	//
 	// ECSTaskPrivileged runs web-frontend:7, the only definition with a
 	// privileged container.
-	ECSTaskPrivileged = "e1f2a7b8c9d0e1f2a8b9c0d1"
-	// The four remaining witnesses are tasks still running a SUPERSEDED
-	// revision of their family — the shape a mid-deployment cluster really
-	// has, and the reason each posture signal lands on exactly one task
-	// while its family's current revision stays clean.
-	//
+	ECSTaskPrivileged = "0a1b2c3d4e5f60010001000100010001"
 	// ECSTaskHostNamespace runs order-worker:4, the only definition on the
 	// host network and process namespace.
-	ECSTaskHostNamespace = "c9d0e1f2a7b8c9d0e1f2a8b9"
+	ECSTaskHostNamespace = "0a1b2c3d4e5f60010001000100010002"
 	// ECSTaskWritableRoot runs web-frontend:6, the only definition leaving a
 	// container's root filesystem writable.
-	ECSTaskWritableRoot = "b8c9d0e1f2a7b8c9d0e1f2a8"
+	ECSTaskWritableRoot = "0a1b2c3d4e5f60010001000100010003"
 	// ECSTaskNoLogging runs batch-etl-runner:2, the only definition with a
 	// container that has no log driver.
-	ECSTaskNoLogging = "d0e1f2a7b8c9d0e1f2a8b9c0"
+	ECSTaskNoLogging = "0a1b2c3d4e5f60010001000100010004"
 	// ECSTaskEnvSecret runs order-worker:3, the only definition with a
 	// plaintext credential in a container environment.
-	ECSTaskEnvSecret = "c3d4e5f6a1b2c3d4e5f60102"
+	ECSTaskEnvSecret = "0a1b2c3d4e5f60010001000100010005"
 )
 
 // Superseded revisions the witness tasks above still run.
@@ -478,7 +475,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("PENDING"),
 			DesiredStatus:     aws.String("RUNNING"),
-			TaskDefinitionArn: aws.String(ecsDefOrderWorkerSecret),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:5"),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("1024"),
 			Memory:            aws.String("2048"),
@@ -565,7 +562,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("ACTIVATING"),
 			DesiredStatus:     aws.String("RUNNING"),
-			TaskDefinitionArn: aws.String(ecsDefWebFrontendOld),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("256"),
 			Memory:            aws.String("512"),
@@ -582,7 +579,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("DEACTIVATING"),
 			DesiredStatus:     aws.String("STOPPED"),
-			TaskDefinitionArn: aws.String(ecsDefOrderWorkerOld),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:5"),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("1024"),
 			Memory:            aws.String("2048"),
@@ -600,7 +597,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnBatch),
 			LastStatus:        aws.String("STOPPING"),
 			DesiredStatus:     aws.String("STOPPED"),
-			TaskDefinitionArn: aws.String(ecsDefBatchETLOld),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:3"),
 			LaunchType:        ecstypes.LaunchTypeEc2,
 			Cpu:               aws.String("2048"),
 			Memory:            aws.String("4096"),
@@ -616,7 +613,7 @@ func buildECSTasks() []ecstypes.Task {
 			ClusterArn:        aws.String(ecsClusterArnServices),
 			LastStatus:        aws.String("PROVISIONING"),
 			DesiredStatus:     aws.String("RUNNING"),
-			TaskDefinitionArn: aws.String(ecsDefWebFrontendPriv),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
 			LaunchType:        ecstypes.LaunchTypeFargate,
 			Cpu:               aws.String("256"),
 			Memory:            aws.String("512"),
@@ -642,6 +639,99 @@ func buildECSTasks() []ecstypes.Task {
 			HealthStatus:      ecstypes.HealthStatusUnknown,
 			Connectivity:      ecstypes.ConnectivityConnected,
 			AvailabilityZone:  aws.String("us-east-1c"),
+		},
+		// Healthy, running tasks whose only signal is their definition's own
+		// posture — one per task-definition rule, so no posture finding ever
+		// shares a row with a lifecycle finding.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/0a1b2c3d4e5f60010001000100010001"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("RUNNING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String(ecsDefWebFrontendPriv),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("256"),
+			Memory:            aws.String("512"),
+			Group:             aws.String("service:web-frontend"),
+			CreatedAt:         aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			StartedAt:         aws.Time(mustTime("2026-04-26T09:01:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1a"),
+		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/0a1b2c3d4e5f60010001000100010002"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("RUNNING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String(ecsDefOrderWorkerOld),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("1024"),
+			Memory:            aws.String("2048"),
+			Group:             aws.String("service:order-worker"),
+			CreatedAt:         aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			StartedAt:         aws.Time(mustTime("2026-04-26T09:01:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1b"),
+		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/0a1b2c3d4e5f60010001000100010003"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("RUNNING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String(ecsDefWebFrontendOld),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("256"),
+			Memory:            aws.String("512"),
+			Group:             aws.String("service:web-frontend"),
+			CreatedAt:         aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			StartedAt:         aws.Time(mustTime("2026-04-26T09:01:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1c"),
+		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/0a1b2c3d4e5f60010001000100010004"),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("RUNNING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String(ecsDefBatchETLOld),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("2048"),
+			Memory:            aws.String("4096"),
+			Group:             aws.String("service:batch-etl-runner"),
+			CreatedAt:         aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			StartedAt:         aws.Time(mustTime("2026-04-26T09:01:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1a"),
+		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/0a1b2c3d4e5f60010001000100010005"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("RUNNING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String(ecsDefOrderWorkerSecret),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("1024"),
+			Memory:            aws.String("2048"),
+			Group:             aws.String("service:order-worker"),
+			CreatedAt:         aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			StartedAt:         aws.Time(mustTime("2026-04-26T09:01:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1b"),
 		},
 	}
 }

@@ -85,7 +85,7 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 	}
 
 	// AS-140: FieldUpdates must be empty — the merged "failed (+1)" stack is
-	// computed at render time by phraseFromFindings(r.Findings) (Wave-1
+	// computed at render time by domain.StatusPhrase(r.Findings) (Wave-1
 	// "failed" finding + this enricher's Wave-2 orphan finding). The B1
 	// regression is now structurally impossible because the enricher no
 	// longer writes the merged phrase.
@@ -182,7 +182,7 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 			t.Errorf("Summary = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 		}
 		// AS-140: FieldUpdates must be empty — merged phrase is computed at
-		// render time by phraseFromFindings(r.Findings).
+		// render time by domain.StatusPhrase(r.Findings).
 		if updates, ok := result.FieldUpdates["aurora-orphan"]; ok && len(updates) != 0 {
 			t.Errorf("AS-140: expected empty FieldUpdates for aurora-orphan (status overlay removed); got %v", updates)
 		}

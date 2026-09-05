@@ -496,7 +496,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		// r.Findings already carries a Wave-2 entry for this resource (the demo
 		// path and the fold-layer live path both mutate r.Findings directly),
 		// extractListCells has already derived the correct cell from
-		// listPhraseFromFindings(r.Findings) — including the "<top> (+N)"
+		// domain.StatusPhrase(r.Findings) — including the "<top> (+N)"
 		// stacking notation for multi-finding rows. This fallback instead picks
 		// the WORST-severity entry from the enrichment-store map's per-resource
 		// slice (a resource may carry more than one independently-evaluated

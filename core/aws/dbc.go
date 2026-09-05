@@ -83,7 +83,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 		}
 
 		findings, attentionDetails := computeDBCFindings(cluster)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       clusterID,

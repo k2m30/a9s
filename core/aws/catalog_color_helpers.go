@@ -52,23 +52,11 @@ func colorFromWave1(r domain.Resource) (domain.Color, bool) {
 // (e.g. elb's deletion-protection check, vpc's flow-logs check, tgw's
 // attachment-health check) that a wave1-only lookup silently drops.
 func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
-	found := false
-	worst := domain.SevDim
-	for i := range r.Findings {
-		s := r.Findings[i].Source
-		if s != "wave1" && !strings.HasPrefix(s, "wave2:") {
-			continue
-		}
-		sev := r.Findings[i].Severity
-		if !found || sev > worst {
-			worst = sev
-			found = true
-		}
-	}
-	if !found {
+	top, ok := domain.TopFinding(r.Findings)
+	if !ok {
 		return domain.ColorHealthy, false
 	}
-	return colorFromSeverity(worst), true
+	return colorFromSeverity(top.Severity), true
 }
 
 // colorAnyFindingOrHealthy classifies r from colorFromAnyFinding, defaulting

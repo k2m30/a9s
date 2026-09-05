@@ -106,7 +106,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		autoFailover := rg.AutomaticFailover == elasticachetypes.AutomaticFailoverStatusEnabled
 
 		findings, attentionDetails := computeRedisFindings(status, multiAZ, autoFailover, rg)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       rgID,

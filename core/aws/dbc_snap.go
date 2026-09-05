@@ -75,7 +75,7 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 		// Per spec §4 (docs/resources/dbc-snap.md), Status is the §4 phrase, not
 		// raw AWS state. Healthy snapshots render BLANK.
 		findings := computeDBCSnapFindings(snapshot)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		engine := ""
 		if snapshot.Engine != nil {

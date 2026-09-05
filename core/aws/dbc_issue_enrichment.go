@@ -32,7 +32,7 @@ const (
 //
 // The merged S4 status phrase (e.g. "maintenance overdue" alone, or
 // "stopped (+1)" stacked over a Wave-1 finding) is computed at render time
-// from r.Findings via phraseFromFindings; this enricher only emits Findings.
+// from r.Findings via domain.StatusPhrase; this enricher only emits Findings.
 func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),

@@ -149,7 +149,7 @@ func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion,
 		Name: name,
 		Fields: map[string]string{
 			"name":            name,
-			"status":          phraseFromFindings(findings),
+			"status":          domain.StatusPhrase(findings),
 			"default_version": strconv.FormatInt(aws.ToInt64(tpl.DefaultVersionNumber), 10),
 			"latest_version":  strconv.FormatInt(aws.ToInt64(tpl.LatestVersionNumber), 10),
 			"created_by":      aws.ToString(tpl.CreatedBy),

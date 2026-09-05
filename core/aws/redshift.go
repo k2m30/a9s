@@ -91,7 +91,7 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 		}
 
 		findings := computeRedshiftFindings(cluster)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       clusterID,

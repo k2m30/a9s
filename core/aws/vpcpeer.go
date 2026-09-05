@@ -94,7 +94,7 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 		Name: name,
 		Fields: map[string]string{
 			"pcx_id":          id,
-			"status":          phraseFromFindings(findings),
+			"status":          domain.StatusPhrase(findings),
 			"requester_vpc":   requesterVPC,
 			"requester_owner": requesterOwner,
 			"accepter_vpc":    accepterVPC,

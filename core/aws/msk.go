@@ -72,7 +72,7 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 		}
 
 		findings := computeMSKFindings(cluster.State)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       clusterName,

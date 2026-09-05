@@ -68,7 +68,7 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 		}
 
 		findings := computeKinesisFindings(stream.StreamStatus)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       streamName,

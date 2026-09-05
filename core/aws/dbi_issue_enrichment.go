@@ -31,7 +31,7 @@ const dbiEngineDeprecatedDetail = "AWS no longer supports this engine version, s
 // (Wave 2 ~ does not bump the S1 menu badge). The merged
 // S4 status phrase (e.g. "maintenance scheduled" alone, or "stopped (+1)" stacked
 // over a Wave-1 finding) is computed at render time from r.Findings via
-// phraseFromFindings; this enricher only emits Findings.
+// domain.StatusPhrase; this enricher only emits Findings.
 func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),

@@ -30,7 +30,7 @@ const (
 //   - otherwise → no finding
 //
 // The enricher no longer writes FieldUpdates["status"]. The Wave-2
-// phrase is sourced at render time from r.Findings via phraseFromFindings;
+// phrase is sourced at render time from r.Findings via domain.StatusPhrase;
 // row color is sourced from the Wave-2 finding's Severity via colorSES.
 func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{

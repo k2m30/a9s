@@ -110,9 +110,9 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 	findings, attentionDetails := computeMWAAFindings(env)
 
 	rawStatus := string(env.Status)
-	statusPhrase := phraseFromFindings(findings)
+	statusPhrase := domain.StatusPhrase(findings)
 	if statusPhrase == "" && rawStatus != "" && rawStatus != string(mwaatypes.EnvironmentStatusAvailable) {
-		// Defensive parity with rds.go's phraseFromFindings fallback: an
+		// Defensive parity with rds.go's status-phrase fallback: an
 		// undocumented future status value still surfaces as raw text
 		// instead of silently rendering blank. AVAILABLE with zero findings
 		// legitimately stays "" — docs/resources/mwaa.md §4 "Healthy rows

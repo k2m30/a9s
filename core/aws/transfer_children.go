@@ -125,7 +125,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 		Fields: map[string]string{
 			"agreement_id":    id,
 			"description":     aws.ToString(agreement.Description),
-			"status":          phraseFromFindings(findings),
+			"status":          domain.StatusPhrase(findings),
 			"local_profile":   aws.ToString(agreement.LocalProfileId),
 			"partner_profile": aws.ToString(agreement.PartnerProfileId),
 			"base_directory":  aws.ToString(agreement.BaseDirectory),

@@ -260,6 +260,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				LogGroup:  aws.String("/aws/lambda/image-thumbnail-gen"),
 				LogFormat: lambdatypes.LogFormatText,
 			},
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},
 		{
@@ -291,6 +294,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 					"PROVIDER_API_KEY":  "pk-live-4c81b7e2af9d6035",
 				},
 			},
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},
 		{
@@ -312,6 +318,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			LoggingConfig: &lambdatypes.LoggingConfig{
 				LogGroup:  aws.String("/aws/lambda/cloudwatch-slack-notifier"),
 				LogFormat: lambdatypes.LogFormatText,
+			},
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},

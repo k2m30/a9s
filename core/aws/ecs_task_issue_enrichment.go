@@ -40,12 +40,18 @@ const (
 	ecsTaskEnvSecretDetail = "A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block."
 )
 
-// ecsTaskGone reports a task that has already stopped. The row is a task,
-// not a definition, so a stopped task is not an open posture item however
-// its definition reads. The single place that fact is spelled: the fetcher's
-// lifecycle findings and the Wave-2 posture pass both call it.
+// ecsTaskGone reports a task that is stopped or on its way there. The row is
+// a task, not a definition, so once teardown starts its definition's posture
+// is no longer an open item — nobody is going to reconfigure a task that is
+// already draining. The single place that fact is spelled: the fetcher's
+// lifecycle findings and the Wave-2 posture pass both call it. The lifecycle
+// finding for these states still fires; a state is not a posture.
 func ecsTaskGone(lastStatus string) bool {
-	return lastStatus == "STOPPED"
+	switch lastStatus {
+	case "STOPPED", "STOPPING", "DEPROVISIONING", "DEACTIVATING":
+		return true
+	}
+	return false
 }
 
 // EnrichECSTasks is a Wave 2 enricher for ECS tasks.

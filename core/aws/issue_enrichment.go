@@ -115,7 +115,7 @@ func formatDate(t interface{ Format(string) string }) string {
 // own Phrase/Detail/Code, never demoted into another finding's supporting
 // row. ApplyWave2ToRow (core/runtime/helpers.go) folds the whole slice
 // onto domain.Resource.Findings, and colorFromAnyFinding/buildAttentionEntries/
-// listPhraseFromFindings already read the whole slice for worst-severity
+// domain.StatusPhrase already reads the whole slice for worst-severity
 // color, one Attention entry per issue-severity finding, and the stacked
 // "<top> (+N)" list phrase respectively.
 //

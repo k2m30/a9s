@@ -2,7 +2,10 @@
 
 package domain
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // wave2SourcePrefix is the Source prefix stamped on every Wave-2-emitted
 // Finding ("wave2:<short>"). Wave-1 findings never carry this prefix — their
@@ -74,4 +77,33 @@ type DetailRow struct {
 	Label string
 	Value string
 	Tier  string
+}
+
+// TopFinding returns the finding that decides the row: the highest-severity
+// entry, slice order among equals. A SevDim finding is therefore selected
+// only when nothing issue-severity is present. ok is false for an empty
+// slice.
+//
+// This is the single selection every render surface shares — the Status cell
+// phrase and the row colour both resolve through it, so a red row can never
+// read as a warning.
+func TopFinding(findings []Finding) (Finding, bool) {
+	if len(findings) == 0 {
+		return Finding{}, false
+	}
+	return WorstSeverityFinding(findings), true
+}
+
+// StatusPhrase is the list Status cell for a resource's findings: the phrase
+// of the finding TopFinding selects, suffixed "(+N)" when other findings are
+// stacked behind it. Empty for a resource with no findings.
+func StatusPhrase(findings []Finding) string {
+	top, ok := TopFinding(findings)
+	if !ok {
+		return ""
+	}
+	if len(findings) == 1 {
+		return top.Phrase
+	}
+	return top.Phrase + " (+" + strconv.Itoa(len(findings)-1) + ")"
 }

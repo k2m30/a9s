@@ -76,7 +76,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		if !pitrEnabled {
 			// Emit only the Finding entry. The merged display
 			// phrase (e.g. "archived: kms key lost") is computed at render time
-			// by phraseFromFindings(r.Findings) — not by writing
+			// by domain.StatusPhrase(r.Findings) — not by writing
 			// FieldUpdates["status"] here.
 			setWave2Finding(&result, r.ID, ddbCodePITROff, "point-in-time recovery disabled", "~", "ddb", nil, "")
 		}

@@ -106,7 +106,7 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		}
 
 		findings, attentionDetails := computeDDBFindings(table)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		itemCount := ""
 		if table.ItemCount != nil {

@@ -81,7 +81,11 @@ func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.F
 	if healthStatus == "UNHEALTHY" {
 		return []domain.Finding{{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"}}
 	}
-	if ecsTaskGone(status) {
+	// Not ecsTaskGone: that predicate answers "has teardown started", which
+	// is true for the transitional states below and would swallow their own
+	// lifecycle findings. This branch asks the narrower question of whether
+	// the task has actually stopped, which is what picks stop-code over dim.
+	if status == "STOPPED" {
 		if stopCode != "" && stopCode != "UserInitiated" {
 			return []domain.Finding{{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: " + stopCode, Severity: domain.SevBroken, Source: "wave1"}}
 		}

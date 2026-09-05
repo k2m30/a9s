@@ -120,9 +120,9 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 func buildTransferResource(server *transfertypes.DescribedServer) resource.Resource {
 	id := aws.ToString(server.ServerId)
 	findings := computeTransferFindings(server)
-	statusPhrase := phraseFromFindings(findings)
+	statusPhrase := domain.StatusPhrase(findings)
 	if statusPhrase == "" && server.State != "" && server.State != transfertypes.StateOnline {
-		// Defensive parity with mwaa.go's phraseFromFindings fallback: an
+		// Defensive parity with mwaa.go's status-phrase fallback: an
 		// undocumented future State value still surfaces as raw text
 		// instead of silently rendering blank. ONLINE with zero findings
 		// legitimately stays "" (Healthy).
@@ -238,7 +238,7 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer, err error)
 		findings = append(findings, f)
 	}
 	findings = append(findings, degradedDetailsFinding("transfer", err, transferDetailsDeniedDetail, detailsUnavailableDetail))
-	statusPhrase := phraseFromFindings(findings)
+	statusPhrase := domain.StatusPhrase(findings)
 
 	raw := listed
 	return resource.Resource{

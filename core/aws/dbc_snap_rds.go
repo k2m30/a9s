@@ -81,7 +81,7 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 		}
 
 		findings := computeRDSDBClusterSnapshotFindings(snapshot)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		engine := ""
 		if snapshot.Engine != nil {

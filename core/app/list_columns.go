@@ -4,7 +4,6 @@ package app
 
 import (
 	"maps"
-	"strconv"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/config"
@@ -168,7 +167,7 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	// Key-less, Path-based case (e.g. lambda/ec2's per-session view
 	// {Title:"State", Path:"State"} with no Key, or acm/eks/ng's
 	// default-view {Path:"Status"} with no Key). Every qualifying column
-	// must route through the same phraseFromFindings + HumanizeStatusPhrase
+	// must route through the same domain.StatusPhrase + HumanizeStatusPhrase
 	// chokepoint — otherwise it falls through to the raw fieldpath/Fields
 	// value further down and a raw AWS enum (e.g. "FAILED", "STALE")
 	// reaches the screen. The Key==status/lifecycleKey checks are kept for
@@ -183,7 +182,7 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	isStatusCol := col.Key == "status" || col.Key == lifecycleKey ||
 		strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")
 	if isStatusCol {
-		if phrase := listPhraseFromFindings(r.Findings); phrase != "" {
+		if phrase := domain.StatusPhrase(r.Findings); phrase != "" {
 			return phrase
 		}
 		if v, ok := r.Fields[lifecycleKey]; ok && v != "" {
@@ -261,33 +260,6 @@ func humanizeListCell(col ColumnDef, v string) string {
 	return v
 }
 
-// listPhraseFromFindings mirrors phraseFromFindings in table_render.go, with
-// one addition: SevDim findings are included as the lowest-priority phrase
-// source. An issue-severity (SevWarn/SevBroken) finding always wins over a
-// SevDim one regardless of slice order, so a row whose only findings are dim
-// (e.g. ct-events "routine event", lambda.state.inactive, sns-sub.state.deleted)
-// still gets a Status-cell phrase instead of falling through to the raw
-// lifecycle field — dim rows are a state, not a problem, so they must not
-// count as issues (Attention filter, menu badges, unifiedIssueCount all stay
-// severity-gated via domain.Severity.IsIssue()), but the cell should still
-// explain why the row is dim.
-func listPhraseFromFindings(findings []domain.Finding) string {
-	if len(findings) == 0 {
-		return ""
-	}
-	top := 0
-	for i, f := range findings {
-		if f.Severity.IsIssue() {
-			top = i
-			break
-		}
-	}
-	if len(findings) == 1 {
-		return findings[top].Phrase
-	}
-	return findings[top].Phrase + " (+" + strconv.Itoa(len(findings)-1) + ")"
-}
-
 // hasWave2Finding reports whether findings already contains a Wave-2 entry
 // (Source prefixed "wave2:"). Used by buildListBody's S4 status-cell override
 // to detect when applyWave2ToRow has already mutated r.Findings directly
@@ -317,7 +289,7 @@ func hasWave2Finding(findings []domain.Finding) bool {
 // map lookup alone only ever hits after a live probe re-confirms the same
 // finding, so a freshly cold-booted list shows no glyph/severity on
 // flagged rows until the sweep completes. r.Findings is assumed
-// pre-ordered by severity (the same convention listPhraseFromFindings
+// pre-ordered by severity (the same convention domain.StatusPhrase
 // relies on via findings[0]), so the first entry is "the top" finding. A
 // resource may carry more than one independently-evaluated Wave-2
 // condition in the findings map's per-ID slice; the decorator reduces to

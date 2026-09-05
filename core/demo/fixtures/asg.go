@@ -90,7 +90,7 @@ const (
 	ASGSingleAZ = "acme-staging-asg"
 	// ASGNoELBHealthCheck is the only group attached to a target group while
 	// still deciding health from EC2 status checks alone.
-	ASGNoELBHealthCheck = "asg-unhealthy-instance"
+	ASGNoELBHealthCheck = "awseb-e-acmeprodapi-asg"
 	// ASGLaunchConfigIMDSv1 / ASGLaunchConfigPublicIP / ASGLaunchConfigSecret
 	// all name the same group: acme-web-prod-lc is the only launch
 	// configuration in the demo, so all three signals land on its group.
@@ -199,6 +199,9 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA),
 			CreatedTime:            aws.Time(mustTime("2025-03-10T12:00:00Z")),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0eee555555555555e"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
 			// LaunchTemplate — required for the lt->asg related-panel pivot
 			// (plain single-template path). References prod-web-lt (lt.go).
 			LaunchTemplate: &asgtypes.LaunchTemplateSpecification{
@@ -210,15 +213,23 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			},
 		},
 		{
-			AutoScalingGroupName:   aws.String("awseb-e-acmeprodapi-asg"),
-			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:44444444-4444-4444-4444-444444444444:autoScalingGroupName/awseb-e-acmeprodapi-asg"),
-			MinSize:                aws.Int32(1),
-			MaxSize:                aws.Int32(4),
-			DesiredCapacity:        aws.Int32(2),
-			HealthCheckType:        aws.String("ELB"),
+			AutoScalingGroupName: aws.String("awseb-e-acmeprodapi-asg"),
+			AutoScalingGroupARN:  aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:44444444-4444-4444-4444-444444444444:autoScalingGroupName/awseb-e-acmeprodapi-asg"),
+			MinSize:              aws.Int32(1),
+			MaxSize:              aws.Int32(4),
+			DesiredCapacity:      aws.Int32(2),
+			// The asg.no-elb-health-check witness: registered behind the api
+			// target group yet still deciding health from EC2 status checks.
+			// Healthy on every other signal so its phrase renders alone.
+			HealthCheckType:        aws.String("EC2"),
 			HealthCheckGracePeriod: aws.Int32(180),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-01-20T09:00:00Z")),
+			TargetGroupARNs:        []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-api-tg/0987654321fedcba"},
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0fff666666666666f"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0aaa777777777777a"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("elasticbeanstalk:environment-name"), Value: aws.String("acme-prod-api")},
 			},
@@ -306,10 +317,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckType:        aws.String("EC2"),
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
-			// The asg.no-elb-health-check witness: registered behind the web
-			// target group yet still deciding health from EC2 status checks.
-			TargetGroupARNs: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"},
-			CreatedTime:     aws.Time(mustTime("2025-05-12T08:00:00Z")),
+			CreatedTime:            aws.Time(mustTime("2025-05-12T08:00:00Z")),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0eee555555555555e"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0fff666666666666f"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},

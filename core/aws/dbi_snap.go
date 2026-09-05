@@ -117,7 +117,7 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 
 		// Compute findings per §0.1 precedence ladder.
 		findings := ComputeDBISnapStatusAndIssues(snap)
-		statusPhrase := phraseFromFindings(findings)
+		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       snapshotID,
