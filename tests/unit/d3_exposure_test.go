@@ -151,11 +151,13 @@ func d3WeakTLSListener(port int32) elbtypes.Listener {
 // TestD3EveryWeakTLSPortIsNamed pins the weak-TLS finding to the same shape as
 // the cleartext one: two listeners on a retired policy are two ports to
 // change, and each row leads with the port so the operator knows which
-// listener a policy name belongs to.
+// listener a policy name belongs to. The listeners arrive in descending port
+// order, so the phrase and the rows are only both ascending if they are
+// ordered together rather than taken as the API answered.
 func TestD3EveryWeakTLSPortIsNamed(t *testing.T) {
 	res := d3EnrichELB(t, &d3ELBFake{page1: []elbtypes.Listener{
-		d3WeakTLSListener(443),
 		d3WeakTLSListener(8443),
+		d3WeakTLSListener(443),
 	}})
 
 	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBWeakTLS,

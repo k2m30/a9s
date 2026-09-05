@@ -393,6 +393,30 @@ func TestD3PolicyDocumentDecodesIdenticallyEverywhere(t *testing.T) {
 		}
 	})
 
+	// A document that already is JSON is used as it stands, so a resource
+	// name holding a literal '%' is not read as the start of an escape.
+	// Decode and Parse have to agree on that, or the same document means two
+	// things depending on which entry point the caller reached for.
+	t.Run("literal_percent_in_valid_json", func(t *testing.T) {
+		const doc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow",` +
+			`"Action":"s3:GetObject","Resource":"arn:aws:s3:::acme-reports/100%2Fyear/*"}]}`
+		const resourceWant = "arn:aws:s3:::acme-reports/100%2Fyear/*"
+
+		if got := iampolicy.Decode(doc); got != doc {
+			t.Errorf("Decode unescaped a document that was already JSON:\n want %q\n  got %q", doc, got)
+		}
+		parsed, err := iampolicy.Parse(doc)
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if len(parsed.Statement) != 1 || len(parsed.Statement[0].Resource) != 1 {
+			t.Fatalf("parsed %+v, want one statement with one resource", parsed.Statement)
+		}
+		if got := parsed.Statement[0].Resource[0]; got != resourceWant {
+			t.Errorf("Parse read the resource as %q, want %q", got, resourceWant)
+		}
+	})
+
 	t.Run("role_fetcher", func(t *testing.T) {
 		created := time.Now().Add(-365 * 24 * time.Hour)
 		fake := &d3RoleFake{role: iamtypes.Role{
