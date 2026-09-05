@@ -85,7 +85,7 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `ListDomainNames` returns only `DomainName` and `EngineType`; there is no state, processing flag, or config field to classify from.
+`ListDomainNames` returns only `DomainName` and `EngineType`, so the fetcher pairs it with `DescribeDomains` (bounded fan-out, up to 5 names per call) and every signal readable from `DomainStatus` is decided there: the hard states (`Deleted`, `Isolated`, `Processing`/`UpgradeProcessing`) and the two background checks (`ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`). A domain being deleted reports nothing else.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -136,9 +136,9 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 Wave → surface mapping applied here:
 
-- OpenSearch has **no Wave 1** signal at all (the list API is config-thin), so on first paint every row is green with a blank Status. The attention picture appears only after the Wave 2 `DescribeDomains` fan-out returns.
-- Wave 2 hard-state signals (`Deleted`, `Processing/UpgradeProcessing`, `Isolated`) drive **S2 + S4** (color + cause). They do not bump S1 and are not candidates for S3 — color is already the signal.
-- Wave 2 background-check signals (`UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`) land on a still-green row → **S3 + S4 + S5** (glyph + short cause + detail sentence). `UpdateAvailable` past the auto-update cutoff is a pressing background concern (`!`); missing at-rest encryption is a posture finding (`~`) — see §6 user decision.
+- The hard states (`Deleted`, `Processing/UpgradeProcessing`, `Isolated`) drive **S2 + S4** (color + cause).
+- The background checks (`UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`) drive **S1 + S2 + S3 + S4 + S5**. `UpdateAvailable` past the auto-update cutoff is a pressing background concern (`!`); missing at-rest encryption is a posture finding (`~`) — see §6 user decision.
+- The network-posture checks (`reachable outside a VPC`, `HTTPS not enforced`, `node-to-node encryption off`) are the only Wave 2 signals, and they read the fields the fetcher already wrote.
 
 One row per signal from §3:
 
@@ -199,8 +199,8 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
 | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
-| opensearch.update-forced | software update forced soon | broken | wave2 |
-| opensearch.encryption-off | encryption at rest off | warn | wave2 |
+| opensearch.update-forced | software update forced soon | broken | wave1 |
+| opensearch.encryption-off | encryption at rest off | warn | wave1 |
 | opensearch.public | reachable outside a VPC | broken | wave2 |
 | opensearch.https-not-enforced | HTTPS not enforced | warn | wave2 |
 | opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave2 |

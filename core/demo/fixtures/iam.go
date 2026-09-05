@@ -97,6 +97,9 @@ const (
 	// IAMUserConsoleNeverUsed has a console password created long ago and
 	// never used — iam-user.console-never-used.
 	IAMUserConsoleNeverUsed = "dormant-console-user"
+	// IAMUserConsoleSignInStale signed in to the console once, more than 90
+	// days ago — iam-user.console-dormant.
+	IAMUserConsoleSignInStale = "lapsed-console-user"
 	// IAMUserKeyUnused holds the one access key old enough to report, and
 	// which has never signed a request — iam-user.old-key and
 	// iam-user.access-key-unused.
@@ -149,8 +152,9 @@ var sharedIAMFixtures = sync.OnceValue(func() *IAMFixtures {
 	// Key ages and last-use dates are relative to fixture construction so the
 	// 90-day thresholds keep meaning the same thing as the calendar moves.
 	f.ConsoleUsers = map[string]bool{
-		"alice.johnson":         true,
-		IAMUserConsoleNeverUsed: true,
+		"alice.johnson":           true,
+		IAMUserConsoleNeverUsed:   true,
+		IAMUserConsoleSignInStale: true,
 	}
 	// The console-never-used witness has MFA registered, so it carries that
 	// finding alone and not the no-MFA one.
@@ -158,6 +162,13 @@ var sharedIAMFixtures = sync.OnceValue(func() *IAMFixtures {
 		IAMUserConsoleNeverUsed: {{
 			UserName:     aws.String(IAMUserConsoleNeverUsed),
 			SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/" + IAMUserConsoleNeverUsed),
+			EnableDate:   aws.Time(time.Now().AddDate(0, 0, -400)),
+		}},
+		// MFA registered so the stale-sign-in witness carries the dormant
+		// finding alone and not the no-MFA one.
+		IAMUserConsoleSignInStale: {{
+			UserName:     aws.String(IAMUserConsoleSignInStale),
+			SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/" + IAMUserConsoleSignInStale),
 			EnableDate:   aws.Time(time.Now().AddDate(0, 0, -400)),
 		}},
 	}
@@ -864,6 +875,15 @@ func buildIAMUsers() []iamtypes.User {
 			Arn:        aws.String("arn:aws:iam::123456789012:user/" + IAMUserConsoleNeverUsed),
 			Path:       aws.String("/"),
 			CreateDate: aws.Time(time.Date(2024, 2, 1, 9, 0, 0, 0, time.UTC)),
+		},
+		// Witness: console password signed in once, more than 90 days ago.
+		{
+			UserName:         aws.String(IAMUserConsoleSignInStale),
+			UserId:           aws.String("AIDAEXAMPLECONSSTALE"),
+			Arn:              aws.String("arn:aws:iam::123456789012:user/" + IAMUserConsoleSignInStale),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2024, 3, 1, 9, 0, 0, 0, time.UTC)),
+			PasswordLastUsed: aws.Time(time.Now().AddDate(0, 0, -200)),
 		},
 		// Witness: one active access key, old and never used.
 		{

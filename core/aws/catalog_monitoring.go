@@ -16,19 +16,11 @@ import (
 )
 
 func colorAlarm(r domain.Resource) domain.Color {
-	switch r.Fields["state"] {
-	case "ALARM":
-		return domain.ColorBroken
-	case "INSUFFICIENT_DATA":
-		return domain.ColorWarning
-	case "OK":
-		actionsCount, err := strconv.Atoi(r.Fields["actions_count"])
-		if err != nil || actionsCount == 0 {
-			return domain.ColorWarning
-		}
-		return domain.ColorHealthy
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
-	return domain.ColorHealthy
+	actionsCount, _ := strconv.Atoi(r.Fields["actions_count"])
+	return colorFromFindings(alarmStateFindings(r.Fields["state"], actionsCount))
 }
 
 func colorLogs(r domain.Resource) domain.Color {
@@ -49,33 +41,22 @@ func colorLogs(r domain.Resource) domain.Color {
 }
 
 func colorTrail(r domain.Resource) domain.Color {
-	if r.Fields["is_logging"] == "false" {
-		return domain.ColorBroken
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
-	if r.Fields["latest_delivery_error"] != "" && r.Fields["latest_delivery_error"] != "-" {
-		return domain.ColorBroken
-	}
-	if trailDeliveryIsStale(r.Fields["is_logging"], r.Fields["latest_delivery_time"]) {
-		return domain.ColorBroken
-	}
-	switch r.Fields["status"] {
-	case "failed", "FAILED", "error", "ERROR":
-		return domain.ColorBroken
-	}
-	if r.Fields["log_file_validation_enabled"] == "false" {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(trailWave1Wave2Findings(
+		r.Fields["is_logging"], r.Fields["latest_delivery_error"],
+		r.Fields["latest_delivery_time"], r.Fields["log_file_validation_enabled"]))
 }
 
 func colorCTEvents(r domain.Resource) domain.Color {
-	switch r.Fields["status"] {
-	case "ct-danger":
-		return domain.ColorBroken
-	case "ct-attention":
-		return domain.ColorWarning
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
-	return domain.ColorDim
+	// Every event carries a finding, including the routine tier that colours
+	// the row dim — so the fallback never returns healthy here.
+	return colorFromFindings(ctEventFindings(
+		r.Fields["status"], r.Fields["cause"], r.Fields["error_code"], r.Name))
 }
 
 var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var

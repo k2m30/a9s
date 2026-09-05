@@ -80,14 +80,33 @@ func (f *ECSFake) DescribeServices(_ context.Context, input *ecs.DescribeService
 
 func (f *ECSFake) ListTasks(_ context.Context, input *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
 	clusterFilter := aws.ToString(input.Cluster)
+	serviceFilter := aws.ToString(input.ServiceName)
 	var arns []string
 	for _, t := range f.fix.Tasks {
+		// The real ListTasks accepts either the cluster's short name or its
+		// full ARN; a ecs-svc row carries the name, so matching the ARN alone
+		// returns nothing for every demo service.
 		clusterArn := aws.ToString(t.ClusterArn)
-		if clusterFilter == "" || clusterArn == clusterFilter {
-			arns = append(arns, aws.ToString(t.TaskArn))
+		if clusterFilter != "" && clusterArn != clusterFilter && shortNameOf(clusterArn) != clusterFilter {
+			continue
 		}
+		if serviceFilter != "" && aws.ToString(t.Group) != "service:"+serviceFilter {
+			continue
+		}
+		if input.DesiredStatus != "" && aws.ToString(t.DesiredStatus) != string(input.DesiredStatus) {
+			continue
+		}
+		arns = append(arns, aws.ToString(t.TaskArn))
 	}
 	return &ecs.ListTasksOutput{TaskArns: arns}, nil
+}
+
+// shortNameOf returns the segment after the last "/" of an ARN.
+func shortNameOf(arn string) string {
+	if idx := strings.LastIndex(arn, "/"); idx != -1 {
+		return arn[idx+1:]
+	}
+	return arn
 }
 
 func (f *ECSFake) DescribeTasks(_ context.Context, input *ecs.DescribeTasksInput, _ ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {

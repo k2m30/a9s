@@ -79,10 +79,27 @@ type DetailRow struct {
 	Tier  string
 }
 
-// TopFinding returns the finding that decides the row: the highest-severity
-// entry, slice order among equals. A SevDim finding is therefore selected
-// only when nothing issue-severity is present. ok is false for an empty
-// slice.
+// selectionRank orders findings for display, which is not the enum's own
+// order: SevOK sits between SevDim and SevWarn, so a plain maximum would put
+// "healthy" text on a row the operator is looking at because it is dim.
+// Broken beats warn beats dim beats everything else.
+func selectionRank(s Severity) int {
+	switch s {
+	case SevBroken:
+		return 3
+	case SevWarn:
+		return 2
+	case SevDim:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// TopFinding returns the finding that decides the row: the worst by
+// selectionRank, slice order among equals. A dim finding is therefore
+// selected only when nothing issue-severity is present, and a healthy one
+// only when there is nothing else at all. ok is false for an empty slice.
 //
 // This is the single selection every render surface shares — the Status cell
 // phrase and the row colour both resolve through it, so a red row can never
@@ -91,19 +108,36 @@ func TopFinding(findings []Finding) (Finding, bool) {
 	if len(findings) == 0 {
 		return Finding{}, false
 	}
-	return WorstSeverityFinding(findings), true
+	top := findings[0]
+	for _, f := range findings[1:] {
+		if selectionRank(f.Severity) > selectionRank(top.Severity) {
+			top = f
+		}
+	}
+	return top, true
 }
 
 // StatusPhrase is the list Status cell for a resource's findings: the phrase
-// of the finding TopFinding selects, suffixed "(+N)" when other findings are
-// stacked behind it. Empty for a resource with no findings.
+// of the finding TopFinding selects, suffixed "(+N)" for the other
+// issue-severity findings stacked behind it. Dim findings never count — a
+// state is not one of the things wrong with the row. Empty for a resource
+// with no findings.
 func StatusPhrase(findings []Finding) string {
 	top, ok := TopFinding(findings)
 	if !ok {
 		return ""
 	}
-	if len(findings) == 1 {
+	others := 0
+	for _, f := range findings {
+		if f.Severity.IsIssue() {
+			others++
+		}
+	}
+	if top.Severity.IsIssue() {
+		others--
+	}
+	if others <= 0 {
 		return top.Phrase
 	}
-	return top.Phrase + " (+" + strconv.Itoa(len(findings)-1) + ")"
+	return top.Phrase + " (+" + strconv.Itoa(others) + ")"
 }

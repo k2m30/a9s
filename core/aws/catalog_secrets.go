@@ -39,26 +39,14 @@ func colorSecrets(r domain.Resource) domain.Color {
 }
 
 func colorSSM(r domain.Resource) domain.Color {
-	sensitiveSuffixes := []string{
-		"_password", "_secret", "_token", "_apikey",
-		"_api_key", "_credentials", "_passwd",
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
-	name := strings.ToLower(r.Fields["name"])
-	if r.Fields["type"] == "String" {
-		for _, suffix := range sensitiveSuffixes {
-			if strings.HasSuffix(name, suffix) {
-				return domain.ColorBroken
-			}
-		}
+	var lastModified *time.Time
+	if t, err := time.Parse("2006-01-02 15:04", r.Fields["last_modified"]); err == nil {
+		lastModified = &t
 	}
-	if lm := r.Fields["last_modified"]; lm != "" {
-		if t, err := time.Parse("2006-01-02 15:04", lm); err == nil {
-			if time.Since(t) > 365*24*time.Hour {
-				return domain.ColorWarning
-			}
-		}
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(ssmColorFindings(r.Fields["name"], r.Fields["type"], lastModified))
 }
 
 func colorKMS(r domain.Resource) domain.Color {

@@ -42,7 +42,7 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 		verificationStatus := string(identity.VerificationStatus)
 
 		findings := sesIdentityFindings(identity)
-		topPhrase := sesTopPhrase(findings)
+		topPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       identityName,
@@ -102,12 +102,22 @@ func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {
 	return findings
 }
 
-func sesTopPhrase(findings []domain.Finding) string {
-	if len(findings) == 0 {
-		return ""
+// sesFindingForPhrase maps a Status cell phrase back to the finding that
+// produced it, by running the fetcher's own predicate over every verification
+// status rather than restating the phrase-to-severity mapping a second time.
+// Only rows built outside the fetcher need it — a fetched identity carries the
+// finding itself.
+func sesFindingForPhrase(phrase string) (domain.Finding, bool) {
+	probes := []sesv2types.IdentityInfo{{SendingEnabled: false}}
+	for _, st := range sesv2types.VerificationStatusPending.Values() {
+		probes = append(probes, sesv2types.IdentityInfo{VerificationStatus: st, SendingEnabled: true})
 	}
-	if len(findings) == 1 {
-		return string(findings[0].Phrase)
+	for _, probe := range probes {
+		for _, f := range sesIdentityFindings(probe) {
+			if f.Phrase == phrase {
+				return f, true
+			}
+		}
 	}
-	return fmt.Sprintf("%s (+%d)", findings[0].Phrase, len(findings)-1)
+	return domain.Finding{}, false
 }

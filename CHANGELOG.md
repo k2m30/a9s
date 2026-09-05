@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ECS services now say why they are short of capacity: a service that wants
+  tasks and is running none reads `no tasks running`, and one running fewer
+  than it asks for reads `running below desired count`. Both used to colour
+  the row with nothing in the Status column to explain it.
+- IAM users whose console sign-in has gone unused for over 90 days are now
+  flagged, alongside the existing never-used check.
+- ECS service task lists now work in demo mode — the demo backend matched
+  clusters by ARN only, so no service ever listed its tasks.
+
 - `make check-deps` reports outdated direct Go modules, a newer Go toolchain
   patch, and newer releases of pinned GitHub Actions, and fails the pre-push
   gate the same way `make security` does — dependency drift that was only
@@ -184,6 +193,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `efs_have_backup_enabled`.
 
 ### Changed
+
+- Row colour and the Status column now come from one selection for every
+  resource type. A row that carries several findings shows the worst one and
+  counts the rest, instead of showing whichever finding happened to be first.
+  Route tables, SNS subscriptions, SSM parameters, CloudTrail trails,
+  CloudWatch alarms, CloudTrail events, SES identities, IAM users and
+  policies, auto scaling groups and ECS services all classified from raw AWS
+  fields beside the findings that described the same thing; they no longer do.
+- OpenSearch domains report the software-update and encryption-at-rest checks
+  as soon as the list loads rather than a moment later, and the "+N" in the
+  Status column now matches the number of findings the detail view shows.
+- ECS tasks listed under a service now carry the same unhealthy and
+  stop-reason findings the top-level task list has always shown.
 
 - Redis and Redshift rows now take their color from the worst finding on
   the row rather than the first Wave 1 one, so a Broken signal can no

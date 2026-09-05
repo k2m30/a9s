@@ -203,7 +203,8 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `status == DRAINING` | 1 | Dim | n/a | S2, S4 | `draining` | `Service is draining; tasks shutting down ahead of delete.` |
 | `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive` | `Service is inactive — not scheduling tasks; safe to delete.` |
-| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | n/a | S2, S4 | `running 2/4` | `Running below desired count — deployment in progress or capacity short.` |
+| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S4, S5 | `no tasks running` | `The service is asking for tasks and none of them are running, so it is serving nothing.` |
+| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S4, S5 | `running below desired count` | `Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity.` |
 | `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S2, S4, S5, S1 (via Broken color + finding count) | `deploy failed` | `Latest deployment failed to reach steady state; rollout halted.` |
 | `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S2, S4, S5, S1 | `running 2/4: no active deploy` | `Task shortfall without an active deployment — placement or health-check blocked.` |
 | `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `unable to place` | `Scheduler cannot place tasks — check subnet IPs, capacity providers, constraints.` |
@@ -278,6 +279,8 @@ ecs-svc — COMPUTE. Lifecycle key: `status`.
 | --- | --- | --- | --- |
 | ecs-svc.state.inactive | inactive | broken | wave1 |
 | ecs-svc.state.draining | draining | warn | wave1 |
+| ecs-svc.tasks.none-running | no tasks running | broken | wave1 |
+| ecs-svc.tasks.below-desired | running below desired count | warn | wave1 |
 | ecs-svc.deployment-failed | deployment failed | broken | wave2 |
 | ecs-svc.public-ip | tasks get public IPs | warn | wave2 |
 <!-- END GENERATED: findings -->

@@ -94,13 +94,7 @@ func FetchECSServicesPage(
 			// emit wave1 Findings for non-healthy lifecycle states.
 			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
 			// so the existing structural Color path works as fallback.
-			var findings []domain.Finding
-			switch status {
-			case "DRAINING":
-				findings = []domain.Finding{{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"}}
-			case "INACTIVE":
-				findings = []domain.Finding{{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
-			}
+			findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
 
 			r := resource.Resource{
 				ID:   serviceName,
@@ -139,4 +133,32 @@ func FetchECSServicesPage(
 			TotalHint:   -1,
 		},
 	}, nil
+}
+
+// ecsSvcFindings is the one predicate for a service's health: its lifecycle
+// state, then whether it is running the tasks it asks for. colorECSSvc runs it
+// over Fields for rows built outside the fetcher.
+func ecsSvcFindings(status string, desiredCount, runningCount int32) []domain.Finding {
+	var findings []domain.Finding
+	switch status {
+	case "DRAINING":
+		findings = append(findings, domain.Finding{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"})
+	case "INACTIVE":
+		findings = append(findings, domain.Finding{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"})
+	}
+	// A service that asks for nothing is idle by design, not short of capacity.
+	switch {
+	case desiredCount <= 0:
+	case runningCount == 0:
+		findings = append(findings, domain.Finding{
+			Code: CodeECSSvcNoTasksRunning, Phrase: "no tasks running",
+			Detail: ecsSvcNoTasksRunningDetail, Severity: domain.SevBroken, Source: "wave1",
+		})
+	case runningCount < desiredCount:
+		findings = append(findings, domain.Finding{
+			Code: CodeECSSvcTasksBelowDesired, Phrase: "running below desired count",
+			Detail: ecsSvcTasksBelowDesiredDetail, Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+	return findings
 }

@@ -152,14 +152,10 @@ func colorSFN(r domain.Resource) domain.Color {
 }
 
 func colorSNSSub(r domain.Resource) domain.Color {
-	switch r.Fields["subscription_arn"] {
-	case "PendingConfirmation":
-		return domain.ColorWarning
-	case "Deleted":
-		return domain.ColorDim
-	default:
-		return domain.ColorHealthy
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
+	return colorFromFindings(snsSubStateFindings(r.Fields["subscription_arn"]))
 }
 
 func colorEBRule(r domain.Resource) domain.Color {
@@ -210,27 +206,24 @@ func colorMSK(r domain.Resource) domain.Color {
 }
 
 func colorSES(r domain.Resource) domain.Color {
-	// Wave-2 SES findings (account shutdown/probation/quota) live in
-	// r.Findings with Source="wave2:ses"; FieldUpdates["status"] is no longer
-	// written. Wave-1 (verification/sending) is in Fields["status"] from the
-	// SES fetcher's sesTopPhrase. Wave-2 wins when present — Severity drives
-	// the color directly, except the quota signal whose spec surfaces are
-	// S3/S4/S5 only (docs/resources/ses.md §4) — quota stays green even at
-	// SevWarn so the row remains a Healthy row with an informational glyph.
-	for i := range r.Findings {
-		if r.Findings[i].Source == "wave2:ses" {
-			if r.Findings[i].Code == sesCodeQuota {
-				return domain.ColorHealthy
-			}
-			return colorFromSeverity(r.Findings[i].Severity)
+	// The quota signal's spec surfaces are S3/S4/S5 only
+	// (docs/resources/ses.md §4): it earns a glyph and a phrase but leaves
+	// the row green. It is dropped from the slice the colour is taken from
+	// rather than short-circuiting the selection, so every other finding
+	// still competes on severity.
+	colouring := make([]domain.Finding, 0, len(r.Findings))
+	for _, f := range r.Findings {
+		if f.Code != sesCodeQuota {
+			colouring = append(colouring, f)
 		}
 	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	switch phrase {
-	case "verification failed", "verify: temp failure", "verification not started":
-		return domain.ColorBroken
-	case "pending verification", "sending disabled":
-		return domain.ColorWarning
+	if top, ok := domain.TopFinding(colouring); ok {
+		return colorFromSeverity(top.Severity)
+	}
+	// Reached only by a Resource built outside the fetcher, which carries the
+	// Status phrase in Fields but no Findings.
+	if f, ok := sesFindingForPhrase(stripFindingSuffix(r.Fields["status"])); ok {
+		return colorFromSeverity(f.Severity)
 	}
 	return domain.ColorHealthy
 }

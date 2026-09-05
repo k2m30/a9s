@@ -63,15 +63,12 @@ func colorSubnet(r domain.Resource) domain.Color {
 }
 
 func colorRTB(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	blackhole, _ := strconv.Atoi(r.Fields["blackhole_routes_count"])
-	if blackhole > 0 {
-		return domain.ColorBroken
-	}
-	assoc, _ := strconv.Atoi(r.Fields["associations_count"])
-	if assoc == 0 && r.Fields["is_main"] != "true" {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	associations, _ := strconv.Atoi(r.Fields["associations_count"])
+	return colorFromFindings(rtbFindings(blackhole, associations, r.Fields["is_main"]))
 }
 
 func colorNAT(r domain.Resource) domain.Color {

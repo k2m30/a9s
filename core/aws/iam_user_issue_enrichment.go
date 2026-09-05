@@ -27,6 +27,7 @@ const (
 	iamUserCodeConsoleNeverUsed domain.FindingCode = "iam-user.console-never-used"
 	iamUserCodeKeyUnused        domain.FindingCode = "iam-user.access-key-unused"
 	iamUserCodeTwoActiveKeys    domain.FindingCode = "iam-user.two-active-keys"
+	iamUserCodeConsoleDormant   domain.FindingCode = "iam-user.console-dormant"
 
 	iamUserNoMFADetail = "This user signs in to the console with a password alone, so a leaked or guessed " +
 		"password is a full takeover. Register an MFA device for the user, or remove the console password if " +
@@ -34,6 +35,7 @@ const (
 	iamUserOldKeyDetail = "This access key has been valid for more than 90 days, so a copy taken at any point " +
 		"since it was created still works. Create a replacement key, move callers onto it, then deactivate and " +
 		"delete the old one."
+	iamUserConsoleDormantDetail   = "Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not."
 	iamUserConsoleNeverUsedDetail = "This user has a console password that has never been used since the account " +
 		"was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave " +
 		"the user with programmatic access only."
@@ -162,6 +164,18 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			riskLabel = riskNoMFA
 			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, "console user without MFA", "!", "iam-user",
 				[]domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: "!"}}, iamUserNoMFADetail)
+		}
+
+		consolePasswordFlag := "false"
+		if hasConsolePassword {
+			consolePasswordFlag = "true"
+		}
+		for _, f := range iamUserConsoleDormantFindings(consolePasswordFlag, r.Fields["password_last_used"]) {
+			if riskLabel == "" {
+				riskLabel = riskConsoleDormant
+			}
+			setWave2Finding(&result, r.ID, f.Code, f.Phrase, "~", "iam-user",
+				[]domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: "~"}}, f.Detail)
 		}
 
 		if hasConsolePassword && r.Fields["password_last_used"] == "Never" &&
@@ -320,4 +334,19 @@ func lastFourOfKeyID(keyID string) string {
 		return keyID
 	}
 	return "…" + keyID[len(keyID)-4:]
+}
+
+// iamUserConsoleDormantFindings is the one predicate for a console login
+// nobody has used in unusedCredentialAge. colorIAMUser runs it over Fields for
+// rows built outside the enricher. A password that was never used at all is a
+// different finding (iamUserCodeConsoleNeverUsed) and is not reported here.
+func iamUserConsoleDormantFindings(hasConsolePassword, passwordLastUsed string) []domain.Finding {
+	if hasConsolePassword != "true" || !olderThan(passwordLastUsed, unusedCredentialAge) {
+		return nil
+	}
+	return []domain.Finding{{
+		Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days",
+		Detail:   iamUserConsoleDormantDetail,
+		Severity: domain.SevWarn, Source: "wave2:iam-user",
+	}}
 }

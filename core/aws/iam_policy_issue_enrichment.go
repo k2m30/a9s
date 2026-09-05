@@ -22,6 +22,7 @@ const (
 	iamPolicyCodeAdminStar domain.FindingCode = "iam-policy.admin-star"
 	iamPolicyCodePrivEsc   domain.FindingCode = "policy.privilege-escalation"
 
+	iamPolicyOrphanDetail    = "This customer-managed policy can be attached but is attached to no user, group or role, so it grants nothing and nobody is reviewing it. Delete it, or attach it where it was meant to apply."
 	iamPolicyAdminStarDetail = "This policy allows every action on every resource, so anyone holding it is an " +
 		"account administrator. Replace the \"*\" action and resource with the specific ones its holders need."
 	iamPolicyPrivEscDetail = "This policy grants a combination of actions that lets its holder grant itself full " +
@@ -84,9 +85,9 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			return
 		}
 		riskVal := ""
-		// Check if the policy is not attached to any entity — orphan.
-		attachCount := r.Fields["attachment_count"]
-		if attachCount == "0" {
+		// The orphan finding itself is wave1 (orphanUnattachedPolicyFinding);
+		// only the Risk column value is decided here.
+		if r.Fields["attachment_count"] == "0" {
 			riskVal = riskUnattached
 		}
 		if isAdminStarPolicy(doc) {

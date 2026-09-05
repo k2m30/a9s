@@ -78,6 +78,9 @@ const (
 )
 
 const (
+	// ECSServiceNoTasksRunning is the witness for ecs-svc.tasks.none-running.
+	ECSServiceNoTasksRunning = "acme-svc-stalled"
+
 	ecsClusterArnServices = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"
 	ecsClusterArnBatch    = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"
 	ecsClusterArnStaging  = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-staging"
@@ -380,6 +383,27 @@ func buildECSServices() []ecstypes.Service {
 		Tags: []ecstypes.Tag{
 			{Key: aws.String("Environment"), Value: aws.String("prod")},
 			{Key: aws.String("Team"), Value: aws.String("platform")},
+		},
+	})
+
+	// Issue: ACTIVE, wants tasks, none running → Broken. The only demo service
+	// with RunningCount 0 against a non-zero DesiredCount; every other service
+	// is either at its desired count, deliberately scaled to zero, or the
+	// below-desired witness above.
+	named = append(named, ecstypes.Service{
+		ServiceName:        aws.String(ECSServiceNoTasksRunning),
+		ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-services/" + ECSServiceNoTasksRunning),
+		ClusterArn:         aws.String(ecsClusterArnServices),
+		Status:             aws.String("ACTIVE"),
+		DesiredCount:       2,
+		RunningCount:       0,
+		PendingCount:       0,
+		LaunchType:         ecstypes.LaunchTypeFargate,
+		TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/" + ECSServiceNoTasksRunning + ":1"),
+		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
+		CreatedAt:          aws.Time(mustTime("2025-06-04T11:00:00Z")),
+		Tags: []ecstypes.Tag{
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
 		},
 	})
 
@@ -983,6 +1007,23 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 				Name:  aws.String("degraded"),
 				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/degraded:latest"),
 				Cpu:   512,
+			},
+		},
+	}
+
+	defs["arn:aws:ecs:us-east-1:123456789012:task-definition/"+ECSServiceNoTasksRunning+":1"] = &ecstypes.TaskDefinition{
+		TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/" + ECSServiceNoTasksRunning + ":1"),
+		Family:            aws.String(ECSServiceNoTasksRunning),
+		Revision:          1,
+		Status:            ecstypes.TaskDefinitionStatusActive,
+		NetworkMode:       ecstypes.NetworkModeAwsvpc,
+		Cpu:               aws.String("256"),
+		Memory:            aws.String("512"),
+		ContainerDefinitions: []ecstypes.ContainerDefinition{
+			{
+				Name:  aws.String("stalled"),
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/stalled:latest"),
+				Cpu:   256,
 			},
 		},
 	}

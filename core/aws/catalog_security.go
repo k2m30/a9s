@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -25,28 +24,15 @@ func colorPolicy(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	if r.Fields["attachment_count"] == "0" && r.Fields["is_attachable"] == "true" {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(orphanUnattachedPolicyFinding(r.Fields["attachment_count"], r.Fields["is_attachable"] == "true"))
 }
 
 func colorIAMUser(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	if r.Fields["has_console_password"] != "true" {
-		return domain.ColorHealthy
-	}
-	plu := r.Fields["password_last_used"]
-	t, err := time.Parse("2006-01-02 15:04", plu)
-	if err != nil {
-		return domain.ColorHealthy
-	}
-	if time.Since(t) > 90*24*time.Hour {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(iamUserConsoleDormantFindings(
+		r.Fields["has_console_password"], r.Fields["password_last_used"]))
 }
 
 func colorIAMGroup(r domain.Resource) domain.Color {
@@ -257,6 +243,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Code: iamUserCodeOldKey, Phrase: "key <keyID> >90d (rotation)", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeConsoleNeverUsed, Phrase: "console password never used", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeKeyUnused, Phrase: "access key unused for <N> days", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeTwoActiveKeys, Phrase: "two active access keys", Severity: domain.SevWarn, Source: "wave2"},
 		},

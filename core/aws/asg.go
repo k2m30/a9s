@@ -110,36 +110,11 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			RawStruct: asg,
 		}
 
-		// emit canonical Findings for every non-healthy branch colorASG reads,
-		// mirroring colorASG's own precedence (status, then underprovisioned,
-		// then unhealthy count, then suspended processes) so the list Status
-		// cell / detail Attention block always explain the color instead of
-		// relying on a bare structural read.
-		switch {
-		case asgDeleting(status):
-			r.Findings = []domain.Finding{{
-				Code: CodeASGStateDeleting, Phrase: "delete in progress",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		case asg.MinSize != nil && inServiceCount < int(*asg.MinSize):
-			r.Findings = []domain.Finding{{
-				Code:     CodeASGUnderprovisioned,
-				Phrase:   fmt.Sprintf("%d of %d instances in service", inServiceCount, *asg.MinSize),
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
-		case unhealthyCount > 0:
-			r.Findings = []domain.Finding{{
-				Code:     CodeASGUnhealthyInstances,
-				Phrase:   fmt.Sprintf("%d unhealthy instance(s)", unhealthyCount),
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		case suspendedProcesses != "" && (strings.Contains(suspendedProcesses, "Launch") ||
-			strings.Contains(suspendedProcesses, "Terminate") || strings.Contains(suspendedProcesses, "HealthCheck")):
-			r.Findings = []domain.Finding{{
-				Code: CodeASGScalingSuspended, Phrase: "scaling suspended",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
+		minSizeInt := 0
+		if asg.MinSize != nil {
+			minSizeInt = int(*asg.MinSize)
 		}
+		r.Findings = asgHealthFindings(status, inServiceCount, unhealthyCount, minSizeInt, suspendedProcesses)
 
 		// Posture signals, each evaluated independently of the health switch
 		// above and of one another.
@@ -205,4 +180,38 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// asgHealthFindings is the one predicate for a group's health, in precedence
+// order: a group being deleted reports nothing else, then too few instances in
+// service, then unhealthy instances, then scaling processes an operator
+// suspended. colorASG runs it over Fields for rows built outside the fetcher.
+func asgHealthFindings(status string, inServiceCount, unhealthyCount, minSize int, suspendedProcesses string) []domain.Finding {
+	switch {
+	case asgDeleting(status):
+		return []domain.Finding{{
+			Code: CodeASGStateDeleting, Phrase: "delete in progress",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case inServiceCount < minSize:
+		return []domain.Finding{{
+			Code:     CodeASGUnderprovisioned,
+			Phrase:   fmt.Sprintf("%d of %d instances in service", inServiceCount, minSize),
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	case unhealthyCount > 0:
+		return []domain.Finding{{
+			Code:     CodeASGUnhealthyInstances,
+			Phrase:   fmt.Sprintf("%d unhealthy instance(s)", unhealthyCount),
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case strings.Contains(suspendedProcesses, "Launch") ||
+		strings.Contains(suspendedProcesses, "Terminate") ||
+		strings.Contains(suspendedProcesses, "HealthCheck"):
+		return []domain.Finding{{
+			Code: CodeASGScalingSuspended, Phrase: "scaling suspended",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
 }

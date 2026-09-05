@@ -40,79 +40,38 @@ func isZeroOrEpoch(t time.Time) bool {
 	return t.IsZero() || t.Unix() == 0
 }
 
-// openSearchSignals classifies a DomainStatus against the 5 spec signals.
-// Returns hard-state findings (for Resource.Findings) and the total signal count
-// (for computing the Fields["status"] display phrase with suffix).
-// Background-check signals (UpdateForcedSoon, EncryptionOff) contribute to the
-// display count but are NOT included in Findings — they are enricher territory
-// (EnrichOpenSearchDomains emits each as its own Wave-2 Finding/Code so
-// encryption-at-rest-off is never presented as an appendix of the unrelated
-// update-forced finding; when both fire on one resource only one Wave-2
-// Finding can attach per the IssueEnricherResult contract, so the enricher
-// picks the worse one and surfaces the other as a supporting DetailRow).
-func openSearchSignals(d opensearchtypes.DomainStatus, now time.Time) (hardFindings []domainpkg.Finding, totalCount int) {
-	isDeleted := d.Deleted != nil && *d.Deleted
-	isIsolated := d.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated
-	isProcessing := (d.Processing != nil && *d.Processing) ||
-		(d.UpgradeProcessing != nil && *d.UpgradeProcessing)
-	isUpdateForcedSoon := openSearchUpdateForcedSoon(d, now)
-	isEncOff := d.EncryptionAtRestOptions != nil &&
-		d.EncryptionAtRestOptions.Enabled != nil &&
-		!*d.EncryptionAtRestOptions.Enabled
-
-	if isDeleted {
-		hardFindings = append(hardFindings, domainpkg.Finding{Code: CodeOpenSearchDeleting, Phrase: "deleting: removal in progress", Severity: domainpkg.SevDim, Source: "wave1"})
-	}
-	if isIsolated {
-		hardFindings = append(hardFindings, domainpkg.Finding{Code: CodeOpenSearchIsolated, Phrase: "isolated: quarantined by AWS", Severity: domainpkg.SevBroken, Source: "wave1"})
-	}
-	if isProcessing {
-		hardFindings = append(hardFindings, domainpkg.Finding{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domainpkg.SevWarn, Source: "wave1"})
-	}
-
-	totalCount = len(hardFindings)
-	if isUpdateForcedSoon {
-		totalCount++
-	}
-	if isEncOff {
-		totalCount++
-	}
-	return hardFindings, totalCount
-}
-
-// computeOpenSearchFindings returns only the hard-state findings for a domain.
-// Background-check signals are not included (enricher territory).
+// computeOpenSearchFindings classifies a DomainStatus against the spec's five
+// signals. The two background checks read the same DomainStatus the hard
+// states do, so they are wave-1 findings here rather than a second reading of
+// the fetcher's own Fields in the enricher — one slice carries every signal
+// and domain.StatusPhrase counts it once.
 func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []domainpkg.Finding {
-	findings, _ := openSearchSignals(d, now)
+	var findings []domainpkg.Finding
+	if d.Deleted != nil && *d.Deleted {
+		// A domain being torn down has no actionable posture left; the
+		// background signals would only add issue-severity noise to a row
+		// that is on its way out.
+		return []domainpkg.Finding{{Code: CodeOpenSearchDeleting, Phrase: "deleting: removal in progress", Severity: domainpkg.SevDim, Source: "wave1"}}
+	}
+	if d.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated {
+		findings = append(findings, domainpkg.Finding{Code: CodeOpenSearchIsolated, Phrase: "isolated: quarantined by AWS", Severity: domainpkg.SevBroken, Source: "wave1"})
+	}
+	if (d.Processing != nil && *d.Processing) || (d.UpgradeProcessing != nil && *d.UpgradeProcessing) {
+		findings = append(findings, domainpkg.Finding{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domainpkg.SevWarn, Source: "wave1"})
+	}
+	if openSearchUpdateForcedSoon(d, now) {
+		findings = append(findings, domainpkg.Finding{
+			Code: opensearchCodeUpdateForced, Phrase: "software update forced soon",
+			Detail: opensearchUpdateForcedDetail, Severity: domainpkg.SevBroken, Source: "wave1",
+		})
+	}
+	if d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled {
+		findings = append(findings, domainpkg.Finding{
+			Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off",
+			Detail: opensearchEncryptionOffDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+		})
+	}
 	return findings
-}
-
-// openSearchStatusPhrase computes the display phrase for Fields["status"],
-// including background-check signals in the suffix count.
-func openSearchStatusPhrase(d opensearchtypes.DomainStatus, now time.Time) string {
-	findings, totalCount := openSearchSignals(d, now)
-	if totalCount == 0 {
-		return ""
-	}
-	if len(findings) == 0 {
-		// Only background checks active — use first background phrase
-		// (this path means totalCount > 0 but no hard findings)
-		// Determine which background came first
-		if openSearchUpdateForcedSoon(d, now) {
-			top := "software update forced soon"
-			if totalCount > 1 {
-				return fmt.Sprintf("%s (+%d)", top, totalCount-1)
-			}
-			return top
-		}
-		top := "encryption at rest off"
-		return top
-	}
-	top := findings[0].Phrase
-	if totalCount > 1 {
-		return fmt.Sprintf("%s (+%d)", top, totalCount-1)
-	}
-	return top
 }
 
 // FetchOpenSearchDomains performs a two-step fetch:
@@ -236,7 +195,7 @@ func FetchOpenSearchDomainsAt(
 			}
 
 			findings := computeOpenSearchFindings(domain, now)
-			statusPhrase := openSearchStatusPhrase(domain, now)
+			statusPhrase := domainpkg.StatusPhrase(findings)
 
 			r := resource.Resource{
 				ID:       domainName,
@@ -264,6 +223,20 @@ func FetchOpenSearchDomainsAt(
 					"node_to_node_encryption_enabled":   nodeToNode,
 				},
 				RawStruct: domain,
+			}
+
+			if updateAvailable == "true" {
+				var rows []domainpkg.DetailRow
+				if updateDate != "" {
+					rows = append(rows, domainpkg.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "!"})
+				}
+				if currentVersion != "" {
+					rows = append(rows, domainpkg.DetailRow{Label: "Current Version", Value: currentVersion})
+				}
+				if newVersion != "" {
+					rows = append(rows, domainpkg.DetailRow{Label: "New Version", Value: newVersion})
+				}
+				addWave1Rows(&r, opensearchCodeUpdateForced, rows...)
 			}
 
 			resources = append(resources, r)

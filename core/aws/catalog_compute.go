@@ -6,7 +6,6 @@ import (
 	"context"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -57,24 +56,9 @@ func colorECSSvc(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["status"] {
-	case "INACTIVE":
-		return domain.ColorBroken
-	case "DRAINING":
-		return domain.ColorWarning
-	}
-	running := r.Fields["running_count"]
-	desired := r.Fields["desired_count"]
-	if desired == "0" || desired == "" {
-		return domain.ColorHealthy
-	}
-	if running == "0" {
-		return domain.ColorBroken
-	}
-	if running != desired {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	desired, _ := strconv.ParseInt(r.Fields["desired_count"], 10, 32)
+	running, _ := strconv.ParseInt(r.Fields["running_count"], 10, 32)
+	return colorFromFindings(ecsSvcFindings(r.Fields["status"], int32(desired), int32(running)))
 }
 
 func colorECSCluster(r domain.Resource) domain.Color {
@@ -118,31 +102,15 @@ func colorASG(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	// Reached only by a Resource built outside the fetcher, which carries
-	// Fields but no Findings.
-	if asgDeleting(r.Fields["status"]) {
-		return domain.ColorWarning
+	inService, _ := strconv.Atoi(r.Fields["in_service_count"])
+	unhealthy, _ := strconv.Atoi(r.Fields["instances_unhealthy_count"])
+	minSize, err := strconv.Atoi(r.Fields["min_size"])
+	if err != nil {
+		// An absent min_size cannot make a group underprovisioned.
+		minSize = inService
 	}
-	inService := r.Fields["in_service_count"]
-	minSz := r.Fields["min_size"]
-	if inService != "" && minSz != "" {
-		inSvc, err1 := strconv.Atoi(inService)
-		minSzInt, err2 := strconv.Atoi(minSz)
-		if err1 == nil && err2 == nil && inSvc < minSzInt {
-			return domain.ColorBroken
-		}
-	}
-	if unhealthy := r.Fields["instances_unhealthy_count"]; unhealthy != "" {
-		if n, err := strconv.Atoi(unhealthy); err == nil && n > 0 {
-			return domain.ColorWarning
-		}
-	}
-	if sp := r.Fields["suspended_processes"]; sp != "" {
-		if strings.Contains(sp, "Launch") || strings.Contains(sp, "Terminate") || strings.Contains(sp, "HealthCheck") {
-			return domain.ColorWarning
-		}
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(asgHealthFindings(
+		r.Fields["status"], inService, unhealthy, minSize, r.Fields["suspended_processes"]))
 }
 
 func colorEB(r domain.Resource) domain.Color {
@@ -523,6 +491,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSSvcNoTasksRunning, Phrase: "no tasks running", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECSSvcTasksBelowDesired, Phrase: "running below desired count", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ecsSvcCodeDeploymentFailed, Phrase: "deployment failed", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: ecsSvcCodePublicIP, Phrase: "tasks get public IPs", Severity: domain.SevWarn, Source: "wave2"},
 		},

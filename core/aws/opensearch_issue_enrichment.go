@@ -39,24 +39,13 @@ const (
 	opensearchEncryptionOffDetail = "Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place."
 )
 
-// EnrichOpenSearchDomains emits Findings for background-check signals
-// read from resource Fields populated by FetchOpenSearchDomains:
+// EnrichOpenSearchDomains emits the network-posture Findings from resource
+// Fields populated by FetchOpenSearchDomains. Each condition names its own
+// FindingCode and Detail sentence and is evaluated independently of the
+// others, so a domain that trips several keeps one Finding per problem.
 //
-//   - service_software_update_available == "true"  → Severity "!", Summary "software update forced soon"
-//   - encryption_at_rest_enabled == "false"        → Severity "~", Summary "encryption at rest off"
-//
-// Each condition names its own FindingCode and Detail sentence and is
-// evaluated independently of the other via its own setWave2Finding call. When
-// both are active on the same resource, both Findings survive in
-// IssueEnricherResult.Findings[id] — update-forced ("!") and encryption-off
-// ("~") each carry their own Code/Phrase/Detail. The two conditions never
-// share a Detail sentence or a Phrase — each keeps its own wording
-// (opensearchUpdateForcedDetail vs opensearchEncryptionOffDetail) so an
-// operator reading either surface sees two distinct problems, not one
-// problem with an appendix.
-//
-// No FieldUpdates — the fetcher is authoritative for Status on opensearch.
-// clients may be nil; no API calls are made.
+// No FieldUpdates — the Status cell is domain.StatusPhrase over the row's
+// findings. clients may be nil; no API calls are made.
 func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -78,9 +67,6 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 			continue
 		}
 
-		updateAvailable := r.Fields["service_software_update_available"] == "true"
-		encOff := r.Fields["encryption_at_rest_enabled"] == "false"
-
 		// Reachable outside a VPC only counts when the access policy also
 		// lets anyone in: a public endpoint fronted by a scoped policy is a
 		// deliberate, defended design.
@@ -95,32 +81,6 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 		}
 		if r.Fields["node_to_node_encryption_enabled"] == "false" {
 			setWave2Finding(&result, r.ID, opensearchCodeN2NOff, "node-to-node encryption off", "~", "opensearch", nil, opensearchN2NOffDetail)
-		}
-
-		if !updateAvailable && !encOff {
-			continue
-		}
-
-		if updateAvailable {
-			// "!" condition — update forced soon, evaluated independently of encOff.
-			var rows []domain.DetailRow
-			if updateDate := r.Fields["automated_update_date"]; updateDate != "" {
-				rows = append(rows, domain.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "!"})
-			}
-			if cv := r.Fields["current_version"]; cv != "" {
-				rows = append(rows, domain.DetailRow{Label: "Current Version", Value: cv})
-			}
-			if nv := r.Fields["new_version"]; nv != "" {
-				rows = append(rows, domain.DetailRow{Label: "New Version", Value: nv})
-			}
-			setWave2Finding(&result, r.ID, opensearchCodeUpdateForced, "software update forced soon", "!", "opensearch", rows, opensearchUpdateForcedDetail)
-		}
-		if encOff {
-			// "~" condition — encryption at rest off, evaluated independently of
-			// updateAvailable. When updateAvailable also fired above, this
-			// survives as its own Finding alongside it (setWave2Finding's
-			// append-style same-resourceID handling), not folded into it.
-			setWave2Finding(&result, r.ID, opensearchCodeEncryptionOff, "encryption at rest off", "~", "opensearch", nil, opensearchEncryptionOffDetail)
 		}
 	}
 

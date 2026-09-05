@@ -10,6 +10,7 @@ const (
 	riskNoMFA            = "no MFA"
 	riskKeyTooOld        = "key too old"
 	riskConsoleNeverUsed = "console never used"
+	riskConsoleDormant   = "console dormant"
 	riskKeyUnused        = "key unused"
 	riskTwoActiveKeys    = "two active keys"
 	riskAdminPolicy      = "admin policy"

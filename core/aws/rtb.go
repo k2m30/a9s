@@ -95,20 +95,7 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 			RawStruct: rtb,
 		}
 
-		// mirrors colorRTB's own precedence: blackhole routes win first, then
-		// an unassociated non-main table.
-		switch {
-		case blackholeCount > 0:
-			r.Findings = []domain.Finding{{
-				Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)",
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
-		case len(rtb.Associations) == 0 && isMain != "true":
-			r.Findings = []domain.Finding{{
-				Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		}
+		r.Findings = rtbFindings(blackholeCount, len(rtb.Associations), isMain)
 
 		resources = append(resources, r)
 	}
@@ -134,4 +121,23 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// rtbFindings is the one predicate for a route table's health: a blackhole
+// route (its target is gone) outranks a non-main table nothing is associated
+// with. colorRTB runs it over Fields for rows built outside the fetcher.
+func rtbFindings(blackholeCount, associationsCount int, isMain string) []domain.Finding {
+	switch {
+	case blackholeCount > 0:
+		return []domain.Finding{{
+			Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	case associationsCount == 0 && isMain != "true":
+		return []domain.Finding{{
+			Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
 }

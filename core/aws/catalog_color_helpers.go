@@ -47,6 +47,15 @@ func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
 	return colorFromSeverity(top.Severity), true
 }
 
+// colorFromFindings is the bare-Fields path every classifier ends with: a
+// Resource built outside the fetcher (a constructed row in a contract test, a
+// cached row from before findings existed) carries Fields but no Findings, so
+// the classifier runs the type's OWN findings predicate over those Fields
+// rather than reading the same raw fields a second way.
+func colorFromFindings(findings []domain.Finding) domain.Color {
+	return colorAnyFindingOrHealthy(domain.Resource{Findings: findings})
+}
+
 // colorAnyFindingOrHealthy classifies r from colorFromAnyFinding, defaulting
 // to healthy when no Finding is present. Shared by the mwaa/transfer/vpc-peer/
 // lt catalog entries: every signal on these types is color-bearing — no

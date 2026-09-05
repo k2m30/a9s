@@ -52,9 +52,9 @@ Transcribed from `docs/attention-signals.md`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `PasswordLastUsed` absent AND `CreateDate` >90d → dormant console user. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+- **Signal**: `PasswordLastUsed` absent AND `CreateDate` >90d → dormant console user.
   - **State bucket**: Warning.
-  - **How obtained**: `ListUsers` response — `User.PasswordLastUsed` (nullable `*time.Time`) and `User.CreateDate` (`*time.Time`). Both fields are present on the `ListUsers` output shape; no extra call is required.
+  - **How obtained**: `ListUsers` response — `User.PasswordLastUsed` (nullable `*time.Time`) and `User.CreateDate` (`*time.Time`). Both are on the `ListUsers` output shape, but whether the user has a console password at all is only knowable from `GetLoginProfile`, so the finding itself is emitted in Wave 2 alongside the other console signals.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -104,6 +104,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` | `Console password has never been used since the account was created — an unguarded sign-in path.` |
+| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` | `Nobody has signed in to this console login for over 90 days — confirm the person still needs it.` |
 | Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` | `Access key …4QJZ has not signed a request in 120 days — deactivate it, then delete it.` |
 | Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` | `Both access-key slots are active, which doubles exposure and blocks a clean rotation.` |
 | `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` | `The user carries an AWS-managed policy granting administrator-equivalent access.` |
@@ -154,6 +155,7 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
 | iam-user.admin-attached | has an administrator policy | warn | wave2 |
 | iam-user.console-never-used | console password never used | warn | wave2 |
+| iam-user.console-dormant | console sign-in unused for 90 days | warn | wave2 |
 | iam-user.access-key-unused | access key unused for <N> days | warn | wave2 |
 | iam-user.two-active-keys | two active access keys | warn | wave2 |
 <!-- END GENERATED: findings -->

@@ -483,32 +483,11 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			"started_at", "stopped_reason", "stop_code", "task_arn",
 		},
 		Color: func(r domain.Resource) domain.Color {
-			// Structural broken overrides (precedence over wave1).
-			if r.Fields["health"] == "UNHEALTHY" {
-				return domain.ColorBroken
+			if c, ok := colorFromAnyFinding(r); ok {
+				return c
 			}
-			if r.Fields["status"] == "STOPPED" {
-				sc := r.Fields["stop_code"]
-				if sc != "" && sc != "UserInitiated" {
-					return domain.ColorBroken
-				}
-			}
-			// Wave1 Findings.
-			for _, f := range r.Findings {
-				if f.Source == "wave1" {
-					return resource.ColorFromSeverity(f.Severity)
-				}
-			}
-			// Structural lifecycle fallback.
-			switch r.Fields["status"] {
-			case "RUNNING":
-				return domain.ColorHealthy
-			case "STOPPED":
-				return domain.ColorDim
-			case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
-				return domain.ColorWarning
-			}
-			return domain.ColorHealthy
+			return colorFromFindings(ecsTaskStructuralFindings(
+				r.Fields["status"], r.Fields["stop_code"], r.Fields["health"]))
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcTasks(ctx, c.ECS, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
