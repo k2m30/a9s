@@ -284,7 +284,7 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	// where an identifier is allowed and is what the operator greps the console for.
 	// d4 row 20 replaced the "false" in front of that aside with "off": a Go
 	// bool literal describes the SDK field, not the account. Do not restore
-	// "off (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
+	// "false (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
 	// fails on it.
 	if rows["Block public access control lists"] != "off (BlockPublicAcls)" {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",
@@ -344,7 +344,7 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	// where an identifier is allowed and is what the operator greps the console for.
 	// d4 row 20 replaced the "false" in front of that aside with "off": a Go
 	// bool literal describes the SDK field, not the account. Do not restore
-	// "off (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
+	// "false (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
 	// fails on it.
 	if rows["Block public access control lists"] != "off (BlockPublicAcls)" {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",

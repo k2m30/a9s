@@ -13,9 +13,15 @@ package unit_test
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -23,7 +29,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime"
+	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // netTypes is every registered type that ships a §4 table. The rulings below
@@ -105,7 +111,7 @@ func netBench(t *testing.T, shortName string) (rows []netRow, details map[domain
 			t.Fatalf("%s: Wave-2 enricher returned error: %v", shortName, err)
 		}
 		for i := range benchRows {
-			runtime.ApplyWave2ToRow(&benchRows[i], *td, result.Findings, result.AttentionDetails)
+			a9sruntime.ApplyWave2ToRow(&benchRows[i], *td, result.Findings, result.AttentionDetails)
 		}
 	}
 
@@ -241,47 +247,135 @@ func netDocQuotes(t *testing.T, shortName string) []string {
 	return out
 }
 
-// netDocQuoteTypes is where quote-equals-rendered-Detail holds today.
-//
-// It is deliberately not every registered type. The check matches a §4 cell to
-// a Detail by comparing sentences, because the table's first column is a prose
-// signal description and carries no finding code, so there is nothing to join
-// on. That makes two sound documentation patterns indistinguishable from a
-// wrong quote: a cell quoting a template ("Certificate expires in <N> days on
-// <NotAfter>") can never equal a rendered string, and a finding with no demo
-// fixture renders no Detail at all, so its correct quote reads as invented.
-// Widening the sweep as written produces 297 such reports across 58 types and
-// the only way to clear them is to delete correct documentation.
-//
-// Closing this needs a ruling on how a §4 row names its finding code. Until
-// then the check stays where every documented finding has a witness.
-var netDocQuoteTypes = []string{"sg", "subnet", "elb", "tgw", "vpce"}
+// detailConstants returns every operator Detail sentence the code can render:
+// the string constants named *Detail declared under core/aws. That is the
+// oracle a §4 cell is checked against, rather than the demo bench, because a
+// finding with no demo fixture still has its constant and a cell must not be
+// judged by whether someone remembered to plant a witness.
+func detailConstants(t *testing.T) map[string]bool {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller(0) failed")
+	}
+	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "core", "aws")
+	matches, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatalf("glob core/aws: %v", err)
+	}
 
-// TestNetworkingDocQuotes_EqualTheRenderedDetail is the standing form of the
-// prefix check. Both directions matter: a quote with no matching Detail is a
-// sentence the app never says, and a Detail with no quote means the doc has
-// stopped describing what ships.
-func TestNetworkingDocQuotes_EqualTheRenderedDetail(t *testing.T) {
-	for _, short := range netDocQuoteTypes {
-		t.Run(short, func(t *testing.T) {
-			_, details := netBench(t, short)
-
-			shipped := map[string]domain.FindingCode{}
-			for code, d := range details {
-				shipped[d] = code
-			}
-
-			quoted := map[string]bool{}
-			for _, q := range netDocQuotes(t, short) {
-				quoted[q] = true
-				if _, ok := shipped[q]; !ok {
-					t.Errorf("§4 quotes a sentence the code never renders:\n  quoted: %q\n"+
-						"  quote the finding's whole Detail constant verbatim, or drop the cell if the finding has none", q)
+	out := map[string]bool{}
+	fset := token.NewFileSet()
+	for _, path := range matches {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		file, perr := parser.ParseFile(fset, path, nil, 0)
+		if perr != nil {
+			t.Fatalf("parse %s: %v", path, perr)
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.ValueSpec:
+				// const/var xxxDetail = "..."
+				for i, name := range node.Names {
+					if !strings.HasSuffix(name.Name, "Detail") || i >= len(node.Values) {
+						continue
+					}
+					if v, folded := foldStringExpr(node.Values[i]); folded && v != "" {
+						out[v] = true
+					}
+				}
+			case *ast.KeyValueExpr:
+				// Detail: "..." or Detail: fmt.Sprintf("...", …)
+				key, isIdent := node.Key.(*ast.Ident)
+				if !isIdent || key.Name != "Detail" {
+					return true
+				}
+				if v, folded := foldStringExpr(node.Value); folded && v != "" {
+					out[v] = true
+					return true
+				}
+				if call, isCall := node.Value.(*ast.CallExpr); isCall && len(call.Args) > 0 {
+					if v, folded := foldStringExpr(call.Args[0]); folded && v != "" {
+						out[v] = true
+					}
 				}
 			}
-			for d, code := range shipped {
-				if !quoted[d] {
-					t.Errorf("%s renders a Detail sentence that no §4 row quotes:\n  %q", code, d)
+			return true
+		})
+	}
+	if len(out) == 0 {
+		t.Fatal("no *Detail string constants found under core/aws; the oracle would pass everything")
+	}
+	return out
+}
+
+// foldStringExpr evaluates a string literal or a chain of them joined by +,
+// which is how the longer Detail sentences are wrapped in source.
+func foldStringExpr(e ast.Expr) (string, bool) {
+	switch v := e.(type) {
+	case *ast.BasicLit:
+		if v.Kind != token.STRING {
+			return "", false
+		}
+		s, err := strconv.Unquote(v.Value)
+		if err != nil {
+			return "", false
+		}
+		return s, true
+	case *ast.BinaryExpr:
+		if v.Op != token.ADD {
+			return "", false
+		}
+		l, lok := foldStringExpr(v.X)
+		r, rok := foldStringExpr(v.Y)
+		if !lok || !rok {
+			return "", false
+		}
+		return l + r, true
+	}
+	return "", false
+}
+
+// docPlaceholder matches the two ways a sentence names a value it fills in at
+// render time: a `<...>` placeholder in a doc cell, and a printf verb in the
+// format string a finding builds its Detail from.
+var docPlaceholder = regexp.MustCompile(`<[^>]*>|%[a-zA-Z]`)
+
+// docQuoteMatches reports whether quote names constant, treating a value the
+// finding substitutes as equal on both sides. Without that a template cell
+// could never match the template it was copied from.
+func docQuoteMatches(quote, constant string) bool {
+	if quote == constant {
+		return true
+	}
+	return docPlaceholder.ReplaceAllString(quote, "\x00") ==
+		docPlaceholder.ReplaceAllString(constant, "\x00")
+}
+
+// TestNetworkingDocQuotes_EqualADetailConstant checks every §4 Detail cell on
+// every resource page against the constants the code can actually render.
+//
+// A quote that matches nothing is either invented or has drifted from the
+// constant it once copied; either way the doc is telling an operator the app
+// says something it does not.
+func TestNetworkingDocQuotes_EqualADetailConstant(t *testing.T) {
+	constants := detailConstants(t)
+	for _, short := range netTypes(t) {
+		t.Run(short, func(t *testing.T) {
+			for _, quote := range netDocQuotes(t, short) {
+				matched := false
+				for constant := range constants {
+					if docQuoteMatches(quote, constant) {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("§4 quotes a Detail sentence no finding renders:\n  %q\n"+
+						"quote the finding's Detail constant verbatim (a <placeholder> may stand for a "+
+						"value the finding fills in), or drop the cell if the finding has none", quote)
 				}
 			}
 		})

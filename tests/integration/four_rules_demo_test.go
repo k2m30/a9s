@@ -197,7 +197,14 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	pins := []string{
 		"EC2 Instances (40) issues:15",
 		"ECS Services (25) issues:6",
-		"DB Instances (50) issues:42",
+		// d4 row 1: 42 -> 28. Sixteen rows carried
+		// dbi.warn.deletion_protection_off because the bulk pool left
+		// DeletionProtection unset; the pool now sets it and only
+		// warn-dbi-unprotected keeps the finding. Fourteen of the fifteen rows
+		// that lost it had no other issue, so the badge falls by exactly
+		// fourteen. Do not restore 42 — TestD4_DeletionProtectionHasOneWitness
+		// fails on it.
+		"DB Instances (50) issues:28",
 		"EBS Volumes (8) issues:5",
 		"Elastic Beanstalk (7) issues:4",
 		"EBS Snapshots (9) issues:5",

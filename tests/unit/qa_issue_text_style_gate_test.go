@@ -87,7 +87,7 @@ var knownAcronymExemptions = map[string]bool{
 	// by AWS", "orphan: source DB deleted", "AccessDenied: ... S3 bucket
 	// policy ..."). These are the author's own word choice, not a
 	// machine-cased SDK constant — there is nothing to humanize.
-	"AWS": true, "HTTP": true, "HTTPS": true, "DB": true, "EB": true,
+	"AWS": true, "HTTP": true, "HTTPS": true, "TCP": true, "DB": true, "EB": true,
 	"EC2": true, "S3": true, "NS": true, "SOA": true, "AZ": true,
 	"PAB": true, "OK": true,
 	// UTC is how a timestamp names its zone and IOPS is how a volume's
