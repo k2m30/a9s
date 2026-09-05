@@ -52,6 +52,13 @@ arn_check() {
 }
 # term_check: stdin -> matching lines against the local term list (if any).
 term_check() { [ -n "$EFF" ] && grep -niE "$EFF" 2>/dev/null; }
+# key_check: stdin -> lines carrying an AWS access-key-ID-shaped token that is
+# not visibly synthetic. GitHub push protection rejects the whole push for a
+# key-shaped literal, so a synthetic key in a test must carry EXAMPL or XMP
+# inside the token (the AWS documentation examples do).
+key_check() {
+	perl -ne 'print "$.:$_" if grep { !/EXAMPL|XMP/ } /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g'
+}
 
 fail=0
 
@@ -72,9 +79,11 @@ diff|staged)
 	fi
 	a=$(printf '%s\n' "$added" | arn_check)
 	t=$(printf '%s\n' "$added" | term_check)
-	if [ -n "$a" ] || [ -n "$t" ]; then
+	k=$(printf '%s\n' "$added" | key_check)
+	if [ -n "$a" ] || [ -n "$t" ] || [ -n "$k" ]; then
 		echo "BLOCKED: real identifier in the ${MODE} changes —"
 		[ -n "$a" ] && { echo "  account ID inside an ARN:"; printf '%s\n' "$a" | sed 's/^/    /'; }
+		[ -n "$k" ] && { echo "  access-key-shaped token without EXAMPL/XMP (GitHub push protection rejects it):"; printf '%s\n' "$k" | sed 's/^/    /'; }
 		[ -n "$t" ] && { echo "  forbidden term (local .githooks/sensitive_patterns.txt):"; printf '%s\n' "$t" | sed 's/^/    /'; }
 		fail=1
 	fi
@@ -97,13 +106,20 @@ tree|audit)
 	# Tree mode also term-scans NEW content (worktree vs merge-base with
 	# origin/main) so the gate enforces the term list even when git hooks are
 	# not installed. Whole-tree term scanning stays audit-only by design.
-	if [ "$MODE" = tree ] && [ -n "$EFF" ]; then
+	if [ "$MODE" = tree ]; then
 		base=$(git merge-base origin/main HEAD 2>/dev/null)
 		if [ -n "$base" ]; then
-			nt=$(git diff "$base" -U0 --no-color -- $PATHSPEC | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' | term_check)
+			new_content=$(git diff "$base" -U0 --no-color -- $PATHSPEC | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//')
+			nt=$(printf '%s\n' "$new_content" | term_check)
 			if [ -n "$nt" ]; then
 				echo "BLOCKED: forbidden term in new content (vs merge-base with origin/main) —"
 				printf '%s\n' "$nt" | sed 's/^/    /'
+				fail=1
+			fi
+			nk=$(printf '%s\n' "$new_content" | key_check)
+			if [ -n "$nk" ]; then
+				echo "BLOCKED: access-key-shaped token in new content (GitHub push protection rejects it) —"
+				printf '%s\n' "$nk" | sed 's/^/    /'
 				fail=1
 			fi
 		fi

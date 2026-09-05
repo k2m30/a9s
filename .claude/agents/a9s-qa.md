@@ -80,6 +80,7 @@ The ruling comes back in `spec.md` / `log.md`; continue from there.
 ## Rules
 
 - Never edit files outside `tests/`. Never change a `FindingDef`, a fixture, or a phrase — file a finding.
+- A synthetic AWS access key ID in a test is one of the AWS documentation examples (`AKIAIOSFODNN7EXAMPLE`, `AKIAI44QH8DHBEXAMPLE`) or carries `EXAMPL` inside the token; GitHub push protection rejects the whole push for any other key-shaped literal, and `scripts/check-no-real-data.sh` now blocks it locally first.
 - Use exact value assertions, not `!= ""`. Assert the negative case. Test every type the spec names, never one as a proxy for the rest.
 - `//nolint:<linter> // reason` on a line that intentionally discards a value; never delete the check.
 - A test's comment says what behaviour it pins and why that behaviour is right — nothing about who asked for it or which round it came from.
