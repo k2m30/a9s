@@ -690,8 +690,38 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 // needed by the current related checkers: SG, SNS, SubnetGroup, LogDeliveryConfigurations.
 // These fields exist on CacheCluster, not ReplicationGroup, and are read by the
 // pre-phase-7 related checkers via DescribeCacheClusters on MemberClusters[0].
+// redisPostureWitnessCluster is the member cluster a posture witness names in
+// MemberClusters[0]. The redis related panel reads security groups, subnet
+// group and notification target off the member cluster, not off the
+// replication group, so a witness without one answers every two-hop pivot
+// "unknown" rather than resolving. It carries what the graph-root member
+// carries, so the witnesses pivot to the same security group, subnet group
+// and VPC as the healthy fixtures.
+func redisPostureWitnessCluster(rgID string) elasticachetypes.CacheCluster {
+	id := rgID + "-001"
+	return elasticachetypes.CacheCluster{
+		CacheClusterId:            aws.String(id),
+		ReplicationGroupId:        aws.String(rgID),
+		ARN:                       aws.String("arn:aws:elasticache:us-east-1:123456789012:cluster:" + id),
+		CacheClusterStatus:        aws.String("available"),
+		CacheNodeType:             aws.String("cache.t3.medium"),
+		Engine:                    aws.String("redis"),
+		EngineVersion:             aws.String("7.1"),
+		NumCacheNodes:             aws.Int32(1),
+		CacheSubnetGroupName:      aws.String(ProdRedisSubnetGroup),
+		PreferredAvailabilityZone: aws.String("us-east-1a"),
+		SecurityGroups: []elasticachetypes.SecurityGroupMembership{
+			{SecurityGroupId: aws.String(ProdRedisSGID), Status: aws.String("active")},
+		},
+	}
+}
+
 func buildRedisCacheClusters() []elasticachetypes.CacheCluster {
 	return []elasticachetypes.CacheCluster{
+		redisPostureWitnessCluster(RedisAtRestOff),
+		redisPostureWitnessCluster(RedisTransitOff),
+		redisPostureWitnessCluster(RedisNoAuth),
+		redisPostureWitnessCluster(RedisNoBackup),
 		// Graph-root primary member cluster — carries all related-panel pivot fields.
 		{
 			CacheClusterId:            aws.String(ProdRedisMemberClusterID),
