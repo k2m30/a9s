@@ -76,8 +76,10 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		case logErr != nil:
 			MarkSkipped(&result, r.ID, &failures, "DescribeLoggingStatus", logErr)
 		case !aws.ToBool(logging.LoggingEnabled):
+			// No supporting row: "Audit logging: off" is the phrase split on a
+			// colon, and U11 forbids restating it under the finding it belongs to.
 			setWave2Finding(&result, r.ID, redshiftCodeAuditLoggingOff, "audit logging off", "~", "redshift",
-				[]domain.DetailRow{{Label: "Audit logging", Value: "off", Tier: "~"}}, redshiftAuditLoggingOffDetail)
+				nil, redshiftAuditLoggingOffDetail)
 		}
 
 		value, ok := redshiftRequireSSL(ctx, clients, r, requireSSLByGroup, &result, &failures)

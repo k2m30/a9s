@@ -74,7 +74,7 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 		// even though the row itself is Dim. Suppresses the badge contamination
 		// without affecting the Dim row's S4 "deleting: removal in progress" phrase
 		// (that comes from the fetcher and is independent of this enricher).
-		if r.Fields["deleted"] == "true" {
+		if resourceIsTearingDown(r.RawStruct) {
 			continue
 		}
 

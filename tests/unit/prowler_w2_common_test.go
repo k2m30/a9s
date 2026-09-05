@@ -126,6 +126,15 @@ func w2Rows(t *testing.T, res awsclient.IssueEnricherResult, id, code string) []
 	return ad.Rows
 }
 
+// w2AssertNoRows pins that a finding carries no supporting rows, for the codes
+// whose phrase already says everything there is to say.
+func w2AssertNoRows(t *testing.T, res awsclient.IssueEnricherResult, id, code string) {
+	t.Helper()
+	if ad, ok := res.AttentionDetails[id][domain.FindingCode(code)]; ok && len(ad.Rows) > 0 {
+		t.Errorf("%s on %s carries rows %v; the phrase already states the whole fact", code, id, ad.Rows)
+	}
+}
+
 // w2AssertRow pins one Label: Value pair of an AttentionDetail.
 func w2AssertRow(t *testing.T, rows []domain.DetailRow, label, value string) {
 	t.Helper()
