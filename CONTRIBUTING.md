@@ -77,11 +77,12 @@ Claude Code dispatches specialized agents for different tasks. Key ones for cont
 
 | Agent | What it does | When to use |
 |-------|-------------|-------------|
-| `a9s-coder` | Writes implementation code (TDD) | Features, bug fixes |
-| `a9s-qa` | Writes test code | Test coverage gaps |
+| `a9s-dev` | Writes implementation code, fixtures and generated docs — never tests | Features, bug fixes |
+| `a9s-qa` | Writes test code — never production code | Test coverage gaps |
+| `a9s-facilitator` | Rules when the dev/QA loop stalls | `OFF`, `LOOP`, `BLOCKED` |
+| `a9s-acceptance` | Skeptical end-user acceptance on rendered surfaces | Before a release |
 | `a9s-qa-stories` | Given/when/then stories from the design spec | New views, before tests |
 | `a9s-consistency-checker` | Verifies code/docs/website alignment | Before pushing |
-| `a9s-fixtures` | Builds demo/test fixtures from real AWS | New resource data |
 | `a9s-devops` | AWS-practitioner consult | Resource priorities, workflows |
 | `tui-designer` | TUI wireframes and color schemes | New/redesigned views |
 
