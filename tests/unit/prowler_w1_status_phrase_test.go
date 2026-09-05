@@ -280,3 +280,27 @@ func TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned(t *testing.T) {
 		t.Errorf("Status cell shows %q, want %q", got.Code, pw1EC2CodeInternetExposed)
 	}
 }
+
+// TestProwlerW1_ColourAndStatusCellAgreeOnEveryDemoRow pins the invariant the
+// whole selection change exists for: the row's colour and the phrase in its
+// Status cell come from the same finding. Deleting the wave-source filter in
+// colorFromAnyFinding widened what the colour considers, so this checks the
+// two did not drift apart on any row of the eight batch types.
+func TestProwlerW1_ColourAndStatusCellAgreeOnEveryDemoRow(t *testing.T) {
+	for _, row := range pw1ComputeBench(t) {
+		td := catalog.Find(row.typeName)
+		if td == nil {
+			t.Fatalf("%s not in the catalog", row.typeName)
+		}
+		top, ok := domain.TopFinding(row.res.Findings)
+		if !ok {
+			continue // no findings: colour is the type's structural fallback
+		}
+		want := td.ResolveColor(row.res)
+		got := resource.ColorFromSeverity(top.Severity)
+		if want != got {
+			t.Errorf("%s/%s: row colour %v but Status cell shows %q (%v) — colour and cell disagree; findings=%+v",
+				row.typeName, row.res.ID, want, top.Phrase, top.Severity, row.res.Findings)
+		}
+	}
+}
