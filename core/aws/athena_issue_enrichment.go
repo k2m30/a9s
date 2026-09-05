@@ -5,29 +5,43 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
+	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// athena canonical FindingCodes.
+// athena canonical FindingCodes. Enforcement and result encryption are two
+// independent settings, so they are two findings: a workgroup can fail either
+// without the other, and one merged phrase could name only the first.
 const (
-	athenaCodeGovernanceMisconfigured domain.FindingCode = "athena.governance-misconfigured"
+	athenaCodeSettingsNotEnforced domain.FindingCode = "athena.settings-not-enforced"
+	athenaCodeResultsUnencrypted  domain.FindingCode = "athena.results-unencrypted"
+)
+
+// S5 operator sentences for the athena Wave 2 findings.
+const (
+	athenaSettingsNotEnforcedDetail = "Every query submitted to this workgroup may override the settings it " +
+		"defines, so the result location and encryption configured here are advisory rather than binding. Turn on " +
+		"the workgroup's configuration enforcement so its settings apply to every query."
+	athenaResultsUnencryptedDetail = "Query results are written to S3 with no encryption configured, so whatever " +
+		"a query returns is readable by anyone who can read the results bucket. Set an encryption option on the " +
+		"workgroup's result configuration."
 )
 
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
 // surface governance and security findings.
 //
 // Findings:
-//   - WorkGroup.Configuration.EnforceWorkGroupConfiguration == false → "~" severity,
-//     "EnforceWorkGroupConfiguration disabled (callers can bypass)".
-//   - WorkGroup.Configuration.ResultConfiguration.EncryptionConfiguration == nil → "~" severity,
-//     "result encryption not configured".
+//   - WorkGroup.Configuration.EnforceWorkGroupConfiguration == false → "~",
+//     athenaCodeSettingsNotEnforced.
+//   - WorkGroup.Configuration.ResultConfiguration.EncryptionConfiguration == nil → "~",
+//     athenaCodeResultsUnencrypted, carrying the result location so the row
+//     names where the unencrypted output lands.
 //
 // Per-WG errors mark Truncated=true and are skipped.
 // Skip when clients.Athena == nil.
@@ -67,33 +81,33 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if key == "" {
 			key = wgName
 		}
-		var rows []domain.DetailRow
 		// EnforceWorkGroupConfiguration defaults to true; false means callers can bypass settings.
+		// No supporting row: the phrase already says the setting is overridable,
+		// and U11 forbids restating it underneath.
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
-			rows = append(rows, domain.DetailRow{
-				Label: "Workgroup settings enforced",
-				Value: "no",
-				Tier:  "~",
-			})
+			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced,
+				"settings can be overridden per query", "~", "athena", nil, athenaSettingsNotEnforcedDetail)
 		}
 		// Missing encryption on result configuration is a security concern.
 		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
-			rows = append(rows, domain.DetailRow{
-				Label: "Query result encryption",
-				Value: "off",
-				Tier:  "~",
-			})
+			var rows []domain.DetailRow
+			if loc := aws.ToString(resultOutputLocation(cfg)); loc != "" {
+				rows = append(rows, domain.DetailRow{Label: "Results written to", Value: loc, Tier: "~"})
+			}
+			setWave2Finding(&result, key, athenaCodeResultsUnencrypted,
+				"query results stored unencrypted", "~", "athena", rows, athenaResultsUnencryptedDetail)
 		}
-		if len(rows) == 0 {
-			return
-		}
-		summary := rows[0].Label
-		if len(rows) > 1 {
-			summary = fmt.Sprintf("%s (%d findings)", rows[0].Label, len(rows))
-		}
-		setWave2Finding(&result, key, athenaCodeGovernanceMisconfigured, summary, "~", "athena", rows, "")
 	})
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil
+}
+
+// resultOutputLocation returns the workgroup's configured result location, or
+// nil when the workgroup has no result configuration at all.
+func resultOutputLocation(cfg *athenatypes.WorkGroupConfiguration) *string {
+	if cfg.ResultConfiguration == nil {
+		return nil
+	}
+	return cfg.ResultConfiguration.OutputLocation
 }

@@ -120,7 +120,8 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: athenaCodeWorkgroupDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: athenaCodeGovernanceMisconfigured, Phrase: "EnforceWorkGroupConfiguration (<N> findings)", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: athenaCodeSettingsNotEnforced, Phrase: "settings can be overridden per query", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: athenaCodeResultsUnencrypted, Phrase: "query results stored unencrypted", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

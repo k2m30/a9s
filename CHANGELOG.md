@@ -270,6 +270,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rows. One workgroup now carries both halves and the rest encrypt their
   results.
 
+- An Athena workgroup's governance problems now read as sentences. The list
+  cell said `Workgroup settings enforced (2 findings)`, which was the label of
+  the row underneath it and left the reader to work out which way "enforced"
+  pointed. Unenforced settings and unencrypted results are two independent
+  settings, so they are two signals: `settings can be overridden per query`
+  and `query results stored unencrypted`, each with a sentence saying what it
+  exposes and what to change, and the second naming where the results land.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's

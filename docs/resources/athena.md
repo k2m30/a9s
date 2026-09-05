@@ -82,10 +82,15 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-- **Signal**: `Configuration.EnforceWorkGroupConfiguration == false` AND `Configuration.ResultConfiguration.EncryptionConfiguration == nil`.
+- **Signal**: `Configuration.EnforceWorkGroupConfiguration == false`.
   - **State bucket**: Warning.
   - **API call**: `GetWorkGroup` per workgroup.
-  - **Cost shape**: per-resource. Governance gap — workgroup does not force its settings on clients, and no result-encryption is configured, so query results can be written unencrypted to S3.
+  - **Cost shape**: per-resource. A workgroup that does not force its settings leaves every setting it defines advisory — the client chooses.
+
+- **Signal**: `Configuration.ResultConfiguration.EncryptionConfiguration == nil`.
+  - **State bucket**: Warning.
+  - **API call**: same `GetWorkGroup` per workgroup — no additional call.
+  - **Cost shape**: per-resource. Query results land in S3 unencrypted, so whatever a query returns is readable by anyone who can read the bucket. Evaluated independently of enforcement: a workgroup can fail either without the other.
 
 - **Signal**: `Configuration.BytesScannedCutoffPerQuery` unset (nil).
   - **State bucket**: Warning.
@@ -121,7 +126,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled: no new queries accepted` | `Workgroup is disabled — queries submitted here will be rejected until re-enabled.` |
-| `EnforceWorkGroupConfiguration==false && ResultConfiguration.EncryptionConfiguration==nil` | 2 | Healthy | `~` | S3, S4, S5 | `results unencrypted, not enforced` | `Query results written to S3 without encryption; workgroup does not force client-side settings.` |
+| `EnforceWorkGroupConfiguration == false` | 2 | Healthy | `~` | S3, S4 | `settings can be overridden per query` | `Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query.` |
+| `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Healthy | `~` | S3, S4, S5 | `query results stored unencrypted` | `Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration.` |
 | `BytesScannedCutoffPerQuery` unset | 2 | Healthy | `~` | S3, S4, S5 | `no per-query scan limit` | `No data-scan ceiling — a runaway query can bill unbounded dollars.` |
 
 Rules for filling list and detail text:
@@ -129,11 +135,11 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Tests will assert the cause is present.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), you may omit the row from this table entirely; §3 still describes it.
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled: no new queries accepted` tells the operator the workgroup is admin-off, and a green row prefixed with `~` and `results unencrypted, not enforced` tells them the workgroup has a governance gap without needing to press detail. Operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled: no new queries accepted` tells the operator the workgroup is admin-off, and a green row prefixed with `~` and `query results stored unencrypted` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still write results in the clear, and a merged cell could name only the first. Operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -146,7 +152,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — athena contract row (related targets and AWS API URL) — `docs/related-resources.md` § Per-type contract, row `athena`, and § `athena` subsection.
 - a9s golden doc — Wave 1 `State==ENABLED`/`DISABLED` mapping — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 1 cell.
-- a9s golden doc — Wave 2 `EnforceWorkGroupConfiguration==false && ResultConfiguration.EncryptionConfiguration==nil` and `BytesScannedCutoffPerQuery` unset — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 2 cell.
+- a9s golden doc — Wave 2 `EnforceWorkGroupConfiguration==false`, `ResultConfiguration.EncryptionConfiguration==nil` and `BytesScannedCutoffPerQuery` unset — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 2 cell.
 - a9s golden doc — Wave 3 `ListQueryExecutions`/`BatchGetQueryExecution` is out of scope — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 3 cell.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "a9s is a read-only terminal UI for AWS".
 - AWS Go SDK v2 — `ListWorkGroups` returns `WorkGroupSummary` with `Name`, `State`, `CreationTime`, `Description`, `EngineVersion` — `AWS SDK Go v2 — service/athena/types.WorkGroupSummary § State`.
@@ -168,7 +174,8 @@ athena — DATA & ANALYTICS. Lifecycle key: `state`.
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | athena.workgroup-disabled | disabled | warn | wave1 |
-| athena.governance-misconfigured | EnforceWorkGroupConfiguration (<N> findings) | warn | wave2 |
+| athena.settings-not-enforced | settings can be overridden per query | warn | wave2 |
+| athena.results-unencrypted | query results stored unencrypted | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

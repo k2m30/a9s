@@ -13,7 +13,6 @@ package unit
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -161,8 +160,15 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	}
 	// The phrase names the setting in the operator's words, not the SDK's
 	// (EnforceWorkGroupConfiguration) — the style gate forbids the latter.
-	if f.Phrase != "Workgroup settings enforced" {
-		t.Errorf("summary = %q, want %q", f.Phrase, "Workgroup settings enforced")
+	// d4 row 22 replaced the old phrase, "Workgroup settings enforced", which
+	// was the supporting row's own label: it restated the row beneath it and
+	// left the operator to work out which way "enforced" pointed. Do not
+	// restore it, and do not expect a row here — the phrase says it all.
+	if f.Phrase != "settings can be overridden per query" {
+		t.Errorf("phrase = %q, want %q", f.Phrase, "settings can be overridden per query")
+	}
+	if f.Code != "athena.settings-not-enforced" {
+		t.Errorf("code = %q, want %q", f.Code, "athena.settings-not-enforced")
 	}
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it is correctly configured")
@@ -195,8 +201,16 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Phrase), "encryption") {
-		t.Errorf("summary %q must contain \"encryption\"", f.Phrase)
+	// d4 row 22 split the one governance finding into two codes, so this is
+	// its own phrase rather than a merged summary. It says "unencrypted"
+	// where the old substring check looked for "encryption"; do not narrow it
+	// back to a substring, which passed on the merged phrase naming the other
+	// half.
+	if f.Phrase != "query results stored unencrypted" {
+		t.Errorf("phrase = %q, want %q", f.Phrase, "query results stored unencrypted")
+	}
+	if f.Code != "athena.results-unencrypted" {
+		t.Errorf("code = %q, want %q", f.Code, "athena.results-unencrypted")
 	}
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it has encryption configured")
