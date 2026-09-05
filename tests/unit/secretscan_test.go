@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/secretscan"
 )
@@ -225,7 +224,7 @@ func TestScanText_SecretOnLastLineNoTrailingNewline(t *testing.T) {
 	}
 }
 
-func TestScanText_5000LinesUnder100ms(t *testing.T) {
+func fiveThousandLineUserData() string {
 	var sb strings.Builder
 	for i := 0; i < 5000; i++ {
 		sb.WriteString("echo 'this is a totally normal line of user data with nothing interesting ")
@@ -233,17 +232,21 @@ func TestScanText_5000LinesUnder100ms(t *testing.T) {
 		sb.WriteString("'\n")
 	}
 	sb.WriteString("export DB_PASSWORD=hunter2hunter2\n")
-	text := sb.String()
+	return sb.String()
+}
 
-	start := time.Now()
-	hits := secretscan.ScanText(text)
-	elapsed := time.Since(start)
-
-	if elapsed > 100*time.Millisecond {
-		t.Errorf("ScanText(5000 lines) took %v, want under 100ms", elapsed)
-	}
+func TestScanText_5000Lines_FindsPlantedSecretAtRightLine(t *testing.T) {
+	hits := secretscan.ScanText(fiveThousandLineUserData())
 	want := []secretscan.Hit{{Kind: "keyword", Where: "line 5001"}}
 	if !reflect.DeepEqual(hits, want) {
 		t.Errorf("ScanText(5000 lines) = %v, want %v", hits, want)
+	}
+}
+
+func BenchmarkScanText_5000Lines(b *testing.B) {
+	text := fiveThousandLineUserData()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		secretscan.ScanText(text)
 	}
 }

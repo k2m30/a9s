@@ -525,3 +525,30 @@ func TestPrivilegeEscalation_LowercaseActionsStillMatchCombo(t *testing.T) {
 		t.Errorf("PrivilegeEscalation() = %v, want to contain PassRole+CreateLambda+Invoke even with all-lowercase action names", d.PrivilegeEscalation())
 	}
 }
+
+// --- verify round 3: attacking the round-2 fixes themselves ---
+
+func TestEvaluate_NotPrincipalOnly_NoPrincipalBlock_PublicButNoCrossAccount(t *testing.T) {
+	doc := `{"Statement":{"Effect":"Allow","NotPrincipal":{"AWS":"210987654321"},"Action":"s3:GetObject","Resource":"*"}}`
+	d := mustParse(t, doc)
+	ex := iampolicy.Evaluate(d, "123456789012")
+	if !ex.Public {
+		t.Errorf("Public = false, want true: a NotPrincipal-only statement (no Principal block at all) is still treated as public")
+	}
+	if len(ex.CrossAccount) != 0 {
+		t.Errorf("CrossAccount = %v, want empty: the NotPrincipal account is an exclusion, not a grant, and must never be aggregated as cross-account", ex.CrossAccount)
+	}
+}
+
+func TestParse_ValidJSONWithLiteralPercentTwoBInValue_NotDecoded(t *testing.T) {
+	doc := `{"Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"*","Condition":{"StringEquals":{"aws:PrincipalTag/Team":"a%2Bb"}}}]}`
+	d := mustParse(t, doc)
+	if len(d.Statement) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(d.Statement))
+	}
+	got := d.Statement[0].Condition["StringEquals"]["aws:PrincipalTag/Team"]
+	want := []string{"a%2Bb"}
+	if !strSliceEqual(got, want) {
+		t.Errorf("Condition value = %v, want %v: a document that is already valid JSON must never be run through the URL-decode fallback, even if a string value happens to contain '%%2B'", got, want)
+	}
+}
