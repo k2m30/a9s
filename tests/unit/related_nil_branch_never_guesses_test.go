@@ -25,8 +25,12 @@ import (
 )
 
 var (
-	nilListBranchRe = regexp.MustCompile(`\bif \w*[Ll]ist == nil \{`)
-	guessedIDsRe    = regexp.MustCompile(`(relatedResultTrunc|KnownRelated)\([^,]+,\s*ids`)
+	nilListBranchRe = regexp.MustCompile(`\bif (\w*[Ll]ist == nil|len\(\w*[Ll]ist\) == 0) \{`)
+	// Every helper that builds a RESOLVED result, so a new wrapper cannot hide
+	// a guess from this gate the way relatedResult and r53RelatedResult did:
+	// the first pattern matched only two of the three spellings in the tree,
+	// and the surviving site used the one it missed.
+	guessedIDsRe = regexp.MustCompile(`(\w*[Rr]elatedResult\w*|KnownRelated)\([^,]+,\s*(ids|\w+IDs)`)
 )
 
 // TestRelatedNilBranch_NeverBuildsIDs scans every related-checker file for a
