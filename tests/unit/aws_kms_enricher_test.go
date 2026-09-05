@@ -216,3 +216,13 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 		t.Error("must not produce finding for key-error when API returned error")
 	}
 }
+
+// The kms enricher also reads the key policy; a key with no policy attached
+// keeps these tests about rotation, which is what they were written for.
+func (f *kmsFake) GetKeyPolicy(
+	_ context.Context,
+	_ *kms.GetKeyPolicyInput,
+	_ ...func(*kms.Options),
+) (*kms.GetKeyPolicyOutput, error) {
+	return &kms.GetKeyPolicyOutput{}, nil
+}

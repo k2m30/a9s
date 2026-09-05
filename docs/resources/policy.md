@@ -98,6 +98,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `AttachmentCount==0`, customer-managed — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: 0 attachments` | `Customer-managed policy attached to no users, groups, or roles.` |
 | Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `wildcard admin: Allow *:*` | `Default version grants Action=* on Resource=* — effective AdministratorAccess.` |
+| Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `allows privilege escalation` | `The policy grants a set of actions that lets its holder grant itself full administrator.` |
 
 Rules for filling list and detail text:
 
@@ -144,6 +145,7 @@ policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycl
 | --- | --- | --- | --- |
 | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
 | iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 |
+| policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

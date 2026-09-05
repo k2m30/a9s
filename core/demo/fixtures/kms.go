@@ -32,6 +32,11 @@ type KMSFixtures struct {
 // key still shown).
 const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 
+// KMSPublicPolicy is the witness key for kms.public-policy: its default key
+// policy grants kms:Decrypt to a wildcard principal. Every other demo key
+// either has no policy fixture or names concrete principals.
+const KMSPublicPolicy = "c9d0e1f2-a3b4-6789-01cd-ffaabbccddee"
+
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
 var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
@@ -260,6 +265,20 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// Witness: key policy open to any AWS principal.
+		{
+			KeyId:                aws.String(KMSPublicPolicy),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSPublicPolicy),
+			Description:          aws.String("Shared analytics export key — key policy allows any AWS principal to decrypt"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 3, 18, 9, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 		// EFS prod-app-data encryption key — required for efs→kms related-panel pivot.
 		// The prod-efs-app-data filesystem sets KmsKeyId = ProdEFSKmsKeyARN; the
 		// checker strips the ARN to the bare key ID and looks it up here.
@@ -398,6 +417,11 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			TargetKeyId: aws.String("e5f6a7b8-cdef-2345-6789-bbccddeeffe0"),
 		},
 		{
+			AliasName:   aws.String("alias/shared-analytics-export"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/shared-analytics-export"),
+			TargetKeyId: aws.String(KMSPublicPolicy),
+		},
+		{
 			AliasName:   aws.String("alias/no-rotation-cmk"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/no-rotation-cmk"),
 			TargetKeyId: aws.String("f6a7b8c9-def0-3456-789a-ccddeeff0011"),
@@ -480,6 +504,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	// realistic default key policy shape.
 	keyPolicies := map[string]string{
 		"a1b2c3d4-5678-90ab-cdef-111111111111": `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowKeyUseByEC2InstanceRole","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ec2-instance-profile"},"Action":["kms:Decrypt","kms:GenerateDataKey"],"Resource":"*"}]}`,
+		KMSPublicPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowAnyoneToDecrypt","Effect":"Allow","Principal":"*","Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
 	}
 
 	// RotationEnabled — the primary production key is the sole demo CMK with

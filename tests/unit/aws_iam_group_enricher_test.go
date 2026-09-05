@@ -123,7 +123,9 @@ func TestEnrichIAMGroup_PopulatedGroupProducesNoFindings(t *testing.T) {
 		},
 		attachedPoliciesByGroup: map[string][]iamtypes.AttachedPolicy{
 			"dev-team": {iamAttachedPolicy("arn:aws:iam::aws:policy/ReadOnlyAccess", "ReadOnlyAccess")},
-			"ops-team": {iamAttachedPolicy("arn:aws:iam::aws:policy/AdministratorAccess", "AdministratorAccess")},
+			// A scoped managed policy: this test is about the orphan / no-op
+			// conditions, and an admin policy would raise a second, unrelated finding.
+			"ops-team": {iamAttachedPolicy("arn:aws:iam::aws:policy/AmazonS3FullAccess", "AmazonS3FullAccess")},
 		},
 		inlinePoliciesByGroup: map[string][]string{},
 	}

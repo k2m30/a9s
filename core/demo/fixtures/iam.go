@@ -54,6 +54,10 @@ type IAMFixtures struct {
 	// AccessKeysByUser keyed by user name — backs EnrichIAMUserMFA's stale
 	// access-key check.
 	AccessKeysByUser map[string][]iamtypes.AccessKeyMetadata
+	// AccessKeyLastUsed keyed by access key ID — backs
+	// iam:GetAccessKeyLastUsed. A key absent from this map has never been
+	// used, which the fake reports as a nil LastUsedDate.
+	AccessKeyLastUsed map[string]time.Time
 }
 
 // PolicyEntities holds the entities (roles, users, groups) attached to a policy.
@@ -65,6 +69,39 @@ type PolicyEntities struct {
 
 const (
 	fixtIAMProdLambdaRoleARN = "arn:aws:iam::123456789012:role/service-role/acme-lambda-execution"
+
+	// Witness rows for the IAM posture findings. Each names the ONE demo
+	// resource that carries the finding; every other row of the same type is
+	// explicitly set to the healthy value for that condition.
+
+	// RoleConfusedDeputy trusts lambda.amazonaws.com with no aws:SourceAccount
+	// or aws:SourceArn condition — role.trust.confused-deputy.
+	RoleConfusedDeputy = "acme-invoker-callback-role"
+	// RoleAdminAttached carries the AWS-managed AdministratorAccess policy —
+	// role.admin-attached.
+	RoleAdminAttached = "acme-break-glass-role"
+	// RoleInlinePrivEsc has an inline policy granting iam:PassRole plus
+	// lambda:CreateFunction plus lambda:InvokeFunction —
+	// role.inline-privilege-escalation.
+	RoleInlinePrivEsc = "acme-pipeline-builder-role"
+	// PolicyPrivEsc is a customer-managed policy granting the same
+	// escalation combination — policy.privilege-escalation.
+	PolicyPrivEsc = "acme-privesc-policy"
+	// IAMUserAdminAttached carries AdministratorAccess — iam-user.admin-attached.
+	IAMUserAdminAttached = "break-glass-admin"
+	// IAMUserConsoleNeverUsed has a console password created long ago and
+	// never used — iam-user.console-never-used.
+	IAMUserConsoleNeverUsed = "dormant-console-user"
+	// IAMUserKeyUnused holds the one access key old enough to report, and
+	// which has never signed a request — iam-user.old-key and
+	// iam-user.access-key-unused.
+	IAMUserKeyUnused = "stale-key-user"
+	// IAMUserTwoKeys has both access-key slots active — iam-user.two-active-keys.
+	IAMUserTwoKeys = "dual-key-user"
+	// IAMGroupAdminAttached is the pre-existing admins group, whose
+	// AdministratorAccess attachment is the natural witness for
+	// iam-group.admin-attached.
+	IAMGroupAdminAttached = "admins"
 )
 
 func IsCustomerManagedPolicyARN(policyARN string) bool {
@@ -99,18 +136,62 @@ var sharedIAMFixtures = sync.OnceValue(func() *IAMFixtures {
 	// password (PasswordLastUsed is set) but no MFA device registered → "!"
 	// finding (CIS IAM.5). bob.smith has an active access key older than 90
 	// days → "~" finding (rotation).
+	//
+	// Key ages and last-use dates are relative to fixture construction so the
+	// 90-day thresholds keep meaning the same thing as the calendar moves.
 	f.ConsoleUsers = map[string]bool{
-		"alice.johnson": true,
+		"alice.johnson":         true,
+		IAMUserConsoleNeverUsed: true,
 	}
-	f.MFADevicesByUser = map[string][]iamtypes.MFADevice{}
+	// The console-never-used witness has MFA registered, so it carries that
+	// finding alone and not the no-MFA one.
+	f.MFADevicesByUser = map[string][]iamtypes.MFADevice{
+		IAMUserConsoleNeverUsed: {{
+			UserName:     aws.String(IAMUserConsoleNeverUsed),
+			SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/" + IAMUserConsoleNeverUsed),
+			EnableDate:   aws.Time(time.Now().AddDate(0, 0, -400)),
+		}},
+	}
+	const (
+		freshKeyID = "AKIAEXAMPLE2222222222"
+		staleKeyID = "AKIAEXAMPLE4444444444"
+		dualKeyID1 = "AKIAEXAMPLE5555555555"
+		dualKeyID2 = "AKIAEXAMPLE6666666666"
+	)
 	f.AccessKeysByUser = map[string][]iamtypes.AccessKeyMetadata{
 		"bob.smith": {
 			{
-				AccessKeyId: aws.String("AKIAEXAMPLE2222222222"),
+				AccessKeyId: aws.String(freshKeyID),
 				Status:      iamtypes.StatusTypeActive,
-				CreateDate:  aws.Time(time.Date(2025, 9, 1, 10, 30, 0, 0, time.UTC)),
+				CreateDate:  aws.Time(time.Now().AddDate(0, 0, -20)),
 			},
 		},
+		IAMUserKeyUnused: {
+			{
+				AccessKeyId: aws.String(staleKeyID),
+				Status:      iamtypes.StatusTypeActive,
+				CreateDate:  aws.Time(time.Now().AddDate(0, 0, -400)),
+			},
+		},
+		IAMUserTwoKeys: {
+			{
+				AccessKeyId: aws.String(dualKeyID1),
+				Status:      iamtypes.StatusTypeActive,
+				CreateDate:  aws.Time(time.Now().AddDate(0, 0, -30)),
+			},
+			{
+				AccessKeyId: aws.String(dualKeyID2),
+				Status:      iamtypes.StatusTypeActive,
+				CreateDate:  aws.Time(time.Now().AddDate(0, 0, -10)),
+			},
+		},
+	}
+	// staleKeyID is deliberately absent: never used is what makes it the
+	// unused-key witness. Every other active key was used in the last week.
+	f.AccessKeyLastUsed = map[string]time.Time{
+		freshKeyID: time.Now().AddDate(0, 0, -2),
+		dualKeyID1: time.Now().AddDate(0, 0, -3),
+		dualKeyID2: time.Now().AddDate(0, 0, -1),
 	}
 	return f
 })
@@ -159,7 +240,7 @@ func buildIAMRoles() []iamtypes.Role {
 			// checkRoleIamUser, offline parse of Principal.AWS ARNs). Models
 			// a realistic "break-glass manual deploy" trust policy alongside
 			// the CodePipeline service principal.
-			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"codepipeline.amazonaws.com"},"Action":"sts:AssumeRole"},{"Effect":"Allow","Principal":{"AWS":["arn:aws:iam::123456789012:group/admins","arn:aws:iam::123456789012:user/alice.johnson"]},"Action":"sts:AssumeRole","Condition":{"Bool":{"aws:MultiFactorAuthPresent":"true"}}}]}`),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"codepipeline.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}},{"Effect":"Allow","Principal":{"AWS":["arn:aws:iam::123456789012:group/admins","arn:aws:iam::123456789012:user/alice.johnson"]},"Action":"sts:AssumeRole","Condition":{"Bool":{"aws:MultiFactorAuthPresent":"true"}}}]}`),
 		},
 		{
 			RoleName:    aws.String("acme-rds-monitoring"),
@@ -224,6 +305,37 @@ func buildIAMRoles() []iamtypes.Role {
 		},
 	}
 
+	// Witness roles for the trust-policy and attachment posture findings.
+	roles = append(roles,
+		iamtypes.Role{
+			RoleName:                 aws.String(RoleConfusedDeputy),
+			RoleId:                   aws.String("AROAEXAMPLECONFDEP01"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RoleConfusedDeputy),
+			Path:                     aws.String("/"),
+			CreateDate:               aws.Time(time.Date(2025, 6, 2, 11, 0, 0, 0, time.UTC)),
+			Description:              aws.String("Role Lambda assumes to call back into this account — no aws:SourceAccount or aws:SourceArn scoping"),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		},
+		iamtypes.Role{
+			RoleName:                 aws.String(RoleAdminAttached),
+			RoleId:                   aws.String("AROAEXAMPLEADMINATT1"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RoleAdminAttached),
+			Path:                     aws.String("/"),
+			CreateDate:               aws.Time(time.Date(2025, 2, 14, 9, 0, 0, 0, time.UTC)),
+			Description:              aws.String("Break-glass operator role carrying the AWS-managed AdministratorAccess policy"),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"sts:AssumeRole","Condition":{"Bool":{"aws:MultiFactorAuthPresent":"true"}}}]}`),
+		},
+		iamtypes.Role{
+			RoleName:                 aws.String(RoleInlinePrivEsc),
+			RoleId:                   aws.String("AROAEXAMPLEINLPRIVE1"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RoleInlinePrivEsc),
+			Path:                     aws.String("/"),
+			CreateDate:               aws.Time(time.Date(2025, 5, 20, 13, 0, 0, 0, time.UTC)),
+			Description:              aws.String("Pipeline build role whose inline policy can pass a role into a Lambda it creates and invokes"),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"codebuild.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
+		},
+	)
+
 	// Backup prod role — required for backup→role related-panel pivot (checkBackupRole).
 	// ListBackupSelections for plan-broken-2failed returns this ARN in IamRoleArn.
 	// checkBackupRole extracts the role name as the last segment after "/".
@@ -234,7 +346,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/"),
 		CreateDate:               aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
 		Description:              aws.String("IAM role assumed by AWS Backup for prod database and critical plan backups"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
 	// CloudTrail-to-CloudWatch-Logs delivery role — required for trail:role
@@ -248,7 +360,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/"),
 		CreateDate:               aws.Time(time.Date(2025, 2, 1, 9, 0, 0, 0, time.UTC)),
 		Description:              aws.String("IAM role assumed by CloudTrail to deliver events to CloudWatch Logs"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"cloudtrail.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"cloudtrail.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
 	// RDS monitoring roles — required for dbi→role related-panel pivot.
@@ -353,7 +465,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/service-role/"),
 		CreateDate:               aws.Time(time.Date(2024, 9, 1, 8, 0, 0, 0, time.UTC)),
 		Description:              aws.String("Default AWS-managed service role used by AWS Backup for plans without a custom IAM role"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
 	// EventBridge rule target-invocation role — required for eb-rule:role
@@ -365,7 +477,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/"),
 		CreateDate:               aws.Time(time.Date(2025, 3, 12, 9, 0, 0, 0, time.UTC)),
 		Description:              aws.String("Role assumed by EventBridge to invoke CI/CD deployment targets"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"events.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"events.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
 	// ECS service-linked role — required for ecs-svc:role related-panel pivot
@@ -389,7 +501,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/"),
 		CreateDate:               aws.Time(time.Date(2025, 1, 5, 8, 0, 0, 0, time.UTC)),
 		Description:              aws.String("EKS control-plane role assumed by the acme-* clusters to manage AWS resources on their behalf"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
 	// S3 healthy-bucket access role (checkS3Role pivot).
@@ -403,7 +515,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/"),
 		CreateDate:               aws.Time(time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)),
 		Description:              aws.String("Role granting read access to a9s-demo-healthy S3 bucket (" + HealthyBucketARN + ")"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
 	// CT-event cross-reference roles for ctdetail nav tests
@@ -507,6 +619,19 @@ func buildIAMInstanceProfiles(roles []iamtypes.Role) map[string]iamtypes.Instanc
 
 func buildIAMPolicies() []iamtypes.Policy {
 	policies := []iamtypes.Policy{
+		// Witness: a customer-managed policy whose action set adds up to
+		// administrator even though no single action looks privileged.
+		{
+			PolicyName:       aws.String(PolicyPrivEsc),
+			PolicyId:         aws.String("ANPAEXAMPLEPRIVESC01"),
+			Arn:              aws.String("arn:aws:iam::123456789012:policy/" + PolicyPrivEsc),
+			AttachmentCount:  aws.Int32(1),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2025, 5, 20, 13, 0, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+			Description:      aws.String("Lets a build pipeline pass a role into a Lambda it creates and invokes"),
+			IsAttachable:     true,
+		},
 		{
 			PolicyName:       aws.String("acme-s3-read-only"),
 			PolicyId:         aws.String("ANPAEXAMPLE111111111"),
@@ -698,6 +823,38 @@ func buildIAMUsers() []iamtypes.User {
 			CreateDate:       aws.Time(time.Date(2023, 1, 15, 9, 0, 0, 0, time.UTC)),
 			PasswordLastUsed: aws.Time(time.Date(2024, 6, 1, 14, 0, 0, 0, time.UTC)),
 		},
+		// Witness: console password created long ago and never used.
+		{
+			UserName:   aws.String(IAMUserConsoleNeverUsed),
+			UserId:     aws.String("AIDAEXAMPLECONSNEVER"),
+			Arn:        aws.String("arn:aws:iam::123456789012:user/" + IAMUserConsoleNeverUsed),
+			Path:       aws.String("/"),
+			CreateDate: aws.Time(time.Date(2024, 2, 1, 9, 0, 0, 0, time.UTC)),
+		},
+		// Witness: one active access key, old and never used.
+		{
+			UserName:   aws.String(IAMUserKeyUnused),
+			UserId:     aws.String("AIDAEXAMPLESTALEKEY1"),
+			Arn:        aws.String("arn:aws:iam::123456789012:user/service-accounts/" + IAMUserKeyUnused),
+			Path:       aws.String("/service-accounts/"),
+			CreateDate: aws.Time(time.Date(2024, 5, 12, 9, 0, 0, 0, time.UTC)),
+		},
+		// Witness: both access-key slots active at once.
+		{
+			UserName:   aws.String(IAMUserTwoKeys),
+			UserId:     aws.String("AIDAEXAMPLEDUALKEY01"),
+			Arn:        aws.String("arn:aws:iam::123456789012:user/service-accounts/" + IAMUserTwoKeys),
+			Path:       aws.String("/service-accounts/"),
+			CreateDate: aws.Time(time.Date(2025, 11, 3, 9, 0, 0, 0, time.UTC)),
+		},
+		// Witness: AdministratorAccess attached directly to a user.
+		{
+			UserName:   aws.String(IAMUserAdminAttached),
+			UserId:     aws.String("AIDAEXAMPLEADMINUSR1"),
+			Arn:        aws.String("arn:aws:iam::123456789012:user/" + IAMUserAdminAttached),
+			Path:       aws.String("/"),
+			CreateDate: aws.Time(time.Date(2024, 10, 4, 9, 0, 0, 0, time.UTC)),
+		},
 		// Issue: PasswordLastUsed=nil (never logged in) with old CreateDate → Warning (unused console access)
 		{
 			UserName:   aws.String("legacy-service-user"),
@@ -775,6 +932,17 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("acme-s3-read-only"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only")},
 	}
+	f.AttachedUserPolicies[IAMUserAdminAttached] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
+	}
+
+	// Witness attachments and inline documents for the escalation findings.
+	f.AttachedRolePolicies[RoleAdminAttached] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
+	}
+	f.InlineRolePolicies[RoleInlinePrivEsc] = []string{"pipeline-deploy"}
+	f.InlinePolicyDocuments[RoleInlinePrivEsc+"/pipeline-deploy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["iam:PassRole","lambda:CreateFunction","lambda:InvokeFunction"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/"+PolicyPrivEsc] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["iam:PassRole","lambda:CreateFunction","lambda:InvokeFunction"],"Resource":"*"}]}`)
 
 	// Attached group policies
 	f.AttachedGroupPolicies["admins"] = []iamtypes.AttachedPolicy{
@@ -823,7 +991,7 @@ func buildIAMRelations(f *IAMFixtures) {
 
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-s3-read-only"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::acme-data-*","arn:aws:s3:::acme-data-*/*"]}]}`)
 
-	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-deploy-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["codedeploy:*","s3:GetObject","s3:PutObject"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-deploy-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["codedeploy:GetApplication","codedeploy:ListDeployments","s3:GetObject","s3:PutObject"],"Resource":"*"}]}`)
 
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-secrets-access"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret"],"Resource":"arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/*"}]}`)
 

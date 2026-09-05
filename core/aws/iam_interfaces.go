@@ -51,6 +51,16 @@ type IAMListAccessKeysAPI interface {
 	ListAccessKeys(ctx context.Context, params *iam.ListAccessKeysInput, optFns ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error)
 }
 
+// IAMGetAccessKeyLastUsedAPI defines the interface for the IAM
+// GetAccessKeyLastUsed operation. Used by Wave 2 EnrichIAMUserMFA to detect
+// access keys that are active but have not been used in over 90 days.
+// Deliberately outside the IAMAPI aggregate, like IAMGetRoleAPI: the
+// enricher asks for it by type assertion, so a client that does not serve it
+// skips the check instead of failing the whole sweep.
+type IAMGetAccessKeyLastUsedAPI interface {
+	GetAccessKeyLastUsed(ctx context.Context, params *iam.GetAccessKeyLastUsedInput, optFns ...func(*iam.Options)) (*iam.GetAccessKeyLastUsedOutput, error)
+}
+
 // IAMListAttachedRolePoliciesAPI defines the interface for the IAM ListAttachedRolePolicies operation.
 type IAMListAttachedRolePoliciesAPI interface {
 	ListAttachedRolePolicies(ctx context.Context, params *iam.ListAttachedRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error)

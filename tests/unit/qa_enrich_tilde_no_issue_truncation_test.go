@@ -54,7 +54,9 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 		{"elb", awsclient.EnrichELBAttributes},
 		{"iam-group", awsclient.EnrichIAMGroup},
 		{"iam-role", awsclient.EnrichIAMRoleLastUsed},
-		{"kms", awsclient.EnrichKMSRotation},
+		// kms is deliberately absent: EnrichKMSRotation now also reports an
+		// open key policy, an issue-severity finding, so its cap genuinely
+		// lower-bounds the issue count and Truncated must be allowed to rise.
 		{"logs", awsclient.EnrichLogsMetricFilters},
 		{"msk", awsclient.EnrichMSKCluster},
 		{"r53", awsclient.EnrichRoute53Zone},

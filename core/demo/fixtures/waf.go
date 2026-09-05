@@ -10,6 +10,11 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
 
+// WAFNoRules is the witness Web ACL for waf.no-rules: it exists and is
+// associated, but contains no rules at all. Every other demo ACL has at
+// least one rule.
+const WAFNoRules = "acme-empty-waf"
+
 // WAFFixtures holds typed fixture data for WAFv2.
 type WAFFixtures struct {
 	// WebACLSummaries holds REGIONAL-scope Web ACLs (served by ListWebACLs
@@ -32,6 +37,13 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-prod-api-waf/a1b2c3d4-5678-90ab-cdef-111111111111"),
 				Description: aws.String("WAF for production API Gateway"),
 				LockToken:   aws.String("lock-token-111"),
+			},
+			{
+				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-444444444444"),
+				Name:        aws.String(WAFNoRules),
+				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRules + "/a1b2c3d4-5678-90ab-cdef-444444444444"),
+				Description: aws.String("Web ACL attached to the internal ALB with no rules configured"),
+				LockToken:   aws.String("lock-token-444"),
 			},
 			{
 				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-333333333333"),
@@ -65,6 +77,11 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 			// so checkELBWAF's GetWebACLForResource reverse lookup resolves.
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-staging-waf/a1b2c3d4-5678-90ab-cdef-333333333333": {
 				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-web-alb/5555555555aaaaaa",
+			},
+			// Associated, so the empty ACL carries the no-rules finding
+			// alone rather than also reading as an orphan.
+			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRules + "/a1b2c3d4-5678-90ab-cdef-444444444444": {
+				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/internal-api-alb/6666666666bbbbbb",
 			},
 		},
 	}

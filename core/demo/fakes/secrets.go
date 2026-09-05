@@ -41,8 +41,18 @@ func (f *SecretsFake) GetSecretValue(_ context.Context, input *secretsmanager.Ge
 	}, nil
 }
 
-// GetResourcePolicy returns an empty policy — demo mode does not model
-// Secrets Manager resource policies.
-func (f *SecretsFake) GetResourcePolicy(_ context.Context, _ *secretsmanager.GetResourcePolicyInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetResourcePolicyOutput, error) {
-	return &secretsmanager.GetResourcePolicyOutput{}, nil
+// GetResourcePolicy returns the fixture-registered resource policy for the
+// requested secret (see SecretsFixtures.ResourcePolicies). Secrets with no
+// entry have no resource policy attached, which is what the real API reports
+// as a nil ResourcePolicy.
+func (f *SecretsFake) GetResourcePolicy(_ context.Context, input *secretsmanager.GetResourcePolicyInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetResourcePolicyOutput, error) {
+	secretID := aws.ToString(input.SecretId)
+	policy, ok := f.fix.ResourcePolicies[secretID]
+	if !ok {
+		return &secretsmanager.GetResourcePolicyOutput{Name: input.SecretId}, nil
+	}
+	return &secretsmanager.GetResourcePolicyOutput{
+		Name:           input.SecretId,
+		ResourcePolicy: aws.String(policy),
+	}, nil
 }

@@ -44,6 +44,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - VPC endpoints whose policy grants every action to every principal —
   the policy AWS attaches when none is supplied — are now flagged.
   Closes Prowler `vpc_endpoint_connections_trust_boundaries`.
+- IAM roles now report three trust and permission problems the list was
+  silent about: a trust policy any AWS account can use, an AWS service
+  trusted with nothing scoping which caller it acts for, and an inline
+  policy whose action set adds up to full administrator. A role carrying
+  AdministratorAccess or PowerUserAccess is flagged too. The wildcard-trust
+  check moved off string matching onto the shared policy engine, so a
+  wildcard principal paired with an external ID no longer reads as
+  wide open. Closes Prowler `iam_role_cross_service_confused_deputy_prevention`,
+  `iam_inline_policy_allows_privilege_escalation`,
+  `iam_role_administratoraccess_policy` and part of
+  `iam_role_cross_account_readonlyaccess_policy`.
+
+- IAM policies now report a customer-managed policy whose actions combine
+  into a path to full administrator, even when no single action looks
+  privileged. A policy already reported as wildcard admin is not reported
+  twice. Closes Prowler `iam_policy_allows_privilege_escalation`.
+
+- IAM users now report a console password that has never been used, an
+  access key that has gone 90 days without signing a request, both
+  access-key slots active at once, and AdministratorAccess attached
+  directly to the user. Access keys are named by their last four
+  characters only. Each condition is now its own entry, so a user with a
+  stale key and no MFA no longer has one problem hidden behind the other.
+  Closes Prowler `iam_user_console_access_unused`,
+  `iam_user_accesskey_unused`, `iam_user_two_active_access_key` and
+  `iam_user_administrator_access_policy`.
+
+- IAM groups now report AdministratorAccess attached to the group, which
+  hands administrator access to every member. Closes Prowler
+  `iam_group_administrator_access_policy`.
+
+- WAF web ACLs now report an ACL with no rules at all, which lets every
+  request through while still reading as protection. Closes Prowler
+  `wafv2_webacl_with_rules`.
+
+- Secrets Manager secrets now report a resource policy any AWS account can
+  read the secret through, and one that names a principal in another
+  account. Closes Prowler `secretsmanager_not_publicly_accessible` and
+  `secretsmanager_has_restrictive_resource_policy`.
+
+- KMS keys now report a key policy that lets any AWS principal decrypt with
+  the key. Closes Prowler `kms_key_not_publicly_accessible`.
 
 ### Fixed (security)
 

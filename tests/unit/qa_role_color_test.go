@@ -3,14 +3,23 @@ package unit
 // qa_role_color_test.go — Wave 1 Color tests for IAM Roles.
 //
 // Contract:
-//   - No assume_role_policy_document field → ColorHealthy.
-//   - Principal is a service (not a wildcard) → ColorHealthy.
-//   - Principal is "*" (star) → ColorBroken (overly permissive trust policy).
-//   - Principal is "*" with extra whitespace → ColorBroken.
+//   - The row color is derived from the resource's Findings alone. The trust
+//     verdict is decided once, in the fetcher, and the classifier reports it —
+//     it does not re-read assume_role_policy_document and reach its own
+//     conclusion.
+//   - A wildcard-trust finding → ColorBroken.
+//   - No finding → ColorHealthy, whatever the raw document says.
+//
+// The two "star principal" cases previously asserted ColorBroken from the raw
+// document with no finding attached. That expectation encoded a second,
+// independent trust evaluator inside the classifier, which is exactly what
+// could disagree with the Findings list; it is deliberately inverted here,
+// not broken.
 
 import (
 	"testing"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -20,10 +29,18 @@ func TestRoleColor(t *testing.T) {
 		t.Fatal("role resource type not registered")
 	}
 
+	wildcardTrust := []domain.Finding{{
+		Code:     "role.trust.wildcard-principal",
+		Phrase:   "anyone can assume this role",
+		Severity: domain.SevBroken,
+		Source:   "wave1",
+	}}
+
 	cases := []struct {
-		name   string
-		fields map[string]string
-		want   resource.Color
+		name     string
+		fields   map[string]string
+		findings []domain.Finding
+		want     resource.Color
 	}{
 		{
 			name:   "no_doc",
@@ -38,26 +55,28 @@ func TestRoleColor(t *testing.T) {
 			want: resource.ColorHealthy,
 		},
 		{
-			name: "star_principal",
+			name: "star_principal_with_finding",
 			fields: map[string]string{
 				"assume_role_policy_document": `{"Statement":[{"Principal":"*"}]}`,
 			},
-			want: resource.ColorBroken,
+			findings: wildcardTrust,
+			want:     resource.ColorBroken,
 		},
 		{
-			name: "star_principal_spaced",
+			name: "star_principal_without_finding",
 			fields: map[string]string{
 				"assume_role_policy_document": `{"Statement":[{"Principal": "*"}]}`,
 			},
-			want: resource.ColorBroken,
+			want: resource.ColorHealthy,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := td.Color(resource.Resource{Fields: tc.fields})
+			got := td.Color(resource.Resource{Fields: tc.fields, Findings: tc.findings})
 			if got != tc.want {
-				t.Errorf("Color(fields=%v) = %v, want %v", tc.fields, got, tc.want)
+				t.Errorf("Color(fields=%v, findings=%d) = %v, want %v",
+					tc.fields, len(tc.findings), got, tc.want)
 			}
 		})
 	}

@@ -47,6 +47,16 @@ func (f *iamGetRoleFakeWithNilRole) GetRole(
 	return &iam.GetRoleOutput{}, nil
 }
 
+// The role enricher also sweeps attached policies; an account with none is
+// the shape this fake stands for.
+func (f *iamGetRoleFakeWithNilRole) ListAttachedRolePolicies(
+	_ context.Context,
+	_ *iam.ListAttachedRolePoliciesInput,
+	_ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{}, nil
+}
+
 var _ awsclient.IAMAPI = (*iamGetRoleFakeWithNilRole)(nil)
 
 // iamBareAPI implements IAMAPI but does NOT implement IAMGetRoleAPI (no GetRole).
@@ -852,4 +862,24 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The role enricher also sweeps attached policies; an account with none is
+// the shape this fake stands for.
+func (f *iamGetRoleFakeCombo) ListAttachedRolePolicies(
+	_ context.Context,
+	_ *iam.ListAttachedRolePoliciesInput,
+	_ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{}, nil
+}
+
+// The role enricher also sweeps attached policies; an account with none is
+// the shape this fake stands for.
+func (f *iamBareAPI) ListAttachedRolePolicies(
+	_ context.Context,
+	_ *iam.ListAttachedRolePoliciesInput,
+	_ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{}, nil
 }

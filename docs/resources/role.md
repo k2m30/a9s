@@ -125,8 +125,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| trust policy allows `Principal:AWS=*` without external-id — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a (color is the signal) | S2, S4 | `trust allows *, no external-id` | `Trust policy allows any AWS principal to assume this role with no external-id guard — anyone can AssumeRole.` |
+| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S2, S4, S5 | `anyone can assume this role` | `Any AWS account can call sts:AssumeRole on this role and obtain its permissions.` |
+| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S2, S4, S5 | `service can assume without source scoping` | `A service can assume this role for any caller, so another customer's resource can trick it into using your role.` |
+| an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S2, S4, S5 | `inline policy allows privilege escalation` | `An inline policy grants a set of actions that lets its holder grant itself full administrator.` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `unused >90d` | `No AssumeRole activity in the last 90 days (region-scoped — may miss usage in other regions).` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `has AdministratorAccess` | `The role carries an AWS-managed policy granting administrator-equivalent access.` |
 
 Rules for filling list and detail text:
 
@@ -136,7 +139,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `trust allows *, no external-id` is actionable on sight (revoke or add external-id), and a green row prefixed `~` with `unused >90d` tells the operator this role is a candidate for deletion without needing to open detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `anyone can assume this role` is actionable on sight (name the accounts, or add an external-id condition), and a green row prefixed `~` with `unused >90d` tells the operator this role is a candidate for deletion without needing to open detail.
 
 ## 5. Out of Scope
 
@@ -170,7 +173,10 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | role.trust.wildcard-principal | anyone can assume this role | broken | wave1 |
+| role.trust.confused-deputy | service can assume without source scoping | warn | wave1 |
+| role.inline-privilege-escalation | inline policy allows privilege escalation: <combo> | broken | wave1 |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 |
+| role.admin-attached | has AdministratorAccess | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

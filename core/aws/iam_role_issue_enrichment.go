@@ -18,7 +18,11 @@ import (
 
 // iam-role canonical FindingCodes.
 const (
-	iamRoleCodeDormant domain.FindingCode = "iam-role.dormant"
+	iamRoleCodeDormant       domain.FindingCode = "iam-role.dormant"
+	iamRoleCodeAdminAttached domain.FindingCode = "role.admin-attached"
+
+	iamRoleDormantDetail = "Nothing has assumed this role in over 90 days, so its trust policy and permissions " +
+		"are live but unexercised. Confirm the workload that used it is gone, then delete the role."
 )
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
@@ -52,14 +56,31 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			return
 		}
 		// Skip AWS service-linked roles.
-		if strings.HasPrefix(r.Fields["path"], "/aws-service-role/") {
+		if strings.HasPrefix(r.Fields["path"], awsServiceRolePathPrefix) {
 			return
+		}
+		adminPolicy := ""
+		attached, aerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedRolePoliciesOutput, error) {
+			return clients.IAM.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+				RoleName: aws.String(roleName),
+			})
+		})
+		if aerr != nil {
+			mu.Lock()
+			result.TruncatedIDs[r.ID] = true
+			mu.Unlock()
+		} else {
+			adminPolicy = adminAttachedPolicyName(attached.AttachedPolicies)
 		}
 		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String(roleName),
 		})
 		mu.Lock()
 		defer mu.Unlock()
+		if adminPolicy != "" {
+			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, "has AdministratorAccess", "~", "iam-role",
+				adminAttachedRows(adminPolicy), adminAttachedDetail)
+		}
 		if err != nil {
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -74,7 +95,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			isDormant = true
 		}
 		if isDormant {
-			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil, "")
+			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil, iamRoleDormantDetail)
 		}
 	})
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

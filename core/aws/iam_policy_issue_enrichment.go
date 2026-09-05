@@ -5,18 +5,32 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // iam-policy canonical FindingCodes.
 const (
 	iamPolicyCodeAdminStar domain.FindingCode = "iam-policy.admin-star"
+	iamPolicyCodePrivEsc   domain.FindingCode = "policy.privilege-escalation"
+
+	iamPolicyAdminStarDetail = "This policy allows every action on every resource, so anyone holding it is an " +
+		"account administrator. Replace the \"*\" action and resource with the specific ones its holders need."
+	iamPolicyPrivEscDetail = "This policy grants a combination of actions that lets its holder grant itself full " +
+		"administrator, even though no single action looks privileged. Split the combination across separate " +
+		"policies or remove the escalation actions."
+
+	// privEscComboRowCap bounds the Combo rows listed on one finding; the
+	// remainder is summarised in a trailing row.
+	privEscComboRowCap = 10
 )
 
 // EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
@@ -80,7 +94,14 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (allows * on *)", "!", "iam-policy", []domain.DetailRow{
 				{Label: "Action", Value: "*", Tier: "!"},
 				{Label: "Resource", Value: "*", Tier: "!"},
-			}, "")
+			}, iamPolicyAdminStarDetail)
+		} else if combos := policyPrivEscCombos(doc); len(combos) > 0 {
+			// An admin policy matches nearly every combination; reporting it
+			// twice would say the same thing in two voices, so admin wins.
+			riskVal = "PRIV_ESC"
+			setWave2Finding(&result, r.ID, iamPolicyCodePrivEsc,
+				"allows privilege escalation: "+combos[0], "!", "iam-policy",
+				privEscComboRows(combos), iamPolicyPrivEscDetail)
 		}
 		result.FieldUpdates[r.ID] = map[string]string{
 			"risk": riskVal,
@@ -165,4 +186,42 @@ func isAdminStarPolicyString(doc string) bool {
 	return (strings.Contains(doc, `"Effect":"Allow"`) || strings.Contains(doc, `"Effect": "Allow"`)) &&
 		(strings.Contains(doc, `"Action":"*"`) || strings.Contains(doc, `"Action": "*"`)) &&
 		(strings.Contains(doc, `"Resource":"*"`) || strings.Contains(doc, `"Resource": "*"`))
+}
+
+// policyPrivEscCombos re-encodes the decoded policy document and runs it
+// through iampolicy's privilege-escalation matcher. FetchManagedPolicyDocument
+// hands back the unmarshalled document, so the round trip is what keeps this
+// on the one policy engine instead of a second ad-hoc walk of the map.
+func policyPrivEscCombos(doc any) []string {
+	if doc == nil {
+		return nil
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		return nil
+	}
+	parsed, err := iampolicy.Parse(string(raw))
+	if err != nil {
+		return nil
+	}
+	return parsed.PrivilegeEscalation()
+}
+
+// privEscComboRows lists the matched combinations, capped so a policy that
+// matches dozens does not push the rest of the Attention section off screen.
+func privEscComboRows(combos []string) []domain.DetailRow {
+	shown := combos
+	var overflow int
+	if len(shown) > privEscComboRowCap {
+		overflow = len(shown) - privEscComboRowCap
+		shown = shown[:privEscComboRowCap]
+	}
+	rows := make([]domain.DetailRow, 0, len(shown)+1)
+	for _, c := range shown {
+		rows = append(rows, domain.DetailRow{Label: "Combo", Value: c, Tier: "!"})
+	}
+	if overflow > 0 {
+		rows = append(rows, domain.DetailRow{Label: "Combo", Value: fmt.Sprintf("… +%d more", overflow), Tier: "!"})
+	}
+	return rows
 }

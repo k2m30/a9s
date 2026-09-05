@@ -136,6 +136,7 @@ One row per signal from §3:
 | `KeyState==PendingReplicaDeletion` | 2 | Broken | n/a | S2, S4 | `pending replica deletion` | `Multi-Region replica is scheduled for deletion; primary still holds the material.` |
 | `KeyState==Unavailable` | 2 | Broken | n/a | S2, S4 | `unavailable: custom key store offline` | `Custom key store (CloudHSM or external) is disconnected; key cannot be used.` |
 | `KeyRotationEnabled==false` on CMK | 2 | Healthy + `!` | `!` | S1, S3, S4, S5 | `rotation off` | `Customer-managed key has automatic rotation disabled; enable annual rotation for compliance.` |
+| Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `key policy open to anyone` | `Any AWS account can use this key to decrypt data encrypted with it — scope the key policy.` |
 
 Rules for filling list and detail text:
 
@@ -180,6 +181,7 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 | kms.state.unavailable | <key state> | broken | wave1 |
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 |
+| kms.public-policy | key policy open to anyone | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

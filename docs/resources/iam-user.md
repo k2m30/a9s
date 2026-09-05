@@ -103,10 +103,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `PasswordLastUsed` null AND `CreateDate` >90d — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `dormant: no console login in 90d+` | `Console user created 2y ago has never signed in — candidate for removal.` |
-| Active key unused >90d | 2 | Warning | `~` | S3, S4, S5 | `key unused 120d` | `Access key AKIA…4QJZ last used 120 days ago — consider rotating or deactivating.` |
-| Active key never used, CreateDate >90d | 2 | Warning | `~` | S3, S4, S5 | `key never used, 180d old` | `Access key AKIA…4QJZ created 180 days ago and never used — candidate for deletion.` |
-| Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console login, no MFA` | `User has console password but zero MFA devices — add MFA or remove password.` |
+| Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` | `Console password has never been used since the account was created — an unguarded sign-in path.` |
+| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` | `Access key …4QJZ has not signed a request in 120 days — deactivate it, then delete it.` |
+| Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` | `Both access-key slots are active, which doubles exposure and blocks a clean rotation.` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has AdministratorAccess` | `The user carries an AWS-managed policy granting administrator-equivalent access.` |
+| Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` | `User has console password but zero MFA devices — add MFA or remove password.` |
 
 Rules applied:
 
@@ -118,7 +119,7 @@ Rules applied:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every row carries a cause in the Status column: dormant rows say `dormant: no console login in 90d+`, console-without-MFA rows say `console login, no MFA` with a `!` glyph, and stale-key rows say `key unused 120d` with a `~` glyph. The operator can triage the whole list (delete dormant users, fix MFA on the flagged users, rotate the aging keys) without opening a single detail view.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every row carries a cause in the Status column: never-signed-in rows say `console password never used`, console-without-MFA rows say `console user without MFA` with a `!` glyph, and stale-key rows say `access key unused for 120 days` with a `~` glyph. The operator can triage the whole list (delete dormant users, fix MFA on the flagged users, rotate the aging keys) without opening a single detail view.
 
 ## 5. Out of Scope
 
@@ -151,6 +152,10 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 | --- | --- | --- | --- |
 | iam-user.no-mfa | console user without MFA | broken | wave2 |
 | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
+| iam-user.admin-attached | has AdministratorAccess | warn | wave2 |
+| iam-user.console-never-used | console password never used | warn | wave2 |
+| iam-user.access-key-unused | access key unused for <N> days | warn | wave2 |
+| iam-user.two-active-keys | two active access keys | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

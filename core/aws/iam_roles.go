@@ -14,31 +14,90 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// roleCodeWildcardTrust is the canonical FindingCode for a role whose trust
-// policy allows any AWS principal ("*") to assume it without a mitigating
-// sts:ExternalId condition.
-const roleCodeWildcardTrust domain.FindingCode = "role.trust.wildcard-principal"
+// role trust-policy FindingCodes and their S5 detail sentences.
+const (
+	// roleCodeWildcardTrust — the trust policy lets any AWS principal assume
+	// the role with nothing scoping the grant.
+	roleCodeWildcardTrust domain.FindingCode = "role.trust.wildcard-principal"
+	// roleCodeConfusedDeputy — an AWS service can assume the role without an
+	// aws:SourceAccount / aws:SourceArn / aws:SourceOrgID condition.
+	roleCodeConfusedDeputy domain.FindingCode = "role.trust.confused-deputy"
+	// roleCodeInlinePrivEsc — an inline policy grants an action set that adds
+	// up to full administrator.
+	roleCodeInlinePrivEsc domain.FindingCode = "role.inline-privilege-escalation"
 
-// roleWildcardTrustFindings mirrors colorRole's own wildcard-principal
-// detection (catalog_security.go) so the Findings list and the row color
-// never disagree. Checks both the nested-object form ({"AWS":"*"}, caught by
-// trustWildcard=="true" from parseTrustWildcard) and the bare-string form
-// ("Principal":"*", which parseTrustWildcard's typed struct cannot
-// unmarshal since Principal is not an object in that shape) — the same two
-// shapes colorRole's substring check covers.
-func roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc string) []domain.Finding {
-	if trustWildcard == "true" ||
-		strings.Contains(assumeRolePolicyDoc, `"Principal":"*"`) ||
-		strings.Contains(assumeRolePolicyDoc, `"Principal": "*"`) {
-		return []domain.Finding{{
-			Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role",
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+	roleWildcardTrustDetail = "Any AWS account can call sts:AssumeRole on this role and obtain its permissions. " +
+		"Replace the \"*\" principal in the trust policy with the specific account or role ARNs, or add an " +
+		"sts:ExternalId condition."
+	roleConfusedDeputyDetail = "An AWS service principal can assume this role on behalf of any caller, so another " +
+		"customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn " +
+		"condition to the trust statement."
+	roleInlinePrivEscDetail = "An inline policy on this role grants a combination of actions that lets its holder " +
+		"grant itself full administrator. Split or scope the inline policy so the escalation actions are not all " +
+		"available together."
+
+	// awsServiceRolePathPrefix marks an AWS service-linked role. AWS owns the
+	// trust policy and the attached permissions, so posture findings about
+	// either are not actionable by the operator.
+	awsServiceRolePathPrefix = "/aws-service-role/"
+)
+
+// roleTrustAnalysis is one parse of a role's trust policy: the Findings it
+// yields, their supporting Attention rows, and the trust_wildcard /
+// trust_summary display fields. The Findings list, the Trust column and the
+// row color all read this single verdict.
+type roleTrustAnalysis struct {
+	findings []domain.Finding
+	details  map[domain.FindingCode]domain.AttentionDetail
+	wildcard string
+	summary  string
+}
+
+func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
+	out := roleTrustAnalysis{wildcard: "false"}
+	doc, err := iampolicy.Parse(assumeRolePolicyDoc)
+	if err != nil {
+		return out
 	}
-	return nil
+	if iampolicy.EvaluateTrust(doc, "").Public {
+		out.wildcard, out.summary = "true", "WILDCARD"
+		out.findings = append(out.findings, domain.Finding{
+			Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role",
+			Detail: roleWildcardTrustDetail, Severity: domain.SevBroken, Source: "wave1",
+		})
+	}
+	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {
+		out.findings = append(out.findings, domain.Finding{
+			Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping",
+			Detail: roleConfusedDeputyDetail, Severity: domain.SevWarn, Source: "wave1",
+		})
+		out.details = map[domain.FindingCode]domain.AttentionDetail{
+			roleCodeConfusedDeputy: {Rows: []domain.DetailRow{
+				{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
+			}},
+		}
+	}
+	return out
+}
+
+// unscopedServicePrincipals returns the confused-deputy service principals
+// worth reporting on a role's trust policy. AWS service-linked roles are
+// excluded (AWS owns the document), and so is a role trusted only by
+// ec2.amazonaws.com: an EC2 instance profile is assumed by the instance
+// itself, so there is no third-party caller to scope.
+func unscopedServicePrincipals(doc iampolicy.Document, path string) []string {
+	if strings.HasPrefix(path, awsServiceRolePathPrefix) {
+		return nil
+	}
+	svcs := doc.HasServicePrincipalWithoutSourceScope()
+	if len(svcs) == 1 && svcs[0] == "ec2" {
+		return nil
+	}
+	return svcs
 }
 
 // FetchIAMRolesPage calls the IAM ListRoles API and returns a single page
@@ -96,12 +155,20 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			}
 		}
 
-		// Detect wildcard principal in trust policy.
-		trustWildcard, trustSummary := parseTrustWildcard(assumeRolePolicyDoc)
+		trust := analyseRoleTrust(assumeRolePolicyDoc, path)
+		findings, details := trust.findings, trust.details
 
 		policyResources := ""
 		if listPoliciesAPI != nil && getPolicyAPI != nil && roleName != "" {
-			policyResources = enumerateRoleInlinePolicyResources(ctx, listPoliciesAPI, getPolicyAPI, roleName)
+			var inline inlinePolicyScan
+			policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
+			if inline.finding != nil {
+				findings = append(findings, *inline.finding)
+				if details == nil {
+					details = map[domain.FindingCode]domain.AttentionDetail{}
+				}
+				details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: inline.rows}
+			}
 		}
 
 		r := resource.Resource{
@@ -115,12 +182,13 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 				"create_date":                 createDate,
 				"description":                 description,
 				"assume_role_policy_document": assumeRolePolicyDoc,
-				"trust_wildcard":              trustWildcard,
-				"trust_summary":               trustSummary,
+				"trust_wildcard":              trust.wildcard,
+				"trust_summary":               trust.summary,
 				"policy_resources":            policyResources,
 			},
-			Findings:  roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc),
-			RawStruct: role,
+			Findings:         findings,
+			AttentionDetails: details,
+			RawStruct:        role,
 		}
 
 		resources = append(resources, r)
@@ -231,7 +299,7 @@ func roleToResource(role iamtypes.Role) resource.Resource {
 		}
 	}
 
-	trustWildcard, trustSummary := parseTrustWildcard(assumeRolePolicyDoc)
+	trust := analyseRoleTrust(assumeRolePolicyDoc, path)
 
 	return resource.Resource{
 		ID:   roleName,
@@ -244,39 +312,51 @@ func roleToResource(role iamtypes.Role) resource.Resource {
 			"create_date":                 createDate,
 			"description":                 description,
 			"assume_role_policy_document": assumeRolePolicyDoc,
-			"trust_wildcard":              trustWildcard,
-			"trust_summary":               trustSummary,
+			"trust_wildcard":              trust.wildcard,
+			"trust_summary":               trust.summary,
 			// GetRole does not return inline-policy resources; leaving this
 			// empty on a lazily-fetched role (vs. a ListRoles page fetch)
 			// mirrors how other by-ID fetchers omit list-only enrichment
 			// fields rather than pay for it on every single-ID drill.
 			"policy_resources": "",
 		},
-		Findings:  roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc),
-		RawStruct: role,
+		Findings:         trust.findings,
+		AttentionDetails: trust.details,
+		RawStruct:        role,
 	}
 }
 
-// enumerateRoleInlinePolicyResources walks a role's inline policies and
-// returns a comma-separated list of every Statement[].Resource entry across
-// all documents. Emitted as Fields["policy_resources"] so sibling pivots
-// (s3, kms, secrets, …) can scan the list and match by ARN substring.
+// inlinePolicyScan carries the privilege-escalation verdict of a role's
+// inline policies: at most one finding, whichever inline policy tripped
+// first, with the offending policy name and combination as its rows.
+type inlinePolicyScan struct {
+	finding *domain.Finding
+	rows    []domain.DetailRow
+}
+
+// enumerateRoleInlinePolicies walks a role's inline policies once and
+// returns both a comma-separated list of every Statement[].Resource entry
+// across all documents and the privilege-escalation verdict.
+//
+// policy_resources is emitted as a Field so sibling pivots (s3, kms,
+// secrets, …) can scan the list and match by ARN substring.
 // Cost: 1 ListRolePolicies + N GetRolePolicy per role.
 // Attached (managed) policies require a separate walk via
 // ListAttachedRolePolicies + GetPolicyVersion and are not enumerated here
 // yet; inline policies cover the s3-access-role case and are the minimum
 // needed to make the s3→role pivot resolve.
-func enumerateRoleInlinePolicyResources(
+func enumerateRoleInlinePolicies(
 	ctx context.Context,
 	listAPI IAMListRolePoliciesAPI,
 	getAPI IAMGetRolePolicyAPI,
 	roleName string,
-) string {
+) (string, inlinePolicyScan) {
+	var scan inlinePolicyScan
 	listOut, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
 		RoleName: aws.String(roleName),
 	})
 	if err != nil || listOut == nil {
-		return ""
+		return "", scan
 	}
 	var allResources []string
 	for _, policyName := range listOut.PolicyNames {
@@ -292,8 +372,28 @@ func enumerateRoleInlinePolicyResources(
 			doc = decoded
 		}
 		allResources = append(allResources, extractPolicyResources(doc)...)
+		if scan.finding != nil {
+			continue
+		}
+		parsed, perr := iampolicy.Parse(doc)
+		if perr != nil {
+			continue
+		}
+		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
+			scan.finding = &domain.Finding{
+				Code:     roleCodeInlinePrivEsc,
+				Phrase:   "inline policy allows privilege escalation: " + combos[0],
+				Detail:   roleInlinePrivEscDetail,
+				Severity: domain.SevBroken,
+				Source:   "wave1",
+			}
+			scan.rows = []domain.DetailRow{
+				{Label: "Policy", Value: policyName, Tier: "!"},
+				{Label: "Combo", Value: combos[0], Tier: "!"},
+			}
+		}
 	}
-	return strings.Join(allResources, ",")
+	return strings.Join(allResources, ","), scan
 }
 
 // extractPolicyResources parses a policy-document JSON string and returns
@@ -327,59 +427,4 @@ func extractPolicyResources(doc string) []string {
 		}
 	}
 	return out
-}
-
-// parseTrustWildcard examines a decoded AssumeRolePolicyDocument JSON string
-// and returns ("true"/"false", "WILDCARD"/"") indicating whether the policy
-// has a Statement with Principal.AWS == "*" and no Condition.StringEquals.sts:ExternalId.
-func parseTrustWildcard(doc string) (trustWildcard, trustSummary string) {
-	if doc == "" {
-		return "false", ""
-	}
-	var policy struct {
-		Statement []struct {
-			Principal struct {
-				AWS any `json:"AWS"`
-			} `json:"Principal"`
-			Condition map[string]any `json:"Condition"`
-		} `json:"Statement"`
-	}
-	if err := json.Unmarshal([]byte(doc), &policy); err != nil {
-		return "false", ""
-	}
-	for _, stmt := range policy.Statement {
-		hasWildcard := false
-		switch v := stmt.Principal.AWS.(type) {
-		case string:
-			if v == "*" {
-				hasWildcard = true
-			}
-		case []any:
-			for _, item := range v {
-				if s, ok := item.(string); ok && s == "*" {
-					hasWildcard = true
-					break
-				}
-			}
-		}
-		if !hasWildcard {
-			continue
-		}
-		// Check for mitigating condition.
-		hasExternalID := false
-		if cond, ok := stmt.Condition["StringEquals"]; ok {
-			if condMap, ok := cond.(map[string]any); ok {
-				for k := range condMap {
-					if strings.EqualFold(k, "sts:externalid") {
-						hasExternalID = true
-						break
-					}
-				}
-			}
-		}
-		if !hasExternalID {
-			return "true", "WILDCARD"
-		}
-	}
-	return "false", ""
 }

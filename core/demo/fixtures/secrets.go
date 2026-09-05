@@ -11,11 +11,27 @@ import (
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
+// Witness secrets for the resource-policy findings. Every other demo secret
+// has no resource policy attached at all, which is the healthy default.
+const (
+	// SecretPublicPolicy has a resource policy granting a wildcard principal
+	// — secrets.public-policy.
+	SecretPublicPolicy = "prod/partner/shared-import-token"
+	// SecretCrossAccountPolicy names a principal in a second account —
+	// secrets.cross-account-policy.
+	SecretCrossAccountPolicy = "prod/partner/analytics-readonly"
+)
+
 // SecretsFixtures holds typed fixture data for Secrets Manager.
 type SecretsFixtures struct {
 	Secrets []smtypes.SecretListEntry
 	// SecretValues maps secret name to plaintext value (for GetSecretValue).
 	SecretValues map[string]string
+	// ResourcePolicies maps secret name AND ARN to its attached resource
+	// policy JSON. Keyed both ways because the enricher looks a secret up by
+	// ARN while related checkers use the name. A secret absent from the map
+	// has no resource policy, the healthy default.
+	ResourcePolicies map[string]string
 }
 
 var secretNamePool = []string{
@@ -286,6 +302,38 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 		},
 	}
 
+	const (
+		publicPolicySecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + SecretPublicPolicy + "-PbLcAn"
+		crossAcctSecretARN    = "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + SecretCrossAccountPolicy + "-XaCcTn"
+	)
+	secrets = append(secrets,
+		// Witness: resource policy open to every AWS principal.
+		smtypes.SecretListEntry{
+			Name:             aws.String(SecretPublicPolicy),
+			ARN:              aws.String(publicPolicySecretARN),
+			Description:      aws.String("Import token shared with a partner integration"),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -3)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -20)),
+			RotationEnabled:  aws.Bool(true),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
+			CreatedDate:      aws.Time(time.Now().AddDate(0, 0, -200)),
+		},
+		// Witness: resource policy naming a principal in another account.
+		smtypes.SecretListEntry{
+			Name:             aws.String(SecretCrossAccountPolicy),
+			ARN:              aws.String(crossAcctSecretARN),
+			Description:      aws.String("Read-only analytics credential shared with the reporting account"),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -2)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -15)),
+			RotationEnabled:  aws.Bool(true),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
+			CreatedDate:      aws.Time(time.Now().AddDate(0, 0, -180)),
+		},
+	)
+
+	publicPolicyDoc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["secretsmanager:GetSecretValue"],"Resource":"*"}]}`
+	crossAcctPolicyDoc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-analytics-reader"},"Action":["secretsmanager:GetSecretValue"],"Resource":"*"}]}`
+
 	for i := range 18 {
 		name := secretNamePool[i]
 		desc := secretDescPool[i]
@@ -313,6 +361,12 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			"prod/api/stripe-key":        `{"api_key":"[REDACTED]"}`,
 			"prod/redis/auth-token":      `{"auth_token":"[REDACTED]"}`,
 			"staging/database/mysql":     `{"host":"staging-mysql.c9xyz123.us-east-1.rds.amazonaws.com","port":"3306","username":"staginguser","password":"[REDACTED]"}`,
+		},
+		ResourcePolicies: map[string]string{
+			SecretPublicPolicy:       publicPolicyDoc,
+			publicPolicySecretARN:    publicPolicyDoc,
+			SecretCrossAccountPolicy: crossAcctPolicyDoc,
+			crossAcctSecretARN:       crossAcctPolicyDoc,
 		},
 	}
 })

@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
+// secrets_issue_enrichment.go — Wave 2 issue enrichment for the secrets resource type.
+package aws
+
+import (
+	"context"
+	"sync"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// secrets resource-policy FindingCodes.
+const (
+	secretsCodePublicPolicy       domain.FindingCode = "secrets.public-policy"
+	secretsCodeCrossAccountPolicy domain.FindingCode = "secrets.cross-account-policy"
+
+	secretsPublicPolicyDetail = "The secret's resource policy allows a wildcard principal, so any AWS account can " +
+		"read the credential this secret holds. Remove the \"*\" principal from the resource policy, or scope it " +
+		"with a condition naming the accounts that need it."
+	secretsCrossAccountPolicyDetail = "The secret's resource policy names a principal in another AWS account, so " +
+		"that account can read the credential. Confirm the grant is intended and still needed, and remove the " +
+		"account from the resource policy otherwise."
+)
+
+// EnrichSecretsPolicy calls GetResourcePolicy per secret (cap EnrichmentCap)
+// and classifies the attached resource policy through iampolicy.
+//
+// Findings:
+//   - Exposure.Public → "!" finding "resource policy open to anyone"
+//   - Exposure.CrossAccount non-empty and not public → "~" finding
+//     "resource policy grants another account"
+//
+// A secret with no resource policy attached (ResourcePolicy nil) is the
+// normal case and yields nothing, and a secret already scheduled for deletion
+// is skipped entirely. Skip when clients.SecretsManager == nil.
+func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+	result := IssueEnricherResult{
+		Findings:     make(map[string][]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
+	if clients.SecretsManager == nil {
+		return result, nil
+	}
+	policyAPI, ok := clients.SecretsManager.(SecretsManagerGetResourcePolicyAPI)
+	if !ok {
+		return result, nil
+	}
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
+
+	var failures []string
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
+		// A secret already scheduled for deletion is on its way out; the
+		// operator's move is to wait or restore, not to edit its policy.
+		if r.Fields["status"] == "DELETED" {
+			return
+		}
+		secretID := r.Fields["arn"]
+		if secretID == "" {
+			secretID = r.ID
+		}
+		if secretID == "" {
+			return
+		}
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*secretsmanager.GetResourcePolicyOutput, error) {
+			return policyAPI.GetResourcePolicy(ctx, &secretsmanager.GetResourcePolicyInput{
+				SecretId: aws.String(secretID),
+			})
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			if IsNotFoundErr(err) {
+				result.TruncatedIDs[r.ID] = true
+				return
+			}
+			MarkSkipped(&result, r.ID, &failures, "secrets-policy", err)
+			return
+		}
+		if out == nil || aws.ToString(out.ResourcePolicy) == "" {
+			return
+		}
+		doc, perr := iampolicy.Parse(aws.ToString(out.ResourcePolicy))
+		if perr != nil {
+			result.TruncatedIDs[r.ID] = true
+			return
+		}
+		ex := iampolicy.Evaluate(doc, ownAccount)
+		switch {
+		case ex.Public:
+			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, "resource policy open to anyone", "!", "secrets",
+				publicPolicyRows(ex), secretsPublicPolicyDetail)
+		case len(ex.CrossAccount) > 0:
+			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, "resource policy grants another account",
+				"~", "secrets", crossAccountPolicyRows(ex), secretsCrossAccountPolicyDetail)
+		}
+	})
+	result.Truncated = len(resources) > EnrichmentCap
+	err := Finish(&result, failures, n, "secrets-policy")
+	return result, err
+}

@@ -145,8 +145,9 @@ func TestDemoExpectedTopLevelCountsForTest_Policy_ExcludesAWSManaged(t *testing.
 	// inline group policy surfaced by ListGroupPolicies. AWS-managed policies
 	// are excluded by the Scope=Local filter in the fetcher and by
 	// IsCustomerManagedPolicyARN in countTopLevelIAMPolicies.
+	// 28 includes the privilege-escalation witness policy acme-privesc-policy.
 	counts := fixtures.ExpectedTopLevelCountsForTest()
-	if got, want := counts["policy"], 27; got != want {
+	if got, want := counts["policy"], 28; got != want {
 		t.Fatalf("policy count = %d, want %d", got, want)
 	}
 }

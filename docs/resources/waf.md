@@ -108,7 +108,7 @@ One row per signal from §3 that has operator-readable surface text:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `Rules==[]` (no-op ACL) | 2 | Healthy | `~` | S3, S4, S5 | `no rules — ACL inert` | `Web ACL has no rules; requests pass through unfiltered.` |
+| `Rules==[]` (no-op ACL) | 2 | Healthy | `~` | S3, S4, S5 | `web ACL has no rules` | `Web ACL has no rules; every request reaches the protected resource unfiltered.` |
 | `DefaultAction==Allow` + zero rules | 2 | Healthy | `!` | S1, S3, S4, S5 | `allow-all: no rules, default Allow` | `Default action is Allow and no rules are configured — no protection in effect.` |
 
 ## 4.1 UX review (two sentences)
@@ -146,6 +146,7 @@ waf — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle f
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | waf.no-logging | no logging configuration | warn | wave2 |
+| waf.no-rules | web ACL has no rules | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -254,6 +254,21 @@ func (f *IAMFake) ListAccessKeys(_ context.Context, input *iam.ListAccessKeysInp
 	return &iam.ListAccessKeysOutput{AccessKeyMetadata: f.fix.AccessKeysByUser[userName]}, nil
 }
 
+// GetAccessKeyLastUsed returns the fixture-registered last-use record for an
+// access key (see IAMFixtures.AccessKeyLastUsed). A key with no entry has
+// never been used, which is what the real API reports as a nil LastUsedDate.
+// Required for EnrichIAMUserMFA's Wave-2 unused-key issue check.
+func (f *IAMFake) GetAccessKeyLastUsed(_ context.Context, input *iam.GetAccessKeyLastUsedInput, _ ...func(*iam.Options)) (*iam.GetAccessKeyLastUsedOutput, error) {
+	keyID := aws.ToString(input.AccessKeyId)
+	last := &iamtypes.AccessKeyLastUsed{ServiceName: aws.String("N/A"), Region: aws.String("N/A")}
+	if used, ok := f.fix.AccessKeyLastUsed[keyID]; ok {
+		last.LastUsedDate = aws.Time(used)
+		last.ServiceName = aws.String("s3")
+		last.Region = aws.String("us-east-1")
+	}
+	return &iam.GetAccessKeyLastUsedOutput{AccessKeyLastUsed: last}, nil
+}
+
 // GetInstanceProfile resolves an instance-profile name from fixture data.
 // Backs the asg:role and eb:role related-panel pivots (checkASGRole /
 // checkEbRole via asgInstanceProfileToRoles).

@@ -21,8 +21,30 @@ import (
 
 // iam-user canonical FindingCodes.
 const (
-	iamUserCodeNoMFA  domain.FindingCode = "iam-user.no-mfa"
-	iamUserCodeOldKey domain.FindingCode = "iam-user.old-key"
+	iamUserCodeNoMFA            domain.FindingCode = "iam-user.no-mfa"
+	iamUserCodeOldKey           domain.FindingCode = "iam-user.old-key"
+	iamUserCodeAdminAttached    domain.FindingCode = "iam-user.admin-attached"
+	iamUserCodeConsoleNeverUsed domain.FindingCode = "iam-user.console-never-used"
+	iamUserCodeKeyUnused        domain.FindingCode = "iam-user.access-key-unused"
+	iamUserCodeTwoActiveKeys    domain.FindingCode = "iam-user.two-active-keys"
+
+	iamUserNoMFADetail = "This user signs in to the console with a password alone, so a leaked or guessed " +
+		"password is a full takeover. Register an MFA device for the user, or remove the console password if " +
+		"the user only needs programmatic access."
+	iamUserOldKeyDetail = "This access key has been valid for more than 90 days, so a copy taken at any point " +
+		"since it was created still works. Create a replacement key, move callers onto it, then deactivate and " +
+		"delete the old one."
+	iamUserConsoleNeverUsedDetail = "This user has a console password that has never been used since the account " +
+		"was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave " +
+		"the user with programmatic access only."
+	iamUserKeyUnusedDetail = "This access key is active but has not signed a request in over 90 days, so it is a " +
+		"live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it."
+	iamUserTwoActiveKeysDetail = "This user has both of its access-key slots active at once, which doubles the " +
+		"exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use."
+
+	// unusedCredentialAge is the age past which an untouched credential is
+	// reported. Matches the 90-day threshold used for key rotation.
+	unusedCredentialAge = 90 * 24 * time.Hour
 )
 
 // EnrichIAMUserMFA calls GetLoginProfile + ListMFADevices + ListAccessKeys per user
@@ -30,7 +52,7 @@ const (
 //
 // Findings:
 //   - GetLoginProfile succeeds AND ListMFADevices empty → "!" finding "console user without MFA"
-//   - Any active access key with CreateDate >90d → "~" finding "access key >90d (rotation)"
+//   - Any active access key with CreateDate >90d → "~" finding "key <id> >90d (rotation)"
 //
 // Skip when clients.IAM == nil.
 func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -49,6 +71,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		return result, nil
 	}
 
+	keyLastUsedAPI, _ := clients.IAM.(IAMGetAccessKeyLastUsedAPI)
 	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
@@ -68,11 +91,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			UserName: aws.String(userName),
 		})
 		if err != nil {
-			var noSuchEntity *iamtypes.NoSuchEntityException
-			var apiErr smithy.APIError
-			isNoSuchEntity := errors.As(err, &noSuchEntity) ||
-				(errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntityException")
-			if !isNoSuchEntity {
+			if !isNoSuchEntity(err) {
 				// Unexpected error — skip this user but flag truncation.
 				mu.Lock()
 				truncated = true
@@ -85,12 +104,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			hasConsolePassword = true
 		}
 
-		var rows []domain.DetailRow
-		severity := "~"
 		hasMFA := false
-		riskLabel := ""
-
-		// Check MFA only for console users.
 		if hasConsolePassword {
 			mfaOut, mfaErr := mfaAPI.ListMFADevices(ctx, &iam.ListMFADevicesInput{
 				UserName: aws.String(userName),
@@ -103,18 +117,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				return
 			}
 			hasMFA = len(mfaOut.MFADevices) > 0
-			if !hasMFA {
-				rows = append(rows, domain.DetailRow{
-					Label: "MFA",
-					Value: "console user without MFA",
-					Tier:  "!",
-				})
-				severity = "!"
-				riskLabel = "NO_MFA"
-			}
 		}
 
-		// Check access key age regardless of console password presence.
 		keysOut, keysErr := accessKeyAPI.ListAccessKeys(ctx, &iam.ListAccessKeysInput{
 			UserName: aws.String(userName),
 		})
@@ -125,43 +129,92 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			mu.Unlock()
 			return
 		}
-		hasOldKey := false
-		for _, key := range keysOut.AccessKeyMetadata {
-			if key.Status != iamtypes.StatusTypeActive {
-				continue
-			}
-			if key.CreateDate == nil {
-				continue
-			}
-			if time.Since(*key.CreateDate) > 90*24*time.Hour {
-				hasOldKey = true
-				keyID := ""
-				if key.AccessKeyId != nil {
-					keyID = *key.AccessKeyId
-				}
-				rows = append(rows, domain.DetailRow{
-					Label: "Access Key",
-					Value: fmt.Sprintf("key %s >90d (rotation)", keyID),
-					Tier:  "~",
-				})
-				if riskLabel == "" {
-					riskLabel = "OLD_KEY"
-				}
-			}
-		}
-		_ = hasOldKey
 
-		// Write field updates for mfa and risk columns.
+		adminPolicy := ""
+		attached, aerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedUserPoliciesOutput, error) {
+			return clients.IAM.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
+				UserName: aws.String(userName),
+			})
+		})
+		if aerr != nil {
+			mu.Lock()
+			result.TruncatedIDs[r.ID] = true
+			mu.Unlock()
+		} else {
+			adminPolicy = adminAttachedPolicyName(attached.AttachedPolicies)
+		}
+
+		activeKeys := activeAccessKeys(keysOut.AccessKeyMetadata)
+		unusedKeys := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		mfaVal := "false"
 		if hasMFA || !hasConsolePassword {
 			mfaVal = "true"
 		}
-
-		mu.Lock()
-		defer mu.Unlock()
 		consolePasswordVal := "false"
 		if hasConsolePassword {
 			consolePasswordVal = "true"
+		}
+		riskLabel := ""
+
+		if hasConsolePassword && !hasMFA {
+			riskLabel = "NO_MFA"
+			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, "console user without MFA", "!", "iam-user",
+				[]domain.DetailRow{{Label: "MFA", Value: "console user without MFA", Tier: "!"}}, iamUserNoMFADetail)
+		}
+
+		if hasConsolePassword && r.Fields["password_last_used"] == "Never" &&
+			olderThan(r.Fields["create_date"], unusedCredentialAge) {
+			if riskLabel == "" {
+				riskLabel = "CONSOLE_UNUSED"
+			}
+			setWave2Finding(&result, r.ID, iamUserCodeConsoleNeverUsed, "console password never used", "~", "iam-user",
+				[]domain.DetailRow{{Label: "Created", Value: r.Fields["create_date"], Tier: "~"}}, iamUserConsoleNeverUsedDetail)
+		}
+
+		for _, key := range activeKeys {
+			if key.CreateDate == nil || time.Since(*key.CreateDate) <= unusedCredentialAge {
+				continue
+			}
+			if riskLabel == "" {
+				riskLabel = "OLD_KEY"
+			}
+			phrase := fmt.Sprintf("key %s >90d (rotation)", lastFourOfKeyID(aws.ToString(key.AccessKeyId)))
+			setWave2Finding(&result, r.ID, iamUserCodeOldKey, phrase, "~", "iam-user",
+				[]domain.DetailRow{{Label: "Access Key", Value: phrase, Tier: "~"}}, iamUserOldKeyDetail)
+			break
+		}
+
+		if len(unusedKeys) > 0 {
+			k := unusedKeys[0]
+			if riskLabel == "" {
+				riskLabel = "KEY_UNUSED"
+			}
+			setWave2Finding(&result, r.ID, iamUserCodeKeyUnused,
+				fmt.Sprintf("access key unused for %d days", k.idleDays), "~", "iam-user",
+				[]domain.DetailRow{
+					{Label: "Key", Value: k.suffix, Tier: "~"},
+					{Label: "Last used", Value: k.lastUsed, Tier: "~"},
+				}, iamUserKeyUnusedDetail)
+		}
+
+		if len(activeKeys) >= 2 {
+			if riskLabel == "" {
+				riskLabel = "TWO_KEYS"
+			}
+			setWave2Finding(&result, r.ID, iamUserCodeTwoActiveKeys, "two active access keys", "~", "iam-user",
+				[]domain.DetailRow{{Label: "Keys", Value: "2 active", Tier: "~"}}, iamUserTwoActiveKeysDetail)
+		}
+
+		if adminPolicy != "" {
+			if riskLabel == "" {
+				riskLabel = "ADMIN"
+			}
+			setWave2Finding(&result, r.ID, iamUserCodeAdminAttached, "has AdministratorAccess", "~", "iam-user",
+				adminAttachedRows(adminPolicy), adminAttachedDetail)
 		}
 
 		result.FieldUpdates[r.ID] = map[string]string{
@@ -169,17 +222,101 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			"risk":                 riskLabel,
 			"has_console_password": consolePasswordVal, //nolint:gosec // not a credential, display field key
 		}
-
-		if len(rows) == 0 {
-			return
-		}
-		// Use the no-mfa code when severity is "!", otherwise old-key code.
-		code := iamUserCodeOldKey
-		if severity == "!" {
-			code = iamUserCodeNoMFA
-		}
-		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows, "")
 	})
 	result.Truncated = truncated
 	return result, nil
+}
+
+// isNoSuchEntity reports the IAM "this entity does not exist" error, which
+// GetLoginProfile returns for a user with no console password — an answer,
+// not a failure.
+func isNoSuchEntity(err error) bool {
+	var noSuchEntity *iamtypes.NoSuchEntityException
+	var apiErr smithy.APIError
+	return errors.As(err, &noSuchEntity) ||
+		(errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntityException")
+}
+
+// olderThan reports whether a "2006-01-02 15:04" field value parses and is
+// further in the past than age. An unparseable or absent date is never old:
+// unknown is not misconfigured.
+func olderThan(formatted string, age time.Duration) bool {
+	t, err := time.Parse("2006-01-02 15:04", formatted)
+	return err == nil && time.Since(t) > age
+}
+
+func activeAccessKeys(keys []iamtypes.AccessKeyMetadata) []iamtypes.AccessKeyMetadata {
+	var out []iamtypes.AccessKeyMetadata
+	for _, k := range keys {
+		if k.Status == iamtypes.StatusTypeActive {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// idleKey describes one active access key that has gone unused long enough
+// to report. suffix is the last four characters of the key ID only — the
+// full ID is a credential identifier and never leaves this package.
+type idleKey struct {
+	suffix   string
+	lastUsed string
+	idleDays int
+}
+
+// unusedAccessKeys calls GetAccessKeyLastUsed per active key and returns the
+// keys whose last use (or, absent any use, whose creation) is older than
+// unusedCredentialAge. A client that does not serve the API, or a per-key
+// error, yields no finding rather than a false one.
+func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys []iamtypes.AccessKeyMetadata) []idleKey {
+	if api == nil {
+		return nil
+	}
+	var out []idleKey
+	for _, k := range keys {
+		keyID := aws.ToString(k.AccessKeyId)
+		if keyID == "" {
+			continue
+		}
+		lastUsedOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetAccessKeyLastUsedOutput, error) {
+			return api.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: aws.String(keyID)})
+		})
+		if err != nil {
+			continue
+		}
+		var lastUsedAt *time.Time
+		if lastUsedOut.AccessKeyLastUsed != nil {
+			lastUsedAt = lastUsedOut.AccessKeyLastUsed.LastUsedDate
+		}
+		since, label := lastUsedAt, "never"
+		if lastUsedAt != nil {
+			label = lastUsedAt.Format("2006-01-02")
+		} else {
+			// Never used: the key has been idle since it was created.
+			since = k.CreateDate
+		}
+		if since == nil {
+			continue
+		}
+		idle := time.Since(*since)
+		if idle <= unusedCredentialAge {
+			continue
+		}
+		out = append(out, idleKey{
+			suffix:   lastFourOfKeyID(keyID),
+			lastUsed: label,
+			idleDays: int(idle.Hours() / 24),
+		})
+	}
+	return out
+}
+
+// lastFourOfKeyID renders an access key ID as its last four characters only.
+// Every surface that names a key goes through here: a key ID is a credential
+// identifier and has no business in a list cell, a detail row or a log.
+func lastFourOfKeyID(keyID string) string {
+	if len(keyID) <= 4 {
+		return keyID
+	}
+	return "…" + keyID[len(keyID)-4:]
 }

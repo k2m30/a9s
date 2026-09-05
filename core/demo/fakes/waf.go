@@ -51,8 +51,11 @@ func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ..
 		return nil, fmt.Errorf("GetWebACL: Name is required")
 	}
 	ruleCount := 3
-	if *input.Name == "acme-staging-waf" {
+	switch *input.Name {
+	case "acme-staging-waf":
 		ruleCount = 1
+	case fixtures.WAFNoRules:
+		ruleCount = 0
 	}
 	rules := make([]wafv2types.Rule, ruleCount)
 	for i := range rules {

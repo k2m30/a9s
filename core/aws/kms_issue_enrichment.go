@@ -9,14 +9,24 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // kms canonical FindingCodes.
 const (
 	kmsCodeRotationDisabled domain.FindingCode = "kms.rotation-disabled"
+	kmsCodePublicPolicy     domain.FindingCode = "kms.public-policy"
+
+	kmsRotationDisabledDetail = "This customer-managed key never rotates its backing material, so every ciphertext " +
+		"ever written under it depends on one key that has been in use since creation. Enable automatic key " +
+		"rotation on the key."
+	kmsPublicPolicyDetail = "The key policy allows a wildcard principal, so any AWS account can use this key to " +
+		"decrypt data encrypted with it. Replace the \"*\" principal with the specific accounts or roles that " +
+		"need the key, or add a condition scoping the grant."
 )
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -34,6 +44,8 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	if clients.KMS == nil {
 		return result, nil
 	}
+	keyPolicyAPI, _ := clients.KMS.(KMSGetKeyPolicyAPI)
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -42,6 +54,16 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		if keyID == "" {
 			return
 		}
+		ex, public, ok := kmsKeyPolicyIsPublic(ctx, keyPolicyAPI, r, ownAccount)
+		mu.Lock()
+		switch {
+		case !ok:
+			result.TruncatedIDs[keyID] = true
+		case public:
+			setWave2Finding(&result, keyID, kmsCodePublicPolicy, "key policy open to anyone", "!", "kms",
+				publicPolicyRows(ex), kmsPublicPolicyDetail)
+		}
+		mu.Unlock()
 		out, err := clients.KMS.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{
 			KeyId: aws.String(keyID),
 		})
@@ -65,10 +87,58 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			"rotation_enabled": rotationVal,
 		}
 		if !out.KeyRotationEnabled {
-			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil, "")
+			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil, kmsRotationDisabledDetail)
 		}
 	})
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
+}
+
+// kmsKeyPolicyIsPublic reads a key's default policy and returns the exposure
+// when it grants a wildcard principal. AWS-managed keys are skipped: AWS
+// owns their policy and the operator cannot change it. A policy that cannot
+// be read or parsed leaves the key unknown (ok=false), never healthy.
+func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resource.Resource, ownAccount string) (ex iampolicy.Exposure, public, ok bool) {
+	if api == nil || kmsKeyIsAWSManaged(r) || kmsKeyIsGoingAway(r) {
+		return ex, false, true
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.GetKeyPolicyOutput, error) {
+		return api.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
+			KeyId:      aws.String(r.ID),
+			PolicyName: aws.String("default"),
+		})
+	})
+	if err != nil {
+		return ex, false, false
+	}
+	if out == nil || out.Policy == nil {
+		// No policy attached is a complete answer, not a gap.
+		return ex, false, true
+	}
+	doc, perr := iampolicy.Parse(*out.Policy)
+	if perr != nil {
+		return ex, false, false
+	}
+	ex = iampolicy.Evaluate(doc, ownAccount)
+	return ex, ex.Public, true
+}
+
+// kmsKeyIsGoingAway reports a key already scheduled for deletion. The
+// operator's move on such a key is to wait or cancel the deletion, so a
+// posture row about its policy would outlive the key it describes.
+func kmsKeyIsGoingAway(r resource.Resource) bool {
+	meta, ok := r.RawStruct.(kmstypes.KeyMetadata)
+	if !ok {
+		return false
+	}
+	return meta.KeyState == kmstypes.KeyStatePendingDeletion ||
+		meta.KeyState == kmstypes.KeyStatePendingReplicaDeletion
+}
+
+// kmsKeyIsAWSManaged reads KeyManager off the DescribeKey metadata the
+// fetcher stashed. FetchKMSKeysPage filters AWS-managed keys out, but
+// FetchKMSKeysByIDs does not, so a drilled-into key can still arrive here.
+func kmsKeyIsAWSManaged(r resource.Resource) bool {
+	meta, ok := r.RawStruct.(kmstypes.KeyMetadata)
+	return ok && meta.KeyManager == kmstypes.KeyManagerTypeAws
 }

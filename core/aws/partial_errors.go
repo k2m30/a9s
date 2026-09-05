@@ -58,7 +58,7 @@ func IsNotFoundErr(err error) bool {
 		return false
 	}
 	switch apiErr.ErrorCode() {
-	case "NoSuchBucket", "NotFound", "NoSuchHostedZone":
+	case "NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException":
 		return true
 	default:
 		return false

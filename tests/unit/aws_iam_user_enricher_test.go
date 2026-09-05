@@ -262,3 +262,26 @@ func TestEnrichIAMUserMFA_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 		t.Errorf("expected empty Findings, got %d entries", len(result.Findings))
 	}
 }
+
+// The user enricher also sweeps attached policies; a user with none is the
+// shape this fake stands for.
+func (f *iamUserMFAFake) ListAttachedUserPolicies(
+	_ context.Context,
+	_ *iam.ListAttachedUserPoliciesInput,
+	_ ...func(*iam.Options),
+) (*iam.ListAttachedUserPoliciesOutput, error) {
+	return &iam.ListAttachedUserPoliciesOutput{}, nil
+}
+
+// The user enricher also asks when each key was last used. "Just now" keeps
+// these tests about MFA and key age, which is what they were written for.
+func (f *iamUserMFAFake) GetAccessKeyLastUsed(
+	_ context.Context,
+	_ *iam.GetAccessKeyLastUsedInput,
+	_ ...func(*iam.Options),
+) (*iam.GetAccessKeyLastUsedOutput, error) {
+	now := time.Now()
+	return &iam.GetAccessKeyLastUsedOutput{
+		AccessKeyLastUsed: &iamtypes.AccessKeyLastUsed{LastUsedDate: &now},
+	}, nil
+}

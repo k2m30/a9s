@@ -25,6 +25,19 @@ type Exposure struct {
 
 // Evaluate classifies the Allow statements of a resource policy.
 func Evaluate(doc Document, ownAccount string) Exposure {
+	return evaluate(doc, ownAccount, restrictiveKeys)
+}
+
+// EvaluateTrust classifies a role's trust policy. Identical to Evaluate
+// except that sts:ExternalId counts as a restrictive condition: on an
+// AssumeRole trust policy a wildcard principal paired with a shared external
+// ID is the documented cross-account pattern, while on a resource policy the
+// same key scopes nothing.
+func EvaluateTrust(doc Document, ownAccount string) Exposure {
+	return evaluate(doc, ownAccount, trustRestrictiveKeys)
+}
+
+func evaluate(doc Document, ownAccount string, keys []string) Exposure {
 	var ex Exposure
 	var conditioned bool
 	accounts := map[string]struct{}{}
@@ -34,7 +47,7 @@ func Evaluate(doc Document, ownAccount string) Exposure {
 			continue
 		}
 		if st.Principal.Wildcard || st.NotPrincipal {
-			if isRestrictive(st.Condition) {
+			if isRestrictive(st.Condition, keys) {
 				conditioned = true
 			} else {
 				ex.Public = true
@@ -91,11 +104,15 @@ var restrictiveKeys = []string{
 	"kms:CallerAccount", "kms:ViaService", "lambda:FunctionUrlAuthType", "sns:Endpoint",
 }
 
+// trustRestrictiveKeys is restrictiveKeys plus the trust-policy-only
+// sts:ExternalId. Used by EvaluateTrust.
+var trustRestrictiveKeys = slices.Concat([]string{"sts:ExternalId"}, restrictiveKeys)
+
 // isRestrictive mirrors Prowler's is_condition_block_restrictive with
 // is_cross_account_allowed=True: any positive operator carrying a scoping
 // key whose every value is concrete. Negated and IfExists operators cannot
 // narrow the principal, so they never count.
-func isRestrictive(cond map[string]map[string][]string) bool {
+func isRestrictive(cond map[string]map[string][]string, keys []string) bool {
 	for op, block := range cond {
 		if strings.Contains(op, "Not") || strings.HasSuffix(op, "IfExists") {
 			continue
@@ -109,7 +126,7 @@ func isRestrictive(cond map[string]map[string][]string) bool {
 				if !slices.ContainsFunc(vals, isAnyIP) {
 					return true
 				}
-			case slices.ContainsFunc(restrictiveKeys, func(k string) bool { return strings.EqualFold(k, key) }):
+			case slices.ContainsFunc(keys, func(k string) bool { return strings.EqualFold(k, key) }):
 				if !slices.ContainsFunc(vals, isWildcardValue) {
 					return true
 				}

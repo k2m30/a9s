@@ -255,3 +255,13 @@ func TestEnrichIAMRoleLastUsed_NilClientReturnsEmptyFindingsNoError(t *testing.T
 		t.Errorf("expected empty Findings, got %d entries", len(result.Findings))
 	}
 }
+
+// The role enricher also sweeps attached policies; an account with none is
+// the shape this fake stands for.
+func (f *iamGetRoleFake) ListAttachedRolePolicies(
+	_ context.Context,
+	_ *iam.ListAttachedRolePoliciesInput,
+	_ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{}, nil
+}

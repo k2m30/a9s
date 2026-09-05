@@ -161,6 +161,8 @@ One row per signal from §3:
 | `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant: not read in 210d` | `Secret has not been read in this region for 210 days — check if still in use.` |
 | `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deletion in 6d` | `Scheduled for deletion on 2026-04-26 — restore with RestoreSecret before window ends.` |
 | `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` | `Rotation started but never completed — an AWSPENDING version has been lingering.` |
+| Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `resource policy open to anyone` | `Any AWS account can read the credential this secret holds — remove the wildcard principal.` |
+| Resource policy names a principal in another account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` | `Another AWS account can read this secret — confirm the grant is intended and still needed.` |
 
 Formatting notes applied:
 
@@ -216,6 +218,8 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 | secrets.state.dormant | dormant | warn | wave1 |
 | secrets.rotation.disabled | rotation not enabled | warn | wave1 |
 | secrets.value.stale | value unchanged in over 365 days | warn | wave1 |
+| secrets.public-policy | resource policy open to anyone | broken | wave2 |
+| secrets.cross-account-policy | resource policy grants another account | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
