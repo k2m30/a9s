@@ -49,14 +49,15 @@ type Document struct {
 }
 
 // Decode returns the text of a policy document as the IAM APIs hand it over.
-// Some return it percent-encoded, and path-style unescaping is the correct
-// reading: a literal '+' inside a policy — a regex, a resource name — must
-// survive, which query-style unescaping would turn into a space. A document
-// that carries no escape, or that does not unescape, comes back unchanged so
-// the caller's JSON parse reports the real problem rather than this function
+// A document that already is JSON is used as it stands, so a literal '%'
+// inside a string value survives; only a document that is not JSON is
+// unescaped, once, path-style — a literal '+' inside a policy (a regex, a
+// resource name) must survive, which query-style unescaping would turn into a
+// space. A document that does not unescape comes back unchanged so the
+// caller's JSON parse reports the real problem rather than this function
 // inventing one.
 func Decode(doc string) string {
-	if !strings.Contains(doc, "%") {
+	if json.Valid([]byte(doc)) || !strings.Contains(doc, "%") {
 		return doc
 	}
 	if decoded, err := url.PathUnescape(doc); err == nil {
@@ -65,23 +66,16 @@ func Decode(doc string) string {
 	return doc
 }
 
-// Parse decodes a policy document. IAM APIs return some documents
-// percent-encoded (path style: a literal '+' stays a '+'), so a failed
-// decode is retried after unescaping when the text contains a '%'.
-// Unrecognised shapes inside the document are skipped, never fatal.
+// Parse reads a policy document, encoded or not — see Decode for the one
+// unescape rule. Unrecognised shapes inside the document are skipped, never
+// fatal.
 func Parse(doc string) (Document, error) {
 	doc = strings.TrimSpace(doc)
 	if doc == "" {
 		return Document{}, errors.New("iampolicy: empty document")
 	}
 	var raw map[string]any
-	err := json.Unmarshal([]byte(doc), &raw)
-	if err != nil && strings.Contains(doc, "%") {
-		if decoded, uerr := url.PathUnescape(doc); uerr == nil {
-			err = json.Unmarshal([]byte(decoded), &raw)
-		}
-	}
-	if err != nil {
+	if err := json.Unmarshal([]byte(Decode(doc)), &raw); err != nil {
 		return Document{}, fmt.Errorf("iampolicy: %w", err)
 	}
 	d := Document{Version: str(raw["Version"])}

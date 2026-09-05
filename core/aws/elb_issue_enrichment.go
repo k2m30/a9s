@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -226,26 +227,25 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 		// Every offending port is a port to fix, so each finding names all of
 		// them rather than sending the operator back to the console for the
-		// rest of a list only the balancer knows.
-		ports := map[domain.FindingCode][]string{}
-		rows := map[domain.FindingCode][]domain.DetailRow{}
+		// rest of a list only the balancer knows. DescribeListeners does not
+		// promise an order, so the ports are sorted numerically and the rows
+		// follow them: an unchanged balancer must render the same cell twice.
+		offenders := map[domain.FindingCode][]elbOffendingListener{}
 		for _, listener := range listeners {
 			code, row, bad := elbListenerExposure(r.Fields["type"], listener)
 			if !bad {
 				continue
 			}
-			ports[code] = append(ports[code], strconv.Itoa(int(aws.ToInt32(listener.Port))))
-			rows[code] = append(rows[code], row)
+			offenders[code] = append(offenders[code],
+				elbOffendingListener{port: aws.ToInt32(listener.Port), row: row})
 		}
-		if p := ports[elbCodePlainHTTPListener]; len(p) > 0 {
+		if ports, rows := elbOffendersInPortOrder(offenders[elbCodePlainHTTPListener]); ports != "" {
 			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener,
-				"ports "+strings.Join(p, ", ")+" in the clear", "~", "elb",
-				rows[elbCodePlainHTTPListener], elbPlainHTTPListenerDetail)
+				"ports "+ports+" in the clear", "~", "elb", rows, elbPlainHTTPListenerDetail)
 		}
-		if p := ports[elbCodeWeakTLSPolicy]; len(p) > 0 {
+		if ports, rows := elbOffendersInPortOrder(offenders[elbCodeWeakTLSPolicy]); ports != "" {
 			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy,
-				"weak TLS policy on ports "+strings.Join(p, ", "), "~", "elb",
-				rows[elbCodeWeakTLSPolicy], elbWeakTLSPolicyDetail)
+				"weak TLS policy on ports "+ports, "~", "elb", rows, elbWeakTLSPolicyDetail)
 		}
 	})
 	sort.Strings(failures)
@@ -279,4 +279,27 @@ func allELBListeners(ctx context.Context, api ELBv2DescribeListenersAPI, lbARN s
 		token = page.Pagination.NextToken
 	}
 	return out, nil
+}
+
+// elbOffendingListener pairs a listener's port with the row that describes it,
+// so sorting one keeps the other alongside.
+type elbOffendingListener struct {
+	port int32
+	row  domain.DetailRow
+}
+
+// elbOffendersInPortOrder renders the joined port list and the rows in the
+// same numeric order. An empty port list means there is nothing to report.
+func elbOffendersInPortOrder(offenders []elbOffendingListener) (string, []domain.DetailRow) {
+	if len(offenders) == 0 {
+		return "", nil
+	}
+	slices.SortFunc(offenders, func(a, b elbOffendingListener) int { return cmp.Compare(a.port, b.port) })
+	ports := make([]string, 0, len(offenders))
+	rows := make([]domain.DetailRow, 0, len(offenders))
+	for _, o := range offenders {
+		ports = append(ports, strconv.Itoa(int(o.port)))
+		rows = append(rows, o.row)
+	}
+	return strings.Join(ports, ", "), rows
 }
