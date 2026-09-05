@@ -131,7 +131,12 @@ Transcribed from `docs/attention-signals.md` §Networking — `subnet` row.
   - **State bucket**: Broken.
   - **How obtained**: compute on the list response — same fields as above.
 
-- **Signal**: `MapPublicIpOnLaunch == true` AND the effective route table for this subnet has no `0.0.0.0/0 → IGW` default route (where "effective" = the explicitly associated route table, or the VPC main route table when no explicit association exists). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+- **Signal**: `MapPublicIpOnLaunch == true`.
+  - **Finding**: `subnet.auto-public-ip`, phrase `auto-assigns public IPs`.
+  - **State bucket**: Warning.
+  - **How obtained**: read `Subnet.MapPublicIpOnLaunch` on the list response. A nil pointer is unknown, not misconfigured, and emits nothing.
+
+- **Signal**: the same field AND the effective route table for this subnet has no `0.0.0.0/0 → IGW` default route (where "effective" = the explicitly associated route table, or the VPC main route table when no explicit association exists). — NOT IMPLEMENTED: the `MapPublicIpOnLaunch` half above ships; the route-table cross-reference does not, so a subnet that auto-assigns is flagged whether or not it has an internet route.
   - **State bucket**: Warning (misconfigured public subnet).
   - **How obtained**: read `Subnet.MapPublicIpOnLaunch`; cross-reference the already-loaded `rtb` list by `Associations[].SubnetId` (falling back to the VPC main route table); scan `Routes[]` for a `DestinationCidrBlock == "0.0.0.0/0"` with `GatewayId` starting `igw-`.
 
@@ -174,7 +179,7 @@ One row per signal from §3:
 | IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` | — |
 | IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` | — |
 | `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` | `Every instance launched into this subnet gets a public IP address by default.` |
-| Misconfigured public subnet (auto-assign public IP, no IGW default route) — NOT IMPLEMENTED (backlog; the auto-assign half above ships without the route-table cross-reference) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
+| Misconfigured public subnet (auto-assign public address, no IGW default route) — NOT IMPLEMENTED: the auto-assign half above ships, the route-table cross-reference does not | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
 
 Rules for filling list and detail text:
 

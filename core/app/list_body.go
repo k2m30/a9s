@@ -970,20 +970,16 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string][]dom
 		s.State.List.rowsVersion++
 	}
 
-	// RowStore-backed type cache. The per-row Findings copy below is
-	// belt-and-braces: a shallow copy(out, rows) shares each row's slice
-	// header, so anything that appended into spare capacity would reach the
-	// store's pre-Amend rows. ApplyWave2ToRow does not — it allocates — but
-	// applySlice is free to grow beyond it.
+	// RowStore-backed type cache. A shallow copy is enough: applySlice's only
+	// statement is ApplyWave2ToRow, which replaces Findings and
+	// AttentionDetails with freshly allocated ones rather than writing into
+	// the arrays these rows still share with the store's pre-Amend copy.
 	amend := func(rows []resource.Resource) []resource.Resource {
 		if len(rows) == 0 {
 			return rows
 		}
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
-		for i := range out {
-			out[i].Findings = append([]domain.Finding(nil), out[i].Findings...)
-		}
 		applySlice(out)
 		return out
 	}

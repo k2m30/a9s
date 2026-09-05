@@ -81,16 +81,21 @@ Transcribed from `docs/attention-signals.md`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `IpPermissions[]` with `IpRanges[].CidrIp == 0.0.0.0/0` covering any port in the set {22, 23, 21, 3389, 1433, 3306, 5432, 6379, 27017, 11211, 9200}. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `IpPermissions[]` with `IpRanges[].CidrIp == 0.0.0.0/0` (or `Ipv6Ranges[].CidrIpv6 == ::/0`) covering any port in the set {20, 21, 22, 23, 25, 445, 1433, 1521, 2483, 3306, 3389, 5432, 5601, 6379, 7199, 8888, 9092, 9160, 9200, 11211, 27017}. An all-protocols (`-1`) rule open to the internet is the same signal one step wider.
+  - **Finding**: `sg.ingress.dangerous-ports`, phrase `ports <list> open to 0.0.0.0/0`; the all-protocols case is `sg.ingress.wide-open`, phrase `all ports open to 0.0.0.0/0`.
   - **State bucket**: Broken.
-  - **How obtained**: read `IpPermissions[]` on the SG, inspect each rule's `FromPort`/`ToPort`/`IpProtocol` against `IpRanges[].CidrIp` — the list API returns the full ingress rule set, no extra call. a9s-devops: port list is the standard "admin/database exposed to the internet" set (SSH/telnet/FTP/RDP/SQL/MySQL/Postgres/Redis/Mongo/memcached/Elasticsearch).
-- **Signal**: Cross-ref `eni` — this SG's `GroupId` is not referenced by any `NetworkInterface.Groups[].GroupId` in the loaded `eni` list. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **How obtained**: read `IpPermissions[]` on the SG, inspect each rule's `FromPort`/`ToPort`/`IpProtocol` against `IpRanges[].CidrIp` — the list API returns the full ingress rule set, no extra call. a9s-devops: port list is the standard "admin/database exposed to the internet" set. 8080 and 8443 are deliberately excluded — they front ordinary public applications far more often than anything worth paging on.
+- **Signal**: `GroupName == "default"` carrying any ingress rule, or egress beyond the single all-protocols rule to `0.0.0.0/0` AWS creates every group with.
+  - **Finding**: `sg.default-with-rules`, phrase `default group allows traffic`.
   - **State bucket**: Warning.
-  - **How obtained**: cross-reference the already-loaded `eni` list by `Groups[].GroupId`. Skip the rule if the `eni` list wasn't loaded in this sweep (cannot distinguish "no users" from "didn't look").
+  - **How obtained**: read `GroupName`, `IpPermissions[]` and `IpPermissionsEgress[]` on the list response. AWS attaches this group to anything launched without an explicit one, so every rule on it applies to resources nobody chose to put there.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals.
+- **Signal**: Cross-ref `eni` — this SG's `GroupId` is not referenced by any `NetworkInterface.Groups[].GroupId` in the loaded `eni` list.
+  - **Finding**: `sg.unused`, phrase `not attached to anything`.
+  - **State bucket**: Warning.
+  - **How obtained**: `EnrichSGUsage` cross-references the already-loaded `eni` list by `Groups[].GroupId`. Zero AWS calls. Emits nothing when the `eni` list was not loaded this sweep or was truncated at the first page — an incomplete list cannot distinguish "no users" from "didn't look". Default groups are exempt: AWS creates one per VPC and it cannot be deleted, so unattached is its normal state.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -146,7 +151,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - Contract targets `cfn, ct-events, ec2, elb, eni, lambda, sg, vpc` — `docs/related-resources.md` § Per-type contract row `sg` (line 99) and detail block `### \`sg\`` (lines 902–913).
 - Wave 1 admin-port signal and port set — `docs/attention-signals.md` § Networking row `sg` (line 60).
-- Wave 1 orphan-SG signal (cross-ref `eni`) — `docs/attention-signals.md` § Networking row `sg` (line 60).
+- Wave 2 orphan-SG signal (cross-ref `eni`) — `docs/attention-signals.md` § Networking row `sg`.
 - Wave 3 SG-referencing-deleted-SG — `docs/attention-signals.md` § Networking row `sg` (line 60).
 - `SecurityGroup` struct has no `State` field (config-only; SGs are always "healthy" unless a rule-level or usage-level signal fires) — `AWS SDK Go v2 — ec2/types.SecurityGroup`.
 - `IpPermissions[].IpRanges[].CidrIp` — `AWS SDK Go v2 — ec2/types.IpPermission § IpRanges` and `ec2/types.IpRange § CidrIp`.
