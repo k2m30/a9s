@@ -185,7 +185,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a red `failed: AZ out of capacity` row tells the operator to move workloads to another AZ, a red `IPs exhausted: 3 free of 256` row tells them the subnet has run out of addresses, and a yellow `public IP on launch, no IGW route` row tells them the subnet is misconfigured — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a red `failed: AZ out of capacity` row tells the operator to move workloads to another AZ, a red `IPs exhausted: 3 free of 256` row tells them the subnet has run out of addresses, and a yellow `auto-assigns public IPs` row tells them anything launched here reaches the internet by default — operator can triage without opening detail.
 
 ## 5. Out of Scope
 

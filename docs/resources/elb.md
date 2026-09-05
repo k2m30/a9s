@@ -172,7 +172,7 @@ Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — yellow for `provisioning`/`active_impaired` and red for `failed` are paired with the AWS-provided `State.Reason` in the Status column, so the operator reads the cause inline. One UX gap: when `State.Reason` is empty (common during very early `provisioning`), the Status column falls back to a generic phrase; implementation should take the reason verbatim when non-empty and never show a bare state keyword.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — yellow for `provisioning`/`active_impaired` and red for `failed` are paired with the AWS-provided `State.Reason` in the Status column, so the operator reads the cause inline. The four posture signals read the same way: `HTTP desync mitigation off`, `invalid HTTP headers not dropped`, `listener without TLS on port 80` and `weak TLS policy on listener 443` each name the setting and, where it varies, the listener — the operator opens detail only for the remedy sentence. One UX gap: when `State.Reason` is empty (common during very early `provisioning`), the Status column falls back to a generic phrase; implementation should take the reason verbatim when non-empty and never show a bare state keyword.
 
 ## 5. Out of Scope
 

@@ -214,7 +214,7 @@ Note: S4 cells pair the state with a cause per the "state keywords are not expla
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreachable` or `failed: <LastError.Message>` tells the operator exactly why the endpoint is down without opening detail; a yellow row with `gateway: no route tables attached` points them straight at the route-table pivot. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreachable` or `failed: <LastError.Message>` tells the operator exactly why the endpoint is down without opening detail; a yellow row with `gateway: no route tables attached` points them straight at the route-table pivot. A yellow `endpoint policy allows any principal` row says the endpoint is still on the open policy AWS supplies by default. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 

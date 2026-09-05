@@ -121,7 +121,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 (color + cause word covers `pending`/`modifying`/`deleting`/`deleted`). For Wave 2, the list text `attachment failed` / `attachment rejected` / `attachment awaiting accept` names what to chase in one glance; the operator still presses detail only to find out *which* attachment — that trade (list stays narrow, detail carries the IDs) is acceptable because a TGW typically has few attachments and the next click is always "show me the attachments list".
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 (color + cause word covers `pending`/`modifying`/`deleting`/`deleted`). For Wave 2, the list text `attachment failed` / `attachment rejected` / `attachment awaiting accept` names what to chase in one glance; the operator still presses detail only to find out *which* attachment — that trade (list stays narrow, detail carries the IDs) is acceptable because a TGW typically has few attachments and the next click is always "show me the attachments list". The `auto-accepts shared attachments` row is Wave 1 and needs no detail at all — the phrase is the whole finding.
 
 ## 5. Out of Scope
 

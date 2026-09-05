@@ -120,7 +120,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `0.0.0.0/0` on admin/db port — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2 + S4 | `open: 22 to 0.0.0.0/0` | `Ingress rule allows TCP 22 from 0.0.0.0/0 — SSH is reachable from the entire internet.` |
+| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S2 + S4 | `ports 22 open to 0.0.0.0/0` (`all ports open to 0.0.0.0/0` for an all-protocols rule) | `Ingress rule allows TCP 22 from 0.0.0.0/0 — SSH is reachable from the entire internet.` |
 | `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S2 + S4 + S5 | `default group allows traffic` | `The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group.` |
 | Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` | `No network interface in this account references this group, so its rules protect nothing.` |
 
@@ -133,7 +133,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for both signals — a red row with `open: 22 to 0.0.0.0/0` tells the on-call engineer immediately which port and which side of the rule is the problem, and a yellow row with `orphan: no ENIs attached` says the SG is cruft. UX gap worth flagging for implementation: the admin-port rule as written in `docs/attention-signals.md` covers only IPv4 `0.0.0.0/0`; SDK `IpPermission` also exposes `Ipv6Ranges[].CidrIpv6`, and an IPv6 `::/0` on port 22 is equally exposed — recommend extending the check to IPv6 and rendering the list text as `open: 22 to ::/0` in that case. Flagged here per a9s-devops; the golden doc can be amended separately if the team accepts.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `ports 22 open to 0.0.0.0/0` tells the on-call engineer immediately which port and which side of the rule is the problem, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. UX gap worth flagging for implementation: the admin-port rule as written in `docs/attention-signals.md` covers only IPv4 `0.0.0.0/0`; SDK `IpPermission` also exposes `Ipv6Ranges[].CidrIpv6`, and an IPv6 `::/0` on port 22 is equally exposed — recommend extending the check to IPv6 and rendering the list text as `open: 22 to ::/0` in that case. Flagged here per a9s-devops; the golden doc can be amended separately if the team accepts.
 
 ## 5. Out of Scope
 
