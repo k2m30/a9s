@@ -19,9 +19,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// colorEKSCluster classifies an EKS cluster. Prefers colorFromWave1 so real
-// fetched resources (Findings populated by buildEKSResource, eks.go, Source:
-// "wave1") color from their own Finding; the raw-field checks below are the
+// colorEKSCluster classifies an EKS cluster from its worst Finding
+// (populated by buildEKSResource, eks.go); the raw-field checks below are the
 // identical-precedence fallback for callers that construct a Resource with
 // only Fields set (e.g. qa_eks_color_test.go).
 func colorEKSCluster(r domain.Resource) domain.Color {

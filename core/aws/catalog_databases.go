@@ -81,10 +81,6 @@ func colorS3(r domain.Resource) domain.Color {
 }
 
 func colorRedis(r domain.Resource) domain.Color {
-	// colorFromAnyFinding, not colorFromWave1: the posture rows stack after
-	// the lifecycle ones, and colorFromWave1 returns the FIRST finding's
-	// severity — which would let a Warn lifecycle row hide the Broken
-	// no-AUTH-token finding behind it.
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
@@ -171,9 +167,6 @@ func colorOpenSearch(r domain.Resource) domain.Color {
 }
 
 func colorRedshift(r domain.Resource) domain.Color {
-	// colorFromAnyFinding, not colorFromWave1: redshift's audit-logging and
-	// require_ssl signals are Wave-2 sourced, and a wave1-only lookup would
-	// paint those rows healthy.
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}

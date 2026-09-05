@@ -170,6 +170,9 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
+Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
+sentence would restate it. Their S5 cell reads `—`.
+
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `State == pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` | — |

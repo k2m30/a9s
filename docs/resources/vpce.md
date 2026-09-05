@@ -195,20 +195,23 @@ Wave → surface mapping for this resource:
 
 One row per §3 signal (Healthy case omitted per rule):
 
+Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
+sentence would restate it. Their S5 cell reads `—`.
+
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `State == PendingAcceptance` | 1 | Warning | n/a | S2, S4 | `pending acceptance` | n/a (Wave 1 Warning has no S5) |
-| `State == Pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` | n/a |
-| `State == Deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | n/a |
-| `State == Failed` | 1 | Broken | n/a | S2, S4 | `failed: <LastError.Message>` | n/a (Wave 1 Broken has no S5) |
-| `State == Rejected` | 1 | Broken | n/a | S2, S4 | `rejected by service owner` | n/a |
-| `State == Expired` | 1 | Broken | n/a | S2, S4 | `expired` | n/a |
-| `State == Partial` | 1 | Broken | n/a | S2, S4 | `partial: some AZ ENIs missing` | n/a |
+| `State == PendingAcceptance` | 1 | Warning | — | S2, S4 | `pending acceptance` | n/a (Wave 1 Warning has no S5) |
+| `State == Pending` | 1 | Warning | — | S2, S4 | `pending: provisioning` | — |
+| `State == Deleting` | 1 | Warning | — | S2, S4 | `deleting` | — |
+| `State == Failed` | 1 | Broken | — | S2, S4 | `failed: <LastError.Message>` | — |
+| `State == Rejected` | 1 | Broken | — | S2, S4 | `rejected by service owner` | — |
+| `State == Expired` | 1 | Broken | — | S2, S4 | `expired` | — |
+| `State == Partial` | 1 | Broken | — | S2, S4 | `partial: some AZ ENIs missing` | — |
 | `PolicyDocument` grants a wildcard action to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy allows any principal` | `The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach.` |
-| `LastError` non-empty | 1 | Broken | n/a | S2, S4 | `<LastError.Code>: <LastError.Message>` | n/a |
-| interface, `NetworkInterfaceIds == []` | 1 | Broken | n/a | S2, S4 | `interface: no ENIs — unreachable` | n/a |
-| gateway, `RouteTableIds == []` | 1 | Warning | n/a | S2, S4 | `gateway: no route tables attached` | n/a |
-| `State == Deleted` | 1 | Dim | n/a | S2, S4 | `deleted` | n/a |
+| `LastError` non-empty | 1 | Broken | — | S2, S4 | `<LastError.Code>: <LastError.Message>` | — |
+| interface, `NetworkInterfaceIds == []` | 1 | Broken | — | S2, S4 | `interface: no ENIs — unreachable` | — |
+| gateway, `RouteTableIds == []` | 1 | Warning | — | S2, S4 | `gateway: no route tables attached` | — |
+| `State == Deleted` | 1 | Dim | — | S2, S4 | `deleted` | — |
 
 Note: S4 cells pair the state with a cause per the "state keywords are not explanations" rule; bare `Pending` or `Failed` would be insufficient. When `LastError.Message` is present for a `Failed` row, it replaces the generic `failed` cause at render time. Truncate `LastError.Message` at 40 chars for the list view — the full sentence is available in the detail view's field block (which is always rendered for any resource and is not an S5 enrichment line).
 
