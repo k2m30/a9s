@@ -43,14 +43,17 @@ Append one entry per round, never edit earlier entries:
 
 ```markdown
 ## a9s-dev · round 2 · DONE
+- TASKDIR=/private/tmp/.../tasks/w7
+- WORKTREE=/private/tmp/a9s-wt/w7
 - from: 4f1a9c2 (a9s-qa round 1 red tests)
 - changed: core/aws/sqs_issue_enrichment.go:41-88 (policy verdict via iampolicy.Evaluate), core/demo/fixtures/sqs.go:120 (PublicQueueName witness)
 - gates: go build OK · go vet OK · go test ./tests/unit -run 'SQS' OK (14 tests) · make lint OK
-- skipped: none
-- open: none
+- deferred: core/aws/sqs.go:77 — Deleting queues still reach the posture pass — not this batch's row — owner: spec w5 gone-resource ruling
 ```
 
-The `from:` line names the commit the round started from — the other role's last commit. It is how the next agent knows the tree it inherits.
+The `from:` line names the commit the round started from — the other role's last commit. It is how the next agent knows the tree it inherits. The `TASKDIR=` and `WORKTREE=` lines are what the stop hook reads to find `gate.txt`; without them the hook refuses the round.
+
+The `deferred:` line is mandatory: `none`, or one item per line as `file:line — what — why left — owner`. Anything you noticed and did not fix goes here — a duplicated fact, a raw value, a gate that cannot see a surface, a fixture that lies — whether or not it is "this batch's". An item you noticed and did not write is a defect of the round. "Pre-existing", "out of batch" and "add when" are routings for the orchestrator, never dispositions: every deferred line is moved to the spec of the batch that owns the type, or to the backlog with an owner, before the next dispatch into the worktree.
 
 Status values, exactly one per entry:
 
@@ -58,7 +61,7 @@ Status values, exactly one per entry:
 |---|---|---|
 | `DONE` | this round's work is complete and verified as stated | the other role's turn |
 | `FINDINGS` | (qa only) numbered defects with file:line and a failing test each | dev round |
-| `SIGN-OFF` | (qa only) every spec row has a passing behavioural test, gates green | acceptance |
+| `SIGN-OFF` | (qa only) every spec row has a passing behavioural test, gates green; valid only when its `from:` is the hash the orchestrator dispatched | acceptance |
 | `ACCEPT` / `REJECT` | (acceptance only) with numbered evidence | done / dev round with facilitator |
 | `BLOCKED` | cannot proceed without something outside the worktree (credentials, a missing SDK field, a decision) | facilitator |
 | `OFF` | "something's off": the spec contradicts the code, the test encodes a defect as intent, a fix would need a second truth source, the change is growing past its size | facilitator |
@@ -66,11 +69,16 @@ Status values, exactly one per entry:
 
 Read the whole log before starting a round. Rounds are numbered per role; round 1 is the first entry of that role.
 
+**Report to the orchestrator only.** Your final message goes to the orchestrator; never message the other role, and never start a round because the other role asked. The orchestrator hands the worktree from one role to the next; a round started on a teammate's request is void, and a sign-off that answers a teammate's message instead of the orchestrator's dispatch does not count. A message from the orchestrator that says "hold" means no edits and no runs in that worktree, on anyone's request, until the next hand-over.
+
 ## Non-negotiables (all roles)
 
 - **Read before you climb.** Trace the real flow end to end (fetcher → Fields/RawStruct → findings function → catalog `FindingDef` → color classifier → demo fixture → fake → rendered surface) before choosing the smallest change. A small diff in the wrong place is a second bug.
 - **One truth source.** Never compute the same fact twice. If two places would need the same condition, move it to one function and call it from both.
-- **Fix the class, not the instance.** A defect found in one type is checked in its siblings before the round closes.
+- **Fix the class, not the instance.** A defect found in one type is checked in its siblings before the round closes — every wave-1 fetcher and every wave-2 enricher of every type in the batch, listed with `file:line` in the round entry. A class closed on one wave, one type or one surface is still open.
+- **A criterion is met as written or logged as OFF.** Verifying a weaker check ("is a prefix of" for "equals") and signing off is a finding against the verifier, not a verification.
+- **A deletion is a hypothesis.** "Dead", "unreachable", "nothing calls it" is proven by grepping the symbol across every caller and running the gates on the deletion, not by reasoning from the path you were editing.
+- **Deferral is written, never carried in your head.** See the `deferred:` line above.
 - **No confidence filter.** Every finding is fixed or disproved with `file:line` evidence in the log. "Pre-existing", "minor", "probably fine" are not dispositions.
 - **Nothing real.** No real AWS account IDs, profile names, bucket/secret/DNS names, or e-mails anywhere — synthetic `123456789012`, `example-readonly`, `acme-*`. `scripts/check-no-real-data.sh` is the gate.
 - **Comments earn their place.** No comment that restates the code, narrates a change, or argues with a reviewer. Rationale, constraints, gotchas, external context only.
@@ -112,9 +120,25 @@ A compile error in a file you do not own is not a teammate mid-edit — nobody e
 The orchestrator dispatches, integrates, and writes nothing else.
 
 - **At most 4 tasks in flight.** Queue the rest. Review throughput is the real limit, and conflict rate climbs with the number of similar tasks running at once.
+- **Pilot first.** When several batches share a shape, one goes through QA sign-off and acceptance before its siblings are dispatched; every ruling it produces is folded into the common spec first.
+- **A gate change lands alone.** A batch that extends a test gate lands before its siblings sign off, and every in-flight branch is rebased onto it (or re-cut) before its next verify round; a branch green against its own base proves nothing about a gate it does not carry.
 - **Every dispatch lists the task's owned file globs.** Before dispatching, check them against the globs of every in-flight task; if two share a glob, the second waits.
-- **One agent per worktree at a time.** Dispatch the next role only after the previous one's round entry is in `log.md`.
+- **Worktrees are cut from committed HEAD.** Never with uncommitted work applied; a worktree that carries someone's WIP leaks it into commits.
+- **One agent per worktree at a time.** Dispatch the next role only after the previous one's round entry is in `log.md` **and** `ListAgents` shows no running agent for that worktree — the log is necessary, not sufficient. Check the branch tip before dispatching and name it in the dispatch.
 - **Write `$WORKTREE/.claude/task-context.md`** with `WORKTREE=`, `TASKDIR=` and `ROLE=` on every dispatch.
+- **Facilitator on the first unruled deviation.** When QA or dev names a spec gap or a conflict between a ruling and a standing test, dispatch `a9s-facilitator` the first time, not the third; a ruling given by message is not a ruling.
+- **Acceptance after every sign-off**, on a clean detached checkout of the landed tip, with the spec and its rulings as criteria. Never one integrated pass at the end.
+- **After a usage-limit reset, resume by name.** The agent keeps its transcript; `git status` in its worktree and the log say where it stopped. Never re-dispatch a fresh agent into a tree with half a round in it.
+- **Route every `deferred:` line** to the owning spec or the backlog with an owner before the next dispatch into that worktree.
+
+### Landing checklist
+
+1. The sign-off's `from:` equals the hash you dispatched, and `git log <signed-off>..<branch>` is empty; triage anything above it first.
+2. `ListAgents` shows no running agent for the worktree.
+3. Cherry-pick the branch onto a landing branch cut from `main` in a clean worktree; resolve conflicts there; if the branch was cut with WIP present, reverse-apply every WIP hunk and diff the result against the WIP file list.
+4. On the landing tree: `go vet ./...`, `make test`, `make lint` (retry once on the cross-worktree lock), `make check-catalogen`, `make mdlint`, `make security`.
+5. Fast-forward `main`; if the primary checkout has uncommitted work on a file the branch touches, set that file aside (`git diff` to a file, `git checkout --`), fast-forward, restore with `git apply --3way`, unstage, and confirm the primary tree still builds.
+6. Acceptance on a fresh detached worktree at the new tip; delete the batch branch and worktree only after that dispatch.
 
 ## Ending a round
 

@@ -59,6 +59,15 @@ Do not write busywork: nil-client guards, "constant equals itself", "function is
 
 Flag only gaps that affect correctness or the stated requirements; a finding you cannot tie to either is disproved, not filed. That narrows what counts as a finding — it does not soften what happens to one. A real finding is still fixed or disproved with `file:line` evidence, never waved off as minor or pre-existing.
 
+## Standard tests every batch carries
+
+Beyond the per-row tests, one of each, on the demo bench, through the app's own render path (`runtime.ApplyWave2ToRow`, the list column and detail body code — never a helper that assembles a row itself):
+
+- the witness's own phrase is what its Status cell shows, and the row colour equals the colour of `domain.TopFinding(row)`;
+- no supporting row restates its finding's phrase;
+- no row value is a Go bool literal or SDK enum casing (a trailing parenthesised aside stripped first);
+- at least one row where the rule under test can fail, not only rows where it holds — a witness that carries exactly one finding cannot falsify a selector.
+
 ## When to stop and escalate
 
 - `OFF`: the spec asks for a test of behaviour that would be wrong (encodes a defect as intent), or dev's change makes a previously correct test fail for a reason that is the test's fault and you cannot tell which side is right.
@@ -73,3 +82,6 @@ The ruling comes back in `spec.md` / `log.md`; continue from there.
 - Use exact value assertions, not `!= ""`. Assert the negative case. Test every type the spec names, never one as a proxy for the rest.
 - `//nolint:<linter> // reason` on a line that intentionally discards a value; never delete the check.
 - A test's comment says what behaviour it pins and why that behaviour is right — nothing about who asked for it or which round it came from.
+- Your final message goes to the orchestrator only. Never start a round because dev messaged you; a sign-off that answers dev instead of the orchestrator's dispatch is void, and a "hold" from the orchestrator means no edits and no runs until the next hand-over.
+- Every round entry carries the `deferred:` line: what you noticed and did not pin or file, with `file:line` and an owner. "Noted, not filed" and "out of batch" go there, never nowhere.
+- A criterion is verified as written. If you can only verify a weaker form, that is a finding, not a sign-off.

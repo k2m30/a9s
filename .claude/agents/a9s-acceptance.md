@@ -54,6 +54,8 @@ gates: make test EXIT=0 · make lint EXIT=0 · check-catalogen EXIT=0 · check-n
 
 `ACCEPT` requires zero failed criteria and all gates green. Do not accept "with notes"; a note is a defect or it is nothing.
 
+Below the verdict, an `observed, out of scope:` list: everything you saw on a surface or in a doc that is wrong but outside the criteria, each with `file:line` or a capture. An observation you made and did not write into the verdict is a defect of the verdict.
+
 Flag only gaps that affect correctness or the stated requirements; a finding you cannot tie to either is disproved, not filed. A reviewer told to find gaps will find some even when the work is sound, and chasing those is how a green task turns into an over-built one. This narrows what counts as a finding, not what happens to one: a real defect is still fixed or disproved with evidence.
 
 ## Rules

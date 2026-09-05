@@ -147,14 +147,19 @@ class GreenGateHookTest(unittest.TestCase):
                 code, reason = run_hook(junk)
                 self.assertEqual(0, code, reason)
 
-    def test_done_without_any_taskdir_passes(self):
-        """No TASKDIR anywhere means no evidence to check; never block blind."""
+    def test_done_without_any_taskdir_blocks(self):
+        """Inverted from "passes": a DONE the hook cannot locate used to slip
+        through, and every dev round of the first session did exactly that
+        (agents run from the primary repo, which has no task-context file, and
+        the entry carried no TASKDIR= line), so a red gate.txt was never seen.
+        An unlocatable gate is an unproven gate."""
         p = payload(DONE_MESSAGE, self.taskdir)
         p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n\nno taskdir line here\n"
         empty = tempfile.mkdtemp(prefix="w10-cwd-")
         self.addCleanup(shutil.rmtree, empty, True)
         code, reason = run_hook(p, cwd=empty)
-        self.assertEqual(0, code, reason)
+        self.assertEqual(2, code)
+        self.assertIn("TASKDIR", reason)
 
     def test_taskdir_falls_back_to_task_context_file(self):
         """After a compaction the DONE entry can lose its TASKDIR= line; the

@@ -186,9 +186,13 @@ def main():
 
     taskdir, worktree = resolve_paths(message, str(payload.get("cwd") or ""))
     if not taskdir:
-        return
-
-    reason = failure(os.path.join(taskdir, "gate.txt"), worktree)
+        reason = (
+            "the round entry has no `TASKDIR=` line and no .claude/task-context.md "
+            "exists under the working directory, so the gate cannot be located. "
+            "Add `- TASKDIR=<path>` and `- WORKTREE=<path>` to the entry."
+        )
+    else:
+        reason = failure(os.path.join(taskdir, "gate.txt"), worktree)
     if reason is None:
         return
 

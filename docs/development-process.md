@@ -205,7 +205,7 @@ No failure, no retro. A retro written to fill a template teaches that the templa
 
 ## Branching and Commits
 
-- **Trunk-based**: work lands on `main`, and `main` is always releasable. A worktree branch exists for the length of a task and is integrated by the orchestrator, not pushed.
+- **Trunk-based**: work lands on `main`, and `main` is always releasable. A worktree branch exists for the length of a task and is integrated by the orchestrator, not pushed, following the landing checklist in `.claude/skills/a9s-team-loop/SKILL.md`: signed-off hash equals the dispatched hash and nothing sits above it, cherry-pick onto a clean landing branch, full gates there, fast-forward `main`, acceptance on a fresh detached checkout, then delete the branch.
 - **One commit per concern**. Refactor work follows the per-phase spec in `docs/historical/refactor/<phase>.md`.
 - **Conventional Commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`, `ci:`.
 - **Never `--no-verify`, never `--no-gpg-sign`**. Hook failures are diagnosed, not bypassed.
