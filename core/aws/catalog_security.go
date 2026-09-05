@@ -186,18 +186,12 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		// inline-only account (zero managed policies, many inline ones on
 		// groups) would otherwise report a confirmed-empty "0" instead of
 		// the honest lower-bound "N+", making it look unnavigable.
-		// LowerBoundOnly marks this pairing (IsTruncated=true, no cursor) as
-		// deliberate: without it, resource.sanitizeFetchResult cannot tell this
-		// apart from a fetcher that hit a local cap and forgot to wire a
-		// cursor, and would downgrade it back to a confirmed "0", the exact
-		// bug this registration exists to prevent.
 		AvailabilityFetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
 			if result.Pagination == nil {
 				result.Pagination = &resource.PaginationMeta{}
 			}
 			result.Pagination.IsTruncated = true
-			result.Pagination.LowerBoundOnly = true
 			return result, err
 		}),
 		Wave2: IssueEnricher{Fn: EnrichIAMPolicy, Priority: 100},
@@ -388,8 +382,8 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 			}
 			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(role))
 		},
-		Columns:   resource.RolePolicyColumns(),
-		Color:     colorWave1OrHealthy,
+		Columns: resource.RolePolicyColumns(),
+		Color:   colorWave1OrHealthy,
 		FieldKeys: []string{"policy_name", "policy_arn", "policy_type"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)
