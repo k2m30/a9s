@@ -136,9 +136,10 @@ type RedisFixtures struct {
 // multi-W1 case (U7a). The graph-root (prod-redis-sessions) carries matching
 // sibling entries for all 10 registered related-panel pivots.
 var sharedRedisFixtures = sync.OnceValue(func() *RedisFixtures {
+	groups := normalizeRedisPosture(buildRedisReplicationGroups())
 	return &RedisFixtures{
-		ReplicationGroups: normalizeRedisPosture(buildRedisReplicationGroups()),
-		CacheClusters:     buildRedisCacheClusters(),
+		ReplicationGroups: groups,
+		CacheClusters:     withRedisMemberClusters(buildRedisCacheClusters(), groups),
 		SubnetGroups:      buildRedisCacheSubnetGroups(),
 		TagLists:          buildRedisTagLists(),
 	}
@@ -685,43 +686,54 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 // CacheClusters
 // ---------------------------------------------------------------------------
 
-// buildRedisCacheClusters builds the member-cluster list.
-// The graph-root member cluster (ProdRedisMemberClusterID) carries all fields
-// needed by the current related checkers: SG, SNS, SubnetGroup, LogDeliveryConfigurations.
-// These fields exist on CacheCluster, not ReplicationGroup, and are read by the
-// pre-phase-7 related checkers via DescribeCacheClusters on MemberClusters[0].
-// redisPostureWitnessCluster is the member cluster a posture witness names in
-// MemberClusters[0]. The redis related panel reads security groups, subnet
-// group and notification target off the member cluster, not off the
-// replication group, so a witness without one answers every two-hop pivot
-// "unknown" rather than resolving. It carries what the graph-root member
-// carries, so the witnesses pivot to the same security group, subnet group
-// and VPC as the healthy fixtures.
-func redisPostureWitnessCluster(rgID string) elasticachetypes.CacheCluster {
-	id := rgID + "-001"
-	return elasticachetypes.CacheCluster{
-		CacheClusterId:            aws.String(id),
-		ReplicationGroupId:        aws.String(rgID),
-		ARN:                       aws.String("arn:aws:elasticache:us-east-1:123456789012:cluster:" + id),
-		CacheClusterStatus:        aws.String("available"),
-		CacheNodeType:             aws.String("cache.t3.medium"),
-		Engine:                    aws.String("redis"),
-		EngineVersion:             aws.String("7.1"),
-		NumCacheNodes:             aws.Int32(1),
-		CacheSubnetGroupName:      aws.String(ProdRedisSubnetGroup),
-		PreferredAvailabilityZone: aws.String("us-east-1a"),
-		SecurityGroups: []elasticachetypes.SecurityGroupMembership{
-			{SecurityGroupId: aws.String(ProdRedisSGID), Status: aws.String("active")},
-		},
+// withRedisMemberClusters appends the member cluster every replication group
+// names but the hand-written list above does not define.
+//
+// The redis related panel reads security groups and subnet group off
+// MemberClusters[0], not off the replication group, so a group whose first
+// member is missing answers all three two-hop pivots "unknown" instead of
+// resolving. Deriving them keeps that true by construction as groups are
+// added, rather than by remembering to hand-write a member each time.
+func withRedisMemberClusters(clusters []elasticachetypes.CacheCluster, groups []elasticachetypes.ReplicationGroup) []elasticachetypes.CacheCluster {
+	have := make(map[string]bool, len(clusters))
+	for _, c := range clusters {
+		have[aws.ToString(c.CacheClusterId)] = true
 	}
+	for _, rg := range groups {
+		if len(rg.MemberClusters) == 0 {
+			continue
+		}
+		id := rg.MemberClusters[0]
+		if have[id] {
+			continue
+		}
+		have[id] = true
+		clusters = append(clusters, elasticachetypes.CacheCluster{
+			CacheClusterId:            aws.String(id),
+			ReplicationGroupId:        rg.ReplicationGroupId,
+			ARN:                       aws.String("arn:aws:elasticache:us-east-1:123456789012:cluster:" + id),
+			CacheClusterStatus:        aws.String("available"),
+			CacheNodeType:             rg.CacheNodeType,
+			Engine:                    aws.String("redis"),
+			EngineVersion:             aws.String("7.1"),
+			NumCacheNodes:             aws.Int32(1),
+			CacheSubnetGroupName:      aws.String(ProdRedisSubnetGroup),
+			PreferredAvailabilityZone: aws.String("us-east-1a"),
+			SecurityGroups: []elasticachetypes.SecurityGroupMembership{
+				{SecurityGroupId: aws.String(ProdRedisSGID), Status: aws.String("active")},
+			},
+		})
+	}
+	return clusters
 }
 
+// buildRedisCacheClusters builds the hand-written member clusters — the ones
+// that carry more than the three two-hop pivots need. The graph-root member
+// (ProdRedisMemberClusterID) additionally carries the SNS topic and the log
+// delivery configuration the notification and logs pivots read. Every other
+// group's first member is derived by withRedisMemberClusters.
 func buildRedisCacheClusters() []elasticachetypes.CacheCluster {
 	return []elasticachetypes.CacheCluster{
-		redisPostureWitnessCluster(RedisAtRestOff),
-		redisPostureWitnessCluster(RedisTransitOff),
-		redisPostureWitnessCluster(RedisNoAuth),
-		redisPostureWitnessCluster(RedisNoBackup),
 		// Graph-root primary member cluster — carries all related-panel pivot fields.
 		{
 			CacheClusterId:            aws.String(ProdRedisMemberClusterID),
@@ -792,7 +804,11 @@ func buildRedisCacheClusters() []elasticachetypes.CacheCluster {
 			Engine:                    aws.String("redis"),
 			EngineVersion:             aws.String("7.0"),
 			NumCacheNodes:             aws.Int32(1),
+			CacheSubnetGroupName:      aws.String(ProdRedisSubnetGroup),
 			PreferredAvailabilityZone: aws.String("us-east-1a"),
+			SecurityGroups: []elasticachetypes.SecurityGroupMembership{
+				{SecurityGroupId: aws.String(ProdRedisSGID), Status: aws.String("active")},
+			},
 		},
 	}
 }
