@@ -169,9 +169,8 @@ if [ ${#workflows[@]} -gt 0 ]; then
       current="$ref"
     fi
 
-    # A bare SHA or a moving ref (@main) carries no version to compare against.
-    # That is a property of the pin, not of the network, so it is a finding
-    # rather than a skipped section.
+    # A bare SHA or a moving ref (@main) carries no version to compare against,
+    # so the pin's freshness is unverifiable and counts as a finding.
     if ! printf '%s' "$current" | grep -qE '^v?[0-9]+(\.[0-9]+)*$'; then
       if ! grep -qx "unpinned ${slug}" "$tmp/seen"; then
         echo "action ${slug} unpinned-by-tag ${ref} (${file})"
