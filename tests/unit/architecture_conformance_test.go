@@ -318,6 +318,7 @@ var rowStoreMutationSeamFiles = map[string]struct{}{
 	"tui/app_enrich_fold.go":           {}, // applyEnrichment: AmendRows-wrapped store leg only
 	"tui/runtime_adapter_navigate.go":  {}, // comment reference only, no direct mutation call
 	"runtime/handlers_availability.go": {}, // AmendRows-wrapped FieldUpdates fold
+	"runtime/handlers_resources.go":    {}, // stripWave2FindingsRows: AmendRows-wrapped clear leg only
 	"runtime/helpers.go":               {}, // applyEnrichment: AmendRows-wrapped store leg only
 }
 
