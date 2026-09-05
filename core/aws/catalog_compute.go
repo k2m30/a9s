@@ -118,9 +118,8 @@ func colorASG(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	// Reached only by a Resource carrying Fields but no Findings — a row
-	// built outside the fetcher. Every branch below mirrors one the fetcher
-	// emits a Finding for; asgDeleting keeps the deleting test in one place.
+	// Reached only by a Resource built outside the fetcher, which carries
+	// Fields but no Findings.
 	if asgDeleting(r.Fields["status"]) {
 		return domain.ColorWarning
 	}
