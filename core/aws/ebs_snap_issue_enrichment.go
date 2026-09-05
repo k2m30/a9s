@@ -33,7 +33,7 @@ import (
 const ebsSnapCodePublic domain.FindingCode = "ebs-snap.public"
 
 // ebsSnapPublicDetail is the S5 operator sentence for ebsSnapCodePublic.
-const ebsSnapPublicDetail = "This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Remove the `all` group from the snapshot's createVolumePermission."
+const ebsSnapPublicDetail = "This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the `all` group."
 
 // enrichEBSSnapCrossRef is the IssueEnricherFunc registered for ebs-snap:
 // the cache-only orphan scan, plus the one account-wide DescribeSnapshots

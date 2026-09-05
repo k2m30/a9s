@@ -16,9 +16,9 @@ import (
 )
 
 // asgDeleting reports a group AWS is tearing down. Its capacity is on its
-// way to zero and nothing about it can be reconfigured. The single lifecycle
-// guard for every asg posture finding — the fetcher's Wave-1 rules and the
-// launch-configuration pass in the Wave-2 enricher both call it.
+// way to zero and nothing about it can be reconfigured. The single place that
+// fact is spelled: the fetcher's lifecycle switch and posture rules and the
+// launch-configuration pass in the Wave-2 enricher all call it.
 func asgDeleting(status string) bool {
 	return status == "Delete in progress"
 }
@@ -116,7 +116,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		// cell / detail Attention block always explain the color instead of
 		// relying on a bare structural read.
 		switch {
-		case status == "Delete in progress":
+		case asgDeleting(status):
 			r.Findings = []domain.Finding{{
 				Code: CodeASGStateDeleting, Phrase: "delete in progress",
 				Severity: domain.SevWarn, Source: "wave1",
@@ -175,7 +175,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeASGNoELBHealthCheck, domain.DetailRow{
-				Label: "HealthCheckType", Value: aws.ToString(asg.HealthCheckType), Tier: "~",
+				Label: "Health check type", Value: aws.ToString(asg.HealthCheckType), Tier: "~",
 			})
 		}
 

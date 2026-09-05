@@ -45,6 +45,6 @@ const (
 
 // S5 operator sentences stamped onto Finding.Detail for the posture codes above.
 const (
-	ec2IMDSv1AllowedDetail = "Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Set MetadataOptions.HttpTokens to required on the instance."
+	ec2IMDSv1AllowedDetail = "Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata."
 	ec2PublicIPDetail      = "The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly."
 )

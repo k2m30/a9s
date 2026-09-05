@@ -30,7 +30,7 @@ const (
 
 // S5 operator sentences for the launch-configuration posture codes above.
 const (
-	asgLaunchConfigIMDSv1Detail   = "Instances this group launches answer metadata requests without a session token, so an SSRF bug on any of them leaks the attached role's credentials. Launch configurations cannot be edited — copy this one to a launch template with HttpTokens required and repoint the group."
+	asgLaunchConfigIMDSv1Detail   = "Instances this group launches answer metadata requests without a session token, so an SSRF bug on any of them leaks the attached role's credentials. Launch configurations cannot be edited — copy this one to a launch template that requires session tokens and repoint the group."
 	asgLaunchConfigPublicIPDetail = "Every instance this group launches gets a routable public address, so each new instance is reachable from the internet on whatever its security groups leave open. Copy the launch configuration to a launch template with public address assignment off."
 	//nolint:gosec // G101 false positive: operator prose about a credential, not one
 	asgLaunchConfigSecretDetail = "A credential is pasted into the launch configuration's user data, so it is readable by anyone who can call autoscaling:DescribeLaunchConfigurations and lands on every instance the group starts. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it."
@@ -177,7 +177,7 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 	}
 	if lc.MetadataOptions == nil || lc.MetadataOptions.HttpTokens != asgtypes.InstanceMetadataHttpTokensStateRequired {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigIMDSv1, "launch configuration allows IMDSv1", "~", "asg",
-			[]domain.DetailRow{{Label: "HttpTokens", Value: tokens, Tier: "~"}}, asgLaunchConfigIMDSv1Detail)
+			[]domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: "~"}}, asgLaunchConfigIMDSv1Detail)
 	}
 	if lc.AssociatePublicIpAddress != nil && *lc.AssociatePublicIpAddress {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigPublicIP, "launch configuration assigns public IPs", "~", "asg",

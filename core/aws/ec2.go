@@ -203,7 +203,7 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
-				Label: "HttpTokens", Value: "optional", Tier: "~",
+				Label: "Metadata tokens", Value: "optional", Tier: "~",
 			})
 		}
 		if publicIP != "" {

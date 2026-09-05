@@ -81,7 +81,7 @@ func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.F
 	if healthStatus == "UNHEALTHY" {
 		return []domain.Finding{{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"}}
 	}
-	if status == "STOPPED" {
+	if ecsTaskGone(status) {
 		if stopCode != "" && stopCode != "UserInitiated" {
 			return []domain.Finding{{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: " + stopCode, Severity: domain.SevBroken, Source: "wave1"}}
 		}

@@ -34,16 +34,16 @@ const (
 const (
 	ecsTaskPrivilegedDetail    = "A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs."
 	ecsTaskHostNamespaceDetail = "This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset."
-	ecsTaskWritableRootDetail  = "A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Set ReadonlyRootFilesystem on the container and mount a volume for the paths it genuinely writes."
-	ecsTaskNoLoggingDetail     = "A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping. Add a LogConfiguration pointing at awslogs or your log router."
+	ecsTaskWritableRootDetail  = "A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes."
+	ecsTaskNoLoggingDetail     = "A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping. Give the container a log driver pointing at awslogs or your log router."
 	//nolint:gosec // G101 false positive: operator prose about a credential, not one
 	ecsTaskEnvSecretDetail = "A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block."
 )
 
 // ecsTaskGone reports a task that has already stopped. The row is a task,
 // not a definition, so a stopped task is not an open posture item however
-// its definition reads. The single lifecycle guard for every ecs-task
-// posture finding.
+// its definition reads. The single place that fact is spelled: the fetcher's
+// lifecycle findings and the Wave-2 posture pass both call it.
 func ecsTaskGone(lastStatus string) bool {
 	return lastStatus == "STOPPED"
 }
