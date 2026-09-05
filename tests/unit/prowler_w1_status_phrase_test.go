@@ -123,27 +123,25 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 	clients := &awsclient.ServiceClients{EC2: ec2Fake, ECS: ecsFake, Lambda: lambdaFake, AutoScaling: asgFake}
 
 	// The sg and ebs lists are cross-referenced by the ec2 and ebs-snap
-	// enrichers; the ami list by lt's.
+	// enrichers; the ami list by lt's. Each is drained, because a sibling that
+	// sorts onto page two is a cross-reference that silently resolves to
+	// nothing.
 	cache := resource.ResourceCache{}
 	for _, entry := range []struct {
 		short string
-		fetch func() (resource.FetchResult, error)
+		fetch func(token string) (resource.FetchResult, error)
 	}{
-		{"sg", func() (resource.FetchResult, error) {
-			return awsclient.FetchSecurityGroupsPage(context.Background(), ec2Fake, "")
+		{"sg", func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchSecurityGroupsPage(context.Background(), ec2Fake, token)
 		}},
-		{"ebs", func() (resource.FetchResult, error) {
-			return awsclient.FetchEBSVolumesPage(context.Background(), ec2Fake, "")
+		{"ebs", func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchEBSVolumesPage(context.Background(), ec2Fake, token)
 		}},
-		{"ami", func() (resource.FetchResult, error) {
-			return awsclient.FetchAMIsPage(context.Background(), ec2Fake, "")
+		{"ami", func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchAMIsPage(context.Background(), ec2Fake, token)
 		}},
 	} {
-		out, err := entry.fetch()
-		if err != nil {
-			t.Fatalf("demo %s list: %v", entry.short, err)
-		}
-		cache[entry.short] = resource.ResourceCacheEntry{Resources: out.Resources}
+		cache[entry.short] = resource.ResourceCacheEntry{Resources: DrainPages(t, "demo "+entry.short, entry.fetch)}
 	}
 
 	var rows []pw1BenchRow
@@ -152,22 +150,19 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 		if td == nil || td.Fetcher == nil {
 			t.Fatalf("%s has no catalog Fetcher", short)
 		}
-		page, err := td.Fetcher(context.Background(), clients, "")
-		// Rows and a composite error together are the designed partial-success
-		// outcome — lt's details-denied witness is fetched exactly that way.
-		// Only a row-less error is a harness failure.
-		if err != nil && len(page.Resources) == 0 {
-			t.Fatalf("demo %s fetch: %v", short, err)
-		}
+		resources := DrainPages(t, "demo "+short, func(token string) (resource.FetchResult, error) {
+			return td.Fetcher(context.Background(), clients, token)
+		})
 		res := awsclient.IssueEnricherResult{}
 		if e, ok := awsclient.Wave2EnricherFor(short); ok && e.Fn != nil {
-			res, err = e.Fn(context.Background(), clients, page.Resources, cache)
+			var err error
+			res, err = e.Fn(context.Background(), clients, resources, cache)
 			if err != nil {
 				t.Fatalf("demo %s enrich: %v", short, err)
 			}
 		}
-		for i := range page.Resources {
-			r := page.Resources[i]
+		for i := range resources {
+			r := resources[i]
 			runtime.ApplyWave2ToRow(&r, *td, res.Findings, res.AttentionDetails)
 			rows = append(rows, pw1BenchRow{typeName: short, res: r})
 		}
@@ -204,6 +199,37 @@ func pw1BenchRowFor(t *testing.T, rows []pw1BenchRow, typeName, id string) resou
 	}
 	t.Fatalf("demo row %s/%s not found", typeName, id)
 	return resource.Resource{}
+}
+
+// TestProwlerW1_BenchContainsEveryWitness pins the bench's own completeness.
+// Every other test here looks a witness up and fails when it is absent, so a
+// fixture that stops being produced reads as one broken assertion rather than
+// as a bench that can no longer see it. This reports the whole gap at once,
+// and it is the assertion that fails if the drain ever stops short again.
+func TestProwlerW1_BenchContainsEveryWitness(t *testing.T) {
+	rows := pw1ComputeBench(t)
+	present := map[string]bool{}
+	for _, row := range rows {
+		present[row.typeName+"/"+row.res.ID] = true
+	}
+	var missing []string
+	for _, w := range pw1WitnessPhrases {
+		if !present[w.typeName+"/"+w.id] {
+			missing = append(missing, w.typeName+"/"+w.id)
+		}
+	}
+	for _, id := range []string{fixtures.EC2InstanceInternetExposed} {
+		if !present["ec2/"+id] {
+			missing = append(missing, "ec2/"+id)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("the demo bench does not contain %d expected witness row(s): %v\n"+
+			"either the fixture is gone or the bench stopped draining before it", len(missing), missing)
+	}
+	if len(rows) == 0 {
+		t.Fatal("the demo bench produced no rows at all")
+	}
 }
 
 // TestProwlerW1_WitnessPhraseIsTheOneSelected pins that each witness's own

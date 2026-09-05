@@ -42,10 +42,12 @@ const pw1TaskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/acme-a
 // the per-definition describes so the memoisation contract can be asserted.
 type pw1ECSTaskFake struct {
 	awsclient.ECSAPI
-	tasks       map[string]ecstypes.Task           // task id → task
-	defs        map[string]ecstypes.TaskDefinition // definition ARN → definition
-	defErr      map[string]error                   // definition ARN → error
-	tasksErr    error
+	tasks    map[string]ecstypes.Task           // task id → task
+	defs     map[string]ecstypes.TaskDefinition // definition ARN → definition
+	defErr   map[string]error                   // definition ARN → error
+	tasksErr error
+
+	// EnrichECSTasks fans this fake out through ForEachParallel.
 	mu          sync.Mutex
 	defRequests []string
 }
@@ -513,11 +515,10 @@ func TestECSTask_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 		t.Fatal("ecs-task has no catalog Fetcher")
 	}
 	clients := &awsclient.ServiceClients{ECS: fakes.NewECS()}
-	page, ferr := td.Fetcher(context.Background(), clients, "")
-	if ferr != nil {
-		t.Fatalf("fetching demo ecs-task rows: %v", ferr)
-	}
-	res, eerr := awsclient.EnrichECSTasks(context.Background(), clients, page.Resources, nil)
+	resources := DrainPages(t, "demo ecs-task", func(token string) (resource.FetchResult, error) {
+		return td.Fetcher(context.Background(), clients, token)
+	})
+	res, eerr := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
 	if eerr != nil {
 		t.Fatalf("EnrichECSTasks(demo): %v", eerr)
 	}
@@ -527,7 +528,7 @@ func TestECSTask_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	// therefore "the witness's definition and no other definition", which is
 	// what makes exactly one row shape appear on the bench.
 	defOf := map[string]string{}
-	for _, r := range page.Resources {
+	for _, r := range resources {
 		defOf[r.ID] = r.Fields["task_definition"]
 	}
 	for code, witness := range map[domain.FindingCode]string{

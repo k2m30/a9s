@@ -31,6 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // assertStackInSync fails the test immediately if m.StackInSync() is false,
@@ -174,6 +175,13 @@ func TestStackSync_SelectorFlow(t *testing.T) {
 	// lists <A9S_CONFIG_FOLDER>/themes/*.yaml from disk before pushing the
 	// selector — an empty/missing dir flashes "No theme files found" instead
 	// of pushing, so seed one real theme file.
+	// ApplyTheme writes a package-level global with no restore of its own, so
+	// a theme selected here stays selected for every test that renders after
+	// this one — including the golden suites, whose help overlay prints the
+	// active theme's name.
+	restoreTheme := styles.ActiveTheme()
+	t.Cleanup(func() { styles.ApplyTheme(restoreTheme) })
+
 	m := newRootSizedModel()
 	themesDir := os.Getenv("A9S_CONFIG_FOLDER") + "/themes"
 	if err := os.MkdirAll(themesDir, 0o755); err != nil {

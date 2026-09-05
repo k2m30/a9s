@@ -18,8 +18,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/atotto/clipboard"
-
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -106,23 +104,20 @@ func TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL(t *testing.T) {
 	m := newDemoConsoleModel()
 	m = loadDemoEC2List(m)
 
-	_, cmd := rootApplyMsg(m, rootKeyPress("O"))
-	if cmd == nil {
-		t.Fatal("pressing 'O' on a resource list should return a command for the console-URL copy")
-	}
-	msg := cmd()
-	flash, ok := msg.(messages.Flash)
-	if !ok {
-		t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
-	}
-	if flash.IsError {
-		t.Skipf("clipboard not available in this environment: %s", flash.Text)
-	}
-
-	got, err := clipboard.ReadAll()
-	if err != nil {
-		t.Skipf("clipboard read-back unavailable: %v", err)
-	}
+	got := ReadClipboardAfter(t, func() {
+		_, cmd := rootApplyMsg(m, rootKeyPress("O"))
+		if cmd == nil {
+			t.Fatal("pressing 'O' on a resource list should return a command for the console-URL copy")
+		}
+		msg := cmd()
+		flash, ok := msg.(messages.Flash)
+		if !ok {
+			t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
+		}
+		if flash.IsError {
+			t.Skipf("clipboard not available in this environment: %s", flash.Text)
+		}
+	})
 	want := "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=i-0abc123"
 	if got != want {
 		t.Errorf("clipboard content after 'O' = %q, want %q", got, want)
@@ -266,23 +261,20 @@ func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
 		Resource:     res,
 	})
 
-	_, cmd := rootApplyMsg(m, rootKeyPress("O"))
-	if cmd == nil {
-		t.Fatal("pressing 'O' in detail view should return a command for the console-URL copy")
-	}
-	msg := cmd()
-	flash, ok := msg.(messages.Flash)
-	if !ok {
-		t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
-	}
-	if flash.IsError {
-		t.Skipf("clipboard not available in this environment: %s", flash.Text)
-	}
-
-	got, err := clipboard.ReadAll()
-	if err != nil {
-		t.Skipf("clipboard read-back unavailable: %v", err)
-	}
+	got := ReadClipboardAfter(t, func() {
+		_, cmd := rootApplyMsg(m, rootKeyPress("O"))
+		if cmd == nil {
+			t.Fatal("pressing 'O' in detail view should return a command for the console-URL copy")
+		}
+		msg := cmd()
+		flash, ok := msg.(messages.Flash)
+		if !ok {
+			t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
+		}
+		if flash.IsError {
+			t.Skipf("clipboard not available in this environment: %s", flash.Text)
+		}
+	})
 	want := "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=i-0abc123"
 	if got != want {
 		t.Errorf("clipboard content after 'O' = %q, want %q", got, want)
@@ -386,22 +378,20 @@ func TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL(t *testing
 	// comment for the same contract on the 'c' key). The only way to verify
 	// what was actually copied is a real clipboard read-back; skip (not
 	// fail) when clipboard access is unavailable in this environment.
-	_, cmd := rootApplyMsg(m, rootKeyPress("O"))
-	if cmd == nil {
-		t.Fatal("pressing 'O' should return a command for the console-URL copy")
-	}
-	msg := cmd()
-	flash, ok := msg.(messages.Flash)
-	if !ok {
-		t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
-	}
-	if flash.IsError {
-		t.Skipf("clipboard not available in this environment (%s) — headless side already confirmed %q", flash.Text, headlessURL)
-	}
-	got, err := clipboard.ReadAll()
-	if err != nil {
-		t.Skipf("clipboard read-back unavailable: %v — headless side already confirmed %q", err, headlessURL)
-	}
+	got := ReadClipboardAfter(t, func() {
+		_, cmd := rootApplyMsg(m, rootKeyPress("O"))
+		if cmd == nil {
+			t.Fatal("pressing 'O' should return a command for the console-URL copy")
+		}
+		msg := cmd()
+		flash, ok := msg.(messages.Flash)
+		if !ok {
+			t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
+		}
+		if flash.IsError {
+			t.Skipf("clipboard not available in this environment (%s) — headless side already confirmed %q", flash.Text, headlessURL)
+		}
+	})
 	if got != wantURL {
 		t.Errorf("TUI 'O' copied clipboard content = %q, want %q", got, wantURL)
 	}

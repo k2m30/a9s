@@ -15,7 +15,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/atotto/clipboard"
 	"gopkg.in/yaml.v3"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -44,23 +43,20 @@ import (
 // qa_copy_test.go precedent for write failures.
 func wave3CopyAndReadClipboard(t *testing.T, m tui.Model) string {
 	t.Helper()
-	_, cmd := rootApplyMsg(m, rootKeyPress("c"))
-	if cmd == nil {
-		t.Fatal("copy key must return a non-nil cmd")
-	}
-	msg := cmd()
-	flash, ok := msg.(messages.Flash)
-	if !ok {
-		t.Fatalf("expected messages.Flash from copy, got %T", msg)
-	}
-	if flash.IsError || strings.HasPrefix(flash.Text, "Copy failed:") {
-		t.Skip("clipboard not available in this environment")
-	}
-	got, err := clipboard.ReadAll()
-	if err != nil {
-		t.Skipf("clipboard read-back unavailable: %v", err)
-	}
-	return got
+	return ReadClipboardAfter(t, func() {
+		_, cmd := rootApplyMsg(m, rootKeyPress("c"))
+		if cmd == nil {
+			t.Fatal("copy key must return a non-nil cmd")
+		}
+		msg := cmd()
+		flash, ok := msg.(messages.Flash)
+		if !ok {
+			t.Fatalf("expected messages.Flash from copy, got %T", msg)
+		}
+		if flash.IsError || strings.HasPrefix(flash.Text, "Copy failed:") {
+			t.Skip("clipboard not available in this environment")
+		}
+	})
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

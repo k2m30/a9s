@@ -58,6 +58,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/session"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // knownVisibilityGaps pins the exact inventory of (type, resource-key)
@@ -94,40 +95,11 @@ import (
 // surfaces — a real regression, not a Dim/neutral non-issue.
 var knownVisibilityGaps = map[string]bool{}
 
-// demoVisibilityMaxFetchPages mirrors demoPivotMaxFetchPages — a safety
-// valve against a runaway fake fetcher during drain.
-const demoVisibilityMaxFetchPages = 50
-
-// drainVisibilityFixtures runs td.Fetcher to exhaustion against the demo
-// clients. Local copy of drainDemoFixtures's exact contract (same signature
-// and behavior) kept independent so this gate does not depend on load order
-// with qa_demo_pivot_coverage_test.go / qa_demo_state_coverage_test.go for
-// its core drain step; the shared fixture set still comes from the same
-// demo.NewServiceClients() typed fakes.
+// drainVisibilityFixtures drains a type's demo rows through its own Wave-1
+// Fetcher, via the same helper every other bench in this directory uses.
 func drainVisibilityFixtures(t *testing.T, td resource.ResourceTypeDef, clients *awsclient.ServiceClients) ([]resource.Resource, bool) {
 	t.Helper()
-	if td.Fetcher == nil {
-		return nil, false
-	}
-	ctx := context.Background()
-	var all []resource.Resource
-	token := ""
-	for page := range demoVisibilityMaxFetchPages {
-		result, err := td.Fetcher(ctx, clients, token)
-		if err != nil && len(result.Resources) == 0 {
-			// Rows + composite error together are the designed E5
-			// partial-success outcome (e.g. mwaa's details-denied demo
-			// witness); only a row-less error is a harness failure.
-			t.Fatalf("%s: Fetcher page %d returned error: %v", td.ShortName, page, err)
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			return all, true
-		}
-		token = result.Pagination.NextToken
-	}
-	t.Fatalf("%s: Fetcher did not terminate within %d pages — runaway pagination in demo fixtures", td.ShortName, demoVisibilityMaxFetchPages)
-	return all, true
+	return unit.DrainFixtures(t, td, clients)
 }
 
 // buildVisibilityTypeCache drains every registered type's demo fixtures and

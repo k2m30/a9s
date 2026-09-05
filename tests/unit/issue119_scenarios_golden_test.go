@@ -14,6 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
@@ -58,18 +59,13 @@ func TestGenerateIssue119Scenarios(t *testing.T) {
 func TestIssue119ScenarioGoldens(t *testing.T) {
 	baseDir := filepath.Join("..", "testdata", "golden", "issue119")
 
-	// Perf: render and compare only 2 representative scenarios to keep the test under 20ms.
-	// All golden files remain on disk for full opt-in regeneration via UPDATE_GOLDEN=1.
-	// Chosen: one wide two-column layout and one stacked layout.
-	goldenSubset := map[string]struct{}{
-		"wide_120_two_column": {},
-		"stacked_090_default": {},
-	}
-
-	plain := collectIssue119ScenarioViewsFiltered(t, true, goldenSubset)
-	ansi := collectIssue119ScenarioViewsFiltered(t, false, goldenSubset)
+	plain := collectIssue119ScenarioViews(t, true)
+	ansi := collectIssue119ScenarioViews(t, false)
 
 	names := sortedIssue119Names(plain)
+	if len(names) != len(issue119Scenarios()) {
+		t.Fatalf("compared %d scenarios, want all %d", len(names), len(issue119Scenarios()))
+	}
 	for _, name := range names {
 		plainPath := filepath.Join(baseDir, name+".golden.txt")
 		ansiPath := filepath.Join(baseDir, name+".ansi.golden")
@@ -96,6 +92,37 @@ func TestIssue119ScenarioGoldens(t *testing.T) {
 	}
 }
 
+// TestIssue119GoldenFilesAllBelongToAScenario closes the other half of the
+// gate. Comparing every scenario proves no scenario drifts unwatched; this
+// proves no golden file sits on disk that nothing compares, which is how a
+// refreshed-but-unasserted snapshot looked like coverage for as long as it did.
+func TestIssue119GoldenFilesAllBelongToAScenario(t *testing.T) {
+	baseDir := filepath.Join("..", "testdata", "golden", "issue119")
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		t.Fatalf("read %s: %v", baseDir, err)
+	}
+	known := map[string]bool{}
+	for _, sc := range issue119Scenarios() {
+		known[sc.name+".golden.txt"] = true
+		known[sc.name+".ansi.golden"] = true
+	}
+	var orphans []string
+	for _, e := range entries {
+		if e.IsDir() || !known[e.Name()] {
+			orphans = append(orphans, e.Name())
+		}
+	}
+	if len(orphans) > 0 {
+		t.Errorf("%d golden file(s) in %s belong to no scenario, so nothing compares them: %v\n"+
+			"add the scenario back or delete the files", len(orphans), baseDir, orphans)
+	}
+	if len(entries) != 2*len(issue119Scenarios()) {
+		t.Errorf("%d golden files for %d scenarios, want a plain and an ANSI file each",
+			len(entries), len(issue119Scenarios()))
+	}
+}
+
 func TestIssue119ScenarioCatalog(t *testing.T) {
 	for _, sc := range issue119Scenarios() {
 		t.Logf("scenario: %s", sc.name)
@@ -108,31 +135,12 @@ func collectIssue119ScenarioViews(t *testing.T, noColor bool) map[string]string 
 	tui.Version = ""
 	t.Cleanup(func() { tui.Version = oldVersion })
 
-	if noColor {
-		tuitest.NoColor(t)
-	} else {
-		tuitest.ForceColor(t)
-	}
-
-	out := make(map[string]string)
-	for _, sc := range issue119Scenarios() {
-		v := withIssue119EC2Defs(t, func() string { return sc.render(t) })
-		v = strings.ReplaceAll(v, "\r\n", "\n")
-		if noColor {
-			v = stripAnsi(v)
-		}
-		out[sc.name] = v
-	}
-	return out
-}
-
-// collectIssue119ScenarioViewsFiltered renders only the scenarios whose names are
-// present in the keep set. Used by TestIssue119ScenarioGoldens for fast CI runs.
-func collectIssue119ScenarioViewsFiltered(t *testing.T, noColor bool, keep map[string]struct{}) map[string]string {
-	t.Helper()
-	oldVersion := tui.Version
-	tui.Version = ""
-	t.Cleanup(func() { tui.Version = oldVersion })
+	// The help overlay prints the active theme's name, and the theme is a
+	// package-level global. Pinning it here makes these goldens independent of
+	// whatever rendered before them under -shuffle.
+	oldTheme := styles.ActiveTheme()
+	styles.ApplyTheme(styles.DefaultTheme())
+	t.Cleanup(func() { styles.ApplyTheme(oldTheme) })
 
 	if noColor {
 		tuitest.NoColor(t)
@@ -142,9 +150,6 @@ func collectIssue119ScenarioViewsFiltered(t *testing.T, noColor bool, keep map[s
 
 	out := make(map[string]string)
 	for _, sc := range issue119Scenarios() {
-		if _, ok := keep[sc.name]; !ok {
-			continue
-		}
 		v := withIssue119EC2Defs(t, func() string { return sc.render(t) })
 		v = strings.ReplaceAll(v, "\r\n", "\n")
 		if noColor {

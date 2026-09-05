@@ -22,8 +22,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/atotto/clipboard"
 )
 
 // TestConsoleOpen_Demo_KeyFlashesDisabledAndNeverExecsBrowser points $BROWSER
@@ -77,28 +75,21 @@ func TestConsoleOpen_Demo_KeyFlashesDisabledAndNeverExecsBrowser(t *testing.T) {
 }
 
 // TestConsoleOpen_Demo_UppercaseOCopiesAnHTTPSConsoleURL presses "O" on a
-// loaded demo resource list and confirms a copy-confirmation flash renders.
-// Where the test environment supports reading the system clipboard
-// (skipIfNoClipboard, shared with clipboard_test.go), it additionally reads
-// the clipboard back and asserts the copied value is an https console URL —
-// per the harness convention of not building new clipboard-reading
-// machinery, this reuses the existing helper rather than adding one.
+// loaded demo resource list and asserts the value that reaches the pasteboard
+// is an https console URL. The read-back goes through readClipboardAfter so a
+// sibling test's copy cannot be mistaken for this one's.
 func TestConsoleOpen_Demo_UppercaseOCopiesAnHTTPSConsoleURL(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	scenario.OpenList("ec2")
 
-	scenario.Press("O")
+	got := readClipboardAfter(t, func() {
+		scenario.Press("O")
 
-	if scenario.lastFlash == nil {
-		t.Fatal("pressing 'O' should produce a flash confirming the console-URL copy")
-	}
-	scenario.ExpectNoAPIError()
-
-	skipIfNoClipboard(t)
-	got, err := clipboard.ReadAll()
-	if err != nil {
-		t.Fatalf("clipboard.ReadAll failed after pressing 'O': %v", err)
-	}
+		if scenario.lastFlash == nil {
+			t.Fatal("pressing 'O' should produce a flash confirming the console-URL copy")
+		}
+		scenario.ExpectNoAPIError()
+	})
 	if !strings.HasPrefix(got, "https://") || !strings.Contains(got, "console.aws.amazon.com") {
 		t.Errorf("clipboard content after 'O' = %q, want an https://...console.aws.amazon.com/... URL", got)
 	}

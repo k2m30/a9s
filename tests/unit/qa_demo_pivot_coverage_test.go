@@ -70,6 +70,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // knownDisconnectedPivots pins the exact (type, pivot) inventory captured at
@@ -107,40 +108,12 @@ var knownDisconnectedPivots = map[string]bool{}
 // FAIL ("remove from allowlist"); a gap NOT in this list -> FAIL unconditionally.
 var knownIssueCoverageGaps = map[string]bool{}
 
-// demoPivotMaxFetchPages bounds the pagination drain per type as a safety
-// valve against a runaway fake that never sets IsTruncated=false. Every real
-// demo fixture set fits comfortably within a handful of pages.
-const demoPivotMaxFetchPages = 50
-
-// drainDemoFixtures runs td.Fetcher to exhaustion against the demo clients,
-// exactly as the production fetch loop does (see aws.FetchS3Buckets), and
-// returns every resource.Resource the type's demo fixtures produce. Returns
-// (nil, false) when the type has no Wave-1 Fetcher registered — such types
-// cannot be driven generically and are skipped by the caller.
+// drainDemoFixtures drains a type's demo rows through its own Wave-1 Fetcher.
+// The paging, the page bound and the rows-plus-error tolerance live in
+// unit.DrainFixtures so every bench in this directory drains identically.
 func drainDemoFixtures(t *testing.T, td resource.ResourceTypeDef, clients *awsclient.ServiceClients) ([]resource.Resource, bool) {
 	t.Helper()
-	if td.Fetcher == nil {
-		return nil, false
-	}
-	ctx := context.Background()
-	var all []resource.Resource
-	token := ""
-	for page := range demoPivotMaxFetchPages {
-		result, err := td.Fetcher(ctx, clients, token)
-		if err != nil && len(result.Resources) == 0 {
-			// Rows + composite error together are the designed E5
-			// partial-success outcome (e.g. mwaa's details-denied demo
-			// witness); only a row-less error is a harness failure.
-			t.Fatalf("%s: Fetcher page %d returned error: %v", td.ShortName, page, err)
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			return all, true
-		}
-		token = result.Pagination.NextToken
-	}
-	t.Fatalf("%s: Fetcher did not terminate within %d pages — runaway pagination in demo fixtures", td.ShortName, demoPivotMaxFetchPages)
-	return all, true
+	return unit.DrainFixtures(t, td, clients)
 }
 
 // buildDemoTypeCache drains every registered type's demo fixtures via its

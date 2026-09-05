@@ -2,8 +2,10 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -42,4 +44,68 @@ func newDemoColdCacheApp(t *testing.T) *tui.Model {
 		tui.WithNoCache(true),
 	)
 	return &m
+}
+
+// DemoDrainMaxPages bounds every fixture drain as a safety valve against a
+// fake that never clears IsTruncated. Real demo fixture sets fit in a handful
+// of pages, so reaching this bound is a runaway, not a large account.
+const DemoDrainMaxPages = 50
+
+// DrainPages runs fetch to exhaustion the way the production fetch loop does
+// and returns every resource across every page.
+//
+// Rows and a composite error arriving together are the designed partial-success
+// outcome — lt's and mwaa's details-denied witnesses are fetched exactly that
+// way — so only a row-less error aborts. A harness that stops at page one
+// instead loses every witness that sorts past the first page without ever
+// failing, which is the failure this helper exists to make impossible.
+func DrainPages(t *testing.T, label string, fetch func(token string) (resource.FetchResult, error)) []resource.Resource {
+	t.Helper()
+	var all []resource.Resource
+	token := ""
+	for page := range DemoDrainMaxPages {
+		result, err := fetch(token)
+		if err != nil && len(result.Resources) == 0 {
+			t.Fatalf("%s: fetch page %d returned error: %v", label, page, err)
+		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			return all
+		}
+		token = result.Pagination.NextToken
+	}
+	t.Fatalf("%s: fetch did not terminate within %d pages — runaway pagination in demo fixtures", label, DemoDrainMaxPages)
+	return all
+}
+
+// DrainFixtures drains a registered type's demo rows through its own Wave-1
+// Fetcher. Reports false when the type has no Fetcher, which is the caller's
+// signal to skip rather than fail.
+func DrainFixtures(t *testing.T, td resource.ResourceTypeDef, clients *awsclient.ServiceClients) ([]resource.Resource, bool) {
+	t.Helper()
+	if td.Fetcher == nil {
+		return nil, false
+	}
+	return DrainPages(t, td.ShortName, func(token string) (resource.FetchResult, error) {
+		return td.Fetcher(context.Background(), clients, token)
+	}), true
+}
+
+// CollectAllPages drains fetch and hands back the error instead of failing, for
+// tests whose subject is the error itself. The page bound still applies.
+func CollectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
+	var all []resource.Resource
+	token := ""
+	for range DemoDrainMaxPages {
+		result, err := fetch(token)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			return all, nil
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, fmt.Errorf("fetch did not terminate within %d pages", DemoDrainMaxPages)
 }

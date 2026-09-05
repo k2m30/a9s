@@ -566,6 +566,12 @@ var nonPaginatedAPIs = []string{
 	"GetPublicAccessBlock",
 	// GetKeyRotationStatus — returns a single key's rotation config.
 	"GetKeyRotationStatus",
+	// GetRepositoryPermissionsPolicy — one repository's resource policy
+	// document. codeartifact.GetRepositoryPermissionsPolicyOutput carries a
+	// single Policy and no token field. Surfaced once the audit began judging
+	// each call rather than each function: its enricher paginates a different
+	// call, which used to exempt this one.
+	"GetRepositoryPermissionsPolicy",
 	// DescribeEnvironmentHealth — single environment health object.
 	"DescribeEnvironmentHealth",
 	// DescribeLoadBalancerAttributes — single LB's attributes.
@@ -636,6 +642,15 @@ var nonPaginatedAPIs = []string{
 	"ListResourcesForWebACL",
 }
 
+// paginationBurnDown is the list of call sites the per-call-site audit already
+// finds unpaginated. They are carried rather than failing, so this gate goes
+// red only on a NEW one; each entry is a finding routed to the batch that owns
+// the enricher. Deleting an entry that is no longer found is enforced below,
+// so the list cannot outlive the work.
+//
+// Key shape: "<file>:<Enrich func>:<SDK operation>".
+var paginationBurnDown = map[string]bool{}
+
 // TestNoSingleCallListAPIEnrichers walks core/aws/*_issue_enrichment.go via
 // go/ast and flags any Enrich* function that:
 //
@@ -678,6 +693,7 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 	fset := token.NewFileSet()
 
 	var violations []string
+	var carried []string
 
 	for _, filePath := range matches {
 		// Defensive: skip any _test.go files that the glob might pick up.
@@ -706,9 +722,6 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 
 			funcName := fn.Name.Name
 
-			// Check whether the function body contains any pagination identifier.
-			hasPaginationRef := bodyContainsAny(fn.Body, "NextToken", "Marker", "ContinuationToken")
-
 			// Collect all 3-level selector calls: clients.Service.Op(...)
 			// A 3-level selector is: SelectorExpr{ X: SelectorExpr{ X: Ident("clients") } }
 			calls := collectThreeLevelCalls(fn.Body, "clients")
@@ -717,9 +730,8 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 				opName := callInfo.opName
 				line := fset.Position(callInfo.pos).Line
 
-				// If the function already references a pagination token anywhere,
-				// we assume the author intends to paginate and don't flag it.
-				if hasPaginationRef {
+				// This call drives a pagination token itself.
+				if callInfo.paginated {
 					continue
 				}
 
@@ -734,11 +746,27 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 					continue
 				}
 
+				key := fmt.Sprintf("%s:%s:%s", baseName, funcName, opName)
+				if paginationBurnDown[key] {
+					carried = append(carried, fmt.Sprintf("%s:%d: %s calls %s", baseName, line, funcName, opName))
+					continue
+				}
+
 				violations = append(violations, fmt.Sprintf(
 					"%s:%d: %s calls %s without pagination (NextToken/Marker absent); add to skip-list with justification or paginate",
 					baseName, line, funcName, opName,
 				))
 			}
+		}
+	}
+
+	if len(carried) > 0 {
+		t.Logf("burn-down: %d known unpaginated call site(s) still open:\n  %s",
+			len(carried), strings.Join(carried, "\n  "))
+	}
+	for key := range paginationBurnDown {
+		if !seenBurnDownKey(carried, key) {
+			t.Errorf("paginationBurnDown lists %q, which the audit no longer finds — delete the entry so the list stays the real burn-down", key)
 		}
 	}
 
@@ -754,21 +782,51 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 	}
 }
 
+// seenBurnDownKey reports whether the audit produced a carried entry for key,
+// whose shape is "<file>:<func>:<op>" against carried's "<file>:<line>: <func>
+// calls <op>".
+func seenBurnDownKey(carried []string, key string) bool {
+	parts := strings.Split(key, ":")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, c := range carried {
+		if strings.HasPrefix(c, parts[0]+":") && strings.Contains(c, parts[1]+" calls "+parts[2]) {
+			return true
+		}
+	}
+	return false
+}
+
 // ---------------------------------------------------------------------------
 // AST helpers for TestNoSingleCallListAPIEnrichers
 // ---------------------------------------------------------------------------
 
-// callSite records the operation name and source position of a detected call.
+// callSite records the operation name and source position of a detected call,
+// and whether that call is the one being paginated.
 type callSite struct {
-	opName string
-	pos    token.Pos
+	opName    string
+	pos       token.Pos
+	paginated bool
 }
 
 // collectThreeLevelCalls finds all call expressions of the form root.X.Op(...)
 // within the given AST node. Returns one callSite per distinct call.
+//
+// paginated is decided per call, not per function: the call must sit inside a
+// loop whose own subtree references a pagination token. A function that
+// paginates one API and single-shots another mentions NextToken either way, so
+// a function-wide check calls the second one paginated and never reports it.
 func collectThreeLevelCalls(body ast.Node, rootIdent string) []callSite {
 	var sites []callSite
+	var stack []ast.Node
 	ast.Inspect(body, func(n ast.Node) bool {
+		if n == nil {
+			stack = stack[:len(stack)-1]
+			return true
+		}
+		stack = append(stack, n)
+
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
@@ -787,10 +845,30 @@ func collectThreeLevelCalls(body ast.Node, rootIdent string) []callSite {
 		if !ok || ident.Name != rootIdent {
 			return true
 		}
-		sites = append(sites, callSite{opName: sel.Sel.Name, pos: call.Pos()})
+		sites = append(sites, callSite{
+			opName:    sel.Sel.Name,
+			pos:       call.Pos(),
+			paginated: inPaginatedLoop(stack),
+		})
 		return true
 	})
 	return sites
+}
+
+// inPaginatedLoop reports whether any loop enclosing the call currently on top
+// of stack drives a pagination token. The token has to live in the loop that
+// contains the call, because a second loop elsewhere in the same function says
+// nothing about this call.
+func inPaginatedLoop(stack []ast.Node) bool {
+	for _, n := range stack {
+		switch n.(type) {
+		case *ast.ForStmt, *ast.RangeStmt:
+			if bodyContainsAny(n, "NextToken", "Marker", "ContinuationToken") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // bodyContainsAny reports whether any of the given identifier names appear
@@ -827,4 +905,62 @@ func looksLikeListOrDescribe(op string) bool {
 		}
 	}
 	return false
+}
+
+// TestPaginationAudit_JudgesEachCallNotEachFunction is the audit's own test.
+// An enricher that pages one API and single-shots another mentions NextToken
+// either way, so a function-wide check exempts the second call and reports
+// nothing. This pins that the second call is still seen.
+func TestPaginationAudit_JudgesEachCallNotEachFunction(t *testing.T) {
+	const src = `package aws
+
+func EnrichThing(ctx any, clients *ServiceClients) {
+	token := ""
+	for {
+		out, _ := clients.Backup.ListBackupJobs(ctx, &In{NextToken: &token})
+		if out.NextToken == nil {
+			break
+		}
+		token = *out.NextToken
+	}
+	clients.EC2.DescribeVolumeStatus(ctx, &In{})
+	for _, id := range ids {
+		clients.EC2.DescribeInstanceStatus(ctx, &In{})
+	}
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "x.go", src, 0)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	fn := file.Decls[0].(*ast.FuncDecl)
+
+	got := map[string]bool{}
+	for _, c := range collectThreeLevelCalls(fn.Body, "clients") {
+		got[c.opName] = c.paginated
+	}
+
+	want := map[string]bool{
+		// Inside the loop that advances the token.
+		"ListBackupJobs": true,
+		// Outside any loop.
+		"DescribeVolumeStatus": false,
+		// Inside a loop, but one that iterates resource IDs and drives no
+		// token — the shape a function-wide check cannot tell from the first.
+		"DescribeInstanceStatus": false,
+	}
+	for op, wantPaginated := range want {
+		gotPaginated, seen := got[op]
+		if !seen {
+			t.Errorf("%s was not collected at all", op)
+			continue
+		}
+		if gotPaginated != wantPaginated {
+			t.Errorf("%s paginated = %v, want %v", op, gotPaginated, wantPaginated)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("collected %d calls, want %d: %v", len(got), len(want), got)
+	}
 }

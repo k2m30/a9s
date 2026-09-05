@@ -64,6 +64,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // ---------------------------------------------------------------------------
@@ -250,8 +251,10 @@ func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 		t.Fatalf("expected alice.johnson to carry a Broken wave2 finding (console user without MFA, "+
 			"CIS IAM.5) from EnrichIAMUserMFA, got finding=%+v hasFinding=%v", findings, hasFinding)
 	}
-	finding := findings[0]
-	alice.Findings = append(alice.Findings, finding)
+	// The fold is what production applies, so the classifier below sees the
+	// same row the list does. Appending the finding by hand would skip the
+	// stale-wave2 strip and the AttentionDetails re-keying.
+	a9sruntime.ApplyWave2ToRow(alice, *td, enrichResult.Findings, enrichResult.AttentionDetails)
 
 	// Mirror production's field-update application (Controller.ApplyListFieldUpdates
 	// -> applyFieldUpdatesToSlice in core/app/list_body.go): FieldUpdates is a

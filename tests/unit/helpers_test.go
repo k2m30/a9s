@@ -37,20 +37,7 @@ func lipglossWidth(s string) int {
 // resources, stop on the first error (discarding any partial results), and
 // stop once Pagination is nil or IsTruncated is false.
 func collectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := fetch(token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
+	return CollectAllPages(fetch)
 }
 
 // newDetailControllerUnit builds a Controller (via the blessed newTestController

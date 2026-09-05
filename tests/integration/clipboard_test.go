@@ -3,11 +3,47 @@
 package integration
 
 import (
+	"fmt"
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/atotto/clipboard"
 )
+
+// The pasteboard is one mutable object shared by every test in this binary,
+// and the copy paths report only a flash label, so the copied text can be
+// checked only by reading it back. clipboardMu serialises the tests that do.
+var clipboardMu sync.Mutex
+
+var clipboardSeq atomic.Uint64
+
+// readClipboardAfter runs copyFn, which must perform the real pasteboard
+// write, and returns what landed there. A unique sentinel goes on first so a
+// write that never happened is a skip rather than an assertion against the
+// previous test's leftovers.
+func readClipboardAfter(t *testing.T, copyFn func()) string {
+	t.Helper()
+	clipboardMu.Lock()
+	defer clipboardMu.Unlock()
+
+	sentinel := fmt.Sprintf("a9s-clipboard-sentinel-%d-%d", os.Getpid(), clipboardSeq.Add(1))
+	if err := clipboard.WriteAll(sentinel); err != nil {
+		t.Skipf("clipboard not writable in this environment: %v", err)
+	}
+
+	copyFn()
+
+	got, err := clipboard.ReadAll()
+	if err != nil {
+		t.Skipf("clipboard read-back unavailable: %v", err)
+	}
+	if got == sentinel {
+		t.Skip("the copy did not reach the pasteboard in this environment")
+	}
+	return got
+}
 
 // skipIfNoClipboard skips the test if clipboard access is not available
 // (e.g., running in SSH, headless CI, or container environments).
@@ -41,15 +77,11 @@ func TestQA_180_ClipboardWriteAndReadBack(t *testing.T) {
 
 	testContent := "a9s-integration-test-clipboard-content-12345"
 
-	err := clipboard.WriteAll(testContent)
-	if err != nil {
-		t.Fatalf("clipboard.WriteAll failed: %v", err)
-	}
-
-	readBack, err := clipboard.ReadAll()
-	if err != nil {
-		t.Fatalf("clipboard.ReadAll failed: %v", err)
-	}
+	readBack := readClipboardAfter(t, func() {
+		if err := clipboard.WriteAll(testContent); err != nil {
+			t.Fatalf("clipboard.WriteAll failed: %v", err)
+		}
+	})
 
 	if readBack != testContent {
 		t.Errorf("clipboard round-trip failed: wrote %q, read %q", testContent, readBack)

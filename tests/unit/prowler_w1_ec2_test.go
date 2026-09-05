@@ -127,15 +127,20 @@ func (f *pw1EC2ListFake) DescribeInstanceStatus(_ context.Context, _ *ec2.Descri
 // per-instance user-data attribute keyed by instance ID.
 type pw1EC2EnrichFake struct {
 	awsclient.EC2API
-	userData    map[string]string // instance ID → raw (undecoded) script
-	attrErr     map[string]error  // instance ID → DescribeInstanceAttribute error
+	userData map[string]string // instance ID → raw (undecoded) script
+	attrErr  map[string]error  // instance ID → DescribeInstanceAttribute error
+
+	// The enricher fans this fake out through ForEachParallel, so every
+	// recorded call is written from a different goroutine.
 	mu          sync.Mutex
 	attrCalls   []string
 	statusPages int
 }
 
 func (f *pw1EC2EnrichFake) DescribeInstanceStatus(_ context.Context, _ *ec2.DescribeInstanceStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error) {
+	f.mu.Lock()
 	f.statusPages++
+	f.mu.Unlock()
 	return &ec2.DescribeInstanceStatusOutput{}, nil
 }
 

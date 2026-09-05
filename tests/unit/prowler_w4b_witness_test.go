@@ -35,12 +35,9 @@ func w4bBench(t *testing.T, shortName string) ([]resource.Resource, resource.Res
 		t.Fatalf("%s not registered", shortName)
 	}
 	clients := demo.NewServiceClients()
-	rows, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+	rows := DrainPages(t, shortName, func(token string) (resource.FetchResult, error) {
 		return td.Fetcher(context.Background(), clients, token)
 	})
-	if err != nil {
-		t.Fatalf("%s fetch: %v", shortName, err)
-	}
 	if len(rows) == 0 {
 		t.Fatalf("%s: no demo rows", shortName)
 	}
@@ -199,6 +196,14 @@ func TestW4bPowerUserResolvesThroughGroupPolicyPivot(t *testing.T) {
 // text the views render. IAM action names and condition keys (iam:PassRole,
 // sts:ExternalId) are operator vocabulary and are allowed by ruling — they
 // carry a colon and never collide with this list.
+//
+// Ceiling: hand-picked, so it catches a regression only in a name already
+// listed. It is not derived from the SDK on purpose — core/config/
+// views_reference.yaml holds every field name of every service, and most of
+// them ("Policy", "Key", "Name", "Actions") are also the words an operator
+// uses, so sweeping against all of them would reject correct text far more
+// often than wrong text. Extend by hand when a new type's enricher starts
+// reading a field whose name would embarrass the view.
 var w4bSDKFieldNames = []string{
 	"AccessKeyId", "AssumeRolePolicyDocument", "AttachedPolicies", "CreateDate",
 	"KeyManager", "KeyRotationEnabled", "LastUsedDate", "MFADevices",
@@ -243,12 +248,9 @@ func w4bAssertOperatorText(t *testing.T, id, where, text string) {
 // to another batch, and pinning it here would hide these rows regressing.
 func TestW4bRoleWave1SupportingRowsSurviveTheFetcher(t *testing.T) {
 	clients := demo.NewServiceClients()
-	rows, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+	rows := DrainPages(t, "role", func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchIAMRolesPage(context.Background(), clients.IAM, token)
 	})
-	if err != nil {
-		t.Fatalf("FetchIAMRolesPage: %v", err)
-	}
 
 	deputy := w4bRow(t, rows, fixtures.RoleConfusedDeputy)
 	w4AssertRows(t, deputy.AttentionDetails, "role.trust.confused-deputy",
@@ -264,5 +266,122 @@ func TestW4bRoleWave1SupportingRowsSurviveTheFetcher(t *testing.T) {
 	}
 	if ad.Rows[1].Value != "PassRole+CreateLambda+Invoke" {
 		t.Errorf("Combo = %q, want PassRole+CreateLambda+Invoke", ad.Rows[1].Value)
+	}
+}
+
+// w4WitnessTypes are the batch's seven types.
+var w4WitnessTypes = []string{"role", "policy", "iam-user", "iam-group", "waf", "secrets", "kms"}
+
+// TestW4EveryWave2CodeHasExactlyOneWitness generalises the exactly-one rule
+// that was proved for two witnesses by hand.
+//
+// A demo bench earns its keep only when each signal is demonstrated by one
+// row: zero rows means the signal is undemonstrated and no surface test can
+// see it, and two rows mean neither is the witness, so changing the rule moves
+// a count nobody can attribute. Deriving the set from what the bench actually
+// emits means a new wave-2 finding is covered the day it ships, without a hand
+// list to forget to extend.
+func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
+	carriers := map[domain.FindingCode][]string{}
+	for _, shortName := range w4WitnessTypes {
+		rows, _ := w4bBench(t, shortName)
+		for _, r := range rows {
+			for _, f := range r.Findings {
+				if !strings.HasPrefix(f.Source, "wave2:") {
+					continue
+				}
+				carriers[f.Code] = append(carriers[f.Code], shortName+"/"+r.ID)
+			}
+		}
+	}
+
+	if len(carriers) == 0 {
+		t.Fatal("no wave-2 finding fired anywhere on the batch's demo bench")
+	}
+
+	codes := make([]domain.FindingCode, 0, len(carriers))
+	for code := range carriers {
+		codes = append(codes, code)
+	}
+	slices.Sort(codes)
+
+	singles := 0
+	for _, code := range codes {
+		ids := carriers[code]
+		slices.Sort(ids)
+		if reason, broad := w4MultiCarrierCodes[code]; broad {
+			if len(ids) < 2 {
+				t.Errorf("%s is listed as a fleet-wide signal (%s) but fires on %d row(s); "+
+					"if it now has a single witness, move it out of w4MultiCarrierCodes", code, reason, len(ids))
+			}
+			continue
+		}
+		singles++
+		if len(ids) != 1 {
+			t.Errorf("%s fires on %d demo rows, want exactly 1: %v", code, len(ids), ids)
+		}
+	}
+
+	const wantWitnessed = 14
+	if singles != wantWitnessed {
+		t.Errorf("%d witness-backed wave-2 codes on the bench, want %d — a witness was added or lost "+
+			"without this count moving with it; codes seen: %v", singles, wantWitnessed, codes)
+	}
+}
+
+// w4MultiCarrierCodes are the batch's wave-2 codes that describe a fleet-wide
+// posture rather than one planted fixture, so more than one demo row carries
+// them by design. Everything else is a witness and must fire exactly once.
+var w4MultiCarrierCodes = map[domain.FindingCode]string{
+	"iam-role.dormant":         "every unused demo role is dormant; the signal is the account's shape, not one row",
+	"kms.rotation-disabled":    "rotation is off on most demo keys, as it is on most real ones",
+	"iam-group.admin-attached": "deliberately two rows, so the Policy row is proved to name the policy that fired rather than a constant",
+	"iam-group.orphan-or-noop": "an empty group and a no-op group are two different shapes of the same signal",
+}
+
+// TestW4AccessKeyRowsRenderKeySuffixAndDate pins how the unused-access-key
+// finding renders its two supporting rows. The key is shown by its last four
+// characters because an access key id is a credential the operator should not
+// have to read in full to recognise, and the date answers "how long has this
+// been true" without making them open the console.
+func TestW4AccessKeyRowsRenderKeySuffixAndDate(t *testing.T) {
+	rows, _ := w4bBench(t, "iam-user")
+
+	const code domain.FindingCode = "iam-user.access-key-unused"
+	var carrier *resource.Resource
+	for i := range rows {
+		if _, ok := rows[i].AttentionDetails[code]; ok {
+			carrier = &rows[i]
+			break
+		}
+	}
+	if carrier == nil {
+		t.Fatalf("no demo iam-user row carries %s, so the rendering below is unwitnessed", code)
+	}
+
+	got := map[string]string{}
+	for _, r := range carrier.AttentionDetails[code].Rows {
+		got[r.Label] = r.Value
+	}
+
+	key, ok := got["Key"]
+	if !ok {
+		t.Fatalf("%s renders no Key row: %+v", code, carrier.AttentionDetails[code].Rows)
+	}
+	if !strings.HasPrefix(key, "…") {
+		t.Errorf("Key row = %q, want the last four characters behind a leading ellipsis so the full "+
+			"credential is not printed", key)
+	}
+	if len([]rune(key)) != 5 {
+		t.Errorf("Key row = %q (%d runes), want an ellipsis plus exactly four characters",
+			key, len([]rune(key)))
+	}
+
+	lastUsed, ok := got["Last used"]
+	if !ok {
+		t.Fatalf("%s renders no Last used row: %+v", code, carrier.AttentionDetails[code].Rows)
+	}
+	if lastUsed == "" {
+		t.Error("Last used row is empty; the operator cannot tell how long the key has been idle")
 	}
 }

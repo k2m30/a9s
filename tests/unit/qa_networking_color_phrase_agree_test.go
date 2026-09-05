@@ -47,7 +47,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 	demoClients := demo.NewServiceClients()
 
 	var bad []string
-	for _, short := range netTypes {
+	for _, short := range netTypes(t) {
 		td := resource.FindResourceType(short)
 		if td == nil {
 			t.Fatalf("%s: not registered", short)

@@ -23,10 +23,49 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// netTypes are the five types this batch owns.
-var netTypes = []string{"sg", "subnet", "elb", "tgw", "vpce"}
+// netTypes is every registered type that ships a §4 table. The rulings below
+// are not properties of five networking types; a value that reads as a Go bool
+// or a doc that quotes a sentence the app never says is the same defect
+// wherever it happens, and scoping the sweep to the batch that first hit it
+// left every other type unwatched.
+func netTypes(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	for _, td := range resource.AllResourceTypes() {
+		if _, err := os.Stat(netDocPath(td.ShortName)); err == nil {
+			out = append(out, td.ShortName)
+		}
+	}
+	sort.Strings(out)
+	if len(out) < 5 {
+		t.Fatalf("only %d registered types have a docs/resources page; the sweep would prove nothing", len(out))
+	}
+	return out
+}
+
+func netDocPath(shortName string) string {
+	return "../../docs/resources/" + shortName + ".md"
+}
+
+// TestNetworkingDocs_EveryRegisteredTypeHasAPage names the types the sweep
+// cannot see. A type with no §4 page is not covered by any assertion here, so
+// the gap has to be visible rather than silently skipped.
+func TestNetworkingDocs_EveryRegisteredTypeHasAPage(t *testing.T) {
+	var missing []string
+	for _, td := range resource.AllResourceTypes() {
+		if _, err := os.Stat(netDocPath(td.ShortName)); err != nil {
+			missing = append(missing, td.ShortName)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Errorf("%d registered type(s) have no docs/resources page, so nothing checks what they render: %v",
+			len(missing), missing)
+	}
+}
 
 // netRow is one AttentionDetail row as an operator sees it, plus enough
 // context to name the literal that produced it.
@@ -55,31 +94,32 @@ func netBench(t *testing.T, shortName string) (rows []netRow, details map[domain
 		t.Fatalf("%s: no demo fixtures — this gate cannot see the type", shortName)
 	}
 
-	details = map[domain.FindingCode]string{}
-	collect := func(resID string, fs []domain.Finding, ad map[domain.FindingCode]domain.AttentionDetail) {
-		for _, f := range fs {
-			if f.Detail != "" {
-				details[f.Code] = f.Detail
-			}
-		}
-		for code, d := range ad {
-			for _, r := range d.Rows {
-				rows = append(rows, netRow{shortName, resID, code, r.Label, r.Value})
-			}
-		}
-	}
-
-	for _, res := range fixtures {
-		collect(res.ID, res.Findings, res.AttentionDetails)
-	}
-
+	// The wave-2 result is folded onto each row before anything is read off
+	// it, because the fold is what decides which findings survive and how
+	// AttentionDetails is keyed. Reading the result map instead would assert
+	// against a shape the renderer never sees.
+	benchRows := append([]resource.Resource(nil), fixtures...)
 	if enricher, ok := awsclient.Wave2EnricherFor(shortName); ok && enricher.Fn != nil {
 		result, err := enricher.Fn(t.Context(), clients, fixtures, cache)
 		if err != nil {
 			t.Fatalf("%s: Wave-2 enricher returned error: %v", shortName, err)
 		}
-		for resID, fs := range result.Findings {
-			collect(resID, fs, result.AttentionDetails[resID])
+		for i := range benchRows {
+			runtime.ApplyWave2ToRow(&benchRows[i], *td, result.Findings, result.AttentionDetails)
+		}
+	}
+
+	details = map[domain.FindingCode]string{}
+	for _, res := range benchRows {
+		for _, f := range res.Findings {
+			if f.Detail != "" {
+				details[f.Code] = f.Detail
+			}
+		}
+		for code, d := range res.AttentionDetails {
+			for _, r := range d.Rows {
+				rows = append(rows, netRow{shortName, res.ID, code, r.Label, r.Value})
+			}
 		}
 	}
 	return rows, details
@@ -100,7 +140,7 @@ var netAllCapsValue = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 // the enum spelling leaking through.
 func TestNetworkingRowValues_AreWordsNotLiterals(t *testing.T) {
 	var bad []string
-	for _, short := range netTypes {
+	for _, short := range netTypes(t) {
 		rows, _ := netBench(t, short)
 		for _, r := range rows {
 			v := strings.TrimSpace(netAsidePattern.ReplaceAllString(r.value, ""))
@@ -180,7 +220,7 @@ var netDocQuotePattern = regexp.MustCompile("\\|\\s*`([^`]+)`\\s*\\|?\\s*$")
 // netDocQuotes returns every S5 quote in the type's §4 table.
 func netDocQuotes(t *testing.T, shortName string) []string {
 	t.Helper()
-	path := "../../docs/resources/" + shortName + ".md"
+	path := netDocPath(shortName)
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
@@ -201,12 +241,28 @@ func netDocQuotes(t *testing.T, shortName string) []string {
 	return out
 }
 
+// netDocQuoteTypes is where quote-equals-rendered-Detail holds today.
+//
+// It is deliberately not every registered type. The check matches a §4 cell to
+// a Detail by comparing sentences, because the table's first column is a prose
+// signal description and carries no finding code, so there is nothing to join
+// on. That makes two sound documentation patterns indistinguishable from a
+// wrong quote: a cell quoting a template ("Certificate expires in <N> days on
+// <NotAfter>") can never equal a rendered string, and a finding with no demo
+// fixture renders no Detail at all, so its correct quote reads as invented.
+// Widening the sweep as written produces 297 such reports across 58 types and
+// the only way to clear them is to delete correct documentation.
+//
+// Closing this needs a ruling on how a §4 row names its finding code. Until
+// then the check stays where every documented finding has a witness.
+var netDocQuoteTypes = []string{"sg", "subnet", "elb", "tgw", "vpce"}
+
 // TestNetworkingDocQuotes_EqualTheRenderedDetail is the standing form of the
 // prefix check. Both directions matter: a quote with no matching Detail is a
 // sentence the app never says, and a Detail with no quote means the doc has
 // stopped describing what ships.
 func TestNetworkingDocQuotes_EqualTheRenderedDetail(t *testing.T) {
-	for _, short := range netTypes {
+	for _, short := range netDocQuoteTypes {
 		t.Run(short, func(t *testing.T) {
 			_, details := netBench(t, short)
 
@@ -236,8 +292,8 @@ func TestNetworkingDocQuotes_EqualTheRenderedDetail(t *testing.T) {
 // Detail text at 100 characters: it contradicts quoting the constant whole,
 // and a constant longer than the cap cannot satisfy both.
 func TestNetworkingDocs_NoDetailLengthCap(t *testing.T) {
-	for _, short := range netTypes {
-		path := "../../docs/resources/" + short + ".md"
+	for _, short := range netTypes(t) {
+		path := netDocPath(short)
 		b, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
@@ -248,6 +304,35 @@ func TestNetworkingDocs_NoDetailLengthCap(t *testing.T) {
 				t.Errorf("docs/resources/%s.md:%d still caps Detail text at 100 characters, which no longer holds "+
 					"now that the cell quotes the whole constant:\n  %s", short, i+1, strings.TrimSpace(line))
 			}
+		}
+	}
+}
+
+// TestNetworkingDocs_NoProseDescribingShippedCodeAsAGap pins that the docs
+// stop describing an implemented check as something to consider implementing.
+//
+// sg.go's internet-facing predicate has checked `::/0` alongside `0.0.0.0/0`
+// since it was written, while sg.md's §4.1 still recommends extending the
+// check to IPv6 and §5 still records the gap. An operator reading the doc
+// concludes their IPv6 exposure is unwatched and goes looking elsewhere, which
+// is worse than the doc saying nothing at all.
+func TestNetworkingDocs_NoProseDescribingShippedCodeAsAGap(t *testing.T) {
+	b, err := os.ReadFile(netDocPath("sg"))
+	if err != nil {
+		t.Fatalf("read sg.md: %v", err)
+	}
+	for i, line := range strings.Split(string(b), "\n") {
+		low := strings.ToLower(line)
+		if !strings.Contains(low, "ipv6") {
+			continue
+		}
+		switch {
+		case strings.Contains(low, "recommend extending"):
+			t.Errorf("docs/resources/sg.md:%d recommends extending the admin-port check to IPv6, "+
+				"which core/aws/sg.go already does:\n  %s", i+1, strings.TrimSpace(line))
+		case strings.Contains(low, "gap"):
+			t.Errorf("docs/resources/sg.md:%d records the IPv6 check as a gap, which it is not:\n  %s",
+				i+1, strings.TrimSpace(line))
 		}
 	}
 }
