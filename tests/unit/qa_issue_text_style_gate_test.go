@@ -90,6 +90,9 @@ var knownAcronymExemptions = map[string]bool{
 	"AWS": true, "HTTP": true, "HTTPS": true, "DB": true, "EB": true,
 	"EC2": true, "S3": true, "NS": true, "SOA": true, "AZ": true,
 	"PAB": true, "OK": true,
+	// UTC is how a timestamp names its zone and IOPS is how a volume's
+	// throughput is measured. Both are what the operator would write.
+	"UTC": true, "IOPS": true,
 }
 
 // awsAccessKeyIDPattern matches an AWS IAM access key ID shape
@@ -163,6 +166,21 @@ func extractTokens(s string) []string {
 // identifier, or the row's own ID/Name.
 func isExemptStyleToken(tok, resourceID, resourceName string) bool {
 	if knownAcronymExemptions[tok] {
+		return true
+	}
+	// A token with three or more digits is an identifier, not an enum: AWS
+	// enum constants are words ("DISABLED", "CREATE_FAILED") while hosted-zone
+	// IDs and volume IDs are the concrete values an operator copies. The
+	// threshold is three rather than one so a protocol version stays in
+	// scope — "TLS13" and "IPV6" carry a digit and are still raw tokens a
+	// reader has to decode, which is what this gate is for.
+	digits := 0
+	for _, r := range tok {
+		if r >= '0' && r <= '9' {
+			digits++
+		}
+	}
+	if digits >= 3 {
 		return true
 	}
 	if awsAccessKeyIDPattern.MatchString(tok) {
