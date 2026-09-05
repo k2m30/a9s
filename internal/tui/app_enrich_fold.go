@@ -29,6 +29,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // applyEnrichment strips every Wave-2 finding (and companion AttentionDetail)
@@ -59,8 +60,7 @@ func (m *Model) applyEnrichment(resourceType string) {
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
 		for i := range out {
-			out[i].Findings = stripWave2(out[i].Findings)
-			out[i].AttentionDetails = nil
+			runtime.ApplyWave2ToRow(&out[i], resource.ResourceTypeDef{}, nil, nil)
 		}
 		return out
 	})
@@ -160,23 +160,6 @@ func wave2DetailsByID(rows []resource.Resource) map[string]map[domain.FindingCod
 				out[r.ID] = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 			}
 			out[r.ID][f.Code] = ad
-		}
-	}
-	return out
-}
-
-// stripWave2 returns a copy of findings with wave2 entries removed.
-// Wave 1 entries (Source = "wave1") are preserved in order.
-// Returns the original slice unchanged when it contains no wave2 entries
-// (avoids allocation on the common happy-path: no stale wave2).
-func stripWave2(findings []domain.Finding) []domain.Finding {
-	if len(findings) == 0 {
-		return findings
-	}
-	out := findings[:0:0] // empty slice, no capacity reuse to avoid alias pollution
-	for _, f := range findings {
-		if !strings.HasPrefix(f.Source, "wave2:") {
-			out = append(out, f)
 		}
 	}
 	return out

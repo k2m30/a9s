@@ -109,7 +109,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// the swap, and only when the incoming row does not already carry its own
 	// Wave-2 entry (never clobber a fresh Wave-2 result that already landed on
 	// this exact swap; the "wave2:" Source prefix is the same discipline
-	// ApplyWave2ToRow/stripWave2Findings use elsewhere).
+	// ApplyWave2ToRow uses elsewhere).
 	if !appendPage && !stale && len(priorFindings) > 0 && len(c.listEnrichmentFindings(typeName)) == 0 {
 		for i := range resources {
 			f, ok := priorFindings[resources[i].ID]
@@ -878,8 +878,7 @@ func (c *Controller) ClearRowFindings(typeName string) {
 func (c *Controller) clearRowFindings(typeName string) {
 	clearSlice := func(rows []resource.Resource) {
 		for i := range rows {
-			rows[i].Findings = stripWave2Findings(rows[i].Findings)
-			rows[i].AttentionDetails = nil
+			runtime.ApplyWave2ToRow(&rows[i], resource.ResourceTypeDef{}, nil, nil)
 		}
 	}
 
@@ -906,13 +905,10 @@ func (c *Controller) clearRowFindings(typeName string) {
 	}
 
 	// RowStore-backed type cache (GetListAllResources and other
-	// typeName-only callers). clearSlice's own reassignments
-	// (rows[i].Findings = stripWave2Findings(...), rows[i].AttentionDetails
-	// = nil) are struct-field replacements, not in-place mutation of a
-	// shared backing array/map, so it is safe to run directly against the
-	// copied slice Amend hands it — stripWave2Findings itself already
-	// allocates a fresh backing array (its zero-capacity re-slice) rather
-	// than truncating findings' existing one.
+	// typeName-only callers). clearSlice replaces struct fields rather than
+	// mutating a shared backing array or map — ApplyWave2ToRow allocates a
+	// fresh Findings array and a fresh AttentionDetails map — so it is safe
+	// to run directly against the copied slice Amend hands it.
 	amend := func(rows []resource.Resource) []resource.Resource {
 		if len(rows) == 0 {
 			return rows
@@ -974,14 +970,11 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string][]dom
 		s.State.List.rowsVersion++
 	}
 
-	// RowStore-backed type cache. Unlike clearRowFindings' stripWave2Findings
-	// (which already allocates a fresh backing array), ApplyWave2ToRow
-	// truncates/writes r.Findings' EXISTING backing array in place
-	// (r.Findings[n] = f) — calling it directly against a shallow
-	// copy(out, rows) would still corrupt the store's pre-Amend Findings
-	// slice, since a shallow struct copy shares the original slice header's
-	// backing array. Each touched row's Findings must be given a fresh
-	// backing array before applySlice runs.
+	// RowStore-backed type cache. The per-row Findings copy below is
+	// belt-and-braces: a shallow copy(out, rows) shares each row's slice
+	// header, so anything that appended into spare capacity would reach the
+	// store's pre-Amend rows. ApplyWave2ToRow does not — it allocates — but
+	// applySlice is free to grow beyond it.
 	amend := func(rows []resource.Resource) []resource.Resource {
 		if len(rows) == 0 {
 			return rows
@@ -1018,26 +1011,6 @@ func listHasBadgeFinding(r resource.Resource) bool {
 		}
 	}
 	return false
-}
-
-// stripWave2Findings returns findings with every Wave-2 entry
-// (domain.Finding.IsWave2Sourced) removed, preserving the order of the
-// remaining entries. Mirrors stripWave2 in internal/tui/app_enrich_fold.go
-// and applyWave2ToRow's strip step in core/runtime/helpers.go — kept as a
-// sibling here (rather than imported) because core/app must not depend
-// on internal/tui (internal/tui already depends on core/app) or
-// core/runtime's unexported helpers.
-func stripWave2Findings(findings []domain.Finding) []domain.Finding {
-	if len(findings) == 0 {
-		return findings
-	}
-	out := findings[:0:0]
-	for _, f := range findings {
-		if !f.IsWave2Sourced() {
-			out = append(out, f)
-		}
-	}
-	return out
 }
 
 // ApplyListTruncatedIDs stores the per-resource truncation set for typeName.

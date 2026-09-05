@@ -29,7 +29,6 @@ package runtime
 
 import (
 	"fmt"
-	"strings"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -218,24 +217,12 @@ func (c *Core) ClearAllWave2Findings() {
 	}
 }
 
-// stripWave2Findings returns findings with wave2-sourced entries removed.
-func stripWave2Findings(findings []domain.Finding) []domain.Finding {
-	if len(findings) == 0 {
-		return findings
-	}
-	out := findings[:0:0]
-	for _, f := range findings {
-		if !strings.HasPrefix(f.Source, "wave2:") {
-			out = append(out, f)
-		}
-	}
-	return out
-}
-
 // stripWave2FindingsRows returns a copy of rows with every wave2-sourced
-// Finding removed and AttentionDetails cleared — the shared AmendRows
-// callback RefreshListEnrichment and ClearAllWave2Findings both need: a
-// stale wave2 verdict must not survive into the next enrichment pass.
+// Finding removed — the shared AmendRows callback RefreshListEnrichment and
+// ClearAllWave2Findings both need: a stale wave2 verdict must not survive
+// into the next enrichment pass. ApplyWave2ToRow with nil results IS the
+// clear, and it is the only code that knows a row's wave-1 AttentionDetails
+// are not the fold's to discard.
 func stripWave2FindingsRows(rows []resource.Resource) []resource.Resource {
 	if len(rows) == 0 {
 		return rows
@@ -243,8 +230,7 @@ func stripWave2FindingsRows(rows []resource.Resource) []resource.Resource {
 	out := make([]resource.Resource, len(rows))
 	copy(out, rows)
 	for i := range out {
-		out[i].Findings = stripWave2Findings(out[i].Findings)
-		out[i].AttentionDetails = nil
+		ApplyWave2ToRow(&out[i], resource.ResourceTypeDef{}, nil, nil)
 	}
 	return out
 }
