@@ -144,8 +144,8 @@ func TestFullRelatedViewValidation(t *testing.T) {
 							// pivot), it could not compute the count — skip the comparison
 							// in that case, but still verify navigation below.
 							if expected.State() == domain.RelatedResolved && uiMsg.Result.Count() != expected.Count() {
-								t.Errorf("related %q: count mismatch: UI=%d, checker=%d",
-									def.DisplayName, uiMsg.Result.Count(), expected.Count())
+								t.Errorf("related %q: count mismatch: UI=%d (state %d, err %v), checker=%d",
+									def.DisplayName, uiMsg.Result.Count(), uiMsg.Result.State(), uiMsg.Result.Err(), expected.Count())
 							}
 
 							// If actionable (count > 0), follow the related entry and verify navigation.
