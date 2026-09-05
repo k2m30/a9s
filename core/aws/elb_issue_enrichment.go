@@ -72,13 +72,15 @@ func isWeakTLSPolicy(policy string) bool {
 }
 
 // elbListenerExposure classifies one listener of a load balancer of the given
-// type ("application" / "network"), returning the finding code, the phrase's
-// variable part and the Attention row, or ok=false when the listener is fine.
+// type ("application" / "network"), returning the finding code and the
+// Attention row, or ok=false when the listener is fine. The phrase is the
+// caller's: both codes name every offending port of the balancer at once, so
+// no single listener knows what it will say.
 //
 // An ALB listener speaking plain HTTP exposes traffic unless its default
 // action redirects to HTTPS; an NLB listener speaking TCP on 443 is a TLS
 // port with no TLS termination, which is the same exposure a level down.
-func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.FindingCode, string, domain.DetailRow, bool) {
+func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.FindingCode, domain.DetailRow, bool) {
 	port := int32(0)
 	if listener.Port != nil {
 		port = *listener.Port
@@ -87,21 +89,21 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 	switch listener.Protocol {
 	case elbtypes.ProtocolEnumHttps, elbtypes.ProtocolEnumTls:
 		if isWeakTLSPolicy(aws.ToString(listener.SslPolicy)) {
-			return elbCodeWeakTLSPolicy, fmt.Sprintf("weak TLS policy on listener %d", port),
-				domain.DetailRow{Label: "Security policy", Value: aws.ToString(listener.SslPolicy), Tier: "~"}, true
+			return elbCodeWeakTLSPolicy,
+				domain.DetailRow{Label: "Security policy", Value: fmt.Sprintf("%d: %s", port, aws.ToString(listener.SslPolicy)), Tier: "~"}, true
 		}
 	case elbtypes.ProtocolEnumHttp:
 		if lbType == "application" && !redirectsToHTTPS(listener) {
-			return elbCodePlainHTTPListener, fmt.Sprintf("listener without TLS on port %d", port),
+			return elbCodePlainHTTPListener,
 				domain.DetailRow{Label: "Listener", Value: fmt.Sprintf("%d/%s", port, protocol), Tier: "~"}, true
 		}
 	case elbtypes.ProtocolEnumTcp:
 		if lbType == "network" && port == 443 {
-			return elbCodePlainHTTPListener, fmt.Sprintf("listener without TLS on port %d", port),
+			return elbCodePlainHTTPListener,
 				domain.DetailRow{Label: "Listener", Value: fmt.Sprintf("%d/%s", port, protocol), Tier: "~"}, true
 		}
 	}
-	return "", "", domain.DetailRow{}, false
+	return "", domain.DetailRow{}, false
 }
 
 // redirectsToHTTPS reports whether every default action of the listener sends
@@ -222,29 +224,28 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			MarkSkipped(&result, r.ID, &failures, "DescribeListeners", err)
 			return
 		}
-		var cleartextPorts []string
-		var cleartextRows []domain.DetailRow
-		weakSeen := false
+		// Every offending port is a port to fix, so each finding names all of
+		// them rather than sending the operator back to the console for the
+		// rest of a list only the balancer knows.
+		ports := map[domain.FindingCode][]string{}
+		rows := map[domain.FindingCode][]domain.DetailRow{}
 		for _, listener := range listeners {
-			code, phrase, row, bad := elbListenerExposure(r.Fields["type"], listener)
-			switch {
-			case !bad:
-			case code == elbCodePlainHTTPListener:
-				cleartextPorts = append(cleartextPorts, strconv.Itoa(int(aws.ToInt32(listener.Port))))
-				cleartextRows = append(cleartextRows, row)
-			case !weakSeen:
-				weakSeen = true
-				setWave2Finding(&result, r.ID, code, phrase, "~", "elb",
-					[]domain.DetailRow{row}, elbWeakTLSPolicyDetail)
+			code, row, bad := elbListenerExposure(r.Fields["type"], listener)
+			if !bad {
+				continue
 			}
+			ports[code] = append(ports[code], strconv.Itoa(int(aws.ToInt32(listener.Port))))
+			rows[code] = append(rows[code], row)
 		}
-		if len(cleartextPorts) > 0 {
-			// Every port in the clear is a port to close, so the phrase names
-			// all of them rather than sending the operator back to the console
-			// for the rest.
+		if p := ports[elbCodePlainHTTPListener]; len(p) > 0 {
 			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener,
-				"ports "+strings.Join(cleartextPorts, ", ")+" in the clear", "~", "elb",
-				cleartextRows, elbPlainHTTPListenerDetail)
+				"ports "+strings.Join(p, ", ")+" in the clear", "~", "elb",
+				rows[elbCodePlainHTTPListener], elbPlainHTTPListenerDetail)
+		}
+		if p := ports[elbCodeWeakTLSPolicy]; len(p) > 0 {
+			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy,
+				"weak TLS policy on ports "+strings.Join(p, ", "), "~", "elb",
+				rows[elbCodeWeakTLSPolicy], elbWeakTLSPolicyDetail)
 		}
 	})
 	sort.Strings(failures)

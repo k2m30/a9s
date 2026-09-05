@@ -203,10 +203,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A load balancer with several listeners in the clear now names every port
-  rather than the first one, and its listeners are read to the end instead of
-  one page deep, so a cleartext listener no longer hides behind whichever
-  listeners AWS returned first.
+- A load balancer with several listeners in the clear, or several on a weak
+  TLS policy, now names every affected port rather than the first one, and its
+  listeners are read to the end instead of one page deep, so a listener no
+  longer hides behind whichever listeners AWS returned first. Each supporting
+  row leads with its port, so a balancer with three of them says which three.
 
 - An IAM user whose access-key last use could not be read now reads as
   unknown rather than clean. The key that could not be read is exactly the

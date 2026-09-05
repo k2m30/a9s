@@ -169,13 +169,13 @@ sentence would restate it. Their S5 cell reads `—`.
 | ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` | `The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest.` |
 | ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` | `Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields.` |
 | ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `ports <ports> in the clear` | `This listener carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path. Terminate TLS on the listener, or redirect it to an HTTPS listener.` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on listener <port>` | `The listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection. Move the listener to one of the modern security policies that require version 1.2 or later.` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on ports <ports>` | `The listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection. Move the listener to one of the modern security policies that require version 1.2 or later.` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — yellow for `provisioning`/`active_impaired` and red for `failed` are paired with the AWS-provided `State.Reason` in the Status column, so the operator reads the cause inline. The four posture signals read the same way: `HTTP desync mitigation off`, `invalid HTTP headers not dropped`, `ports 80, 8080 in the clear` and `weak TLS policy on listener 443` each name the setting and every port it applies to — the operator opens detail only for the remedy sentence. One UX gap: when `State.Reason` is empty (common during very early `provisioning`), the Status column falls back to a generic phrase; implementation should take the reason verbatim when non-empty and never show a bare state keyword.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — yellow for `provisioning`/`active_impaired` and red for `failed` are paired with the AWS-provided `State.Reason` in the Status column, so the operator reads the cause inline. The four posture signals read the same way: `HTTP desync mitigation off`, `invalid HTTP headers not dropped`, `ports 80, 8080 in the clear` and `weak TLS policy on ports 443, 8443` each name the setting and every port it applies to — the operator opens detail only for the remedy sentence. One UX gap: when `State.Reason` is empty (common during very early `provisioning`), the Status column falls back to a generic phrase; implementation should take the reason verbatim when non-empty and never show a bare state keyword.
 
 ## 5. Out of Scope
 
@@ -216,7 +216,7 @@ elb — NETWORKING. Lifecycle key: `state`.
 | elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 |
 | elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 |
 | elb.plain-http-listener | ports <ports> in the clear | warn | wave2 |
-| elb.weak-tls-policy | weak TLS policy on listener <port> | warn | wave2 |
+| elb.weak-tls-policy | weak TLS policy on ports <ports> | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -229,7 +229,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: elbCodePlainHTTPListener, Phrase: "ports <ports> in the clear", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on listener <port>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on ports <ports>", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

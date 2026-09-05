@@ -458,7 +458,11 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 			if !ok {
 				t.Fatalf("SslPolicy %q produced no %s; findings=%+v", policy, w3CodeELBWeakTLS, res.Findings[r.ID])
 			}
-			if want := "weak TLS policy on listener 443"; f.Phrase != want {
+			// d3 row 18: the phrase names every offending port of the
+			// balancer at once, the way the cleartext phrase does, so a
+			// balancer with three weak listeners no longer reports one and
+			// hides the rest. One listener still reads as a list of one.
+			if want := "weak TLS policy on ports 443"; f.Phrase != want {
 				t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 			}
 			if f.Severity != domain.SevWarn {
@@ -470,8 +474,11 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 			if f.Detail == "" {
 				t.Error("Detail is empty; every finding carries an operator sentence")
 			}
+			// d3 row 18: one finding now covers every weak listener, so each
+			// row leads with its port — without it three rows would read
+			// identically and name no listener to go and fix.
 			w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBWeakTLS].Rows, [][2]string{
-				{"Security policy", policy},
+				{"Security policy", "443: " + policy},
 			})
 		})
 	}
@@ -521,7 +528,8 @@ func TestW3ELBWeakTLS_AppliesToNLBTLSListener(t *testing.T) {
 	if !ok {
 		t.Fatalf("NLB TLS listener on a retired policy produced no %s; findings=%+v", w3CodeELBWeakTLS, res.Findings[r.ID])
 	}
-	if want := "weak TLS policy on listener 8443"; f.Phrase != want {
+	// d3 row 18: ports, plural, however many there are.
+	if want := "weak TLS policy on ports 8443"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 }
