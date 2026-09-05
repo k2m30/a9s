@@ -175,17 +175,17 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 		t.Fatal("no iam-user RelatedCheckResult returned for Case K — checker not registered?")
 	}
 
-	// Bug E: with nil clients + empty cache, the paginated fetcher fails, the
-	// short-circuit fires, and the checker returns State: RelatedUnknown.
-	// Expected: a resolved Count=0 (definitive "not found" because the fetcher
-	// should not report unknown on nil clients).
-	if iamUserResult.State() == domain.RelatedUnknown && iamUserResult.Err() == nil && len(iamUserResult.FetchFilter()) == 0 {
-		t.Errorf("Bug E pinned: event=e-e1f2a3b4 (AttachUserPolicy/alice.johnson):"+
-			" checkCtEventsUser returned State: RelatedUnknown with nil clients and empty cache"+
-			" — short-circuit in ctEventsRelatedResources discards nil error from failed fetcher."+
-			" Expected a resolved Count=0 (no match, not unknown/error)."+
+	// INVERTED for row 4. This was filed as "Bug E": Unknown from nil clients
+	// and an empty cache was read as a defect, and a resolved Count=0 as the
+	// fix. Row 4 settles it the other way — with nothing to read and nothing to
+	// call, the checker has not established that the user is absent, and a
+	// definitive zero would be a guess dressed as a fact. Unknown is now the
+	// required answer, so the assertion is reversed rather than retuned.
+	if iamUserResult.State() != domain.RelatedUnknown {
+		t.Errorf("event=e-e1f2a3b4 (AttachUserPolicy/alice.johnson): state = %v with nil clients and an empty cache,"+
+			" want RelatedUnknown — nothing read the user list, so neither a count nor a zero is established."+
 			" ResourceIDs=%v Err=%v FetchFilter=%v",
-			iamUserResult.ResourceIDs(), iamUserResult.Err(), iamUserResult.FetchFilter())
+			iamUserResult.State(), iamUserResult.ResourceIDs(), iamUserResult.Err(), iamUserResult.FetchFilter())
 	}
 }
 

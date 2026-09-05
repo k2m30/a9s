@@ -25,6 +25,7 @@ import (
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -227,6 +228,55 @@ func TestR53Related_TruncatedTargetPageNoMatch_Unknown(t *testing.T) {
 			if got := result.EffectiveState(); got != domain.RelatedUnknown {
 				t.Errorf("state = %v after a truncated first page matched nothing, want RelatedUnknown — "+
 					"a zero from a partial list is a guess, not a count", got)
+			}
+		})
+	}
+}
+
+// TestR53Related_DemoBench_ZoneWithNoMatchingLoadBalancer is the demo-bench
+// witness for the defect the live walk found. acme-corp.com. aliases
+// api.acme-corp.com. at prod-api-alb-1234567890, a name no demo load balancer
+// carries, so its Load Balancers panel must read a resolved zero; before the
+// fix it read 1 with that hostname as the row's ID. staging.acme-corp.com.
+// aliases a load balancer that does exist, and is here so a fix that simply
+// zeroed the panel would fail too.
+func TestR53Related_DemoBench_ZoneWithNoMatchingLoadBalancer(t *testing.T) {
+	byType, _ := buildVisibilityTypeCache(t)
+	elbRows := byType["elb"]
+	if len(elbRows) == 0 {
+		t.Fatal("no demo elb fixtures — the panel cannot be witnessed")
+	}
+	cache := resource.ResourceCache{"elb": resource.ResourceCacheEntry{Resources: elbRows}}
+	clients := demo.NewServiceClients()
+	checker := r53CheckerByTarget(t, "elb")
+
+	// The walk ran against an account holding no load balancers at all, which
+	// is the cache entry the app seeds from a fetcher that found none. That is
+	// the only shape in which the old code reached its guessing branch, so the
+	// witness needs it: with the full demo list present the branch never runs
+	// and the case would pass either way.
+	emptyELB := resource.ResourceCache{"elb": resource.ResourceCacheEntry{Resources: nil}}
+
+	for _, tc := range []struct {
+		zoneID string
+		name   string
+		cache  resource.ResourceCache
+		want   int
+	}{
+		{"/hostedzone/Z0123456789ABCDEFGHIJ", "acme-corp.com. (account with no load balancers)", emptyELB, 0},
+		{"/hostedzone/Z0123456789ABCDEFGHIJ", "acme-corp.com.", cache, 0},
+		{"/hostedzone/Z2345678901ABCDEFGHIJ", "staging.acme-corp.com.", cache, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			zone := resource.Resource{ID: tc.zoneID, Name: tc.name, Fields: map[string]string{"name": tc.name}}
+			result := checker(context.Background(), clients, zone, tc.cache)
+
+			assertNoDNSNameIDs(t, "elb", result)
+			if got := result.EffectiveState(); got != domain.RelatedResolved {
+				t.Fatalf("state = %v, want RelatedResolved: the demo elb list is complete", got)
+			}
+			if result.Count() != tc.want {
+				t.Errorf("Count = %d, want %d; IDs = %v", result.Count(), tc.want, result.ResourceIDs())
 			}
 		})
 	}

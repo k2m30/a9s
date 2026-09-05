@@ -152,13 +152,17 @@ func TestRelated_CtEvents_User_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	// Event-derived: the event names the user in its body, so an empty/cold cache
-	// resolves by identity to a navigable (1) — zero fetch, no scoreless Unknown.
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (event names the user; resolved by identity, zero-fetch)", result.Count())
+	// INVERTED for row 4: this used to assert the event's own username was a
+	// resolved related resource, on the reasoning that the event names it so no
+	// lookup is needed. The username is a well-formed IAM user ID, which is why
+	// it read as safe, but the event only proves the user existed when the call
+	// was recorded. Offering a count for a user nobody looked up navigates to
+	// nothing once the user is deleted. Do not restore the Count=1 expectation.
+	if got := result.EffectiveState(); got != domain.RelatedUnknown {
+		t.Errorf("state = %v, want RelatedUnknown: nothing read the user list, so the count is not known", got)
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "admin-user" {
-		t.Errorf("ResourceIDs = %v, want [admin-user]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none — the event names a user, it does not prove one exists", result.ResourceIDs())
 	}
 }
 
@@ -787,14 +791,15 @@ func TestRelated_CtEvents_IAMUser_TruncatedCacheResolvesByIdentity(t *testing.T)
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (named user resolved by identity, not exact 0)", result.Count())
+	// INVERTED for row 4, same reason as the nil-cache case above: the first
+	// page of users did not name alice, and there are more pages. Neither the
+	// event nor the partial list settles whether that user exists, so the
+	// honest answer is Unknown rather than a count taken from the event body.
+	if got := result.EffectiveState(); got != domain.RelatedUnknown {
+		t.Errorf("state = %v, want RelatedUnknown: a truncated user list that did not name alice proves nothing either way", got)
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "alice" {
-		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs())
-	}
-	if result.Truncated() {
-		t.Error("Truncated = true, want false")
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
 	}
 }
 
