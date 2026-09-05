@@ -74,8 +74,9 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	//   Healthy + Wave-2 `!` (3): acme-product-search and acme-metrics
 	//                       (update-forced), plus acme-public-search, which
 	//                       the databases batch added — opensearch.public, `!`
-	//   Not counted (6): three clean domains, obsolete-tenant-logs (Dim), and
-	//                    acme-http-search / acme-plaintext-nodes, whose new
+	//   Not counted (6): two clean domains, obsolete-tenant-logs (Dim), and
+	//                    legacy-analytics (encryption at rest off) /
+	//                    acme-http-search / acme-plaintext-nodes, whose
 	//                    findings are Wave-2 `~`. That is why the batch added
 	//                    three opensearch findings and the badge moved by one.
 	// 1 + 3 + 3 = 7.
