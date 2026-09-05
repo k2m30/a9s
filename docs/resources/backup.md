@@ -111,7 +111,7 @@ Rules for filling list and detail text:
 - Banned words (never appear): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - S4 never carries a bare state keyword like `FAILED` or `PARTIAL` alone — it always includes the count and the time window so the operator knows the scope at a glance.
 - A plan with zero jobs in the 24h window is Healthy: S2 green, S4 blank, no glyph. (A plan that has *never* run is also Healthy by this rule — the out-of-scope Wave 3 signal is what would catch a stale plan, not Wave 2.)
-- Keep both columns short: List text ≤ 40 chars, Detail text ≤ 100 chars.
+- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
 
 ## 4.1 UX review (two sentences)
 

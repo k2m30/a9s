@@ -197,7 +197,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Tests will assert the cause is present.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), you may omit the row from this table entirely; §3 still describes it.
-- Keep both columns short enough to fit: List text ≤ 40 chars, Detail text ≤ 100 chars.
+- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
 
 ## 4.1 UX review (two sentences)
 

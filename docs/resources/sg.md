@@ -139,7 +139,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `ports 22 open to 0.0.0.0/0` tells the on-call engineer immediately which port and which side of the rule is the problem, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. UX gap worth flagging for implementation: the admin-port rule as written in `docs/attention-signals.md` covers only IPv4 `0.0.0.0/0`; SDK `IpPermission` also exposes `Ipv6Ranges[].CidrIpv6`, and an IPv6 `::/0` on port 22 is equally exposed — recommend extending the check to IPv6 and rendering the list text as `open: 22 to ::/0` in that case. Flagged here per a9s-devops; the golden doc can be amended separately if the team accepts.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `ports 22 open to 0.0.0.0/0` tells the on-call engineer immediately which port and which side of the rule is the problem, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. IPv6 is covered the same way: `isInternetFacing` treats `Ipv6Ranges[].CidrIpv6 == ::/0` as open to the internet, so an IPv6-only exposure on port 22 renders identically.
 
 ## 5. Out of Scope
 
@@ -167,7 +167,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` as universal pivot — `docs/related-resources.md` § Policy (universal pivot applies to every registered type).
 - S4 List text wording (`open: 22 to 0.0.0.0/0`, `orphan: no ENIs attached`) — `user (2026-04-20): decide. Matches the skill's S4 rule that bare state keywords are banned; paired port+CIDR gives operator enough context at the list level.`
 - S5 Detail text wording — same derivation as S4; human-readable expansion of the same facts.
-- IPv6 `::/0` gap — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS SDK exposes IpPermission.Ipv6Ranges[].CidrIpv6; the current attention-signals.md rule mentions only 0.0.0.0/0 and misses an equally dangerous exposure path. Noted in §4.1 as a UX gap rather than amending the golden doc unilaterally.`
+- IPv6 `::/0` — `a9s-devops (2026-04-20): possible=yes, worth=yes.` Shipped: `isInternetFacing` checks `Ipv6Ranges[].CidrIpv6` alongside `0.0.0.0/0`.
 - Egress-wide-open omission — `a9s-devops (2026-04-20): possible=yes, worth=no. Default VPC SG permits all egress; flagging egress 0.0.0.0/0 would paint half the list yellow with no actionable value. Recorded in §5 Out of Scope.`
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 

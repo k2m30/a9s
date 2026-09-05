@@ -159,7 +159,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`FAILED`, `FAULT`, `TIMED_OUT`) in the List text column is not acceptable. The spec pairs it with the build phase.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), the row is omitted entirely from this table; §3 still describes it.
-- List text ≤ 40 chars, Detail text ≤ 100 chars. The sample rows above fit.
+- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
 
 ### 4.1 UX review (two sentences)
 

@@ -117,7 +117,7 @@ A compile error in a file you do not own is not a teammate mid-edit — nobody e
 
 ## Orchestrator checklist
 
-The orchestrator dispatches, integrates, and writes nothing else.
+The orchestrator dispatches, integrates, and writes nothing else — with one fast path. A change with no behaviour (a comment, a doc cell or sentence, a changelog line) or a one-line code change whose correctness is evident from reading and already covered by a gate is done by the orchestrator directly on `main`, gated by what covers it (`make mdlint`; `make test` and `make lint`), and committed with a clear message. Anything that adds a symbol, changes a rendered value, moves a fixture count or golden, or needs a witness goes through the loop. When in doubt, the loop. This is the user's rule (2026-09-05): a two-round cycle for an em-dash cell is waste.
 
 - **At most 4 tasks in flight.** Queue the rest. Review throughput is the real limit, and conflict rate climbs with the number of similar tasks running at once.
 - **Pilot first.** When several batches share a shape, one goes through QA sign-off and acceptance before its siblings are dispatched; every ruling it produces is folded into the common spec first.

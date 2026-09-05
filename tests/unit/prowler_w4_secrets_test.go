@@ -146,7 +146,7 @@ func TestW4SecretPublicPolicy(t *testing.T) {
 	w4AssertNoCode(t, res.Findings["acme-db-password"], w4CodeSecretCrossAccount)
 }
 
-// TestW4SecretPublicPolicyNeverEchoesTheSecret pins the redaction rule: the
+// TestW4SecretPublicPolicyDetailIsAdvice pins the redaction rule: the
 // finding describes the exposure and never carries a value.
 func TestW4SecretPublicPolicyDetailIsAdvice(t *testing.T) {
 	fake := &w4SecretsFake{policies: map[string]string{"acme-open-api-key": w4SecretPublicPolicyDoc}}

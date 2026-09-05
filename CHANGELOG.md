@@ -134,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Databases and storage now report the security posture an auditor asks
   about, not just the lifecycle state. Every signal below is read-only
   and shows up in the list status column, the row color, and the detail
-  view's attention section.
+  view's attention section. Supporting rows read as words (`on`/`off`,
+  `yes`/`no`), and a row that only restated its finding was dropped.
 - **S3 buckets**: a bucket AWS reports as public by policy, versioning
   never enabled, MFA delete off on a versioned bucket, server access
   logging off, no enabled lifecycle rule, and object lock off. Closes

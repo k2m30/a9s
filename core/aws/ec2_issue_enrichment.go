@@ -276,7 +276,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 
 	for _, r := range resources {
 		publicIP := r.Fields["public_ip"]
-		if publicIP == "" || ec2InstanceGone(r.Fields["state"]) || r.Fields["state"] != "running" {
+		if publicIP == "" || r.Fields["state"] != "running" {
 			continue
 		}
 		inst, ok := assertStruct[ec2types.Instance](r.RawStruct)

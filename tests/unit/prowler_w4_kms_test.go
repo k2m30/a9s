@@ -163,7 +163,7 @@ func TestW4KMSPolicyFetchFailureIsUnknown(t *testing.T) {
 		w4PhraseKMSPublic, domain.SevBroken, w4SourceKMSWave2)
 }
 
-// TestW4KMSPublicPolicyIsAnIssueNotInformational pins the cap semantics: the
+// TestW4KMSPublicPolicyBeyondCapIsTruncated pins the cap semantics: the
 // kms enricher now emits a "!" finding, so a run that could not reach every
 // key must report itself truncated rather than presenting a lower bound as a
 // complete count.
