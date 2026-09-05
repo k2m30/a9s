@@ -12,13 +12,17 @@ package unit
 //   without registering navigable fields will cause this test to fail, forcing the
 //   engineer to either add the fields or justify the omission by adding to the list.
 //
-// T-INV-2: TestEnrichmentFinding_AllKeptEnrichersPopulateRows
-//   Every enricher in the buildEnrichQueue order list MUST populate at least one
-//   FindingRow when a matching issue exists.  An enricher that never populates Rows
-//   produces a finding the detail view cannot render meaningfully.
+// T-INV-2: TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare
+//   Every enricher in the buildEnrichQueue order list MUST give the detail view
+//   something to render past the phrase: a non-empty Finding.Detail OR at least
+//   one row, and every row it does emit carries a non-empty label and value.
+//   Mirrors attentionEntry.bare (core/app/detail_body.go), the codebase's own
+//   definition of the gap. Row count alone is not the test: a finding whose
+//   phrase says the whole fact correctly carries no row.
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +44,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -321,7 +326,7 @@ type enricherInvariantCase struct {
 //
 // Note: dbi's live maintenance enricher is EnrichDBIMaintenance (the dead
 // EnrichRDSDocDBMaintenance, wired to no catalog Wave2 field, was deleted).
-func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
+func TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare(t *testing.T) {
 	buildDate := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/inv-tg/abc"
 	smARN := "arn:aws:states:us-east-1:000000000000:stateMachine:inv-sm"
@@ -441,11 +446,78 @@ func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 			}
 			for id, findings := range result.Findings {
 				for _, f := range findings {
-					if len(result.AttentionDetails[id][f.Code].Rows) == 0 {
-						t.Errorf("finding for resource %q code %q has 0 Rows — enricher must populate at least one FindingRow", id, f.Code)
+					rows := result.AttentionDetails[id][f.Code].Rows
+					if f.Detail == "" && len(rows) == 0 {
+						t.Errorf("finding for resource %q code %q is bare — no Detail sentence and no rows, so the detail view renders the phrase and nothing else", id, f.Code)
+					}
+					for _, row := range rows {
+						if strings.TrimSpace(row.Label) == "" || strings.TrimSpace(row.Value) == "" {
+							t.Errorf("finding for resource %q code %q has row %+v with an empty label or value", id, f.Code, row)
+						}
 					}
 				}
 			}
 		})
 	}
+}
+
+// bareEnricherFake is not an AWS client — it is an IssueEnricherFunc shaped
+// like the mistake T-INV-2 exists to catch: a finding with a phrase, no Detail
+// sentence and no rows, so the detail view has one line to render and nothing
+// under it.
+func bareEnricherFake(_ context.Context, _ *awsclient.ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
+	res := awsclient.IssueEnricherResult{
+		Findings:     make(map[string][]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
+	for _, r := range resources {
+		res.Findings[r.Name] = []domain.Finding{{
+			Code:     "inv.bare",
+			Phrase:   "something is wrong",
+			Severity: domain.SevWarn,
+			Source:   "wave2:inv",
+		}}
+	}
+	return res, nil
+}
+
+// TestEnrichmentFinding_BareFindingIsCaught runs T-INV-2's assertion against a
+// deliberately bare finding and against a finding whose only content is a
+// Detail sentence.
+//
+// Without this the invariant could pass because nothing violates it rather
+// than because it works: every real enricher is compliant today, so a rewrite
+// that silently stopped checking would look identical. The Detail-only case
+// pins the other half of ruling J — a Detail sentence is content, so a rowless
+// finding that carries one is correct and must NOT be flagged.
+func TestEnrichmentFinding_BareFindingIsCaught(t *testing.T) {
+	resources := []resource.Resource{{Name: "inv-bare-resource"}}
+
+	bare, err := bareEnricherFake(context.Background(), nil, resources, nil)
+	if err != nil {
+		t.Fatalf("bareEnricherFake: %v", err)
+	}
+	if got := bareFindingCount(bare); got != 1 {
+		t.Errorf("bare finding count = %d, want 1 — T-INV-2's assertion no longer catches a finding with no Detail and no rows", got)
+	}
+
+	withDetail := bare
+	withDetail.Findings["inv-bare-resource"][0].Detail = "The job failed and AWS did not say why; re-run it to get an error message."
+	if got := bareFindingCount(withDetail); got != 0 {
+		t.Errorf("bare finding count = %d, want 0 — a Detail sentence is content, so a rowless finding carrying one is not bare", got)
+	}
+}
+
+// bareFindingCount applies T-INV-2's rule and returns how many findings fail
+// it, so the rule can be exercised without a failing test.
+func bareFindingCount(result awsclient.IssueEnricherResult) int {
+	n := 0
+	for id, findings := range result.Findings {
+		for _, f := range findings {
+			if f.Detail == "" && len(result.AttentionDetails[id][f.Code].Rows) == 0 {
+				n++
+			}
+		}
+	}
+	return n
 }
