@@ -13,6 +13,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patch, and newer releases of pinned GitHub Actions, and fails the pre-push
   gate the same way `make security` does — dependency drift that was only
   visible in Dependabot on the remote is now visible before the push.
+- Security groups now flag more of the ports that should never face the
+  internet — FTP, Telnet, SMTP, SMB, Oracle, Kafka, Cassandra,
+  Memcached and Kibana join SSH, RDP and the databases already covered.
+  A VPC's default group is flagged when it still carries rules, since
+  AWS attaches it to anything launched without an explicit group, and a
+  group no network interface references is flagged as dead
+  configuration. Closes Prowler
+  ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_ftp_20_21,
+  _telnet_23, _memcached_11211, _cassandra_7199_9160_8888, _kafka_9092,
+  _oracle_1521_2483, _to_high_risk_tcp_ports,
+  ec2_securitygroup_default_restrict_traffic and
+  ec2_securitygroup_not_used.
+
+- Subnets that hand every instance a public IP address on launch are now
+  flagged. Closes Prowler vpc_subnet_no_public_ip_by_default.
+
+- Load balancers now report four more posture problems: HTTP desync
+  mitigation left in monitor-only mode, invalid HTTP headers forwarded
+  to targets instead of dropped, a listener carrying traffic in the
+  clear, and a listener on a TLS policy that predates TLS 1.2. Closes
+  Prowler elbv2_desync_mitigation_mode,
+  elbv2_alb_drop_invalid_header_fields_enabled, elbv2_ssl_listeners,
+  elbv2_nlb_tls_termination_enabled and elbv2_insecure_ssl_ciphers.
+
+- Transit gateways that accept shared VPC attachments without review are
+  now flagged. Closes Prowler
+  ec2_transitgateway_auto_accept_vpc_attachments.
+
+- VPC endpoints whose policy grants every action to every principal —
+  the policy AWS attaches when none is supplied — are now flagged.
+  Closes Prowler vpc_endpoint_connections_trust_boundaries.
 
 ### Fixed (security)
 

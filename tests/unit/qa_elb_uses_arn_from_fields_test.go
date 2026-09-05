@@ -84,3 +84,20 @@ func TestEnrichELBAttributes_UsesARNFromFields(t *testing.T) {
 			got, lbARN)
 	}
 }
+
+// DescribeListeners applies the same ARN rule to the enricher's second read:
+// the listener posture pass must also address the load balancer by ARN.
+func (f *strictELBv2Fake) DescribeListeners(
+	_ context.Context,
+	input *elbv2.DescribeListenersInput,
+	_ ...func(*elbv2.Options),
+) (*elbv2.DescribeListenersOutput, error) {
+	got := aws.ToString(input.LoadBalancerArn)
+	if !strings.HasPrefix(got, "arn:aws:") {
+		return nil, &smithy.GenericAPIError{
+			Code:    "ValidationError",
+			Message: "'" + got + "' is not a valid load balancer ARN",
+		}
+	}
+	return &elbv2.DescribeListenersOutput{}, nil
+}

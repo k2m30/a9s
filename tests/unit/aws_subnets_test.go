@@ -72,8 +72,10 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 	if r0.Name != "public-subnet-1a" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "public-subnet-1a", r0.Name)
 	}
-	if len(r0.Findings) != 0 {
-		t.Errorf("resource[0].Findings: expected none for available subnet, got %d", len(r0.Findings))
+	// subnet-0001 is available, so it carries no lifecycle finding — but it
+	// has MapPublicIpOnLaunch set, which is a posture finding in its own right.
+	if len(r0.Findings) != 1 || r0.Findings[0].Code != awsclient.CodeSubnetAutoPublicIP {
+		t.Errorf("resource[0].Findings = %+v, want exactly %s", r0.Findings, awsclient.CodeSubnetAutoPublicIP)
 	}
 
 	// Verify Fields on all resources

@@ -34,17 +34,6 @@ func colorTG(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorSG(r domain.Resource) domain.Color {
-	if r.Fields["wide_open"] == "true" {
-		return domain.ColorBroken
-	}
-	count, _ := strconv.Atoi(r.Fields["dangerous_open_count"])
-	if count > 0 {
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
-}
-
 func colorVPC(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
@@ -237,6 +226,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: elbCodeMisconfigured, Phrase: "deletion protection disabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodePlainHTTPListener, Phrase: "listener without TLS on port <port>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on listener <port>", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -312,10 +305,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
-		Color: colorSG,
+		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
 		}),
+		Wave2:     IssueEnricher{Fn: EnrichSGUsage, Priority: 100},
 		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "risk_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkSGVPC, NeedsTargetCache: false},
@@ -333,6 +327,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Findings: []catalog.FindingDef{
 			{Code: sgCodeWideOpen, Phrase: "all ports open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: sgCodeDangerousPorts, Phrase: "ports <list> open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: sgCodeDefaultWithRules, Phrase: sgDefaultWithRulesPhrase, Severity: domain.SevWarn, Source: "wave1"},
+			{Code: sgCodeUnused, Phrase: sgUnusedPhrase, Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -422,6 +418,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSubnetAutoPublicIP, Phrase: SubnetAutoPublicIPPhrase, Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -644,6 +641,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeVPCEPolicyOpen, Phrase: VPCEPolicyOpenPhrase, Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -684,6 +682,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: tgwCodeAttachmentFailed, Phrase: "attachment <id> failed", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: tgwCodeAttachmentTransitional, Phrase: "attachment <id> <state>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeTGWAutoAccept, Phrase: TGWAutoAcceptPhrase, Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{

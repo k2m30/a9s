@@ -13,4 +13,16 @@ const (
 	CodeVPCEStateExpired           domain.FindingCode = "vpce.state.expired"
 	CodeVPCEStatePartial           domain.FindingCode = "vpce.state.partial"
 	CodeVPCEStateDeleted           domain.FindingCode = "vpce.state.deleted"
+
+	// CodeVPCEPolicyOpen marks an endpoint whose policy grants full access to
+	// every principal — the policy AWS attaches when none is supplied.
+	CodeVPCEPolicyOpen domain.FindingCode = "vpce.policy-open"
 )
+
+// VPCEPolicyOpenPhrase is the S4 status phrase for CodeVPCEPolicyOpen.
+const VPCEPolicyOpenPhrase = "endpoint policy allows any principal"
+
+// VPCEPolicyOpenDetail is the S5 operator sentence for CodeVPCEPolicyOpen.
+const VPCEPolicyOpenDetail = "The endpoint policy grants every action to every principal, so any identity that " +
+	"can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming " +
+	"the principals and resources this VPC is allowed to reach."

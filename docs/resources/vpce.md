@@ -191,7 +191,7 @@ Wave → surface mapping for this resource:
 - **Wave 1 Warning** signals (`PendingAcceptance`, `Pending`, `Deleting`, gateway with no route tables) → S2 (yellow) + S4 (cause). No S1, S3, S5.
 - **Wave 1 Broken** signals (`Failed`, `Rejected`, `Expired`, `Partial`, interface with no ENIs, non-empty `LastError`) → S2 (red) + S4 (cause text, preferring `LastError.Message` when present). No S1 (Wave 1 does not produce a finding object), no S3 (red rows don't carry glyphs).
 - **Wave 1 Dim** (`Deleted`) → S2 (gray) + S4 (`deleted`). No S1, no S3, no S5.
-- No Wave 2 findings exist for this resource, so S1 and S3 never fire on a `vpce` row under the current contract.
+- No Wave 2 findings exist for this resource, so S1 never fires on a `vpce` row under the current contract. The endpoint-policy signal is Wave 1 (the policy document arrives with the list call) and reaches S2/S4/S5.
 
 One row per §3 signal (Healthy case omitted per rule):
 
@@ -204,6 +204,7 @@ One row per §3 signal (Healthy case omitted per rule):
 | `State == Rejected` | 1 | Broken | n/a | S2, S4 | `rejected by service owner` | n/a |
 | `State == Expired` | 1 | Broken | n/a | S2, S4 | `expired` | n/a |
 | `State == Partial` | 1 | Broken | n/a | S2, S4 | `partial: some AZ ENIs missing` | n/a |
+| `PolicyDocument` grants a wildcard action to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy allows any principal` | `The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts.` |
 | `LastError` non-empty | 1 | Broken | n/a | S2, S4 | `<LastError.Code>: <LastError.Message>` | n/a |
 | interface, `NetworkInterfaceIds == []` | 1 | Broken | n/a | S2, S4 | `interface: no ENIs — unreachable` | n/a |
 | gateway, `RouteTableIds == []` | 1 | Warning | n/a | S2, S4 | `gateway: no route tables attached` | n/a |
@@ -217,7 +218,7 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 
 ## 5. Out of Scope
 
-- All §3.3 Wave 3 signals (endpoint policy semantic analysis).
+- Wave 3 endpoint-policy semantics beyond the wildcard-principal/wildcard-action case now covered in §4.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` § "What is a9s?").
 - `PrivateDnsEnabled==false` on an interface endpoint — surfacing this as a Warning would be presumptuous: private-DNS-off is a deliberate choice for services with conflicting names, not a misconfiguration. — a9s-devops (2026-04-20): possible=yes, worth=no. Show it as a field in the detail view, not as an attention signal.
@@ -271,6 +272,7 @@ vpce — NETWORKING. Lifecycle key: `state`.
 | vpce.state.expired | expired | broken | wave1 |
 | vpce.state.partial | partial | broken | wave1 |
 | vpce.state.deleted | deleted | dim | wave1 |
+| vpce.policy-open | endpoint policy allows any principal | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

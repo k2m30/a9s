@@ -117,6 +117,7 @@ One row per signal from §3:
 | attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` | `One or more TGW attachments failed — check VPC, Direct Connect, or peer status.` |
 | attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment rejected` | `Cross-account attachment request was rejected by the accepter account.` |
 | attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment awaiting accept` | `Cross-account VPC attachment request pending acceptance for more than 24h.` |
+| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S2, S4, S5 | `auto-accepts shared attachments` | `Any account this gateway is shared with can attach a VPC to it without review.` |
 
 ## 4.1 UX review (two sentences)
 
@@ -158,6 +159,7 @@ tgw — NETWORKING. Lifecycle key: `state`.
 | tgw.state.deleted | deleted | dim | wave1 |
 | tgw.attachment-failed | attachment <id> failed | broken | wave2 |
 | tgw.attachment-transitional | attachment <id> <state> | warn | wave2 |
+| tgw.auto-accept-attachments | auto-accepts shared attachments | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

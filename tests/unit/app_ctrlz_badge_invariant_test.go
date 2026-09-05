@@ -101,10 +101,6 @@ var appCtrlZRawFieldFixtures = map[string]appCtrlZFieldPair{
 		issue:   map[string]string{"subscription_arn": "PendingConfirmation"},
 		healthy: map[string]string{"subscription_arn": "arn:aws:sns:us-east-1:123456789012:topic:sub-id"},
 	},
-	"sg": {
-		issue:   map[string]string{"wide_open": "true"},
-		healthy: map[string]string{"wide_open": "false", "dangerous_open_count": "0"},
-	},
 	"rtb": {
 		issue:   map[string]string{"blackhole_routes_count": "1", "associations_count": "1", "is_main": "false"},
 		healthy: map[string]string{"blackhole_routes_count": "0", "associations_count": "1", "is_main": "false"},

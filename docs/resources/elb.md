@@ -163,6 +163,10 @@ One row per signal from §3:
 | `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning: <State.Reason>` (fallback `provisioning: coming up`) | `Load balancer still provisioning — not yet accepting traffic.` |
 | `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `impaired: <State.Reason>` (fallback `impaired: scaling behind`) | `Load balancer is routing but lacks resources to scale — AWS is degraded.` |
 | `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed: <State.Reason>` | `Load balancer could not be set up — see State.Reason for cause.` |
+| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` | `The load balancer forwards requests it knows are ambiguous instead of rejecting them.` |
+| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` | `Headers that are not valid HTTP are passed through to the targets instead of being dropped.` |
+| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `listener without TLS on port <port>` | `This listener carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path.` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on listener <port>` | `The listener's security policy still negotiates TLS 1.0/1.1 or ciphers without forward secrecy.` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 
@@ -172,7 +176,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 5. Out of Scope
 
-- All §3.3 Wave 3 signals (copied above): CloudWatch `HTTPCode_ELB_5XX_Count`; `DescribeLoadBalancerAttributes` per LB (deletion-protection, access-logs).
+- CloudWatch `HTTPCode_ELB_5XX_Count` (§3.3). The `DescribeLoadBalancerAttributes` and `DescribeListeners` signals listed there now ship as Wave 2 and appear in §4.
 - Target-health signals (healthy/unhealthy target counts) — those live on `tg` per `attention-signals.md`, not on `elb`.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
@@ -206,6 +210,10 @@ elb — NETWORKING. Lifecycle key: `state`.
 | elb.state.active\_impaired | active impaired | warn | wave1 |
 | elb.state.failed | failed | broken | wave1 |
 | elb.misconfigured | deletion protection disabled | warn | wave2 |
+| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 |
+| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 |
+| elb.plain-http-listener | listener without TLS on port <port> | warn | wave2 |
+| elb.weak-tls-policy | weak TLS policy on listener <port> | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

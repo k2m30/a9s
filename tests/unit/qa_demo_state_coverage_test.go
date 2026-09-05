@@ -199,7 +199,7 @@ var knownStateCoverageGaps = map[string]bool{
 	"secrets:dim": true,
 	"ses:dim":     true,
 	"sfn:dim":     true, "sfn:warning": true,
-	"sg:dim": true, "sg:warning": true,
+	"sg:dim":     true,
 	"sns:broken": true, "sns:dim": true,
 	"sns-sub:broken": true,
 	"sqs:broken":     true, "sqs:dim": true,

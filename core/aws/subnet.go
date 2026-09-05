@@ -79,6 +79,22 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"}}
 		}
 
+		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
+		if subnet.MapPublicIpOnLaunch != nil && *subnet.MapPublicIpOnLaunch {
+			findings = append(findings, domain.Finding{
+				Code:     CodeSubnetAutoPublicIP,
+				Phrase:   SubnetAutoPublicIPPhrase,
+				Detail:   SubnetAutoPublicIPDetail,
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			})
+			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
+				CodeSubnetAutoPublicIP: {Rows: []domain.DetailRow{
+					{Label: "MapPublicIpOnLaunch", Value: "true", Tier: "~"},
+				}},
+			}
+		}
+
 		r := resource.Resource{
 			ID:   subnetID,
 			Name: name,
@@ -91,8 +107,9 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 				"state":             state,
 				"available_ips":     availableIPs,
 			},
-			Findings:  findings,
-			RawStruct: subnet,
+			Findings:         findings,
+			AttentionDetails: attentionDetails,
+			RawStruct:        subnet,
 		}
 
 		resources = append(resources, r)

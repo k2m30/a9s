@@ -26,16 +26,49 @@ const sgCodeWideOpen domain.FindingCode = "sg.ingress.wide-open"
 // public internet.
 const sgCodeDangerousPorts domain.FindingCode = "sg.ingress.dangerous-ports"
 
+// sgCodeDefaultWithRules is the canonical FindingCode for a VPC's default
+// security group that still carries rules. AWS attaches it to anything
+// launched without an explicit group, so every rule on it applies to
+// resources nobody chose to put there.
+const sgCodeDefaultWithRules domain.FindingCode = "sg.default-with-rules"
+
+// sgDefaultWithRulesPhrase is the S4 status phrase for sgCodeDefaultWithRules.
+const sgDefaultWithRulesPhrase = "default group allows traffic"
+
+// sgDefaultWithRulesDetail is the S5 operator sentence for sgCodeDefaultWithRules.
+const sgDefaultWithRulesDetail = "The VPC's default security group still carries rules, and AWS attaches it to " +
+	"any resource launched without an explicit group. Remove every ingress rule and every egress rule other than " +
+	"the AWS-created allow-all, and give each workload its own group."
+
 // sensitivePorts is the set of ports that are considered security-sensitive
-// when exposed to the internet (0.0.0.0/0 or ::/0).
+// when exposed to the internet (0.0.0.0/0 or ::/0). Single source: both the
+// finding and the risk_summary display phrase enumerate this map, so a port
+// added here is exposed on every surface at once.
+//
+// 8080 and 8443 are deliberately absent: they front ordinary public HTTP(S)
+// applications far more often than anything worth paging on, and adding them
+// turns the signal into noise.
 var sensitivePorts = map[int32]bool{
+	20:    true, // FTP data
+	21:    true, // FTP control
 	22:    true, // SSH
-	3389:  true, // RDP
-	3306:  true, // MySQL
-	5432:  true, // PostgreSQL
+	23:    true, // Telnet
+	25:    true, // SMTP
+	445:   true, // SMB
 	1433:  true, // MSSQL
+	1521:  true, // Oracle TNS listener
+	2483:  true, // Oracle TTC
+	3306:  true, // MySQL
+	3389:  true, // RDP
+	5432:  true, // PostgreSQL
+	5601:  true, // Kibana
 	6379:  true, // Redis
+	7199:  true, // Cassandra JMX
+	9092:  true, // Kafka
+	9160:  true, // Cassandra Thrift
 	9200:  true, // Elasticsearch
+	8888:  true, // Cassandra OpsCenter
+	11211: true, // Memcached
 	27017: true, // MongoDB
 }
 
@@ -82,8 +115,9 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 // computeSGRiskFields inspects the ingress rules of a security group and
 // returns (dangerous_open_count, wide_open, risk_summary).
 //
-//	dangerous_open_count and wide_open are the machine fields colorSG reads
-//	to decide severity; they are never rewritten by the humanizer.
+//	dangerous_open_count and wide_open are the machine fields the ec2
+//	internet-exposure signal reads through the sg cache; they are never
+//	rewritten by the humanizer.
 //
 //	risk_summary is a display-only, owner-worded phrase for the list Risk
 //	column and the detail "Risk Summary" row:
@@ -91,7 +125,7 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 //	  "all ports open to 0.0.0.0/0"        — at least one rule with all-protocols (-1) open to 0.0.0.0/0
 //	  "ports 22, 3306 open to 0.0.0.0/0"   — specific dangerous ports open to 0.0.0.0/0
 //	When both wide-open and specific ports are present, the wide-open phrase
-//	wins (it's the more severe signal) — mirrors colorSG's own precedence.
+//	wins (it's the more severe signal) — mirrors sgRiskFindings' precedence.
 func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
 	dangerousCount := 0
 	wideOpen := false
@@ -164,10 +198,11 @@ func sgDangerousPortsPhrase(ports string) string {
 	return "ports " + ports + " open to 0.0.0.0/0"
 }
 
-// sgRiskFindings mirrors colorSG's own precedence (wide-open first, then
-// dangerous ports) so the list Status cell / detail Attention block always
-// explain the Broken color with the same owner-worded phrase risk_summary
-// carries for display.
+// sgRiskFindings ranks wide-open ahead of dangerous ports so the list Status
+// cell / detail Attention block explain the Broken color with the same
+// owner-worded phrase risk_summary carries for display. The row color derives
+// from these findings alone (colorAnyFindingOrHealthy) — wide_open and
+// dangerous_open_count are consumed by other types, never by the classifier.
 func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.Finding {
 	switch {
 	case wideOpen == "true":
@@ -182,6 +217,31 @@ func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.F
 		}}
 	}
 	return nil
+}
+
+// sgDefaultAllowsTraffic reports whether sg is a VPC's default security
+// group that still carries rules. Every group is created with an allow-all
+// egress rule, so that one rule alone is the untouched state, not a signal.
+func sgDefaultAllowsTraffic(sg ec2types.SecurityGroup) bool {
+	if aws.ToString(sg.GroupName) != "default" {
+		return false
+	}
+	return len(sg.IpPermissions) > 0 || !isAWSDefaultEgress(sg.IpPermissionsEgress)
+}
+
+// isAWSDefaultEgress reports whether perms is exactly the egress rule AWS
+// creates with every security group: all protocols to 0.0.0.0/0, nothing else.
+func isAWSDefaultEgress(perms []ec2types.IpPermission) bool {
+	if len(perms) == 0 {
+		return true
+	}
+	if len(perms) != 1 {
+		return false
+	}
+	p := perms[0]
+	return aws.ToString(p.IpProtocol) == "-1" &&
+		len(p.IpRanges) == 1 && aws.ToString(p.IpRanges[0].CidrIp) == "0.0.0.0/0" &&
+		len(p.Ipv6Ranges) == 0 && len(p.UserIdGroupPairs) == 0 && len(p.PrefixListIds) == 0
 }
 
 // FetchSecurityGroupsPage calls the EC2 DescribeSecurityGroups API and returns
@@ -229,6 +289,24 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 
 		dangerousCount, wideOpen, riskSummary := computeSGRiskFields(sg.IpPermissions)
 
+		findings := sgRiskFindings(wideOpen, dangerousCount, riskSummary)
+		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
+		if sgDefaultAllowsTraffic(sg) {
+			findings = append(findings, domain.Finding{
+				Code:     sgCodeDefaultWithRules,
+				Phrase:   sgDefaultWithRulesPhrase,
+				Detail:   sgDefaultWithRulesDetail,
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			})
+			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
+				sgCodeDefaultWithRules: {Rows: []domain.DetailRow{
+					{Label: "Ingress rules", Value: strconv.Itoa(len(sg.IpPermissions)), Tier: "~"},
+					{Label: "Egress rules", Value: strconv.Itoa(len(sg.IpPermissionsEgress)), Tier: "~"},
+				}},
+			}
+		}
+
 		r := resource.Resource{
 			ID:   groupID,
 			Name: groupName,
@@ -241,8 +319,9 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 				"wide_open":            wideOpen,
 				"risk_summary":         riskSummary,
 			},
-			Findings:  sgRiskFindings(wideOpen, dangerousCount, riskSummary),
-			RawStruct: sg,
+			Findings:         findings,
+			AttentionDetails: attentionDetails,
+			RawStruct:        sg,
 		}
 
 		resources = append(resources, r)

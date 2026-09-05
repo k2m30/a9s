@@ -92,6 +92,28 @@ const (
 	AMIEBSKmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + AMIEBSKmsKeyID
 )
 
+// Prowler-gap witnesses for the networking types. Each names the ONE demo
+// resource that carries the corresponding finding; every other row of that
+// type is set to the healthy value for the same condition.
+const (
+	// SGDangerousFTP is the only demo group exposing a newly sensitive port
+	// (FTP control) to the internet.
+	SGDangerousFTP = "sg-0ftp00000000000001"
+	// SGDefaultWithRules is the only demo group named "default" that still
+	// carries rules.
+	SGDefaultWithRules = "sg-0default000000001"
+	// SGUnused is the only demo group no network interface references.
+	SGUnused = "sg-0unused0000000001"
+	// SubnetAutoPublicIP is the only demo subnet that auto-assigns public IPs.
+	SubnetAutoPublicIP = fixtProdPublicSubnetA
+	// TGWAutoAccept is the only demo transit gateway that auto-accepts
+	// shared attachments.
+	TGWAutoAccept = "tgw-0aaa111111111111a"
+	// VPCEPolicyOpen is the only demo VPC endpoint whose policy grants every
+	// action to every principal.
+	VPCEPolicyOpen = "vpce-0aaa111111111111a"
+)
+
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
 // with deterministic demo data that matches the data served by the old demo code paths.
 // This is the single source of truth for all EC2 fake responses.
@@ -109,7 +131,7 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	f.TransitGateways = buildTransitGateways()
 	f.TGWAttachments = buildTGWAttachments()
 	f.VpcEndpoints = buildVpcEndpoints()
-	f.NetworkInterfaces = buildNetworkInterfaces()
+	f.NetworkInterfaces = buildNetworkInterfaces(f.SecurityGroups)
 	f.Volumes = buildVolumes()
 	f.VolumeStatuses = buildVolumeStatuses()
 	f.Snapshots = buildSnapshots()
@@ -1295,6 +1317,87 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 		},
 	})
 
+	// FTP control port open to the world — the witness for the widened
+	// sensitive-port set (sgCodeDangerousPorts). No other demo group opens
+	// any of the ports added alongside FTP.
+	sgs = append(sgs, ec2types.SecurityGroup{
+		GroupId:          aws.String(SGDangerousFTP),
+		GroupName:        aws.String("acme-legacy-ftp-sg"),
+		VpcId:            aws.String(fixtProdVPCID),
+		Description:      aws.String("Legacy file-drop host — FTP open to the world"),
+		OwnerId:          aws.String("123456789012"),
+		SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + SGDangerousFTP),
+		IpPermissions: []ec2types.IpPermission{
+			{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(21),
+				ToPort:     aws.Int32(21),
+				IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+			},
+		},
+		IpPermissionsEgress: []ec2types.IpPermission{
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+		},
+		Tags: []ec2types.Tag{
+			{Key: aws.String("Name"), Value: aws.String("acme-legacy-ftp-sg")},
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+
+	// The prod VPC's default group, still carrying the self-referencing
+	// ingress rule AWS creates it with — the witness for
+	// sgCodeDefaultWithRules. It is the only demo group named "default", so
+	// every other row is healthy for that condition by construction.
+	sgs = append(sgs, ec2types.SecurityGroup{
+		GroupId:          aws.String(SGDefaultWithRules),
+		GroupName:        aws.String("default"),
+		VpcId:            aws.String(fixtProdVPCID),
+		Description:      aws.String("default VPC security group"),
+		OwnerId:          aws.String("123456789012"),
+		SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + SGDefaultWithRules),
+		IpPermissions: []ec2types.IpPermission{
+			{
+				IpProtocol: aws.String("-1"),
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
+					{GroupId: aws.String(SGDefaultWithRules), Description: aws.String("All traffic from members of this group")},
+				},
+			},
+		},
+		IpPermissionsEgress: []ec2types.IpPermission{
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+		},
+		Tags: []ec2types.Tag{
+			{Key: aws.String("Name"), Value: aws.String("default")},
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+
+	// Left out of buildNetworkInterfaces' attachment pass — the single
+	// witness for sgCodeUnused.
+	sgs = append(sgs, ec2types.SecurityGroup{
+		GroupId:          aws.String(SGUnused),
+		GroupName:        aws.String("acme-decommissioned-batch-sg"),
+		VpcId:            aws.String(fixtProdVPCID),
+		Description:      aws.String("Batch tier retired in 2025 — group never deleted"),
+		OwnerId:          aws.String("123456789012"),
+		SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + SGUnused),
+		IpPermissions: []ec2types.IpPermission{
+			{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(8080),
+				ToPort:     aws.Int32(8080),
+				IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.0.0.0/16"), Description: aws.String("Batch API from VPC")}},
+			},
+		},
+		IpPermissionsEgress: []ec2types.IpPermission{
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+		},
+		Tags: []ec2types.Tag{
+			{Key: aws.String("Name"), Value: aws.String("acme-decommissioned-batch-sg")},
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+
 	vpcIDs := []string{fixtProdVPCID, fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
 	sgNames := []string{"app-sg", "cache-sg", "worker-sg", "monitoring-sg", "lambda-sg", "batch-sg", "data-sg", "analytics-sg", "admin-sg", "internal-sg"}
 	sgDescs := []string{"Application tier", "Cache tier", "Worker tier", "Monitoring", "Lambda functions", "Batch jobs", "Data pipeline", "Analytics", "Admin access", "Internal services"}
@@ -1358,7 +1461,7 @@ func buildSubnets() []ec2types.Subnet {
 			AvailabilityZoneId:      aws.String("use1-az2"),
 			State:                   ec2types.SubnetStateAvailable,
 			AvailableIpAddressCount: aws.Int32(248),
-			MapPublicIpOnLaunch:     aws.Bool(true),
+			MapPublicIpOnLaunch:     aws.Bool(false),
 			DefaultForAz:            aws.Bool(false),
 			OwnerId:                 aws.String("123456789012"),
 			Tags: []ec2types.Tag{
@@ -1615,7 +1718,7 @@ func buildSubnets() []ec2types.Subnet {
 			AvailabilityZoneId:      aws.String("use1-az1"),
 			State:                   ec2types.SubnetStateAvailable,
 			AvailableIpAddressCount: aws.Int32(240),
-			MapPublicIpOnLaunch:     aws.Bool(true),
+			MapPublicIpOnLaunch:     aws.Bool(false),
 			DefaultForAz:            aws.Bool(false),
 			OwnerId:                 aws.String("123456789012"),
 			Tags: []ec2types.Tag{
@@ -1631,7 +1734,7 @@ func buildSubnets() []ec2types.Subnet {
 			AvailabilityZoneId:      aws.String("use1-az2"),
 			State:                   ec2types.SubnetStateAvailable,
 			AvailableIpAddressCount: aws.Int32(240),
-			MapPublicIpOnLaunch:     aws.Bool(true),
+			MapPublicIpOnLaunch:     aws.Bool(false),
 			DefaultForAz:            aws.Bool(false),
 			OwnerId:                 aws.String("123456789012"),
 			Tags: []ec2types.Tag{
@@ -2569,7 +2672,49 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 // Network Interfaces
 // ---------------------------------------------------------------------------
 
-func buildNetworkInterfaces() []ec2types.NetworkInterface {
+// buildNetworkInterfaces returns the hand-written interfaces plus one
+// attachment per security group that none of them already reference, so the
+// sg.unused signal has exactly one witness (SGUnused) instead of firing on
+// every group whose owning service the fixtures model without its ENIs.
+// Default groups are skipped: AWS creates one per VPC and it is exempt from
+// the check.
+func buildNetworkInterfaces(sgs []ec2types.SecurityGroup) []ec2types.NetworkInterface {
+	enis := namedNetworkInterfaces()
+	referenced := make(map[string]bool, len(sgs))
+	for _, eni := range enis {
+		for _, g := range eni.Groups {
+			referenced[aws.ToString(g.GroupId)] = true
+		}
+	}
+	for i, sg := range sgs {
+		groupID := aws.ToString(sg.GroupId)
+		if groupID == "" || groupID == SGUnused || referenced[groupID] || aws.ToString(sg.GroupName) == "default" {
+			continue
+		}
+		referenced[groupID] = true
+		name := aws.ToString(sg.GroupName)
+		enis = append(enis, ec2types.NetworkInterface{
+			NetworkInterfaceId: aws.String(fmt.Sprintf("eni-0sg%017x", i)),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              sg.VpcId,
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String(fmt.Sprintf("10.0.%d.%d", 100+i/250, 10+i%250)),
+			MacAddress:         aws.String(fmt.Sprintf("0a:1b:2c:3d:5e:%02x", i%256)),
+			Description:        aws.String("Workload interface for " + name),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(false),
+			SourceDestCheck:    aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: sg.GroupId, GroupName: sg.GroupName},
+			},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String(name + "-eni")}},
+		})
+	}
+	return enis
+}
+
+func namedNetworkInterfaces() []ec2types.NetworkInterface {
 	return []ec2types.NetworkInterface{
 		{
 			NetworkInterfaceId: aws.String("eni-0aaa111111111111a"),

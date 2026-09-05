@@ -121,7 +121,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `0.0.0.0/0` on admin/db port — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2 + S4 | `open: 22 to 0.0.0.0/0` | `Ingress rule allows TCP 22 from 0.0.0.0/0 — SSH is reachable from the entire internet.` |
-| Not referenced by any ENI (orphan) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `orphan: no ENIs attached` | `This security group is not attached to any network interface — candidate for cleanup.` |
+| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S2 + S4 + S5 | `default group allows traffic` | `The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group.` |
+| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` | `No network interface in this account references this group, so its rules protect nothing.` |
 
 Rules for filling list and detail text:
 
@@ -173,6 +174,8 @@ sg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 | --- | --- | --- | --- |
 | sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 |
 | sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 |
+| sg.default-with-rules | default group allows traffic | warn | wave1 |
+| sg.unused | not attached to anything | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

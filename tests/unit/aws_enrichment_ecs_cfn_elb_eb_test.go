@@ -880,6 +880,17 @@ func (f *fakeELBEnricher) DescribeLoadBalancerAttributes(
 	return &elbv2svc.DescribeLoadBalancerAttributesOutput{Attributes: attrs}, nil
 }
 
+// DescribeListeners answers the enricher's listener-posture pass. These cases
+// exercise the attributes half only, so every balancer reports no listeners —
+// an empty set is a valid answer and must not colour the attribute findings.
+func (f *fakeELBEnricher) DescribeListeners(
+	_ context.Context,
+	_ *elbv2svc.DescribeListenersInput,
+	_ ...func(*elbv2svc.Options),
+) (*elbv2svc.DescribeListenersOutput, error) {
+	return &elbv2svc.DescribeListenersOutput{}, nil
+}
+
 // Compile-time check.
 var _ awsclient.ELBv2API = (*fakeELBEnricher)(nil)
 

@@ -173,7 +173,8 @@ One row per signal from §3:
 | `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed: AZ out of capacity` | — |
 | IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` | — |
 | IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` | — |
-| Misconfigured public subnet (auto-assign public IP, no IGW default route) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
+| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` | `Every instance launched into this subnet gets a public IP address by default.` |
+| Misconfigured public subnet (auto-assign public IP, no IGW default route) — NOT IMPLEMENTED (backlog; the auto-assign half above ships without the route-table cross-reference) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
 
 Rules for filling list and detail text:
 
@@ -231,6 +232,7 @@ subnet — NETWORKING. Lifecycle key: `state`.
 | subnet.state.unavailable | unavailable | broken | wave1 |
 | subnet.state.failed | failed | broken | wave1 |
 | subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 |
+| subnet.auto-public-ip | auto-assigns public IPs | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

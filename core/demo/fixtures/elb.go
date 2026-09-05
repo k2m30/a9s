@@ -51,6 +51,22 @@ const (
 	fixtLambdaProcessorTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/lambda-processor-tg/3333333333333333"
 )
 
+// Prowler-gap witnesses for the elb type. Each names the ONE demo load
+// balancer that carries the corresponding Wave-2 finding; no other load
+// balancer has the attribute or the listener that would trip it.
+const (
+	// ELBDesyncMonitor only observes ambiguous HTTP requests instead of
+	// rejecting them.
+	ELBDesyncMonitor = "monitoring-alb"
+	// ELBKeepsInvalidHeaders forwards invalid HTTP header fields to its
+	// targets.
+	ELBKeepsInvalidHeaders = "acme-dev-web"
+	// ELBPlainHTTP serves an HTTP listener that does not redirect to HTTPS.
+	ELBPlainHTTP = "auth-service-alb"
+	// ELBWeakTLS terminates TLS on a pre-TLS-1.2 security policy.
+	ELBWeakTLS = "events-alb"
+)
+
 // NewELBFixtures builds and returns a fully-populated ELBFixtures struct.
 var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 	f := &ELBFixtures{
@@ -88,6 +104,7 @@ var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 		},
 	}
 	f.LoadBalancers = buildLoadBalancers()
+	buildWitnessAttributes(f)
 	f.TargetGroups = buildTargetGroups()
 	buildListeners(f)
 	buildTargetHealth(f)
@@ -97,6 +114,33 @@ var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 
 func NewELBFixtures() *ELBFixtures {
 	return sharedELBFixtures()
+}
+
+// lbARNByName resolves a demo load balancer's ARN from its name so the
+// witness tables below key off the same generated ARN the fetcher emits.
+func lbARNByName(lbs []elbv2types.LoadBalancer, name string) string {
+	for _, lb := range lbs {
+		if aws.ToString(lb.LoadBalancerName) == name {
+			return aws.ToString(lb.LoadBalancerArn)
+		}
+	}
+	return ""
+}
+
+// buildWitnessAttributes gives each attribute-driven elb finding exactly one
+// witness. Every load balancer named here also carries the healthy value for
+// the sibling attribute, so neither witness trips the other's finding; every
+// load balancer NOT named here has no attribute entry at all, which the
+// enricher reads as "not reported" rather than "misconfigured".
+func buildWitnessAttributes(f *ELBFixtures) {
+	f.LoadBalancerAttributes[lbARNByName(f.LoadBalancers, ELBDesyncMonitor)] = []elbv2types.LoadBalancerAttribute{
+		{Key: aws.String("routing.http.desync_mitigation_mode"), Value: aws.String("monitor")},
+		{Key: aws.String("routing.http.drop_invalid_header_fields.enabled"), Value: aws.String("true")},
+	}
+	f.LoadBalancerAttributes[lbARNByName(f.LoadBalancers, ELBKeepsInvalidHeaders)] = []elbv2types.LoadBalancerAttribute{
+		{Key: aws.String("routing.http.desync_mitigation_mode"), Value: aws.String("defensive")},
+		{Key: aws.String("routing.http.drop_invalid_header_fields.enabled"), Value: aws.String("false")},
+	}
 }
 
 func buildLoadBalancers() []elbv2types.LoadBalancer {
@@ -326,6 +370,41 @@ func buildTargetGroups() []elbv2types.TargetGroup {
 }
 
 func buildListeners(f *ELBFixtures) {
+	// The only demo listener speaking plain HTTP with a forward action —
+	// every other HTTP listener redirects to HTTPS.
+	plainARN := lbARNByName(f.LoadBalancers, ELBPlainHTTP)
+	f.Listeners[plainARN] = []elbv2types.Listener{
+		{
+			ListenerArn:     aws.String(plainARN + "/listener/aaaa1111"),
+			LoadBalancerArn: aws.String(plainARN),
+			Port:            aws.Int32(80),
+			Protocol:        elbv2types.ProtocolEnumHttp,
+			DefaultActions: []elbv2types.Action{
+				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdAPITGARN)},
+			},
+		},
+	}
+
+	// The only demo listener on a pre-TLS-1.2 security policy. It carries a
+	// certificate so the wave-1 "no certificate configured" signal stays on
+	// its own witness.
+	weakTLSARN := lbARNByName(f.LoadBalancers, ELBWeakTLS)
+	f.Listeners[weakTLSARN] = []elbv2types.Listener{
+		{
+			ListenerArn:     aws.String(weakTLSARN + "/listener/bbbb2222"),
+			LoadBalancerArn: aws.String(weakTLSARN),
+			Port:            aws.Int32(443),
+			Protocol:        elbv2types.ProtocolEnumHttps,
+			SslPolicy:       aws.String("ELBSecurityPolicy-2016-08"),
+			Certificates: []elbv2types.Certificate{
+				{CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111")},
+			},
+			DefaultActions: []elbv2types.Action{
+				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdWebTGARN)},
+			},
+		},
+	}
+
 	f.Listeners[fixtProdELBARN] = []elbv2types.Listener{
 		{
 			ListenerArn:     aws.String(fixtProdListenerARN),

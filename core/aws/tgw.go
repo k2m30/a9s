@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -72,6 +73,26 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
 		}
 
+		// A gateway on its way out cannot accept anything; a posture finding
+		// on it is noise an operator can do nothing about.
+		lifecycleEnded := state == "deleting" || state == "deleted"
+
+		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
+		if !lifecycleEnded && tgw.Options != nil && tgw.Options.AutoAcceptSharedAttachments == ec2types.AutoAcceptSharedAttachmentsValueEnable {
+			findings = append(findings, domain.Finding{
+				Code:     CodeTGWAutoAccept,
+				Phrase:   TGWAutoAcceptPhrase,
+				Detail:   TGWAutoAcceptDetail,
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			})
+			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
+				CodeTGWAutoAccept: {Rows: []domain.DetailRow{
+					{Label: "AutoAcceptSharedAttachments", Value: "enable", Tier: "~"},
+				}},
+			}
+		}
+
 		r := resource.Resource{
 			ID:   tgwID,
 			Name: name,
@@ -82,8 +103,9 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 				"owner_id":    ownerID,
 				"description": description,
 			},
-			Findings:  findings,
-			RawStruct: tgw,
+			Findings:         findings,
+			AttentionDetails: attentionDetails,
+			RawStruct:        tgw,
 		}
 
 		resources = append(resources, r)
