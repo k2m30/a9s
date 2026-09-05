@@ -166,7 +166,7 @@ One row per signal from §3:
 | ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` | `The load balancer forwards requests it knows are ambiguous instead of rejecting them.` |
 | ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` | `Headers that are not valid HTTP are passed through to the targets instead of being dropped.` |
 | ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `listener without TLS on port <port>` | `This listener carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path.` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on listener <port>` | `The listener's security policy still negotiates TLS 1.0/1.1 or ciphers without forward secrecy.` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on listener <port>` | `The listener's security policy still negotiates older protocol versions or ciphers without forward secrecy.` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 

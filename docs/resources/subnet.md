@@ -178,7 +178,7 @@ One row per signal from §3:
 | `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed: AZ out of capacity` | — |
 | IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` | — |
 | IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` | — |
-| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` | `Every instance launched into this subnet gets a public IP address by default.` |
+| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` | `Every instance launched into this subnet is given a public address by default, so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign public address setting off and attach an elastic address to the instances that genuinely need one.` |
 | Misconfigured public subnet (auto-assign public address, no IGW default route) — NOT IMPLEMENTED: the auto-assign half above ships, the route-table cross-reference does not | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
 
 Rules for filling list and detail text:
