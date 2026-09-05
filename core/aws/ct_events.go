@@ -624,7 +624,7 @@ func ctDangerPhrase(cause, errorCode, eventName string) (phrase, detail string) 
 	switch cause {
 	case ctCauseError:
 		humanized := domain.HumanizeStatusPhrase(errorCode)
-		return "failed: " + humanized, fmt.Sprintf("CloudTrail recorded %s failing with %s.", eventName, errorCode)
+		return "failed: " + humanized, fmt.Sprintf("CloudTrail recorded a failed call (%s) — it was refused with (%s).", eventName, errorCode)
 	case ctCauseDestructive:
 		return "destructive call", fmt.Sprintf("CloudTrail recorded a destructive call (%s) — verify it was expected.", eventName)
 	}
@@ -639,9 +639,9 @@ func ctAttentionPhrase(cause, eventName string) (phrase, detail string) {
 	case ctCauseWrite:
 		return "modifying call", fmt.Sprintf("CloudTrail recorded a modifying call (%s) — verify the change was expected.", eventName)
 	case ctCauseRoot:
-		return "root account activity", fmt.Sprintf("CloudTrail recorded %s performed by the account root user.", eventName)
+		return "root account activity", fmt.Sprintf("CloudTrail recorded a call (%s) performed by the account root user.", eventName)
 	case ctCauseCrossAccount:
-		return "cross-account access", fmt.Sprintf("CloudTrail recorded %s from a different AWS account than the recipient.", eventName)
+		return "cross-account access", fmt.Sprintf("CloudTrail recorded a call (%s) from a different AWS account than the recipient.", eventName)
 	case ctCauseSensitiveRead:
 		return "reads sensitive data (" + eventName + ")", fmt.Sprintf("CloudTrail recorded a read of sensitive data (%s) — verify the caller is expected.", eventName)
 	}

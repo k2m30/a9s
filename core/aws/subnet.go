@@ -90,7 +90,7 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			})
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				CodeSubnetAutoPublicIP: {Rows: []domain.DetailRow{
-					{Label: "MapPublicIpOnLaunch", Value: "true", Tier: "~"},
+					{Label: "Public address on launch", Value: "true", Tier: "~"},
 				}},
 			}
 		}

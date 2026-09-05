@@ -85,13 +85,21 @@ func ApplyWave2ToRow(
 	// in-place compaction here would mutate the backing array still shared
 	// with prior snapshots/retained rows.
 	out := make([]domain.Finding, 0, len(r.Findings))
+	stale := make(map[domain.FindingCode]bool, len(r.Findings))
 	for _, f := range r.Findings {
-		if !strings.HasPrefix(f.Source, "wave2:") {
-			out = append(out, f)
+		if strings.HasPrefix(f.Source, "wave2:") {
+			stale[f.Code] = true
+			continue
 		}
+		out = append(out, f)
 	}
 	r.Findings = out
-	r.AttentionDetails = nil
+	// The fold owns exactly the wave-2 slice: the outgoing findings' codes and
+	// nothing else. Wave-1 supporting rows come from data only the fetcher
+	// holds and nothing re-derives them, so dropping the whole map would lose
+	// them for the rest of the row's life. Rebuilt into a NEW map for the same
+	// reason the findings slice is: applyEnrichment's row copy is shallow.
+	r.AttentionDetails = keepingCodes(r.AttentionDetails, stale)
 
 	fs := findings[r.ID]
 	if len(fs) == 0 {
@@ -124,4 +132,23 @@ func ApplyWave2ToRow(
 			r.AttentionDetails[f.Code] = ad
 		}
 	}
+}
+
+// keepingCodes copies ad without the entries named in drop, returning nil when
+// nothing survives so a row with no supporting rows keeps its zero value.
+func keepingCodes(
+	ad map[domain.FindingCode]domain.AttentionDetail,
+	drop map[domain.FindingCode]bool,
+) map[domain.FindingCode]domain.AttentionDetail {
+	var kept map[domain.FindingCode]domain.AttentionDetail
+	for code, detail := range ad {
+		if drop[code] {
+			continue
+		}
+		if kept == nil {
+			kept = make(map[domain.FindingCode]domain.AttentionDetail, len(ad))
+		}
+		kept[code] = detail
+	}
+	return kept
 }

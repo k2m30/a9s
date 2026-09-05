@@ -326,19 +326,23 @@ func s3PABRows(out *s3.GetPublicAccessBlockOutput, err error) []domain.DetailRow
 		}
 	}
 	cfg := out.PublicAccessBlockConfiguration
+	// The label is what the console calls the setting; the SDK flag name
+	// rides in the value, which the style gate exempts because a value
+	// legitimately is an identifier.
 	flags := []struct {
-		name  string
+		label string
+		flag  string
 		value *bool
 	}{
-		{"BlockPublicAcls", cfg.BlockPublicAcls},
-		{"IgnorePublicAcls", cfg.IgnorePublicAcls},
-		{"BlockPublicPolicy", cfg.BlockPublicPolicy},
-		{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
+		{"Block public access control lists", "BlockPublicAcls", cfg.BlockPublicAcls},
+		{"Ignore public access control lists", "IgnorePublicAcls", cfg.IgnorePublicAcls},
+		{"Block public bucket policy", "BlockPublicPolicy", cfg.BlockPublicPolicy},
+		{"Restrict public buckets", "RestrictPublicBuckets", cfg.RestrictPublicBuckets},
 	}
 	var rows []domain.DetailRow
 	for _, fc := range flags {
 		if !aws.ToBool(fc.value) {
-			rows = append(rows, domain.DetailRow{Label: fc.name, Value: "false"})
+			rows = append(rows, domain.DetailRow{Label: fc.label, Value: "false (" + fc.flag + ")"})
 		}
 	}
 	if len(rows) == 0 {

@@ -21,5 +21,5 @@ const TGWAutoAcceptPhrase = "auto-accepts shared attachments"
 
 // TGWAutoAcceptDetail is the S5 operator sentence for CodeTGWAutoAccept.
 const TGWAutoAcceptDetail = "Any account this gateway is shared with can attach a VPC to it without review, " +
-	"putting that VPC on your routed network the moment it asks. Set AutoAcceptSharedAttachments to disable " +
-	"and accept attachments explicitly."
+	"putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each " +
+	"attachment explicitly."

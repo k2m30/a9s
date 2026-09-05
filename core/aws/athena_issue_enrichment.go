@@ -71,7 +71,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		// EnforceWorkGroupConfiguration defaults to true; false means callers can bypass settings.
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
 			rows = append(rows, domain.DetailRow{
-				Label: "EnforceWorkGroupConfiguration",
+				Label: "Workgroup settings enforced",
 				Value: "false",
 				Tier:  "~",
 			})
@@ -79,7 +79,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		// Missing encryption on result configuration is a security concern.
 		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
 			rows = append(rows, domain.DetailRow{
-				Label: "ResultConfiguration.EncryptionConfiguration",
+				Label: "Query result encryption",
 				Value: "nil",
 				Tier:  "~",
 			})

@@ -32,10 +32,10 @@ const (
 const (
 	elbDesyncMitigationOffDetail = "The load balancer forwards requests it knows are ambiguous instead of " +
 		"rejecting them, so a crafted request can be interpreted one way by the balancer and another by the " +
-		"target. Set routing.http.desync_mitigation_mode to defensive or strictest."
+		"target. Set the desync mitigation mode to defensive or strictest."
 	elbInvalidHeadersKeptDetail = "Headers that are not valid HTTP are passed through to the targets instead of " +
-		"being dropped, which is how request smuggling reaches an application. Enable " +
-		"routing.http.drop_invalid_header_fields."
+		"being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid " +
+		"header fields."
 	elbPlainHTTPListenerDetail = "This listener carries traffic in the clear, so credentials and session cookies " +
 		"cross the network readable by anyone on the path. Terminate TLS on the listener, or redirect it to an " +
 		"HTTPS listener."
@@ -87,7 +87,7 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 	case elbtypes.ProtocolEnumHttps, elbtypes.ProtocolEnumTls:
 		if isWeakTLSPolicy(aws.ToString(listener.SslPolicy)) {
 			return elbCodeWeakTLSPolicy, fmt.Sprintf("weak TLS policy on listener %d", port),
-				domain.DetailRow{Label: "SslPolicy", Value: aws.ToString(listener.SslPolicy), Tier: "~"}, true
+				domain.DetailRow{Label: "Security policy", Value: aws.ToString(listener.SslPolicy), Tier: "~"}, true
 		}
 	case elbtypes.ProtocolEnumHttp:
 		if lbType == "application" && !redirectsToHTTPS(listener) {
@@ -190,13 +190,13 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			case "routing.http.desync_mitigation_mode":
 				if isALB && *attr.Value == elbDesyncMonitorMode {
 					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, "HTTP desync mitigation off", "~", "elb",
-						[]domain.DetailRow{{Label: "desync_mitigation_mode", Value: elbDesyncMonitorMode, Tier: "~"}},
+						[]domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: "~"}},
 						elbDesyncMitigationOffDetail)
 				}
 			case "routing.http.drop_invalid_header_fields.enabled":
 				if isALB && *attr.Value != "true" {
 					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, "invalid HTTP headers not dropped", "~", "elb",
-						[]domain.DetailRow{{Label: "drop_invalid_header_fields", Value: *attr.Value, Tier: "~"}},
+						[]domain.DetailRow{{Label: "Drop invalid headers", Value: *attr.Value, Tier: "~"}},
 						elbInvalidHeadersKeptDetail)
 				}
 			}

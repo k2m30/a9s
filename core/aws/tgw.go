@@ -88,7 +88,7 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			})
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				CodeTGWAutoAccept: {Rows: []domain.DetailRow{
-					{Label: "AutoAcceptSharedAttachments", Value: "enable", Tier: "~"},
+					{Label: "Auto-accept shared attachments", Value: "enable", Tier: "~"},
 				}},
 			}
 		}

@@ -61,7 +61,7 @@ func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Re
 			continue
 		}
 		setWave2Finding(&result, r.ID, sgCodeUnused, sgUnusedPhrase, "~", "sg",
-			[]domain.DetailRow{{Label: "ENIs referencing", Value: "0", Tier: "~"}},
+			[]domain.DetailRow{{Label: "Network interfaces referencing", Value: "0", Tier: "~"}},
 			sgUnusedDetail)
 	}
 

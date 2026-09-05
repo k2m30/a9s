@@ -73,7 +73,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			cfg.DefaultCacheBehavior.ViewerProtocolPolicy == cftypes.ViewerProtocolPolicyAllowAll {
 			summaries = append(summaries, "no HTTPS redirect (insecure)")
 			rows = append(rows, domain.DetailRow{
-				Label: "ViewerProtocolPolicy",
+				Label: "Viewer protocol policy",
 				Value: "allow-all",
 				Tier:  "~",
 			})

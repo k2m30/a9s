@@ -222,7 +222,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 			if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
 				r.Findings = []domain.Finding{{
 					Code: CodeAMIDeprecated, Phrase: "deprecated",
-					Detail:   "DeprecationTime has passed — AWS no longer recommends this AMI for new launches.",
+					Detail:   "The deprecation date has passed — AWS no longer recommends this AMI for new launches.",
 					Severity: domain.SevWarn, Source: "wave1",
 				}}
 			}
