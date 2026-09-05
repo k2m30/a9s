@@ -8,6 +8,7 @@ paths:
   - "docs/README.tmpl.md"
   - "README.md"
   - "website/**"
+  - "CONTRIBUTING.md"
 ---
 
 # Docs sync
