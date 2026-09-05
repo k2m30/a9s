@@ -164,7 +164,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeASGSingleAZ, domain.DetailRow{
-				Label: "AZs", Value: strings.Join(asg.AvailabilityZones, ", "), Tier: "~",
+				Label: "Availability zones", Value: strings.Join(asg.AvailabilityZones, ", "), Tier: "~",
 			})
 		}
 		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&

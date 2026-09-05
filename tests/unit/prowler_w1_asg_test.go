@@ -187,7 +187,7 @@ func TestASG_SingleAZ_OneZone(t *testing.T) {
 	rs := pw1FetchASGs(t, g)
 	r := pw1ResourceByID(t, rs, "acme-single-az")
 	pw1RequireFinding(t, r.Findings, pw1ASGCodeSingleAZ, "single availability zone", domain.SevWarn, "wave1")
-	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeSingleAZ].Rows, "AZs", "us-east-1a")
+	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeSingleAZ].Rows, "Availability zones", "us-east-1a")
 }
 
 // TestASG_SingleAZ_TwoZonesIsHealthy pins the negative case at the boundary
@@ -218,7 +218,7 @@ func TestASG_NoELBHealthCheck_BehindTargetGroup(t *testing.T) {
 	rs := pw1FetchASGs(t, g)
 	r := pw1ResourceByID(t, rs, "acme-tg-ec2-health")
 	pw1RequireFinding(t, r.Findings, pw1ASGCodeNoELBHealth, "no load balancer health check", domain.SevWarn, "wave1")
-	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeNoELBHealth].Rows, "HealthCheckType", "EC2")
+	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeNoELBHealth].Rows, "Health check type", "EC2")
 }
 
 // TestASG_NoELBHealthCheck_ClassicLoadBalancerCounts pins that the older
@@ -275,7 +275,7 @@ func TestASG_LaunchConfigIMDSv1_Optional(t *testing.T) {
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-imdsv1-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-imdsv1-asg"], pw1ASGCodeLCIMDSv1,
 		"launch configuration allows IMDSv1", domain.SevWarn, "wave2:asg")
-	pw1RequireRow(t, pw1Rows(res, "acme-imdsv1-asg", pw1ASGCodeLCIMDSv1), "HttpTokens", "optional")
+	pw1RequireRow(t, pw1Rows(res, "acme-imdsv1-asg", pw1ASGCodeLCIMDSv1), "Metadata tokens", "optional")
 }
 
 // TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset pins the one rule in
@@ -292,7 +292,7 @@ func TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset(t *testing.T) {
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-unset-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-unset-asg"], pw1ASGCodeLCIMDSv1,
 		"launch configuration allows IMDSv1", domain.SevWarn, "wave2:asg")
-	pw1RequireRow(t, pw1Rows(res, "acme-unset-asg", pw1ASGCodeLCIMDSv1), "HttpTokens", "unset")
+	pw1RequireRow(t, pw1Rows(res, "acme-unset-asg", pw1ASGCodeLCIMDSv1), "Metadata tokens", "unset")
 }
 
 // TestASG_LaunchConfigIMDSv1_RequiredIsHealthy pins the negative case.

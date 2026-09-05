@@ -118,8 +118,10 @@ func colorASG(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	status := r.Fields["status"]
-	if status == "Delete in progress" {
+	// Reached only by a Resource carrying Fields but no Findings — a row
+	// built outside the fetcher. Every branch below mirrors one the fetcher
+	// emits a Finding for; asgDeleting keeps the deleting test in one place.
+	if asgDeleting(r.Fields["status"]) {
 		return domain.ColorWarning
 	}
 	inService := r.Fields["in_service_count"]
