@@ -6,6 +6,8 @@ paths:
   - "cmd/**"
   - "docs/shared/**"
   - "docs/README.tmpl.md"
+  - "README.md"
+  - "website/**"
 ---
 
 # Docs sync

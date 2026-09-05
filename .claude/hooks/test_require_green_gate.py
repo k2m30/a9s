@@ -247,5 +247,42 @@ class GateFileShapeTest(unittest.TestCase):
         self.assertIn("make test", reason)
 
 
+# gate.txt after a round that appended to the previous round's file: the
+# `make test` section is from the earlier tree, and the gate was re-run only
+# for lint. Nothing in the file says which section belongs to which tree.
+APPENDED_ACROSS_TWO_RUNS = """## gate: make test
+ok  \tgithub.com/k2m30/a9s/tests/unit\t18.412s
+EXIT=0
+## gate: make lint
+core/aws/kms.go:41:2: ineffectual assignment to err (ineffassign)
+EXIT=1
+## gate: make lint
+0 issues.
+EXIT=0
+"""
+
+
+class GateFileSingleRunTest(unittest.TestCase):
+    """A gate.txt must describe one run of the gates against one tree.
+
+    Two sections for the same gate prove the file spans more than one run, so
+    the sections that appear once were captured against an earlier tree. The
+    lint fix that produced the second lint section edited code the earlier
+    `make test` never saw, which is the same "the gate proves an earlier tree"
+    failure the mtime check already refuses -- it is just invisible to mtime,
+    because appending refreshes the whole file.
+    """
+
+    def setUp(self):
+        self.taskdir = tempfile.mkdtemp(prefix="w10-onerun-")
+        self.addCleanup(shutil.rmtree, self.taskdir, True)
+
+    def test_gate_spanning_two_runs_does_not_close_the_round(self):
+        with open(os.path.join(self.taskdir, "gate.txt"), "w") as fh:
+            fh.write(APPENDED_ACROSS_TWO_RUNS)
+        code, reason = run_hook(payload(DONE_MESSAGE, self.taskdir))
+        self.assertEqual(2, code)
+
+
 if __name__ == "__main__":
     unittest.main()

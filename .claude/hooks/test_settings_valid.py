@@ -133,6 +133,17 @@ class ClaudeMdTest(unittest.TestCase):
         ):
             self.assertIn(heading, self.text)
 
+    def test_docs_sync_rule_loads_where_it_forbids_an_edit(self):
+        """The rule's hardest line is "never edit README.md directly -- it will
+        be overwritten by readmegen". A rule scoped only to the code paths that
+        trigger a docs update is absent at the moment an agent opens the
+        generated file, which is the moment it has to stop."""
+        text = read(".claude", "rules", "docs-sync.md")
+        head = text.split("---")[1]
+        for surface in ("README.md", "website/**"):
+            with self.subTest(surface=surface):
+                self.assertIn(surface, head)
+
 
 class ProcessDocsTest(unittest.TestCase):
     def test_team_loop_has_no_wait_and_retry_rule(self):

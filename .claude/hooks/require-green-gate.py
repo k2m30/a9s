@@ -40,7 +40,8 @@ OWNED_DIRS = ("core", "internal", "cmd", "scripts", ".a9s")
 EXIT_RE = re.compile(r"\bEXIT=(\d+)\b")
 GATE_MARKER_RE = re.compile(r"^##\s*gate:\s*(.+?)\s*$")
 
-CAPTURE_RECIPE = """  printf '## gate: make test\\n' >> $TASKDIR/gate.txt
+CAPTURE_RECIPE = """  : > $TASKDIR/gate.txt
+  printf '## gate: make test\\n' >> $TASKDIR/gate.txt
   make -C $WORKTREE test >> $TASKDIR/gate.txt 2>&1
   printf 'EXIT=%s\\n' $? >> $TASKDIR/gate.txt
   printf '## gate: make lint\\n' >> $TASKDIR/gate.txt
@@ -84,25 +85,30 @@ def resolve_paths(message, cwd):
 
 
 def gate_results(text):
-    """Map each gate named by a `## gate:` marker to the exit code under it.
+    """Map each gate named by a `## gate:` marker to one exit code per section.
 
     The last exit line in a section wins. A command's output can contain an
     `EXIT=` line of its own -- a test asserting on a captured gate log does
     exactly that -- and only the one the recipe appends last is the command's.
+
+    Sections are kept per occurrence rather than collapsed, because a gate
+    appearing twice means the file was appended across two runs and its other
+    sections describe an earlier tree.
     """
-    results = {}
+    sections = {}
     current = None
     for line in text.splitlines():
         marker = GATE_MARKER_RE.match(line)
         if marker:
             current = marker.group(1)
+            sections.setdefault(current, []).append(None)
             continue
         if current is None:
             continue
         found = EXIT_RE.search(line)
         if found:
-            results[current] = int(found.group(1))
-    return results
+            sections[current][-1] = int(found.group(1))
+    return sections
 
 
 def newest_owned_mtime(worktree):
@@ -145,15 +151,22 @@ def failure(gate_path, worktree):
 
     results = gate_results(body)
     for gate in REQUIRED_GATES:
-        if gate not in results:
+        codes = results.get(gate, [])
+        if not codes or codes[-1] is None:
             return (
                 "gate.txt at %s has no `## gate: %s` section with an exit code."
                 % (gate_path, gate)
             )
-        if results[gate] != 0:
+        if len(codes) > 1:
+            return (
+                "gate.txt at %s holds %d `## gate: %s` sections, so it spans more "
+                "than one run and its earlier sections describe an earlier tree. "
+                "Truncate it and capture every gate again." % (gate_path, len(codes), gate)
+            )
+        if codes[0] != 0:
             return "`%s` exited %d in %s. DONE requires EXIT=0." % (
                 gate,
-                results[gate],
+                codes[0],
                 gate_path,
             )
     return None
