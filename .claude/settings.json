@@ -121,9 +121,7 @@
       "TaskUpdate",
       "ToolSearch"
     ],
-    "deny": [
-      "Bash(git commit * -F*)"
-    ]
+    "deny": []
   },
   "hooks": {
     "PreToolUse": [
