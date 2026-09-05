@@ -11,6 +11,8 @@ package unit
 import (
 	"context"
 	"errors"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -51,7 +53,12 @@ func (f *pw1ECSTaskFake) DescribeTasks(_ context.Context, in *ecs.DescribeTasksI
 		return nil, f.tasksErr
 	}
 	var out []ecstypes.Task
-	for _, id := range in.Tasks {
+	for _, ref := range in.Tasks {
+		// The enricher passes task IDs, the fetcher passes full ARNs.
+		id := ref
+		if i := strings.LastIndex(ref, "/"); i >= 0 {
+			id = ref[i+1:]
+		}
 		if task, ok := f.tasks[id]; ok {
 			out = append(out, task)
 		}
@@ -70,6 +77,19 @@ func (f *pw1ECSTaskFake) DescribeTaskDefinition(_ context.Context, in *ecs.Descr
 		return nil, errors.New("ClientException: task definition not found")
 	}
 	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &def}, nil
+}
+
+func (f *pw1ECSTaskFake) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
+	return &ecs.ListClustersOutput{ClusterArns: []string{"arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster"}}, nil
+}
+
+func (f *pw1ECSTaskFake) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
+	arns := make([]string, 0, len(f.tasks))
+	for _, task := range f.tasks {
+		arns = append(arns, aws.ToString(task.TaskArn))
+	}
+	sort.Strings(arns)
+	return &ecs.ListTasksOutput{TaskArns: arns}, nil
 }
 
 // pw1Task builds a running task pointing at defARN.
@@ -537,11 +557,13 @@ func TestECSTask_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	}
 }
 
-// TestECSTask_PostureSignalsSilentOnStoppedTask pins common contract rule 4 on
-// ecs-task: the row is a task, not a definition, so a task that has already
-// stopped is not an open posture item however its definition reads.
-func TestECSTask_PostureSignalsSilentOnStoppedTask(t *testing.T) {
-	const id = "0aaaa1111bbbb2222cccc3333dddd4460"
+// pw1ECSTeardownStates are the lifecycle states in which a task is on its way
+// out. A task in any of them is gone as far as posture goes: nothing about its
+// definition can be acted on through this row any more.
+var pw1ECSTeardownStates = []string{"STOPPED", "STOPPING", "DEPROVISIONING", "DEACTIVATING"}
+
+// pw1BadDefinition is a task definition that trips all five posture rules.
+func pw1BadDefinition() ecstypes.TaskDefinition {
 	c := pw1NoRefContainer("app")
 	c.Privileged = aws.Bool(true)
 	c.ReadonlyRootFilesystem = aws.Bool(false)
@@ -550,31 +572,81 @@ func TestECSTask_PostureSignalsSilentOnStoppedTask(t *testing.T) {
 		ecstypes.KeyValuePair{Name: aws.String("ADMIN_PASSWORD"), Value: aws.String("s3cr3t-value-9")})
 	def := pw1TaskDef(pw1TaskDefARN, c)
 	def.NetworkMode = ecstypes.NetworkModeHost
+	return def
+}
 
-	task := pw1Task(id, pw1TaskDefARN)
-	task.LastStatus = aws.String("STOPPED")
-	task.DesiredStatus = aws.String("STOPPED")
-	task.StopCode = ecstypes.TaskStopCodeEssentialContainerExited
+// TestECSTask_PostureSignalsSilentThroughoutTeardown pins that every state in
+// which a task is being torn down silences the posture rules, not STOPPED
+// alone. A task that is stopping is as unactionable as one that has stopped.
+func TestECSTask_PostureSignalsSilentThroughoutTeardown(t *testing.T) {
+	for _, state := range pw1ECSTeardownStates {
+		t.Run(state, func(t *testing.T) {
+			const id = "0aaaa1111bbbb2222cccc3333dddd4460"
+			task := pw1Task(id, pw1TaskDefARN)
+			task.LastStatus = aws.String(state)
+			task.DesiredStatus = aws.String("STOPPED")
 
-	r := pw1ECSTaskResource(id, pw1TaskDefARN)
-	r.Fields["status"] = "STOPPED"
-	r.Fields["last_status"] = "STOPPED"
+			r := pw1ECSTaskResource(id, pw1TaskDefARN)
+			r.Fields["status"] = state
+			r.Fields["last_status"] = state
 
-	fake := &pw1ECSTaskFake{
-		tasks: map[string]ecstypes.Task{id: task},
-		defs:  map[string]ecstypes.TaskDefinition{pw1TaskDefARN: def},
+			fake := &pw1ECSTaskFake{
+				tasks: map[string]ecstypes.Task{id: task},
+				defs:  map[string]ecstypes.TaskDefinition{pw1TaskDefARN: pw1BadDefinition()},
+			}
+			res := pw1EnrichECSTasks(t, fake, r)
+
+			for _, code := range []domain.FindingCode{
+				pw1ECSTaskCodePrivileged,
+				pw1ECSTaskCodeHostNamespace,
+				pw1ECSTaskCodeWritableRoot,
+				pw1ECSTaskCodeNoLogging,
+				pw1ECSTaskCodeEnvSecret,
+			} {
+				if _, ok := pw1FindFinding(res.Findings[id], code); ok {
+					t.Errorf("%s emitted for a task in state %s", code, state)
+				}
+			}
+		})
 	}
-	res := pw1EnrichECSTasks(t, fake, r)
+}
 
-	for _, code := range []domain.FindingCode{
-		pw1ECSTaskCodePrivileged,
-		pw1ECSTaskCodeHostNamespace,
-		pw1ECSTaskCodeWritableRoot,
-		pw1ECSTaskCodeNoLogging,
-		pw1ECSTaskCodeEnvSecret,
-	} {
-		if _, ok := pw1FindFinding(res.Findings[id], code); ok {
-			t.Errorf("%s emitted for a task that has already stopped", code)
-		}
+// TestECSTask_TeardownStatesKeepTheirLifecycleFinding pins the other half of
+// the same rule: silencing posture must not silence the state itself. A
+// stopping task still says so in its Status cell.
+func TestECSTask_TeardownStatesKeepTheirLifecycleFinding(t *testing.T) {
+	want := map[string]string{
+		"STOPPING":       "stopping",
+		"DEPROVISIONING": "deprovisioning",
+		"DEACTIVATING":   "deactivating",
+		"STOPPED":        "stopped",
+	}
+	td := catalog.Find("ecs-task")
+	if td == nil || td.Fetcher == nil {
+		t.Fatal("ecs-task has no catalog Fetcher")
+	}
+	for _, state := range pw1ECSTeardownStates {
+		t.Run(state, func(t *testing.T) {
+			const id = "0aaaa1111bbbb2222cccc3333dddd4461"
+			task := pw1Task(id, pw1TaskDefARN)
+			task.LastStatus = aws.String(state)
+			task.DesiredStatus = aws.String("STOPPED")
+
+			fake := &pw1ECSTaskFake{
+				tasks: map[string]ecstypes.Task{id: task},
+				defs:  map[string]ecstypes.TaskDefinition{pw1TaskDefARN: pw1BadDefinition()},
+			}
+			page, err := td.Fetcher(context.Background(), &awsclient.ServiceClients{ECS: fake}, "")
+			if err != nil {
+				t.Fatalf("ecs-task fetcher: %v", err)
+			}
+			r := pw1ResourceByID(t, page.Resources, id)
+			if len(r.Findings) == 0 {
+				t.Fatalf("state %s lost its lifecycle finding entirely", state)
+			}
+			if r.Findings[0].Phrase != want[state] {
+				t.Errorf("state %s: lifecycle phrase = %q, want %q", state, r.Findings[0].Phrase, want[state])
+			}
+		})
 	}
 }
