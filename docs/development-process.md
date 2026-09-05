@@ -138,7 +138,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 1. `make verify-hooks` — aborts unless `git config core.hooksPath` is `.githooks`. The sensitive-term half of `check-no-real-data` lives in the git hooks; an unhooked clone would silently lose it.
 2. `make check-no-real-data` — blocks real AWS/environment identifiers (account IDs in ARNs, previously-leaked terms) from tracked files; tree mode also term-scans NEW content against the merge-base with `origin/main`.
 3. `make test-race` — unit tests with race detector and `-shuffle=on` (a gate that runs in declaration order cannot catch order-dependent leaks, per the v3.54.0 macOS TempDir incident). One green run is one ordering; sweep seeds when order-dependence is suspected.
-4. `make lint` — golangci-lint.
+4. `make lint` — golangci-lint, including the gofmt formatter: an unformatted Go file fails the gate.
 5. `make security` — govulncheck.
 6. `make check-deps` — `scripts/check-deps-current.sh`: outdated direct Go modules, a newer Go toolchain patch for the pinned minor, or a newer release of a pinned GitHub Action fail the push; bump first. It also fails (exit 2) when a section could not run, so a network outage never reads as a pass — set `DEPS_CHECK_OFFLINE_OK=1` to knowingly accept the gap.
 7. `make gofix` — `//go:fix inline` directives applied.
