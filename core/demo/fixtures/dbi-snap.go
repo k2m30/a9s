@@ -38,6 +38,11 @@ const (
 	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
 	// WarnDBISnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
+	// WarnDBISnapCopyingID is the witness for dbi-snap.warn.transitional: a
+	// state the predicate does not enumerate and cannot restore from yet.
+	WarnDBISnapCopyingID  = "cross-region-copy-snap"
+	WarnDBISnapCopyingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:cross-region-copy-snap"
+
 	WarnDBISnapCreatingID  = "dev-feature-branch-snap"
 	WarnDBISnapCreatingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:dev-feature-branch-snap"
 
@@ -163,6 +168,29 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			MasterUsername:       aws.String("pgadmin"),
 			LicenseModel:         aws.String("postgresql-license"),
 			PercentProgress:      aws.Int32(42),
+			SourceRegion:         aws.String("us-east-1"),
+		},
+
+		// 3. WarnDBISnapCopyingID — Wave-1 warning: Status=copying, a state the
+		// predicate does not name. Encrypted so it carries the transitional
+		// finding alone.
+		{
+			DBSnapshotIdentifier: aws.String(WarnDBISnapCopyingID),
+			DBSnapshotArn:        aws.String(WarnDBISnapCopyingARN),
+			DBInstanceIdentifier: aws.String("dev-feature-branch"),
+			Status:               aws.String("copying"),
+			Engine:               aws.String("aurora-postgresql"),
+			EngineVersion:        aws.String("16.4"),
+			SnapshotType:         aws.String("manual"),
+			SnapshotCreateTime:   aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			AllocatedStorage:     aws.Int32(20),
+			StorageType:          aws.String("aurora"),
+			Encrypted:            aws.Bool(true),
+			KmsKeyId:             aws.String(dbiKMSKeyID),
+			AvailabilityZone:     aws.String("us-east-1a"),
+			MasterUsername:       aws.String("pgadmin"),
+			LicenseModel:         aws.String("postgresql-license"),
+			PercentProgress:      aws.Int32(70),
 			SourceRegion:         aws.String("us-east-1"),
 		},
 

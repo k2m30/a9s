@@ -159,7 +159,7 @@ var transitionalStatusSet = map[string]struct{}{
 	"stopping": {}, "upgrading": {}, "maintenance": {},
 	"configuring-enhanced-monitoring": {}, "configuring-iam-database-auth": {},
 	"configuring-log-exports": {}, "converting-to-vpc": {}, "moving-to-vpc": {},
-	"storage-optimization": {},
+	"storage-optimization": {}, "deleting": {},
 }
 
 // computeDBIFindings returns the findings for an RDS DB instance plus the
@@ -231,12 +231,10 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 		}
 		return append(findings, postureFindings...), postureDetails
 	}
-	// Unknown status: do NOT emit a lifecycle wave1 finding. The fetcher falls
-	// back to the raw RDS status string for Fields["status"], and colorDBI's
-	// legacy classifier handles severity for new/unforeseen states such as
-	// `incompatible-*` / `inaccessible-*` variants the broken map does not
-	// enumerate. The posture pack still applies — it does not depend on the
-	// lifecycle state being one a9s recognises.
+	// Unknown status: no lifecycle finding, so the row reads healthy on its
+	// lifecycle and the posture pack still decides its colour. Emitting a
+	// warning for a status a9s does not recognise would flag every future RDS
+	// state AWS adds, most of which are benign.
 	return postureFindings, postureDetails
 }
 

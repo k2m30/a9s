@@ -10,7 +10,11 @@ const (
 	CodeDBCSnapFailed       domain.FindingCode = "dbc-snap.broken.failed"
 	CodeDBCSnapIncompatible domain.FindingCode = "dbc-snap.broken.incompatible"
 
-	CodeDBCSnapCreating     domain.FindingCode = "dbc-snap.warn.creating"
+	CodeDBCSnapCreating domain.FindingCode = "dbc-snap.warn.creating"
+
+	// CodeDBCSnapTransitional — any other non-terminal snapshot state AWS reports
+	// (copying, pending, …). Severity: SevWarn.
+	CodeDBCSnapTransitional domain.FindingCode = "dbc-snap.warn.transitional"
 	CodeDBCSnapManualUnused domain.FindingCode = "dbc-snap.warn.manual_unused"
 	CodeDBCSnapUnencrypted  domain.FindingCode = "dbc-snap.warn.unencrypted"
 )

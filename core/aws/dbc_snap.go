@@ -29,8 +29,15 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 	}
 
 	var findings []domain.Finding
-	if rawStatus == "creating" {
+	switch {
+	case rawStatus == "creating":
 		findings = append(findings, domain.Finding{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
+	case rawStatus != "" && rawStatus != "available":
+		// Any other state AWS reports is one the snapshot cannot be restored
+		// from yet — copying, pending, and whatever the API adds next. Passing
+		// the keyword through keeps a new state visible instead of silently
+		// ready, the way computeDBCFindings does for a cluster.
+		findings = append(findings, domain.Finding{Code: CodeDBCSnapTransitional, Phrase: rawStatus, Severity: domain.SevWarn, Source: "wave1"})
 	}
 	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
 		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)

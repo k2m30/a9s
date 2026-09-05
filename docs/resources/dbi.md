@@ -109,7 +109,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Healthy.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 
-- **Signal**: `DBInstanceStatus` in transitional set (`creating`, `modifying`, `backing-up`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `upgrading`, `maintenance`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `moving-to-vpc`, `storage-optimization`) → Warning.
+- **Signal**: `DBInstanceStatus` in transitional set (`creating`, `modifying`, `backing-up`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `upgrading`, `maintenance`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `moving-to-vpc`, `storage-optimization`, `deleting`) → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 

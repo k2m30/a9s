@@ -57,6 +57,11 @@ const (
 	ProdDBCSnapDocDBID  = "rds:acme-docdb-prod-2026-03-20"
 	ProdDBCSnapDocDBARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-20"
 
+	// WarnDBCSnapCopyingID is the witness for dbc-snap.warn.transitional: a
+	// state the predicate does not enumerate and cannot restore from yet.
+	WarnDBCSnapCopyingID  = "acme-docdb-prod-snap-copying"
+	WarnDBCSnapCopyingARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:acme-docdb-prod-snap-copying"
+
 	// WarnDBCSnapOrphanID — orphan: parent cluster NOT in dbc list.
 	// Pins the SnapshotCrossRef helper's orphan rule for dbc-snap.
 	WarnDBCSnapOrphanID  = "orphan-deleted-cluster-snap"
@@ -378,6 +383,21 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			EngineVersion:               aws.String("5.0.0"),
 			SnapshotType:                aws.String("automated"),
 			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-5 * time.Minute)),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// Status=copying — a state the predicate does not name → Warning.
+		// Encrypted and automated so it carries the transitional finding alone.
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapCopyingID),
+			DBClusterIdentifier:         aws.String(ProdDbcID),
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapCopyingARN),
+			Status:                      aws.String("copying"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("automated"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-10 * time.Minute)),
 			StorageType:                 aws.String("standard"),
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),

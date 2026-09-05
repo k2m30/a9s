@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A database instance being deleted now reads as a warning instead of green.
+- A snapshot in a state neither ready nor failed, such as one still copying,
+  now reads as a warning instead of green, on both RDS and DocumentDB
+  snapshots. Only three states were named and everything else fell through as
+  ready.
 - ECS services now say why they are short of capacity: a service that wants
   tasks and is running none reads `no tasks running`, and one running fewer
   than it asks for reads `running below desired count`. Both used to colour

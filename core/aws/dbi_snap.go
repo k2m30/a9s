@@ -37,13 +37,19 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 	}
 
 	var findings []domain.Finding
-	if rawStatus == "creating" {
+	switch {
+	case rawStatus == "creating":
 		pct := int32(0)
 		if snap.PercentProgress != nil {
 			pct = *snap.PercentProgress
 		}
 		phrase := fmt.Sprintf("creating: %d%%", pct)
 		findings = append(findings, domain.Finding{Code: CodeDBISnapCreating, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"})
+	case rawStatus != "" && rawStatus != "available":
+		// Any other state AWS reports is one the snapshot cannot be restored
+		// from yet — copying, pending, and whatever RDS adds next. Passing the
+		// keyword through keeps a new state visible instead of silently ready.
+		findings = append(findings, domain.Finding{Code: CodeDBISnapTransitional, Phrase: rawStatus, Severity: domain.SevWarn, Source: "wave1"})
 	}
 	if isSnapUnencrypted(snap) {
 		findings = append(findings, domain.Finding{Code: CodeDBISnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"})

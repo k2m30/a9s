@@ -71,6 +71,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `DBSnapshot.Status` on the `DescribeDBSnapshots` response.
 
 - **Signal**: `Status == "creating"` → Warning.
+- **Signal**: `Status` is any other value that is neither `available` nor an enumerated broken state (e.g. `copying`, `pending`) → Warning. The snapshot cannot be restored from yet, and passing the keyword through keeps a state AWS adds later visible instead of reading as ready.
   - **State bucket**: Warning.
   - **How obtained**: `DBSnapshot.Status` on the `DescribeDBSnapshots` response.
 
@@ -129,6 +130,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating: <pct>%` | — |
+| `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S2, S4 | `<status>` | — |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` | — |
 | `Status == incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (or current keyword) | — |
 | `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` | — |
@@ -199,6 +201,7 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi-snap.broken.failed | failed | broken | wave1 |
 | dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbi-snap.warn.creating | creating: <pct>% | warn | wave1 |
+| dbi-snap.warn.transitional | <status> | warn | wave1 |
 | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |
 | dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 |

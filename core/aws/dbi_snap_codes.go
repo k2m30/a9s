@@ -10,6 +10,10 @@ const (
 	CodeDBISnapFailed       domain.FindingCode = "dbi-snap.broken.failed"
 	CodeDBISnapIncompatible domain.FindingCode = "dbi-snap.broken.incompatible"
 
-	CodeDBISnapCreating    domain.FindingCode = "dbi-snap.warn.creating"
-	CodeDBISnapUnencrypted domain.FindingCode = "dbi-snap.warn.unencrypted"
+	CodeDBISnapCreating domain.FindingCode = "dbi-snap.warn.creating"
+
+	// CodeDBISnapTransitional — any other non-terminal snapshot state AWS reports
+	// (copying, pending, …). Severity: SevWarn.
+	CodeDBISnapTransitional domain.FindingCode = "dbi-snap.warn.transitional"
+	CodeDBISnapUnencrypted  domain.FindingCode = "dbi-snap.warn.unencrypted"
 )

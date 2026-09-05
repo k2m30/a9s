@@ -90,6 +90,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `DBClusterSnapshot.Status` on the list response.
 
 - **Signal**: `Status == "creating"`.
+- **Signal**: `Status` is any other value that is neither `available` nor an enumerated broken state (e.g. `copying`, `pending`) → Warning. The snapshot cannot be restored from yet, and passing the keyword through keeps a state AWS adds later visible instead of reading as ready.
   - **State bucket**: Warning.
   - **How obtained**: `DBClusterSnapshot.Status` on the list response.
 
@@ -147,6 +148,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating` | — |
+| `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S2, S4 | `<status>` | — |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` | — |
 | `Status` matches `incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (keyword verbatim) | — |
 | manual age > 365d | 1 | Warning | n/a | S2, S4 | `manual, unused 400d` | — |
@@ -204,6 +206,7 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbc-snap.broken.failed | failed | broken | wave1 |
 | dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbc-snap.warn.creating | creating | warn | wave1 |
+| dbc-snap.warn.transitional | <status> | warn | wave1 |
 | dbc-snap.warn.manual\_unused | manual, unused <N>d | warn | wave1 |
 | dbc-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
