@@ -237,10 +237,17 @@ func TestW2RowValuesAreWordsNotEnumsOrBools(t *testing.T) {
 					continue
 				}
 				for _, row := range ad.Rows {
-					// Strip a trailing "(setting)" aside before judging the
-					// word: naming the parameter an operator changes is the
-					// S3 flag convention and is deliberately exempt.
-					v := strings.TrimSpace(regexp.MustCompile(`\([^()]*\)$`).ReplaceAllString(row.Value, ""))
+					// A value naming the setting an operator changes, as a
+					// parenthesised aside, is quoting that setting's literal
+					// value — "false (require_ssl)" is what the console shows
+					// and what they edit. Rewording it to "off" would
+					// misreport the parameter, so the aside form is exempt
+					// from the vocabulary rule rather than stripped and then
+					// judged on what is left.
+					if regexp.MustCompile(`\([^()]+\)$`).MatchString(strings.TrimSpace(row.Value)) {
+						continue
+					}
+					v := strings.TrimSpace(row.Value)
 					switch {
 					case v == "true" || v == "false":
 						t.Errorf("%s/%s %s row %q = %q: a Go bool literal is not a word; want %s",

@@ -164,7 +164,7 @@ func TestW2OpenSearchHTTPSNotEnforced(t *testing.T) {
 	_, res := w2OSRun(t, off, absent, w2OSDomain("acme-search-safe"))
 
 	w2AssertFinding(t, res.Findings["acme-search-http"], w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, w2OSSource)
-	w2AssertRow(t, w2Rows(t, res, "acme-search-http", w2OSCodeHTTPSOff), "Encrypted transport", "not required")
+	w2AssertNoRows(t, res, "acme-search-http", w2OSCodeHTTPSOff)
 	w2AssertFinding(t, res.Findings["acme-search-nohttpsopt"], w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, w2OSSource)
 	w2AssertNoCode(t, res.Findings["acme-search-safe"], w2OSCodeHTTPSOff)
 	w2AssertFindingDef(t, "opensearch", w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, "wave2")
@@ -180,7 +180,7 @@ func TestW2OpenSearchNodeToNodeEncryptionOff(t *testing.T) {
 	_, res := w2OSRun(t, off, absent, w2OSDomain("acme-search-safe"))
 
 	w2AssertFinding(t, res.Findings["acme-search-n2n"], w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, w2OSSource)
-	w2AssertRow(t, w2Rows(t, res, "acme-search-n2n", w2OSCodeN2NOff), "Encryption between nodes", "off")
+	w2AssertNoRows(t, res, "acme-search-n2n", w2OSCodeN2NOff)
 	w2AssertFinding(t, res.Findings["acme-search-non2nopt"], w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, w2OSSource)
 	w2AssertNoCode(t, res.Findings["acme-search-safe"], w2OSCodeN2NOff)
 	w2AssertFindingDef(t, "opensearch", w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, "wave2")
@@ -204,8 +204,8 @@ func TestW2OpenSearchThreeConditionsOnOneDomain(t *testing.T) {
 	w2AssertFinding(t, res.Findings["acme-search-worst"], w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, w2OSSource)
 	w2AssertFinding(t, res.Findings["acme-search-worst"], w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, w2OSSource)
 
-	w2AssertRow(t, w2Rows(t, res, "acme-search-worst", w2OSCodeHTTPSOff), "Encrypted transport", "not required")
-	w2AssertRow(t, w2Rows(t, res, "acme-search-worst", w2OSCodeN2NOff), "Encryption between nodes", "off")
+	w2AssertNoRows(t, res, "acme-search-worst", w2OSCodeHTTPSOff)
+	w2AssertNoRows(t, res, "acme-search-worst", w2OSCodeN2NOff)
 }
 
 // A domain being deleted emits no posture finding — the existing enricher

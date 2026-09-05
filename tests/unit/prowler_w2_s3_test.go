@@ -229,7 +229,7 @@ func TestW2S3VersioningOff(t *testing.T) {
 	w2AssertRow(t, w2Rows(t, res, "acme-noversion", w2S3CodeVersioningOff), "Versioning", "never enabled")
 
 	w2AssertFinding(t, res.Findings["acme-suspended"], w2S3CodeVersioningOff, "versioning off", domain.SevWarn, w2S3Source)
-	w2AssertRow(t, w2Rows(t, res, "acme-suspended", w2S3CodeVersioningOff), "Versioning", "Suspended")
+	w2AssertRow(t, w2Rows(t, res, "acme-suspended", w2S3CodeVersioningOff), "Versioning", "suspended")
 
 	w2AssertNoCode(t, res.Findings["acme-versioned"], w2S3CodeVersioningOff)
 	w2AssertFindingDef(t, "s3", w2S3CodeVersioningOff, "versioning off", domain.SevWarn, "wave2")
@@ -242,7 +242,7 @@ func TestW2S3MFADeleteOff(t *testing.T) {
 	res := w2S3Run(t, fake, "acme-mfaoff", "acme-versioned")
 
 	w2AssertFinding(t, res.Findings["acme-mfaoff"], w2S3CodeMFADeleteOff, "MFA delete off", domain.SevWarn, w2S3Source)
-	w2AssertRow(t, w2Rows(t, res, "acme-mfaoff", w2S3CodeMFADeleteOff), "MFA delete", "disabled")
+	w2AssertNoRows(t, res, "acme-mfaoff", w2S3CodeMFADeleteOff)
 	w2AssertNoCode(t, res.Findings["acme-versioned"], w2S3CodeMFADeleteOff)
 	w2AssertFindingDef(t, "s3", w2S3CodeMFADeleteOff, "MFA delete off", domain.SevWarn, "wave2")
 }
@@ -268,7 +268,7 @@ func TestW2S3AccessLoggingOff(t *testing.T) {
 	res := w2S3Run(t, &w2S3Posture{noLogging: map[string]bool{"acme-nolog": true}}, "acme-nolog", "acme-logged")
 
 	w2AssertFinding(t, res.Findings["acme-nolog"], w2S3CodeAccessLoggingOff, "access logging off", domain.SevWarn, w2S3Source)
-	w2AssertRow(t, w2Rows(t, res, "acme-nolog", w2S3CodeAccessLoggingOff), "Access logging", "off")
+	w2AssertNoRows(t, res, "acme-nolog", w2S3CodeAccessLoggingOff)
 	w2AssertNoCode(t, res.Findings["acme-logged"], w2S3CodeAccessLoggingOff)
 	w2AssertFindingDef(t, "s3", w2S3CodeAccessLoggingOff, "access logging off", domain.SevWarn, "wave2")
 }
@@ -295,7 +295,7 @@ func TestW2S3NoObjectLock(t *testing.T) {
 	res := w2S3Run(t, &w2S3Posture{noObjectLock: map[string]bool{"acme-nolock": true}}, "acme-nolock", "acme-locked")
 
 	w2AssertFinding(t, res.Findings["acme-nolock"], w2S3CodeNoObjectLock, "object lock off", domain.SevWarn, w2S3Source)
-	w2AssertRow(t, w2Rows(t, res, "acme-nolock", w2S3CodeNoObjectLock), "Object lock", "off")
+	w2AssertNoRows(t, res, "acme-nolock", w2S3CodeNoObjectLock)
 	w2AssertNoCode(t, res.Findings["acme-locked"], w2S3CodeNoObjectLock)
 	w2AssertFindingDef(t, "s3", w2S3CodeNoObjectLock, "object lock off", domain.SevWarn, "wave2")
 }
@@ -316,7 +316,7 @@ func TestW2S3TwoConditionsProduceTwoFindings(t *testing.T) {
 	w2AssertFinding(t, res.Findings["acme-bad"], w2S3CodePublic, "publicly accessible", domain.SevBroken, w2S3Source)
 	w2AssertFinding(t, res.Findings["acme-bad"], w2S3CodeAccessLoggingOff, "access logging off", domain.SevWarn, w2S3Source)
 	w2AssertRow(t, w2Rows(t, res, "acme-bad", w2S3CodePublic), "Policy status", "public")
-	w2AssertRow(t, w2Rows(t, res, "acme-bad", w2S3CodeAccessLoggingOff), "Access logging", "off")
+	w2AssertNoRows(t, res, "acme-bad", w2S3CodeAccessLoggingOff)
 }
 
 // A cross-region bucket answers PermanentRedirect from the session's endpoint.
