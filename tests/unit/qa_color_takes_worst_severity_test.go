@@ -20,25 +20,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// rawFieldClassifiers never consult r.Findings at all: they classify from
-// Fields alone. They predate this batch and did not change in it, so they are
-// excluded here rather than silently failing a rule they were never held to.
-// Each is a standing violation of the catalog contract's "colour derives from
-// findings" rule, tracked outside this batch.
-var rawFieldClassifiers = map[string]bool{
-	"rtb": true, "alarm": true, "trail": true, "ct-events": true,
-	"sns-sub": true, "ses": true, "ssm": true,
-}
-
 // TestColorTakesWorstSeverity_EveryType constructs a warn-then-broken row for
 // every finding-driven type and asserts the colour comes from the broken
 // finding, wherever it sits in the slice.
 func TestColorTakesWorstSeverity_EveryType(t *testing.T) {
 	var bad []string
 	for _, td := range resource.AllResourceTypes() {
-		if rawFieldClassifiers[td.ShortName] {
-			continue
-		}
 		row := domain.Resource{
 			ID:   "probe-" + td.ShortName,
 			Name: "probe-" + td.ShortName,
@@ -66,9 +53,6 @@ func TestColorTakesWorstSeverity_DemoBench(t *testing.T) {
 
 	var bad []string
 	for _, td := range resource.AllResourceTypes() {
-		if rawFieldClassifiers[td.ShortName] {
-			continue
-		}
 		fixtures := byType[td.ShortName]
 		if len(fixtures) == 0 {
 			continue
