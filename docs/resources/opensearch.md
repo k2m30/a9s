@@ -85,7 +85,7 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-`ListDomainNames` returns only `DomainName` and `EngineType`, so the fetcher pairs it with `DescribeDomains` (bounded fan-out, up to 5 names per call) and every signal readable from `DomainStatus` is decided there: the hard states (`Deleted`, `Isolated`, `Processing`/`UpgradeProcessing`) and the two background checks (`ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`). A domain being deleted reports nothing else.
+`ListDomainNames` returns only `DomainName` and `EngineType`, so the fetcher pairs it with `DescribeDomains` (bounded fan-out, up to 5 names per call). Every signal below is readable from the `DomainStatus` that call returns, so all of them are decided in the fetcher and none costs an extra call. A domain being deleted reports nothing else.
 
 One bullet per distinct signal.
 
@@ -114,26 +114,25 @@ One bullet per distinct signal.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
   - **Cost shape**: hybrid.
 
-### 3.2 Wave 2 — bounded extra API calls
-
-No extra API calls. The network-posture enricher reads fields
-`FetchOpenSearchDomains` already wrote from the same `DescribeDomains`
-response, so these cost nothing beyond the list load.
-
 - **Signal**: no `VPCOptions` AND the access policy allows any principal.
   - **State bucket**: Broken.
-  - **API call**: none.
-  - **Cost shape**: free.
+  - **API call**: `DescribeDomains` — bounded fan-out (shared).
+  - **Cost shape**: hybrid.
 
 - **Signal**: `DomainStatus.DomainEndpointOptions.EnforceHTTPS` not true.
   - **State bucket**: Warning.
-  - **API call**: none.
-  - **Cost shape**: free.
+  - **API call**: `DescribeDomains` — bounded fan-out (shared).
+  - **Cost shape**: hybrid.
 
 - **Signal**: `DomainStatus.NodeToNodeEncryptionOptions.Enabled` not true.
   - **State bucket**: Warning.
-  - **API call**: none.
-  - **Cost shape**: free.
+  - **API call**: `DescribeDomains` — bounded fan-out (shared).
+  - **Cost shape**: hybrid.
+
+### 3.2 Wave 2 — bounded extra API calls
+
+None. `DescribeDomains` is the fetcher's own call and its `DomainStatus`
+carries every signal in §3.1, so opensearch registers no Wave 2 enricher.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -143,7 +142,7 @@ response, so these cost nothing beyond the list load.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
+Every signal from §3.1 must land on one or more of these five existing surfaces. No other UI is allowed.
 
 | # | Surface | Mechanism |
 |---|---|---|
@@ -157,7 +156,7 @@ Wave → surface mapping applied here:
 
 - The hard states (`Deleted`, `Processing/UpgradeProcessing`, `Isolated`) drive **S2 + S4** (color + cause).
 - The background checks (`UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`) drive **S1 + S2 + S3 + S4 + S5**. `UpdateAvailable` past the auto-update cutoff is a pressing background concern (`!`); missing at-rest encryption is a posture finding (`~`) — see §6 user decision.
-- The network-posture checks (`reachable outside a VPC`, `HTTPS not enforced`, `node-to-node encryption off`) are the only Wave 2 signals, and they read the fields the fetcher already wrote.
+- The network-posture checks (`reachable outside a VPC`, `HTTPS not enforced`, `node-to-node encryption off`) drive **S1 + S2 + S3 + S4 + S5** on the same terms.
 
 One row per signal from §3:
 
@@ -220,9 +219,9 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
 | opensearch.update-forced | software update forced soon | warn | wave1 |
 | opensearch.encryption-off | encryption at rest off | warn | wave1 |
-| opensearch.public | reachable outside a VPC | broken | wave2 |
-| opensearch.https-not-enforced | HTTPS not enforced | warn | wave2 |
-| opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave2 |
+| opensearch.public | reachable outside a VPC | broken | wave1 |
+| opensearch.https-not-enforced | HTTPS not enforced | warn | wave1 |
+| opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave1 |
 | opensearch.warn.details\_denied | details denied | warn | wave1 |
 | opensearch.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->

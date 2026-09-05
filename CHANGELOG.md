@@ -207,6 +207,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   80% consumed, instead of showing the warning glyph on a green row.
 - An OpenSearch domain with a forced software update pending now reads as a
   warning rather than as broken: the update is scheduled, not a failure.
+- Every OpenSearch signal, including the internet-reachable, plaintext-HTTP and
+  node-to-node-encryption checks, is now on screen the moment the list loads.
+  They were reported a moment later by a second pass that made no AWS call and
+  only re-read what the list load had already fetched.
 - OpenSearch domains report the software-update and encryption-at-rest checks
   as soon as the list loads rather than a moment later, and the "+N" in the
   Status column now matches the number of findings the detail view shows.

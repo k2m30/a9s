@@ -40,11 +40,11 @@ func isZeroOrEpoch(t time.Time) bool {
 	return t.IsZero() || t.Unix() == 0
 }
 
-// computeOpenSearchFindings classifies a DomainStatus against the spec's five
-// signals. The two background checks read the same DomainStatus the hard
-// states do, so they are wave-1 findings here rather than a second reading of
-// the fetcher's own Fields in the enricher — one slice carries every signal
-// and domain.StatusPhrase counts it once.
+// computeOpenSearchFindings classifies a DomainStatus against every signal the
+// spec names. DescribeDomains is the fetcher's own call and DomainStatus
+// carries all of them, so there is no second pass reading these same fields
+// back out of Fields: one slice holds every finding and domain.StatusPhrase
+// counts each once.
 func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []domainpkg.Finding {
 	var findings []domainpkg.Finding
 	if d.Deleted != nil && *d.Deleted {
@@ -71,7 +71,36 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 			Detail: opensearchEncryptionOffDetail, Severity: domainpkg.SevWarn, Source: "wave1",
 		})
 	}
+	// Reachable outside a VPC only counts when the access policy also lets
+	// anyone in: a public endpoint fronted by a scoped policy is a deliberate,
+	// defended design.
+	if d.VPCOptions == nil && openSearchPolicyIsPublic(d) {
+		findings = append(findings, domainpkg.Finding{
+			Code: opensearchCodePublic, Phrase: "reachable outside a VPC",
+			Detail: opensearchPublicDetail, Severity: domainpkg.SevBroken, Source: "wave1",
+		})
+	}
+	if d.DomainEndpointOptions == nil || !aws.ToBool(d.DomainEndpointOptions.EnforceHTTPS) {
+		findings = append(findings, domainpkg.Finding{
+			Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced",
+			Detail: opensearchHTTPSNotForcedDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+		})
+	}
+	if d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled) {
+		findings = append(findings, domainpkg.Finding{
+			Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off",
+			Detail: opensearchN2NOffDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+		})
+	}
 	return findings
+}
+
+// openSearchPolicyIsPublic reports whether the domain's access policy lets any
+// principal in. The fetcher also writes the verdict to Fields for the list
+// column; both read it from here so the two can never disagree.
+func openSearchPolicyIsPublic(d opensearchtypes.DomainStatus) bool {
+	doc, err := iampolicy.Parse(aws.ToString(d.AccessPolicies))
+	return err == nil && iampolicy.Evaluate(doc, "").Public
 }
 
 // FetchOpenSearchDomains performs a two-step fetch:
@@ -180,11 +209,7 @@ func FetchOpenSearchDomainsAt(
 			// wave-2 enricher as Fields — the enricher makes no AWS calls of
 			// its own and must not re-derive them from RawStruct.
 			vpcEnabled := strconv.FormatBool(domain.VPCOptions != nil)
-			accessPolicyPublic := "false"
-			if doc, err := iampolicy.Parse(aws.ToString(domain.AccessPolicies)); err == nil &&
-				iampolicy.Evaluate(doc, "").Public {
-				accessPolicyPublic = "true"
-			}
+			accessPolicyPublic := strconv.FormatBool(openSearchPolicyIsPublic(domain))
 			enforceHTTPS := "true"
 			if domain.DomainEndpointOptions == nil || !aws.ToBool(domain.DomainEndpointOptions.EnforceHTTPS) {
 				enforceHTTPS = "false"

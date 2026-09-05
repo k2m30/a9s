@@ -465,7 +465,6 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, err
 		}),
-		Wave2: IssueEnricher{Fn: EnrichOpenSearchDomains, Priority: 100},
 		FieldKeys: []string{
 			"domain_name", "engine_version", "instance_type", "instance_count", "endpoint",
 			"status", "domain_processing_status",
@@ -496,9 +495,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: opensearchCodePublic, Phrase: "reachable outside a VPC", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: opensearchCodePublic, Phrase: "reachable outside a VPC", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off", Severity: domain.SevWarn, Source: "wave1"},
 			DetailsDeniedFindingDef("opensearch"),
 			DetailsUnavailableFindingDef("opensearch"),
 		},
