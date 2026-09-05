@@ -15,6 +15,7 @@ package unit
 import (
 	"context"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -41,9 +42,13 @@ type w2RedshiftFake struct {
 
 	loggingOff  map[string]bool
 	requireSSL  map[string]string // parameter group name → require_ssl value
-	paramCalls  map[string]int
 	clusterErrs map[string]error
 	groupErrs   map[string]error
+
+	// The enricher fans this fake out through ForEachParallel, so every
+	// recorded call is written from a different goroutine.
+	mu         sync.Mutex
+	paramCalls map[string]int
 }
 
 func (f *w2RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.DescribeLoggingStatusInput, _ ...func(*redshift.Options)) (*redshift.DescribeLoggingStatusOutput, error) {
@@ -62,10 +67,12 @@ func (f *w2RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.D
 
 func (f *w2RedshiftFake) DescribeClusterParameters(_ context.Context, in *redshift.DescribeClusterParametersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClusterParametersOutput, error) {
 	g := aws.ToString(in.ParameterGroupName)
+	f.mu.Lock()
 	if f.paramCalls == nil {
 		f.paramCalls = map[string]int{}
 	}
 	f.paramCalls[g]++
+	f.mu.Unlock()
 	if err := f.groupErrs[g]; err != nil {
 		return nil, err
 	}
