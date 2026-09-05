@@ -230,7 +230,11 @@ func TestW2EFSNoBackupPolicy(t *testing.T) {
 	res := w2EFSEnrich(t, fake, "fs-0acme00000000001", "fs-0acme00000000002", "fs-0acme00000000003")
 
 	w2AssertFinding(t, res.Findings["fs-0acme00000000001"], w2EFSCodeNoBackupPolicy, "automatic backups off", domain.SevWarn, w2EFSSource)
-	w2AssertRow(t, w2Rows(t, res, "fs-0acme00000000001", w2EFSCodeNoBackupPolicy), "Backup policy", "DISABLED")
+	// INVERTED. This assertion used to require the row to read the raw EFS
+	// enum "DISABLED", which encoded the defect as intent: an operator never
+	// sees an SDK constant, and the phrase already says backups are off, so
+	// the row has nothing to add. Do not "restore" it.
+	w2AssertNoRows(t, res, "fs-0acme00000000001", w2EFSCodeNoBackupPolicy)
 
 	// No backup policy at all is the same operational fact as a disabled one.
 	w2AssertFinding(t, res.Findings["fs-0acme00000000002"], w2EFSCodeNoBackupPolicy, "automatic backups off", domain.SevWarn, w2EFSSource)
@@ -253,7 +257,9 @@ func TestW2EFSPolicyAndBackupConditionsAreIndependent(t *testing.T) {
 	w2AssertFinding(t, res.Findings["fs-0acme00000000001"], w2EFSCodePublicPolicy, "file system policy open to anyone", domain.SevBroken, w2EFSSource)
 	w2AssertFinding(t, res.Findings["fs-0acme00000000001"], w2EFSCodeNoBackupPolicy, "automatic backups off", domain.SevWarn, w2EFSSource)
 	w2AssertRow(t, w2Rows(t, res, "fs-0acme00000000001", w2EFSCodePublicPolicy), "Principal", "*")
-	w2AssertRow(t, w2Rows(t, res, "fs-0acme00000000001", w2EFSCodeNoBackupPolicy), "Backup policy", "DISABLED")
+	// INVERTED, same reason as above: the backup-policy finding stands on its
+	// phrase, and the raw "DISABLED" this once required was the defect.
+	w2AssertNoRows(t, res, "fs-0acme00000000001", w2EFSCodeNoBackupPolicy)
 }
 
 // The mount-target signal this enricher already owns must keep working once

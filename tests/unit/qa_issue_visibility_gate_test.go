@@ -154,12 +154,16 @@ func buildVisibilityTypeCache(t *testing.T) (map[string][]resource.Resource, res
 }
 
 // mergeWave2Findings runs the type's registered Wave-2 IssueEnricher (if any)
-// against fixtures and returns a COPY of fixtures where each resource's
-// Findings slice has the enricher's per-resource Finding appended (skipped
-// if a Finding with the same Code is already present, mirroring
-// applyWave2ToRow's dedupe-by-code intent for this narrow read-only gate).
-// Resources for types with no Wave-2 enricher are returned unmodified
-// (still copied, so callers can safely mutate).
+// against fixtures and returns a COPY of fixtures folded the way the running
+// app folds them — through runtime.ApplyWave2ToRow, the same call the
+// enrichment handler makes.
+//
+// Folding by hand here is what let every wave-2 supporting row escape the
+// rendered-surface gates: a hand-rolled merge that appends Findings and
+// ignores IssueEnricherResult.AttentionDetails builds a row the app never
+// produces, so a gate reading it scans a detail block missing exactly the
+// rows this batch added. Any divergence between test fold and app fold is a
+// blind spot by construction, so there is only one fold.
 func mergeWave2Findings(
 	t *testing.T,
 	td resource.ResourceTypeDef,
@@ -179,31 +183,8 @@ func mergeWave2Findings(
 	if err != nil {
 		t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
 	}
-	if len(result.Findings) == 0 {
-		return merged
-	}
-
 	for i := range merged {
-		fs, ok := result.Findings[merged[i].ID]
-		if !ok {
-			continue
-		}
-		for _, f := range fs {
-			already := false
-			for _, existing := range merged[i].Findings {
-				if existing.Code == f.Code {
-					already = true
-					break
-				}
-			}
-			if already {
-				continue
-			}
-			findingsCopy := make([]domain.Finding, len(merged[i].Findings), len(merged[i].Findings)+1)
-			copy(findingsCopy, merged[i].Findings)
-			findingsCopy = append(findingsCopy, f)
-			merged[i].Findings = findingsCopy
-		}
+		runtime.ApplyWave2ToRow(&merged[i], td, result.Findings, result.AttentionDetails)
 	}
 	return merged
 }

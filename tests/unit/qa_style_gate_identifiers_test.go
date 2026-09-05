@@ -115,10 +115,15 @@ type styleGateIdentifierSurface struct {
 }
 
 // collectAuthoredSurfaces gathers every AttentionDetail label and Detail
-// sentence a type can render, from both waves. Wave 1 comes off the fixtures
-// the fetcher produced; wave 2 comes from the enricher's own result, read
-// directly rather than through ApplyWave2ToRow so this gate stays independent
-// of how the two waves are folded together.
+// sentence a type can render, from the row the app actually builds: fixtures
+// folded through runtime.ApplyWave2ToRow by mergeWave2Findings.
+//
+// Reading the enricher result directly instead — which this helper used to do,
+// on the reasoning that it kept the gate independent of how the waves are
+// folded — is what made the gate blind. Independence from the fold means
+// scanning surfaces the operator never sees and missing ones they do: the fold
+// decides which wave-2 rows survive onto the row and under which code, so a
+// gate that skips it is not independent, it is looking somewhere else.
 func collectAuthoredSurfaces(t *testing.T, td resource.ResourceTypeDef, fixtures []resource.Resource, cache resource.ResourceCache, clients *awsclient.ServiceClients) []styleGateIdentifierSurface {
 	t.Helper()
 	var out []styleGateIdentifierSurface
@@ -134,34 +139,13 @@ func collectAuthoredSurfaces(t *testing.T, td resource.ResourceTypeDef, fixtures
 		})
 	}
 
-	for _, res := range fixtures {
+	for _, res := range mergeWave2Findings(t, td, fixtures, cache, clients) {
 		for _, f := range res.Findings {
 			add(td.ShortName, res.ID, "detail", f.Code, f.Detail, false)
 		}
 		for code, ad := range res.AttentionDetails {
 			for _, row := range ad.Rows {
 				add(td.ShortName, res.ID, "label", code, row.Label, true)
-			}
-		}
-	}
-
-	enricher, ok := awsclient.Wave2EnricherFor(td.ShortName)
-	if !ok || enricher.Fn == nil {
-		return out
-	}
-	result, err := enricher.Fn(t.Context(), clients, fixtures, cache)
-	if err != nil {
-		t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
-	}
-	for resID, fs := range result.Findings {
-		for _, f := range fs {
-			add(td.ShortName, resID, "detail", f.Code, f.Detail, false)
-		}
-	}
-	for resID, byCode := range result.AttentionDetails {
-		for code, ad := range byCode {
-			for _, row := range ad.Rows {
-				add(td.ShortName, resID, "label", code, row.Label, true)
 			}
 		}
 	}
