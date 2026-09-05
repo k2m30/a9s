@@ -40,8 +40,7 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 		lifecycle = []domain.Finding{{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"}}
 	}
 
-	switch table.TableStatus {
-	case ddbtypes.TableStatusDeleting, ddbtypes.TableStatusArchiving, ddbtypes.TableStatusArchived:
+	if resourceIsTearingDown(table) {
 		return lifecycle, nil
 	}
 	if aws.ToBool(table.DeletionProtectionEnabled) {

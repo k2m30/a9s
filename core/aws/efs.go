@@ -42,9 +42,7 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 		}
 	}
 
-	switch lcs {
-	case efstypes.LifeCycleStateDeleting, efstypes.LifeCycleStateDeleted:
-		// A file system on its way out has no posture worth reporting.
+	if isTeardownStatus(string(lcs)) {
 		return findings, nil
 	}
 	if aws.ToBool(encrypted) {
