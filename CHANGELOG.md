@@ -251,6 +251,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   port 443, where the port promises TLS and the protocol never terminates
   it.
 
+- Demo mode had no resource whose related panel drilled to an IAM role with
+  a finding on it, so the role's issues could only be seen from the role
+  list. One build project now uses the role whose inline policy allows
+  privilege escalation.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's

@@ -97,7 +97,12 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Name:        aws.String("acme-docker-images"),
 			Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-docker-images"),
 			Description: aws.String("Base Docker image builder"),
-			ServiceRole: aws.String(prodCBRoleARN),
+			// The one demo resource whose IAM Role pivot drills to a role
+			// carrying a finding (RoleInlinePrivEsc, iam.go): without it the
+			// drilled role detail is only reachable from the role list, so
+			// nothing compares the two surfaces. Every other project keeps
+			// prodCBRoleARN, so the pivot count is one either way.
+			ServiceRole: aws.String("arn:aws:iam::123456789012:role/" + RoleInlinePrivEsc),
 			Source: &cbtypes.ProjectSource{
 				Type: cbtypes.SourceTypeS3,
 			},
