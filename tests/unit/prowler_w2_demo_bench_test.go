@@ -15,6 +15,7 @@ package unit_test
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/demo"
@@ -103,5 +104,59 @@ func TestW2DemoBenchOneWitnessPerFinding(t *testing.T) {
 					w.shortName, len(carriers), w.code, carriers)
 			}
 		})
+	}
+}
+
+// normalizeAttentionLine strips the severity glyph, case and trailing
+// punctuation so "~ Audit logging: off" and "audit logging off" compare equal.
+func normalizeAttentionLine(s string) string {
+	s = strings.TrimLeft(s, "!~ ")
+	s = strings.Map(func(r rune) rune {
+		switch r {
+		case ':', '.', ',':
+			return -1
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
+}
+
+// TestW2DetailAttentionNeverRepeatsItself pins U11 on the rendered surface: a
+// finding's supporting rows must add something its phrase does not. A row that
+// normalizes to the same words as the phrase above it makes the detail view
+// print one fact twice, which is how an operator learns to skip the block.
+func TestW2DetailAttentionNeverRepeatsItself(t *testing.T) {
+	batchTypes := map[string]bool{
+		"s3": true, "redis": true, "dbi": true, "dbc": true, "dbi-snap": true,
+		"dbc-snap": true, "ddb": true, "opensearch": true, "redshift": true, "efs": true,
+	}
+
+	clients := demo.NewServiceClients()
+	byType, cache := buildVisibilityTypeCache(t)
+
+	for _, td := range resource.AllResourceTypes() {
+		if !batchTypes[td.ShortName] {
+			continue
+		}
+		fixtures := byType[td.ShortName]
+		if len(fixtures) == 0 {
+			continue
+		}
+		for _, res := range mergeWave2Findings(t, td, fixtures, cache, clients) {
+			lines := detailAttentionValuesFor(t, res, td.ShortName)
+			seen := map[string]int{}
+			for i, raw := range lines {
+				n := normalizeAttentionLine(raw)
+				if n == "" {
+					continue
+				}
+				if j, dup := seen[n]; dup {
+					t.Errorf("%s/%s: attention line %d %q repeats line %d; the row adds nothing the phrase did not say",
+						td.ShortName, res.ID, i, raw, j)
+					continue
+				}
+				seen[n] = i
+			}
+		}
 	}
 }
