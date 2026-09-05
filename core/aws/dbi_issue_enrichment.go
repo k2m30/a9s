@@ -67,7 +67,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		marker = out.Marker
 	}
 
-
 	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
 	// parallel statusByID map: the merged S4 phrase (single-finding or
 	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
