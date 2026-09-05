@@ -4,15 +4,10 @@
 package unit
 
 import (
-	"context"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
-	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -158,59 +153,8 @@ func TestRedshiftColor_PhraseProbeFallback(t *testing.T) {
 // actionable; emitting it would contaminate the unified S1 menu badge count.
 // ---------------------------------------------------------------------------
 
-func TestOpenSearch_Enrich_DeletedDomain_SkipsFinding(t *testing.T) {
-	now := time.Now()
-	past := now.Add(-24 * time.Hour)
-
-	// Construct a domain that would otherwise emit a "!" finding (update forced soon),
-	// but mark it Deleted — the enricher must skip it.
-	domainName := "deleted-but-pending-update"
-	domain := ostypes.DomainStatus{
-		DomainName: aws.String(domainName),
-		Deleted:    aws.Bool(true),
-		ServiceSoftwareOptions: &ostypes.ServiceSoftwareOptions{
-			UpdateAvailable:     aws.Bool(true),
-			AutomatedUpdateDate: aws.Time(past),
-			CurrentVersion:      aws.String("OpenSearch_2.11"),
-			NewVersion:          aws.String("OpenSearch_2.13"),
-		},
-	}
-
-	r := resource.Resource{
-		ID:   domainName,
-		Name: domainName,
-		Fields: map[string]string{
-			"deleted":                           "true",
-			"service_software_update_available": "true",
-			"encryption_at_rest_enabled":        "true",
-		},
-		RawStruct: domain,
-	}
-
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, []resource.Resource{r}, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Findings) != 0 {
-		t.Errorf("Findings = %v, want none (deleted domain must not emit findings)", result.Findings)
-	}
-
-	// Sanity: without the Deleted flag the same domain WOULD emit a finding.
-	// This anchors the pin: what we're guarding is the guard, not the absence
-	// of the underlying signal.
-	r.Fields["deleted"] = "false"
-	domain.Deleted = aws.Bool(false)
-	r.RawStruct = domain
-	result2, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, []resource.Resource{r}, nil)
-	if err != nil {
-		t.Fatalf("unexpected error (non-deleted): %v", err)
-	}
-	if len(result2.Findings) != 1 {
-		t.Errorf("non-deleted control: Findings = %v, want exactly one (sanity check for the pin anchor)", result2.Findings)
-	}
-	if fs, ok := result2.Findings[domainName]; !ok {
-		t.Errorf("non-deleted control: finding summary = %q, want to contain %q", "", "software update")
-	} else if f := fs[0]; !strings.Contains(f.Phrase, "software update") {
-		t.Errorf("non-deleted control: finding summary = %q, want to contain %q", f.Phrase, "software update")
-	}
-}
+// The deleted-domain guard moved to the fetcher with the checks it guarded, so
+// TestOpenSearch_Enrich_DeletedDomain_SkipsFinding is deleted rather than
+// inverted: TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed
+// (aws_opensearch_test.go) pins the same fact, anchor included, on the surface
+// that now decides it.

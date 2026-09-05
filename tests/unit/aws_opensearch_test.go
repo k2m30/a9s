@@ -292,6 +292,10 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 // T006 — update_available_healthy_bang: UpdateAvailable=true, past AutomatedUpdateDate
 // ---------------------------------------------------------------------------
 
+// The update-forced and encryption-off signals were an enricher's until d1 moved
+// them to wave 1; aws_opensearch_issue_enrichment_test.go covered them there and
+// is deleted, because these fetcher tests already assert the same behaviour on
+// the surface that now produces it.
 func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	domain := osTestBaseDomain("acme-product-search")
 	// AutomatedUpdateDate in the past relative to the injected now below.
@@ -447,14 +451,64 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Fetcher does not write Resource.Status — it is always "".
-	// Display column carries both background-check signals with (+N) suffix.
+	// Inverted in d1: both signals read the DescribeDomains response the fetcher
+	// already holds and made no AWS call, so they are wave-1 findings on the row
+	// rather than enricher output. The status cell is built from those findings.
 	if r.Fields["status"] != "software update forced soon (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon (+1)")
 	}
-	// Both signals are background-checks owned by Wave 2 — neither in Findings.
-	if len(r.Findings) != 0 {
-		t.Errorf("Findings = %v, want none (background-checks are enricher territory)", r.Findings)
+
+	// Each independently-evaluated condition keeps its own Finding with its own
+	// S5 sentence (owner contract #52) rather than one being demoted into a
+	// supporting row of the other.
+	byCode := map[domainpkg.FindingCode]domainpkg.Finding{}
+	for _, f := range r.Findings {
+		byCode[f.Code] = f
+	}
+	if len(r.Findings) != 2 {
+		t.Fatalf("Findings = %+v, want the update-forced and encryption-off findings", r.Findings)
+	}
+	for _, want := range []struct {
+		code     domainpkg.FindingCode
+		phrase   string
+		severity domainpkg.Severity
+		detail   string
+	}{
+		{
+			code:     "opensearch.software-update-forced",
+			phrase:   "software update forced soon",
+			severity: domainpkg.SevWarn,
+			detail:   "AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window.",
+		},
+		{
+			code:     "opensearch.encryption-at-rest-off",
+			phrase:   "encryption at rest off",
+			severity: domainpkg.SevWarn,
+			detail:   "Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place.",
+		},
+	} {
+		got, ok := byCode[want.code]
+		if !ok {
+			t.Errorf("no finding with code %q; got %+v", want.code, r.Findings)
+			continue
+		}
+		if got.Phrase != want.phrase {
+			t.Errorf("%s: Phrase = %q, want %q", want.code, got.Phrase, want.phrase)
+		}
+		if got.Severity != want.severity {
+			t.Errorf("%s: Severity = %v, want %v", want.code, got.Severity, want.severity)
+		}
+		if got.Detail != want.detail {
+			t.Errorf("%s: Detail = %q, want its own S5 sentence %q", want.code, got.Detail, want.detail)
+		}
+	}
+	for _, ad := range r.AttentionDetails {
+		for _, row := range ad.Rows {
+			if row.Label == "Additional" {
+				t.Errorf("row {Label:%q Value:%q}: a generic \"Additional\" row means the second condition was demoted into a row instead of surfacing as its own finding",
+					row.Label, row.Value)
+			}
+		}
 	}
 }
 

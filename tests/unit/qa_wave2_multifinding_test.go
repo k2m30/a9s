@@ -66,9 +66,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
-	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
-	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -394,78 +392,8 @@ const (
 	opensearchMultiEncryptionOffCode domain.FindingCode = "opensearch.encryption-off"
 )
 
-// opensearchUpdateForcedOperatorSentence and
-// opensearchEncryptionOffOperatorSentence mirror the unexported
-// opensearchUpdateForcedDetail / opensearchEncryptionOffDetail constants in
-// core/aws/opensearch_issue_enrichment.go — the S5 operator sentences
-// that must stay reachable on each condition's OWN Finding.Detail even when
-// both fire on the same domain.
-const (
-	opensearchUpdateForcedOperatorSentence  = "AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window."
-	opensearchEncryptionOffOperatorSentence = "Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place."
-)
-
-func TestOpenSearch_Enrich_MultiBackground_BothConditionsSurfaceAsOwnFindings(t *testing.T) {
-	resources := []resource.Resource{
-		{
-			ID:   fixtures.MultiBackgroundDomain,
-			Name: fixtures.MultiBackgroundDomain,
-			Fields: map[string]string{
-				"service_software_update_available": "true",
-				"encryption_at_rest_enabled":        "false",
-			},
-		},
-	}
-
-	result, err := awsclient.EnrichOpenSearchDomains(t.Context(), nil, resources, nil)
-	if err != nil {
-		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
-	}
-
-	id := fixtures.MultiBackgroundDomain
-	findings := result.Findings[id]
-	if len(findings) != 2 {
-		t.Fatalf("result.Findings[%q] has %d entries, want 2 — each independently-evaluated Wave-2 condition (update-forced, encryption-off) must survive as its OWN Finding once IssueEnricherResult.Findings is map[string][]domain.Finding (#52); got %+v", id, len(findings), findings)
-	}
-
-	byCode := map[domain.FindingCode]domain.Finding{}
-	for _, f := range findings {
-		byCode[f.Code] = f
-	}
-
-	updateForced, ok := byCode[opensearchMultiUpdateForcedCode]
-	if !ok {
-		t.Fatalf("no Finding with Code %q in result.Findings[%q]; got %+v", opensearchMultiUpdateForcedCode, id, findings)
-	}
-	if updateForced.Phrase != "software update forced soon" {
-		t.Errorf("update-forced Finding.Phrase = %q, want %q", updateForced.Phrase, "software update forced soon")
-	}
-	if updateForced.Severity != domain.SevBroken {
-		t.Errorf("update-forced Finding.Severity = %v, want SevBroken", updateForced.Severity)
-	}
-	if updateForced.Detail != opensearchUpdateForcedOperatorSentence {
-		t.Errorf("update-forced Finding.Detail = %q, want %q — its own S5 operator sentence must stay reachable on its own Finding", updateForced.Detail, opensearchUpdateForcedOperatorSentence)
-	}
-
-	encOff, ok := byCode[opensearchMultiEncryptionOffCode]
-	if !ok {
-		t.Fatalf("no Finding with Code %q in result.Findings[%q]; got %+v", opensearchMultiEncryptionOffCode, id, findings)
-	}
-	if encOff.Phrase != "encryption at rest off" {
-		t.Errorf("encryption-off Finding.Phrase = %q, want %q", encOff.Phrase, "encryption at rest off")
-	}
-	if encOff.Severity != domain.SevWarn {
-		t.Errorf("encryption-off Finding.Severity = %v, want SevWarn", encOff.Severity)
-	}
-	if encOff.Detail != opensearchEncryptionOffOperatorSentence {
-		t.Errorf("encryption-off Finding.Detail = %q, want %q — its own S5 operator sentence must stay reachable as its own Finding.Detail, not a generic Additional row", encOff.Detail, opensearchEncryptionOffOperatorSentence)
-	}
-
-	for _, ad := range result.AttentionDetails[id] {
-		for _, row := range ad.Rows {
-			if row.Label == "Additional" {
-				t.Errorf(`Rows contains {Label:%q, Value:%q} — a generic "Additional" row means the second condition was demoted into a row instead of surfacing as its own Finding (#52)`, row.Label, row.Value)
-			}
-		}
-	}
-}
+// The opensearch multi-finding pin moved to
+// TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix (aws_opensearch_test.go)
+// when d1 made both conditions wave 1: the contract it guards is unchanged, but
+// the surface that produces them is the fetcher, and the fetcher's mocks live in
+// package unit.

@@ -27,7 +27,8 @@ const (
 	w2OSCodePublic   = "opensearch.public"
 	w2OSCodeHTTPSOff = "opensearch.https-not-enforced"
 	w2OSCodeN2NOff   = "opensearch.node-to-node-tls-off"
-	w2OSSource       = "wave2:opensearch"
+	// d1 moved these three checks to wave 1 with the rest of the type's signals.
+	w2OSSource       = "wave1"
 	w2OSPublicPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"es:*","Resource":"arn:aws:es:eu-central-1:123456789012:domain/acme-search/*"}]}`
 	w2OSScopedPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/app"},"Action":"es:ESHttpGet","Resource":"*"}]}`
 	w2OSCondPolicy   = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"es:ESHttpGet","Resource":"*","Condition":{"IpAddress":{"aws:SourceIp":["203.0.113.0/24"]}}}]}`
@@ -89,8 +90,23 @@ func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomainsAt: %v", err)
 	}
-	res, err := w2Enricher(t, "opensearch")(context.Background(), &awsclient.ServiceClients{}, rs, nil)
-	w2AssertEnricherInvariants(t, res, err)
+	// Inverted in d1: the three network-posture checks read the DescribeDomains
+	// response the fetcher already holds and made no AWS call, so they are wave-1
+	// findings on the row and opensearch registers no wave 2 at all. The result
+	// is rebuilt from the fetched rows so the assertions below are unchanged.
+	res := awsclient.IssueEnricherResult{
+		Findings:         map[string][]domain.Finding{},
+		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
+		TruncatedIDs:     map[string]bool{},
+	}
+	for _, r := range rs {
+		if len(r.Findings) > 0 {
+			res.Findings[r.ID] = r.Findings
+		}
+		if len(r.AttentionDetails) > 0 {
+			res.AttentionDetails[r.ID] = r.AttentionDetails
+		}
+	}
 	return w2ByID(rs), res
 }
 
@@ -117,7 +133,7 @@ func TestW2OpenSearchPublicNeedsBothNoVPCAndOpenPolicy(t *testing.T) {
 	rows := w2Rows(t, res, "acme-search", w2OSCodePublic)
 	w2AssertRow(t, rows, "Endpoint", "public")
 	w2AssertRow(t, rows, "Access policy", "open")
-	w2AssertFindingDef(t, "opensearch", w2OSCodePublic, "reachable outside a VPC", domain.SevBroken, "wave2")
+	w2AssertFindingDef(t, "opensearch", w2OSCodePublic, "reachable outside a VPC", domain.SevBroken, "wave1")
 
 	w2AssertNoCode(t, res.Findings["acme-search-scoped"], w2OSCodePublic)
 	w2AssertNoCode(t, res.Findings["acme-search-vpc"], w2OSCodePublic)
@@ -167,7 +183,7 @@ func TestW2OpenSearchHTTPSNotEnforced(t *testing.T) {
 	w2AssertNoRows(t, res, "acme-search-http", w2OSCodeHTTPSOff)
 	w2AssertFinding(t, res.Findings["acme-search-nohttpsopt"], w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, w2OSSource)
 	w2AssertNoCode(t, res.Findings["acme-search-safe"], w2OSCodeHTTPSOff)
-	w2AssertFindingDef(t, "opensearch", w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, "wave2")
+	w2AssertFindingDef(t, "opensearch", w2OSCodeHTTPSOff, "HTTPS not enforced", domain.SevWarn, "wave1")
 }
 
 func TestW2OpenSearchNodeToNodeEncryptionOff(t *testing.T) {
@@ -183,7 +199,7 @@ func TestW2OpenSearchNodeToNodeEncryptionOff(t *testing.T) {
 	w2AssertNoRows(t, res, "acme-search-n2n", w2OSCodeN2NOff)
 	w2AssertFinding(t, res.Findings["acme-search-non2nopt"], w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, w2OSSource)
 	w2AssertNoCode(t, res.Findings["acme-search-safe"], w2OSCodeN2NOff)
-	w2AssertFindingDef(t, "opensearch", w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, "wave2")
+	w2AssertFindingDef(t, "opensearch", w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, "wave1")
 }
 
 // ---------------------------------------------------------------------------
