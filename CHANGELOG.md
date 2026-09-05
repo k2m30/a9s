@@ -237,6 +237,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An ECS service event newer than the window is no longer missed because an
   older event preceded it in the list.
+- Demo mode showed sixteen database instances with deletion protection
+  turned off, burying the one instance that exists to demonstrate the
+  signal. The bulk filler pool left the setting unstated, so every filler
+  row inherited the warning. One instance carries it now.
+
+- Demo mode stated two different public addresses for the same instance:
+  the instance said one and its Elastic IP said another. They agree now,
+  on both the public and the private address.
+
+- Demo mode had no network load balancer carrying a cleartext listener, so
+  half of that signal went unshown. One network balancer now serves TCP on
+  port 443, where the port promises TLS and the protocol never terminates
+  it.
 
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each

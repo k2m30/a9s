@@ -216,7 +216,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`. Applied.
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`, `ACTIVE`, `INACTIVE`, `DRAINING`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Applied — every row above pairs state with the operator-visible reason (e.g. `running 2/4: no active deploy` rather than bare `INACTIVE`).
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), the row is omitted — `ACTIVE` healthy services render S4 blank and do not appear in §4.
-- Keep both columns short enough to fit: List text ≤ 40 chars, Detail text ≤ 100 chars. Verified on every row.
+- Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is. Verified on every row.
 
 ## 4.1 UX review (two sentences)
 

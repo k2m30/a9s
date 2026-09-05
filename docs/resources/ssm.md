@@ -90,7 +90,7 @@ Wave → surface mapping:
 Rules for filling list and detail text:
 
 - Banned words: `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
-- List text ≤ 40 chars, Detail text ≤ 100 chars. (All three list entries above fit.)
+- Keep the List text short enough to fit: ≤ 40 chars (all three list entries above fit). The Detail cell quotes the finding's Detail constant verbatim, however long it is.
 - Bare state keywords are not acceptable. Every row above pairs the condition with a cause.
 
 ## 4.1 UX review (two sentences)

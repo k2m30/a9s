@@ -136,7 +136,7 @@ One row per signal from §3:
 | orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: source volume deleted` | `Source EBS volume no longer exists in this account/region.` |
 | restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S3, S4, S5 | `shared with all AWS accounts` | `This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the all group.` |
 
-(Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars, Detail text ≤ 100 chars.)
+(Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)
 
 ## 4.1 UX review (two sentences)
 

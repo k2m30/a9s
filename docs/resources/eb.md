@@ -169,7 +169,7 @@ Rules for filling list and detail text:
 
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`. Note: "truncated to 40 chars" above is a spec-writing instruction to the implementer, not a string the operator ever sees.
 - A bare state keyword (`Red`, `Grey`, `Terminated`) in the List text column is not acceptable. Pair it with the cause.
-- List text ≤ 40 chars, Detail text ≤ 100 chars.
+- Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
 
 ## 4.1 UX review (two sentences)
 

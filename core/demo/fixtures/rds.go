@@ -118,6 +118,7 @@ func normalizeRDSInstancePosture(dbs []rdstypes.DBInstance) []rdstypes.DBInstanc
 		out[i].MultiAZ = aws.Bool(true)
 		out[i].AutoMinorVersionUpgrade = aws.Bool(true)
 		out[i].IAMDatabaseAuthenticationEnabled = aws.Bool(true)
+		out[i].DeletionProtection = aws.Bool(true)
 		out[i].MasterUsername = aws.String("dbadmin")
 		out[i].CertificateDetails = &rdstypes.CertificateDetails{
 			CAIdentifier: aws.String(DBICurrentCAIdentifier),

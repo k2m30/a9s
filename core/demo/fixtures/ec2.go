@@ -2210,11 +2210,11 @@ func buildInternetGateways() []ec2types.InternetGateway {
 func buildAddresses() []ec2types.Address {
 	return []ec2types.Address{
 		{
-			AllocationId: aws.String("eipalloc-0aaa111111111111a"), PublicIp: aws.String("54.210.33.200"),
+			AllocationId: aws.String("eipalloc-0aaa111111111111a"), PublicIp: aws.String("54.210.33.112"),
 			AssociationId: aws.String("eipassoc-0aaa111111111111a"), InstanceId: aws.String("i-0a1b2c3d4e5f60001"),
 			SubnetId: aws.String(fixtProdPublicSubnetA), Domain: ec2types.DomainTypeVpc,
 			NetworkBorderGroup: aws.String("us-east-1"), NetworkInterfaceId: aws.String("eni-0aaa111111111111a"),
-			PrivateIpAddress: aws.String("10.0.1.50"),
+			PrivateIpAddress: aws.String("10.0.1.10"),
 			// aws:cloudformation:stack-name tag — required for eip→cfn related-panel
 			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: []ec2types.Tag{

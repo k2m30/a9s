@@ -153,7 +153,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`ACTIVE`, `ARCHIVED`) in the List text column is not acceptable without a cause. `archiving` and `archived` are paired with their cause above.
 - For signals that legitimately have no operator-actionable cause (pure Healthy), the row is omitted from this table; §3 still describes it.
-- Keep both columns short enough to fit: List text ≤ 40 chars, Detail text ≤ 100 chars.
+- Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
 
 ## 4.1 UX review (two sentences)
 

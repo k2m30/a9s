@@ -131,7 +131,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword alone is not acceptable when a cause helps. For `UPDATING` the cause ("resharding") is the only useful amplification AWS exposes at list time; for `CREATING` / `DELETING` the state word is itself the cause because no richer reason field exists on `StreamSummary`.
 - `StreamStatus == ACTIVE` is omitted from this table — healthy rows render blank per the rules.
-- Keep both columns short: List text ≤ 40 chars, Detail text ≤ 100 chars.
+- Keep the List text short: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
 
 ## 4.1 UX review (two sentences)
 
