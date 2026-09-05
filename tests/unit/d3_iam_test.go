@@ -243,14 +243,36 @@ func TestD3AdminPolicyRowsUsePlainWords(t *testing.T) {
 		t.Fatalf("EnrichIAMPolicy: %v", err)
 	}
 
-	ad, ok := res.AttentionDetails[arn][d3CodePolicyAdmin]
-	if !ok || len(ad.Rows) == 0 {
-		t.Fatalf("no supporting rows on the admin finding")
+	w4AssertRows(t, res.AttentionDetails[arn], d3CodePolicyAdmin, []domain.DetailRow{
+		{Label: "Allowed actions", Value: "all (*)"},
+		{Label: "On resources", Value: "all (*)"},
+	})
+	if got := res.FieldUpdates[arn]["risk"]; got != "admin policy" {
+		t.Errorf("risk = %q, want %q", got, "admin policy")
 	}
-	for _, row := range ad.Rows {
-		if row.Label == "Action" || row.Label == "Resource" {
-			t.Errorf("row label %q is the policy-document attribute name, not a word an operator reads", row.Label)
-		}
+}
+
+// TestD3PrivEscStatusReadsAsWords pins the Status cell of a policy that grants
+// an escalation path. The cell is read by an operator, so it carries the
+// vocabulary word rather than the enum-shaped token the code used to write.
+func TestD3PrivEscStatusReadsAsWords(t *testing.T) {
+	const arn = "arn:aws:iam::123456789012:policy/acme-lambda-deployer"
+	fake := &d3PolicyFake{docs: map[string]string{
+		arn: `{"Version":"2012-10-17","Statement":[{"Effect":"Allow",` +
+			`"Action":["iam:PassRole","lambda:CreateFunction","lambda:InvokeFunction"],"Resource":"*"}]}`,
+	}}
+	res, err := awsclient.EnrichIAMPolicy(context.Background(),
+		&awsclient.ServiceClients{IAM: fake, Region: "us-east-1"},
+		[]resource.Resource{{
+			ID: arn, Name: "acme-lambda-deployer", Type: "policy",
+			Fields:    map[string]string{"attachment_count": "2"},
+			RawStruct: iamtypes.Policy{PolicyName: aws.String("acme-lambda-deployer"), Arn: aws.String(arn)},
+		}}, nil)
+	if err != nil {
+		t.Fatalf("EnrichIAMPolicy: %v", err)
+	}
+	if got := res.FieldUpdates[arn]["risk"]; got != "privilege escalation" {
+		t.Errorf("risk = %q, want %q", got, "privilege escalation")
 	}
 }
 

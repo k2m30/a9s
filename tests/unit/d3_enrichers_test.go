@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -349,3 +350,57 @@ func d3NotFoundErr() error {
 }
 
 var _ = d3NotFoundErr
+
+// d3RDSFirstPageFails answers every page with an error, the shape of a
+// throttled account where nothing was collected at all.
+type d3RDSFirstPageFails struct {
+	awsclient.RDSAPI
+}
+
+func (f *d3RDSFirstPageFails) DescribePendingMaintenanceActions(
+	_ context.Context, _ *rds.DescribePendingMaintenanceActionsInput, _ ...func(*rds.Options),
+) (*rds.DescribePendingMaintenanceActionsOutput, error) {
+	return nil, errors.New("Throttling: rate exceeded")
+}
+
+var _ awsclient.RDSAPI = (*d3RDSFirstPageFails)(nil)
+
+// TestD3MaintenanceFirstPageFailureIsNotClean attacks row 5 from the other
+// side: keeping the pages already read must not turn a walk that read nothing
+// into a clean verdict. No pages means no coverage, and the pass says so.
+func TestD3MaintenanceFirstPageFailureIsNotClean(t *testing.T) {
+	const instance = "acme-orders-db"
+	res, err := awsclient.EnrichDBIMaintenance(context.Background(),
+		&awsclient.ServiceClients{RDS: &d3RDSFirstPageFails{}, Region: "us-east-1"},
+		[]resource.Resource{{ID: instance, Name: instance, Type: "dbi"}}, nil)
+
+	if !res.Truncated && err == nil {
+		t.Errorf("a walk that read no pages reported neither truncation nor an error")
+	}
+	w4AssertNoCode(t, res.Findings[instance], d3CodeDBIMaintenance)
+}
+
+// TestD3EveryKeyFailingMarksTheUserOnce attacks row 1: a user whose keys all
+// fail to read is unknown once, not once per key, and still carries no
+// finding.
+func TestD3EveryKeyFailingMarksTheUserOnce(t *testing.T) {
+	fake := &d3UserFake{
+		withMFA: map[string]bool{"acme-batch-user": true},
+		keys: map[string][]iamtypes.AccessKeyMetadata{
+			"acme-batch-user": {
+				d3Key("acme-batch-user", "AKIAIOSFODNN7EXAMPLE", 10),
+				d3Key("acme-batch-user", "AKIAI44QH8DHBEXAMPLE", 10),
+			},
+		},
+		lastUsedErr: map[string]error{
+			"AKIAIOSFODNN7EXAMPLE": errors.New("Throttling: rate exceeded"),
+			"AKIAI44QH8DHBEXAMPLE": errors.New("Throttling: rate exceeded"),
+		},
+	}
+	res := d3EnrichUsers(t, fake, []resource.Resource{d3UserResource("acme-batch-user")})
+
+	if !res.TruncatedIDs["acme-batch-user"] {
+		t.Errorf("TruncatedIDs[acme-batch-user] = false; no key could be read")
+	}
+	w4AssertNoCode(t, res.Findings["acme-batch-user"], d3CodeUserKeyUnused)
+}

@@ -25,6 +25,7 @@ import (
 
 const (
 	d3CodeELBPlainHTTP     domain.FindingCode = "elb.plain-http-listener"
+	d3CodeELBWeakTLS       domain.FindingCode = "elb.weak-tls-policy"
 	d3CodeCAPublicPolicy   domain.FindingCode = "codeartifact.public-access-policy"
 	d3CodeVPCEPolicyOpen   domain.FindingCode = "vpce.policy-open"
 	d3CodeLTUserDataSecret domain.FindingCode = "lt.user-data-secret"
@@ -134,6 +135,45 @@ func TestD3EveryCleartextPortIsNamed(t *testing.T) {
 	if !ok || len(ad.Rows) != 3 {
 		t.Fatalf("rows = %+v, want one per offending listener", ad.Rows)
 	}
+}
+
+// d3WeakTLSListener is an HTTPS listener on a retired security policy.
+func d3WeakTLSListener(port int32) elbtypes.Listener {
+	return elbtypes.Listener{
+		ListenerArn:     aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-web/abc123/t" + string(rune('0'+port%10))),
+		LoadBalancerArn: aws.String(d3LBArn),
+		Port:            aws.Int32(port),
+		Protocol:        elbtypes.ProtocolEnumHttps,
+		SslPolicy:       aws.String("ELBSecurityPolicy-2016-08"),
+	}
+}
+
+// TestD3EveryWeakTLSPortIsNamed pins the weak-TLS finding to the same shape as
+// the cleartext one: two listeners on a retired policy are two ports to
+// change, and each row leads with the port so the operator knows which
+// listener a policy name belongs to.
+func TestD3EveryWeakTLSPortIsNamed(t *testing.T) {
+	res := d3EnrichELB(t, &d3ELBFake{page1: []elbtypes.Listener{
+		d3WeakTLSListener(443),
+		d3WeakTLSListener(8443),
+	}})
+
+	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBWeakTLS,
+		"weak TLS policy on ports 443, 8443", domain.SevWarn, "wave2:elb")
+	w4AssertRows(t, res.AttentionDetails["acme-web"], d3CodeELBWeakTLS, []domain.DetailRow{
+		{Label: "Security policy", Value: "443: ELBSecurityPolicy-2016-08"},
+		{Label: "Security policy", Value: "8443: ELBSecurityPolicy-2016-08"},
+	})
+}
+
+// TestD3ModernTLSListenerIsNotWeak pins the negative case: a listener on a
+// current security policy raises nothing, so merging ports must not start
+// reporting healthy listeners.
+func TestD3ModernTLSListenerIsNotWeak(t *testing.T) {
+	modern := d3WeakTLSListener(443)
+	modern.SslPolicy = aws.String("ELBSecurityPolicy-TLS13-1-2-2021-06")
+	res := d3EnrichELB(t, &d3ELBFake{page1: []elbtypes.Listener{modern}})
+	w4AssertNoCode(t, res.Findings["acme-web"], d3CodeELBWeakTLS)
 }
 
 // TestD3RedirectingListenerIsNotInTheClear pins the negative case: a listener
@@ -378,4 +418,42 @@ func TestD3CleanUserDataReportsNothing(t *testing.T) {
 		t.Fatalf("EnrichLTDeprecatedAMI: %v", err)
 	}
 	w4AssertNoCode(t, res.Findings["lt-0acme1234567890"], d3CodeLTUserDataSecret)
+}
+
+// TestD3PortListIsStableWhateverTheAPIOrder attacks the merged phrase: the
+// listener order DescribeListeners returns is not part of the contract, so a
+// phrase built by appending in arrival order reads differently between two
+// refreshes of the same unchanged balancer. The status cell must be a
+// function of the balancer, not of the order the API happened to answer in.
+func TestD3PortListIsStableWhateverTheAPIOrder(t *testing.T) {
+	ascending := d3EnrichELB(t, &d3ELBFake{page1: []elbtypes.Listener{
+		d3PlainHTTPListener(80), d3PlainHTTPListener(8080), d3PlainHTTPListener(8081),
+	}})
+	descending := d3EnrichELB(t, &d3ELBFake{page1: []elbtypes.Listener{
+		d3PlainHTTPListener(8081), d3PlainHTTPListener(8080), d3PlainHTTPListener(80),
+	}})
+
+	a, ok := w4FindingByCode(t, ascending.Findings["acme-web"], d3CodeELBPlainHTTP)
+	if !ok {
+		t.Fatalf("no cleartext finding in the ascending case")
+	}
+	d, ok := w4FindingByCode(t, descending.Findings["acme-web"], d3CodeELBPlainHTTP)
+	if !ok {
+		t.Fatalf("no cleartext finding in the descending case")
+	}
+	if a.Phrase != d.Phrase {
+		t.Errorf("the phrase follows the API's order:\n  %q\n  %q", a.Phrase, d.Phrase)
+	}
+}
+
+// TestD3CleartextPortsMergeAcrossPages attacks rows 9 and 10 together: paging
+// and merging have to compose, or a balancer with one offending listener per
+// page reports only the page the loop happened to finish on.
+func TestD3CleartextPortsMergeAcrossPages(t *testing.T) {
+	res := d3EnrichELB(t, &d3ELBFake{
+		page1: []elbtypes.Listener{d3PlainHTTPListener(80)},
+		page2: []elbtypes.Listener{d3PlainHTTPListener(8080)},
+	})
+	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBPlainHTTP,
+		"ports 80, 8080 in the clear", domain.SevWarn, "wave2:elb")
 }
