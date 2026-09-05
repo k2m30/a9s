@@ -48,6 +48,23 @@ type Document struct {
 	Statement []Statement
 }
 
+// Decode returns the text of a policy document as the IAM APIs hand it over.
+// Some return it percent-encoded, and path-style unescaping is the correct
+// reading: a literal '+' inside a policy — a regex, a resource name — must
+// survive, which query-style unescaping would turn into a space. A document
+// that carries no escape, or that does not unescape, comes back unchanged so
+// the caller's JSON parse reports the real problem rather than this function
+// inventing one.
+func Decode(doc string) string {
+	if !strings.Contains(doc, "%") {
+		return doc
+	}
+	if decoded, err := url.PathUnescape(doc); err == nil {
+		return decoded
+	}
+	return doc
+}
+
 // Parse decodes a policy document. IAM APIs return some documents
 // percent-encoded (path style: a literal '+' stays a '+'), so a failed
 // decode is retried after unescaping when the text contains a '%'.
