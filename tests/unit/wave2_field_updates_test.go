@@ -411,7 +411,7 @@ func TestEnrichStepFunctionsStatus_WritesLastRun(t *testing.T) {
 // Test #7 — policy: risk FieldUpdates (coder must add this)
 
 // TestEnrichIAMPolicy_WritesRiskField verifies that EnrichIAMPolicy populates
-// FieldUpdates[policyID]["risk"] == "admin policy" for a policy with Effect:Allow Action:* Resource:*.
+// FieldUpdates[policyID]["risk"] == "ADMIN_ALL" for a policy with Effect:Allow Action:* Resource:*.
 func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
 	policyARN := "arn:aws:iam::123456789012:policy/AdminStarPolicy"
 	adminDoc := `{
@@ -462,8 +462,8 @@ func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for policy %q — coder must add risk FieldUpdates to EnrichIAMPolicy", policyARN)
 	}
-	if fu["risk"] != "admin policy" {
-		t.Errorf("policy risk = %q, want %q", fu["risk"], "admin policy")
+	if fu["risk"] != "ADMIN_ALL" {
+		t.Errorf("policy risk = %q, want %q", fu["risk"], "ADMIN_ALL")
 	}
 }
 
@@ -1183,7 +1183,7 @@ func (f *ssmFake) DescribeParameters(
 }
 
 // TestFetchSSM_WritesRisk verifies that FetchSSMParametersPage sets
-// Fields["risk"] == "stale" for a SecureString parameter whose LastModifiedDate
+// Fields["risk"] == "STALE" for a SecureString parameter whose LastModifiedDate
 // is more than 365 days ago.
 func TestFetchSSM_WritesRisk(t *testing.T) {
 	staleDate := time.Now().Add(-400 * 24 * time.Hour) // 400 days ago
@@ -1208,8 +1208,8 @@ func TestFetchSSM_WritesRisk(t *testing.T) {
 
 	r := result.Resources[0]
 	risk := r.Fields["risk"]
-	if risk != "stale" {
-		t.Errorf("ssm risk = %q, want %q — coder must compute a stale risk for SecureString parameters not modified in >365 days", risk, "stale")
+	if risk != "STALE" {
+		t.Errorf("ssm risk = %q, want %q — coder must compute risk=STALE for SecureString parameters not modified in >365 days", risk, "STALE")
 	}
 }
 

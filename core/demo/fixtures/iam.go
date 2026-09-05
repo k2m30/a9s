@@ -77,6 +77,11 @@ const (
 	// RoleConfusedDeputy trusts lambda.amazonaws.com with no aws:SourceAccount
 	// or aws:SourceArn condition — role.trust.confused-deputy.
 	RoleConfusedDeputy = "acme-invoker-callback-role"
+	// RoleScopedWildcardTrust is the healthy counterpart of
+	// role.trust.wildcard-principal: it trusts any AWS principal, but only one
+	// holding the agreed external ID, which is the documented cross-account
+	// pattern. It must render with no finding.
+	RoleScopedWildcardTrust = "acme-partner-integration-role"
 	// RoleAdminAttached carries the AWS-managed AdministratorAccess policy —
 	// role.admin-attached.
 	RoleAdminAttached = "acme-break-glass-role"
@@ -102,6 +107,10 @@ const (
 	// AdministratorAccess attachment is the natural witness for
 	// iam-group.admin-attached.
 	IAMGroupAdminAttached = "admins"
+	// IAMGroupPowerUserAttached carries PowerUserAccess, the other member of
+	// adminManagedPolicyARNs, so the finding's Policy row is witnessed naming
+	// something other than AdministratorAccess.
+	IAMGroupPowerUserAttached = "platform-engineers"
 )
 
 func IsCustomerManagedPolicyARN(policyARN string) bool {
@@ -315,6 +324,19 @@ func buildIAMRoles() []iamtypes.Role {
 			CreateDate:               aws.Time(time.Date(2025, 6, 2, 11, 0, 0, 0, time.UTC)),
 			Description:              aws.String("Role Lambda assumes to call back into this account — no aws:SourceAccount or aws:SourceArn scoping"),
 			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+		},
+		iamtypes.Role{
+			RoleName:                 aws.String(RoleScopedWildcardTrust),
+			RoleId:                   aws.String("AROAEXAMPLESCOPEDWC1"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RoleScopedWildcardTrust),
+			Path:                     aws.String("/"),
+			CreateDate:               aws.Time(time.Date(2025, 4, 8, 10, 0, 0, 0, time.UTC)),
+			Description:              aws.String("Cross-account role a partner assumes with the agreed external ID"),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"acme-partner-9f3c2"}}}]}`),
+			// Recently assumed, so the scoped-trust witness renders with a
+			// blank status rather than the dormant-role warning every other
+			// demo role carries.
+			RoleLastUsed: &iamtypes.RoleLastUsed{LastUsedDate: aws.Time(time.Now().AddDate(0, 0, -3))},
 		},
 		iamtypes.Role{
 			RoleName:                 aws.String(RoleAdminAttached),
@@ -679,6 +701,18 @@ func buildIAMPolicies() []iamtypes.Policy {
 			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
+		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUserAttached so
+		// the admin-attached finding's Policy row is witnessed naming a policy
+		// other than AdministratorAccess.
+		{
+			PolicyName:       aws.String("PowerUserAccess"),
+			PolicyId:         aws.String("ANPAEXAMPLE000000002"),
+			Arn:              aws.String("arn:aws:iam::aws:policy/PowerUserAccess"),
+			AttachmentCount:  aws.Int32(1),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 39, 47, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+		},
 		// AWS-managed policies referenced by role_policies fixtures
 		{
 			PolicyName:       aws.String("AmazonEKSWorkerNodePolicy"),
@@ -890,6 +924,13 @@ func buildIAMGroups() []iamtypes.Group {
 			Path:       aws.String("/"),
 			CreateDate: aws.Time(time.Date(2024, 3, 1, 8, 10, 0, 0, time.UTC)),
 		},
+		{
+			GroupName:  aws.String(IAMGroupPowerUserAttached),
+			GroupId:    aws.String("AGPAEXAMPLE555555555"),
+			Arn:        aws.String("arn:aws:iam::123456789012:group/" + IAMGroupPowerUserAttached),
+			Path:       aws.String("/"),
+			CreateDate: aws.Time(time.Date(2024, 5, 6, 9, 0, 0, 0, time.UTC)),
+		},
 		// Issue: empty group (no users) → Warning (unused IAM group, potential access confusion)
 		{
 			GroupName:  aws.String("empty-group"),
@@ -948,6 +989,9 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.AttachedGroupPolicies["admins"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
 	}
+	f.AttachedGroupPolicies[IAMGroupPowerUserAttached] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("PowerUserAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/PowerUserAccess")},
+	}
 	f.AttachedGroupPolicies["developers"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("acme-s3-read-only"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only")},
 		{PolicyName: aws.String("acme-deploy-policy"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy")},
@@ -959,6 +1003,10 @@ func buildIAMRelations(f *IAMFixtures) {
 	}
 	f.GroupUsers["developers"] = []iamtypes.User{
 		{UserName: aws.String("alice.johnson"), UserId: aws.String("AIDAEXAMPLE111111111"), Arn: aws.String("arn:aws:iam::123456789012:user/alice.johnson"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 6, 15, 9, 0, 0, 0, time.UTC))},
+		{UserName: aws.String("bob.smith"), UserId: aws.String("AIDAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:user/bob.smith"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 9, 1, 10, 30, 0, 0, time.UTC))},
+	}
+
+	f.GroupUsers[IAMGroupPowerUserAttached] = []iamtypes.User{
 		{UserName: aws.String("bob.smith"), UserId: aws.String("AIDAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:user/bob.smith"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 9, 1, 10, 30, 0, 0, time.UTC))},
 	}
 
@@ -980,6 +1028,11 @@ func buildIAMRelations(f *IAMFixtures) {
 			{GroupName: aws.String("developers"), GroupId: aws.String("AGPAEXAMPLE222222222")},
 		},
 	}
+	f.EntitiesForPolicy["arn:aws:iam::aws:policy/PowerUserAccess"] = &PolicyEntities{
+		Groups: []iamtypes.PolicyGroup{
+			{GroupName: aws.String(IAMGroupPowerUserAttached), GroupId: aws.String("AGPAEXAMPLE555555555")},
+		},
+	}
 	f.EntitiesForPolicy["arn:aws:iam::aws:policy/AdministratorAccess"] = &PolicyEntities{
 		Groups: []iamtypes.PolicyGroup{
 			{GroupName: aws.String("admins"), GroupId: aws.String("AGPAEXAMPLE111111111")},
@@ -994,6 +1047,8 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-deploy-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["codedeploy:GetApplication","codedeploy:ListDeployments","s3:GetObject","s3:PutObject"],"Resource":"*"}]}`)
 
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-secrets-access"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret"],"Resource":"arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/*"}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::aws:policy/PowerUserAccess"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","NotAction":["iam:*","organizations:*","account:*"],"Resource":"*"}]}`)
 
 	f.PolicyDocuments["arn:aws:iam::aws:policy/AdministratorAccess"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}`)
 
