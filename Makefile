@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs smoke-enrichers check-no-real-data install-hooks ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security check-deps coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs smoke-enrichers check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -78,6 +78,12 @@ e2e-install:
 
 security:
 	govulncheck ./...
+
+# Dependabot only reports on the remote; this is the same answer locally.
+# Exit 2 (a section could not run) fails the gate too — an unverifiable
+# check must not read as a pass.
+check-deps:
+	@./scripts/check-deps-current.sh
 
 # TODO: drop the docs/historical/refactor/** exclusion once refactor-doc churn
 # stops. Excluding here keeps unrelated doc PRs from being gated by lint
@@ -243,7 +249,7 @@ install-hooks:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: verify-hooks check-no-real-data test-race lint security gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot mdlint smoke smoke-related smoke-costs smoke-enrichers
+ready-to-push: verify-hooks check-no-real-data test-race lint security check-deps gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot mdlint smoke smoke-related smoke-costs smoke-enrichers
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. ADDITIVE on top of Stage 6: it does NOT re-run

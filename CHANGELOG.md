@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `make check-deps` reports outdated direct Go modules, a newer Go toolchain
+  patch, and newer releases of pinned GitHub Actions, and fails the pre-push
+  gate the same way `make security` does — dependency drift that was only
+  visible in Dependabot on the remote is now visible before the push.
+
 ### Fixed (security)
 
 - Switching profile or region could leave the previous account's data on
