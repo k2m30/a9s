@@ -16,7 +16,9 @@ import (
 	"strings"
 )
 
-// Principal is the parsed Principal (or NotPrincipal) block of a statement.
+// Principal is the parsed Principal block of a statement. A NotPrincipal
+// block names who is excluded, not who is granted, so its entries are never
+// stored here; the statement only records that it used one.
 type Principal struct {
 	Wildcard      bool
 	AWS           []string
@@ -47,9 +49,9 @@ type Document struct {
 }
 
 // Parse decodes a policy document. IAM APIs return some documents
-// URL-encoded, so a failed decode is retried after unescaping when the text
-// contains a '%'. Unrecognised shapes inside the document are skipped, never
-// fatal.
+// percent-encoded (path style: a literal '+' stays a '+'), so a failed
+// decode is retried after unescaping when the text contains a '%'.
+// Unrecognised shapes inside the document are skipped, never fatal.
 func Parse(doc string) (Document, error) {
 	doc = strings.TrimSpace(doc)
 	if doc == "" {
@@ -58,7 +60,7 @@ func Parse(doc string) (Document, error) {
 	var raw map[string]any
 	err := json.Unmarshal([]byte(doc), &raw)
 	if err != nil && strings.Contains(doc, "%") {
-		if decoded, uerr := url.QueryUnescape(doc); uerr == nil {
+		if decoded, uerr := url.PathUnescape(doc); uerr == nil {
 			err = json.Unmarshal([]byte(decoded), &raw)
 		}
 	}
@@ -82,12 +84,8 @@ func parseStatement(s map[string]any) Statement {
 		NotResource: strs(s["NotResource"]),
 		Condition:   parseCondition(s["Condition"]),
 	}
-	if np, ok := s["NotPrincipal"]; ok {
-		st.NotPrincipal = true
-		st.Principal = parsePrincipal(np)
-	} else {
-		st.Principal = parsePrincipal(s["Principal"])
-	}
+	_, st.NotPrincipal = s["NotPrincipal"]
+	st.Principal = parsePrincipal(s["Principal"])
 	return st
 }
 

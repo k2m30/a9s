@@ -43,9 +43,6 @@ func Evaluate(doc Document, ownAccount string) Exposure {
 				}
 			}
 		}
-		if st.NotPrincipal {
-			continue
-		}
 		for _, p := range st.Principal.AWS {
 			if id := accountID(p); id != "" && id != ownAccount {
 				accounts[id] = struct{}{}

@@ -2,7 +2,10 @@ package unit
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/secretscan"
 )
@@ -202,5 +205,45 @@ func TestRedact(t *testing.T) {
 				t.Errorf("Redact(%q) = %q, want %q", tt.value, got, tt.want)
 			}
 		})
+	}
+}
+
+// --- verify round: adversarial attacks against the landed engine ---
+
+func TestScanKV_ARNValueWithTrailingWhitespace_NoHit(t *testing.T) {
+	hits := secretscan.ScanKV(map[string]string{"DB_PASSWORD": "arn:aws:secretsmanager:us-east-1:123456789012:secret:x   "})
+	if hits != nil {
+		t.Errorf("ScanKV() = %v, want nil (trailing whitespace must not defeat the arn: reference exclusion)", hits)
+	}
+}
+
+func TestScanText_SecretOnLastLineNoTrailingNewline(t *testing.T) {
+	hits := secretscan.ScanText("#!/bin/bash\nexport DB_PASSWORD=hunter2hunter2")
+	want := []secretscan.Hit{{Kind: "keyword", Where: "line 2"}}
+	if !reflect.DeepEqual(hits, want) {
+		t.Errorf("ScanText() = %v, want %v (a match on the final line must still be found when the text has no trailing newline)", hits, want)
+	}
+}
+
+func TestScanText_5000LinesUnder100ms(t *testing.T) {
+	var sb strings.Builder
+	for i := 0; i < 5000; i++ {
+		sb.WriteString("echo 'this is a totally normal line of user data with nothing interesting ")
+		sb.WriteString(strconv.Itoa(i))
+		sb.WriteString("'\n")
+	}
+	sb.WriteString("export DB_PASSWORD=hunter2hunter2\n")
+	text := sb.String()
+
+	start := time.Now()
+	hits := secretscan.ScanText(text)
+	elapsed := time.Since(start)
+
+	if elapsed > 100*time.Millisecond {
+		t.Errorf("ScanText(5000 lines) took %v, want under 100ms", elapsed)
+	}
+	want := []secretscan.Hit{{Kind: "keyword", Where: "line 5001"}}
+	if !reflect.DeepEqual(hits, want) {
+		t.Errorf("ScanText(5000 lines) = %v, want %v", hits, want)
 	}
 }

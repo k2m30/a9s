@@ -1,7 +1,9 @@
 package unit
 
 import (
+	"net/url"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/iampolicy"
@@ -433,5 +435,93 @@ func TestHasServicePrincipalWithoutSourceScope(t *testing.T) {
 				t.Errorf("HasServicePrincipalWithoutSourceScope() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// --- verify round: adversarial attacks against the landed engine ---
+
+// FINDING 1: a real IAM document, when percent-encoded by a real-world
+// encoder that leaves '+' unescaped (many do, since '+' needs no escaping
+// outside a form body), has any literal '+' in its content silently turned
+// into a space. url.QueryUnescape treats '+' as application/x-www-form-urlencoded
+// space, which AWS's percent-encoded policy documents are not: AWS encodes a
+// real space as %20, so a literal '+' surviving the encoder means a literal
+// '+' in the source, not a space. iampolicy.Parse (policy.go:60-63) uses
+// url.QueryUnescape and corrupts it.
+func TestParse_URLEncoded_LiteralPlusIsNotSpace(t *testing.T) {
+	plain := `{"Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"*","Condition":{"StringEquals":{"aws:PrincipalTag/Team":"a+b"}}}]}`
+	encoded := strings.ReplaceAll(url.QueryEscape(plain), "%2B", "+")
+
+	d, err := iampolicy.Parse(encoded)
+	if err != nil {
+		t.Fatalf("Parse(%q) unexpected error: %v", encoded, err)
+	}
+	if len(d.Statement) != 1 {
+		t.Fatalf("Parse(%q) expected 1 statement, got %d", encoded, len(d.Statement))
+	}
+	got := d.Statement[0].Condition["StringEquals"]["aws:PrincipalTag/Team"]
+	want := []string{"a+b"}
+	if !strSliceEqual(got, want) {
+		t.Errorf("Condition value = %v, want %v (a literal '+' in a percent-encoded document must not become a space)", got, want)
+	}
+}
+
+// FINDING 2: a statement carrying both Principal and NotPrincipal (invalid
+// under AWS's own policy grammar, but not guaranteed to be rejected for an
+// already-attached or hand-edited resource policy read back via a read-only
+// API) takes the NotPrincipal branch unconditionally (policy.go:85-90) and
+// silently discards the real Principal's AWS entries — evaluate.go:46-48
+// then `continue`s past CrossAccount aggregation for the whole statement.
+// A concrete cross-account principal must not vanish from CrossAccount just
+// because a NotPrincipal key also happens to be present.
+func TestEvaluate_PrincipalAndNotPrincipalBothPresent_CrossAccountNotDropped(t *testing.T) {
+	doc := `{"Statement":{"Effect":"Allow","Principal":{"AWS":"210987654321"},"NotPrincipal":{"AWS":"999888777666"},"Action":"s3:GetObject","Resource":"*"}}`
+	d := mustParse(t, doc)
+	ex := iampolicy.Evaluate(d, "123456789012")
+	if !containsStr(ex.CrossAccount, "210987654321") {
+		t.Errorf("CrossAccount = %v, want it to contain 210987654321 (the real Principal, not silently dropped because NotPrincipal was also present)", ex.CrossAccount)
+	}
+}
+
+// --- verify round: correctly-handled edge cases, pinned against regression ---
+
+func TestEvaluate_ForAnyValuePrefixedOperator_StillRestrictive(t *testing.T) {
+	doc := `{"Statement":{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"s3:GetObject","Resource":"*","Condition":{"ForAnyValue:StringEquals":{"aws:PrincipalOrgID":"o-abc123"}}}}`
+	d := mustParse(t, doc)
+	ex := iampolicy.Evaluate(d, "123456789012")
+	if ex.Public {
+		t.Errorf("Public = true, want false: a ForAnyValue:-prefixed operator carrying a real PrincipalOrgID must still scope the wildcard principal")
+	}
+	if !ex.Conditioned {
+		t.Errorf("Conditioned = false, want true")
+	}
+}
+
+func TestEvaluate_SourceIpArrayMixingAnyAndScoped_NotRestrictive(t *testing.T) {
+	doc := `{"Statement":{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"s3:GetObject","Resource":"*","Condition":{"IpAddress":{"aws:SourceIp":["0.0.0.0/0","10.0.0.0/8"]}}}}`
+	d := mustParse(t, doc)
+	ex := iampolicy.Evaluate(d, "123456789012")
+	if !ex.Public {
+		t.Errorf("Public = false, want true: 0.0.0.0/0 anywhere in a multi-value SourceIp condition matches every caller, so the /8 alongside it does not narrow anything")
+	}
+	if ex.Conditioned {
+		t.Errorf("Conditioned = true, want false")
+	}
+}
+
+func TestAllowsAction_PartiallyOverlappingDenyDoesNotShadowUnrelatedActions(t *testing.T) {
+	d := mustParse(t, `{"Statement":[{"Effect":"Allow","Action":"iam:*","Resource":"*"},{"Effect":"Deny","Action":"iam:Delete*","Resource":"*"}]}`)
+	if !d.AllowsAction("iam:CreateAccessKey") {
+		t.Errorf("AllowsAction(iam:CreateAccessKey) = false, want true: a Deny on iam:Delete* must not shadow an unrelated iam:* grant")
+	}
+	if d.AllowsAction("iam:DeleteUser") {
+		t.Errorf("AllowsAction(iam:DeleteUser) = true, want false: the Deny does cover this one")
+	}
+}
+
+func TestPrivilegeEscalation_LowercaseActionsStillMatchCombo(t *testing.T) {
+	d := mustParse(t, `{"Statement":{"Effect":"Allow","Action":["iam:passrole","lambda:createfunction","lambda:invokefunction"],"Resource":"*"}}`)
+	if !containsStr(d.PrivilegeEscalation(), "PassRole+CreateLambda+Invoke") {
+		t.Errorf("PrivilegeEscalation() = %v, want to contain PassRole+CreateLambda+Invoke even with all-lowercase action names", d.PrivilegeEscalation())
 	}
 }
