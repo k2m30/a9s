@@ -143,9 +143,19 @@ func TestFullRelatedViewValidation(t *testing.T) {
 							// RelatedUnknown, or a server-side-filtered RelatedDeferred
 							// pivot), it could not compute the count — skip the comparison
 							// in that case, but still verify navigation below.
-							if expected.State() == domain.RelatedResolved && uiMsg.Result.Count() != expected.Count() {
-								t.Errorf("related %q: count mismatch: UI=%d (state %d, err %v), checker=%d",
-									def.DisplayName, uiMsg.Result.Count(), uiMsg.Result.State(), uiMsg.Result.Err(), expected.Count())
+							// A truncated checker result counted only what it could see on
+							// the first page, so it is a lower bound: the UI, which may have
+							// walked further, is allowed to have found more. Demanding
+							// equality there fails the walk for being better informed.
+							if expected.State() == domain.RelatedResolved {
+								switch {
+								case expected.Truncated() && uiMsg.Result.Count() < expected.Count():
+									t.Errorf("related %q: UI=%d is below the checker's lower bound %d (truncated result)",
+										def.DisplayName, uiMsg.Result.Count(), expected.Count())
+								case !expected.Truncated() && uiMsg.Result.Count() != expected.Count():
+									t.Errorf("related %q: count mismatch: UI=%d (state %d, err %v), checker=%d",
+										def.DisplayName, uiMsg.Result.Count(), uiMsg.Result.State(), uiMsg.Result.Err(), expected.Count())
+								}
 							}
 
 							// If actionable (count > 0), follow the related entry and verify navigation.
