@@ -292,7 +292,9 @@ func (f *invGlueFake) GetJobRuns(
 	if state, ok := f.jobRuns[name]; ok {
 		return &glusvc.GetJobRunsOutput{
 			JobRuns: []gluetypes.JobRun{
-				{JobName: &name, JobRunState: state},
+				// A real failed Glue run reports why it failed; the enricher
+				// only has an Error row to populate when AWS sends one.
+				{JobName: &name, JobRunState: state, ErrorMessage: aws.String("JobRunFailed: worker ran out of memory")},
 			},
 		}, nil
 	}
