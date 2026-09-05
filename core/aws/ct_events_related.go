@@ -142,16 +142,23 @@ func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceC
 }
 
 // ctEventsMatchTarget resolves an event-derived id list against target's
-// related-resource cache: a cold (nil) cache trusts ids outright, a proven
-// cache keeps only ids that resolve to a cached resource by ID or Name, and a
-// truncated cache falls back to trusting ids (it can't disprove a miss).
+// related-resource cache. An id in an event body is a claim about the past —
+// the resource existed when the call was recorded, which is not evidence it
+// exists now — so only the list can turn it into a count:
+//
+//   - nil list (nothing cached, nothing to call): Unknown. Trusting the ids
+//     here offered a row that navigates to a resource that may be long gone.
+//   - proven list: the ids the list confirms, by ID or Name.
+//   - truncated list: still only the confirmed ids, because an unread page
+//     cannot confirm anything; Unknown when it confirmed none, since a zero
+//     off a partial list is a guess either way.
 func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, ids []string) resource.RelatedCheckResult {
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, target)
 	if err != nil {
 		return resource.ErrorRelated(target, err)
 	}
 	if resourceList == nil {
-		return relatedResult(target, ids)
+		return resource.UnknownRelated(target)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -166,10 +173,10 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 			matched = append(matched, r.ID)
 		}
 	}
-	if truncated {
-		return relatedResult(target, ids)
+	if truncated && len(matched) == 0 {
+		return resource.UnknownRelated(target)
 	}
-	return relatedResult(target, matched)
+	return relatedResultTrunc(target, matched, truncated)
 }
 
 // extractCTResourceIDs scans the event's Resources slice for entries matching

@@ -707,14 +707,17 @@ func TestRelated_CtEvents_EC2_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (named instance resolved by identity)", result.Count())
+	// INVERTED for row 6. This used to assert the named instance was "resolved
+	// by identity" off a truncated cache that did not contain it. An id in an
+	// event body says the instance existed when the call was recorded; an
+	// unread page confirms nothing, so the honest answer is Unknown. Do not
+	// restore it.
+	if got := result.EffectiveState(); got != domain.RelatedUnknown {
+		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedUnknown; IDs=%v",
+			got, result.ResourceIDs())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-05dc37e3db4cd5201" {
-		t.Errorf("ResourceIDs = %v, want [i-05dc37e3db4cd5201]", result.ResourceIDs())
-	}
-	if result.Truncated() {
-		t.Error("Truncated = true, want false")
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
 	}
 }
 
@@ -741,14 +744,14 @@ func TestRelated_CtEvents_S3_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (named bucket resolved by identity)", result.Count())
+	// INVERTED for row 6, same reason as the EC2 case above: a truncated list
+	// that did not contain my-bucket confirms nothing about it.
+	if got := result.EffectiveState(); got != domain.RelatedUnknown {
+		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedUnknown; IDs=%v",
+			got, result.ResourceIDs())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-bucket" {
-		t.Errorf("ResourceIDs = %v, want [my-bucket]", result.ResourceIDs())
-	}
-	if result.Truncated() {
-		t.Error("Truncated = true, want false")
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
 	}
 }
 
@@ -824,25 +827,30 @@ func TestRelated_CtEvents_EC2_TruncatedPartialMatchIncludesAllNamedIDs(t *testin
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 2 {
-		t.Errorf("Count = %d, want 2 (both named instances, not just the cached one)", result.Count())
+	// INVERTED for row 6. This used to assert both named instances came back,
+	// "not just the cached one" — i-bbb was never confirmed by anything, and
+	// the panel offered it as a live row. Only what the list confirms is a
+	// count; the truncation flag is what says more may follow. Do not restore
+	// the old expectation.
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 — only i-aaa is on the read page", result.Count())
 	}
-	got := map[string]bool{}
-	for _, id := range result.ResourceIDs() {
-		got[id] = true
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-aaa" {
+		t.Errorf("ResourceIDs = %v, want [i-aaa]; i-bbb is unconfirmed, not absent", result.ResourceIDs())
 	}
-	if !got["i-aaa"] || !got["i-bbb"] {
-		t.Errorf("ResourceIDs = %v, want both i-aaa and i-bbb", result.ResourceIDs())
-	}
-	if result.Truncated() {
-		t.Error("Truncated = true, want false")
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true — the list was cut short, so the count is a lower bound")
 	}
 }
 
 func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{
-			Resources:   []resource.Resource{{ID: "other-stack", Name: "other-stack"}},
+			// acme-vpc-stack is IN the list: this test is about the stack
+			// NAME being extracted from the ARN rather than the uuid, so the
+			// list has to confirm it for the extraction to be observable at
+			// all (row 6 — an unconfirmed id is Unknown, not a count).
+			Resources:   []resource.Resource{{ID: "acme-vpc-stack", Name: "acme-vpc-stack"}, {ID: "other-stack", Name: "other-stack"}},
 			IsTruncated: true,
 		},
 	}
@@ -983,8 +991,12 @@ func TestRelated_CtEvents_RDS_DBInstanceEventResolves(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 1 || len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-instance" {
-		t.Errorf("Count=%d ResourceIDs=%v, want 1 [my-instance] (a real DB instance is a dbi relation)", result.Count(), result.ResourceIDs())
+	// INVERTED for row 6: the cache is cold, so nothing has confirmed that
+	// my-instance still exists. The sibling test above still pins the real
+	// point — a DBCluster id is never reported as a dbi relation.
+	if got := result.EffectiveState(); got != domain.RelatedUnknown {
+		t.Errorf("state = %v with a cold cache, want RelatedUnknown; Count=%d IDs=%v",
+			got, result.Count(), result.ResourceIDs())
 	}
 }
 

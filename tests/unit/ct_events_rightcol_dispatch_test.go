@@ -162,7 +162,16 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 
 					// Classify the result.
 					isPivot := result.State() == domain.RelatedDeferred
-					isNotActionable := result.Count() == 0 && len(result.FetchFilter()) == 0
+					// Row 6 made a third case reachable here: Unknown, which has
+					// Count 0 and no FetchFilter like a not-actionable row but
+					// is the opposite of one — nothing has answered the
+					// question yet, so selecting it must dispatch the work that
+					// does. It dispatches a related-check re-run scoped to the
+					// ct-events row rather than a fetch scoped to the target,
+					// so it is neither D1/D3 nor D2 and gets its own branch.
+					isUnknown := result.State() == domain.RelatedUnknown
+					isNotActionable := !isUnknown &&
+						result.Count() == 0 && len(result.FetchFilter()) == 0
 
 					c := buildCTEventsRightColController(t, fixture)
 					errMsg := ""
@@ -203,6 +212,13 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 					}
 					c.Apply(app.Action{Kind: app.ActionToggleFocus})
 					_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx)})
+
+					if isUnknown {
+						if len(tasks) == 0 {
+							t.Errorf("unknown row dispatched 0 tasks — an unanswered row must be able to answer itself: %s", label)
+						}
+						return
+					}
 
 					// D1/D3: an actionable row (typed hit or pivot) must dispatch at
 					// least one fetch task scoped to this def's TargetType — see the

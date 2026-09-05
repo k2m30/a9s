@@ -13,6 +13,11 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 )
 
+// CtEventDeletedBucket is the demo event whose body names a bucket no demo S3
+// fixture carries — the witness that an id read out of an event is a claim
+// about the past, not a related resource the panel may offer.
+const CtEventDeletedBucket = "evt-0a1b2c3d4e5f60009"
+
 // CloudTrailFixtures holds all CloudTrail domain objects served by the fake.
 type CloudTrailFixtures struct {
 	Trails      []cloudtrailtypes.Trail
@@ -267,6 +272,23 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"Root","principalId":"123456789012","arn":"arn:aws:iam::123456789012:root","accountId":"123456789012","sessionContext":{"sessionCredentialFromConsole":"true","attributes":{"mfaAuthenticated":"true","creationDate":"2026-03-28T14:20:00Z"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"s3.amazonaws.com","eventName":"CreateBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"signin.amazonaws.com","requestParameters":{"bucketName":"webapp-assets-prod"},"responseElements":null,"requestID":"req-s3-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:s3:::webapp-assets-prod","accountId":"123456789012","type":"AWS::S3::Bucket"}]}`),
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("webapp-assets-prod")},
+			},
+		},
+		// CtEventDeletedBucket — the witness for the row-6 rule. The event
+		// names a bucket that no demo S3 fixture carries, exactly as a real
+		// DeleteBucket leaves behind: the resource was there when the call was
+		// recorded and is not there now. Its S3 Buckets panel must render the
+		// honest answer rather than offering a row that navigates to nothing.
+		{
+			EventId:         aws.String(CtEventDeletedBucket),
+			EventName:       aws.String("DeleteBucket"),
+			EventTime:       aws.Time(t2),
+			EventSource:     aws.String("s3.amazonaws.com"),
+			Username:        aws.String("alice.johnson"),
+			ReadOnly:        aws.String("false"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:50:00Z","eventSource":"s3.amazonaws.com","eventName":"DeleteBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.20","userAgent":"aws-cli/2.15.0","requestParameters":{"bucketName":"acme-retired-archive"},"responseElements":null,"requestID":"req-s3-del-002","eventID":"` + CtEventDeletedBucket + `","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:s3:::acme-retired-archive","accountId":"123456789012","type":"AWS::S3::Bucket"}]}`),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("acme-retired-archive")},
 			},
 		},
 		{
