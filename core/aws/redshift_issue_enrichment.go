@@ -27,7 +27,7 @@ const (
 // S5 operator sentences for the redshift posture findings.
 const (
 	redshiftAuditLoggingOffDetail = "Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group."
-	redshiftRequireSSLOffDetail   = "The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set require_ssl to true in the cluster's parameter group and reboot."
+	redshiftRequireSSLOffDetail   = "The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require_ssl) to true and reboot."
 )
 
 // EnrichRedshiftPosture reports the two cluster-security settings
