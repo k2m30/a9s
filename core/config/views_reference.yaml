@@ -198,6 +198,8 @@ dbi:  # rdstypes.DBInstance
   - AdditionalStorageVolumes[].AllocatedStorage
   - AdditionalStorageVolumes[].IOPS
   - AdditionalStorageVolumes[].MaxAllocatedStorage
+  - AdditionalStorageVolumes[].StorageOperationPercentProgress
+  - AdditionalStorageVolumes[].StorageOperationStatus
   - AdditionalStorageVolumes[].StorageThroughput
   - AdditionalStorageVolumes[].StorageType
   - AdditionalStorageVolumes[].StorageVolumeStatus
@@ -338,6 +340,8 @@ dbi:  # rdstypes.DBInstance
   - StatusInfos[].StatusType
   - StorageEncrypted
   - StorageEncryptionType
+  - StorageOperationPercentProgress
+  - StorageOperationStatus
   - StorageThroughput
   - StorageType
   - StorageVolumeStatus
@@ -476,6 +480,8 @@ eks:  # ekstypes.Cluster
   - AccessConfig.AuthenticationMode
   - AccessConfig.BootstrapClusterCreatorAdminPermissions
   - Arn
+  - CertificateAuthority.Active.ActivatedBy
+  - CertificateAuthority.Active.Id
   - CertificateAuthority.Data
   - ClientRequestToken
   - ComputeConfig.Enabled
@@ -497,6 +503,14 @@ eks:  # ekstypes.Cluster
   - Health.Issues[].ResourceIds[]
   - Id
   - Identity.Oidc.Issuer
+  - KubeApiServerConfig.EventTtl
+  - KubeApiServerConfig.ServiceNodePortRange.MaxPort
+  - KubeApiServerConfig.ServiceNodePortRange.MinPort
+  - KubeControllerManagerConfig.HorizontalPodAutoscalerControllerConfig.HorizontalPodAutoscalerSyncPeriod
+  - KubeControllerManagerConfig.PodGcControllerConfig.TerminatedPodGcThreshold
+  - KubeSchedulerConfig.NodeResourcesFit.ScoringStrategy.Resources[].Name
+  - KubeSchedulerConfig.NodeResourcesFit.ScoringStrategy.Resources[].Weight
+  - KubeSchedulerConfig.NodeResourcesFit.ScoringStrategy.Type
   - KubernetesNetworkConfig.ElasticLoadBalancing.Enabled
   - KubernetesNetworkConfig.IpFamily
   - KubernetesNetworkConfig.ServiceIpv4Cidr
@@ -507,10 +521,14 @@ eks:  # ekstypes.Cluster
   - OutpostConfig.ControlPlaneInstanceType
   - OutpostConfig.OutpostArns[]
   - OutpostConfig.ControlPlanePlacement.GroupName
+  - OutpostConfig.ControlPlanePlacement.SpreadLevel
+  - OutpostConfig.EtcdInstanceType
+  - OutpostConfig.EtcdPlacement.SpreadLevel
   - PlatformVersion
   - RemoteNetworkConfig.RemoteNodeNetworks[].Cidrs[]
   - RemoteNetworkConfig.RemotePodNetworks[].Cidrs[]
   - ResourcesVpcConfig.ClusterSecurityGroupId
+  - ResourcesVpcConfig.ControlPlaneEgressMode
   - ResourcesVpcConfig.EndpointPrivateAccess
   - ResourcesVpcConfig.EndpointPublicAccess
   - ResourcesVpcConfig.PublicAccessCidrs[]
@@ -816,6 +834,7 @@ lambda:  # lambdatypes.FunctionConfiguration
   - DeadLetterConfig.TargetArn
   - Description
   - DurableConfig.ExecutionTimeout
+  - DurableConfig.KMSKeyArn
   - DurableConfig.RetentionPeriodInDays
   - Environment.Error.ErrorCode
   - Environment.Error.Message
@@ -823,6 +842,7 @@ lambda:  # lambdatypes.FunctionConfiguration
   - EphemeralStorage.Size
   - FileSystemConfigs[].Arn
   - FileSystemConfigs[].LocalMountPath
+  - FileSystemConfigs[].S3FilesConfig.DirectS3Read
   - FunctionArn
   - FunctionName
   - Handler
@@ -885,6 +905,7 @@ alarm:  # cwtypes.MetricAlarm
   - EvaluationInterval
   - EvaluationPeriods
   - EvaluationState
+  - EvaluationWindow
   - ExtendedStatistic
   - InsufficientDataActions[]
   - MetricName
@@ -914,6 +935,8 @@ alarm:  # cwtypes.MetricAlarm
   - ThresholdMetricId
   - TreatMissingData
   - Unit
+  - WarmUpConfiguration.WarmUpPeriodDurationInMinutes
+  - WarmUpConfiguration.OnlyStartEvaluatingAfterWarmUpPeriodEnds
 
 sns:  # snstypes.Topic
   - TopicArn
@@ -1022,6 +1045,12 @@ ecs-svc:  # ecstypes.Service
   - DeploymentConfiguration.CanaryConfiguration.CanaryPercent
   - DeploymentConfiguration.DeploymentCircuitBreaker.Enable
   - DeploymentConfiguration.DeploymentCircuitBreaker.Rollback
+  - DeploymentConfiguration.DeploymentCircuitBreaker.ResetOnHealthyTask
+  - DeploymentConfiguration.DeploymentCircuitBreaker.ThresholdConfiguration.Type
+  - DeploymentConfiguration.DeploymentCircuitBreaker.ThresholdConfiguration.Value
+  - DeploymentConfiguration.EarlySuccessCriteria.Enable
+  - DeploymentConfiguration.EarlySuccessCriteria.HealthyPercent
+  - DeploymentConfiguration.EarlySuccessCriteria.SourceServiceRevisionCleanup
   - DeploymentConfiguration.LifecycleHooks[].HookDetails
   - DeploymentConfiguration.LifecycleHooks[].HookTargetArn
   - DeploymentConfiguration.LifecycleHooks[].LifecycleStages[]
@@ -1187,6 +1216,8 @@ cfn:  # cfntypes.Stack
   - ChangeSetId
   - DeletionMode
   - DeletionTime
+  - DeploymentConfig.DisableRollback
+  - DeploymentConfig.Mode
   - Description
   - DetailedStatus
   - DisableRollback
@@ -1231,6 +1262,8 @@ role:  # iamtypes.Role
   - PermissionsBoundary.PermissionsBoundaryType
   - RoleLastUsed.LastUsedDate
   - RoleLastUsed.Region
+  - SourceRoleTemplate.TemplateArn
+  - SourceRoleTemplate.TemplateMinorVersion
   - Tags[].Key
   - Tags[].Value
 
@@ -1358,6 +1391,19 @@ ddb:  # ddbtypes.TableDescription
   - TableName
   - TableSizeBytes
   - TableStatus
+  - VectorIndexes[].Backfilling
+  - VectorIndexes[].Dimensions
+  - VectorIndexes[].DistanceFunction
+  - VectorIndexes[].IndexArn
+  - VectorIndexes[].IndexName
+  - VectorIndexes[].IndexSizeBytes
+  - VectorIndexes[].IndexStatus
+  - VectorIndexes[].ItemCount
+  - VectorIndexes[].Projection.NonKeyAttributes[]
+  - VectorIndexes[].Projection.ProjectionType
+  - VectorIndexes[].SearchSchema[].AttributeName
+  - VectorIndexes[].SearchSchema[].SearchSchemaElementType
+  - VectorIndexes[].VectorAttribute.AttributeName
   - WarmThroughput.ReadUnitsPerSecond
   - WarmThroughput.Status
   - WarmThroughput.WriteUnitsPerSecond
@@ -1383,6 +1429,7 @@ eip:  # ec2types.Address
 
 acm:  # acmtypes.CertificateSummary
   - CertificateArn
+  - CertificateKeyPairOrigin
   - CreatedAt
   - DomainName
   - ExportOption
@@ -1450,6 +1497,7 @@ asg:  # asgtypes.AutoScalingGroup
   - LaunchTemplate.Version
   - LoadBalancerNames[]
   - MaxInstanceLifetime
+  - MixedInstancesPolicy.InstancesDistribution.DistributionSegments[].TargetCapacityTypes[]
   - MixedInstancesPolicy.InstancesDistribution.OnDemandAllocationStrategy
   - MixedInstancesPolicy.InstancesDistribution.OnDemandBaseCapacity
   - MixedInstancesPolicy.InstancesDistribution.OnDemandPercentageAboveBaseCapacity
@@ -1500,6 +1548,7 @@ asg:  # asgtypes.AutoScalingGroup
   - MixedInstancesPolicy.LaunchTemplate.Overrides[].LaunchTemplateSpecification.Version
   - MixedInstancesPolicy.LaunchTemplate.Overrides[].WeightedCapacity
   - NewInstancesProtectedFromScaleIn
+  - Operator.Principal
   - PlacementGroup
   - PredictedCapacity
   - ServiceLinkedRoleARN
@@ -1650,6 +1699,7 @@ dbi-snap:  # rdstypes.DBSnapshot
   - Encrypted
   - Engine
   - EngineVersion
+  - FullSnapshotSizeInBytes
   - IAMDatabaseAuthenticationEnabled
   - InstanceCreateTime
   - Iops
@@ -1724,6 +1774,8 @@ vpce:  # ec2types.VpcEndpoint
   - LastError.Message
   - NetworkInterfaceIds[]
   - OwnerId
+  - PayerResponsibilities[].PayerResponsibilityType
+  - PayerResponsibilities[].Scope
   - PolicyDocument
   - PrivateDnsEnabled
   - RequesterManaged
@@ -2410,6 +2462,11 @@ redshift:  # redshifttypes.Cluster
   - IpAddressType
   - KmsKeyId
   - LakehouseRegistrationStatus
+  - LoggingPublishStatus.S3Tables.EnabledAll
+  - LoggingPublishStatus.S3Tables.LastIngestionTimes
+  - LoggingPublishStatus.S3Tables.S3TableGranularity
+  - LoggingPublishStatus.S3Tables.S3TableNamespace
+  - LoggingPublishStatus.S3Tables.S3Tables[]
   - MaintenanceTrackName
   - ManualSnapshotRetentionPeriod
   - MasterPasswordSecretArn
@@ -2547,6 +2604,7 @@ cb:  # cbtypes.Project
   - Environment.EnvironmentVariables[].Value
   - Environment.EnvironmentVariables[].Type
   - Environment.Fleet.FleetArn
+  - Environment.HostKernel
   - Environment.ImagePullCredentialsType
   - Environment.PrivilegedMode
   - Environment.RegistryCredential.Credential
@@ -2709,6 +2767,7 @@ opensearch:  # ostypes.DomainStatus
   - Endpoint
   - EndpointV2
   - Endpoints
+  - EngineMode
   - EngineVersion
   - IPAddressType
   - IdentityCenterOptions.EnabledAPIAccess
@@ -2740,6 +2799,7 @@ opensearch:  # ostypes.DomainStatus
   - SoftwareUpdateOptions.AutoSoftwareUpdateEnabled
   - SoftwareUpdateOptions.UseLatestServiceSoftwareForBlueGreen
   - UpgradeProcessing
+  - UseCase
   - VPCOptions.AvailabilityZones[]
   - VPCOptions.EgressEnabled
   - VPCOptions.SecurityGroupIds[]
@@ -2819,6 +2879,13 @@ msk:  # kafkatypes.Cluster
   - Provisioned.LoggingInfo.BrokerLogs.S3.Enabled
   - Provisioned.LoggingInfo.BrokerLogs.S3.Bucket
   - Provisioned.LoggingInfo.BrokerLogs.S3.Prefix
+  - Provisioned.LoggingInfo.AuthorizerLogs.CloudWatchLogs.Enabled
+  - Provisioned.LoggingInfo.AuthorizerLogs.CloudWatchLogs.LogGroup
+  - Provisioned.LoggingInfo.AuthorizerLogs.Firehose.Enabled
+  - Provisioned.LoggingInfo.AuthorizerLogs.Firehose.DeliveryStream
+  - Provisioned.LoggingInfo.AuthorizerLogs.S3.Enabled
+  - Provisioned.LoggingInfo.AuthorizerLogs.S3.Bucket
+  - Provisioned.LoggingInfo.AuthorizerLogs.S3.Prefix
   - Provisioned.OpenMonitoring.Prometheus.JmxExporter.EnabledInBroker
   - Provisioned.OpenMonitoring.Prometheus.NodeExporter.EnabledInBroker
   - Provisioned.Rebalancing.Status
@@ -3259,6 +3326,7 @@ cb_builds:  # cbtypes.Build
   - Environment.EnvironmentVariables[].Value
   - Environment.EnvironmentVariables[].Type
   - Environment.Fleet.FleetArn
+  - Environment.HostKernel
   - Environment.ImagePullCredentialsType
   - Environment.PrivilegedMode
   - Environment.RegistryCredential.Credential
@@ -3436,6 +3504,7 @@ elb_listener_rules:  # elbv2types.Rule
   - Conditions[].QueryStringConfig.Values[].Key
   - Conditions[].QueryStringConfig.Values[].Value
   - Conditions[].RegexValues[]
+  - Conditions[].SourceIpConfig.IpAddressType
   - Conditions[].SourceIpConfig.Values[]
   - Conditions[].Values[]
   - IsDefault
@@ -3538,7 +3607,14 @@ ami:  # ec2types.Image
   - ImageLocation
   - ImageOwnerAlias
   - ImageType
+  - ImageWatermarks[].SourceImageCreationTime
+  - ImageWatermarks[].SourceImageId
+  - ImageWatermarks[].SourceImageRegion
+  - ImageWatermarks[].WatermarkCreationTime
+  - ImageWatermarks[].WatermarkKey
   - ImdsSupport
+  - InstanceTypeSpecification.SupportedInstanceTypes[].InstanceType
+  - InstanceTypeSpecification.UnsupportedInstanceTypes[].InstanceType
   - KernelId
   - LastLaunchedTime
   - Name
@@ -3548,6 +3624,7 @@ ami:  # ec2types.Image
   - ProductCodes[].ProductCodeId
   - ProductCodes[].ProductCodeType
   - Public
+  - PublicSsmParameterName
   - RamdiskId
   - RootDeviceName
   - RootDeviceType
