@@ -28,7 +28,14 @@ const DefaultPageSize = resource.DefaultPageSize
 // matches are found locally — never report a partial count as definitive.
 func FetchRelatedTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	if entry, ok := cache[target]; ok {
-		return entry.Resources, entry.IsTruncated, nil
+		// A present entry is a complete answer even when it holds nothing:
+		// the executor seeds it straight from a fetcher that found zero
+		// resources, and nil there would be indistinguishable from "no entry".
+		resources := entry.Resources
+		if resources == nil {
+			resources = []resource.Resource{}
+		}
+		return resources, entry.IsTruncated, nil
 	}
 	pf := resource.GetPaginatedFetcher(target)
 	if pf == nil {

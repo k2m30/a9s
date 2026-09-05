@@ -25,7 +25,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		return resource.ErrorRelated("iam-user", err)
 	}
 	if userList == nil {
-		return relatedResult("iam-user", []string{username})
+		return resource.UnknownRelated("iam-user")
 	}
 
 	var ids []string
@@ -34,8 +34,11 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 			ids = append(ids, userRes.ID)
 		}
 	}
+	// The event names a user that was there when it was recorded; it does not
+	// prove the user is there now. A first page that did not list them is no
+	// answer either way.
 	if len(ids) == 0 && truncated {
-		ids = []string{username} // event names this exact user; truncated cache missed it → resolve by identity
+		return resource.UnknownRelated("iam-user")
 	}
 	return relatedResult("iam-user", ids)
 }

@@ -61,6 +61,22 @@ func canonicalDNS(s string) string {
 	return strings.TrimSuffix(s, ".")
 }
 
+// r53RelatedResult applies the rule stated at FetchRelatedTarget's doc
+// comment: a first page of the TARGET list that matched nothing does not prove
+// the rest of the account matched nothing either, so an empty result off a
+// truncated target list is Unknown rather than a resolved zero.
+//
+// recordsTruncated is the zone's own record scan and is deliberately NOT part
+// of that test: a truncated record scan with no match renders "(0+)", which
+// already says "more records may match" without claiming ignorance of the
+// target type.
+func r53RelatedResult(target string, ids []string, recordsTruncated, targetTruncated bool) resource.RelatedCheckResult {
+	if len(ids) == 0 && targetTruncated {
+		return resource.UnknownRelated(target)
+	}
+	return relatedResultTrunc(target, ids, recordsTruncated || targetTruncated)
+}
+
 // checkR53ELB reports load balancers referenced by AliasTarget.DNSName in
 // this zone's records. Pattern C: one ListResourceRecordSets call per zone,
 // then cross-check the DNS names against the ELB cache.
@@ -95,13 +111,10 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 		if fetchErr != nil {
 			return resource.ErrorRelated("elb", fetchErr)
 		}
-		// Cache not yet populated (no fetch error) — fall back to the alias
-		// DNS names as IDs rather than a proven count.
-		ids := make([]string, 0, len(wanted))
-		for d := range wanted {
-			ids = append(ids, d)
-		}
-		return relatedResultTrunc("elb", ids, recordsTruncated)
+		// Nothing cached and no fetcher: the aliases name something we cannot
+		// look up. The alias DNS name is not a elb ID, so reporting it would
+		// offer the operator a row that navigates to nothing.
+		return resource.UnknownRelated("elb")
 	}
 	var ids []string
 	for _, elbRes := range elbList {
@@ -118,7 +131,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	return relatedResultTrunc("elb", ids, recordsTruncated || elbTruncated)
+	return r53RelatedResult("elb", ids, recordsTruncated, elbTruncated)
 }
 
 // checkR53CF reports CloudFront distributions referenced by AliasTarget.DNSName
@@ -154,11 +167,10 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 		if fetchErr != nil {
 			return resource.ErrorRelated("cf", fetchErr)
 		}
-		ids := make([]string, 0, len(wanted))
-		for d := range wanted {
-			ids = append(ids, d)
-		}
-		return relatedResultTrunc("cf", ids, recordsTruncated)
+		// Nothing cached and no fetcher: the aliases name something we cannot
+		// look up. The alias DNS name is not a cf ID, so reporting it would
+		// offer the operator a row that navigates to nothing.
+		return resource.UnknownRelated("cf")
 	}
 	var ids []string
 	for _, cfRes := range cfList {
@@ -170,7 +182,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfRes.ID)
 		}
 	}
-	return relatedResultTrunc("cf", ids, recordsTruncated || cfTruncated)
+	return r53RelatedResult("cf", ids, recordsTruncated, cfTruncated)
 }
 
 // checkR53APIGW reports API Gateways fronted by AliasTarget.DNSName in this
@@ -207,11 +219,10 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		if fetchErr != nil {
 			return resource.ErrorRelated("apigw", fetchErr)
 		}
-		ids := make([]string, 0, len(wantedIDs))
-		for id := range wantedIDs {
-			ids = append(ids, id)
-		}
-		return relatedResultTrunc("apigw", ids, recordsTruncated)
+		// Nothing cached and no fetcher: the aliases name something we cannot
+		// look up. The alias DNS name is not a apigw ID, so reporting it would
+		// offer the operator a row that navigates to nothing.
+		return resource.UnknownRelated("apigw")
 	}
 	var ids []string
 	for _, apigwRes := range apigwList {
@@ -219,7 +230,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, apigwRes.ID)
 		}
 	}
-	return relatedResultTrunc("apigw", ids, recordsTruncated || apigwTruncated)
+	return r53RelatedResult("apigw", ids, recordsTruncated, apigwTruncated)
 }
 
 // checkR53S3 reports S3 buckets referenced by AliasTarget.DNSName (S3 website
@@ -256,11 +267,10 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 		if fetchErr != nil {
 			return resource.ErrorRelated("s3", fetchErr)
 		}
-		ids := make([]string, 0, len(wantedBuckets))
-		for b := range wantedBuckets {
-			ids = append(ids, b)
-		}
-		return relatedResultTrunc("s3", ids, recordsTruncated)
+		// Nothing cached and no fetcher: the aliases name something we cannot
+		// look up. The alias DNS name is not a s3 ID, so reporting it would
+		// offer the operator a row that navigates to nothing.
+		return resource.UnknownRelated("s3")
 	}
 	var ids []string
 	for _, s3Res := range s3List {
@@ -268,7 +278,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, s3Res.ID)
 		}
 	}
-	return relatedResultTrunc("s3", ids, recordsTruncated || s3Truncated)
+	return r53RelatedResult("s3", ids, recordsTruncated, s3Truncated)
 }
 
 // checkR53ACM reports ACM certificates whose DNS validation CNAME records
@@ -348,14 +358,10 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		if fetchErr != nil {
 			return resource.ErrorRelated("logs", fetchErr)
 		}
-		// Fallback: return the log-group ARNs as IDs when the cache is unavailable.
-		var ids []string
-		for _, cfg := range out.QueryLoggingConfigs {
-			if cfg.CloudWatchLogsLogGroupArn != nil && *cfg.CloudWatchLogsLogGroupArn != "" {
-				ids = append(ids, *cfg.CloudWatchLogsLogGroupArn)
-			}
-		}
-		return relatedResult("logs", ids)
+		// Nothing cached and no fetcher: the aliases name something we cannot
+		// look up. The alias DNS name is not a logs ID, so reporting it would
+		// offer the operator a row that navigates to nothing.
+		return resource.UnknownRelated("logs")
 	}
 
 	wanted := make(map[string]struct{})
@@ -382,7 +388,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	return relatedResultTrunc("logs", ids, logsTruncated)
+	return r53RelatedResult("logs", ids, false, logsTruncated)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.
