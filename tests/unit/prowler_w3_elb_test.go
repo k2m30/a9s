@@ -221,7 +221,7 @@ func TestW3ELBDesync_MonitorModeFlagged(t *testing.T) {
 		t.Error("Detail is empty; every finding carries an operator sentence")
 	}
 	w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBDesyncOff].Rows, [][2]string{
-		{"desync_mitigation_mode", "monitor"},
+		{"Desync mitigation", "monitor"},
 	})
 }
 
@@ -268,7 +268,7 @@ func TestW3ELBInvalidHeaders_Flagged(t *testing.T) {
 		t.Error("Detail is empty; every finding carries an operator sentence")
 	}
 	w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBInvalidHeaders].Rows, [][2]string{
-		{"drop_invalid_header_fields", "false"},
+		{"Drop invalid headers", "false"},
 	})
 }
 
@@ -471,7 +471,7 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 				t.Error("Detail is empty; every finding carries an operator sentence")
 			}
 			w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBWeakTLS].Rows, [][2]string{
-				{"SslPolicy", policy},
+				{"Security policy", policy},
 			})
 		})
 	}

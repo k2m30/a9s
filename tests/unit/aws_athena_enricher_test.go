@@ -159,8 +159,10 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(f.Phrase, "Enforce") {
-		t.Errorf("summary %q must contain \"Enforce\"", f.Phrase)
+	// The phrase names the setting in the operator's words, not the SDK's
+	// (EnforceWorkGroupConfiguration) — the style gate forbids the latter.
+	if f.Phrase != "Workgroup settings enforced" {
+		t.Errorf("summary = %q, want %q", f.Phrase, "Workgroup settings enforced")
 	}
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it is correctly configured")

@@ -280,8 +280,11 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	}
 
 	rows := rowMap(result.AttentionDetails["a9s-demo-partial-pab"][finding.Code].Rows)
-	if rows["BlockPublicAcls"] != "false" {
-		t.Errorf("Rows[BlockPublicAcls] = %q, want %q", rows["BlockPublicAcls"], "false")
+	// The row is labelled in plain words; the SDK flag name rides in the value,
+	// where an identifier is allowed and is what the operator greps the console for.
+	if rows["Block public access control lists"] != "false (BlockPublicAcls)" {
+		t.Errorf("Rows[Block public access control lists] = %q, want %q",
+			rows["Block public access control lists"], "false (BlockPublicAcls)")
 	}
 	if rows["Account-level PAB"] != "may still apply" {
 		t.Errorf("Rows[Account-level PAB] = %q, want %q", rows["Account-level PAB"], "may still apply")
@@ -333,11 +336,15 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	}
 
 	rows := rowMap(result.AttentionDetails["a9s-demo-multifail-pab"][finding.Code].Rows)
-	if rows["BlockPublicAcls"] != "false" {
-		t.Errorf("Rows[BlockPublicAcls] = %q, want %q", rows["BlockPublicAcls"], "false")
+	// The row is labelled in plain words; the SDK flag name rides in the value,
+	// where an identifier is allowed and is what the operator greps the console for.
+	if rows["Block public access control lists"] != "false (BlockPublicAcls)" {
+		t.Errorf("Rows[Block public access control lists] = %q, want %q",
+			rows["Block public access control lists"], "false (BlockPublicAcls)")
 	}
-	if rows["BlockPublicPolicy"] != "false" {
-		t.Errorf("Rows[BlockPublicPolicy] = %q, want %q", rows["BlockPublicPolicy"], "false")
+	if rows["Block public bucket policy"] != "false (BlockPublicPolicy)" {
+		t.Errorf("Rows[Block public bucket policy] = %q, want %q",
+			rows["Block public bucket policy"], "false (BlockPublicPolicy)")
 	}
 }
 

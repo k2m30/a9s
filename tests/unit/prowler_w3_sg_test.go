@@ -426,7 +426,7 @@ func TestW3EnrichSGUsage_UnreferencedGroupFlagged(t *testing.T) {
 		t.Error("Detail is empty; every finding carries an operator sentence")
 	}
 	w3AssertRows(t, res.AttentionDetails["sg-0unused1111111111"][w3CodeSGUnused].Rows, [][2]string{
-		{"ENIs referencing", "0"},
+		{"Network interfaces referencing", "0"},
 	})
 	if len(res.Findings["sg-0inuse22222222222"]) != 0 {
 		t.Errorf("attached group was flagged: %+v", res.Findings["sg-0inuse22222222222"])

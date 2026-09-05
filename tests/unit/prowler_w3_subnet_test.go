@@ -77,7 +77,7 @@ func TestW3SubnetAutoPublicIP_Flagged(t *testing.T) {
 		t.Error("Detail is empty; every finding carries an operator sentence")
 	}
 	w3AssertRows(t, rows[0].AttentionDetails[w3CodeSubnetAutoPublicIP].Rows, [][2]string{
-		{"MapPublicIpOnLaunch", "true"},
+		{"Public address on launch", "true"},
 	})
 }
 

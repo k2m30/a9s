@@ -91,7 +91,7 @@ func TestW3TGWAutoAccept_Flagged(t *testing.T) {
 		t.Error("Detail is empty; every finding carries an operator sentence")
 	}
 	w3AssertRows(t, rows[0].AttentionDetails[w3CodeTGWAutoAccept].Rows, [][2]string{
-		{"AutoAcceptSharedAttachments", "enable"},
+		{"Auto-accept shared attachments", "enable"},
 	})
 }
 
