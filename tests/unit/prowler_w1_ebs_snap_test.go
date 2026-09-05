@@ -119,7 +119,9 @@ func TestEBSSnap_Public_RestorableByAnyone(t *testing.T) {
 	res := pw1EnrichEBSSnap(t, fake, pw1EBSCache("vol-0aaaa1111bbbb2222"), pub)
 	pw1RequireFinding(t, res.Findings["snap-0public00aaaaa1"], pw1EBSSnapCodePublic,
 		"shared with all AWS accounts", domain.SevBroken, "wave2:ebs-snap")
-	pw1RequireRow(t, pw1Rows(res, "snap-0public00aaaaa1", pw1EBSSnapCodePublic), "Public", "true")
+	// d4 row 20: the value is a word, not the SDK field's shape. Do not
+	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	pw1RequireRow(t, pw1Rows(res, "snap-0public00aaaaa1", pw1EBSSnapCodePublic), "Public", "yes")
 }
 
 // TestEBSSnap_Public_PrivateIsHealthy pins the negative case: a snapshot the

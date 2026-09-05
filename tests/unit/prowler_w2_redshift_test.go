@@ -155,7 +155,10 @@ func TestW2RedshiftRequireSSLOff(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, w2RedshiftSource)
-	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "Requires encrypted connections", "false (require_ssl)")
+	// d4 row 20: the parameter identifier still rides as the aside, but the
+	// value in front of it is a word. Do not restore "false (require_ssl)" —
+	// TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "Requires encrypted connections", "off (require_ssl)")
 	w2AssertNoCode(t, res.Findings["acme-analytics"], w2RedshiftCodeRequireSSLOff)
 	w2AssertFindingDef(t, "redshift", w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, "wave2")
 }
@@ -203,7 +206,10 @@ func TestW2RedshiftBothConditionsOnOneCluster(t *testing.T) {
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeAuditLoggingOff, "audit logging off", domain.SevWarn, w2RedshiftSource)
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, w2RedshiftSource)
 	w2AssertNoRows(t, res, "acme-reporting", w2RedshiftCodeAuditLoggingOff)
-	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "Requires encrypted connections", "false (require_ssl)")
+	// d4 row 20: the parameter identifier still rides as the aside, but the
+	// value in front of it is a word. Do not restore "false (require_ssl)" —
+	// TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "Requires encrypted connections", "off (require_ssl)")
 }
 
 func TestW2RedshiftErrorOnOneClusterKeepsTheRest(t *testing.T) {

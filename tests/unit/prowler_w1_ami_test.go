@@ -71,7 +71,9 @@ func TestAMI_Public_SharedWithEveryAccount(t *testing.T) {
 	rs := pw1FetchAMIs(t, &pw1AMIFake{images: []ec2types.Image{pw1Image("ami-0public00aaaaaa1", aws.Bool(true))}})
 	r := pw1ResourceByID(t, rs, "ami-0public00aaaaaa1")
 	pw1RequireFinding(t, r.Findings, pw1AMICodePublic, "shared with all AWS accounts", domain.SevBroken, "wave1")
-	pw1RequireRow(t, r.AttentionDetails[pw1AMICodePublic].Rows, "Public", "true")
+	// d4 row 20: the value is a word, not the SDK field's shape. Do not
+	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	pw1RequireRow(t, r.AttentionDetails[pw1AMICodePublic].Rows, "Public", "yes")
 }
 
 // TestAMI_Public_PrivateIsHealthy pins the negative case.

@@ -218,7 +218,9 @@ func TestASG_NoELBHealthCheck_BehindTargetGroup(t *testing.T) {
 	rs := pw1FetchASGs(t, g)
 	r := pw1ResourceByID(t, rs, "acme-tg-ec2-health")
 	pw1RequireFinding(t, r.Findings, pw1ASGCodeNoELBHealth, "no load balancer health check", domain.SevWarn, "wave1")
-	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeNoELBHealth].Rows, "Health check type", "EC2")
+	// d4 row 20: the value is a word, not the SDK field's shape. Do not
+	// restore "EC2" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeNoELBHealth].Rows, "Health check type", "ec2")
 }
 
 // TestASG_NoELBHealthCheck_ClassicLoadBalancerCounts pins that the older
@@ -318,7 +320,9 @@ func TestASG_LaunchConfigPublicIP_Enabled(t *testing.T) {
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-public-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-public-asg"], pw1ASGCodeLCPublicIP,
 		"launch configuration assigns public IPs", domain.SevWarn, "wave2:asg")
-	pw1RequireRow(t, pw1Rows(res, "acme-public-asg", pw1ASGCodeLCPublicIP), "Public address assignment", "true")
+	// d4 row 20: the value is a word, not the SDK field's shape. Do not
+	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	pw1RequireRow(t, pw1Rows(res, "acme-public-asg", pw1ASGCodeLCPublicIP), "Public address assignment", "enabled")
 }
 
 // TestASG_LaunchConfigPublicIP_FalseIsHealthy pins the negative case.

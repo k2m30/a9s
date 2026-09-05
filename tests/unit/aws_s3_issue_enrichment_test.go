@@ -282,9 +282,13 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	rows := rowMap(result.AttentionDetails["a9s-demo-partial-pab"][finding.Code].Rows)
 	// The row is labelled in plain words; the SDK flag name rides in the value,
 	// where an identifier is allowed and is what the operator greps the console for.
-	if rows["Block public access control lists"] != "false (BlockPublicAcls)" {
+	// d4 row 20 replaced the "false" in front of that aside with "off": a Go
+	// bool literal describes the SDK field, not the account. Do not restore
+	// "off (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
+	// fails on it.
+	if rows["Block public access control lists"] != "off (BlockPublicAcls)" {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",
-			rows["Block public access control lists"], "false (BlockPublicAcls)")
+			rows["Block public access control lists"], "off (BlockPublicAcls)")
 	}
 	if rows["Account-level PAB"] != "may still apply" {
 		t.Errorf("Rows[Account-level PAB] = %q, want %q", rows["Account-level PAB"], "may still apply")
@@ -338,13 +342,17 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	rows := rowMap(result.AttentionDetails["a9s-demo-multifail-pab"][finding.Code].Rows)
 	// The row is labelled in plain words; the SDK flag name rides in the value,
 	// where an identifier is allowed and is what the operator greps the console for.
-	if rows["Block public access control lists"] != "false (BlockPublicAcls)" {
+	// d4 row 20 replaced the "false" in front of that aside with "off": a Go
+	// bool literal describes the SDK field, not the account. Do not restore
+	// "off (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
+	// fails on it.
+	if rows["Block public access control lists"] != "off (BlockPublicAcls)" {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",
-			rows["Block public access control lists"], "false (BlockPublicAcls)")
+			rows["Block public access control lists"], "off (BlockPublicAcls)")
 	}
-	if rows["Block public bucket policy"] != "false (BlockPublicPolicy)" {
+	if rows["Block public bucket policy"] != "off (BlockPublicPolicy)" {
 		t.Errorf("Rows[Block public bucket policy] = %q, want %q",
-			rows["Block public bucket policy"], "false (BlockPublicPolicy)")
+			rows["Block public bucket policy"], "off (BlockPublicPolicy)")
 	}
 }
 

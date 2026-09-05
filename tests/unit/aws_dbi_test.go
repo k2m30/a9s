@@ -732,8 +732,13 @@ func TestDBI_Fetch_FindingsPopulated_EveryFixture(t *testing.T) {
 		{fixtures.WarnDbiPublicMaintID, []string{"publicly accessible"}},
 		// Wave-2 only on Healthy row — Findings must be nil/empty (Wave-2 is not in Findings).
 		{fixtures.MaintDbiScheduledID, nil},
-		// Legacy fixture with all 4 Wave-1 warnings — sourced from full RDS pool.
-		{"db-public-no-encryption", []string{"no automated backups", "publicly accessible", "unencrypted storage", "deletion protection off"}},
+		// Legacy fixture from the full RDS pool. d4 row 1 took "deletion
+		// protection off" off this row: normalizeRDSInstancePosture now sets
+		// DeletionProtection on the whole bulk pool, so the finding has the
+		// one witness it is supposed to have (warn-dbi-unprotected, dbi.go).
+		// Do not restore the fourth phrase — TestD4_DeletionProtectionHasOneWitness
+		// fails on it.
+		{"db-public-no-encryption", []string{"no automated backups", "publicly accessible", "unencrypted storage"}},
 	}
 
 	for _, tc := range cases {
