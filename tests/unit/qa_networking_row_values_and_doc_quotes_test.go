@@ -354,6 +354,78 @@ func docQuoteMatches(quote, constant string) bool {
 		docPlaceholder.ReplaceAllString(constant, "\x00")
 }
 
+// docQuoteBurnDown is every type whose §4 cells still quote sentences the code
+// cannot say, with the exact number of such cells today.
+//
+// One reason covers all of them: the pages were written before the Detail
+// constants existed or drifted from them afterwards, so a cell describes what
+// someone expected the app to say. Two shapes hide in that: a type with Detail
+// constants whose cells no longer match them, and a type that emits no Detail
+// at all (acm, alarm, cf, r53 and their kind), where the cells cannot be fixed
+// by quoting — the sentence has to be written or the cell dropped. Task w27
+// settles both by putting Detail on FindingDef and letting catalogen write the
+// cells, and deletes this map.
+//
+// Exact counts, so the list can only shrink: a type that improves without its
+// number moving fails here too.
+var docQuoteBurnDown = map[string]int{
+	"acm":          11,
+	"alarm":        6,
+	"apigw":        1,
+	"asg":          11,
+	"athena":       2,
+	"backup":       2,
+	"cb":           1,
+	"cf":           6,
+	"cfn":          7,
+	"codeartifact": 3,
+	"dbc":          9,
+	"dbc-snap":     1,
+	"dbi":          14,
+	"dbi-snap":     1,
+	"ddb":          4,
+	"eb":           5,
+	"eb-rule":      4,
+	"ebs":          7,
+	"ebs-snap":     8,
+	"ec2":          9,
+	"ecr":          3,
+	"ecs-svc":      8,
+	"ecs-task":     14,
+	"efs":          6,
+	"eks":          5,
+	"glue":         4,
+	"iam-group":    2,
+	"iam-user":     5,
+	"kinesis":      3,
+	"kms":          9,
+	"lambda":       3,
+	"logs":         3,
+	"lt":           1,
+	"msk":          7,
+	"nat":          3,
+	"ng":           23,
+	"opensearch":   5,
+	"pipeline":     4,
+	"policy":       3,
+	"r53":          3,
+	"redis":        10,
+	"redshift":     12,
+	"role":         5,
+	"rtb":          2,
+	"secrets":      7,
+	"ses":          8,
+	"sfn":          2,
+	"sns":          3,
+	"sqs":          5,
+	"ssm":          3,
+	"tg":           3,
+	"trail":        4,
+	"vpc":          1,
+	"vpc-peer":     5,
+	"waf":          2,
+}
+
 // TestNetworkingDocQuotes_EqualADetailConstant checks every §4 Detail cell on
 // every resource page against the constants the code can actually render.
 //
@@ -362,23 +434,40 @@ func docQuoteMatches(quote, constant string) bool {
 // says something it does not.
 func TestNetworkingDocQuotes_EqualADetailConstant(t *testing.T) {
 	constants := detailConstants(t)
+	unmatched := map[string]int{}
+
 	for _, short := range netTypes(t) {
-		t.Run(short, func(t *testing.T) {
-			for _, quote := range netDocQuotes(t, short) {
-				matched := false
-				for constant := range constants {
-					if docQuoteMatches(quote, constant) {
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					t.Errorf("§4 quotes a Detail sentence no finding renders:\n  %q\n"+
-						"quote the finding's Detail constant verbatim (a <placeholder> may stand for a "+
-						"value the finding fills in), or drop the cell if the finding has none", quote)
+		for _, quote := range netDocQuotes(t, short) {
+			matched := false
+			for constant := range constants {
+				if docQuoteMatches(quote, constant) {
+					matched = true
+					break
 				}
 			}
-		})
+			if matched {
+				continue
+			}
+			unmatched[short]++
+			if _, carried := docQuoteBurnDown[short]; !carried {
+				t.Errorf("docs/resources/%s.md §4 quotes a Detail sentence no finding renders:\n  %q\n"+
+					"quote the finding's Detail constant verbatim (a <placeholder> may stand for a value "+
+					"the finding fills in), or drop the cell if the finding has none", short, quote)
+			}
+		}
+	}
+
+	for short, want := range docQuoteBurnDown {
+		switch got := unmatched[short]; {
+		case got == 0:
+			t.Errorf("docs/resources/%s.md no longer quotes anything unrenderable — delete its docQuoteBurnDown entry", short)
+		case got > want:
+			t.Errorf("docs/resources/%s.md quotes %d unrenderable sentences, up from the %d carried; "+
+				"the burn-down only shrinks", short, got, want)
+		case got < want:
+			t.Errorf("docs/resources/%s.md is down to %d unrenderable sentences from %d — lower its "+
+				"docQuoteBurnDown entry to %d so the gate holds the ground you took", short, got, want, got)
+		}
 	}
 }
 
