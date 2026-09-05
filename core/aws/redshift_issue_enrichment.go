@@ -89,8 +89,10 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		}
 
 		if sslKnown && !strings.EqualFold(sslValue, "true") {
-			shown := sslValue
-			if shown == "" {
+			// The parameter's stored value is the string "false"; the row says
+			// what that means for connections.
+			shown := "off"
+			if sslValue == "" {
 				shown = "unset"
 			}
 			// The row exists to name the parameter an operator edits, so the

@@ -181,7 +181,7 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 	}
 	if lc.AssociatePublicIpAddress != nil && *lc.AssociatePublicIpAddress {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigPublicIP, "launch configuration assigns public IPs", "~", "asg",
-			[]domain.DetailRow{{Label: "Public address assignment", Value: "true", Tier: "~"}}, asgLaunchConfigPublicIPDetail)
+			[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}}, asgLaunchConfigPublicIPDetail)
 	}
 	if userData := aws.ToString(lc.UserData); userData != "" {
 		if hits := secretscan.ScanText(decodeUserData(userData)); len(hits) > 0 {

@@ -256,6 +256,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   list. One build project now uses the role whose inline policy allows
   privilege escalation.
 
+- Detail rows say what is true of the account rather than how the SDK spells
+  it. A public image and a public snapshot read `yes` instead of `true`, an
+  auto-scaling group's health check reads `ec2` instead of `EC2`, its public
+  address assignment reads `enabled`, Redshift's encrypted-connection
+  parameter and the four S3 public-access-block flags read `off` beside the
+  parameter name they name, and an Athena workgroup's unenforced settings
+  read `no` with its unencrypted results reading `off` rather than `nil`.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's

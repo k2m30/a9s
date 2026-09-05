@@ -239,7 +239,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 			Detail:   amiPublicDetail,
 			Severity: domain.SevBroken, Source: "wave1",
 		})
-		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "true", Tier: "!"})
+		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "yes", Tier: "!"})
 	}
 
 	return r

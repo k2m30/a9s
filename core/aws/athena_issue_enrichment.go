@@ -72,7 +72,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
 			rows = append(rows, domain.DetailRow{
 				Label: "Workgroup settings enforced",
-				Value: "false",
+				Value: "no",
 				Tier:  "~",
 			})
 		}
@@ -80,7 +80,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
 			rows = append(rows, domain.DetailRow{
 				Label: "Query result encryption",
-				Value: "nil",
+				Value: "off",
 				Tier:  "~",
 			})
 		}

@@ -174,8 +174,10 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 				Detail:   asgNoELBHealthCheckDetail,
 				Severity: domain.SevWarn, Source: "wave1",
 			})
+			// The API spells the type "EC2"/"ELB"; the row says which check the
+			// group runs, not how the SDK spells it.
 			addWave1Rows(&r, CodeASGNoELBHealthCheck, domain.DetailRow{
-				Label: "Health check type", Value: aws.ToString(asg.HealthCheckType), Tier: "~",
+				Label: "Health check type", Value: strings.ToLower(aws.ToString(asg.HealthCheckType)), Tier: "~",
 			})
 		}
 

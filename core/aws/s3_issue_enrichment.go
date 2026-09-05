@@ -77,7 +77,7 @@ const (
 //
 // On partial PAB (one or more flags false):
 //
-//	Rows: one entry per false flag: {Label:"<FlagName>", Value:"false"},
+//	Rows: one entry per unset flag: {Label:"<FlagName>", Value:"off (<FlagName>)"},
 //	      plus {Label:"Account-level PAB", Value:"may still apply"}
 //
 // On PermanentRedirect (301) / IllegalLocationConstraintException (400):
@@ -340,7 +340,7 @@ func s3PABRows(out *s3.GetPublicAccessBlockOutput, err error) []domain.DetailRow
 	var rows []domain.DetailRow
 	for _, fc := range flags {
 		if !aws.ToBool(fc.value) {
-			rows = append(rows, domain.DetailRow{Label: fc.label, Value: "false (" + fc.flag + ")"})
+			rows = append(rows, domain.DetailRow{Label: fc.label, Value: "off (" + fc.flag + ")"})
 		}
 	}
 	if len(rows) == 0 {

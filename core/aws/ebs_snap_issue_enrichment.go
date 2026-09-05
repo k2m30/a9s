@@ -91,7 +91,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 				continue
 			}
 			setWave2Finding(result, id, ebsSnapCodePublic, "shared with all AWS accounts", "!", "ebs-snap",
-				[]domain.DetailRow{{Label: "Public", Value: "true", Tier: "!"}}, ebsSnapPublicDetail)
+				[]domain.DetailRow{{Label: "Public", Value: "yes", Tier: "!"}}, ebsSnapPublicDetail)
 		}
 		if out.NextToken == nil || aws.ToString(out.NextToken) == "" {
 			return nil

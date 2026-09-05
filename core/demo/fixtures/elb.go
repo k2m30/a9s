@@ -374,10 +374,22 @@ func buildTargetGroups() []elbv2types.TargetGroup {
 }
 
 func buildListeners(f *ELBFixtures) {
-	// The only demo listener speaking plain HTTP with a forward action —
-	// every other HTTP listener redirects to HTTPS.
+	// The only demo listeners speaking plain HTTP with a forward action —
+	// every other HTTP listener redirects to HTTPS. Two of them, supplied
+	// 8080 before 80 because DescribeListeners promises no order: the merged
+	// phrase has to sort the ports itself, and a fixture already in order
+	// could not tell whether it does.
 	plainARN := lbARNByName(f.LoadBalancers, ELBPlainHTTP)
 	f.Listeners[plainARN] = []elbv2types.Listener{
+		{
+			ListenerArn:     aws.String(plainARN + "/listener/aaaa1112"),
+			LoadBalancerArn: aws.String(plainARN),
+			Port:            aws.Int32(8080),
+			Protocol:        elbv2types.ProtocolEnumHttp,
+			DefaultActions: []elbv2types.Action{
+				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdAPITGARN)},
+			},
+		},
 		{
 			ListenerArn:     aws.String(plainARN + "/listener/aaaa1111"),
 			LoadBalancerArn: aws.String(plainARN),
@@ -404,11 +416,25 @@ func buildListeners(f *ELBFixtures) {
 		},
 	}
 
-	// The only demo listener on a pre-TLS-1.2 security policy. It carries a
+	// The only demo listeners on a pre-TLS-1.2 security policy. Both carry a
 	// certificate so the wave-1 "no certificate configured" signal stays on
-	// its own witness.
+	// its own witness, and they are supplied 8443 before 443 for the same
+	// reason the cleartext pair is out of order.
 	weakTLSARN := lbARNByName(f.LoadBalancers, ELBWeakTLS)
 	f.Listeners[weakTLSARN] = []elbv2types.Listener{
+		{
+			ListenerArn:     aws.String(weakTLSARN + "/listener/bbbb2223"),
+			LoadBalancerArn: aws.String(weakTLSARN),
+			Port:            aws.Int32(8443),
+			Protocol:        elbv2types.ProtocolEnumHttps,
+			SslPolicy:       aws.String("ELBSecurityPolicy-TLS-1-0-2015-04"),
+			Certificates: []elbv2types.Certificate{
+				{CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111")},
+			},
+			DefaultActions: []elbv2types.Action{
+				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdWebTGARN)},
+			},
+		},
 		{
 			ListenerArn:     aws.String(weakTLSARN + "/listener/bbbb2222"),
 			LoadBalancerArn: aws.String(weakTLSARN),
