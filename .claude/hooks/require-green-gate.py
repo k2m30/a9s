@@ -11,6 +11,12 @@ must be backed by `$TASKDIR/gate.txt` holding EXIT=0 for `make test` and for
 `make lint`, captured after the last edit to the worktree. Exit 2 hands the
 reason back and the agent keeps working.
 
+gate.txt has one shape, pinned by the capture recipe in the a9s-team-loop
+skill: a `## gate: <name>` marker line, the command's output, then its exit
+code. This file parses that shape and nothing else, so the recipe and the
+parser cannot drift apart. Within a section the LAST exit line wins -- an
+`EXIT=0` quoted inside a test transcript must never rescue a red gate.
+
 The hook never blocks when it has no reliable information — no parseable
 payload, no TASKDIR, no DONE claim. A gate that guesses is worse than no gate.
 """
@@ -32,6 +38,14 @@ MAX_GATE_AGE_SECONDS = 6 * 60 * 60
 OWNED_DIRS = ("core", "internal", "cmd", "scripts", ".a9s")
 
 EXIT_RE = re.compile(r"\bEXIT=(\d+)\b")
+GATE_MARKER_RE = re.compile(r"^##\s*gate:\s*(.+?)\s*$")
+
+CAPTURE_RECIPE = """  printf '## gate: make test\\n' >> $TASKDIR/gate.txt
+  make -C $WORKTREE test >> $TASKDIR/gate.txt 2>&1
+  printf 'EXIT=%s\\n' $? >> $TASKDIR/gate.txt
+  printf '## gate: make lint\\n' >> $TASKDIR/gate.txt
+  make -C $WORKTREE lint >> $TASKDIR/gate.txt 2>&1
+  printf 'EXIT=%s\\n' $? >> $TASKDIR/gate.txt"""
 
 
 def read_payload():
@@ -70,21 +84,24 @@ def resolve_paths(message, cwd):
 
 
 def gate_results(text):
-    """Map each required gate to the exit code captured under it.
+    """Map each gate named by a `## gate:` marker to the exit code under it.
 
-    gate.txt is a shell transcript: a line naming the command, its output, then
-    a line carrying EXIT=<n>. Each EXIT belongs to the last command named.
+    The last exit line in a section wins. A command's output can contain an
+    `EXIT=` line of its own -- a test asserting on a captured gate log does
+    exactly that -- and only the one the recipe appends last is the command's.
     """
     results = {}
     current = None
     for line in text.splitlines():
-        for gate in REQUIRED_GATES:
-            if gate in line and "EXIT=" not in line:
-                current = gate
+        marker = GATE_MARKER_RE.match(line)
+        if marker:
+            current = marker.group(1)
+            continue
+        if current is None:
+            continue
         found = EXIT_RE.search(line)
-        if found and current is not None:
+        if found:
             results[current] = int(found.group(1))
-            current = None
     return results
 
 
@@ -129,7 +146,10 @@ def failure(gate_path, worktree):
     results = gate_results(body)
     for gate in REQUIRED_GATES:
         if gate not in results:
-            return "gate.txt at %s records no exit code for `%s`." % (gate_path, gate)
+            return (
+                "gate.txt at %s has no `## gate: %s` section with an exit code."
+                % (gate_path, gate)
+            )
         if results[gate] != 0:
             return "`%s` exited %d in %s. DONE requires EXIT=0." % (
                 gate,
@@ -162,11 +182,8 @@ def main():
     sys.stderr.write(
         "Round reports DONE but the gate is not proven: %s\n"
         "\n"
-        "Capture both gates into $TASKDIR/gate.txt, for example:\n"
-        "  make -C $WORKTREE test > $TASKDIR/gate.txt 2>&1\n"
-        '  echo "EXIT=$?" >> $TASKDIR/gate.txt\n'
-        "  make -C $WORKTREE lint >> $TASKDIR/gate.txt 2>&1\n"
-        '  echo "EXIT=$?" >> $TASKDIR/gate.txt\n' % reason
+        "Capture both gates into $TASKDIR/gate.txt with this recipe:\n"
+        "%s\n" % (reason, CAPTURE_RECIPE)
     )
     sys.exit(2)
 

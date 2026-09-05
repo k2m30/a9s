@@ -25,24 +25,24 @@ HOOKS_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(HOOKS_DIR))
 HOOK = os.path.join(HOOKS_DIR, "require-green-gate.py")
 
-GREEN_GATE = """$ make test > /tmp/gate.txt 2>&1
+GREEN_GATE = """## gate: make test
 ok  \tgithub.com/k2m30/a9s/tests/unit\t18.412s
 ok  \tgithub.com/k2m30/a9s/tests/integration\t4.006s
 EXIT=0
-$ make lint >> /tmp/gate.txt 2>&1
+## gate: make lint
 0 issues.
 EXIT=0
 """
 
-LINT_RED_GATE = """$ make test > /tmp/gate.txt 2>&1
+LINT_RED_GATE = """## gate: make test
 ok  \tgithub.com/k2m30/a9s/tests/unit\t18.412s
 EXIT=0
-$ make lint >> /tmp/gate.txt 2>&1
+## gate: make lint
 core/aws/kms.go:41:2: ineffectual assignment to err (ineffassign)
 EXIT=1
 """
 
-TEST_ONLY_GATE = """$ make test > /tmp/gate.txt 2>&1
+TEST_ONLY_GATE = """## gate: make test
 ok  \tgithub.com/k2m30/a9s/tests/unit\t18.412s
 EXIT=0
 """
@@ -177,6 +177,74 @@ class GreenGateHookTest(unittest.TestCase):
         self.write_gate(GREEN_GATE)
         code, reason = run_hook(p, cwd=cwd)
         self.assertEqual(0, code, reason)
+
+
+# The capture shape `a9s-team-loop/SKILL.md` pins for gate.txt: the make output
+# writes a `## gate: <name>` marker, redirects the command's output after it,
+# and appends the exit code. The marker is what names the gate: a command's own
+# text never appears in its output, so nothing else in the file can.
+PINNED_CAPTURE_SHAPE = """## gate: make test
+make[1]: Entering directory '/private/tmp/a9s-wt/w10'
+go test ./tests/unit/ ./tests/integration/
+ok  \tgithub.com/k2m30/a9s/tests/unit\t18.412s
+ok  \tgithub.com/k2m30/a9s/tests/integration\t4.006s
+EXIT=0
+## gate: make lint
+make[1]: Entering directory '/private/tmp/a9s-wt/w10'
+golangci-lint run ./...
+0 issues.
+EXIT=0
+"""
+
+# A red `make test` whose own output quotes an EXIT= line. The repo's captured
+# gate convention puts `EXIT=<n>` into logs, and tests that assert on captured
+# gate output echo it back, so this shows up in a real `make test` transcript.
+RED_TEST_QUOTING_AN_EXIT_LINE = """## gate: make test
+--- FAIL: TestGateCaptureShape (0.31s)
+    gate_test.go:22: captured gate log was:
+        EXIT=0
+FAIL\tgithub.com/k2m30/a9s/tests/unit\t18.412s
+make: *** [test] Error 1
+EXIT=1
+## gate: make lint
+0 issues.
+EXIT=0
+"""
+
+
+class GateFileShapeTest(unittest.TestCase):
+    """The parser and the capture recipe have to describe the same file.
+
+    Every path into gate.txt is written by an agent following the recipe the
+    team-loop skill pins and the hook's own reason text repeats. A parser that
+    only accepts a shape neither of them produces does not gate the round, it
+    ends it: the agent re-runs the gates, gets the same file back, and is
+    blocked again with the same message.
+    """
+
+    def setUp(self):
+        self.taskdir = tempfile.mkdtemp(prefix="w10-shape-")
+        self.addCleanup(shutil.rmtree, self.taskdir, True)
+
+    def write_gate(self, body):
+        with open(os.path.join(self.taskdir, "gate.txt"), "w") as fh:
+            fh.write(body)
+
+    def test_gate_captured_the_documented_way_is_accepted(self):
+        """A green gate.txt produced by the pinned recipe must close the round."""
+        self.write_gate(PINNED_CAPTURE_SHAPE)
+        code, reason = run_hook(payload(DONE_MESSAGE, self.taskdir))
+        self.assertEqual(0, code, reason)
+
+    def test_red_gate_is_not_rescued_by_an_exit_line_in_its_own_output(self):
+        """The exit code of a command is the last EXIT= line under it, not the
+        first. Reading the first lets any test that prints EXIT=0 launder a
+        failing gate into a green one -- the exact claim this hook exists to
+        refuse."""
+        self.write_gate(RED_TEST_QUOTING_AN_EXIT_LINE)
+        code, reason = run_hook(payload(DONE_MESSAGE, self.taskdir))
+        self.assertEqual(2, code)
+        self.assertIn("make test", reason)
 
 
 if __name__ == "__main__":

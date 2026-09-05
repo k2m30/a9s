@@ -64,7 +64,7 @@ You may skim other files (message definitions, registry shape) to ground type si
 
 ## Phases
 
-Run in order. Phases 0–5 are analysis and planning done by the skill runner. Phases 6a/6b/7 dispatch agents. Phase 7.5 is the scope-diff gate. Phase 8 is the scenario-harness visual render gate. Phase 9 is the final report checklist (five user-facing gates: §9.1 illegal UI, §9.2 fixture coverage, §9.3 graph-root pivot counts, §9.4 drill-through, §9.5 detail completeness) — implementation is not "done" until 9 emits PASS on every item. Phase 10 is the post-push review loop (CI + reviewer comments).
+Run in order. Phases 0–5 are analysis and planning done by the skill runner. Phases 6a/6b/7 dispatch agents, one at a time in one worktree. Phase 7.5 is the scope-diff gate. Phase 8 is the scenario-harness visual render gate. Phase 9 is the final report checklist (five user-facing gates: §9.1 illegal UI, §9.2 fixture coverage, §9.3 graph-root pivot counts, §9.4 drill-through, §9.5 detail completeness) — implementation is not "done" until 9 emits PASS on every item. Phase 10 is the post-push review loop (CI + reviewer comments).
 
 ### Phase 0 — Intake
 
@@ -92,14 +92,14 @@ The universal rules below govern every per-resource run — they are the same fo
 
 These rules are invariant across all resource types. They are enforced by phase 5 (config audit) and phase 8 (scenario-harness visual render gate). Spec files do NOT restate them per-resource.
 
-**Column layout**
+#### Column layout
 
 - The list view carries ONE Status column (S4). Always one. Never split across two or more columns.
 - No parallel "flags" / "policy" / "CIS" / "Issues" / jargon-code columns. All Wave 1 warnings ride in the Status column per spec §4 precedence.
 - Column definitions live in `core/config/defaults.go` → generated into `.a9s/views/<shortName>.yaml` via `go run ./cmd/viewsgen/`. That is the single authority; the spec does not restate columns.
 - Identity / metadata columns (name, engine, version, region, etc.) are per-resource and declared in defaults.go.
 
-**Visual rendering**
+#### Visual rendering
 
 1. **Healthy rows render a blank Status cell.** Banned strings: `OK`, `ACTIVE`, `available`, `running`, `healthy`, `-`.
 2. **Warning / Broken / Dim rows render the exact §4 "List text" phrase** from the resource's spec. No bare state keyword unless §4 explicitly approves it.
@@ -417,14 +417,14 @@ Record any column delta in the impl-plan's "Contract surface gap analysis" secti
 
 ### Phase 6 — Fixtures-first (gate for QA and phase 7)
 
-Phase 6 has two sub-steps, **6a** (fixtures, blocking) and **6b** (QA tests, parallel with phase 7). Phase 7 is a peer phase, NOT a sub-step of phase 6 — but 6a must complete before either 6b or phase 7 can start. Read this phase and phase 7 together; dispatch 6a first, then 6b and 7 in parallel.
+Phase 6 has two sub-steps, **6a** (dev round 0: fixtures and stubs) and **6b** (QA red tests). Phase 7 is a peer phase, NOT a sub-step of phase 6. All three run **in sequence, one agent in the worktree at a time**, per `.claude/skills/a9s-team-loop/SKILL.md`: 6a → 6b → 7. Read this phase and phase 7 together, then dispatch 6a and wait for its log entry before dispatching 6b.
 
 Rationale for the sequencing:
 - **Fixtures are a single asset**, not two. `core/demo/fixtures/<shortName>.go` feeds BOTH `./a9s --demo` (showcase) AND the unit test suite (6 test files in the tree currently import from here, and counting). Tests import raw SDK-shape fixtures from this file; inline construction in tests is the anti-pattern we are retiring.
 - **Exception: adversarial fixtures** (nil pointers, malformed AWS responses, API error paths, anything the spec marks out of scope) corrupt the demo and stay inline in the QA test file. The `a9s-create-demo-fixture` skill enforces this boundary.
-- **6a blocks 6b**: tests reference fixture symbols; without the file on disk QA's tests don't compile (QA cannot write under `core/` or `internal/`).
-- **6a blocks 7**: if the coder rewrote the fixture file after 6b wrote tests against it, every test would break. Fixtures are written once in 6a and never rewritten inside this skill invocation.
-- **6b and 7 do NOT block each other**: QA writes only `tests/unit/*`; coder in phase 7 writes only `core/aws/<shortName>*.go`. No file overlap, no runtime dependency.
+- **6a blocks 6b**: QA's tests reference fixture symbols and the signatures the spec pins. Round 0 puts both on disk, so QA's red is an assertion failure rather than a build error — a test package that does not compile blinds `go vet` for the production code beside it. QA cannot write under `core/` or `internal/`.
+- **6b blocks 7**: dev implements against tests that already exist. Fixtures are written once in 6a and never rewritten later in this skill invocation; rewriting them would break the tests 6b wrote against their symbols.
+- **6b and 7 never overlap in time.** They touch different directories, but `go vet ./...` and `make test` compile `tests/` together with `core/`, so a half-written test file breaks dev's gate. One agent in the worktree at a time.
 
 Before dispatching 6a, delete the exact stale test files that 6b will rewrite:
 
@@ -443,13 +443,13 @@ Do NOT use a trailing-glob (`aws_<shortName>*.go`) — some resources have child
 phase 6 blocked: Agent dispatch unavailable. Re-invoke the skill from the main Claude Code session.
 ```
 
-#### 6a. Coder — fixtures only (blocks 6b and 7)
+#### 6a. Dev round 0 — fixtures and stubs (blocks 6b and 7)
 
-Dispatch `Agent(a9s-dev)` with a narrow, fixture-only task. The coder uses the `a9s-create-demo-fixture` skill to build a graph-connected fixture file at `core/demo/fixtures/<shortName>.go` (single file per service — no `_fixtures` suffix; fold any existing `<shortName>_fixtures.go`).
+Dispatch `Agent(a9s-dev)` with a narrow task: the fixtures, plus the round-0 stubs described in `.claude/agents/a9s-dev.md`. Dev uses the `a9s-create-demo-fixture` skill to build a graph-connected fixture file at `core/demo/fixtures/<shortName>.go` (single file per service — no `_fixtures` suffix; fold any existing `<shortName>_fixtures.go`), then lands compile-clean zero-value stubs for every symbol the spec pins: fetcher and enricher signatures, interface methods on the API interface and the fake, `FindingDef` rows with the pinned code, phrase, detail and severity, and any pinned constants. No behaviour behind them — that is phase 7.
 
 ```text
-## CODER TASK: <shortName> demo fixtures (phase 6a)
-Parallelization: sequential (blocks 6b QA and phase 7 coder implementation)
+## DEV TASK: <shortName> demo fixtures + round-0 stubs (phase 6a)
+Sequencing: first round of the task. 6b QA and phase 7 wait for this log entry.
 
 ### Invoke this skill:
 Skill: a9s-create-demo-fixture with argument <shortName>. Follow the skill end-to-end.
@@ -486,7 +486,7 @@ Skill: a9s-create-demo-fixture with argument <shortName>. Follow the skill end-t
 
 Record the exact exported symbol list the coder emits — 6b needs it.
 
-#### 6b. QA — test files (parallel with phase 7, after 6a)
+#### 6b. QA — red test files (after 6a, before phase 7)
 
 Dispatch `Agent(a9s-qa)`. Two dispatch modes are valid, pick one explicitly:
 
@@ -500,7 +500,7 @@ QA task shape:
 ```text
 ## QA TASK: Tests for <shortName> from spec
 Mode: score
-Parallelization: parallel-safe with phase 7 (both run after 6a)
+Sequencing: starts from dev's 6a commit; phase 7 starts from yours.
 
 ### Test files to create (or overwrite):
 - tests/unit/aws_<shortName>_test.go — fetcher tests per §3.1 Wave 1 signals
@@ -537,17 +537,17 @@ in the test file — the demo fixture never carries these because they corrupt t
 
 QA replies `SCORE: <N> — <rationale>`. Accept or rework. On accept, re-dispatch same scope with `Mode: execute` and `Confirmed score: <N>`.
 
-### Phase 7 — Coder handoff (full implementation, parallel with 6b)
+### Phase 7 — Dev handoff (full implementation, after 6b)
 
-Runs after 6a, in parallel with 6b.
+Runs after 6b's red tests are committed, starting from that commit.
 
 The fixture file written in 6a is NOT in this file list and MUST NOT be rewritten — QA's tests reference its symbols.
 
 Coder task shape:
 
 ```text
-## CODER TASK: Implement <shortName> against the spec (phase 7 — non-fixture implementation)
-Parallelization: parallel-safe with 6b QA (both run after 6a)
+## DEV TASK: Implement <shortName> against the spec (phase 7 — non-fixture implementation)
+Sequencing: starts from QA's 6b red-test commit. You are the only agent in the worktree.
 
 ### Files to create or overwrite (closed set — adding any file not in this list is a scope violation caught in phase 7.5):
 - **Fetcher** — either `core/aws/<shortName>.go` OR `core/aws/<service>.go` if the fetcher lives in a shared service file (phase 0 located it). Exactly one of the two.
@@ -653,9 +653,11 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 6. **Related pivot counts (rendering)**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped. This asserts the RENDERED count in the right-column panel — a pure visual check.
 
 7. **Drill-through (navigation)** — orthogonal to rule 6. Rule 6 asserts that the count renders correctly; this rule asserts that PRESSING ENTER on the count actually lands on real resources. The pins live in a separate table-driven file — `tests/integration/scenario_related_drill_through_test.go`. Do NOT add a new test function per resource; add ONE row per graph-root fixture to the `drillThroughFixtures` table:
+
    ```go
    {"<label>", "<shortName>", <graphRootID constant or literal>},
    ```
+
    Multiple rows per `shortName` are allowed when a resource has more than one graph-root-equivalent fixture (e.g. `dbi/prod-dbi-1` and `dbi/prod-dbi-aurora`). The shared loops run `DrillRelated` on every pivot with Count ≥ 1 and `FollowNavigableField` on every registered navigable field, asserting non-empty landings and enforcing the `resource.NavIDFromValue` bare-ID contract via `assertBareIDs`. No per-resource assertion code needed.
 8. **Multi-W1 suffix (U7a)**: for the `warn-<short>-multi` fixture, `scenario.ExpectRowStatusEquals(<id>, "<top> (+N-1)")`.
 9. **W1+W2 suffix (U7b)**: for the `warn-<short>-<w1>-plus-<w2>` fixture, `scenario.ExpectRowStatusEquals(<id>, "<w1> (+1)")`.
@@ -663,6 +665,7 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 11. **Non-green rows no glyph (rule 3)**: `scenario.ExpectRowNoGlyphPrefix(<w1+w2 id>)` — the row has a Wave-2 finding but is Warning-colored; the color is the signal, no glyph.
 12. **S5 Wave-2 finding-row visibility (U7c)**: `scenario.OpenDetailResource(<shortName>, <w1+w2 fixture>)`; then `scenario.ExpectViewContains(<w2 finding Action or Description string>)`. Verifies no Wave-2 finding silently disappears when Status shows the Wave-1 phrase.
 13. **S5 every-Wave-1-phrase visibility (U7e)**: on the multi-W1 fixture, open detail and assert every `Resource.Findings` Phrase appears — BUT with first letter capitalized, because `injectAttentionSection` applies `capitalizeFirst` to every entry at render time. Data (`Finding.Phrase`) stays canonical lowercase (`"publicly accessible"`); the rendered frame has `"Publicly accessible"`. Use a helper or pin the expected strings explicitly:
+
     ```go
     multi := selectXxxByID(t, scenario, <multiW1 id>)
     scenario.OpenDetailResource("<short>", multi)
@@ -672,6 +675,7 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
         scenario.ExpectViewContains(rendered)
     }
     ```
+
     The `(+N)` suffix itself is NOT expected in the detail — the detail enumerates phrases, one per row. This is the U7e regression pin that caught the 2026-04-22 bug.
 
 **Wave-2 in demo mode is native** — no injection required. The phase-8 scenario test drives `fullIntegrationNewDemoScenario`, calls `OpenList`, and asserts every rule above directly. The harness's `shouldDrainFollowups` includes `AvailabilityPrefetchedMsg` / `AvailabilityCheckedMsg` / `EnrichmentCheckedMsg` so the enrichment chain cascades end-to-end.

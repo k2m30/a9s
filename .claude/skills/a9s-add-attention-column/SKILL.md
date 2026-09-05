@@ -10,7 +10,7 @@ The user wants WHY a row is colored visible in the list — not just that it's c
 
 ## Prerequisites
 
-You MUST have a scoped task from the architect with:
+You MUST have a scoped task from the orchestrator with:
 - **ShortName** (e.g. `kms`, `redis`, `cfn`)
 - **Column title** (e.g. `Rotation`, `Failover`, `Drift`)
 - **Source category** (one of: A, B-fetcher, B-enricher, C-detail-only)
@@ -18,7 +18,7 @@ You MUST have a scoped task from the architect with:
 - **Optional**: format/decorator (when raw value isn't user-friendly)
 - **AWS docs reference** (the `attention-signals.md` row) for the contract
 
-**If you don't have this, STOP.** Reply with REJECTED and ask for architect scope.
+**If you don't have this, STOP.** Reply with REJECTED and ask for a scoped task.
 
 ## Source category decision
 
@@ -42,9 +42,9 @@ Is the value already on the SDK list-API response (RawStruct path)?
          └─ Multi-line text body? → Tier C: detail-only via DetailField{Key: ..., Label: ...}
 ```
 
-## Pre-flight checklist (architect does this BEFORE dispatching)
+## Pre-flight checklist (the orchestrator does this BEFORE dispatching)
 
-The architect's job is to eliminate per-step rediscovery. Provide:
+The orchestrator's job is to eliminate per-step rediscovery. Provide:
 
 1. **Exact file paths** the agent will edit
 2. **Exact Edit operations** — `old_string` / `new_string` snippets, not prose
@@ -73,7 +73,7 @@ make build && make lint && make test
 
 ### Test
 
-The architect dispatches a9s-qa with a test that asserts the COLUMN HAS DATA, not that the column exists. A column-existence test is busywork; a "value is non-empty for a fixture that should trigger it" test catches real wiring breakage. Example:
+The orchestrator dispatches a9s-qa with a test that asserts the COLUMN HAS DATA, not that the column exists. A column-existence test is busywork; a "value is non-empty for a fixture that should trigger it" test catches real wiring breakage. Example:
 
 ```go
 func TestFetch<Type>_<Field>_Populated(t *testing.T) {
@@ -98,7 +98,7 @@ Fields: map[string]string{
 
 Add `<key>` to the type's `FieldKeys` slice on its catalog literal (`core/aws/catalog_<category>.go`).
 
-### Then defaults_*.go and viewsgen as Tier A.
+### Then defaults_*.go and viewsgen as Tier A
 
 ### Test
 
@@ -166,7 +166,7 @@ If the enricher walks paginated results (e.g. ListPackages, ListSubscriptionsByT
 
 Set `Wave2: IssueEnricher{Fn: <fn>, Priority: <priority>}` on the type's `ResourceTypeDef` literal in `core/aws/catalog_<category>.go`. Exactly one `Wave2` per type — the field is the registration; there is no `init()`/`register*` path. `Wave2EnricherFor(shortName)` (core/aws/wave2.go) resolves it; `tests/unit/architecture_conformance_test.go` pins that every declared Wave2 resolves.
 
-### Then defaults_*.go and viewsgen as Tier A.
+### Then defaults_*.go and viewsgen as Tier A
 
 ### Test
 

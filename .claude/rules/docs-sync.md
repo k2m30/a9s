@@ -1,9 +1,11 @@
 ---
 paths:
-  - "docs/**/*.md"
-  - "website/**"
-  - "README.md"
-  - "CONTRIBUTING.md"
+  - "internal/tui/keys/**"
+  - "core/aws/catalog_*.go"
+  - "core/config/**"
+  - "cmd/**"
+  - "docs/shared/**"
+  - "docs/README.tmpl.md"
 ---
 
 # Docs sync

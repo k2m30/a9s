@@ -76,7 +76,7 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 
 ## Skills and Subagents — in-session tooling
 
-> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. Work runs as the team loop defined in `.claude/skills/a9s-team-loop/SKILL.md`: `a9s-qa` writes red tests → `a9s-dev` implements → `a9s-qa` verifies → `a9s-acceptance` accepts; `a9s-facilitator` rules whenever the loop stalls. The main session orchestrates only. The dev/QA write split (dev ≠ tests, QA ≠ production code) is the TDD guardrail; keep it.
+> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. Work runs as the team loop, whose round order is defined once in `.claude/skills/a9s-team-loop/SKILL.md` — read it there. The main session orchestrates only. The dev/QA write split (dev ≠ tests, QA ≠ production code) is the TDD guardrail; keep it.
 
 ## Skills
 

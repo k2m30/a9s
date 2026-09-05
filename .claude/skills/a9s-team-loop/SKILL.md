@@ -78,13 +78,15 @@ Read the whole log before starting a round. Rounds are numbered per role; round 
 - **Report what you ran, in the shape the gate hook reads.** Gate results are pasted from captured output, never relayed. A dev round that logs `DONE` must leave `$TASKDIR/gate.txt` holding an `EXIT=` line under both `make test` and `make lint`, captured after the last edit:
 
   ```bash
-  make -C $WORKTREE test > $TASKDIR/gate.txt 2>&1
-  echo "EXIT=$?" >> $TASKDIR/gate.txt
+  printf '## gate: make test\n' >> $TASKDIR/gate.txt
+  make -C $WORKTREE test >> $TASKDIR/gate.txt 2>&1
+  printf 'EXIT=%s\n' $? >> $TASKDIR/gate.txt
+  printf '## gate: make lint\n' >> $TASKDIR/gate.txt
   make -C $WORKTREE lint >> $TASKDIR/gate.txt 2>&1
-  echo "EXIT=$?" >> $TASKDIR/gate.txt
+  printf 'EXIT=%s\n' $? >> $TASKDIR/gate.txt
   ```
 
-  Read it back with `tail`/`grep`. `SubagentStop` reads the same file and hands the round back when it is missing, stale, or red.
+  This is the whole contract, and it is stated here only. A `## gate: <name>` marker names the gate, because a command's own text never appears in its output; the exit line the recipe appends last is the command's, so a stray `EXIT=0` inside a test transcript cannot rescue a red gate. Truncate the file at the start of the round (`: > $TASKDIR/gate.txt`), read it back with `tail`/`grep`, and paste the exit lines into the log. `SubagentStop` parses this shape and hands the round back when the file is missing, stale, or red.
 - **Never push, never open a PR, never merge, never tag.** Commits stay local in the worktree; the orchestrator integrates.
 
 ## One agent in a worktree at a time
