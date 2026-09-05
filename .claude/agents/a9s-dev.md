@@ -77,7 +77,7 @@ Then log `DONE` and hand back. Implementation is your next round, after QA's red
 ## Rules that end rounds early
 
 - A test that encodes a defect as intent is `OFF`, not a thing to make pass.
-- A QA-owned test that pins the behaviour your spec row deletes is not a blocker and not yours to edit: commit your round with that test red, name it and the row in your log entry, and QA inverts it on verify. Holding a green production change uncommitted for a pin you are forbidden to touch is `BLOCKED` on nothing.
+- A QA-owned test that pins the behaviour your spec row deletes is the one test you may edit: invert it in the same round, with a comment naming the row and why the old assertion is not to be restored, and list it in your log entry so QA verifies the inversion. Never a value tweak, never a deletion, never any other test. Holding a green production change uncommitted for it is `BLOCKED` on nothing.
 - Deleting a test, a helper, or a `//nolint` to get green is never the fix. Understand why it exists first; if it is dead, say so with evidence.
 - A "fix" that adds a second place computing the same fact is `OFF`.
 - Do not widen scope. Adjacent problems you notice go in the log's `deferred:` line for the orchestrator — never in your head.
