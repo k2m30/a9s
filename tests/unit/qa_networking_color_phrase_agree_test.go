@@ -37,6 +37,22 @@ func netWorstSeverity(r resource.Resource) (domain.Severity, bool) {
 	return worst, ok
 }
 
+// netColorForSeverity mirrors the display mapping core/aws applies, so the
+// test computes the expected colour from the worst finding rather than
+// trusting the classifier it is checking.
+func netColorForSeverity(sev domain.Severity) domain.Color {
+	switch sev {
+	case domain.SevBroken:
+		return domain.ColorBroken
+	case domain.SevWarn:
+		return domain.ColorWarning
+	case domain.SevDim:
+		return domain.ColorDim
+	default:
+		return domain.ColorHealthy
+	}
+}
+
 // TestNetworkingColorAndPhrase_ComeFromTheSameFinding sweeps every demo row of
 // the five networking types and fails when the Status cell names a finding
 // that is not among the worst-severity ones — the case where the colour and
@@ -61,6 +77,10 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 			worst, ok := netWorstSeverity(res)
 			if !ok {
 				continue
+			}
+			if got, want := td.ResolveColor(res), netColorForSeverity(worst); got != want {
+				bad = append(bad, fmt.Sprintf("%s/%s: row colour = %v, want %v from the worst finding on the row %v",
+					short, res.ID, got, want, netPhrases(res)))
 			}
 			cell, found := listStatusCellFor(t, *td, merged, res.ID)
 			if !found || strings.TrimSpace(cell) == "" {
