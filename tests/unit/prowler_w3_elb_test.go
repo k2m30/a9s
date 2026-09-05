@@ -268,7 +268,7 @@ func TestW3ELBInvalidHeaders_Flagged(t *testing.T) {
 		t.Error("Detail is empty; every finding carries an operator sentence")
 	}
 	w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBInvalidHeaders].Rows, [][2]string{
-		{"Drop invalid headers", "false"},
+		{"Drop invalid headers", "disabled"},
 	})
 }
 
