@@ -76,6 +76,7 @@ Read the whole log before starting a round. Rounds are numbered per role; round 
 - **Read before you climb.** Trace the real flow end to end (fetcher → Fields/RawStruct → findings function → catalog `FindingDef` → color classifier → demo fixture → fake → rendered surface) before choosing the smallest change. A small diff in the wrong place is a second bug.
 - **One truth source.** Never compute the same fact twice. If two places would need the same condition, move it to one function and call it from both.
 - **Fix the class, not the instance.** A defect found in one type is checked in its siblings before the round closes — every wave-1 fetcher and every wave-2 enricher of every type in the batch, listed with `file:line` in the round entry. A class closed on one wave, one type or one surface is still open.
+- **A stale pin never blocks a round.** When a spec row deletes behaviour an existing test asserts, dev commits with that test red and names it; QA inverts it with a reason comment on verify. Neither role waits on the other for it.
 - **A criterion is met as written or logged as OFF.** Verifying a weaker check ("is a prefix of" for "equals") and signing off is a finding against the verifier, not a verification.
 - **A deletion is a hypothesis.** "Dead", "unreachable", "nothing calls it" is proven by grepping the symbol across every caller and running the gates on the deletion, not by reasoning from the path you were editing.
 - **Deferral is written, never carried in your head.** See the `deferred:` line above.
