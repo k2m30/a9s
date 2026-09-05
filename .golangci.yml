@@ -48,3 +48,10 @@ linters:
         - diagnostic
       disabled-checks:
         - singleCaseSwitch
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-same-issues: 0

@@ -31,7 +31,7 @@ test-budget:
 	@scripts/test-budget-gate.sh capture
 
 lint:
-	golangci-lint run ./...
+	golangci-lint run --allow-serial-runners ./...
 
 gofix:
 	@if go fix -inline -diff ./... 2>&1 | grep -q '^'; then \
