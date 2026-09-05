@@ -14,26 +14,50 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// computeDDBFindings returns a []domain.Finding for the given DynamoDB table status.
-func computeDDBFindings(status ddbtypes.TableStatus) []domain.Finding {
-	switch status {
-	case ddbtypes.TableStatusActive:
-		return nil
-	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
-		return []domain.Finding{{Code: CodeDDBKMSKeyInaccessible, Phrase: "kms key inaccessible", Severity: domain.SevBroken, Source: "wave1"}}
-	case ddbtypes.TableStatusArchived:
-		return []domain.Finding{{Code: CodeDDBArchivedKMSLost, Phrase: "archived: kms key lost", Severity: domain.SevBroken, Source: "wave1"}}
-	case ddbtypes.TableStatusCreating:
-		return []domain.Finding{{Code: CodeDDBCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
-	case ddbtypes.TableStatusUpdating:
-		return []domain.Finding{{Code: CodeDDBUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
-	case ddbtypes.TableStatusDeleting:
-		return []domain.Finding{{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
-	case ddbtypes.TableStatusArchiving:
-		return []domain.Finding{{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"}}
-	default:
-		return nil
+// computeDDBFindings returns the findings for a DynamoDB table plus the
+// supporting AttentionDetail rows keyed by the finding that owns them. The
+// lifecycle status owns the status column; the deletion-protection posture
+// row is evaluated independently and stacks on top of it, except on a table
+// that is already on its way out.
+func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	if table == nil {
+		return nil, nil
 	}
+	var lifecycle []domain.Finding
+	switch table.TableStatus {
+	case ddbtypes.TableStatusActive:
+	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
+		lifecycle = []domain.Finding{{Code: CodeDDBKMSKeyInaccessible, Phrase: "kms key inaccessible", Severity: domain.SevBroken, Source: "wave1"}}
+	case ddbtypes.TableStatusArchived:
+		lifecycle = []domain.Finding{{Code: CodeDDBArchivedKMSLost, Phrase: "archived: kms key lost", Severity: domain.SevBroken, Source: "wave1"}}
+	case ddbtypes.TableStatusCreating:
+		lifecycle = []domain.Finding{{Code: CodeDDBCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case ddbtypes.TableStatusUpdating:
+		lifecycle = []domain.Finding{{Code: CodeDDBUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case ddbtypes.TableStatusDeleting:
+		lifecycle = []domain.Finding{{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case ddbtypes.TableStatusArchiving:
+		lifecycle = []domain.Finding{{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+
+	switch table.TableStatus {
+	case ddbtypes.TableStatusDeleting, ddbtypes.TableStatusArchiving, ddbtypes.TableStatusArchived:
+		return lifecycle, nil
+	}
+	if aws.ToBool(table.DeletionProtectionEnabled) {
+		return lifecycle, nil
+	}
+	return append(lifecycle, domain.Finding{
+			Code:     CodeDDBDeletionProtectionOff,
+			Phrase:   "deletion protection off",
+			Detail:   ddbDeletionProtectionOffDetail,
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		}), map[domain.FindingCode]domain.AttentionDetail{
+			CodeDDBDeletionProtectionOff: {Rows: []domain.DetailRow{
+				{Label: "DeletionProtectionEnabled", Value: "false", Tier: "~"},
+			}},
+		}
 }
 
 // FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get
@@ -82,7 +106,7 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			name = *table.TableName
 		}
 
-		findings := computeDDBFindings(table.TableStatus)
+		findings, attentionDetails := computeDDBFindings(table)
 		statusPhrase := phraseFromFindings(findings)
 
 		itemCount := ""
@@ -117,7 +141,8 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 				"billing_mode": billingMode,
 				"arn":          arn,
 			},
-			RawStruct: table,
+			RawStruct:        table,
+			AttentionDetails: attentionDetails,
 		}
 
 		resources = append(resources, r)

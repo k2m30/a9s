@@ -18,19 +18,28 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // dbi-snap canonical FindingCodes emitted by the cross-ref enricher.
 const (
 	dbiSnapOrphanCode        domain.FindingCode = "dbi-snap.orphan"
 	dbiSnapPastRetentionCode domain.FindingCode = "dbi-snap.past-retention"
+	dbiSnapPublicCode        domain.FindingCode = "dbi-snap.public"
 )
+
+// dbiSnapPublicDetail is the S5 operator sentence for a snapshot shared with
+// the "all" group.
+const dbiSnapPublicDetail = "The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove `all` from the snapshot's restore attribute."
 
 // enrichDBISnapCrossRef is the IssueEnricherFunc registered for dbi-snap.
 // It is the SnapshotCrossRef helper instantiated with rds.DBSnapshot /
@@ -73,4 +82,28 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	ShortName:         "dbi-snap",
 	OrphanCode:        dbiSnapOrphanCode,
 	PastRetentionCode: dbiSnapPastRetentionCode,
+	PublicAttr:        dbiSnapShareAttributes,
+	PublicCode:        dbiSnapPublicCode,
+	PublicPhrase:      "shared with all AWS accounts",
+	PublicDetail:      dbiSnapPublicDetail,
 })
+
+// dbiSnapShareAttributes reads one DB snapshot's share attributes.
+func dbiSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap resource.Resource) ([]snapshotAttribute, error) {
+	if clients.RDS == nil {
+		return nil, nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBSnapshotAttributesOutput, error) {
+		return clients.RDS.DescribeDBSnapshotAttributes(ctx, &rds.DescribeDBSnapshotAttributesInput{
+			DBSnapshotIdentifier: aws.String(snap.ID),
+		})
+	})
+	if err != nil || out.DBSnapshotAttributesResult == nil {
+		return nil, err
+	}
+	attrs := make([]snapshotAttribute, 0, len(out.DBSnapshotAttributesResult.DBSnapshotAttributes))
+	for _, a := range out.DBSnapshotAttributesResult.DBSnapshotAttributes {
+		attrs = append(attrs, snapshotAttribute{Name: aws.ToString(a.AttributeName), Values: a.AttributeValues})
+	}
+	return attrs, nil
+}

@@ -111,20 +111,24 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	}
 
 	// Verify second file system (LifeCycleState=creating + NumberOfMountTargets=0):
-	// two coexisting W1 signals. Broken ("no mount targets") wins precedence.
-	// Expected Fields["status"] = "no mount targets (+1)", Findings has both findings.
+	// three coexisting W1 signals: the fixture is creating, has no mount
+	// targets, and is unencrypted. Broken ("no mount targets") wins precedence
+	// and the other two ride along in the suffix.
 	r1 := resources[1]
-	if r1.Fields["status"] != "no mount targets (+1)" {
-		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets (+1)", r1.Fields["status"])
+	if r1.Fields["status"] != "no mount targets (+2)" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets (+2)", r1.Fields["status"])
 	}
-	if len(r1.Findings) != 2 {
-		t.Fatalf("resource[1].Findings: expected 2 findings, got %v", r1.Findings)
+	if len(r1.Findings) != 3 {
+		t.Fatalf("resource[1].Findings: expected 3 findings, got %v", r1.Findings)
 	}
 	if r1.Findings[0].Code != awsclient.CodeEFSNoMountTargets {
 		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEFSNoMountTargets, r1.Findings[0].Code)
 	}
 	if r1.Findings[1].Code != awsclient.CodeEFSCreating {
 		t.Errorf("resource[1].Findings[1].Code: expected %q, got %q", awsclient.CodeEFSCreating, r1.Findings[1].Code)
+	}
+	if string(r1.Findings[2].Code) != "efs.unencrypted" {
+		t.Errorf("resource[1].Findings[2].Code: expected %q, got %q", "efs.unencrypted", r1.Findings[2].Code)
 	}
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty, got %q", r1.Name)

@@ -18,6 +18,19 @@ type RedshiftFixtures struct {
 
 // Stable IDs for Redshift fixtures — imported by sibling fixture files and QA tests.
 const (
+	// One witness per Wave-2 posture finding. Every other cluster has audit
+	// logging on and a parameter group that requires SSL.
+
+	// RedshiftAuditLoggingOff is the cluster with audit logging turned off.
+	RedshiftAuditLoggingOff = "redshift-audit-logging-off"
+	// RedshiftRequireSSLOff is the cluster whose parameter group leaves
+	// require_ssl false.
+	RedshiftRequireSSLOff = "redshift-require-ssl-off"
+	// RedshiftSecureParameterGroup requires SSL; RedshiftOpenParameterGroup
+	// does not. Every cluster but the require-ssl witness uses the secure one.
+	RedshiftSecureParameterGroup = "redshift-secure-params"
+	RedshiftOpenParameterGroup   = "redshift-open-params"
+
 	// Healthy / graph-roots
 	AcmeWarehouseID = "acme-warehouse"
 	AcmeReportingID = "acme-reporting"
@@ -109,7 +122,7 @@ const (
 // those live inline in QA test files per the a9s-create-demo-fixture skill rule.
 var sharedRedshiftFixtures = sync.OnceValue(func() *RedshiftFixtures {
 	return &RedshiftFixtures{
-		Clusters: buildRedshiftClusters(),
+		Clusters: normalizeRedshiftParameterGroups(buildRedshiftClusters()),
 	}
 })
 
@@ -141,6 +154,26 @@ func redshiftBaselineHealthy(id string) redshifttypes.Cluster {
 			Port:    aws.Int32(5439),
 		},
 	}
+}
+
+// normalizeRedshiftParameterGroups attaches a parameter group to every
+// cluster: the secure one everywhere except the require-ssl witness, which
+// gets the open one. Without this the fixture set would have no parameter
+// group at all and the require_ssl check would read every cluster as unknown.
+func normalizeRedshiftParameterGroups(cs []redshifttypes.Cluster) []redshifttypes.Cluster {
+	out := make([]redshifttypes.Cluster, len(cs))
+	copy(out, cs)
+	for i := range out {
+		group := RedshiftSecureParameterGroup
+		if aws.ToString(out[i].ClusterIdentifier) == RedshiftRequireSSLOff {
+			group = RedshiftOpenParameterGroup
+		}
+		out[i].ClusterParameterGroups = []redshifttypes.ClusterParameterGroupStatus{{
+			ParameterGroupName:   aws.String(group),
+			ParameterApplyStatus: aws.String("in-sync"),
+		}}
+	}
+	return out
 }
 
 func buildRedshiftClusters() []redshifttypes.Cluster {
@@ -473,6 +506,12 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	availUnavailableWithWarning.PubliclyAccessible = aws.Bool(true)
 	availUnavailableWithWarning.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-10-01T10:00:00Z"))
 
+	// One witness per Wave-2 posture finding.
+	auditLoggingOff := redshiftBaselineHealthy(RedshiftAuditLoggingOff)
+	auditLoggingOff.KmsKeyId = aws.String(RedshiftKMSKeyARN1)
+	requireSSLOff := redshiftBaselineHealthy(RedshiftRequireSSLOff)
+	requireSSLOff.KmsKeyId = aws.String(RedshiftKMSKeyARN1)
+
 	return []redshifttypes.Cluster{
 		warehouse,
 		reporting,
@@ -502,6 +541,8 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 		warnTwo,
 		brokenWithWarning,
 		availUnavailableWithWarning,
+		auditLoggingOff,
+		requireSSLOff,
 	}
 }
 

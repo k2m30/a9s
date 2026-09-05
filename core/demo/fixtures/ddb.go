@@ -26,10 +26,28 @@ type DDBFixtures struct {
 	// them — the fetcher keeps a name-only `details denied` row (finding
 	// ddb.warn.details_denied).
 	DeniedNames []string
+	// ResourcePolicies maps table name → resource-policy JSON for the
+	// GetResourcePolicy fake. Tables absent from this map have no policy at
+	// all — the healthy default.
+	ResourcePolicies map[string]string
 }
 
 // WarnDDBDetailsDeniedID is the listed-but-denied coverage-gate witness.
 const WarnDDBDetailsDeniedID = "warn-ddb-details-denied"
+
+// One witness per new ddb finding. Every other table keeps deletion
+// protection on and has no resource policy.
+const (
+	// DDBDeletionProtectionOff is the table without deletion protection.
+	DDBDeletionProtectionOff    = "sessions-no-delete-protection"
+	ddbDeletionProtectionOffARN = "arn:aws:dynamodb:us-east-1:123456789012:table/sessions-no-delete-protection"
+	// DDBCrossAccountPolicyID has a resource policy naming a foreign account.
+	DDBCrossAccountPolicyID  = "partner-feed-shared"
+	DDBCrossAccountPolicyARN = "arn:aws:dynamodb:us-east-1:123456789012:table/partner-feed-shared"
+	// DDBPublicPolicyID has a resource policy with a wildcard principal.
+	DDBPublicPolicyID  = "public-catalog-open"
+	DDBPublicPolicyARN = "arn:aws:dynamodb:us-east-1:123456789012:table/public-catalog-open"
+)
 
 // Stable IDs and ARNs — imported by sibling fixture files and tests.
 const (
@@ -84,12 +102,58 @@ const (
 // NewDDBFixtures returns a fully-populated DDBFixtures for demo and tests.
 var sharedDDBFixtures = sync.OnceValue(func() *DDBFixtures {
 	return &DDBFixtures{
-		Tables:              buildDDBTables(),
+		Tables:              normalizeDDBDeletionProtection(buildDDBTables()),
 		ContinuousBackups:   buildDDBContinuousBackups(),
 		KinesisDestinations: buildDDBKinesisDestinations(),
 		DeniedNames:         []string{WarnDDBDetailsDeniedID},
+		ResourcePolicies:    buildDDBResourcePolicies(),
 	}
 })
+
+// normalizeDDBDeletionProtection turns deletion protection on for every table
+// except its dedicated witness, so exactly one demo row carries the
+// deletion-protection-off finding.
+func normalizeDDBDeletionProtection(tables []*ddbtypes.TableDescription) []*ddbtypes.TableDescription {
+	for _, t := range tables {
+		if t == nil || aws.ToString(t.TableName) == DDBDeletionProtectionOff {
+			continue
+		}
+		t.DeletionProtectionEnabled = aws.Bool(true)
+	}
+	return tables
+}
+
+// buildDDBResourcePolicies returns the per-table resource policies. One
+// witness grants a foreign account, one grants everyone; every other table has
+// no policy at all.
+func buildDDBResourcePolicies() map[string]string {
+	return map[string]string{
+		DDBCrossAccountPolicyID: `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PartnerRead",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::210987654321:root"},
+      "Action": ["dynamodb:GetItem", "dynamodb:Query"],
+      "Resource": "` + DDBCrossAccountPolicyARN + `"
+    }
+  ]
+}`,
+		DDBPublicPolicyID: `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AnyoneRead",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": ["dynamodb:GetItem", "dynamodb:Scan"],
+      "Resource": "` + DDBPublicPolicyARN + `"
+    }
+  ]
+}`,
+	}
+}
 
 func NewDDBFixtures() *DDBFixtures {
 	return sharedDDBFixtures()
@@ -367,6 +431,34 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				{AttributeName: aws.String("AuditId"), KeyType: ddbtypes.KeyTypeHash},
 				{AttributeName: aws.String("Timestamp"), KeyType: ddbtypes.KeyTypeRange},
 			},
+		},
+
+		ddbPostureWitnessTable(DDBDeletionProtectionOff, ddbDeletionProtectionOffARN, false),
+		ddbPostureWitnessTable(DDBCrossAccountPolicyID, DDBCrossAccountPolicyARN, true),
+		ddbPostureWitnessTable(DDBPublicPolicyID, DDBPublicPolicyARN, true),
+	}
+}
+
+// ddbPostureWitnessTable builds a plain ACTIVE table for one posture witness.
+// deletionProtection is the only lever: the two policy witnesses keep it on so
+// they carry exactly their own finding.
+func ddbPostureWitnessTable(name, arn string, deletionProtection bool) *ddbtypes.TableDescription {
+	return &ddbtypes.TableDescription{
+		TableName:        aws.String(name),
+		TableArn:         aws.String(arn),
+		TableStatus:      ddbtypes.TableStatusActive,
+		ItemCount:        aws.Int64(4_096),
+		TableSizeBytes:   aws.Int64(1_048_576),
+		CreationDateTime: aws.Time(time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)),
+		BillingModeSummary: &ddbtypes.BillingModeSummary{
+			BillingMode: ddbtypes.BillingModePayPerRequest,
+		},
+		DeletionProtectionEnabled: aws.Bool(deletionProtection),
+		AttributeDefinitions: []ddbtypes.AttributeDefinition{
+			{AttributeName: aws.String("Id"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+		},
+		KeySchema: []ddbtypes.KeySchemaElement{
+			{AttributeName: aws.String("Id"), KeyType: ddbtypes.KeyTypeHash},
 		},
 	}
 }

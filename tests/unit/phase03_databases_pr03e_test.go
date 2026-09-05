@@ -724,6 +724,26 @@ func (m *pr03eRedisRGMock) DescribeReplicationGroups(
 	_ *elasticache.DescribeReplicationGroupsInput,
 	_ ...func(*elasticache.Options),
 ) (*elasticache.DescribeReplicationGroupsOutput, error) {
+	if m.output != nil {
+		for i := range m.output.ReplicationGroups {
+			rg := &m.output.ReplicationGroups[i]
+			// Posture fields this test does not describe default to healthy;
+			// left unset they would each add a Wave-1 finding and break the
+			// exact-count assertions above.
+			if rg.AtRestEncryptionEnabled == nil {
+				rg.AtRestEncryptionEnabled = aws.Bool(true)
+			}
+			if rg.TransitEncryptionEnabled == nil {
+				rg.TransitEncryptionEnabled = aws.Bool(true)
+			}
+			if rg.AuthTokenEnabled == nil {
+				rg.AuthTokenEnabled = aws.Bool(true)
+			}
+			if rg.SnapshotRetentionLimit == nil {
+				rg.SnapshotRetentionLimit = aws.Int32(7)
+			}
+		}
+	}
 	return m.output, nil
 }
 
@@ -901,6 +921,9 @@ func TestPR03e_DDBFetcher_HealthyEmitsNoFinding(t *testing.T) {
 				TableArn:    aws.String("arn:aws:dynamodb:us-east-1:000000000000:table/" + tableName),
 				TableStatus: ddbtypes.TableStatusActive,
 				ItemCount:   aws.Int64(42000),
+				// Deletion protection is on so this fixture stays what the
+				// test calls it: a healthy table with nothing to report.
+				DeletionProtectionEnabled: aws.Bool(true),
 			},
 		},
 	}
@@ -932,9 +955,10 @@ func TestPR03e_DDBFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	descStub := &pr03eDDBDescribeStub{
 		tables: map[string]*ddbtypes.TableDescription{
 			tableName: {
-				TableName:   aws.String(tableName),
-				TableArn:    aws.String("arn:aws:dynamodb:us-east-1:000000000000:table/" + tableName),
-				TableStatus: ddbtypes.TableStatusInaccessibleEncryptionCredentials,
+				TableName:                 aws.String(tableName),
+				TableArn:                  aws.String("arn:aws:dynamodb:us-east-1:000000000000:table/" + tableName),
+				TableStatus:               ddbtypes.TableStatusInaccessibleEncryptionCredentials,
+				DeletionProtectionEnabled: aws.Bool(true),
 			},
 		},
 	}

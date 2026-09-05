@@ -27,10 +27,18 @@ type RedshiftDescribeClusterSubnetGroupsAPI interface {
 	DescribeClusterSubnetGroups(ctx context.Context, params *redshift.DescribeClusterSubnetGroupsInput, optFns ...func(*redshift.Options)) (*redshift.DescribeClusterSubnetGroupsOutput, error)
 }
 
+// RedshiftDescribeClusterParametersAPI defines the interface for the Redshift
+// DescribeClusterParameters operation. Used by EnrichRedshiftPosture to read
+// require_ssl out of a cluster's parameter group.
+type RedshiftDescribeClusterParametersAPI interface {
+	DescribeClusterParameters(ctx context.Context, params *redshift.DescribeClusterParametersInput, optFns ...func(*redshift.Options)) (*redshift.DescribeClusterParametersOutput, error)
+}
+
 // RedshiftAPI is the aggregate interface covering all Redshift operations used by a9s fetchers.
 // *redshift.Client structurally satisfies this interface.
 type RedshiftAPI interface {
 	RedshiftDescribeClustersAPI
 	RedshiftDescribeLoggingStatusAPI
 	RedshiftDescribeClusterSubnetGroupsAPI
+	RedshiftDescribeClusterParametersAPI // Wave 2 enrichment
 }

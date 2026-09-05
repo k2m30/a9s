@@ -56,6 +56,27 @@ type RDSDescribePendingMaintenanceAPI interface {
 	DescribePendingMaintenanceActions(ctx context.Context, params *rds.DescribePendingMaintenanceActionsInput, optFns ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error)
 }
 
+// RDSDescribeDBEngineVersionsAPI defines the interface for the RDS
+// DescribeDBEngineVersions operation. Used by EnrichDBIMaintenance to decide
+// whether an instance's engine version is still supported.
+type RDSDescribeDBEngineVersionsAPI interface {
+	DescribeDBEngineVersions(ctx context.Context, params *rds.DescribeDBEngineVersionsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBEngineVersionsOutput, error)
+}
+
+// RDSDescribeDBSnapshotAttributesAPI defines the interface for the RDS
+// DescribeDBSnapshotAttributes operation. Used by the dbi-snap enricher to
+// read the "restore" attribute that says who may restore the snapshot.
+type RDSDescribeDBSnapshotAttributesAPI interface {
+	DescribeDBSnapshotAttributes(ctx context.Context, params *rds.DescribeDBSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error)
+}
+
+// RDSDescribeDBClusterSnapshotAttributesAPI defines the interface for the RDS
+// DescribeDBClusterSnapshotAttributes operation. Used by the dbc-snap
+// enricher for Aurora / Multi-AZ cluster snapshots.
+type RDSDescribeDBClusterSnapshotAttributesAPI interface {
+	DescribeDBClusterSnapshotAttributes(ctx context.Context, params *rds.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error)
+}
+
 // RDSAPI is the aggregate interface covering all RDS operations used by a9s fetchers.
 // *rds.Client structurally satisfies this interface.
 type RDSAPI interface {
@@ -63,6 +84,9 @@ type RDSAPI interface {
 	RDSDescribeDBSnapshotsAPI
 	RDSDescribeEventsAPI
 	RDSDescribePendingMaintenanceAPI // Wave 2 enrichment
+	RDSDescribeDBEngineVersionsAPI   // Wave 2 enrichment
+	RDSDescribeDBSnapshotAttributesAPI
+	RDSDescribeDBClusterSnapshotAttributesAPI
 	RDSDescribeDBSubnetGroupsAPI
 	RDSDescribeDBClustersAPI
 	RDSDescribeDBClusterSnapshotsAPI

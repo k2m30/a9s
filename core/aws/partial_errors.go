@@ -58,7 +58,11 @@ func IsNotFoundErr(err error) bool {
 		return false
 	}
 	switch apiErr.ErrorCode() {
-	case "NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException", "InvalidInstanceID.NotFound":
+	case "NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException", "InvalidInstanceID.NotFound",
+		// RDS and DocumentDB spell the same race with their own codes; a
+		// snapshot deleted between the list call and a per-snapshot
+		// describe answers one of these.
+		"DBSnapshotNotFound", "DBClusterSnapshotNotFoundFault":
 		return true
 	default:
 		return false

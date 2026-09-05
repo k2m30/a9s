@@ -18,7 +18,7 @@
 //     per-bucket detail call. The honest answer is "0 known matches, more
 //     may exist beyond what we could see."
 //
-//  2. EnrichS3PublicAccessBlock in s3_issue_enrichment.go — mark the bucket's
+//  2. EnrichS3Posture in s3_issue_enrichment.go — mark the bucket's
 //     ID in TruncatedIDs (row "?") but skip the failure-aggregate entry so
 //     the `!` log stays quiet on multi-region accounts.
 //

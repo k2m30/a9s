@@ -19,7 +19,7 @@ import (
 // Warning signals (creating, updating, deleting). The first finding's phrase
 // is the "top" displayed in the Status column (plus (+N-1) suffix); the full
 // slice feeds Resource.Findings so the detail view can render every signal.
-func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32) []domain.Finding {
+func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	var findings []domain.Finding
 
 	switch lcs {
@@ -42,7 +42,25 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32) []domain.Finding {
 		}
 	}
 
-	return findings
+	switch lcs {
+	case efstypes.LifeCycleStateDeleting, efstypes.LifeCycleStateDeleted:
+		// A file system on its way out has no posture worth reporting.
+		return findings, nil
+	}
+	if aws.ToBool(encrypted) {
+		return findings, nil
+	}
+	return append(findings, domain.Finding{
+			Code:     CodeEFSUnencrypted,
+			Phrase:   "not encrypted",
+			Detail:   efsUnencryptedDetail,
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		}), map[domain.FindingCode]domain.AttentionDetail{
+			CodeEFSUnencrypted: {Rows: []domain.DetailRow{
+				{Label: "Encrypted", Value: "false", Tier: "~"},
+			}},
+		}
 }
 
 // FetchEFSFileSystemsPage fetches a single page of EFS file systems.
@@ -85,7 +103,7 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
 
 		// Compute Wave-1 findings.
-		findings := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets)
+		findings, attentionDetails := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets, fs.Encrypted)
 		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
@@ -101,7 +119,8 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 				"encrypted":        encrypted,
 				"mount_targets":    mountTargets,
 			},
-			RawStruct: fs,
+			RawStruct:        fs,
+			AttentionDetails: attentionDetails,
 		}
 
 		resources = append(resources, r)

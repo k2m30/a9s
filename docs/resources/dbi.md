@@ -187,6 +187,12 @@ One row per signal from §3:
 | `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted storage` | `Storage encryption at rest is disabled (CIS RDS.3).` |
 | `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `deletion protection off` | `Deletion protection is disabled — instance can be deleted in one API call.` |
 | Pending maintenance overdue | 2 | Warning on Healthy row | `~` | S3, S4, S5 | `maintenance scheduled` | `Pending maintenance action overdue: <ActionType> (<Description>).` |
+| `MultiAZ == false` on a non-Aurora primary | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` | `The instance runs in one Availability Zone, so an AZ failure takes the database down until you restore it. Enable Multi-AZ to keep a synchronous standby in a second AZ.` |
+| `AutoMinorVersionUpgrade == false` | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` | `Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself.` |
+| `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` | `Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities.` |
+| `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
+| `CertificateDetails.ValidTill` within 90d | 1 | Warning (Broken within 30d) | n/a | S2, S4, S5 | `server certificate expires in <N> days` | `The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window.` |
+| Engine version no longer available | 2 | Broken | `!` | S1, S2, S4, S5 | `engine version deprecated` | `AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing.` |
 
 Notes on the table:
 
@@ -261,6 +267,12 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 |
 | dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 |
 | dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
+| dbi.single-az | single-AZ | warn | wave1 |
+| dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
+| dbi.iam-auth-off | IAM database authentication off | warn | wave1 |
+| dbi.default-master-user | default master username | warn | wave1 |
+| dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 |
+| dbi.engine-deprecated | engine version deprecated | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

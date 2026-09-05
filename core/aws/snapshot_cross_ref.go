@@ -31,6 +31,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -104,6 +107,42 @@ type SnapshotCrossRefConfig struct {
 	// ShortName is the resource short name used to stamp the Source field
 	// ("wave2:<short>") on every emitted Finding. Required.
 	ShortName string
+
+	// PublicAttr, when non-nil, reads one snapshot's share attributes from
+	// AWS so the helper can report a snapshot shared with every account.
+	// This is the one part of the helper that makes an API call; consumers
+	// that leave it nil stay a zero-call cross-ref scan. The returned
+	// attributes are normalized so a single parser answers for the rds and
+	// docdb SDKs alike.
+	PublicAttr func(ctx context.Context, clients *ServiceClients, snap resource.Resource) ([]snapshotAttribute, error)
+	// PublicCode / PublicPhrase / PublicDetail describe the finding emitted
+	// when PublicAttr reports a restore grant to the "all" group. Required
+	// when PublicAttr is non-nil.
+	PublicCode   domain.FindingCode
+	PublicPhrase string
+	PublicDetail string
+}
+
+// snapshotAttribute is one snapshot share attribute, normalized away from the
+// rds / docdb SDK types that carry the same two fields under different names.
+type snapshotAttribute struct {
+	Name   string
+	Values []string
+}
+
+// restoreSharedWithAll reports whether attrs grants restore to the "all"
+// group — AWS's spelling of "every AWS account on earth". This is the single
+// parser behind both the dbi-snap and dbc-snap public checks.
+func restoreSharedWithAll(attrs []snapshotAttribute) bool {
+	for _, a := range attrs {
+		if !strings.EqualFold(a.Name, "restore") {
+			continue
+		}
+		if slices.ContainsFunc(a.Values, func(v string) bool { return strings.EqualFold(v, "all") }) {
+			return true
+		}
+	}
+	return false
 }
 
 // EnrichSnapshotCrossRef returns an IssueEnricherFunc that applies the
@@ -114,7 +153,7 @@ type SnapshotCrossRefConfig struct {
 // Contract: zero API calls, idempotent on repeated runs (Findings overwrites
 // per resource ID).
 func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
-	return func(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
+	return func(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 		// Default severity to "!" (operator-actionable) when callers omit the field.
 		severity := cfg.Severity
 		if severity == "" {
@@ -125,13 +164,16 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			Findings:         make(map[string][]domain.Finding),
 			AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
 			TruncatedIDs:     make(map[string]bool),
+			FieldUpdates:     make(map[string]map[string]string),
 		}
+
+		publicErr := enrichSnapshotPublicShare(ctx, cfg, clients, resources, &result)
 
 		// Skip rule per spec §3.1: the cross-ref enricher requires the parent
 		// list to be loaded. If absent, both rules silently skip.
 		parentEntry, parentLoaded := cache[cfg.ParentShortName]
 		if !parentLoaded {
-			return result, nil
+			return result, publicErr
 		}
 
 		// Build a lookup map: parent ID → RawStruct for O(1) access.
@@ -218,8 +260,55 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows, "")
 		}
 
-		return result, nil
+		return result, publicErr
 	}
+}
+
+// enrichSnapshotPublicShare runs cfg.PublicAttr over the snapshots (cap
+// EnrichmentCap) and emits the "shared with all AWS accounts" finding for
+// each one whose restore attribute names the "all" group. A per-snapshot
+// failure marks that snapshot skipped and never hides the others.
+func enrichSnapshotPublicShare(
+	ctx context.Context,
+	cfg SnapshotCrossRefConfig,
+	clients *ServiceClients,
+	resources []resource.Resource,
+	result *IssueEnricherResult,
+) error {
+	if cfg.PublicAttr == nil || clients == nil {
+		return nil
+	}
+	n := min(len(resources), EnrichmentCap)
+	if n < len(resources) {
+		result.Truncated = true
+	}
+	var failures []string
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		res := resources[i]
+		if res.ID == "" {
+			return
+		}
+		attrs, err := cfg.PublicAttr(ctx, clients, res)
+		mu.Lock()
+		defer mu.Unlock()
+		switch {
+		case err != nil && IsNotFoundErr(err):
+			// The snapshot went away between the list call and this one —
+			// data incomplete for that row, not a failure to log.
+			result.TruncatedIDs[res.ID] = true
+			return
+		case err != nil:
+			MarkSkipped(result, res.ID, &failures, "DescribeSnapshotAttributes", err)
+			return
+		}
+		if !restoreSharedWithAll(attrs) {
+			return
+		}
+		setWave2Finding(result, res.ID, cfg.PublicCode, cfg.PublicPhrase, "!", cfg.ShortName,
+			[]domain.DetailRow{{Label: "Restore", Value: "all", Tier: "!"}}, cfg.PublicDetail)
+	})
+	return Finish(result, failures, n, cfg.ShortName+"-enrich: snapshot share attributes")
 }
 
 // glyphToSeverity maps a legacy "!" / "~" / "" severity glyph to the canonical

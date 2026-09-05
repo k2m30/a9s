@@ -238,3 +238,59 @@ func (f *S3Fake) GetBucketLifecycleConfiguration(_ context.Context, input *s3.Ge
 	}
 	return &s3.GetBucketLifecycleConfigurationOutput{Rules: rules}, nil
 }
+
+// GetBucketPolicyStatus returns AWS's own public/not-public verdict on the
+// bucket policy. Buckets with no entry in PolicyStatuses are not public —
+// the healthy default, so only the witness bucket lights up the finding.
+func (f *S3Fake) GetBucketPolicyStatus(_ context.Context, input *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketPolicyStatus: bucket name is required")
+	}
+	if out, ok := f.fix.PolicyStatuses[*input.Bucket]; ok && out != nil {
+		return out, nil
+	}
+	return &s3.GetBucketPolicyStatusOutput{
+		PolicyStatus: &s3types.PolicyStatus{IsPublic: new(false)},
+	}, nil
+}
+
+// GetBucketVersioning returns the bucket's versioning state. Buckets with no
+// entry in VersioningConfigs are versioned with MFA delete enabled — the
+// healthy default.
+func (f *S3Fake) GetBucketVersioning(_ context.Context, input *s3.GetBucketVersioningInput, _ ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketVersioning: bucket name is required")
+	}
+	if out, ok := f.fix.VersioningConfigs[*input.Bucket]; ok && out != nil {
+		return out, nil
+	}
+	return &s3.GetBucketVersioningOutput{
+		Status:    s3types.BucketVersioningStatusEnabled,
+		MFADelete: s3types.MFADeleteStatusEnabled,
+	}, nil
+}
+
+// GetObjectLockConfiguration returns the bucket's object lock configuration.
+// A nil entry in ObjectLockConfigs yields ObjectLockConfigurationNotFoundError
+// (the canonical AWS response for a bucket without object lock); buckets with
+// no entry have object lock enabled — the healthy default.
+func (f *S3Fake) GetObjectLockConfiguration(_ context.Context, input *s3.GetObjectLockConfigurationInput, _ ...func(*s3.Options)) (*s3.GetObjectLockConfigurationOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetObjectLockConfiguration: bucket name is required")
+	}
+	cfg, ok := f.fix.ObjectLockConfigs[*input.Bucket]
+	if !ok {
+		return &s3.GetObjectLockConfigurationOutput{
+			ObjectLockConfiguration: &s3types.ObjectLockConfiguration{
+				ObjectLockEnabled: s3types.ObjectLockEnabledEnabled,
+			},
+		}, nil
+	}
+	if cfg == nil {
+		return nil, &smithy.GenericAPIError{
+			Code:    "ObjectLockConfigurationNotFoundError",
+			Message: "Object Lock configuration does not exist for this bucket",
+		}
+	}
+	return cfg, nil
+}

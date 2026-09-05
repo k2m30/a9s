@@ -152,6 +152,7 @@ One row per signal from §3:
 | manual age > 365d | 1 | Warning | n/a | S2, S4 | `manual, unused 400d` | — |
 | orphan: source cluster deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source cluster deleted` | `orphan: source cluster deleted` + Source Cluster row |
 | automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` | `automated, <N>d past retention` + Source Cluster / Retention / Created rows |
+| `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S4, S5 | `shared with all AWS accounts` | `The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove the all group from the snapshot's restore attribute.` |
 
 Rules for filling list and detail text:
 
@@ -207,6 +208,7 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbc-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
 | dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
+| dbc-snap.public | shared with all AWS accounts | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

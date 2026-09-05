@@ -99,6 +99,18 @@ type OpenSearchFixtures struct {
 // coverage-gate witness.
 const WarnOpenSearchDetailsUnavailableID = "warn-os-details-unavailable"
 
+// One witness per opensearch network-posture finding. Every other domain
+// enforces HTTPS, encrypts node-to-node traffic, and has no access policy
+// that lets anyone in.
+const (
+	// OpenSearchPublic sits outside a VPC behind an open access policy.
+	OpenSearchPublic = "acme-public-search"
+	// OpenSearchHTTPSOff accepts plaintext HTTP.
+	OpenSearchHTTPSOff = "acme-http-search"
+	// OpenSearchN2NOff leaves traffic between its own nodes unencrypted.
+	OpenSearchN2NOff = "acme-plaintext-nodes"
+)
+
 // NewOpenSearchFixtures constructs OpenSearchFixtures from the canonical demo data.
 // Fixture order matches the spec §2.1 list exactly:
 // 1. healthy_baseline, 2. graph_root, 3. update_available_bang,
@@ -116,6 +128,17 @@ var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 			osProcessingPlusUpdate(),
 			osIsolatedBroken(),
 			osDeletingDim(),
+			// One witness per network-posture finding.
+			osPostureWitness(OpenSearchPublic, func(d *ostypes.DomainStatus) {
+				d.VPCOptions = nil
+				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-east-1:123456789012:domain/` + OpenSearchPublic + `/*"}]}`)
+			}),
+			osPostureWitness(OpenSearchHTTPSOff, func(d *ostypes.DomainStatus) {
+				d.DomainEndpointOptions = &ostypes.DomainEndpointOptions{EnforceHTTPS: aws.Bool(false)}
+			}),
+			osPostureWitness(OpenSearchN2NOff, func(d *ostypes.DomainStatus) {
+				d.NodeToNodeEncryptionOptions = &ostypes.NodeToNodeEncryptionOptions{Enabled: aws.Bool(false)}
+			}),
 		},
 		UnavailableNames: []string{WarnOpenSearchDetailsUnavailableID},
 	}
@@ -156,10 +179,32 @@ func osBaseDomain(name, domainID, arn, engineVersion, endpoint string) ostypes.D
 		DomainEndpointOptions: &ostypes.DomainEndpointOptions{
 			EnforceHTTPS: aws.Bool(true),
 		},
+		NodeToNodeEncryptionOptions: &ostypes.NodeToNodeEncryptionOptions{
+			Enabled: aws.Bool(true),
+		},
 		ServiceSoftwareOptions: &ostypes.ServiceSoftwareOptions{
 			UpdateAvailable: aws.Bool(false),
 		},
 	}
+}
+
+// osPostureWitness builds a healthy active domain and applies one
+// network-posture defect to it.
+func osPostureWitness(name string, defect func(*ostypes.DomainStatus)) ostypes.DomainStatus {
+	d := osBaseDomain(
+		name,
+		"123456789012/"+name,
+		"arn:aws:es:us-east-1:123456789012:domain/"+name,
+		"OpenSearch_2.11",
+		"search-"+name+"-p0st1r.us-east-1.es.amazonaws.com",
+	)
+	d.VPCOptions = &ostypes.VPCDerivedInfo{
+		VPCId:            aws.String(OpenSearchVPCID),
+		SubnetIds:        []string{OpenSearchSubnetA, OpenSearchSubnetB},
+		SecurityGroupIds: []string{OpenSearchSGA, OpenSearchSGB},
+	}
+	defect(&d)
+	return d
 }
 
 // ---------------------------------------------------------------------------

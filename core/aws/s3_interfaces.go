@@ -30,7 +30,7 @@ type S3GetBucketNotificationConfigurationAPI interface {
 }
 
 // S3GetPublicAccessBlockAPI defines the interface for the S3 GetPublicAccessBlock operation.
-// Used by EnrichS3PublicAccessBlock to check per-bucket PAB configuration.
+// Used by EnrichS3Posture to check per-bucket PAB configuration.
 type S3GetPublicAccessBlockAPI interface {
 	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 }
@@ -72,11 +72,38 @@ type S3GetBucketLifecycleAPI interface {
 	GetBucketLifecycleConfiguration(ctx context.Context, params *s3.GetBucketLifecycleConfigurationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLifecycleConfigurationOutput, error)
 }
 
+// S3GetBucketPolicyStatusAPI defines the interface for the S3
+// GetBucketPolicyStatus operation. Used by EnrichS3Posture: AWS evaluates the
+// bucket policy itself and reports whether it makes the bucket public, so a9s
+// does not have to re-derive that verdict from the raw document.
+type S3GetBucketPolicyStatusAPI interface {
+	GetBucketPolicyStatus(ctx context.Context, params *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
+}
+
+// S3GetBucketVersioningAPI defines the interface for the S3
+// GetBucketVersioning operation. Used by EnrichS3Posture for both the
+// versioning-off and MFA-delete-off conditions — one call answers both.
+type S3GetBucketVersioningAPI interface {
+	GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
+}
+
+// S3GetObjectLockConfigurationAPI defines the interface for the S3
+// GetObjectLockConfiguration operation. Used by EnrichS3Posture.
+type S3GetObjectLockConfigurationAPI interface {
+	GetObjectLockConfiguration(ctx context.Context, params *s3.GetObjectLockConfigurationInput, optFns ...func(*s3.Options)) (*s3.GetObjectLockConfigurationOutput, error)
+}
+
 // S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
 // *s3.Client structurally satisfies this interface.
 type S3API interface {
 	S3ListBucketsAPI
 	S3ListObjectsV2API
 	S3GetBucketNotificationConfigurationAPI
-	S3GetPublicAccessBlockAPI // Wave 2 enrichment
+	// Wave 2 enrichment (EnrichS3Posture).
+	S3GetPublicAccessBlockAPI
+	S3GetBucketPolicyStatusAPI
+	S3GetBucketVersioningAPI
+	S3GetBucketLoggingAPI
+	S3GetBucketLifecycleAPI
+	S3GetObjectLockConfigurationAPI
 }

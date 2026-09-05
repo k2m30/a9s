@@ -51,7 +51,7 @@ const (
 	coldSessionPollBudget   = 30 * time.Second
 	coldSessionPollInterval = 100 * time.Millisecond
 
-	// coldS3Wave2Phrase is the stable wave-2 status text EnrichS3PublicAccessBlock
+	// coldS3Wave2Phrase is the stable wave-2 status text EnrichS3Posture
 	// writes into the s3 list row's status field (core/aws/s3_issue_enrichment.go,
 	// FieldUpdates["status"]); pinned as the spec §4 phrase in
 	// tests/integration/scenario_s3_visual_test.go (s3S4Phrase).

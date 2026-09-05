@@ -38,10 +38,10 @@ var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances:        append(dbi.Instances, legacy...),
+		DBInstances:        append(dbi.Instances, normalizeRDSInstancePosture(legacy)...),
 		DBSnapshots:        NewDBISnapFixtures().Instances,
 		Events:             buildRDSEvents(),
-		DBClusters:         buildRDSDBClusters(),
+		DBClusters:         normalizeRDSClusterPosture(buildRDSDBClusters()),
 		DBClusterSnapshots: buildRDSDBClusterSnapshots(),
 		DBSubnetGroups:     buildRDSDBSubnetGroups(),
 	}
@@ -50,6 +50,24 @@ var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 func NewRDSFixtures() *RDSFixtures {
 	return sharedRDSFixtures()
 }
+
+// One witness per dbc security-posture finding, on the Aurora side (the RDS
+// SDK is the only one of the two that carries all four fields). Every other
+// cluster — Aurora and DocumentDB alike — is normalized to the healthy value.
+const (
+	// DBCSingleAZ is the cluster with no instance in a second AZ.
+	DBCSingleAZ = "warn-dbc-single-az"
+	// DBCMinorUpgradeOff has automatic minor version upgrades disabled.
+	DBCMinorUpgradeOff = "warn-dbc-minor-upgrade-off"
+	// DBCIAMAuthOff has IAM database authentication disabled.
+	DBCIAMAuthOff = "warn-dbc-iam-auth-off"
+	// DBCDefaultMasterUser keeps the vendor default administrative username.
+	DBCDefaultMasterUser = "warn-dbc-default-master-user"
+	// DBCSnapPublic is the cluster snapshot shared with every AWS account.
+	DBCSnapPublic = "shared-with-all-aurora-snap"
+	// DBISnapPublic is the DB instance snapshot shared with every AWS account.
+	DBISnapPublic = "shared-with-all-dbi-snap"
+)
 
 const (
 	rdsProdRDSSGID = "sg-0ccc333333333333c"
@@ -86,6 +104,50 @@ var rdsEnginePool = []struct {
 	{"aurora-postgresql", "15.6", "db.t3.medium"},
 	{"mysql", "8.0.36", "db.t3.small"},
 	{"aurora-postgresql", "16.4", "db.t3.medium"},
+}
+
+// normalizeRDSInstancePosture forces the legacy bulk-generated instance pool
+// to the healthy value for every security-posture predicate. The pool exists
+// to give the list realistic bulk, not to demonstrate findings — the
+// dedicated witnesses in dbi.go own that job, and without this pass a dozen
+// filler rows would carry the same finding and bury them.
+func normalizeRDSInstancePosture(dbs []rdstypes.DBInstance) []rdstypes.DBInstance {
+	out := make([]rdstypes.DBInstance, len(dbs))
+	copy(out, dbs)
+	for i := range out {
+		out[i].MultiAZ = aws.Bool(true)
+		out[i].AutoMinorVersionUpgrade = aws.Bool(true)
+		out[i].IAMDatabaseAuthenticationEnabled = aws.Bool(true)
+		out[i].MasterUsername = aws.String("dbadmin")
+		out[i].CertificateDetails = &rdstypes.CertificateDetails{
+			CAIdentifier: aws.String(DBICurrentCAIdentifier),
+			ValidTill:    aws.Time(time.Now().Add(3 * 365 * 24 * time.Hour)),
+		}
+	}
+	return out
+}
+
+// normalizeRDSClusterPosture forces every cluster except the row that
+// witnesses a given posture finding to that finding's healthy value.
+func normalizeRDSClusterPosture(cs []rdstypes.DBCluster) []rdstypes.DBCluster {
+	out := make([]rdstypes.DBCluster, len(cs))
+	copy(out, cs)
+	for i := range out {
+		id := aws.ToString(out[i].DBClusterIdentifier)
+		if id != DBCSingleAZ {
+			out[i].MultiAZ = aws.Bool(true)
+		}
+		if id != DBCMinorUpgradeOff {
+			out[i].AutoMinorVersionUpgrade = aws.Bool(true)
+		}
+		if id != DBCIAMAuthOff {
+			out[i].IAMDatabaseAuthenticationEnabled = aws.Bool(true)
+		}
+		if id != DBCDefaultMasterUser {
+			out[i].MasterUsername = aws.String("dbadmin")
+		}
+	}
+	return out
 }
 
 func buildRDSInstances() []rdstypes.DBInstance {
@@ -494,7 +556,41 @@ func buildRDSDBClusters() []rdstypes.DBCluster {
 			MultiAZ:           aws.Bool(true),
 			ClusterCreateTime: aws.Time(time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)),
 		},
+		rdsPostureWitnessCluster(DBCSingleAZ, func(c *rdstypes.DBCluster) { c.MultiAZ = aws.Bool(false) }),
+		rdsPostureWitnessCluster(DBCMinorUpgradeOff, func(c *rdstypes.DBCluster) { c.AutoMinorVersionUpgrade = aws.Bool(false) }),
+		rdsPostureWitnessCluster(DBCIAMAuthOff, func(c *rdstypes.DBCluster) { c.IAMDatabaseAuthenticationEnabled = aws.Bool(false) }),
+		rdsPostureWitnessCluster(DBCDefaultMasterUser, func(c *rdstypes.DBCluster) { c.MasterUsername = aws.String("admin") }),
 	}
+}
+
+// rdsPostureWitnessCluster builds a healthy available Aurora cluster and
+// applies one posture defect to it. normalizeRDSClusterPosture leaves that
+// one field alone for the matching identifier and repairs it everywhere else.
+func rdsPostureWitnessCluster(id string, defect func(*rdstypes.DBCluster)) rdstypes.DBCluster {
+	c := rdstypes.DBCluster{
+		DBClusterIdentifier:   aws.String(id),
+		DBClusterArn:          aws.String("arn:aws:rds:us-east-1:123456789012:cluster:" + id),
+		Engine:                aws.String("aurora-postgresql"),
+		EngineVersion:         aws.String("16.4"),
+		Status:                aws.String("available"),
+		Endpoint:              aws.String(id + ".cluster-c9xyz123.us-east-1.rds.amazonaws.com"),
+		Port:                  aws.Int32(5432),
+		StorageEncrypted:      aws.Bool(true),
+		KmsKeyId:              aws.String(rdsKMSKeyID),
+		DeletionProtection:    aws.Bool(true),
+		BackupRetentionPeriod: aws.Int32(7),
+		DBSubnetGroup:         aws.String(rdsSubnetGroup),
+		DBClusterMembers: []rdstypes.DBClusterMember{
+			{DBInstanceIdentifier: aws.String(id + "-writer"), IsClusterWriter: aws.Bool(true)},
+		},
+		MasterUsername:                   aws.String("dbadmin"),
+		MultiAZ:                          aws.Bool(true),
+		AutoMinorVersionUpgrade:          aws.Bool(true),
+		IAMDatabaseAuthenticationEnabled: aws.Bool(true),
+		ClusterCreateTime:                aws.Time(time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)),
+	}
+	defect(&c)
+	return c
 }
 
 // buildRDSDBClusterSnapshots returns Aurora + Multi-AZ DB cluster snapshots.
@@ -511,6 +607,26 @@ func buildRDSDBClusterSnapshots() []rdstypes.DBClusterSnapshot {
 			EngineVersion:               aws.String("16.4"),
 			SnapshotType:                aws.String("automated"),
 			SnapshotCreateTime:          aws.Time(time.Date(2026, 4, 15, 4, 0, 0, 0, time.UTC)),
+			ClusterCreateTime:           aws.Time(time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)),
+			MasterUsername:              aws.String("pgadmin"),
+			Port:                        aws.Int32(5432),
+			KmsKeyId:                    aws.String(rdsKMSKeyID),
+			PercentProgress:             aws.Int32(100),
+			StorageType:                 aws.String("aurora"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(rdsProdVPCID),
+		},
+		{
+			// Witness for dbc-snap.public: the fake reports its restore
+			// attribute as granting the "all" group.
+			DBClusterSnapshotIdentifier: aws.String(DBCSnapPublic),
+			DBClusterIdentifier:         aws.String("prod-aurora-cluster"),
+			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:" + DBCSnapPublic),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("aurora-postgresql"),
+			EngineVersion:               aws.String("16.4"),
+			SnapshotType:                aws.String("manual"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-10 * 24 * time.Hour)),
 			ClusterCreateTime:           aws.Time(time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)),
 			MasterUsername:              aws.String("pgadmin"),
 			Port:                        aws.Int32(5432),

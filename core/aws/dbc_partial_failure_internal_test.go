@@ -37,6 +37,10 @@ type fakeDocDBClusterClient struct {
 func (f *fakeDocDBClusterClient) DescribeDBClusters(_ context.Context, _ *docdb.DescribeDBClustersInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClustersOutput, error) {
 	return f.clusterOut, f.clusterErr
 }
+func (f *fakeDocDBClusterClient) DescribeDBClusterSnapshotAttributes(_ context.Context, _ *docdb.DescribeDBClusterSnapshotAttributesInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
+	return &docdb.DescribeDBClusterSnapshotAttributesOutput{}, nil
+}
+
 func (f *fakeDocDBClusterClient) DescribeDBClusterSnapshots(_ context.Context, _ *docdb.DescribeDBClusterSnapshotsInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
 	panic("DescribeDBClusterSnapshots should not be called in dbc partial-failure tests")
 }
@@ -167,4 +171,16 @@ func TestRegisterPaginatedDBC_RDSError_PreservesDocDBRows(t *testing.T) {
 	if result.Pagination.NextToken != "rds:" {
 		t.Errorf("result.Pagination.NextToken = %q, want %q", result.Pagination.NextToken, "rds:")
 	}
+}
+
+func (f *fakeRDSClusterErrClient) DescribeDBEngineVersions(_ context.Context, _ *rds.DescribeDBEngineVersionsInput, _ ...func(*rds.Options)) (*rds.DescribeDBEngineVersionsOutput, error) {
+	return &rds.DescribeDBEngineVersionsOutput{}, nil
+}
+
+func (f *fakeRDSClusterErrClient) DescribeDBSnapshotAttributes(_ context.Context, _ *rds.DescribeDBSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error) {
+	return &rds.DescribeDBSnapshotAttributesOutput{}, nil
+}
+
+func (f *fakeRDSClusterErrClient) DescribeDBClusterSnapshotAttributes(_ context.Context, _ *rds.DescribeDBClusterSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
+	return &rds.DescribeDBClusterSnapshotAttributesOutput{}, nil
 }

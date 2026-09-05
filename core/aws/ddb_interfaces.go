@@ -28,6 +28,13 @@ type DynamoDBDescribeKinesisStreamingDestinationAPI interface {
 	DescribeKinesisStreamingDestination(ctx context.Context, params *dynamodb.DescribeKinesisStreamingDestinationInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error)
 }
 
+// DynamoDBGetResourcePolicyAPI defines the interface for the DynamoDB
+// GetResourcePolicy operation. Used by EnrichDynamoDBPITR to read the
+// table's resource policy and classify who it grants access to.
+type DynamoDBGetResourcePolicyAPI interface {
+	GetResourcePolicy(ctx context.Context, params *dynamodb.GetResourcePolicyInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetResourcePolicyOutput, error)
+}
+
 // DynamoDBAPI is the aggregate interface covering all DynamoDB operations used by a9s fetchers.
 // *dynamodb.Client structurally satisfies this interface.
 type DynamoDBAPI interface {
@@ -35,4 +42,5 @@ type DynamoDBAPI interface {
 	DDBDescribeTableAPI
 	DynamoDBDescribeContinuousBackupsAPI
 	DynamoDBDescribeKinesisStreamingDestinationAPI
+	DynamoDBGetResourcePolicyAPI
 }

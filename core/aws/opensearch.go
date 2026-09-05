@@ -13,6 +13,7 @@ import (
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
 	domainpkg "github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -215,6 +216,25 @@ func FetchOpenSearchDomainsAt(
 				encEnabled = "false"
 			}
 
+			// VPC placement and the access policy verdict are read here, at
+			// the one point that holds the DomainStatus, and handed to the
+			// wave-2 enricher as Fields — the enricher makes no AWS calls of
+			// its own and must not re-derive them from RawStruct.
+			vpcEnabled := strconv.FormatBool(domain.VPCOptions != nil)
+			accessPolicyPublic := "false"
+			if doc, err := iampolicy.Parse(aws.ToString(domain.AccessPolicies)); err == nil &&
+				iampolicy.Evaluate(doc, "").Public {
+				accessPolicyPublic = "true"
+			}
+			enforceHTTPS := "true"
+			if domain.DomainEndpointOptions == nil || !aws.ToBool(domain.DomainEndpointOptions.EnforceHTTPS) {
+				enforceHTTPS = "false"
+			}
+			nodeToNode := "true"
+			if domain.NodeToNodeEncryptionOptions == nil || !aws.ToBool(domain.NodeToNodeEncryptionOptions.Enabled) {
+				nodeToNode = "false"
+			}
+
 			findings := computeOpenSearchFindings(domain, now)
 			statusPhrase := openSearchStatusPhrase(domain, now)
 
@@ -238,6 +258,10 @@ func FetchOpenSearchDomainsAt(
 					"automated_update_date":             updateDate,
 					"current_version":                   currentVersion,
 					"new_version":                       newVersion,
+					"vpc_enabled":                       vpcEnabled,
+					"access_policy_public":              accessPolicyPublic,
+					"enforce_https":                     enforceHTTPS,
+					"node_to_node_encryption_enabled":   nodeToNode,
 				},
 				RawStruct: domain,
 			}

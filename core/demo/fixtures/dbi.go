@@ -111,6 +111,37 @@ const (
 
 	dbiMonitoringRoleARN  = "arn:aws:iam::123456789012:role/rds-monitoring-role"
 	dbiEnhancedMonitorARN = "arn:aws:iam::123456789012:role/rds-enhanced-monitoring"
+
+	// One witness per security-posture finding. Every other instance takes
+	// the healthy value from dbiBaselineHealthy, so the demo bench shows
+	// exactly one row per finding.
+
+	// DBISingleAZ runs in a single Availability Zone.
+	DBISingleAZ    = "warn-dbi-single-az"
+	dbiSingleAZARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-single-az"
+	// DBIMinorUpgradeOff has automatic minor version upgrades disabled.
+	DBIMinorUpgradeOff    = "warn-dbi-minor-upgrade-off"
+	dbiMinorUpgradeOffARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-minor-upgrade-off"
+	// DBIIAMAuthOff has IAM database authentication disabled.
+	DBIIAMAuthOff    = "warn-dbi-iam-auth-off"
+	dbiIAMAuthOffARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-iam-auth-off"
+	// DBIDefaultMasterUser keeps the vendor default administrative username.
+	DBIDefaultMasterUser    = "warn-dbi-default-master-user"
+	dbiDefaultMasterUserARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-default-master-user"
+	// DBICACertExpiring has a server certificate inside the 90-day window.
+	DBICACertExpiring    = "warn-dbi-ca-cert-expiring"
+	dbiCACertExpiringARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-ca-cert-expiring"
+	// DBIEngineDeprecated runs an engine version AWS no longer supports.
+	DBIEngineDeprecated    = "broken-dbi-engine-deprecated"
+	dbiEngineDeprecatedARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-engine-deprecated"
+
+	// DBIHealthyEngineVersion is the engine version every healthy instance
+	// runs; DBIDeprecatedEngineVersion is the retired one the witness runs.
+	// The RDS fake answers DescribeDBEngineVersions from these two.
+	DBIHealthyEngineVersion    = "16.2"
+	DBIDeprecatedEngineVersion = "11.22"
+	// DBICurrentCAIdentifier is the CA the healthy instances use.
+	DBICurrentCAIdentifier = "rds-ca-rsa2048-g1"
 )
 
 // NewDBIFixtures builds and returns a fully-populated DBIFixtures struct.
@@ -151,6 +182,14 @@ func dbiBaselineHealthy(id, arn string) rdstypes.DBInstance {
 		PubliclyAccessible:         aws.Bool(false),
 		MultiAZ:                    aws.Bool(true),
 		PerformanceInsightsEnabled: aws.Bool(true),
+		// Healthy for every security-posture predicate: only the dedicated
+		// witness rows below turn one of these off.
+		AutoMinorVersionUpgrade:          aws.Bool(true),
+		IAMDatabaseAuthenticationEnabled: aws.Bool(true),
+		CertificateDetails: &rdstypes.CertificateDetails{
+			CAIdentifier: aws.String(DBICurrentCAIdentifier),
+			ValidTill:    aws.Time(time.Now().Add(3 * 365 * 24 * time.Hour)),
+		},
 		Endpoint: &rdstypes.Endpoint{
 			Address: aws.String(id + ".xxxxxxx.us-east-1.rds.amazonaws.com"),
 			Port:    aws.Int32(5432),
@@ -286,6 +325,30 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	incompatRestore := dbiBaselineHealthy(BrokenDbiIncompatibleRestoreID, BrokenDbiIncompatibleRestoreARN)
 	incompatRestore.DBInstanceStatus = aws.String("incompatible-restore")
 
+	// 18-23. One witness per security-posture finding.
+	singleAZ := dbiBaselineHealthy(DBISingleAZ, dbiSingleAZARN)
+	singleAZ.MultiAZ = aws.Bool(false)
+
+	minorUpgradeOff := dbiBaselineHealthy(DBIMinorUpgradeOff, dbiMinorUpgradeOffARN)
+	minorUpgradeOff.AutoMinorVersionUpgrade = aws.Bool(false)
+
+	iamAuthOff := dbiBaselineHealthy(DBIIAMAuthOff, dbiIAMAuthOffARN)
+	iamAuthOff.IAMDatabaseAuthenticationEnabled = aws.Bool(false)
+
+	defaultMasterUser := dbiBaselineHealthy(DBIDefaultMasterUser, dbiDefaultMasterUserARN)
+	defaultMasterUser.MasterUsername = aws.String("postgres")
+
+	// The extra hour keeps the day count from rounding down to 59 as the
+	// fixture is built.
+	caCertExpiring := dbiBaselineHealthy(DBICACertExpiring, dbiCACertExpiringARN)
+	caCertExpiring.CertificateDetails = &rdstypes.CertificateDetails{
+		CAIdentifier: aws.String("rds-ca-2019"),
+		ValidTill:    aws.Time(time.Now().Add(60*24*time.Hour + time.Hour)),
+	}
+
+	engineDeprecated := dbiBaselineHealthy(DBIEngineDeprecated, dbiEngineDeprecatedARN)
+	engineDeprecated.EngineVersion = aws.String(DBIDeprecatedEngineVersion)
+
 	return []rdstypes.DBInstance{
 		prodDbi1,
 		auroraBase,
@@ -304,6 +367,12 @@ func buildDBIInstances() []rdstypes.DBInstance {
 		incompatNetwork,
 		incompatOptionGroup,
 		incompatRestore,
+		singleAZ,
+		minorUpgradeOff,
+		iamAuthOff,
+		defaultMasterUser,
+		caCertExpiring,
+		engineDeprecated,
 	}
 }
 

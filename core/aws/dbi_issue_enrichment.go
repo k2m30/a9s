@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -18,7 +19,12 @@ import (
 // dbi canonical FindingCodes.
 const (
 	dbiCodePendingMaintenance domain.FindingCode = "dbi.pending-maintenance"
+	dbiCodeEngineDeprecated   domain.FindingCode = "dbi.engine-deprecated"
 )
+
+// dbiEngineDeprecatedDetail is the S5 operator sentence for an instance
+// running an engine version AWS no longer supports.
+const dbiEngineDeprecatedDetail = "AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing."
 
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
 // and emits one Finding per dbi instance with pending maintenance. Severity "~"
@@ -121,7 +127,83 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		setWave2Finding(&result, key, dbiCodePendingMaintenance, "maintenance scheduled", "~", "dbi", rows, detail)
 	}
 
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	enrichDBIEngineVersions(ctx, clients, resources, &result)
+
+	// Pending maintenance is "~"-only: EnrichmentCap bounds informational
+	// coverage, never the issue count. The engine-deprecated pass below is
+	// "!", and sets Truncated itself when its walk is cut short.
 	return result, nil
+}
+
+// enrichDBIEngineVersions calls DescribeDBEngineVersions once per distinct
+// (engine, version) pair across the instances — the pairs repeat heavily in
+// a real fleet, so the per-run cache turns an N-instance walk into a handful
+// of calls — and emits the deprecated-engine finding for every instance on a
+// version AWS no longer lists as available.
+func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) {
+	n := min(len(resources), EnrichmentCap)
+	if n < len(resources) {
+		result.Truncated = true
+	}
+
+	type enginePair struct{ engine, version string }
+	deprecatedByPair := map[enginePair]bool{}
+	var failures []string
+
+	for i := range n {
+		r := resources[i]
+		db, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
+		if !ok || resourceIsTearingDown(r.RawStruct) {
+			continue
+		}
+		pair := enginePair{engine: aws.ToString(db.Engine), version: aws.ToString(db.EngineVersion)}
+		if pair.engine == "" || pair.version == "" {
+			continue
+		}
+		deprecated, known := deprecatedByPair[pair]
+		if !known {
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBEngineVersionsOutput, error) {
+				return clients.RDS.DescribeDBEngineVersions(ctx, &rds.DescribeDBEngineVersionsInput{
+					Engine:        aws.String(pair.engine),
+					EngineVersion: aws.String(pair.version),
+					// Without IncludeAll a deprecated version is simply absent
+					// from the response, which reads the same as a typo. With
+					// it, AWS returns the row and its Status says which it is.
+					IncludeAll: aws.Bool(true),
+				})
+			})
+			if err != nil {
+				MarkSkipped(result, r.ID, &failures, "DescribeDBEngineVersions", err)
+				continue
+			}
+			deprecated = isDeprecatedEngineVersion(out.DBEngineVersions)
+			deprecatedByPair[pair] = deprecated
+		}
+		if !deprecated {
+			continue
+		}
+		setWave2Finding(result, r.ID, dbiCodeEngineDeprecated, "engine version deprecated", "!", "dbi",
+			[]domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: "!"}},
+			dbiEngineDeprecatedDetail)
+	}
+
+	if len(failures) > 0 {
+		result.Truncated = true
+	}
+}
+
+// isDeprecatedEngineVersion reads the DescribeDBEngineVersions answer for one
+// (engine, version) pair. An empty answer means AWS does not list the version
+// at all, which for a version an instance is demonstrably running means it
+// has been retired.
+func isDeprecatedEngineVersion(versions []rdstypes.DBEngineVersion) bool {
+	if len(versions) == 0 {
+		return true
+	}
+	for _, v := range versions {
+		if strings.EqualFold(aws.ToString(v.Status), "available") {
+			return false
+		}
+	}
+	return true
 }

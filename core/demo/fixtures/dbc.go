@@ -108,7 +108,7 @@ const (
 // NewDBCFixtures builds and returns a fully-populated DBCFixtures struct.
 var sharedDBCFixtures = sync.OnceValue(func() *DBCFixtures {
 	return &DBCFixtures{
-		DBClusters:                buildDBCClusters(),
+		DBClusters:                normalizeDocDBClusterPosture(buildDBCClusters()),
 		DBClusterSnapshots:        buildDBCSnapshots(),
 		DBSubnetGroups:            buildDBCSubnetGroups(),
 		PendingMaintenanceActions: buildDBCPendingMaintenance(),
@@ -148,6 +148,20 @@ func dbcBaseline(id string) docdbtypes.DBCluster {
 		MultiAZ:           aws.Bool(true),
 		ClusterCreateTime: aws.Time(mustTime("2025-04-15T10:20:00Z")),
 	}
+}
+
+// normalizeDocDBClusterPosture forces every DocumentDB cluster to the healthy
+// value for the two posture predicates the DocDB SDK carries. The dbc posture
+// witnesses live on the Aurora side (rds.go), where all four fields exist, so
+// no DocumentDB row should carry one of these findings.
+func normalizeDocDBClusterPosture(cs []docdbtypes.DBCluster) []docdbtypes.DBCluster {
+	out := make([]docdbtypes.DBCluster, len(cs))
+	copy(out, cs)
+	for i := range out {
+		out[i].MultiAZ = aws.Bool(true)
+		out[i].MasterUsername = aws.String("docdbadmin")
+	}
+	return out
 }
 
 func buildDBCClusters() []docdbtypes.DBCluster {

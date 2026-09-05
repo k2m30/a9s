@@ -13,6 +13,12 @@ import (
 // EFSFixtures holds typed fixture data for EFS.
 type EFSFixtures struct {
 	FileSystems []efstypes.FileSystemDescription
+	// FileSystemPolicies maps FileSystemId → resource-policy JSON. Absent
+	// means the file system has no policy — the healthy default.
+	FileSystemPolicies map[string]string
+	// BackupPolicyDisabled lists the file systems whose AWS Backup policy is
+	// off. Every other file system reports ENABLED.
+	BackupPolicyDisabled map[string]bool
 	// MountTargets maps FileSystemId → []MountTargetDescription.
 	MountTargets map[string][]efstypes.MountTargetDescription
 	// AccessPoints maps FileSystemId → []AccessPointDescription.
@@ -112,6 +118,16 @@ const (
 	WarnEFSMultiID            = "fs-0warnmulti0000001"
 	WarnEFSUpdatingMTDownID   = "fs-0warnupdmtdown001"
 	HealthyEFSMTDownID        = "fs-0healthymtdown001"
+
+	// One witness per new efs finding. Every other file system is encrypted,
+	// has no file system policy, and has its backup policy enabled.
+
+	// EFSUnencrypted is the file system stored without encryption at rest.
+	EFSUnencrypted = "fs-0unencrypted00001"
+	// EFSPublicPolicy has a file system policy with a wildcard principal.
+	EFSPublicPolicy = "fs-0publicpolicy0001"
+	// EFSNoBackupPolicy has AWS Backup's automatic daily backups turned off.
+	EFSNoBackupPolicy = "fs-0nobackuppolicy01"
 )
 
 func mustParseEFSTime(s string) time.Time {
@@ -122,9 +138,24 @@ func mustParseEFSTime(s string) time.Time {
 // NewEFSFixtures constructs EFSFixtures from the canonical demo data.
 var sharedEFSFixtures = sync.OnceValue(func() *EFSFixtures {
 	return &EFSFixtures{
-		FileSystems:  buildEFSFileSystems(),
-		MountTargets: buildEFSMountTargets(),
-		AccessPoints: buildEFSAccessPoints(),
+		FileSystems: buildEFSFileSystems(),
+		FileSystemPolicies: map[string]string{
+			EFSPublicPolicy: `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AnyoneMount",
+      "Effect": "Allow",
+      "Principal": {"AWS": "*"},
+      "Action": ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"],
+      "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/` + EFSPublicPolicy + `"
+    }
+  ]
+}`,
+		},
+		BackupPolicyDisabled: map[string]bool{EFSNoBackupPolicy: true},
+		MountTargets:         buildEFSMountTargets(),
+		AccessPoints:         buildEFSAccessPoints(),
 	}
 })
 
@@ -326,7 +357,40 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+
+		// 10-12. One witness per new posture finding.
+		efsPostureWitness(EFSUnencrypted, "unencrypted-legacy-efs", false),
+		efsPostureWitness(EFSPublicPolicy, "public-policy-efs", true),
+		efsPostureWitness(EFSNoBackupPolicy, "no-backup-policy-efs", true),
 	}
+}
+
+// efsPostureWitness builds an available file system with one healthy mount
+// target, differing only in whether it is encrypted. The policy and backup
+// witnesses stay encrypted so each carries exactly its own finding.
+func efsPostureWitness(id, name string, encrypted bool) efstypes.FileSystemDescription {
+	fs := efstypes.FileSystemDescription{
+		FileSystemId:         aws.String(id),
+		FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/" + id),
+		Name:                 aws.String(name),
+		LifeCycleState:       efstypes.LifeCycleStateAvailable,
+		NumberOfMountTargets: 1,
+		Encrypted:            aws.Bool(encrypted),
+		PerformanceMode:      efstypes.PerformanceModeGeneralPurpose,
+		ThroughputMode:       efstypes.ThroughputModeBursting,
+		CreationTime:         aws.Time(mustParseEFSTime("2025-10-01T09:00:00+00:00")),
+		CreationToken:        aws.String(name),
+		OwnerId:              aws.String("123456789012"),
+		SizeInBytes:          &efstypes.FileSystemSize{Value: 1073741824},
+		Tags: []efstypes.Tag{
+			{Key: aws.String("Name"), Value: aws.String(name)},
+			{Key: aws.String("Environment"), Value: aws.String("staging")},
+		},
+	}
+	if encrypted {
+		fs.KmsKeyId = aws.String(ProdEFSKmsKeyARN)
+	}
+	return fs
 }
 
 func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {

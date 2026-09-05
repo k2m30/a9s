@@ -1,6 +1,6 @@
 package unit
 
-// qa_s3_cross_region_test.go — Regression: EnrichS3PublicAccessBlock must handle
+// qa_s3_cross_region_test.go — Regression: EnrichS3Posture must handle
 // cross-region buckets without spamming the error log.
 //
 // Reported 2026-04-25 from a live profile:
@@ -77,10 +77,10 @@ func (f *s3CrossRegionFake) GetPublicAccessBlock(
 	return f.s3PABFake.GetPublicAccessBlock(ctx, input, optFns...)
 }
 
-// TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog verifies that a
+// TestEnrichS3Posture_CrossRegionDoesNotSpamErrorLog verifies that a
 // cross-region bucket (PermanentRedirect / IllegalLocationConstraintException)
 // does NOT contribute to the AggregateFailures error surfaced to the `!` log.
-func TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog(t *testing.T) {
+func TestEnrichS3Posture_CrossRegionDoesNotSpamErrorLog(t *testing.T) {
 	const xRegionBucket = "example-bucket-eu.example.cloud"
 	fake := &s3CrossRegionFake{
 		s3PABFake: s3PABFake{configs: map[string]*s3.GetPublicAccessBlockOutput{}},
@@ -94,7 +94,7 @@ func TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog(t *testing.T) 
 		{ID: "same-region-bucket", Name: "same-region-bucket"},
 	}
 
-	_, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	_, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err == nil {
 		return
 	}
@@ -107,15 +107,15 @@ func TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog(t *testing.T) 
 	}
 }
 
-// TestEnrichS3PublicAccessBlock_IllegalLocationConstraintNotSpammed verifies the
+// TestEnrichS3Posture_IllegalLocationConstraintNotSpammed verifies the
 // other cross-region error class (eu-central-2 endpoint mismatch).
-func TestEnrichS3PublicAccessBlock_IllegalLocationConstraintNotSpammed(t *testing.T) {
+func TestEnrichS3Posture_IllegalLocationConstraintNotSpammed(t *testing.T) {
 	const xRegionBucket = "example-dags-destination-euc2"
 	fake := &fakeS3IllegalLocation{bucket: xRegionBucket}
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{{ID: xRegionBucket, Name: xRegionBucket}}
 
-	_, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	_, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil && strings.Contains(err.Error(), "IllegalLocationConstraint") {
 		t.Errorf("IllegalLocationConstraintException must not appear in error log; got: %v", err)
 	}

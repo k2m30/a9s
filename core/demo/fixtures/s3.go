@@ -47,6 +47,23 @@ const (
 	// this value directly as a KeyId, so the fake's Keys map is indexed by
 	// it verbatim to mirror that AWS behavior.
 	AWSManagedS3KeyID = "alias/aws/s3"
+
+	// One witness bucket per EnrichS3Posture condition. Every other bucket in
+	// the fixture set is healthy for all six, so the demo bench shows exactly
+	// one row per finding.
+
+	// S3BucketPublic is the bucket AWS reports as public by policy.
+	S3BucketPublic = "acme-public-datasets"
+	// S3BucketVersioningOff is the bucket that has never had versioning enabled.
+	S3BucketVersioningOff = "acme-versioning-off"
+	// S3BucketMFADeleteOff has versioning enabled but MFA delete disabled.
+	S3BucketMFADeleteOff = "acme-mfa-delete-off"
+	// S3BucketAccessLoggingOff is the bucket with no server access logging.
+	S3BucketAccessLoggingOff = "acme-no-access-logs"
+	// S3BucketNoLifecycle is the bucket with no enabled lifecycle rule.
+	S3BucketNoLifecycle = "acme-no-lifecycle"
+	// S3BucketNoObjectLock is the bucket with object lock not enabled.
+	S3BucketNoObjectLock = "acme-no-object-lock"
 )
 
 // S3Fixtures holds all S3 domain objects served by the fake.
@@ -80,6 +97,16 @@ type S3Fixtures struct {
 	// GetBucketLifecycleConfiguration). A missing key means return
 	// NoSuchLifecycleConfiguration.
 	LifecycleConfigs map[string][]s3types.LifecycleRule
+	// PolicyStatuses maps bucket names to the verdict GetBucketPolicyStatus
+	// returns. A missing key means not public.
+	PolicyStatuses map[string]*s3.GetBucketPolicyStatusOutput
+	// VersioningConfigs maps bucket names to their versioning state. A missing
+	// key means versioning and MFA delete are both enabled.
+	VersioningConfigs map[string]*s3.GetBucketVersioningOutput
+	// ObjectLockConfigs maps bucket names to their object lock configuration.
+	// A missing key means object lock is enabled; a nil value means the fake
+	// returns ObjectLockConfigurationNotFoundError.
+	ObjectLockConfigs map[string]*s3.GetObjectLockConfigurationOutput
 	// Objects maps bucket name → prefix → slice of S3 objects at that prefix level.
 	Objects map[string]map[string][]s3types.Object
 	// CommonPrefixes maps bucket name → prefix → slice of common prefixes (folders).
@@ -102,15 +129,21 @@ var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
 		NotificationConfigs:      buildS3NotificationConfigs(),
 		PublicAccessBlockConfigs: buildS3PublicAccessBlockConfigs(),
 		EncryptionConfigs:        buildS3EncryptionConfigs(),
-		LoggingConfigs:           buildS3LoggingConfigs(),
 		TaggingConfigs:           buildS3TaggingConfigs(),
 		BucketPolicies:           buildS3BucketPolicies(),
 		CORSConfigs:              buildS3CORSConfigs(),
-		LifecycleConfigs:         buildS3LifecycleConfigs(),
+		PolicyStatuses:           buildS3PolicyStatuses(),
+		VersioningConfigs:        buildS3VersioningConfigs(),
+		ObjectLockConfigs:        buildS3ObjectLockConfigs(),
 		Objects:                  buildS3Objects(),
 		CommonPrefixes:           buildS3CommonPrefixes(),
 	}
 	f.Buckets = buildS3Buckets()
+	// Access logging and lifecycle rules are healthy for every bucket except
+	// their own witness: EnrichS3Posture reports their absence, so leaving
+	// the rest of the fixture set unconfigured would light up the whole list.
+	f.LoggingConfigs = buildS3LoggingConfigs(f.Buckets)
+	f.LifecycleConfigs = buildS3LifecycleConfigs(f.Buckets)
 	return f
 })
 
@@ -160,6 +193,13 @@ func buildS3Buckets() []s3types.Bucket {
 		// full alias ARN — the exact shape that caused the pre-fix KMS
 		// truncation bug (checkS3KMS / kmsKeyIDFromField).
 		{ManagedKeyBucketName, "arn:aws:s3:::" + ManagedKeyBucketName, "us-east-1", "2025-08-01T09:00:00+00:00"},
+		// One witness per EnrichS3Posture condition.
+		{S3BucketPublic, "arn:aws:s3:::" + S3BucketPublic, "us-east-1", "2025-02-14T08:00:00+00:00"},
+		{S3BucketVersioningOff, "arn:aws:s3:::" + S3BucketVersioningOff, "us-east-1", "2025-02-15T08:00:00+00:00"},
+		{S3BucketMFADeleteOff, "arn:aws:s3:::" + S3BucketMFADeleteOff, "us-east-1", "2025-02-16T08:00:00+00:00"},
+		{S3BucketAccessLoggingOff, "arn:aws:s3:::" + S3BucketAccessLoggingOff, "us-east-1", "2025-02-17T08:00:00+00:00"},
+		{S3BucketNoLifecycle, "arn:aws:s3:::" + S3BucketNoLifecycle, "us-east-1", "2025-02-18T08:00:00+00:00"},
+		{S3BucketNoObjectLock, "arn:aws:s3:::" + S3BucketNoObjectLock, "us-east-1", "2025-02-19T08:00:00+00:00"},
 	}
 
 	// Named legacy buckets with objects.
@@ -329,24 +369,22 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 // Logging configs
 // ---------------------------------------------------------------------------
 
-func buildS3LoggingConfigs() map[string]*s3.GetBucketLoggingOutput {
+func buildS3LoggingConfigs(buckets []s3types.Bucket) map[string]*s3.GetBucketLoggingOutput {
 	logToCentral := &s3.GetBucketLoggingOutput{
 		LoggingEnabled: &s3types.LoggingEnabled{
 			TargetBucket: aws.String(LogsBucketName),
 			TargetPrefix: aws.String("s3-access/"),
 		},
 	}
-	return map[string]*s3.GetBucketLoggingOutput{
-		// Healthy and every PAB-issue bucket ship access logs to the
-		// same central log destination — so the `logs` pivot resolves
-		// on issue buckets too (forensic follow-up: "show me access
-		// logs for the bucket that has the public-access problem").
-		HealthyBucketName:        logToCentral,
-		"a9s-demo-nopab":         logToCentral,
-		"a9s-demo-partial-pab":   logToCentral,
-		"a9s-demo-multifail-pab": logToCentral,
-		"a9s-demo-nilcfg":        logToCentral,
+	out := make(map[string]*s3.GetBucketLoggingOutput, len(buckets))
+	for _, b := range buckets {
+		name := aws.ToString(b.Name)
+		if name == "" || name == S3BucketAccessLoggingOff {
+			continue
+		}
+		out[name] = logToCentral
 	}
+	return out
 }
 
 // ---------------------------------------------------------------------------
@@ -424,21 +462,64 @@ func buildS3CORSConfigs() map[string][]s3types.CORSRule {
 	}
 }
 
-// buildS3LifecycleConfigs returns per-bucket lifecycle rules. Only the
-// healthy bucket has a lifecycle configuration; every other bucket's
-// GetBucketLifecycleConfiguration returns NoSuchLifecycleConfiguration.
-func buildS3LifecycleConfigs() map[string][]s3types.LifecycleRule {
-	return map[string][]s3types.LifecycleRule{
-		HealthyBucketName: {
-			{
-				ID:     aws.String("expire-noncurrent-versions"),
-				Status: s3types.ExpirationStatusEnabled,
-				Filter: &s3types.LifecycleRuleFilter{Prefix: aws.String("")},
-				Expiration: &s3types.LifecycleExpiration{
-					Days: aws.Int32(90),
-				},
+// buildS3LifecycleConfigs returns per-bucket lifecycle rules. Every bucket
+// except the no-lifecycle witness carries one enabled rule; that witness has
+// none, so GetBucketLifecycleConfiguration returns
+// NoSuchLifecycleConfiguration for it.
+func buildS3LifecycleConfigs(buckets []s3types.Bucket) map[string][]s3types.LifecycleRule {
+	rules := []s3types.LifecycleRule{
+		{
+			ID:     aws.String("expire-noncurrent-versions"),
+			Status: s3types.ExpirationStatusEnabled,
+			Filter: &s3types.LifecycleRuleFilter{Prefix: aws.String("")},
+			Expiration: &s3types.LifecycleExpiration{
+				Days: aws.Int32(90),
 			},
 		},
+	}
+	out := make(map[string][]s3types.LifecycleRule, len(buckets))
+	for _, b := range buckets {
+		name := aws.ToString(b.Name)
+		if name == "" || name == S3BucketNoLifecycle {
+			continue
+		}
+		out[name] = rules
+	}
+	return out
+}
+
+// buildS3PolicyStatuses returns the GetBucketPolicyStatus verdicts. Only the
+// public witness is public; every other bucket has no entry, and the fake
+// answers "not public" for those.
+func buildS3PolicyStatuses() map[string]*s3.GetBucketPolicyStatusOutput {
+	return map[string]*s3.GetBucketPolicyStatusOutput{
+		S3BucketPublic: {
+			PolicyStatus: &s3types.PolicyStatus{IsPublic: aws.Bool(true)},
+		},
+	}
+}
+
+// buildS3VersioningConfigs returns the versioning state overrides. Buckets
+// with no entry are versioned with MFA delete on — the healthy state.
+func buildS3VersioningConfigs() map[string]*s3.GetBucketVersioningOutput {
+	return map[string]*s3.GetBucketVersioningOutput{
+		// Never configured: both Status and MFADelete come back empty.
+		S3BucketVersioningOff: {},
+		// Versioning on, MFA delete off — the only shape that produces the
+		// MFA-delete finding without also producing the versioning one.
+		S3BucketMFADeleteOff: {
+			Status:    s3types.BucketVersioningStatusEnabled,
+			MFADelete: s3types.MFADeleteStatusDisabled,
+		},
+	}
+}
+
+// buildS3ObjectLockConfigs returns the object lock overrides. A nil value
+// makes the fake return ObjectLockConfigurationNotFoundError; buckets with no
+// entry have object lock enabled.
+func buildS3ObjectLockConfigs() map[string]*s3.GetObjectLockConfigurationOutput {
+	return map[string]*s3.GetObjectLockConfigurationOutput{
+		S3BucketNoObjectLock: nil,
 	}
 }
 

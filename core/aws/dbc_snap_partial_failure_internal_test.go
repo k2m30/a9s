@@ -164,3 +164,19 @@ func TestRegisterPaginatedDBCSnap_RDSError_PreservesDocDBRows(t *testing.T) {
 		t.Errorf("result.Pagination.NextToken = %q, want %q", result.Pagination.NextToken, "rds:")
 	}
 }
+
+func (f *fakeRDSSnapErrClient) DescribeDBEngineVersions(_ context.Context, _ *rds.DescribeDBEngineVersionsInput, _ ...func(*rds.Options)) (*rds.DescribeDBEngineVersionsOutput, error) {
+	return &rds.DescribeDBEngineVersionsOutput{}, nil
+}
+
+func (f *fakeRDSSnapErrClient) DescribeDBSnapshotAttributes(_ context.Context, _ *rds.DescribeDBSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error) {
+	return &rds.DescribeDBSnapshotAttributesOutput{}, nil
+}
+
+func (f *fakeRDSSnapErrClient) DescribeDBClusterSnapshotAttributes(_ context.Context, _ *rds.DescribeDBClusterSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
+	return &rds.DescribeDBClusterSnapshotAttributesOutput{}, nil
+}
+
+func (f *fakeDocDBSnapClient) DescribeDBClusterSnapshotAttributes(_ context.Context, _ *docdb.DescribeDBClusterSnapshotAttributesInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
+	return &docdb.DescribeDBClusterSnapshotAttributesOutput{}, nil
+}

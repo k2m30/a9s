@@ -30,11 +30,19 @@ type DocDBDescribePendingMaintenanceActionsAPI interface {
 	DescribePendingMaintenanceActions(ctx context.Context, params *docdb.DescribePendingMaintenanceActionsInput, optFns ...func(*docdb.Options)) (*docdb.DescribePendingMaintenanceActionsOutput, error)
 }
 
+// DocDBDescribeDBClusterSnapshotAttributesAPI defines the interface for the
+// DocumentDB DescribeDBClusterSnapshotAttributes operation. Used by the
+// dbc-snap enricher for DocumentDB-side cluster snapshots.
+type DocDBDescribeDBClusterSnapshotAttributesAPI interface {
+	DescribeDBClusterSnapshotAttributes(ctx context.Context, params *docdb.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error)
+}
+
 // DocDBAPI is the aggregate interface covering all DocumentDB operations used by a9s fetchers.
 // *docdb.Client structurally satisfies this interface.
 type DocDBAPI interface {
 	DocDBDescribeDBClustersAPI
 	DocDBDescribeDBClusterSnapshotsAPI
+	DocDBDescribeDBClusterSnapshotAttributesAPI
 	DocDBDescribeDBSubnetGroupsAPI
 	DocDBDescribePendingMaintenanceActionsAPI
 }

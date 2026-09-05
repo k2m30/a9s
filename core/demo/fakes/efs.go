@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
+	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -43,4 +44,34 @@ func (f *EFSFake) DescribeAccessPoints(_ context.Context, in *efs.DescribeAccess
 	}
 	aps := f.fix.AccessPoints[aws.ToString(in.FileSystemId)]
 	return &efs.DescribeAccessPointsOutput{AccessPoints: aps}, nil
+}
+
+// DescribeFileSystemPolicy returns the file system's resource policy. File
+// systems absent from FileSystemPolicies have none, which AWS reports as
+// PolicyNotFound — the healthy default.
+func (f *EFSFake) DescribeFileSystemPolicy(_ context.Context, in *efs.DescribeFileSystemPolicyInput, _ ...func(*efs.Options)) (*efs.DescribeFileSystemPolicyOutput, error) {
+	id := aws.ToString(in.FileSystemId)
+	policy, ok := f.fix.FileSystemPolicies[id]
+	if !ok {
+		return nil, &efstypes.PolicyNotFound{Message: aws.String("No policy for " + id)}
+	}
+	return &efs.DescribeFileSystemPolicyOutput{
+		FileSystemId: aws.String(id),
+		Policy:       aws.String(policy),
+	}, nil
+}
+
+// DescribeBackupPolicy returns the file system's AWS Backup policy. Only the
+// file systems listed in BackupPolicyDisabled have it off; everything else
+// reports ENABLED — the healthy default.
+func (f *EFSFake) DescribeBackupPolicy(_ context.Context, in *efs.DescribeBackupPolicyInput, _ ...func(*efs.Options)) (*efs.DescribeBackupPolicyOutput, error) {
+	id := aws.ToString(in.FileSystemId)
+	if f.fix.BackupPolicyDisabled[id] {
+		return &efs.DescribeBackupPolicyOutput{
+			BackupPolicy: &efstypes.BackupPolicy{Status: efstypes.StatusDisabled},
+		}, nil
+	}
+	return &efs.DescribeBackupPolicyOutput{
+		BackupPolicy: &efstypes.BackupPolicy{Status: efstypes.StatusEnabled},
+	}, nil
 }

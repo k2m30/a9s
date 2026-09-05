@@ -5,21 +5,33 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // efs canonical FindingCodes.
 const (
 	efsCodeMountTargetDown domain.FindingCode = "efs.mount-target-down"
+	efsCodePublicPolicy    domain.FindingCode = "efs.public-policy"
+	efsCodeNoBackupPolicy  domain.FindingCode = "efs.no-backup-policy"
+)
+
+// S5 operator sentences for the policy findings.
+const (
+	efsPublicPolicyDetail   = "The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access."
+	efsNoBackupPolicyDetail = "AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on."
 )
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
@@ -42,8 +54,10 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	if clients.EFS == nil {
 		return result, nil
 	}
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
+	var policyFailures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
@@ -56,6 +70,14 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		total++
 		mu.Unlock()
+
+		// The policy checks are independent of the mount-target walk below —
+		// they run first so a mount-target pagination failure cannot swallow
+		// them.
+		if !resourceIsTearingDown(r.RawStruct) {
+			enrichEFSPolicies(ctx, clients, fsID, ownAccount, &result, &policyFailures, &mu)
+		}
+
 		// Paginate mount targets per file system using Marker/NextMarker.
 		var allMountTargets []efstypes.MountTargetDescription
 		var mtMarker *string
@@ -138,7 +160,94 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		}, "")
 	})
 	sort.Strings(failures)
+	sort.Strings(policyFailures)
 	result.Truncated = truncated
 	result.FieldUpdates = make(map[string]map[string]string)
-	return result, AggregateFailures("efs-enrich: DescribeMountTargets", failures, total)
+	// The two passes are counted separately: each names how many of the same
+	// N file systems it could not answer for, and folding them into one
+	// tally would report more failures than there were file systems.
+	return result, errors.Join(
+		AggregateFailures("efs-enrich: DescribeMountTargets", failures, total),
+		AggregateFailures("efs-enrich: file system and backup policy", policyFailures, total),
+	)
+}
+
+// enrichEFSPolicies reads the file system's resource policy and its AWS
+// Backup policy. Both calls answer "not configured" with an error AWS treats
+// as normal (PolicyNotFound), which is a finding for the backup policy and a
+// clean bill of health for the resource policy.
+func enrichEFSPolicies(
+	ctx context.Context,
+	clients *ServiceClients,
+	fsID string,
+	ownAccount string,
+	result *IssueEnricherResult,
+	failures *[]string,
+	mu *sync.Mutex,
+) {
+	policyOut, policyErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeFileSystemPolicyOutput, error) {
+		return clients.EFS.DescribeFileSystemPolicy(ctx, &efs.DescribeFileSystemPolicyInput{FileSystemId: aws.String(fsID)})
+	})
+	backupOut, backupErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeBackupPolicyOutput, error) {
+		return clients.EFS.DescribeBackupPolicy(ctx, &efs.DescribeBackupPolicyInput{FileSystemId: aws.String(fsID)})
+	})
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	switch {
+	case isEFSPolicyNotFound(policyErr):
+		// No file system policy at all: nothing grants public access.
+	case policyErr != nil:
+		MarkSkipped(result, fsID, failures, "DescribeFileSystemPolicy", policyErr)
+	default:
+		doc, parseErr := iampolicy.Parse(aws.ToString(policyOut.Policy))
+		if parseErr != nil {
+			result.TruncatedIDs[fsID] = true
+			break
+		}
+		ex := iampolicy.Evaluate(doc, ownAccount)
+		if ex.Public {
+			setWave2Finding(result, fsID, efsCodePublicPolicy, "file system policy open to anyone", "!", "efs",
+				[]domain.DetailRow{
+					{Label: "Principal", Value: "*", Tier: "!"},
+					{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
+				}, efsPublicPolicyDetail)
+		}
+	}
+
+	status := ""
+	switch {
+	case isEFSPolicyNotFound(backupErr):
+		status = "not configured"
+	case backupErr != nil:
+		MarkSkipped(result, fsID, failures, "DescribeBackupPolicy", backupErr)
+		return
+	case backupOut.BackupPolicy != nil:
+		status = string(backupOut.BackupPolicy.Status)
+	}
+	if strings.EqualFold(status, string(efstypes.StatusEnabled)) {
+		return
+	}
+	if status == "" {
+		status = "not configured"
+	}
+	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, "automatic backups off", "~", "efs",
+		[]domain.DetailRow{{Label: "Backup policy", Value: status, Tier: "~"}}, efsNoBackupPolicyDetail)
+}
+
+// isEFSPolicyNotFound reports whether err is EFS's "no policy is set" answer
+// for either the file system policy or the backup policy. Matched on the
+// error code as well as the modeled type so a response the SDK could not bind
+// to *PolicyNotFound still classifies correctly.
+func isEFSPolicyNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	var notFound *efstypes.PolicyNotFound
+	if errors.As(err, &notFound) {
+		return true
+	}
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PolicyNotFound"
 }

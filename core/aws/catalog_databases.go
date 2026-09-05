@@ -81,7 +81,11 @@ func colorS3(r domain.Resource) domain.Color {
 }
 
 func colorRedis(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	// colorFromAnyFinding, not colorFromWave1: the posture rows stack after
+	// the lifecycle ones, and colorFromWave1 returns the FIRST finding's
+	// severity — which would let a Warn lifecycle row hide the Broken
+	// no-AUTH-token finding behind it.
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
@@ -167,7 +171,10 @@ func colorOpenSearch(r domain.Resource) domain.Color {
 }
 
 func colorRedshift(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	// colorFromAnyFinding, not colorFromWave1: redshift's audit-logging and
+	// require_ssl signals are Wave-2 sourced, and a wave1-only lookup would
+	// paint those rows healthy.
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
@@ -355,6 +362,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBIUnencryptedStorage, Phrase: "unencrypted storage", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBIDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: dbiCodePendingMaintenance, Phrase: "maintenance scheduled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeDBISingleAZ, Phrase: "single-AZ", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIMinorUpgradeOff, Phrase: "auto minor version upgrade off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIIAMAuthOff, Phrase: "IAM database authentication off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIDefaultMasterUser, Phrase: "default master username", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBICACertExpiring, Phrase: "server certificate expires in <N> days", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: dbiCodeEngineDeprecated, Phrase: "engine version deprecated", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -387,7 +400,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			// for having the notification pivots actually work.
 			return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichS3PublicAccessBlock, Priority: 100},
+		Wave2: IssueEnricher{Fn: EnrichS3Posture, Priority: 100},
 		FieldKeys: []string{
 			"name",
 			"bucket_name",
@@ -417,6 +430,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
 			{Code: s3CodePublicAccessBlockIncomplete, Phrase: "public access block incomplete", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: s3CodePublic, Phrase: "publicly accessible", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: s3CodeVersioningOff, Phrase: "versioning off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: s3CodeMFADeleteOff, Phrase: "MFA delete off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: s3CodeAccessLoggingOff, Phrase: "access logging off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: s3CodeNoLifecycle, Phrase: "no lifecycle rules", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: s3CodeNoObjectLock, Phrase: "object lock off", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -464,6 +483,10 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeRedisSnapshotting, Phrase: "snapshotting — backup running", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeRedisShardIssue, Phrase: "shard <NodeGroupId>: <status>", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeRedisMultiAZWithoutAutoFailover, Phrase: "multi-AZ without auto-failover", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisAtRestOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisTransitOff, Phrase: "encryption in transit off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisNoAuth, Phrase: "no authentication token", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedisNoBackup, Phrase: "automatic backups off", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -580,6 +603,10 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: dbcCodeMaintenanceOverdue, Phrase: "maintenance overdue", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeDBCSingleAZ, Phrase: "single-AZ", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCMinorUpgradeOff, Phrase: "auto minor version upgrade off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCIAMAuthOff, Phrase: "IAM database authentication off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCDefaultMasterUser, Phrase: "default master username", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -626,6 +653,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ddbCodePITROff, Phrase: "point-in-time recovery disabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeDDBDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ddbCodeCrossAccountPolicy, Phrase: "resource policy grants another account", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ddbCodePublicPolicy, Phrase: "resource policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
 			DetailsDeniedFindingDef("ddb"),
 			DetailsUnavailableFindingDef("ddb"),
 		},
@@ -690,6 +720,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: opensearchCodePublic, Phrase: "reachable outside a VPC", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off", Severity: domain.SevWarn, Source: "wave2"},
 			DetailsDeniedFindingDef("opensearch"),
 			DetailsUnavailableFindingDef("opensearch"),
 		},
@@ -713,6 +746,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 		},
 		Color: colorRedshift,
+		Wave2: IssueEnricher{Fn: EnrichRedshiftPosture, Priority: 100},
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRedshiftClustersPage(ctx, c.Redshift, continuationToken)
 		}),
@@ -758,6 +792,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeRedshiftMaintenanceDeferred, Phrase: "maintenance deferred", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeRedshiftPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeRedshiftUnencryptedAtRest, Phrase: "unencrypted at rest", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: redshiftCodeAuditLoggingOff, Phrase: "audit logging off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: redshiftCodeRequireSSLOff, Phrase: "SSL not required", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -813,6 +849,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEFSDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: efsCodeMountTargetDown, Phrase: "mount target down", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeEFSUnencrypted, Phrase: "not encrypted", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: efsCodePublicPolicy, Phrase: "file system policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: efsCodeNoBackupPolicy, Phrase: "automatic backups off", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -856,6 +895,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBISnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: dbiSnapOrphanCode, Phrase: "orphan: source DB deleted", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: dbiSnapPastRetentionCode, Phrase: "automated, <N>d past retention", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: dbiSnapPublicCode, Phrase: "shared with all AWS accounts", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -955,6 +995,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBCSnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: dbcSnapOrphanCode, Phrase: "orphan: source cluster deleted", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: dbcSnapPastRetentionCode, Phrase: "automated, <N>d past retention", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: dbcSnapPublicCode, Phrase: "shared with all AWS accounts", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 }

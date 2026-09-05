@@ -134,6 +134,7 @@ One row per signal from §3:
 | `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` | — |
 | orphan: source DB deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source DB deleted` | `orphan: source DB deleted` + Source DB row |
 | automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` | `automated, <N>d past retention` + Source DB / Retention / Created rows |
+| `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S4, S5 | `shared with all AWS accounts` | `The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove the all group from the snapshot's restore attribute.` |
 
 Rules for filling list and detail text:
 
@@ -201,6 +202,7 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |
 | dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 |
+| dbi-snap.public | shared with all AWS accounts | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

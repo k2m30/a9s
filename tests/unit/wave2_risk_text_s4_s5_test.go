@@ -44,7 +44,7 @@ package unit
 //   - Tests #5-#7 (s3/ec2/dbi exemplars, driven through the real Wave-2
 //     enrichers) are COMPILE-RED for the same reason as #2/#3 (they assert
 //     on Finding.Detail) AND LOGIC-RED even post-compile-fix: none of
-//     EnrichS3PublicAccessBlock, EnrichEC2InstanceStatus, EnrichDBIMaintenance
+//     EnrichS3Posture, EnrichEC2InstanceStatus, EnrichDBIMaintenance
 //     (core/aws/*.go) call setWave2Finding with a Detail argument; ec2's
 //     enricher additionally emits "system status: impaired" (built from
 //     strings.ToLower(row.Label)+": "+row.Value) instead of the §4-mandated
@@ -160,20 +160,20 @@ func TestWave2_Logs_RetentionNil_PinsS4S5Strings(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // 5. s3 PAB incomplete (docs/resources/s3.md §4), driven through the REAL
-// enricher EnrichS3PublicAccessBlock.
+// enricher EnrichS3Posture.
 // Pinned strings:
 //   Phrase (S4): "public access block incomplete"
 //   Detail (S5): "Bucket-level public access block is missing or partial — account-level PAB may still apply."
 // ---------------------------------------------------------------------------
 
 // TestWave2_S3_PABIncomplete_PinsS4S5Strings drives the real
-// EnrichS3PublicAccessBlock enricher against a bucket with no PAB
+// EnrichS3Posture enricher against a bucket with no PAB
 // configuration (reusing s3PABFake from aws_s3_issue_enrichment_test.go, the
 // existing sibling test's fake for this exact enricher) and asserts the exact
 // §4-mandated Phrase and Detail.
 //
 // COMPILE-RED: domain.Finding has no Detail field yet, and
-// EnrichS3PublicAccessBlock's setWave2Finding call site has no Detail
+// EnrichS3Posture's setWave2Finding call site has no Detail
 // argument to populate one even after the field exists.
 func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 	fake := &s3PABFake{
@@ -186,9 +186,9 @@ func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 		pabResource("bucket-no-pab"),
 	}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 	findings, ok := result.Findings["bucket-no-pab"]
 	if !ok {

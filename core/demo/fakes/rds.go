@@ -69,3 +69,82 @@ func (f *RDSFake) DescribeDBClusters(_ context.Context, _ *rds.DescribeDBCluster
 func (f *RDSFake) DescribeDBClusterSnapshots(_ context.Context, _ *rds.DescribeDBClusterSnapshotsInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error) {
 	return &rds.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: f.fix.DBClusterSnapshots}, nil
 }
+
+// DescribeDBEngineVersions answers the engine-deprecation check. Every
+// version except fixtures.DBIDeprecatedEngineVersion is available; that one
+// comes back with Status "deprecated".
+func (f *RDSFake) DescribeDBEngineVersions(_ context.Context, in *rds.DescribeDBEngineVersionsInput, _ ...func(*rds.Options)) (*rds.DescribeDBEngineVersionsOutput, error) {
+	engine, version := "", ""
+	if in != nil {
+		if in.Engine != nil {
+			engine = *in.Engine
+		}
+		if in.EngineVersion != nil {
+			version = *in.EngineVersion
+		}
+	}
+	status := "available"
+	if version == fixtures.DBIDeprecatedEngineVersion {
+		status = "deprecated"
+	}
+	return &rds.DescribeDBEngineVersionsOutput{
+		DBEngineVersions: []rdstypes.DBEngineVersion{{
+			Engine:        &engine,
+			EngineVersion: &version,
+			Status:        &status,
+		}},
+	}, nil
+}
+
+// DescribeDBSnapshotAttributes reports the restore grant on a DB snapshot.
+// Only fixtures.DBISnapPublic is shared with the "all" group.
+func (f *RDSFake) DescribeDBSnapshotAttributes(_ context.Context, in *rds.DescribeDBSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error) {
+	id := ""
+	if in != nil && in.DBSnapshotIdentifier != nil {
+		id = *in.DBSnapshotIdentifier
+	}
+	return &rds.DescribeDBSnapshotAttributesOutput{
+		DBSnapshotAttributesResult: &rdstypes.DBSnapshotAttributesResult{
+			DBSnapshotIdentifier: &id,
+			DBSnapshotAttributes: []rdstypes.DBSnapshotAttribute{{
+				AttributeName:   restoreAttributeName(),
+				AttributeValues: restoreAttributeValues(id == fixtures.DBISnapPublic),
+			}},
+		},
+	}, nil
+}
+
+// DescribeDBClusterSnapshotAttributes reports the restore grant on an Aurora
+// cluster snapshot. Only fixtures.DBCSnapPublic is shared with the "all" group.
+func (f *RDSFake) DescribeDBClusterSnapshotAttributes(_ context.Context, in *rds.DescribeDBClusterSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
+	id := ""
+	if in != nil && in.DBClusterSnapshotIdentifier != nil {
+		id = *in.DBClusterSnapshotIdentifier
+	}
+	return &rds.DescribeDBClusterSnapshotAttributesOutput{
+		DBClusterSnapshotAttributesResult: &rdstypes.DBClusterSnapshotAttributesResult{
+			DBClusterSnapshotIdentifier: &id,
+			DBClusterSnapshotAttributes: []rdstypes.DBClusterSnapshotAttribute{{
+				AttributeName:   restoreAttributeName(),
+				AttributeValues: restoreAttributeValues(id == fixtures.DBCSnapPublic),
+			}},
+		},
+	}, nil
+}
+
+// restoreAttributeName is the attribute AWS uses to record who may restore a
+// snapshot.
+func restoreAttributeName() *string {
+	name := "restore"
+	return &name
+}
+
+// restoreAttributeValues returns the restore grant list: the "all" group when
+// the snapshot is shared with every account, otherwise an empty list (AWS's
+// representation of a snapshot shared with nobody).
+func restoreAttributeValues(public bool) []string {
+	if public {
+		return []string{"all"}
+	}
+	return nil
+}

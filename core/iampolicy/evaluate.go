@@ -102,6 +102,7 @@ var restrictiveKeys = []string{
 	"aws:PrincipalAccount", "aws:PrincipalArn", "aws:PrincipalOrgID", "aws:PrincipalOrgPaths",
 	"aws:ResourceAccount", "aws:ResourceOrgID", "aws:userid", "aws:username", "s3:ResourceAccount",
 	"kms:CallerAccount", "kms:ViaService", "lambda:FunctionUrlAuthType", "sns:Endpoint",
+	"elasticfilesystem:AccessPointArn",
 }
 
 // trustRestrictiveKeys is restrictiveKeys plus the trust-policy-only

@@ -105,7 +105,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		multiAZ := rg.MultiAZ == elasticachetypes.MultiAZStatusEnabled
 		autoFailover := rg.AutomaticFailover == elasticachetypes.AutomaticFailoverStatusEnabled
 
-		findings := computeRedisFindings(status, multiAZ, autoFailover, rg.NodeGroups)
+		findings, attentionDetails := computeRedisFindings(status, multiAZ, autoFailover, rg)
 		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
@@ -120,7 +120,8 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 				"status":     statusPhrase,
 				"arn":        arn,
 			},
-			RawStruct: rg,
+			RawStruct:        rg,
+			AttentionDetails: attentionDetails,
 		}
 
 		resources = append(resources, r)
@@ -149,8 +150,12 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 	}, nil
 }
 
-// computeRedisFindings derives the ordered findings slice for a ReplicationGroup.
-func computeRedisFindings(status string, multiAZ bool, autoFailover bool, nodeGroups []elasticachetypes.NodeGroup) []domain.Finding {
+// computeRedisFindings derives the ordered findings slice for a ReplicationGroup
+// plus the supporting AttentionDetail rows keyed by the finding that owns them.
+// Lifecycle findings come first (they own the status column); the
+// security-posture rows are evaluated independently and appended after them.
+func computeRedisFindings(status string, multiAZ bool, autoFailover bool, rg elasticachetypes.ReplicationGroup) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	nodeGroups := rg.NodeGroups
 	var broken []domain.Finding
 	var warnings []domain.Finding
 
@@ -186,5 +191,57 @@ func computeRedisFindings(status string, multiAZ bool, autoFailover bool, nodeGr
 	}
 
 	sort.Slice(warnings, func(i, j int) bool { return warnings[i].Phrase < warnings[j].Phrase })
-	return append(broken, warnings...)
+	findings := make([]domain.Finding, 0, len(broken)+len(warnings))
+	findings = append(findings, broken...)
+	findings = append(findings, warnings...)
+
+	if isTeardownStatus(status) {
+		// A group on its way out has no posture worth reporting.
+		return findings, nil
+	}
+	posture, details := redisPostureFindings(rg)
+	return append(findings, posture...), details
+}
+
+// redisPostureFindings evaluates the four encryption/authentication/backup
+// posture rows against the ReplicationGroup. Every predicate treats a nil
+// pointer as "off": ElastiCache omits these fields exactly when the feature
+// was never enabled, so unknown and disabled are the same state here.
+func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	var findings []domain.Finding
+	details := map[domain.FindingCode]domain.AttentionDetail{}
+
+	add := func(code domain.FindingCode, phrase, detail string, sev domain.Severity, rows []domain.DetailRow) {
+		findings = append(findings, domain.Finding{
+			Code: code, Phrase: phrase, Detail: detail, Severity: sev, Source: "wave1",
+		})
+		details[code] = domain.AttentionDetail{Rows: rows}
+	}
+
+	if !aws.ToBool(rg.AtRestEncryptionEnabled) {
+		add(CodeRedisAtRestOff, "encryption at rest off", redisAtRestOffDetail, domain.SevWarn,
+			[]domain.DetailRow{{Label: "AtRestEncryptionEnabled", Value: "false", Tier: "~"}})
+	}
+	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
+	if !transitOn {
+		add(CodeRedisTransitOff, "encryption in transit off", redisTransitOffDetail, domain.SevWarn,
+			[]domain.DetailRow{{Label: "TransitEncryptionEnabled", Value: "false", Tier: "~"}})
+	}
+	// AWS only accepts an AUTH token on a group that also encrypts in
+	// transit, so a group without in-transit encryption is already reported
+	// by the row above — reporting a missing AUTH token there too would name
+	// the same misconfiguration twice.
+	if transitOn && !aws.ToBool(rg.AuthTokenEnabled) {
+		add(CodeRedisNoAuth, "no authentication token", redisNoAuthDetail, domain.SevBroken,
+			[]domain.DetailRow{{Label: "AuthTokenEnabled", Value: "false", Tier: "!"}})
+	}
+	if rg.SnapshotRetentionLimit == nil || *rg.SnapshotRetentionLimit == 0 {
+		add(CodeRedisNoBackup, "automatic backups off", redisNoBackupDetail, domain.SevWarn,
+			[]domain.DetailRow{{Label: "SnapshotRetentionLimit", Value: "0", Tier: "~"}})
+	}
+
+	if len(details) == 0 {
+		return findings, nil
+	}
+	return findings, details
 }

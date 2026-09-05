@@ -82,7 +82,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
-		findings := computeDBCFindings(cluster)
+		findings, attentionDetails := computeDBCFindings(cluster)
 		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
@@ -103,7 +103,8 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 				"storage_encrypted":       storageEncrypted,
 				"backup_retention_period": backupRetentionPeriod,
 			},
-			RawStruct: cluster,
+			RawStruct:        cluster,
+			AttentionDetails: attentionDetails,
 		}
 
 		resources = append(resources, r)
@@ -151,9 +152,19 @@ func countWriters(members []docdbtypes.DBClusterMember) int {
 	return n
 }
 
-// computeDBCFindings returns []domain.Finding for a DocumentDB cluster.
-func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
+// computeDBCFindings returns the findings for a DocumentDB cluster plus the
+// supporting AttentionDetail rows keyed by the finding that owns them.
+// The security-posture pack (rds_posture.go) is evaluated independently of
+// the lifecycle status and stacks on top of it. DocumentDB clusters carry no
+// AutoMinorVersionUpgrade or IAMDatabaseAuthenticationEnabled field, so those
+// two predicates are handed nil and stay silent.
+func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	status := aws.ToString(cluster.Status)
+	postureFindings, postureDetails := rdsPostureFindings(rdsPosture{
+		Engine:         aws.ToString(cluster.Engine),
+		MultiAZ:        cluster.MultiAZ,
+		MasterUsername: cluster.MasterUsername,
+	}, dbcPostureCodes)
 
 	// Broken statuses — first match wins; no warning stacking.
 	brokenCode := map[string]domain.FindingCode{
@@ -167,18 +178,26 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
 		"incompatible-parameters":             "parameter group incompatible",
 	}
 	if code, ok := brokenCode[status]; ok {
-		return []domain.Finding{{Code: code, Phrase: brokenPhrase[status], Severity: domain.SevBroken, Source: "wave1"}}
+		lead := []domain.Finding{{Code: code, Phrase: brokenPhrase[status], Severity: domain.SevBroken, Source: "wave1"}}
+		return append(lead, postureFindings...), postureDetails
 	}
 
 	// No writer on an available cluster — reads only (Broken; beats warnings).
 	if status == "available" && countWriters(cluster.DBClusterMembers) == 0 {
-		return []domain.Finding{{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1"}}
+		lead := []domain.Finding{{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1"}}
+		return append(lead, postureFindings...), postureDetails
+	}
+
+	// A cluster on its way out has no posture worth reporting.
+	if isTeardownStatus(status) {
+		postureFindings, postureDetails = nil, nil
 	}
 
 	// Transitional statuses.
 	if _, ok := transitionalDBCStatusSet[status]; ok {
 		phrase := status + ": in progress"
-		return []domain.Finding{{Code: CodeDBCTransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		lead := []domain.Finding{{Code: CodeDBCTransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		return append(lead, postureFindings...), postureDetails
 	}
 
 	// Healthy available — collect Wave-1 warnings in spec §4 table order.
@@ -193,11 +212,12 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
 		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
 			findings = append(findings, domain.Finding{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"})
 		}
-		return findings
+		return append(findings, postureFindings...), postureDetails
 	}
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	return []domain.Finding{{Code: CodeDBCTransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
+	lead := []domain.Finding{{Code: CodeDBCTransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
+	return append(lead, postureFindings...), postureDetails
 }
 
 // dedupResourcesByID returns rs with duplicate Resource.ID entries removed,

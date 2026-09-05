@@ -156,6 +156,10 @@ Wave → surface mapping applied below. `Status == "available"` with `AutomaticF
 | `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: creating` | `Shard <ng-id> is being added or re-sharded.` |
 | `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: deleting` | `Shard <ng-id> is being removed.` |
 | `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S2, S4 | `multi-AZ without auto-failover` | `Replication group is deployed multi-AZ but automatic failover is not enabled; a primary-node loss will require manual intervention.` |
+| `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption at rest off` | `Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate.` |
+| `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption in transit off` | `Client traffic to this group crosses the network in cleartext, so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group.` |
+| `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | n/a | S1, S2, S4, S5 | `no authentication token` | `The group accepts any client that can reach it — encryption in transit is on but no authentication token is required. Set one, so a network-level reachability mistake is not immediately a data breach.` |
+| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | n/a | S2, S4, S5 | `automatic backups off` | `Automatic backups are off, so a failed replication group takes its data with it. Set a snapshot retention limit of at least one day.` |
 
 Notes for fillers:
 
@@ -230,6 +234,10 @@ redis — DATABASES & STORAGE. Lifecycle key: `status`.
 | redis.warn.snapshotting | snapshotting — backup running | warn | wave1 |
 | redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 |
 | redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 |
+| redis.encryption-at-rest-off | encryption at rest off | warn | wave1 |
+| redis.encryption-in-transit-off | encryption in transit off | warn | wave1 |
+| redis.no-auth | no authentication token | broken | wave1 |
+| redis.no-backup | automatic backups off | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

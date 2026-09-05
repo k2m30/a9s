@@ -238,3 +238,19 @@ func TestDbcSubnetGroup_NoSubnetGroupName_DocDB(t *testing.T) {
 		t.Errorf("dbcSubnetGroup = %+v, want nil when DBSubnetGroup name is absent", info)
 	}
 }
+
+func (f *fakeRDSSubnetGroupClient) DescribeDBEngineVersions(_ context.Context, _ *rds.DescribeDBEngineVersionsInput, _ ...func(*rds.Options)) (*rds.DescribeDBEngineVersionsOutput, error) {
+	return &rds.DescribeDBEngineVersionsOutput{}, nil
+}
+
+func (f *fakeRDSSubnetGroupClient) DescribeDBSnapshotAttributes(_ context.Context, _ *rds.DescribeDBSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error) {
+	return &rds.DescribeDBSnapshotAttributesOutput{}, nil
+}
+
+func (f *fakeRDSSubnetGroupClient) DescribeDBClusterSnapshotAttributes(_ context.Context, _ *rds.DescribeDBClusterSnapshotAttributesInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
+	return &rds.DescribeDBClusterSnapshotAttributesOutput{}, nil
+}
+
+func (f *fakeDocDBClient) DescribeDBClusterSnapshotAttributes(_ context.Context, _ *docdb.DescribeDBClusterSnapshotAttributesInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
+	return &docdb.DescribeDBClusterSnapshotAttributesOutput{}, nil
+}

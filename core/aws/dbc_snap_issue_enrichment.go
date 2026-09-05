@@ -28,20 +28,30 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // dbc-snap canonical FindingCodes emitted by the cross-ref enricher.
 const (
 	dbcSnapOrphanCode        domain.FindingCode = "dbc-snap.orphan"
 	dbcSnapPastRetentionCode domain.FindingCode = "dbc-snap.past-retention"
+	dbcSnapPublicCode        domain.FindingCode = "dbc-snap.public"
 )
+
+// dbcSnapPublicDetail is the S5 operator sentence for a snapshot shared with
+// the "all" group.
+const dbcSnapPublicDetail = "The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove `all` from the snapshot's restore attribute."
 
 // enrichDBCSnapCrossRef is the IssueEnricherFunc registered for dbc-snap.
 var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
@@ -58,7 +68,51 @@ var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	ShortName:          "dbc-snap",
 	OrphanCode:         dbcSnapOrphanCode,
 	PastRetentionCode:  dbcSnapPastRetentionCode,
+	PublicAttr:         dbcSnapShareAttributes,
+	PublicCode:         dbcSnapPublicCode,
+	PublicPhrase:       "shared with all AWS accounts",
+	PublicDetail:       dbcSnapPublicDetail,
 })
+
+// dbcSnapShareAttributes reads one cluster snapshot's share attributes. The
+// dbc-snap list merges DocumentDB and Aurora rows, so the RawStruct decides
+// which SDK owns the snapshot — the same rule the extractors below follow.
+func dbcSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap resource.Resource) ([]snapshotAttribute, error) {
+	if _, isDocDB := assertStruct[docdbtypes.DBClusterSnapshot](snap.RawStruct); isDocDB {
+		if clients.DocDB == nil {
+			return nil, nil
+		}
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
+			return clients.DocDB.DescribeDBClusterSnapshotAttributes(ctx, &docdb.DescribeDBClusterSnapshotAttributesInput{
+				DBClusterSnapshotIdentifier: aws.String(snap.ID),
+			})
+		})
+		if err != nil || out.DBClusterSnapshotAttributesResult == nil {
+			return nil, err
+		}
+		attrs := make([]snapshotAttribute, 0, len(out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes))
+		for _, a := range out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes {
+			attrs = append(attrs, snapshotAttribute{Name: aws.ToString(a.AttributeName), Values: a.AttributeValues})
+		}
+		return attrs, nil
+	}
+	if clients.RDS == nil {
+		return nil, nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
+		return clients.RDS.DescribeDBClusterSnapshotAttributes(ctx, &rds.DescribeDBClusterSnapshotAttributesInput{
+			DBClusterSnapshotIdentifier: aws.String(snap.ID),
+		})
+	})
+	if err != nil || out.DBClusterSnapshotAttributesResult == nil {
+		return nil, err
+	}
+	attrs := make([]snapshotAttribute, 0, len(out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes))
+	for _, a := range out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes {
+		attrs = append(attrs, snapshotAttribute{Name: aws.ToString(a.AttributeName), Values: a.AttributeValues})
+	}
+	return attrs, nil
+}
 
 // dbcSnapParentID extracts DBClusterIdentifier from either a
 // docdbtypes.DBClusterSnapshot or rdstypes.DBClusterSnapshot.

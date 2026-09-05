@@ -131,6 +131,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ec2_ebs_public_snapshot`.
 - Launch templates now report a credential pasted into the default version's
   user data. Closes Prowler `ec2_launch_template_no_secrets`.
+- Databases and storage now report the security posture an auditor asks
+  about, not just the lifecycle state. Every signal below is read-only
+  and shows up in the list status column, the row color, and the detail
+  view's attention section.
+- **S3 buckets**: a bucket AWS reports as public by policy, versioning
+  never enabled, MFA delete off on a versioned bucket, server access
+  logging off, no enabled lifecycle rule, and object lock off. Closes
+  Prowler `s3_bucket_public_access`,
+  `s3_bucket_policy_public_write_access`, `s3_bucket_object_versioning`,
+  `s3_bucket_no_mfa_delete`, `s3_bucket_server_access_logging_enabled`,
+  `s3_bucket_lifecycle_enabled`, `s3_bucket_object_lock`.
+- **ElastiCache Redis**: encryption at rest off, encryption in transit
+  off, no authentication token on a group that does encrypt in transit, and
+  automatic backups off. Closes Prowler
+  `elasticache_redis_cluster_rest_encryption_enabled`,
+  `elasticache_redis_cluster_in_transit_encryption_enabled`,
+  `elasticache_redis_replication_group_auth_enabled`,
+  `elasticache_redis_cluster_backup_enabled`.
+- **RDS DB instances**: single-AZ, auto minor version upgrade off, IAM
+  database authentication off, a vendor-default master username, a CA
+  certificate inside 90 days of expiry, and an engine version AWS no
+  longer supports. Closes Prowler `rds_instance_multi_az`,
+  `rds_instance_minor_version_upgrade_enabled`,
+  `rds_instance_iam_authentication_enabled`, `rds_instance_default_admin`,
+  `rds_instance_certificate_expiration`,
+  `rds_instance_deprecated_engine_version`,
+  `rds_instance_extended_support`.
+- **DB clusters** (Aurora and DocumentDB): the same four configuration
+  checks on the cluster shape. Closes Prowler `rds_cluster_multi_az`,
+  `rds_cluster_minor_version_upgrade_enabled`,
+  `rds_cluster_iam_authentication_enabled`, `rds_cluster_default_admin`.
+- **DB snapshots**, instance and cluster alike: a snapshot whose restore
+  attribute is shared with every AWS account. Closes Prowler
+  `rds_snapshots_public_access`, `documentdb_cluster_public_snapshot`.
+- **DynamoDB tables**: deletion protection off, and a resource policy
+  that grants another account or any principal at all. Closes Prowler
+  `dynamodb_table_deletion_protection_enabled`,
+  `dynamodb_table_cross_account_access`.
+- **OpenSearch domains**: reachable outside a VPC behind an open access
+  policy, HTTPS not enforced, and node-to-node encryption off. Closes
+  Prowler `opensearch_service_domains_not_publicly_accessible`,
+  `opensearch_service_domains_https_communications_enforced`,
+  `opensearch_service_domains_node_to_node_encryption_enabled`.
+- **Redshift clusters**: audit logging off and a parameter group that
+  does not require SSL. Closes Prowler `redshift_cluster_audit_logging`,
+  `redshift_cluster_in_transit_encryption_enabled`.
+- **EFS file systems**: not encrypted at rest, a file system policy open
+  to anyone, and AWS Backup's automatic backups off. Closes Prowler
+  `efs_encryption_at_rest_enabled`, `efs_not_publicly_accessible`,
+  `efs_have_backup_enabled`.
+
+### Changed
+
+- Redis and Redshift rows now take their color from the worst finding on
+  the row rather than the first Wave 1 one, so a Broken signal can no
+  longer hide behind a Warning that happened to be evaluated earlier.
 
 ### Fixed (security)
 

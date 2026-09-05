@@ -43,12 +43,15 @@ type tildeOnlyEnricherCase struct {
 // tildeOnlyEnricherCases lists every enricher that emits only informational
 // "~" findings (IssueCount is always 0) and must therefore never let its own
 // EnrichmentCap lower-bound the aggregate Truncated flag.
+//
+// ddb and dbi are deliberately absent: their enrichers now also emit "!"
+// findings (an open resource policy, a deprecated engine version), so a capped
+// walk really can hide an issue and Truncated is the correct answer for them.
 func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
 		{"apigw", awsclient.EnrichAPIGatewayStage},
 		{"athena", awsclient.EnrichAthenaWorkGroup},
 		{"cf", awsclient.EnrichCloudFrontDistribution},
-		{"ddb", awsclient.EnrichDynamoDBPITR},
 		{"eb", awsclient.EnrichEBEnvironmentHealth},
 		{"ecs", awsclient.EnrichECSClusters},
 		{"elb", awsclient.EnrichELBAttributes},
@@ -64,7 +67,6 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 		{"sqs", awsclient.EnrichSQSAttributes},
 		{"vpc", awsclient.EnrichVPCFlowLogs},
 		{"waf", awsclient.EnrichWAFLogging},
-		{"dbi", awsclient.EnrichDBIMaintenance},
 	}
 }
 

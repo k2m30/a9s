@@ -187,6 +187,10 @@ One row per signal from §3:
 | `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `not encrypted at rest` | `StorageEncrypted is false — cluster storage is not protected by KMS.` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` | `BackupRetentionPeriod is 0 — automated snapshots are disabled; PITR will not work.` |
 | Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` | `AWS-mandated maintenance past its ForcedApplyDate — AWS will apply it in the next window.` |
+| `MultiAZ == false` | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` | `The cluster has no instance in a second Availability Zone, so an AZ failure takes it down until you restore it. Add a replica in another AZ.` |
+| `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` | `Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself.` |
+| `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` | `Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities.` |
+| `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
 
 Rules for filling list and detail text:
 
@@ -244,6 +248,10 @@ dbc — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 |
 | dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 |
 | dbc.maintenance-overdue | maintenance overdue | broken | wave2 |
+| dbc.single-az | single-AZ | warn | wave1 |
+| dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
+| dbc.iam-auth-off | IAM database authentication off | warn | wave1 |
+| dbc.default-master-user | default master username | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

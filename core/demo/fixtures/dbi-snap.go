@@ -101,6 +101,28 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 	recentSnapTime := time.Now().UTC().Add(-3 * 24 * time.Hour)
 
 	return []rdstypes.DBSnapshot{
+		// 0. DBISnapPublic — witness for dbi-snap.public: the RDS fake reports
+		// its restore attribute as granting the "all" group.
+		{
+			DBSnapshotIdentifier: aws.String(DBISnapPublic),
+			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:" + DBISnapPublic),
+			DBInstanceIdentifier: aws.String(ProdDbiID),
+			Status:               aws.String("available"),
+			Engine:               aws.String("postgres"),
+			EngineVersion:        aws.String("16.2"),
+			SnapshotType:         aws.String("manual"),
+			SnapshotCreateTime:   aws.Time(recentSnapTime),
+			AllocatedStorage:     aws.Int32(100),
+			StorageType:          aws.String("gp3"),
+			Encrypted:            aws.Bool(true),
+			KmsKeyId:             aws.String(dbiKMSKeyID),
+			AvailabilityZone:     aws.String("us-east-1a"),
+			MasterUsername:       aws.String("pgadmin"),
+			LicenseModel:         aws.String("postgresql-license"),
+			PercentProgress:      aws.Int32(100),
+			SourceRegion:         aws.String("us-east-1"),
+		},
+
 		// 1. ProdDBISnapID — Healthy non-Aurora automated snapshot of prod-dbi-1.
 		// SnapshotCreateTime is dynamic (now-3d) to stay within the parent's 7-day retention.
 		{

@@ -12,3 +12,10 @@ const (
 	CodeDDBDeleting           domain.FindingCode = "ddb.warn.deleting"
 	CodeDDBArchiving          domain.FindingCode = "ddb.warn.archiving"
 )
+
+// CodeDDBDeletionProtectionOff is the wave-1 posture finding read from the
+// DescribeTable output the fetcher already holds (Prowler gap closure).
+const CodeDDBDeletionProtectionOff domain.FindingCode = "ddb.deletion-protection-off"
+
+// ddbDeletionProtectionOffDetail is the S5 operator sentence for it.
+const ddbDeletionProtectionOffDetail = "A single DeleteTable call destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step."

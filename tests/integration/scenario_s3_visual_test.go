@@ -34,7 +34,7 @@ const (
 	// has no wave-1 signals, so the s3 entry renders no badge at all.
 	s3ExpectedIssueBkt = 0
 
-	// Wave-2 Rows row labels/values emitted by EnrichS3PublicAccessBlock.
+	// Wave-2 Rows row labels/values emitted by EnrichS3Posture.
 	s3Row_BlockPublicAcls    = "BlockPublicAcls"
 	s3Row_BlockPublicPolicy  = "BlockPublicPolicy"
 	s3Row_AccountLevelLabel  = "Account-level PAB"

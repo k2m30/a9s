@@ -29,7 +29,9 @@ func (f *RedshiftFake) DescribeClusters(_ context.Context, _ *redshift.DescribeC
 // DescribeLoggingStatus routes by ClusterIdentifier:
 //   - acme-warehouse → CloudWatch logging enabled (connectionlog, userlog, useractivitylog)
 //   - acme-reporting → S3 logging enabled (BucketName = RedshiftAuditBucket)
-//   - all others     → logging disabled
+//   - the audit-logging-off witness → logging disabled
+//   - all others     → CloudWatch logging enabled (the healthy default, so
+//     exactly one demo row carries the audit-logging-off finding)
 func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.DescribeLoggingStatusInput, _ ...func(*redshift.Options)) (*redshift.DescribeLoggingStatusOutput, error) {
 	if in == nil || in.ClusterIdentifier == nil {
 		return &redshift.DescribeLoggingStatusOutput{}, nil
@@ -50,11 +52,33 @@ func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.Des
 			BucketName:         aws.String(fixtures.RedshiftAuditBucket),
 			S3KeyPrefix:        aws.String("audit/"),
 		}, nil
-	default:
+	case fixtures.RedshiftAuditLoggingOff:
 		return &redshift.DescribeLoggingStatusOutput{
 			LoggingEnabled: aws.Bool(false),
 		}, nil
+	default:
+		return &redshift.DescribeLoggingStatusOutput{
+			LoggingEnabled:     aws.Bool(true),
+			LogDestinationType: redshifttypes.LogDestinationTypeCloudwatch,
+			LogExports:         []string{"connectionlog", "userlog"},
+		}, nil
 	}
+}
+
+// DescribeClusterParameters answers the require_ssl check. Only
+// fixtures.RedshiftOpenParameterGroup leaves it false.
+func (f *RedshiftFake) DescribeClusterParameters(_ context.Context, in *redshift.DescribeClusterParametersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClusterParametersOutput, error) {
+	value := "true"
+	if in != nil && aws.ToString(in.ParameterGroupName) == fixtures.RedshiftOpenParameterGroup {
+		value = "false"
+	}
+	return &redshift.DescribeClusterParametersOutput{
+		Parameters: []redshifttypes.Parameter{{
+			ParameterName:  aws.String("require_ssl"),
+			ParameterValue: aws.String(value),
+			ApplyType:      redshifttypes.ParameterApplyTypeStatic,
+		}},
+	}, nil
 }
 
 // DescribeClusterSubnetGroups routes by ClusterSubnetGroupName:

@@ -97,17 +97,17 @@ resource-list frame title. The frame-title rules:
 
 | shortName | Name | Wave 1 | Wave 2 | Wave 3 | Source |
 |---|---|---|---|---|---|
-| `dbi` | DB Instances | `DBInstanceStatus`: `available`→Healthy; transitional → Warning; `failed`/`storage-full`/`incompatible-*`/`restore-error`/`inaccessible-encryption-credentials`→Broken. `BackupRetentionPeriod==0` → Warning. `PubliclyAccessible==true` → Warning (reachable from the internet). `StorageEncrypted==false` → Warning (unencrypted at rest). `DeletionProtection==false` → Warning | `DescribePendingMaintenanceActions` (one account-wide call): any pending maintenance action → Warning (`maintenance scheduled`; no overdue gate — unlike `dbc`) | CloudWatch `FreeStorageSpace`, `CPUUtilization`, `ReplicaLag`, `DatabaseConnections` | [DescribeDBInstances](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBInstances.html) |
+| `dbi` | DB Instances | `DBInstanceStatus`: `available`→Healthy; transitional → Warning; `failed`/`storage-full`/`incompatible-*`/`restore-error`/`inaccessible-encryption-credentials`→Broken. `BackupRetentionPeriod==0` → Warning. `PubliclyAccessible==true` → Warning (reachable from the internet). `StorageEncrypted==false` → Warning (unencrypted at rest). `DeletionProtection==false` → Warning. `MultiAZ==false` on a non-Aurora primary → Warning (single-AZ). `AutoMinorVersionUpgrade==false` → Warning. `IAMDatabaseAuthenticationEnabled==false` on an engine that supports it → Warning. `MasterUsername` is a vendor default → Warning. `CertificateDetails.ValidTill` within 90 days → Warning, within 30 → Broken | `DescribePendingMaintenanceActions` (one account-wide call): any pending maintenance action → Warning (`maintenance scheduled`; no overdue gate — unlike `dbc`). `DescribeDBEngineVersions` once per distinct (engine, version) pair: version not listed as available → Broken (`engine version deprecated`) | CloudWatch `FreeStorageSpace`, `CPUUtilization`, `ReplicaLag`, `DatabaseConnections` | [DescribeDBInstances](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBInstances.html) |
 <!-- amended by a9s-resource-spec during dbc gen: service URL realigned to DocumentDB to match related-resources.md; name disambiguated from RDS Aurora -->
-| `dbc` | DocumentDB Clusters | `Status`: `available`→Healthy; transitional → Warning; `failed`/`inaccessible-encryption-credentials`/`incompatible-parameters`→Broken. No `DBClusterMembers[]` entry with `IsClusterWriter==true` → Broken. `DeletionProtection==false` → Warning. `StorageEncrypted==false` → Warning. `BackupRetentionPeriod==0` → Warning | Shared with `dbi`: `DescribePendingMaintenanceActions` — an overdue action emits the `maintenance overdue` finding at Broken severity (unlike `dbi`, which emits Warning) | CloudWatch `DBInstanceReplicaLag`, `DatabaseConnections` | [DescribeDBClusters](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html) |
-| `redis` | ElastiCache Redis | (Replication-group-scoped; values are `ReplicationGroup.Status`.) `Status`: `available`→Healthy; `creating`/`modifying`/`deleting`/`snapshotting`→Warning; `create-failed`→Broken. `AutomaticFailover` != `enabled` on multi-AZ → Warning | None | CloudWatch `DatabaseMemoryUsagePercentage`, `Evictions`, `ReplicationLag`, `EngineCPUUtilization` | [DescribeReplicationGroups](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_DescribeReplicationGroups.html) |
-| `ddb` | DynamoDB Tables | None — `ListTables` returns table names only | `DescribeTable` per table (N+1): `TableStatus`: `ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`/`ARCHIVING`→Warning; `INACCESSIBLE_ENCRYPTION_CREDENTIALS`/`ARCHIVED`→Broken. Plus `DescribeContinuousBackups` per table: PITR disabled → Warning | CloudWatch `ReadThrottleEvents`+`WriteThrottleEvents`, `SystemErrors` | [DescribeTable](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html) |
-| `opensearch` | OpenSearch Domains | None — `ListDomainNames` returns domain names only | `DescribeDomains` (bounded fan-out): `Deleted==true`→Dim; `Processing==true` or `UpgradeProcessing==true`→Warning; `DomainProcessingStatus==Isolated`→Broken. `ServiceSoftwareOptions.UpdateAvailable==true` → Broken (`software update forced soon`). `EncryptionAtRestOptions.Enabled==false` → Warning | Cluster-health (Red/Yellow/Green) is CloudWatch-only: `AWS/ES` namespace, `ClusterStatus.red`/`yellow`. Also `FreeStorageSpace`, `JVMMemoryPressure` | [DescribeDomains](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomains.html) |
-| `redshift` | Redshift Clusters | `ClusterStatus`: `available`→Healthy; `creating`/`modifying`/`resizing`/`rebooting`/`renaming`/`deleting`→Warning; `incompatible-hsm`/`incompatible-network`/`incompatible-parameters`/`incompatible-restore`/`hardware-failure`/`storage-full`→Broken. `ClusterAvailabilityStatus`: `Unavailable`/`Failed`→Broken, `Maintenance`/`Modifying`→Warning. `PendingModifiedValues` non-empty → Warning. `DeferredMaintenanceWindows[]` active → Warning. `PubliclyAccessible==true` → Warning. `Encrypted==false` → Warning | None | CloudWatch `PercentageDiskSpaceUsed`, `HealthStatus` | [DescribeClusters](https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeClusters.html) |
-| `efs` | EFS File Systems | `LifeCycleState`: `available`→Healthy; `creating`/`updating`/`deleting`→Warning; `error`→Broken. `NumberOfMountTargets==0` → Broken (unreachable) | `DescribeMountTargets` per FS: any mount target `LifeCycleState` != `available` → Broken | CloudWatch `PercentIOLimit`, `BurstCreditBalance` | [DescribeMountTargets](https://docs.aws.amazon.com/efs/latest/ug/API_DescribeMountTargets.html) |
-| `s3` | S3 Buckets | None — `ListBuckets` returns `Name`, `CreationDate`, `BucketRegion`, `BucketArn` only | `GetPublicAccessBlock` per bucket: `NoSuchPublicAccessBlockConfiguration` error or any flag false → Warning (public-exposure risk; account-level PAB may still override) | `GetBucketPolicyStatus`, `GetBucketEncryption`, `GetBucketVersioning`, `GetBucketLogging`, `GetBucketLifecycleConfiguration` (each is per-bucket) | [GetPublicAccessBlock](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetPublicAccessBlock.html) |
-| `dbi-snap` | DB Instance Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`/`incompatible-*`→Broken. `Encrypted==false` → Warning (unencrypted at rest) | Cache-scan (zero API calls): cross-ref `dbi` — source DB deleted → Broken (orphan); when parent DB in the loaded list, snapshot age > parent `BackupRetentionPeriod` AND `SnapshotType==automated` → Broken (past retention) | `DescribeDBSnapshotAttributes` per snapshot (public-snapshot) | [DescribeDBSnapshots](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html) |
-| `dbc-snap` | DB Cluster Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`→Broken. Manual snapshot age >365d → Warning (cost) | Cache-scan (zero API calls): cross-ref `dbc` — source cluster deleted → Broken (orphan); when parent cluster in loaded list, age > cluster `BackupRetentionPeriod` AND automated → Broken (past retention) | `DescribeDBClusterSnapshotAttributes` per snapshot | [DescribeDBClusterSnapshots](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusterSnapshots.html) |
+| `dbc` | DocumentDB Clusters | `Status`: `available`→Healthy; transitional → Warning; `failed`/`inaccessible-encryption-credentials`/`incompatible-parameters`→Broken. No `DBClusterMembers[]` entry with `IsClusterWriter==true` → Broken. `DeletionProtection==false` → Warning. `StorageEncrypted==false` → Warning. `BackupRetentionPeriod==0` → Warning. `MultiAZ==false` → Warning (single-AZ). `AutoMinorVersionUpgrade==false` → Warning (Aurora only; DocumentDB does not report it). `IAMDatabaseAuthenticationEnabled==false` → Warning (Aurora only). `MasterUsername` is a vendor default → Warning | Shared with `dbi`: `DescribePendingMaintenanceActions` — an overdue action emits the `maintenance overdue` finding at Broken severity (unlike `dbi`, which emits Warning) | CloudWatch `DBInstanceReplicaLag`, `DatabaseConnections` | [DescribeDBClusters](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html) |
+| `redis` | ElastiCache Redis | (Replication-group-scoped; values are `ReplicationGroup.Status`.) `Status`: `available`→Healthy; `creating`/`modifying`/`deleting`/`snapshotting`→Warning; `create-failed`→Broken. `AutomaticFailover` != `enabled` on multi-AZ → Warning. `AtRestEncryptionEnabled` not true → Warning. `TransitEncryptionEnabled` not true → Warning. `AuthTokenEnabled` not true while in-transit encryption is on → Broken (`no authentication token`). `SnapshotRetentionLimit` 0 or absent → Warning | None | CloudWatch `DatabaseMemoryUsagePercentage`, `Evictions`, `ReplicationLag`, `EngineCPUUtilization` | [DescribeReplicationGroups](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_DescribeReplicationGroups.html) |
+| `ddb` | DynamoDB Tables | None — `ListTables` returns table names only | `DescribeTable` per table (N+1): `TableStatus`: `ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`/`ARCHIVING`→Warning; `INACCESSIBLE_ENCRYPTION_CREDENTIALS`/`ARCHIVED`→Broken. `DeletionProtectionEnabled` not true → Warning. Plus `DescribeContinuousBackups` per table: PITR disabled → Warning; and `GetResourcePolicy` per table: wildcard principal → Broken (`resource policy open to anyone`), otherwise a named foreign account → Warning | CloudWatch `ReadThrottleEvents`+`WriteThrottleEvents`, `SystemErrors` | [DescribeTable](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html) |
+| `opensearch` | OpenSearch Domains | None — `ListDomainNames` returns domain names only | `DescribeDomains` (bounded fan-out): `Deleted==true`→Dim; `Processing==true` or `UpgradeProcessing==true`→Warning; `DomainProcessingStatus==Isolated`→Broken. `ServiceSoftwareOptions.UpdateAvailable==true` → Broken (`software update forced soon`). `EncryptionAtRestOptions.Enabled==false` → Warning. No `VPCOptions` while the access policy allows any principal → Broken (`reachable outside a VPC`). `DomainEndpointOptions.EnforceHTTPS` not true → Warning. `NodeToNodeEncryptionOptions.Enabled` not true → Warning | Cluster-health (Red/Yellow/Green) is CloudWatch-only: `AWS/ES` namespace, `ClusterStatus.red`/`yellow`. Also `FreeStorageSpace`, `JVMMemoryPressure` | [DescribeDomains](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomains.html) |
+| `redshift` | Redshift Clusters | `ClusterStatus`: `available`→Healthy; `creating`/`modifying`/`resizing`/`rebooting`/`renaming`/`deleting`→Warning; `incompatible-hsm`/`incompatible-network`/`incompatible-parameters`/`incompatible-restore`/`hardware-failure`/`storage-full`→Broken. `ClusterAvailabilityStatus`: `Unavailable`/`Failed`→Broken, `Maintenance`/`Modifying`→Warning. `PendingModifiedValues` non-empty → Warning. `DeferredMaintenanceWindows[]` active → Warning. `PubliclyAccessible==true` → Warning. `Encrypted==false` → Warning | `DescribeLoggingStatus` per cluster: logging not enabled → Warning (`audit logging off`). `DescribeClusterParameters` once per distinct parameter group: `require_ssl` not `true` → Warning | CloudWatch `PercentageDiskSpaceUsed`, `HealthStatus` | [DescribeClusters](https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeClusters.html) |
+| `efs` | EFS File Systems | `LifeCycleState`: `available`→Healthy; `creating`/`updating`/`deleting`→Warning; `error`→Broken. `NumberOfMountTargets==0` → Broken (unreachable). `Encrypted` not true → Warning (`not encrypted`) | `DescribeMountTargets` per FS: any mount target `LifeCycleState` != `available` → Broken. `DescribeFileSystemPolicy` per FS: wildcard principal → Broken (`file system policy open to anyone`). `DescribeBackupPolicy` per FS: status not `ENABLED` → Warning | CloudWatch `PercentIOLimit`, `BurstCreditBalance` | [DescribeMountTargets](https://docs.aws.amazon.com/efs/latest/ug/API_DescribeMountTargets.html) |
+| `s3` | S3 Buckets | None — `ListBuckets` returns `Name`, `CreationDate`, `BucketRegion`, `BucketArn` only | Six per-bucket calls in one capped walk: `GetPublicAccessBlock` (`NoSuchPublicAccessBlockConfiguration` error or any flag false → Warning; account-level PAB may still override), `GetBucketPolicyStatus` (`IsPublic` → Broken), `GetBucketVersioning` (not `Enabled` → Warning, else MFA delete not `Enabled` → Warning), `GetBucketLogging` (no `LoggingEnabled` → Warning), `GetBucketLifecycleConfiguration` (zero enabled rules → Warning), `GetObjectLockConfiguration` (not `Enabled` → Warning). A cross-region or deleted bucket short-circuits the walk and marks the row `?` | `GetBucketEncryption` (per-bucket) | [GetPublicAccessBlock](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetPublicAccessBlock.html) |
+| `dbi-snap` | DB Instance Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`/`incompatible-*`→Broken. `Encrypted==false` → Warning (unencrypted at rest) | Cache-scan (zero API calls): cross-ref `dbi` — source DB deleted → Broken (orphan); when parent DB in the loaded list, snapshot age > parent `BackupRetentionPeriod` AND `SnapshotType==automated` → Broken (past retention). Plus `DescribeDBSnapshotAttributes` per snapshot: `restore` attribute lists the `all` group → Broken (`shared with all AWS accounts`) | None | [DescribeDBSnapshots](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html) |
+| `dbc-snap` | DB Cluster Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`→Broken. Manual snapshot age >365d → Warning (cost) | Cache-scan (zero API calls): cross-ref `dbc` — source cluster deleted → Broken (orphan); when parent cluster in loaded list, age > cluster `BackupRetentionPeriod` AND automated → Broken (past retention). Plus `DescribeDBClusterSnapshotAttributes` per snapshot, on whichever of the rds / docdb clients owns the row: `restore` attribute lists the `all` group → Broken (`shared with all AWS accounts`) | None | [DescribeDBClusterSnapshots](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusterSnapshots.html) |
 
 ### Messaging
 
@@ -367,7 +367,19 @@ resource-list frame title. The frame-title rules:
 | dbi | dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 |
 | dbi | dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 |
 | dbi | dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
+| dbi | dbi.single-az | single-AZ | warn | wave1 |
+| dbi | dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
+| dbi | dbi.iam-auth-off | IAM database authentication off | warn | wave1 |
+| dbi | dbi.default-master-user | default master username | warn | wave1 |
+| dbi | dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 |
+| dbi | dbi.engine-deprecated | engine version deprecated | broken | wave2 |
 | s3 | s3.public-access-block-incomplete | public access block incomplete | warn | wave2 |
+| s3 | s3.public | publicly accessible | broken | wave2 |
+| s3 | s3.versioning-off | versioning off | warn | wave2 |
+| s3 | s3.mfa-delete-off | MFA delete off | warn | wave2 |
+| s3 | s3.access-logging-off | access logging off | warn | wave2 |
+| s3 | s3.no-lifecycle | no lifecycle rules | warn | wave2 |
+| s3 | s3.no-object-lock | object lock off | warn | wave2 |
 | redis | redis.broken.create\_failed | create failed — see events | broken | wave1 |
 | redis | redis.warn.creating | creating — new group | warn | wave1 |
 | redis | redis.warn.deleting | deleting — teardown | warn | wave1 |
@@ -375,6 +387,10 @@ resource-list frame title. The frame-title rules:
 | redis | redis.warn.snapshotting | snapshotting — backup running | warn | wave1 |
 | redis | redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 |
 | redis | redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 |
+| redis | redis.encryption-at-rest-off | encryption at rest off | warn | wave1 |
+| redis | redis.encryption-in-transit-off | encryption in transit off | warn | wave1 |
+| redis | redis.no-auth | no authentication token | broken | wave1 |
+| redis | redis.no-backup | automatic backups off | warn | wave1 |
 | dbc | dbc.broken.failed | failed: cluster operation | broken | wave1 |
 | dbc | dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 |
 | dbc | dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 |
@@ -384,6 +400,10 @@ resource-list frame title. The frame-title rules:
 | dbc | dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 |
 | dbc | dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 |
 | dbc | dbc.maintenance-overdue | maintenance overdue | broken | wave2 |
+| dbc | dbc.single-az | single-AZ | warn | wave1 |
+| dbc | dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
+| dbc | dbc.iam-auth-off | IAM database authentication off | warn | wave1 |
+| dbc | dbc.default-master-user | default master username | warn | wave1 |
 | ddb | ddb.broken.kms\_key\_inaccessible | kms key inaccessible | broken | wave1 |
 | ddb | ddb.broken.archived\_kms\_lost | archived: kms key lost | broken | wave1 |
 | ddb | ddb.warn.creating | creating | warn | wave1 |
@@ -391,6 +411,9 @@ resource-list frame title. The frame-title rules:
 | ddb | ddb.warn.deleting | deleting | warn | wave1 |
 | ddb | ddb.warn.archiving | archiving | warn | wave1 |
 | ddb | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 |
+| ddb | ddb.deletion-protection-off | deletion protection off | warn | wave1 |
+| ddb | ddb.cross-account-policy | resource policy grants another account | warn | wave2 |
+| ddb | ddb.public-policy | resource policy open to anyone | broken | wave2 |
 | ddb | ddb.warn.details\_denied | details denied | warn | wave1 |
 | ddb | ddb.warn.details\_unavailable | details unavailable | warn | wave1 |
 | opensearch | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
@@ -398,6 +421,9 @@ resource-list frame title. The frame-title rules:
 | opensearch | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
 | opensearch | opensearch.update-forced | software update forced soon | broken | wave2 |
 | opensearch | opensearch.encryption-off | encryption at rest off | warn | wave2 |
+| opensearch | opensearch.public | reachable outside a VPC | broken | wave2 |
+| opensearch | opensearch.https-not-enforced | HTTPS not enforced | warn | wave2 |
+| opensearch | opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave2 |
 | opensearch | opensearch.warn.details\_denied | details denied | warn | wave1 |
 | opensearch | opensearch.warn.details\_unavailable | details unavailable | warn | wave1 |
 | redshift | redshift.broken.incompatible\_hsm | incompatible-hsm | broken | wave1 |
@@ -420,18 +446,24 @@ resource-list frame title. The frame-title rules:
 | redshift | redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 |
 | redshift | redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 |
 | redshift | redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 |
+| redshift | redshift.audit-logging-off | audit logging off | warn | wave2 |
+| redshift | redshift.require-ssl-off | SSL not required | warn | wave2 |
 | efs | efs.broken.error | error | broken | wave1 |
 | efs | efs.broken.no\_mount\_targets | no mount targets | broken | wave1 |
 | efs | efs.warn.creating | creating | warn | wave1 |
 | efs | efs.warn.updating | updating | warn | wave1 |
 | efs | efs.warn.deleting | deleting | warn | wave1 |
 | efs | efs.mount-target-down | mount target down | broken | wave2 |
+| efs | efs.unencrypted | not encrypted | warn | wave1 |
+| efs | efs.public-policy | file system policy open to anyone | broken | wave2 |
+| efs | efs.no-backup-policy | automatic backups off | warn | wave2 |
 | dbi-snap | dbi-snap.broken.failed | failed | broken | wave1 |
 | dbi-snap | dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbi-snap | dbi-snap.warn.creating | creating: <pct>% | warn | wave1 |
 | dbi-snap | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbi-snap | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |
 | dbi-snap | dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 |
+| dbi-snap | dbi-snap.public | shared with all AWS accounts | broken | wave2 |
 | dbc-snap | dbc-snap.broken.failed | failed | broken | wave1 |
 | dbc-snap | dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbc-snap | dbc-snap.warn.creating | creating | warn | wave1 |
@@ -439,6 +471,7 @@ resource-list frame title. The frame-title rules:
 | dbc-snap | dbc-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbc-snap | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
 | dbc-snap | dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
+| dbc-snap | dbc-snap.public | shared with all AWS accounts | broken | wave2 |
 | alarm | alarm.state.alarm | alarm triggered | broken | wave1 |
 | alarm | alarm.state.insufficient\_data | insufficient data | warn | wave1 |
 | alarm | alarm.no\_actions | no actions | warn | wave1 |

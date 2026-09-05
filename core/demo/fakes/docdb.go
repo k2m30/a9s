@@ -53,3 +53,22 @@ func (f *DocDBFake) DescribePendingMaintenanceActions(_ context.Context, _ *docd
 		PendingMaintenanceActions: f.fix.PendingMaintenanceActions,
 	}, nil
 }
+
+// DescribeDBClusterSnapshotAttributes reports the restore grant on a
+// DocumentDB cluster snapshot. No DocumentDB fixture snapshot is shared with
+// the "all" group — the dbc-snap public witness is the Aurora-side snapshot.
+func (f *DocDBFake) DescribeDBClusterSnapshotAttributes(_ context.Context, in *docdb.DescribeDBClusterSnapshotAttributesInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
+	id := ""
+	if in != nil && in.DBClusterSnapshotIdentifier != nil {
+		id = *in.DBClusterSnapshotIdentifier
+	}
+	name := "restore"
+	return &docdb.DescribeDBClusterSnapshotAttributesOutput{
+		DBClusterSnapshotAttributesResult: &docdbtypes.DBClusterSnapshotAttributesResult{
+			DBClusterSnapshotIdentifier: &id,
+			DBClusterSnapshotAttributes: []docdbtypes.DBClusterSnapshotAttribute{{
+				AttributeName: &name,
+			}},
+		},
+	}, nil
+}

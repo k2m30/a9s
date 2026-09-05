@@ -2,7 +2,7 @@ package unit
 
 // aws_s3_issue_enrichment_test.go — Wave 2 enricher tests for s3.
 //
-// Tests drive aws.EnrichS3PublicAccessBlock and assert the
+// Tests drive aws.EnrichS3Posture and assert the
 // docs/attention-signals.md `s3` Wave 2 contract:
 //   - Severity == "~" (SevWarn) for ALL PAB-missing cases. s3 Wave 2 has NO
 //     Broken tier — "!"/SevBroken must never appear on a PAB finding.
@@ -97,7 +97,7 @@ func (f *s3PABFake) GetPublicAccessBlock(
 // We only use it as S3GetPublicAccessBlockAPI — no other methods needed.
 
 // s3ClientWithPAB wraps s3PABFake into a ServiceClients-compatible S3 field.
-// Because EnrichS3PublicAccessBlock accepts *ServiceClients and calls
+// Because EnrichS3Posture accepts *ServiceClients and calls
 // clients.S3.GetPublicAccessBlock directly, we need an object that implements
 // both S3API (for the S3 field type) and our fake logic.
 //
@@ -188,9 +188,9 @@ func TestS3_Enrich_HealthyBucket_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("healthy-bucket")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	if _, ok := result.Findings["healthy-bucket"]; ok {
@@ -214,9 +214,9 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-nopab")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-nopab")
@@ -267,9 +267,9 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-partial-pab")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-partial-pab")
@@ -315,9 +315,9 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-multifail-pab")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-multifail-pab")
@@ -358,9 +358,9 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-nilcfg")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-nilcfg")
@@ -393,12 +393,12 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("error-bucket")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("expected non-nil composite error when GetPublicAccessBlock returns generic error; got nil")
 	}
-	if !strings.Contains(err.Error(), "s3-enrich: GetPublicAccessBlock") {
-		t.Errorf("err must contain \"s3-enrich: GetPublicAccessBlock\"; got %q", err.Error())
+	if !strings.Contains(err.Error(), "s3-enrich: bucket posture") {
+		t.Errorf("err must contain \"s3-enrich: bucket posture\"; got %q", err.Error())
 	}
 	if !strings.Contains(err.Error(), "error-bucket") {
 		t.Errorf("err must name the failing bucket \"error-bucket\"; got %q", err.Error())
@@ -416,9 +416,9 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 // an empty result without error (degraded gracefully).
 func TestS3_Enrich_NilS3Client_GracefulEmpty(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: nil}
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, nil, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, nil, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 	if result.Findings == nil {
 		t.Error("Findings must not be nil even when S3 client is nil")
@@ -481,9 +481,9 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 		pabResource("a9s-demo-nilcfg"),
 	}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	// Count SevWarn findings manually to decouple from IssueCount field name choices.
@@ -541,9 +541,9 @@ func TestS3_Enrich_NeverEmitsBrokenSeverity(t *testing.T) {
 		pabResource("a9s-demo-nilcfg"),
 	}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 	for id, fs := range result.Findings {
 		for _, f := range fs {
@@ -590,9 +590,9 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 		pabResource("a9s-demo-nilcfg"),
 	}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
 	for id, findings := range result.Findings {
@@ -628,7 +628,7 @@ func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource(deletedBucket)}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("composite error must be nil when NoSuchBucket is the only failure; got %v", err)
 	}
@@ -660,7 +660,7 @@ func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource(deletedBucket)}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("composite error must be nil when NotFound is the only failure; got %v", err)
 	}
@@ -710,7 +710,7 @@ func TestS3_Enrich_NonNotFoundErrors_StillAggregate(t *testing.T) {
 			clients := &awsclient.ServiceClients{S3: c.fake(c.bucket)}
 			resources := []resource.Resource{pabResource(c.bucket)}
 
-			result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+			result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
 			if err == nil {
 				t.Fatalf("expected non-nil composite error for %s; NoSuchBucket/NotFound silent-truncation must not swallow other errors", c.name)
 			}

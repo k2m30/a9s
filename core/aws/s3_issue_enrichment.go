@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -21,6 +23,12 @@ import (
 // s3 canonical FindingCodes.
 const (
 	s3CodePublicAccessBlockIncomplete domain.FindingCode = "s3.public-access-block-incomplete"
+	s3CodePublic                      domain.FindingCode = "s3.public"
+	s3CodeVersioningOff               domain.FindingCode = "s3.versioning-off"
+	s3CodeMFADeleteOff                domain.FindingCode = "s3.mfa-delete-off"
+	s3CodeAccessLoggingOff            domain.FindingCode = "s3.access-logging-off"
+	s3CodeNoLifecycle                 domain.FindingCode = "s3.no-lifecycle"
+	s3CodeNoObjectLock                domain.FindingCode = "s3.no-object-lock"
 )
 
 // s3PABIncompleteDetail is the S5 operator sentence for the PAB-incomplete
@@ -29,11 +37,28 @@ const (
 // apply — but the bucket itself provides no defense-in-depth.
 const s3PABIncompleteDetail = "Bucket-level public access block is missing or partial — account-level PAB may still apply."
 
-// EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
-// and emits a finding when the bucket has no PAB configuration or when any of the
-// four PAB flags is false.
+// S5 operator sentences for the posture findings this enricher emits.
+const (
+	s3PublicDetail           = "AWS reports this bucket's policy as public, so anyone on the internet can reach its objects. Remove the wildcard-principal statements from the bucket policy, or block them with a public access block."
+	s3VersioningOffDetail    = "Overwritten and deleted objects are gone for good — there is no previous version to restore. Enable versioning on the bucket."
+	s3MFADeleteOffDetail     = "Versioning is on, but anyone holding the delete permission can still remove versions permanently. Enable MFA delete so destroying a version needs a second factor."
+	s3AccessLoggingOffDetail = "Nothing records who read or wrote objects here, so an incident leaves no trail to follow. Point server access logging at a log destination bucket."
+	s3NoLifecycleDetail      = "No lifecycle rule expires or transitions objects, so data and cost accumulate indefinitely. Add a lifecycle rule matching the bucket's retention policy."
+	s3NoObjectLockDetail     = "Objects can be overwritten or deleted by anyone with write access — nothing enforces retention. Enable object lock on a new bucket and migrate if the data is compliance-relevant."
+)
+
+// EnrichS3Posture inspects each bucket's security posture (cap EnrichmentCap)
+// with a small set of read-only per-bucket calls and emits one independently
+// evaluated Finding per condition:
 //
-// Contract (Finding):
+//   - GetPublicAccessBlock     → s3.public-access-block-incomplete
+//   - GetBucketPolicyStatus    → s3.public
+//   - GetBucketVersioning      → s3.versioning-off / s3.mfa-delete-off
+//   - GetBucketLogging         → s3.access-logging-off
+//   - GetBucketLifecycle...    → s3.no-lifecycle
+//   - GetObjectLockConfig...   → s3.no-object-lock
+//
+// Contract (public access block Finding):
 //   - Severity is always "~" (a missing/partial bucket-level PAB is a risk,
 //     not a certainty — account-level PAB may still apply — so this signal
 //     never paints a row Broken).
@@ -59,10 +84,11 @@ const s3PABIncompleteDetail = "Bucket-level public access block is missing or pa
 //	The bucket lives in a different region than the configured S3 client.
 //	ListBuckets returns ALL buckets globally regardless of region, but
 //	per-bucket calls require the bucket's regional endpoint. Mark
-//	TruncatedIDs[id]=true (data incomplete → row "?" marker) but do NOT
-//	add to the failure-aggregate error: cross-region buckets are
-//	operational, not bugs, and surfacing them in the `!` log produces
-//	noise on multi-region accounts.
+//	TruncatedIDs[id]=true (data incomplete → row "?" marker), skip every
+//	remaining per-bucket call for that bucket, and do NOT add to the
+//	failure-aggregate error: cross-region buckets are operational, not
+//	bugs, and surfacing them in the `!` log produces noise on multi-region
+//	accounts.
 //
 // On NoSuchBucket / bare "NotFound" (IsNotFoundErr):
 //
@@ -70,12 +96,12 @@ const s3PABIncompleteDetail = "Bucket-level public access block is missing or pa
 //	an operational race, not a bug, for the same reason as the
 //	PermanentRedirect case above. Mark TruncatedIDs[id]=true (data
 //	incomplete → row "?" marker) but do NOT add to the failure-aggregate
-//	error, and do NOT emit a finding: a deleted bucket has no PAB state
-//	to report.
+//	error, and do NOT emit a finding: a deleted bucket has no posture
+//	state to report.
 //
-// On any other API error: no finding emitted; TruncatedIDs[id] = true and
-// the failure aggregates into the returned composite error.
-func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+// On any other API error: no finding emitted for that call; TruncatedIDs[id]
+// = true and the failure aggregates into the returned composite error.
+func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
@@ -90,92 +116,242 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, total, EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		name := r.Name
-		if name == "" {
-			name = r.ID
+		bucketName := r.Name
+		if bucketName == "" {
+			bucketName = r.ID
 		}
-		if name == "" {
+		if bucketName == "" {
 			return
 		}
-		bucketName := name
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
-			return clients.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
-				Bucket: aws.String(bucketName),
-			})
-		})
+		p := scanS3BucketPosture(ctx, clients.S3, bucketName)
+
 		mu.Lock()
 		defer mu.Unlock()
-		if err != nil {
-			var apiErr smithy.APIError
-			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchPublicAccessBlockConfiguration" {
-				setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", "s3", []domain.DetailRow{
-					{Label: "Status", Value: "no public access block configuration"},
-					{Label: "Account-level PAB", Value: "may still apply"},
-				}, s3PABIncompleteDetail)
-				result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
-				return
-			}
-			// A bucket deleted between ListBuckets and this per-bucket call is
-			// an operational race, not a failure. See IsNotFoundErr.
-			if IsNotFoundErr(err) {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
-			// Cross-region buckets: ListBuckets returns ALL buckets globally, but
-			// per-bucket calls require the bucket's regional endpoint. AWS rejects
-			// with PermanentRedirect (301) or IllegalLocationConstraintException (400)
-			// when the configured client region differs from the bucket's region.
-			// This is a legitimate environmental condition (multi-region account),
-			// not a bug — mark data incomplete (TruncatedIDs → "?" row marker)
-			// but do NOT spam the failure log. Classification shared with the
-			// related-def checkers in s3_related.go via isS3CrossRegionErr.
-			if isS3CrossRegionErr(err) {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
-			// Other errors: data incomplete — do not emit a finding.
+		if p.unreachable {
+			// Cross-region bucket or a bucket deleted between ListBuckets and
+			// this call: data incomplete, but neither is a failure to log.
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
 			return
 		}
-		if out.PublicAccessBlockConfiguration == nil {
-			setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", "s3", []domain.DetailRow{
-				{Label: "Status", Value: "no public access block configuration"},
-				{Label: "Account-level PAB", Value: "may still apply"},
-			}, s3PABIncompleteDetail)
-			result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
-			return
+		if len(p.failures) > 0 {
+			// One entry per failed BUCKET, not per failed call: the six calls
+			// share a cause (usually one denied permission), and counting
+			// each would report more failures than there were buckets.
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+			failures = append(failures, fmt.Sprintf("%s: %v", bucketName, p.failures[0]))
 		}
-		cfg := out.PublicAccessBlockConfiguration
-		type flagCheck struct {
-			name  string
-			value *bool
+		for _, f := range p.findings {
+			setWave2Finding(&result, bucketName, f.code, f.phrase, f.glyph, "s3", f.rows, f.detail)
 		}
-		flags := []flagCheck{
-			{"BlockPublicAcls", cfg.BlockPublicAcls},
-			{"IgnorePublicAcls", cfg.IgnorePublicAcls},
-			{"BlockPublicPolicy", cfg.BlockPublicPolicy},
-			{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
+		if p.pabIncomplete {
+			result.FieldUpdates[bucketName] = map[string]string{"status": "public access block incomplete"}
 		}
-		var falseFlags []domain.DetailRow
-		for _, fc := range flags {
-			if fc.value == nil || !*fc.value {
-				falseFlags = append(falseFlags, domain.DetailRow{Label: fc.name, Value: "false"})
-			}
-		}
-		if len(falseFlags) == 0 {
-			// All flags true — healthy bucket. No finding.
-			return
-		}
-		falseFlags = append(falseFlags, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
-		setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", "s3", falseFlags, s3PABIncompleteDetail)
-		result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	})
 	sort.Strings(failures)
 	result.Truncated = truncated
-	return result,
-		AggregateFailures("s3-enrich: GetPublicAccessBlock", failures, total)
+	return result, AggregateFailures("s3-enrich: bucket posture", failures, total)
+}
+
+// s3PostureFinding is one emitted condition, held until the shared result
+// maps can be written under the mutex.
+type s3PostureFinding struct {
+	code   domain.FindingCode
+	phrase string
+	glyph  string
+	detail string
+	rows   []domain.DetailRow
+}
+
+// s3BucketPosture is the outcome of scanning one bucket: the conditions that
+// fired, the per-call errors worth logging, and whether the bucket was
+// reachable from this client's region at all.
+type s3BucketPosture struct {
+	findings      []s3PostureFinding
+	failures      []error
+	unreachable   bool
+	pabIncomplete bool
+}
+
+// s3PostureAPI is the set of read-only per-bucket calls scanS3BucketPosture
+// makes. *s3.Client and the demo S3 fake both satisfy it.
+type s3PostureAPI interface {
+	S3GetPublicAccessBlockAPI
+	S3GetBucketPolicyStatusAPI
+	S3GetBucketVersioningAPI
+	S3GetBucketLoggingAPI
+	S3GetBucketLifecycleAPI
+	S3GetObjectLockConfigurationAPI
+}
+
+// scanS3BucketPosture runs the per-bucket posture calls in order and collects
+// what fired. The first call decides reachability: a cross-region or
+// already-deleted bucket short-circuits the rest, since every remaining call
+// would fail the same way.
+func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s3BucketPosture {
+	var p s3BucketPosture
+	add := func(code domain.FindingCode, phrase, glyph, detail string, rows []domain.DetailRow) {
+		p.findings = append(p.findings, s3PostureFinding{code: code, phrase: phrase, glyph: glyph, detail: detail, rows: rows})
+	}
+
+	pabOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
+		return api.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil || isS3APIErrCode(err, "NoSuchPublicAccessBlockConfiguration"):
+		if rows := s3PABRows(pabOut, err); rows != nil {
+			p.pabIncomplete = true
+			add(s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", s3PABIncompleteDetail, rows)
+		}
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = true
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	statusOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyStatusOutput, error) {
+		return api.GetBucketPolicyStatus(ctx, &s3.GetBucketPolicyStatusInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil:
+		if statusOut.PolicyStatus != nil && aws.ToBool(statusOut.PolicyStatus.IsPublic) {
+			add(s3CodePublic, "publicly accessible", "!", s3PublicDetail,
+				[]domain.DetailRow{{Label: "Policy status", Value: "public", Tier: "!"}})
+		}
+	// A bucket with no policy at all cannot be public by policy.
+	case isS3APIErrCode(err, "NoSuchBucketPolicy"):
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = true
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	versioningOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketVersioningOutput, error) {
+		return api.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil:
+		switch {
+		case versioningOut.Status != s3types.BucketVersioningStatusEnabled:
+			state := string(versioningOut.Status)
+			if state == "" {
+				state = "never enabled"
+			}
+			add(s3CodeVersioningOff, "versioning off", "~", s3VersioningOffDetail,
+				[]domain.DetailRow{{Label: "Versioning", Value: state, Tier: "~"}})
+		case versioningOut.MFADelete != s3types.MFADeleteStatusEnabled:
+			add(s3CodeMFADeleteOff, "MFA delete off", "~", s3MFADeleteOffDetail,
+				[]domain.DetailRow{{Label: "MFA delete", Value: "disabled", Tier: "~"}})
+		}
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = true
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	loggingOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
+		return api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil:
+		if loggingOut.LoggingEnabled == nil {
+			add(s3CodeAccessLoggingOff, "access logging off", "~", s3AccessLoggingOffDetail,
+				[]domain.DetailRow{{Label: "Access logging", Value: "off", Tier: "~"}})
+		}
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = true
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	lifecycleOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLifecycleConfigurationOutput, error) {
+		return api.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil, isS3APIErrCode(err, "NoSuchLifecycleConfiguration"):
+		enabled := 0
+		if lifecycleOut != nil {
+			for _, rule := range lifecycleOut.Rules {
+				if rule.Status == s3types.ExpirationStatusEnabled {
+					enabled++
+				}
+			}
+		}
+		if enabled == 0 {
+			add(s3CodeNoLifecycle, "no lifecycle rules", "~", s3NoLifecycleDetail,
+				[]domain.DetailRow{{Label: "Lifecycle rules", Value: strconv.Itoa(enabled), Tier: "~"}})
+		}
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = true
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	lockOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetObjectLockConfigurationOutput, error) {
+		return api.GetObjectLockConfiguration(ctx, &s3.GetObjectLockConfigurationInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil, isS3APIErrCode(err, "ObjectLockConfigurationNotFoundError"):
+		locked := lockOut != nil && lockOut.ObjectLockConfiguration != nil &&
+			lockOut.ObjectLockConfiguration.ObjectLockEnabled == s3types.ObjectLockEnabledEnabled
+		if !locked {
+			add(s3CodeNoObjectLock, "object lock off", "~", s3NoObjectLockDetail,
+				[]domain.DetailRow{{Label: "Object lock", Value: "off", Tier: "~"}})
+		}
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = true
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	return p
+}
+
+// s3PABRows returns the AttentionDetail rows for an incomplete bucket-level
+// public access block, or nil when the block is complete. err is non-nil only
+// for the NoSuchPublicAccessBlockConfiguration case, which reads the same as
+// a nil configuration body.
+func s3PABRows(out *s3.GetPublicAccessBlockOutput, err error) []domain.DetailRow {
+	if err != nil || out == nil || out.PublicAccessBlockConfiguration == nil {
+		return []domain.DetailRow{
+			{Label: "Status", Value: "no public access block configuration"},
+			{Label: "Account-level PAB", Value: "may still apply"},
+		}
+	}
+	cfg := out.PublicAccessBlockConfiguration
+	flags := []struct {
+		name  string
+		value *bool
+	}{
+		{"BlockPublicAcls", cfg.BlockPublicAcls},
+		{"IgnorePublicAcls", cfg.IgnorePublicAcls},
+		{"BlockPublicPolicy", cfg.BlockPublicPolicy},
+		{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
+	}
+	var rows []domain.DetailRow
+	for _, fc := range flags {
+		if !aws.ToBool(fc.value) {
+			rows = append(rows, domain.DetailRow{Label: fc.name, Value: "false"})
+		}
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return append(rows, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
+}
+
+// isS3APIErrCode reports whether err is the named S3 API error code. The
+// "absent configuration" responses S3 returns as errors (NoSuchBucketPolicy,
+// NoSuchLifecycleConfiguration, ObjectLockConfigurationNotFoundError) are
+// answers, not failures, and each caller matches its own.
+func isS3APIErrCode(err error, code string) bool {
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == code
 }

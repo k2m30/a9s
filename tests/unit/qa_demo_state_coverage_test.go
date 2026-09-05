@@ -59,7 +59,7 @@
 // s3 must NOT appear in knownStateCoverageGaps for its documented
 // "public access block incomplete" finding: core/demo/fixtures/s3.go
 // already carries a bucket with an incomplete GetPublicAccessBlockOutput, so
-// EnrichS3PublicAccessBlock (or the Wave-1 classification, whichever the
+// EnrichS3Posture (or the Wave-1 classification, whichever the
 // registry wires) must produce a witness. If s3 shows a gap here, the harness
 // is wrong — debug it before trusting the rest of the inventory.
 //
@@ -186,19 +186,9 @@ var knownStateCoverageGaps = map[string]bool{
 	"role:dim":     true,
 	"rtb:dim":      true,
 	"s3:dim":       true,
-	// colorS3 (core/aws/catalog_databases.go) is colorFromAnyFinding-only with
-	// a ColorHealthy fallback — no structural branch of its own. s3's sole
-	// registered FindingDef (s3.public-access-block-incomplete) is now
-	// permanently SevWarn (docs/attention-signals.md `s3` Wave 2: flat
-	// "Warning" with no Broken tier — a missing/partial bucket-level PAB
-	// block is a risk, not a certainty, since account-level PAB may still
-	// apply). With no other Broken-driving path, s3 structurally cannot
-	// resolve ColorBroken via any fixture — this is the spec-mandated end
-	// state, not a fixture gap.
-	"s3:broken":   true,
-	"secrets:dim": true,
-	"ses:dim":     true,
-	"sfn:dim":     true, "sfn:warning": true,
+	"secrets:dim":  true,
+	"ses:dim":      true,
+	"sfn:dim":      true, "sfn:warning": true,
 	"sg:dim":     true,
 	"sns:broken": true, "sns:dim": true,
 	"sns-sub:broken": true,
@@ -225,7 +215,7 @@ var knownStateCoverageGaps = map[string]bool{
 	// have since been burned down — each now has a demo fixture producing
 	// the finding. s3 is deliberately absent and MUST stay absent: its
 	// per-resource Wave-1/Wave-2 "public access block incomplete" signal
-	// (EnrichS3PublicAccessBlock / GetPublicAccessBlockOutput fixtures)
+	// (EnrichS3Posture / GetPublicAccessBlockOutput fixtures)
 	// already flows into TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture
 	// in qa_demo_pivot_coverage_test.go, which is unaffected by this ratchet.
 	//

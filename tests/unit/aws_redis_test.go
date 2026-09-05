@@ -42,8 +42,29 @@ func rgOutput(rg elasticachetypes.ReplicationGroup) *elasticache.DescribeReplica
 		rg.Engine = aws.String("redis")
 	}
 	return &elasticache.DescribeReplicationGroupsOutput{
-		ReplicationGroups: []elasticachetypes.ReplicationGroup{rg},
+		ReplicationGroups: []elasticachetypes.ReplicationGroup{w2RedisHealthyPosture(rg)},
 	}
+}
+
+// w2RedisHealthyPosture fills the four posture fields the batch added when a
+// fixture leaves them unset. These tests are about lifecycle and shard status,
+// so an unset encryption or backup field is "not what this test is about",
+// not "misconfigured" — without the default every one of them would also
+// assert three posture findings it never meant to describe.
+func w2RedisHealthyPosture(rg elasticachetypes.ReplicationGroup) elasticachetypes.ReplicationGroup {
+	if rg.AtRestEncryptionEnabled == nil {
+		rg.AtRestEncryptionEnabled = aws.Bool(true)
+	}
+	if rg.TransitEncryptionEnabled == nil {
+		rg.TransitEncryptionEnabled = aws.Bool(true)
+	}
+	if rg.AuthTokenEnabled == nil {
+		rg.AuthTokenEnabled = aws.Bool(true)
+	}
+	if rg.SnapshotRetentionLimit == nil {
+		rg.SnapshotRetentionLimit = aws.Int32(7)
+	}
+	return rg
 }
 
 // ---------------------------------------------------------------------------
@@ -390,8 +411,12 @@ func TestRedis_Wave3_NoMetricFieldsInvented(t *testing.T) {
 
 // rgOutputMulti wraps multiple ReplicationGroups into a DescribeReplicationGroupsOutput.
 func rgOutputMulti(rgs ...elasticachetypes.ReplicationGroup) *elasticache.DescribeReplicationGroupsOutput {
+	out := make([]elasticachetypes.ReplicationGroup, 0, len(rgs))
+	for _, rg := range rgs {
+		out = append(out, w2RedisHealthyPosture(rg))
+	}
 	return &elasticache.DescribeReplicationGroupsOutput{
-		ReplicationGroups: rgs,
+		ReplicationGroups: out,
 	}
 }
 

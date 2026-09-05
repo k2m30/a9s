@@ -149,6 +149,9 @@ One row per signal from §3:
 | `DomainProcessingStatus=="Isolated"` | 2 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` | `AWS has quarantined the domain (billing, policy, or health) — no reads/writes until resolved.` |
 | `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 2 | Healthy | `!` | S1, S3, S4, S5 | `software update forced soon` | `Service-software update is available; AWS will apply it automatically any day — plan the window.` |
 | `EncryptionAtRestOptions.Enabled==false` | 2 | Healthy | `~` | S3, S4, S5 | `encryption at rest off` | `Indexes are stored unencrypted on disk — enable at-rest encryption for compliance.` |
+| No `VPCOptions` AND access policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `reachable outside a VPC` | `The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals.` |
+| `DomainEndpointOptions.EnforceHTTPS` not true | 2 | Warning | `~` | S2, S4, S5 | `HTTPS not enforced` | `The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options.` |
+| `NodeToNodeEncryptionOptions.Enabled` not true | 2 | Warning | `~` | S2, S4, S5 | `node-to-node encryption off` | `Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive.` |
 
 ## 4.1 UX review
 
@@ -198,6 +201,9 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
 | opensearch.update-forced | software update forced soon | broken | wave2 |
 | opensearch.encryption-off | encryption at rest off | warn | wave2 |
+| opensearch.public | reachable outside a VPC | broken | wave2 |
+| opensearch.https-not-enforced | HTTPS not enforced | warn | wave2 |
+| opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave2 |
 | opensearch.warn.details\_denied | details denied | warn | wave1 |
 | opensearch.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->

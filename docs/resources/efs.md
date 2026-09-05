@@ -174,6 +174,9 @@ One row per signal from §3:
 | `LifeCycleState == error` | 1 | Broken | n/a | S2, S4 | `error` | `File system is in error state; AWS could not complete last operation.` |
 | `NumberOfMountTargets == 0` | 1 | Broken | n/a | S2, S4 | `no mount targets` | `No mount targets — file system is unreachable from any subnet.` |
 | any mount target `LifeCycleState != available` | 2 | Broken | n/a | S2, S4, S5 | `mount target down` | `N of M mount targets not available (creating/deleting/error); AZ-level access may be degraded.` |
+| `Encrypted` not true | 1 | Warning | n/a | S2, S4, S5 | `not encrypted` | `File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across.` |
+| File system policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `file system policy open to anyone` | `The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access.` |
+| AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S4, S5 | `automatic backups off` | `AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on.` |
 
 Rules for filling list and detail text:
 
@@ -226,6 +229,9 @@ efs — DATABASES & STORAGE. Lifecycle key: `status`.
 | efs.warn.updating | updating | warn | wave1 |
 | efs.warn.deleting | deleting | warn | wave1 |
 | efs.mount-target-down | mount target down | broken | wave2 |
+| efs.unencrypted | not encrypted | warn | wave1 |
+| efs.public-policy | file system policy open to anyone | broken | wave2 |
+| efs.no-backup-policy | automatic backups off | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

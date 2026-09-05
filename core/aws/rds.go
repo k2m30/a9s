@@ -5,6 +5,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -16,6 +18,13 @@ import (
 
 // FetchRDSInstancesPage fetches a single page of RDS instances.
 func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, continuationToken string) (resource.FetchResult, error) {
+	return FetchRDSInstancesPageAt(ctx, api, continuationToken, time.Now())
+}
+
+// FetchRDSInstancesPageAt is the clock-injectable implementation behind
+// FetchRDSInstancesPage. now decides how many days remain on each instance's
+// CA certificate, so tests can pin the boundary the way acm.go does.
+func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI, continuationToken string, now time.Time) (resource.FetchResult, error) {
 	input := &rds.DescribeDBInstancesInput{
 		MaxRecords: aws.Int32(DefaultPageSize),
 	}
@@ -81,7 +90,7 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			backupRetentionPeriod = fmt.Sprintf("%d", *db.BackupRetentionPeriod)
 		}
 
-		findings := computeDBIFindings(db)
+		findings, attentionDetails := computeDBIFindings(db, now)
 		statusPhrase := phraseFromFindings(findings)
 		if statusPhrase == "" {
 			// Unknown / undocumented RDS status: keep the raw value visible in
@@ -112,7 +121,8 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 				"deletion_protection":     deletionProtection,
 				"backup_retention_period": backupRetentionPeriod,
 			},
-			RawStruct: db,
+			RawStruct:        db,
+			AttentionDetails: attentionDetails,
 		}
 
 		resources = append(resources, r)
@@ -164,10 +174,13 @@ var transitionalStatusSet = map[string]struct{}{
 	"storage-optimization": {},
 }
 
-// computeDBIFindings returns a []domain.Finding for the given RDS DB instance.
-// Broken statuses take priority; transitional statuses are Warn; available
-// instances accumulate Warn findings.
-func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
+// computeDBIFindings returns the findings for an RDS DB instance plus the
+// supporting AttentionDetail rows keyed by the finding that owns them.
+// Broken statuses take priority in the status column; transitional statuses
+// are Warn; the security-posture pack (rds_posture.go) is evaluated
+// independently and stacks on top of whatever the lifecycle status says,
+// except on an instance that is being torn down.
+func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	status := aws.ToString(db.DBInstanceStatus)
 
 	// Broken statuses. `stopped` belongs here per the catalog colorDBI legacy
@@ -195,8 +208,15 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 		"inaccessible-encryption-credentials": "encryption key unavailable",
 		"stopped":                             "stopped",
 	}
+	postureFindings, postureDetails := dbiPostureFindings(db, now)
+	// An instance on its way out has no posture worth reporting.
+	if isTeardownStatus(status) {
+		postureFindings, postureDetails = nil, nil
+	}
+
 	if code, ok := brokenMap[status]; ok {
-		return []domain.Finding{{Code: code, Phrase: brokenPhraseMap[status], Severity: domain.SevBroken, Source: "wave1"}}
+		lead := []domain.Finding{{Code: code, Phrase: brokenPhraseMap[status], Severity: domain.SevBroken, Source: "wave1"}}
+		return append(lead, postureFindings...), postureDetails
 	}
 	if _, ok := transitionalStatusSet[status]; ok {
 		key := firstNonEmptyPendingModifiedValueKey(db.PendingModifiedValues)
@@ -204,7 +224,8 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 		if key != "" {
 			phrase = status + ": " + key
 		}
-		return []domain.Finding{{Code: CodeDBITransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		lead := []domain.Finding{{Code: CodeDBITransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		return append(lead, postureFindings...), postureDetails
 	}
 	if status == "available" {
 		var findings []domain.Finding
@@ -220,14 +241,48 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 		if db.DeletionProtection != nil && !*db.DeletionProtection {
 			findings = append(findings, domain.Finding{Code: CodeDBIDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"})
 		}
-		return findings
+		return append(findings, postureFindings...), postureDetails
 	}
-	// Unknown status: do NOT emit a wave1 finding. The fetcher falls back to
-	// the raw RDS status string for Fields["status"], and colorDBI's legacy
-	// classifier handles severity for new/unforeseen states such as
+	// Unknown status: do NOT emit a lifecycle wave1 finding. The fetcher falls
+	// back to the raw RDS status string for Fields["status"], and colorDBI's
+	// legacy classifier handles severity for new/unforeseen states such as
 	// `incompatible-*` / `inaccessible-*` variants the broken map does not
-	// enumerate.
-	return nil
+	// enumerate. The posture pack still applies — it does not depend on the
+	// lifecycle state being one a9s recognises.
+	return postureFindings, postureDetails
+}
+
+// dbiPostureFindings evaluates the shared RDS posture predicates plus the
+// CA-certificate countdown against an instance.
+func dbiPostureFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	engine := aws.ToString(db.Engine)
+	findings, details := rdsPostureFindings(rdsPosture{
+		Engine:                  engine,
+		MultiAZ:                 db.MultiAZ,
+		IsReadReplica:           db.ReadReplicaSourceDBInstanceIdentifier != nil,
+		AutoMinorVersionUpgrade: db.AutoMinorVersionUpgrade,
+		IAMAuthEnabled:          db.IAMDatabaseAuthenticationEnabled,
+		MasterUsername:          db.MasterUsername,
+		// Aurora instances take their AZ topology from the cluster; the
+		// per-instance MultiAZ flag is not the operator's lever there.
+		SkipSingleAZ: strings.HasPrefix(strings.ToLower(engine), "aurora"),
+	}, dbiPostureCodes)
+
+	if db.CertificateDetails != nil {
+		caFinding, caRows := rdsCACertFinding(
+			aws.ToString(db.CertificateDetails.CAIdentifier),
+			db.CertificateDetails.ValidTill, now,
+			CodeDBICACertExpiring, dbiCACertExpiringDetail,
+		)
+		if caFinding != nil {
+			findings = append(findings, *caFinding)
+			if details == nil {
+				details = map[domain.FindingCode]domain.AttentionDetail{}
+			}
+			details[CodeDBICACertExpiring] = domain.AttentionDetail{Rows: caRows}
+		}
+	}
+	return findings, details
 }
 
 // firstNonEmptyPendingModifiedValueKey inspects PendingModifiedValues fields in spec-defined order

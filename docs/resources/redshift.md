@@ -180,6 +180,8 @@ One row per signal from §3:
 | `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S2, S4 | `maintenance deferred` | `Maintenance deferred; window active until <DeferMaintenanceEndTime>.` |
 | `PubliclyAccessible==true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` | `Cluster endpoint reachable from public internet; review SG and PubliclyAccessible flag.` |
 | `Encrypted==false` | 1 | Warning | n/a | S2, S4 | `unencrypted at rest` | `Storage encryption is off (Encrypted=false). Not CIS-compliant.` |
+| `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S4, S5 | `audit logging off` | `Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group.` |
+| Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S4, S5 | `SSL not required` | `The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set require_ssl to true in the cluster's parameter group and reboot.` |
 
 ## 4.1 UX review (two sentences)
 
@@ -241,6 +243,8 @@ redshift — DATABASES & STORAGE. Lifecycle key: `status`.
 | redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 |
 | redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 |
 | redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 |
+| redshift.audit-logging-off | audit logging off | warn | wave2 |
+| redshift.require-ssl-off | SSL not required | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

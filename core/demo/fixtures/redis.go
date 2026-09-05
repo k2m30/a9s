@@ -97,6 +97,18 @@ const (
 	// Expected Fields["status"] == "shard 0001: modifying (+1)".
 	// Value kept short (≤ 27 chars) so the rendered Cluster ID column does not truncate.
 	MultiShardTwoTransitioningID = "multi-shard-2-transitioning"
+
+	// One witness per redis security-posture finding. Every other replication
+	// group is normalized to the healthy value for all four.
+
+	// RedisAtRestOff stores its data unencrypted.
+	RedisAtRestOff = "warn-redis-at-rest-off"
+	// RedisTransitOff accepts unencrypted client connections.
+	RedisTransitOff = "warn-redis-transit-off"
+	// RedisNoAuth encrypts in transit but requires no AUTH token.
+	RedisNoAuth = "broken-redis-no-auth"
+	// RedisNoBackup has automatic backups turned off.
+	RedisNoBackup = "warn-redis-no-backup"
 )
 
 // RedisFixtures holds typed fixture data for the ElastiCache Redis resource type.
@@ -125,7 +137,7 @@ type RedisFixtures struct {
 // sibling entries for all 10 registered related-panel pivots.
 var sharedRedisFixtures = sync.OnceValue(func() *RedisFixtures {
 	return &RedisFixtures{
-		ReplicationGroups: buildRedisReplicationGroups(),
+		ReplicationGroups: normalizeRedisPosture(buildRedisReplicationGroups()),
 		CacheClusters:     buildRedisCacheClusters(),
 		SubnetGroups:      buildRedisCacheSubnetGroups(),
 		TagLists:          buildRedisTagLists(),
@@ -140,8 +152,74 @@ func NewRedisFixtures() *RedisFixtures {
 // ReplicationGroups
 // ---------------------------------------------------------------------------
 
+// normalizeRedisPosture forces every replication group except the row that
+// witnesses a given posture finding to that finding's healthy value, so
+// exactly one demo row carries each.
+func normalizeRedisPosture(rgs []elasticachetypes.ReplicationGroup) []elasticachetypes.ReplicationGroup {
+	out := make([]elasticachetypes.ReplicationGroup, len(rgs))
+	copy(out, rgs)
+	for i := range out {
+		id := aws.ToString(out[i].ReplicationGroupId)
+		if id != RedisAtRestOff {
+			out[i].AtRestEncryptionEnabled = aws.Bool(true)
+		}
+		if id != RedisTransitOff {
+			out[i].TransitEncryptionEnabled = aws.Bool(true)
+		}
+		// AUTH is only reportable when in-transit encryption is on, so the
+		// in-transit witness legitimately carries no AUTH token either.
+		if id != RedisNoAuth && id != RedisTransitOff {
+			out[i].AuthTokenEnabled = aws.Bool(true)
+		}
+		if id != RedisNoBackup && (out[i].SnapshotRetentionLimit == nil || *out[i].SnapshotRetentionLimit == 0) {
+			out[i].SnapshotRetentionLimit = aws.Int32(1)
+		}
+	}
+	return out
+}
+
+// redisPostureWitness builds a healthy available replication group and applies
+// one posture defect to it.
+func redisPostureWitness(id, description string, defect func(*elasticachetypes.ReplicationGroup)) elasticachetypes.ReplicationGroup {
+	rg := elasticachetypes.ReplicationGroup{
+		ReplicationGroupId:       aws.String(id),
+		Description:              aws.String(description),
+		ARN:                      aws.String("arn:aws:elasticache:us-east-1:123456789012:replicationgroup:" + id),
+		Status:                   aws.String("available"),
+		Engine:                   aws.String("redis"),
+		MultiAZ:                  elasticachetypes.MultiAZStatusDisabled,
+		AutomaticFailover:        elasticachetypes.AutomaticFailoverStatusDisabled,
+		CacheNodeType:            aws.String("cache.t3.medium"),
+		MemberClusters:           []string{id + "-001"},
+		AtRestEncryptionEnabled:  aws.Bool(true),
+		TransitEncryptionEnabled: aws.Bool(true),
+		AuthTokenEnabled:         aws.Bool(true),
+		ConfigurationEndpoint: &elasticachetypes.Endpoint{
+			Address: aws.String(id + ".cfg.use1.cache.amazonaws.com"),
+			Port:    aws.Int32(6379),
+		},
+		SnapshotRetentionLimit: aws.Int32(1),
+		SnapshotWindow:         aws.String("05:00-06:00"),
+	}
+	defect(&rg)
+	return rg
+}
+
 func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 	return []elasticachetypes.ReplicationGroup{
+		redisPostureWitness(RedisAtRestOff, "Unencrypted-at-rest Redis", func(rg *elasticachetypes.ReplicationGroup) {
+			rg.AtRestEncryptionEnabled = aws.Bool(false)
+		}),
+		redisPostureWitness(RedisTransitOff, "Cleartext Redis", func(rg *elasticachetypes.ReplicationGroup) {
+			rg.TransitEncryptionEnabled = aws.Bool(false)
+			rg.AuthTokenEnabled = aws.Bool(false)
+		}),
+		redisPostureWitness(RedisNoAuth, "Redis without AUTH", func(rg *elasticachetypes.ReplicationGroup) {
+			rg.AuthTokenEnabled = aws.Bool(false)
+		}),
+		redisPostureWitness(RedisNoBackup, "Unbacked-up Redis", func(rg *elasticachetypes.ReplicationGroup) {
+			rg.SnapshotRetentionLimit = aws.Int32(0)
+		}),
 		// GRAPH ROOT — every §2 related pivot resolves non-zero here.
 		// Healthy: Status=available, MultiAZ=enabled, AutomaticFailover=enabled.
 		// Expected Fields["status"] == "" (Healthy silence per §4).

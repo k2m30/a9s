@@ -24,10 +24,26 @@ type EFSDescribeAccessPointsAPI interface {
 	DescribeAccessPoints(ctx context.Context, params *efs.DescribeAccessPointsInput, optFns ...func(*efs.Options)) (*efs.DescribeAccessPointsOutput, error)
 }
 
+// EFSDescribeFileSystemPolicyAPI defines the interface for the EFS
+// DescribeFileSystemPolicy operation. Used by EnrichEFSMountTargets to read
+// the file system's resource policy.
+type EFSDescribeFileSystemPolicyAPI interface {
+	DescribeFileSystemPolicy(ctx context.Context, params *efs.DescribeFileSystemPolicyInput, optFns ...func(*efs.Options)) (*efs.DescribeFileSystemPolicyOutput, error)
+}
+
+// EFSDescribeBackupPolicyAPI defines the interface for the EFS
+// DescribeBackupPolicy operation. Used by EnrichEFSMountTargets.
+type EFSDescribeBackupPolicyAPI interface {
+	DescribeBackupPolicy(ctx context.Context, params *efs.DescribeBackupPolicyInput, optFns ...func(*efs.Options)) (*efs.DescribeBackupPolicyOutput, error)
+}
+
 // EFSAPI is the aggregate interface covering all EFS operations used by a9s fetchers.
 // *efs.Client structurally satisfies this interface.
 type EFSAPI interface {
 	EFSDescribeFileSystemsAPI
 	EFSDescribeMountTargetsAPI
 	EFSDescribeAccessPointsAPI
+	// Wave 2 enrichment (EnrichEFSMountTargets).
+	EFSDescribeFileSystemPolicyAPI
+	EFSDescribeBackupPolicyAPI
 }

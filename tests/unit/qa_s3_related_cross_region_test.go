@@ -16,7 +16,7 @@ package unit_test
 // on the out-of-region bucket emitted State: RelatedError and the related panel showed no
 // count for the affected pivot.
 //
-// Pattern A precedent: see s3_issue_enrichment.go EnrichS3PublicAccessBlock,
+// Pattern A precedent: see s3_issue_enrichment.go EnrichS3Posture,
 // which already classifies this exact error pair as operational, not a bug,
 // and marks TruncatedIDs (row "?") rather than spamming the failure log.
 

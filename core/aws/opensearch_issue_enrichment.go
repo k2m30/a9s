@@ -13,8 +13,18 @@ import (
 
 // opensearch canonical FindingCodes.
 const (
-	opensearchCodeUpdateForced  domain.FindingCode = "opensearch.update-forced"
-	opensearchCodeEncryptionOff domain.FindingCode = "opensearch.encryption-off"
+	opensearchCodeUpdateForced   domain.FindingCode = "opensearch.update-forced"
+	opensearchCodeEncryptionOff  domain.FindingCode = "opensearch.encryption-off"
+	opensearchCodePublic         domain.FindingCode = "opensearch.public"
+	opensearchCodeHTTPSNotForced domain.FindingCode = "opensearch.https-not-enforced"
+	opensearchCodeN2NOff         domain.FindingCode = "opensearch.node-to-node-tls-off"
+)
+
+// S5 operator sentences for the network-posture findings.
+const (
+	opensearchPublicDetail         = "The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals."
+	opensearchHTTPSNotForcedDetail = "The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options."
+	opensearchN2NOffDetail         = "Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive."
 )
 
 // opensearchUpdateForcedDetail and opensearchEncryptionOffDetail are the S5
@@ -70,6 +80,24 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 
 		updateAvailable := r.Fields["service_software_update_available"] == "true"
 		encOff := r.Fields["encryption_at_rest_enabled"] == "false"
+
+		// Reachable outside a VPC only counts when the access policy also
+		// lets anyone in: a public endpoint fronted by a scoped policy is a
+		// deliberate, defended design.
+		if r.Fields["vpc_enabled"] == "false" && r.Fields["access_policy_public"] == "true" {
+			setWave2Finding(&result, r.ID, opensearchCodePublic, "reachable outside a VPC", "!", "opensearch", []domain.DetailRow{
+				{Label: "Endpoint", Value: "public", Tier: "!"},
+				{Label: "Access policy", Value: "open", Tier: "!"},
+			}, opensearchPublicDetail)
+		}
+		if r.Fields["enforce_https"] == "false" {
+			setWave2Finding(&result, r.ID, opensearchCodeHTTPSNotForced, "HTTPS not enforced", "~", "opensearch",
+				[]domain.DetailRow{{Label: "EnforceHTTPS", Value: "false", Tier: "~"}}, opensearchHTTPSNotForcedDetail)
+		}
+		if r.Fields["node_to_node_encryption_enabled"] == "false" {
+			setWave2Finding(&result, r.ID, opensearchCodeN2NOff, "node-to-node encryption off", "~", "opensearch",
+				[]domain.DetailRow{{Label: "NodeToNodeEncryption", Value: "false", Tier: "~"}}, opensearchN2NOffDetail)
+		}
 
 		if !updateAvailable && !encOff {
 			continue

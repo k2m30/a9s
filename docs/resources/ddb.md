@@ -144,6 +144,9 @@ One row per signal from §3:
 | `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 2 | Broken | n/a | S2 + S4 + S5 | `kms key inaccessible` | `KMS key inaccessible — table archives in 7d if not restored.` |
 | `TableStatus == ARCHIVED` | 2 | Broken | n/a | S2 + S4 + S5 | `archived: kms key lost` | `Archived due to inaccessible KMS key; on-demand backup kept at ArchivalBackupArn.` |
 | PITR disabled | 2 | Healthy (with `~` background finding) | `~` | S3 + S4 + S5 | `PITR off` | `Point-in-time recovery is disabled — 35-day rollback window unavailable.` |
+| `DeletionProtectionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `deletion protection off` | `A single DeleteTable call destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step.` |
+| Resource policy names a foreign account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` | `The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest.` |
+| Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `resource policy open to anyone` | `The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access.` |
 
 Rules for filling list and detail text:
 
@@ -200,6 +203,9 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 | ddb.warn.deleting | deleting | warn | wave1 |
 | ddb.warn.archiving | archiving | warn | wave1 |
 | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 |
+| ddb.deletion-protection-off | deletion protection off | warn | wave1 |
+| ddb.cross-account-policy | resource policy grants another account | warn | wave2 |
+| ddb.public-policy | resource policy open to anyone | broken | wave2 |
 | ddb.warn.details\_denied | details denied | warn | wave1 |
 | ddb.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->

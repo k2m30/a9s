@@ -548,6 +548,10 @@ func TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap(t *testing.T) {
 // Each entry is matched against the called method name (selector.Sel.Name).
 // Add ONLY with a justification comment.
 var nonPaginatedAPIs = []string{
+	// DescribeLoggingStatus — returns one cluster's logging status, not a
+	// list. redshift.DescribeLoggingStatusOutput carries no Marker or
+	// NextToken field, so there is nothing to page.
+	"DescribeLoggingStatus",
 	// SES account-level singleton — no pages, single account object returned.
 	"GetSendQuota",
 	// SESv2 GetAccount — account-wide singleton, no NextToken.

@@ -149,11 +149,11 @@ expect lambda.txt "lambda(36) !" "lambda title carries the issue count"
 expect lambda.txt "runtime is end-of-life" "lambda deprecated runtime explains itself"
 
 # S3: reference type baseline — count, issues, the PAB cause visible.
-expect s3.txt "s3(36)" "s3 list shows the fixture count"
+expect s3.txt "s3(42)" "s3 list shows the fixture count"
 expect s3.txt "public access block incomplete" "s3 flagged bucket names its cause"
 
 # Reference bucket walk.
-expect s3_filtered.txt "s3(1/36)" "filter narrows the list to one row"
+expect s3_filtered.txt "s3(1/42)" "filter narrows the list to one row"
 expect s3_detail.txt "RELATED" "s3 detail renders the related panel"
 expect s3_detail.txt "CloudTrail Trails (1)" "s3 detail related shows the trail witness"
 expect s3_detail.txt "KMS Key (1)" "s3 detail related shows the kms witness"
