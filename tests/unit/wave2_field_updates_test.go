@@ -86,7 +86,7 @@ var _ awsclient.ELBv2API = (*tgHealthFakeW2)(nil)
 
 // TestEnrichTargetGroupHealth_WritesHealthSummary verifies that EnrichTargetGroupHealth
 // populates FieldUpdates["health_summary"] with either "N/M healthy" for a TG with some
-// unhealthy targets, or "ORPHAN" for a TG with no targets.
+// unhealthy targets, or "no targets" for a TG with no targets.
 func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 	tgARN1 := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-unhealthy/aabbccdd11"
 	tgARN2 := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-orphan/aabbccdd22"
@@ -106,7 +106,7 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 					},
 				},
 			},
-			// tgARN2 has no targets → ORPHAN
+			// tgARN2 has no targets → "no targets"
 			tgARN2: {},
 		},
 	}
@@ -135,13 +135,13 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		}
 	}
 
-	// tgName2: "ORPHAN"
+	// tgName2: "no targets"
 	fu2, ok := result.FieldUpdates[tgName2]
 	if !ok {
 		t.Errorf("FieldUpdates missing entry for %q", tgName2)
 	} else {
-		if fu2["health_summary"] != "ORPHAN" {
-			t.Errorf("%s health_summary = %q, want %q", tgName2, fu2["health_summary"], "ORPHAN")
+		if fu2["health_summary"] != "no targets" {
+			t.Errorf("%s health_summary = %q, want %q", tgName2, fu2["health_summary"], "no targets")
 		}
 	}
 }

@@ -102,7 +102,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		healthy := targetCount - notHealthy
 		healthSummary := ""
 		if targetCount == 0 {
-			healthSummary = "ORPHAN"
+			healthSummary = "no targets"
 		} else {
 			healthSummary = fmt.Sprintf("%d/%d healthy", healthy, targetCount)
 		}
