@@ -239,8 +239,11 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		if r.Fields["status"] != "STOPPED" {
 			t.Errorf("Fields[status]: expected %q, got %q", "STOPPED", r.Fields["status"])
 		}
-		if len(r.Findings) != 0 {
-			t.Errorf("Findings: got %d, want 0 for STOPPED task (stop_code carries actionable info)", len(r.Findings))
+		// The stop code is what makes this row actionable, so it is a finding
+		// rather than a field the reader has to open the row to see. A task
+		// stopped by anything other than a person is broken.
+		if len(r.Findings) != 1 || r.Findings[0].Phrase != "stopped: EssentialContainerExited" {
+			t.Errorf("Findings = %+v, want one stop-code finding", r.Findings)
 		}
 	})
 

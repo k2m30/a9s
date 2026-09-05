@@ -1,47 +1,103 @@
 package unit
 
 import (
+	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/efs"
+	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestEfsColor verifies the EFS Color function reads Resource.Fields["status"]
-// (the derived §4 phrase written by the fetcher + Wave-2 enricher), strips any
-// (+N) suffix, and maps to the spec's state bucket. Written against the current
-// contract: Color is phrase-driven, not field-derived from life_cycle_state.
-func TestEfsColor(t *testing.T) {
-	td := resource.FindResourceType("efs")
-	if td == nil {
-		t.Fatal("efs not registered")
-	}
+// d1EFSSinglePageMock serves one page of file systems to the efs fetcher.
+type d1EFSSinglePageMock struct {
+	output *efs.DescribeFileSystemsOutput
+}
 
+func (m *d1EFSSinglePageMock) DescribeFileSystems(
+	_ context.Context, _ *efs.DescribeFileSystemsInput, _ ...func(*efs.Options),
+) (*efs.DescribeFileSystemsOutput, error) {
+	return m.output, nil
+}
+
+// d1EFSBaseline is a healthy file system: available, encrypted, three mount
+// targets. Mount targets are what makes it reachable, so a baseline with none
+// would carry a Broken finding before any case set its own state.
+func d1EFSBaseline() efstypes.FileSystemDescription {
+	return efstypes.FileSystemDescription{
+		FileSystemId:         aws.String("fs-0prod1234abcd5678"),
+		Name:                 aws.String("prod-app-data"),
+		LifeCycleState:       efstypes.LifeCycleStateAvailable,
+		NumberOfMountTargets: 3,
+		Encrypted:            aws.Bool(true),
+		PerformanceMode:      efstypes.PerformanceModeGeneralPurpose,
+		ThroughputMode:       efstypes.ThroughputModeElastic,
+	}
+}
+
+// TestEfsColor pins the lifecycle state → colour mapping for EFS file systems.
+//
+// "mount target down" is not here: it is a wave-2 phrase produced by
+// EnrichEFSMountTargets from the mount-target API, which the fetcher never
+// calls. prowler_w2_efs covers it. The "(+N)" rows are gone with the phrase
+// matching that needed them.
+func TestEfsColor(t *testing.T) {
 	cases := []struct {
 		name   string
-		status string
+		state  efstypes.LifeCycleState
+		mutate func(*efstypes.FileSystemDescription)
 		want   resource.Color
 	}{
-		{name: "healthy_blank", status: "", want: resource.ColorHealthy},
-		{name: "creating_warning", status: "creating", want: resource.ColorWarning},
-		{name: "updating_warning", status: "updating", want: resource.ColorWarning},
-		{name: "deleting_warning", status: "deleting", want: resource.ColorWarning},
-		{name: "error_broken", status: "error", want: resource.ColorBroken},
-		{name: "no_mount_targets_broken", status: "no mount targets", want: resource.ColorBroken},
-		{name: "mount_target_down_broken", status: "mount target down", want: resource.ColorBroken},
-		{name: "multi_w1_suffix_stripped", status: "no mount targets (+1)", want: resource.ColorBroken},
-		{name: "w1_w2_stack_suffix_stripped", status: "mount target down (+1)", want: resource.ColorBroken},
-		{name: "warning_with_suffix", status: "updating (+1)", want: resource.ColorWarning},
+		{name: "available", state: efstypes.LifeCycleStateAvailable, want: resource.ColorHealthy},
+
+		{name: "creating", state: efstypes.LifeCycleStateCreating, want: resource.ColorWarning},
+		{name: "updating", state: efstypes.LifeCycleStateUpdating, want: resource.ColorWarning},
+		{name: "deleting", state: efstypes.LifeCycleStateDeleting, want: resource.ColorWarning},
+
+		{name: "error", state: efstypes.LifeCycleStateError, want: resource.ColorBroken},
+		{
+			name:   "no_mount_targets",
+			state:  efstypes.LifeCycleStateAvailable,
+			mutate: func(fs *efstypes.FileSystemDescription) { fs.NumberOfMountTargets = 0 },
+			want:   resource.ColorBroken,
+		},
+		{
+			name:   "not_encrypted",
+			state:  efstypes.LifeCycleStateAvailable,
+			mutate: func(fs *efstypes.FileSystemDescription) { fs.Encrypted = aws.Bool(false) },
+			want:   resource.ColorWarning,
+		},
+		{
+			name:   "no_mount_targets_outranks_updating",
+			state:  efstypes.LifeCycleStateUpdating,
+			mutate: func(fs *efstypes.FileSystemDescription) { fs.NumberOfMountTargets = 0 },
+			want:   resource.ColorBroken,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := resource.Resource{
-				Fields: map[string]string{"status": tc.status},
+			fs := d1EFSBaseline()
+			fs.LifeCycleState = tc.state
+			if tc.mutate != nil {
+				tc.mutate(&fs)
 			}
-			got := td.Color(r)
-			if got != tc.want {
-				t.Errorf("Color(status=%q) = %v, want %v", tc.status, got, tc.want)
+			mock := &d1EFSSinglePageMock{
+				output: &efs.DescribeFileSystemsOutput{
+					FileSystems: []efstypes.FileSystemDescription{fs},
+				},
 			}
+			page, err := awsclient.FetchEFSFileSystemsPage(context.Background(), mock, "")
+			if err != nil {
+				t.Fatalf("FetchEFSFileSystemsPage: %v", err)
+			}
+			if len(page.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(page.Resources))
+			}
+			d1AssertColor(t, page.Resources[0], tc.want)
 		})
 	}
 }

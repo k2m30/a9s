@@ -31,6 +31,9 @@ func TestDbiColor(t *testing.T) {
 		{name: "available", status: "available", want: resource.ColorHealthy},
 
 		{name: "failed", status: "failed", want: resource.ColorBroken},
+		// An instance you must restart before it can serve traffic is broken,
+		// not paused; this row moved here from the field-key table.
+		{name: "stopped", status: "stopped", want: resource.ColorBroken},
 		{name: "storage_full", status: "storage-full", want: resource.ColorBroken},
 		{name: "incompatible_parameters", status: "incompatible-parameters", want: resource.ColorBroken},
 		{name: "inaccessible_encryption_credentials", status: "inaccessible-encryption-credentials", want: resource.ColorBroken},

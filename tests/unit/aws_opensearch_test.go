@@ -79,6 +79,12 @@ func osTestBaseDomain(name string) ostypes.DomainStatus {
 		ServiceSoftwareOptions: &ostypes.ServiceSoftwareOptions{
 			UpdateAvailable: aws.Bool(false),
 		},
+		// Node-to-node encryption is read as off when the block is absent, so a
+		// baseline that omitted it would give every test below a posture finding
+		// it never meant to describe.
+		NodeToNodeEncryptionOptions: &ostypes.NodeToNodeEncryptionOptions{
+			Enabled: aws.Bool(true),
+		},
 	}
 }
 
@@ -330,10 +336,11 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	if r.Fields["status"] != "software update forced soon" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
 	}
-	// UpdateForcedSoon is a background-check signal owned by the Wave 2
-	// enricher — it appears in Fields["status"] for display but not in Findings.
-	if len(r.Findings) != 0 {
-		t.Errorf("Findings = %v, want none (UpdateForcedSoon is enricher territory, not wave1)", r.Findings)
+	// The phrase in the status column and the finding that produced it are one
+	// object. An assertion that the column shows a signal the row carries no
+	// finding for describes the split this batch removed.
+	if len(r.Findings) != 1 || r.Findings[0].Code != "opensearch.update-forced" {
+		t.Errorf("Findings = %+v, want exactly the wave-1 update-forced finding", r.Findings)
 	}
 	if r.Fields["service_software_update_available"] != "true" {
 		t.Errorf("Fields[\"service_software_update_available\"] = %q, want %q", r.Fields["service_software_update_available"], "true")
@@ -407,10 +414,11 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	if r.Fields["status"] != "encryption at rest off" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "encryption at rest off")
 	}
-	// EncryptionOff is a background-check signal owned by the Wave 2 enricher —
-	// it appears in Fields["status"] for display but not in Findings.
-	if len(r.Findings) != 0 {
-		t.Errorf("Findings = %v, want none (EncryptionOff is enricher territory, not wave1)", r.Findings)
+	// Same reason as the update-forced row above: the status column reads from
+	// the findings, so a displayed phrase without a finding is not a state the
+	// fetcher can produce.
+	if len(r.Findings) != 1 || r.Findings[0].Code != "opensearch.encryption-off" {
+		t.Errorf("Findings = %+v, want exactly the wave-1 encryption-off finding", r.Findings)
 	}
 	if r.Fields["encryption_at_rest_enabled"] != "false" {
 		t.Errorf("Fields[\"encryption_at_rest_enabled\"] = %q, want %q", r.Fields["encryption_at_rest_enabled"], "false")
@@ -475,13 +483,13 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 		detail   string
 	}{
 		{
-			code:     "opensearch.software-update-forced",
+			code:     "opensearch.update-forced",
 			phrase:   "software update forced soon",
 			severity: domainpkg.SevWarn,
 			detail:   "AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window.",
 		},
 		{
-			code:     "opensearch.encryption-at-rest-off",
+			code:     "opensearch.encryption-off",
 			phrase:   "encryption at rest off",
 			severity: domainpkg.SevWarn,
 			detail:   "Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place.",
@@ -549,9 +557,11 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	if r.Fields["status"] != "processing: config change in flight (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight (+1)")
 	}
-	// Only the hard-state (processing) is in Findings; UpdateForcedSoon is enricher territory.
-	if len(r.Findings) != 1 {
-		t.Errorf("Findings len = %d, want 1 (only processing); Findings = %v", len(r.Findings), r.Findings)
+	// Both signals are findings. The "(+1)" in the column counts the second one,
+	// so a row that displayed the suffix while carrying one finding was counting
+	// something it could not show.
+	if len(r.Findings) != 2 {
+		t.Errorf("Findings len = %d, want 2 (processing and update-forced); Findings = %+v", len(r.Findings), r.Findings)
 	}
 	if len(r.Findings) > 0 && r.Findings[0].Phrase != "processing: config change in flight" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "processing: config change in flight")
@@ -592,8 +602,10 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS (+1)")
 	}
 	// Only the hard-state (isolated) is in Findings; EncryptionOff is enricher territory.
-	if len(r.Findings) != 1 {
-		t.Errorf("Findings len = %d, want 1 (only isolated); Findings = %v", len(r.Findings), r.Findings)
+	// Same as the processing row: the second signal is a finding of its own, and
+	// isolated leads because it is the worse of the two.
+	if len(r.Findings) != 2 {
+		t.Errorf("Findings len = %d, want 2 (isolated and encryption-off); Findings = %+v", len(r.Findings), r.Findings)
 	}
 	if len(r.Findings) > 0 && r.Findings[0].Phrase != "isolated: quarantined by AWS" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "isolated: quarantined by AWS")
@@ -636,13 +648,15 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	// Display: deleted (hard-state) + 2 background-checks → suffix (+2).
-	if r.Fields["status"] != "deleting: removal in progress (+2)" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress (+2)")
+	// A domain being torn down returns the dim lifecycle finding and stops, so
+	// the posture signals are never evaluated. There is no second finding to
+	// count and the column carries the bare phrase; the old "(+2)" expected a
+	// count of signals the row deliberately does not report.
+	if r.Fields["status"] != "deleting: removal in progress" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress")
 	}
-	// Only the hard-state (deleting, SevDim) is in Findings; background-checks are enricher territory.
 	if len(r.Findings) != 1 {
-		t.Errorf("Findings len = %d, want 1 (only deleting); Findings = %v", len(r.Findings), r.Findings)
+		t.Errorf("Findings len = %d, want 1 (only deleting); Findings = %+v", len(r.Findings), r.Findings)
 	}
 	if len(r.Findings) > 0 && r.Findings[0].Phrase != "deleting: removal in progress" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "deleting: removal in progress")

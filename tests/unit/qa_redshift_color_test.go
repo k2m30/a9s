@@ -3,142 +3,112 @@ package unit
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
+
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestRedshiftColor exercises the Redshift Color function directly against
-// the raw AWS enums it reads. Post-§4 phrase migration (2026-04-24) the
-// Color func reads Fields["cluster_status"] (raw ClusterStatus) instead
-// of Fields["status"] (derived §4 phrase). Availability/publicly/encrypted
-// keys are unchanged.
-func TestRedshiftColor(t *testing.T) {
-	td := resource.FindResourceType("redshift")
-	if td == nil {
-		t.Fatal("redshift not registered")
+// d1RedshiftBaseline is a healthy cluster: available on both status axes,
+// encrypted, private, with nothing pending or deferred.
+func d1RedshiftBaseline() redshifttypes.Cluster {
+	return redshifttypes.Cluster{
+		ClusterIdentifier:         aws.String("acme-warehouse"),
+		ClusterNamespaceArn:       aws.String("arn:aws:redshift:us-east-1:123456789012:namespace/acme-warehouse"),
+		NodeType:                  aws.String("ra3.xlplus"),
+		NumberOfNodes:             aws.Int32(2),
+		ClusterStatus:             aws.String("available"),
+		ClusterAvailabilityStatus: aws.String("Available"),
+		Encrypted:                 aws.Bool(true),
+		PubliclyAccessible:        aws.Bool(false),
 	}
+}
 
+// TestRedshiftColor pins the cluster status → colour mapping for Redshift.
+//
+// The old table read Fields["cluster_status"] directly. The raw enum is still
+// the input, but it now reaches the colour through the fetcher's findings, so
+// the two status axes and the posture flags are compared the way production
+// compares them.
+func TestRedshiftColor(t *testing.T) {
 	cases := []struct {
 		name   string
-		fields map[string]string
+		status string
+		mutate func(*redshifttypes.Cluster)
 		want   resource.Color
 	}{
-		{
-			name:   "available",
-			fields: map[string]string{"cluster_status": "available", "encrypted": "true"},
-			want:   resource.ColorHealthy,
-		},
-		{
-			name:   "creating",
-			fields: map[string]string{"cluster_status": "creating"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "modifying",
-			fields: map[string]string{"cluster_status": "modifying"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "resizing",
-			fields: map[string]string{"cluster_status": "resizing"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "rebooting",
-			fields: map[string]string{"cluster_status": "rebooting"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "renaming",
-			fields: map[string]string{"cluster_status": "renaming"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "deleting",
-			fields: map[string]string{"cluster_status": "deleting"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "incompatible_hsm",
-			fields: map[string]string{"cluster_status": "incompatible-hsm"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "incompatible_network",
-			fields: map[string]string{"cluster_status": "incompatible-network"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "incompatible_parameters",
-			fields: map[string]string{"cluster_status": "incompatible-parameters"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "incompatible_restore",
-			fields: map[string]string{"cluster_status": "incompatible-restore"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "hardware_failure",
-			fields: map[string]string{"cluster_status": "hardware-failure"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "storage_full",
-			fields: map[string]string{"cluster_status": "storage-full"},
-			want:   resource.ColorBroken,
-		},
+		{name: "available", status: "available", want: resource.ColorHealthy},
+		{name: "empty_status", status: "", want: resource.ColorHealthy},
+
+		{name: "creating", status: "creating", want: resource.ColorWarning},
+		{name: "modifying", status: "modifying", want: resource.ColorWarning},
+		{name: "resizing", status: "resizing", want: resource.ColorWarning},
+		{name: "rebooting", status: "rebooting", want: resource.ColorWarning},
+		{name: "renaming", status: "renaming", want: resource.ColorWarning},
+		{name: "deleting", status: "deleting", want: resource.ColorWarning},
+
+		{name: "incompatible_hsm", status: "incompatible-hsm", want: resource.ColorBroken},
+		{name: "incompatible_network", status: "incompatible-network", want: resource.ColorBroken},
+		{name: "incompatible_parameters", status: "incompatible-parameters", want: resource.ColorBroken},
+		{name: "incompatible_restore", status: "incompatible-restore", want: resource.ColorBroken},
+		{name: "hardware_failure", status: "hardware-failure", want: resource.ColorBroken},
+		{name: "storage_full", status: "storage-full", want: resource.ColorBroken},
+
 		{
 			name:   "availability_unavailable",
-			fields: map[string]string{"cluster_status": "available", "cluster_availability_status": "Unavailable"},
+			status: "available",
+			mutate: func(c *redshifttypes.Cluster) { c.ClusterAvailabilityStatus = aws.String("Unavailable") },
 			want:   resource.ColorBroken,
 		},
 		{
 			name:   "availability_failed",
-			fields: map[string]string{"cluster_status": "available", "cluster_availability_status": "Failed"},
+			status: "available",
+			mutate: func(c *redshifttypes.Cluster) { c.ClusterAvailabilityStatus = aws.String("Failed") },
 			want:   resource.ColorBroken,
 		},
 		{
 			name:   "availability_maintenance",
-			fields: map[string]string{"cluster_status": "available", "cluster_availability_status": "Maintenance"},
+			status: "available",
+			mutate: func(c *redshifttypes.Cluster) { c.ClusterAvailabilityStatus = aws.String("Maintenance") },
 			want:   resource.ColorWarning,
 		},
 		{
 			name:   "availability_modifying",
-			fields: map[string]string{"cluster_status": "available", "cluster_availability_status": "Modifying"},
+			status: "available",
+			mutate: func(c *redshifttypes.Cluster) { c.ClusterAvailabilityStatus = aws.String("Modifying") },
 			want:   resource.ColorWarning,
 		},
 		{
 			name:   "publicly_accessible",
-			fields: map[string]string{"cluster_status": "available", "publicly_accessible": "true"},
+			status: "available",
+			mutate: func(c *redshifttypes.Cluster) { c.PubliclyAccessible = aws.Bool(true) },
 			want:   resource.ColorWarning,
 		},
 		{
 			name:   "unencrypted",
-			fields: map[string]string{"cluster_status": "available", "encrypted": "false"},
+			status: "available",
+			mutate: func(c *redshifttypes.Cluster) { c.Encrypted = aws.Bool(false) },
 			want:   resource.ColorWarning,
 		},
 		{
-			name: "broken_overrides_warning",
-			fields: map[string]string{
-				"cluster_status":      "hardware-failure",
-				"encrypted":           "false",
-				"publicly_accessible": "true",
+			name:   "broken_status_outranks_posture_warnings",
+			status: "hardware-failure",
+			mutate: func(c *redshifttypes.Cluster) {
+				c.Encrypted = aws.Bool(false)
+				c.PubliclyAccessible = aws.Bool(true)
 			},
 			want: resource.ColorBroken,
-		},
-		{
-			name:   "empty",
-			fields: map[string]string{"cluster_status": ""},
-			want:   resource.ColorHealthy,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := td.Color(resource.Resource{Fields: tc.fields})
-			if got != tc.want {
-				t.Errorf("Color(%v) = %v, want %v", tc.fields, got, tc.want)
+			cluster := d1RedshiftBaseline()
+			cluster.ClusterStatus = aws.String(tc.status)
+			if tc.mutate != nil {
+				tc.mutate(&cluster)
 			}
+			d1AssertColor(t, fetchSingleCluster(t, cluster), tc.want)
 		})
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -144,27 +145,35 @@ func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 		t.Fatal("redis Color func is nil")
 	}
 
-	redisRes := func(status string) resource.Resource {
-		return resource.Resource{
+	// Same shape as the dbc probe: the finding carries the severity, so the
+	// phrase alone cannot decide a colour.
+	redisRes := func(status string, sev domain.Severity) resource.Resource {
+		r := resource.Resource{
 			ID:     "cache-001",
 			Fields: map[string]string{"status": status},
 		}
+		if status != "" {
+			r.Findings = []domain.Finding{{
+				Code: "redis.probe", Phrase: status, Severity: sev, Source: "wave1",
+			}}
+		}
+		return r
 	}
 
 	// Post-migration (2026-04-23): Fields["status"] carries §4 PHRASES, not
 	// bare keywords. Healthy = empty string.
-	availableStyle := styles.ColorStyle(td.Color(redisRes("")))
+	availableStyle := styles.ColorStyle(td.Color(redisRes("", domain.SevOK)))
 	if availableStyle.GetForeground() != styles.ColRunning {
 		t.Errorf("redis healthy (blank): expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
 	}
 
-	creatingStyle := styles.ColorStyle(td.Color(redisRes("creating — new group")))
+	creatingStyle := styles.ColorStyle(td.Color(redisRes("creating — new group", domain.SevWarn)))
 	if creatingStyle.GetForeground() != styles.ColPending {
 		t.Errorf("redis 'creating — new group': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
 	// Per spec: redis deleting → Warning (not Broken).
-	deletingStyle := styles.ColorStyle(td.Color(redisRes("deleting — teardown")))
+	deletingStyle := styles.ColorStyle(td.Color(redisRes("deleting — teardown", domain.SevWarn)))
 	if deletingStyle.GetForeground() != styles.ColPending {
 		t.Errorf("redis 'deleting — teardown': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
 	}

@@ -32,11 +32,10 @@ func TestTrailColor(t *testing.T) {
 			fields: map[string]string{"is_logging": "true", "latest_delivery_error": "AccessDenied to bucket xyz"},
 			want:   resource.ColorBroken,
 		},
-		{
-			name:   "status_failed",
-			fields: map[string]string{"status": "failed"},
-			want:   resource.ColorBroken,
-		},
+		// The "status_failed" case is gone with the phrase branch it probed. The
+		// trail classifier reads is_logging and latest_delivery_error, which are
+		// facts the list response carries; there was never a fetcher path that
+		// wrote "failed" into the status field for it to match.
 		{
 			name: "log_validation_disabled",
 			fields: map[string]string{

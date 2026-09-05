@@ -11,6 +11,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -89,11 +90,29 @@ func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
 // rdsColorResource returns a minimal RDS Resource for a given status value.
 // Uses the canonical "status" key (the legacy "db_instance_status" fallback
 // was removed in #284).
+// rdsColorResource builds a probe row for a status. The severity travels with
+// the finding that produced the phrase, so a probe carrying only a Fields entry
+// would describe a row the fetcher cannot produce.
 func rdsColorResource(dbStatus string) resource.Resource {
-	return resource.Resource{
+	r := resource.Resource{
 		ID:     "db-test-001",
 		Fields: map[string]string{"status": dbStatus},
 	}
+	sev, ok := rdsProbeSeverity[dbStatus]
+	if ok {
+		r.Findings = []domain.Finding{{
+			Code: domain.FindingCode("dbi.probe." + dbStatus), Phrase: dbStatus, Severity: sev, Source: "wave1",
+		}}
+	}
+	return r
+}
+
+// rdsProbeSeverity mirrors computeDBIFindings for the statuses these tests
+// probe: available is healthy and carries no finding at all.
+var rdsProbeSeverity = map[string]domain.Severity{ //nolint:gochecknoglobals // test-only lookup table
+	"failed":   domain.SevBroken,
+	"stopped":  domain.SevBroken,
+	"creating": domain.SevWarn,
 }
 
 func TestQA_RDS_StatusColor_Available(t *testing.T) {

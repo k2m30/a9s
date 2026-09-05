@@ -651,16 +651,11 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 			r := resource.Resource{
 				Fields: fields,
 			}
-			// findingsOnlyColorTypes (ec2/lambda/ami/ebs-snap, since the
-			// color-findings-conformance wave) have NO raw-field fallback at
-			// all — a bare Fields probe can never produce non-Healthy for
-			// them. Attach a representative SevBroken Finding so this probe
-			// still exercises "can this type ever classify non-Healthy" for
-			// its real (Findings-driven) mechanism.
-			if findingsOnlyColorTypes[td.ShortName] {
-				r.Findings = []domain.Finding{
-					{Code: domain.FindingCode(td.ShortName + ".test.probe"), Phrase: s, Severity: domain.SevBroken, Source: "wave1"},
-				}
+			// Colour comes from findings for every type, so the probe carries
+			// one. Without it this asks whether a bare Fields map can be
+			// coloured, which is no longer a question about the type.
+			r.Findings = []domain.Finding{
+				{Code: domain.FindingCode(td.ShortName + ".test.probe"), Phrase: s, Severity: domain.SevBroken, Source: "wave1"},
 			}
 			c := td.Color(r)
 			if c != resource.ColorHealthy {

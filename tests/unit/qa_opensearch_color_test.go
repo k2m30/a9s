@@ -1,146 +1,114 @@
 package unit
 
-// qa_opensearch_color_test.go — Color-function tests for the opensearch resource type.
-//
-// Tests construct a minimal resource.Resource with documented Fields and assert
-// resource.FindResourceType("opensearch").ResolveColor(r) returns the expected
-// resource.Color. Per impl-plan §1.2: the Color func must strip (+N) suffix before
-// matching, and background signals (! and ~) must NOT flip row color.
-
 import (
+	"context"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/opensearch"
+	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
+
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// TestOpenSearchColor pins the domain state → colour mapping for OpenSearch.
+//
+// Two rows read differently from the phrase-matching era, and both follow from
+// colour being the worst finding's severity. An available software update is
+// only reported when AWS has already passed the automated-install date, so an
+// update flag on its own leaves the row green. Encryption at rest being off is
+// a Warn finding, so it colours the row: the old table kept it green on the
+// grounds that a background signal shows as a glyph instead, and that
+// distinction does not survive a severity comparison.
 func TestOpenSearchColor(t *testing.T) {
-	td := resource.FindResourceType("opensearch")
-	if td == nil {
-		t.Fatal("opensearch not registered")
-	}
-
 	cases := []struct {
 		name   string
-		status string
-		fields map[string]string
+		mutate func(*ostypes.DomainStatus)
 		want   resource.Color
 	}{
-		// --- ColorHealthy ---
+		{name: "healthy", want: resource.ColorHealthy},
 		{
-			// healthy: blank status, no flags — green silence
-			name:   "healthy_blank",
-			status: "",
-			fields: map[string]string{"status": ""},
-			want:   resource.ColorHealthy,
-		},
-		{
-			// update_available_alone: ! finding does NOT flip color — glyph does
-			name:   "update_available_alone",
-			status: "software update forced soon",
-			fields: map[string]string{
-				"status":                            "software update forced soon",
-				"service_software_update_available": "true",
-				"deleted":                           "false",
-				"processing":                        "false",
-				"upgrade_processing":                "false",
-				"domain_processing_status":          "Active",
-			},
-			want: resource.ColorHealthy,
-		},
-		{
-			// encryption_off_alone: ~ finding stays green
-			name:   "encryption_off_alone",
-			status: "encryption at rest off",
-			fields: map[string]string{
-				"status":                     "encryption at rest off",
-				"encryption_at_rest_enabled": "false",
-				"deleted":                    "false",
-				"processing":                 "false",
-				"upgrade_processing":         "false",
-				"domain_processing_status":   "Active",
+			name: "update_available_without_a_forced_date",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.ServiceSoftwareOptions = &ostypes.ServiceSoftwareOptions{UpdateAvailable: aws.Bool(true)}
 			},
 			want: resource.ColorHealthy,
 		},
 
-		// --- ColorBroken ---
 		{
-			// isolated: strip (+N) suffix; isolated wins
-			name:   "isolated",
-			status: "isolated: quarantined by AWS",
-			fields: map[string]string{
-				"status":                   "isolated: quarantined by AWS",
-				"domain_processing_status": "Isolated",
-				"deleted":                  "false",
-				"processing":               "false",
-				"upgrade_processing":       "false",
+			name: "update_forced_date_passed",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.ServiceSoftwareOptions = &ostypes.ServiceSoftwareOptions{
+					UpdateAvailable:     aws.Bool(true),
+					AutomatedUpdateDate: aws.Time(time.Now().Add(-24 * time.Hour)),
+				}
 			},
-			want: resource.ColorBroken,
+			want: resource.ColorWarning,
 		},
 		{
-			// isolated_plus_update_available: (+1) suffix stripped; isolated wins
-			name:   "isolated_plus_update_available",
-			status: "isolated: quarantined by AWS (+1)",
-			fields: map[string]string{
-				"status":                            "isolated: quarantined by AWS (+1)",
-				"domain_processing_status":          "Isolated",
-				"service_software_update_available": "true",
-				"deleted":                           "false",
-				"processing":                        "false",
-				"upgrade_processing":                "false",
+			name: "encryption_at_rest_off",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.EncryptionAtRestOptions = &ostypes.EncryptionAtRestOptions{Enabled: aws.Bool(false)}
 			},
-			want: resource.ColorBroken,
+			want: resource.ColorWarning,
 		},
-
-		// --- ColorWarning ---
 		{
-			// processing: Processing=true
+			name: "https_not_enforced",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.DomainEndpointOptions = &ostypes.DomainEndpointOptions{EnforceHTTPS: aws.Bool(false)}
+			},
+			want: resource.ColorWarning,
+		},
+		{
+			name: "node_to_node_encryption_off",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.NodeToNodeEncryptionOptions = &ostypes.NodeToNodeEncryptionOptions{Enabled: aws.Bool(false)}
+			},
+			want: resource.ColorWarning,
+		},
+		{
 			name:   "processing",
-			status: "processing: config change in flight",
-			fields: map[string]string{
-				"status":                   "processing: config change in flight",
-				"processing":               "true",
-				"deleted":                  "false",
-				"upgrade_processing":       "false",
-				"domain_processing_status": "Modifying",
-			},
-			want: resource.ColorWarning,
+			mutate: func(d *ostypes.DomainStatus) { d.Processing = aws.Bool(true) },
+			want:   resource.ColorWarning,
 		},
 		{
-			// upgrade_processing: UpgradeProcessing=true
 			name:   "upgrade_processing",
-			status: "processing: config change in flight",
-			fields: map[string]string{
-				"status":                   "processing: config change in flight",
-				"upgrade_processing":       "true",
-				"processing":               "false",
-				"deleted":                  "false",
-				"domain_processing_status": "Upgrading",
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			// processing_plus_encryption_off: warning wins
-			name:   "processing_plus_encryption_off",
-			status: "processing: config change in flight (+1)",
-			fields: map[string]string{
-				"status":                     "processing: config change in flight (+1)",
-				"processing":                 "true",
-				"encryption_at_rest_enabled": "false",
-				"deleted":                    "false",
-				"upgrade_processing":         "false",
-				"domain_processing_status":   "Modifying",
-			},
-			want: resource.ColorWarning,
+			mutate: func(d *ostypes.DomainStatus) { d.UpgradeProcessing = aws.Bool(true) },
+			want:   resource.ColorWarning,
 		},
 
-		// --- ColorDim ---
 		{
-			// deleted=true → dim row
-			name:   "deleted",
-			status: "deleting: removal in progress",
-			fields: map[string]string{
-				"status":  "deleting: removal in progress",
-				"deleted": "true",
+			name: "isolated",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.DomainProcessingStatus = ostypes.DomainProcessingStatusTypeIsolated
+			},
+			want: resource.ColorBroken,
+		},
+		{
+			name: "reachable_outside_a_vpc",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"es:*","Resource":"*"}]}`)
+			},
+			want: resource.ColorBroken,
+		},
+		{
+			name: "isolated_outranks_encryption_off",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.DomainProcessingStatus = ostypes.DomainProcessingStatusTypeIsolated
+				d.EncryptionAtRestOptions = &ostypes.EncryptionAtRestOptions{Enabled: aws.Bool(false)}
+			},
+			want: resource.ColorBroken,
+		},
+
+		// A domain being torn down reports one dim finding and nothing else,
+		// so no posture signal can promote its colour.
+		{
+			name: "deleted",
+			mutate: func(d *ostypes.DomainStatus) {
+				d.Deleted = aws.Bool(true)
+				d.EncryptionAtRestOptions = &ostypes.EncryptionAtRestOptions{Enabled: aws.Bool(false)}
 			},
 			want: resource.ColorDim,
 		},
@@ -148,15 +116,28 @@ func TestOpenSearchColor(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := resource.Resource{
-				ID:     "test-domain",
-				Name:   "test-domain",
-				Fields: tc.fields,
+			d := osTestBaseDomain("acme-search")
+			if tc.mutate != nil {
+				tc.mutate(&d)
 			}
-			got := td.ResolveColor(r)
-			if got != tc.want {
-				t.Errorf("ResolveColor(%q) = %v, want %v", tc.status, got, tc.want)
+			listMock := &mockOSListDomainNamesAPI{
+				output: &opensearch.ListDomainNamesOutput{
+					DomainNames: []ostypes.DomainInfo{{DomainName: d.DomainName}},
+				},
 			}
+			describeMock := &mockOSDescribeDomainsAPI{
+				output: &opensearch.DescribeDomainsOutput{
+					DomainStatusList: []ostypes.DomainStatus{d},
+				},
+			}
+			resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+			if err != nil {
+				t.Fatalf("FetchOpenSearchDomains: %v", err)
+			}
+			if len(resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(resources))
+			}
+			d1AssertColor(t, resources[0], tc.want)
 		})
 	}
 }

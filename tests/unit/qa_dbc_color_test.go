@@ -3,145 +3,122 @@ package unit
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestDbcColor tests the Color function for DB Clusters (dbc).
-//
-// The production Color func reads "status" (the phrase-based key populated by
-// the fetcher after Wave-1 enrichment), strips any (+N) suffix via
-// StripFindingSuffix, then matches against explicit Broken/Warning/Healthy phrases.
-// Transitional statuses carry the suffix ": in progress".
-//
-// Coverage targets every branch of the dbc Color switch:
-//   - Empty status → Healthy
-//   - Broken phrases: "failed: cluster operation", "encryption key unreachable",
-//     "parameter group incompatible", "no writer: reads only"
-//   - Warning phrases: "delete-protection off", "not encrypted at rest",
-//     "no automated backups"
-//   - Wave-2 phrase: "maintenance overdue" → Healthy (green so "!" glyph renders)
-//   - Transitional "* : in progress" suffix → Warning
-//   - Stacked (+N) suffix on any phrase → stripped before matching
-//   - Unknown phrase → Healthy (future-proof)
-func TestDbcColor(t *testing.T) {
-	td := resource.FindResourceType("dbc")
-	if td == nil {
-		t.Fatal("dbc not registered")
+// d1DbcBaseline is a posture-clean Aurora cluster: every predicate in
+// computeRDSDBClusterFindings and the shared rds_posture pack answers "no
+// finding". Each case mutates exactly the field its row is about, so a
+// finding that appears is the one the case names and nothing else.
+func d1DbcBaseline() rdstypes.DBCluster {
+	return rdstypes.DBCluster{
+		DBClusterIdentifier:              aws.String("acme-aurora-prod"),
+		DBClusterArn:                     aws.String("arn:aws:rds:us-east-1:123456789012:cluster:acme-aurora-prod"),
+		Engine:                           aws.String("aurora-postgresql"),
+		Status:                           aws.String("available"),
+		StorageEncrypted:                 aws.Bool(true),
+		DeletionProtection:               aws.Bool(true),
+		BackupRetentionPeriod:            aws.Int32(7),
+		MultiAZ:                          aws.Bool(true),
+		AutoMinorVersionUpgrade:          aws.Bool(true),
+		IAMDatabaseAuthenticationEnabled: aws.Bool(true),
+		MasterUsername:                   aws.String("acmeadmin"),
+		DBClusterMembers: []rdstypes.DBClusterMember{
+			{DBInstanceIdentifier: aws.String("acme-aurora-prod-1"), IsClusterWriter: aws.Bool(true)},
+		},
 	}
+}
 
+// TestDbcColor pins the status → colour mapping for DB clusters.
+//
+// The row colour is the worst severity among the cluster's findings. Each case
+// feeds an SDK DBCluster through the dbc fetcher and compares the colour its
+// findings imply against the colour the row expects.
+//
+// Three families of case from the phrase-matching era are gone with the
+// classifier that needed them: an empty or nil Fields map (no SDK struct
+// produces one), the "(+N)" suffix cases (the suffix is a display artefact of
+// StatusPhrase, never seen by a severity comparison), and the wave-2
+// "maintenance overdue" phrase (the enricher owns it; prowler_w2_dbc covers it).
+func TestDbcColor(t *testing.T) {
 	cases := []struct {
 		name   string
-		fields map[string]string
+		status string
+		mutate func(*rdstypes.DBCluster)
 		want   resource.Color
 	}{
-		// ── ColorHealthy ────────────────────────────────────────────────────────
-		{
-			name:   "empty_status",
-			fields: map[string]string{"status": ""},
-			want:   resource.ColorHealthy,
-		},
-		{
-			name:   "nil_fields",
-			fields: nil,
-			want:   resource.ColorHealthy,
-		},
-		{
-			name:   "unknown_status_future_proof",
-			fields: map[string]string{"status": "some-future-aws-status"},
-			want:   resource.ColorHealthy,
-		},
-		// Wave-2 phrase "maintenance overdue" stays green so the "!" glyph renders.
-		{
-			name:   "maintenance_overdue",
-			fields: map[string]string{"status": "maintenance overdue"},
-			want:   resource.ColorHealthy,
-		},
+		{name: "available", status: "available", want: resource.ColorHealthy},
 
-		// ── ColorBroken ──────────────────────────────────────────────────────────
-		{
-			name:   "failed_cluster_operation",
-			fields: map[string]string{"status": "failed: cluster operation"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "encryption_key_unreachable",
-			fields: map[string]string{"status": "encryption key unreachable"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "parameter_group_incompatible",
-			fields: map[string]string{"status": "parameter group incompatible"},
-			want:   resource.ColorBroken,
-		},
+		{name: "failed_cluster_operation", status: "failed", want: resource.ColorBroken},
+		{name: "encryption_key_unreachable", status: "inaccessible-encryption-credentials", want: resource.ColorBroken},
+		{name: "parameter_group_incompatible", status: "incompatible-parameters", want: resource.ColorBroken},
 		{
 			name:   "no_writer_reads_only",
-			fields: map[string]string{"status": "no writer: reads only"},
-			want:   resource.ColorBroken,
+			status: "available",
+			mutate: func(c *rdstypes.DBCluster) {
+				c.DBClusterMembers = []rdstypes.DBClusterMember{
+					{DBInstanceIdentifier: aws.String("acme-aurora-prod-1"), IsClusterWriter: aws.Bool(false)},
+				}
+			},
+			want: resource.ColorBroken,
 		},
 
-		// ── ColorWarning ─────────────────────────────────────────────────────────
 		{
 			name:   "delete_protection_off",
-			fields: map[string]string{"status": "delete-protection off"},
+			status: "available",
+			mutate: func(c *rdstypes.DBCluster) { c.DeletionProtection = aws.Bool(false) },
 			want:   resource.ColorWarning,
 		},
 		{
 			name:   "not_encrypted_at_rest",
-			fields: map[string]string{"status": "not encrypted at rest"},
+			status: "available",
+			mutate: func(c *rdstypes.DBCluster) { c.StorageEncrypted = aws.Bool(false) },
 			want:   resource.ColorWarning,
 		},
 		{
 			name:   "no_automated_backups",
-			fields: map[string]string{"status": "no automated backups"},
-			want:   resource.ColorWarning,
-		},
-		// Transitional statuses carry the ": in progress" suffix.
-		{
-			name:   "creating_in_progress",
-			fields: map[string]string{"status": "creating: in progress"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "modifying_in_progress",
-			fields: map[string]string{"status": "modifying: in progress"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "deleting_in_progress",
-			fields: map[string]string{"status": "deleting: in progress"},
+			status: "available",
+			mutate: func(c *rdstypes.DBCluster) { c.BackupRetentionPeriod = aws.Int32(0) },
 			want:   resource.ColorWarning,
 		},
 
-		// ── (+N) suffix stripping ────────────────────────────────────────────────
-		// Stacked findings append "(+N)" — must be stripped before phrase matching.
+		{name: "creating", status: "creating", want: resource.ColorWarning},
+		{name: "modifying", status: "modifying", want: resource.ColorWarning},
+		{name: "deleting", status: "deleting", want: resource.ColorWarning},
+
+		// A status a9s does not enumerate is reported, not swallowed: the
+		// fetcher passes the raw keyword through as a warning. The old table
+		// expected Healthy here because the phrase classifier's default arm was
+		// "no match, stay green" — that default made every future AWS status
+		// invisible, which is the opposite of future-proof.
+		{name: "unknown_status_is_reported", status: "some-future-aws-status", want: resource.ColorWarning},
+
 		{
-			name:   "broken_with_stacked_suffix",
-			fields: map[string]string{"status": "failed: cluster operation (+1)"},
+			name:   "broken_status_outranks_a_posture_warning",
+			status: "failed",
+			mutate: func(c *rdstypes.DBCluster) { c.StorageEncrypted = aws.Bool(false) },
 			want:   resource.ColorBroken,
-		},
-		{
-			name:   "warning_with_stacked_suffix",
-			fields: map[string]string{"status": "no automated backups (+2)"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "maintenance_overdue_with_stacked_suffix",
-			fields: map[string]string{"status": "maintenance overdue (+1)"},
-			want:   resource.ColorHealthy,
-		},
-		{
-			name:   "delete_protection_off_with_suffix",
-			fields: map[string]string{"status": "delete-protection off (+3)"},
-			want:   resource.ColorWarning,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := td.Color(resource.Resource{Fields: tc.fields})
-			if got != tc.want {
-				t.Errorf("Color(%v) = %v, want %v", tc.fields, got, tc.want)
+			cluster := d1DbcBaseline()
+			cluster.Status = aws.String(tc.status)
+			if tc.mutate != nil {
+				tc.mutate(&cluster)
 			}
+			page, err := rdsClusterPage(t, cluster)
+			if err != nil {
+				t.Fatalf("FetchRDSDBClustersPage: %v", err)
+			}
+			if len(page.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(page.Resources))
+			}
+			d1AssertColor(t, page.Resources[0], tc.want)
 		})
 	}
 }

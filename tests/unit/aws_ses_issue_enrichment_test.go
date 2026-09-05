@@ -644,12 +644,11 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 			wantColor: resource.ColorBroken,
 		},
 		{
-			// quota 80%+ reaches S3/S4/S5 only per docs/resources/ses.md §4
-			// (line 140): "Surfaces reached" is S3, S4, S5 — S2 (row color)
-			// is explicitly excluded. The row stays a Healthy (green) row
-			// with a "~" informational glyph; the Severity here is SevWarn
-			// but colorSES special-cases sesCodeQuota to ColorHealthy.
-			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorHealthy (S2 excluded by spec)",
+			// The quota row reaches S2 along with the rest: docs/resources/ses.md
+			// §4 lists S1 through S5 for it. It used to be excluded from the row
+			// colour by a per-code special case in colorSES, which meant a Warn
+			// finding could sit on a green row.
+			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorWarning",
 			r: resource.Resource{
 				ID: "acme-corp.com",
 				Findings: []domain.Finding{
@@ -660,7 +659,7 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 					"sending_enabled":     "true",
 				},
 			},
-			wantColor: resource.ColorHealthy,
+			wantColor: resource.ColorWarning,
 		},
 		{
 			// Wave-2 wins when stacked with Wave-1. To prove precedence, the

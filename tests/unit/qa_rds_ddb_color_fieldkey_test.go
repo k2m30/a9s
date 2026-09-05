@@ -1,243 +1,96 @@
 package unit
 
-// qa_rds_ddb_color_fieldkey_test.go — Regression tests for RDS (dbi) and DDB Color
-// reading the "status" field key.
+// qa_rds_ddb_color_fieldkey_test.go — the status → colour table for DynamoDB.
 //
-// Bug: RDS Color was reading "db_instance_status" as the primary key;
-//      DDB Color was reading "table_status" as the primary key.
-// Fix: Both now read "status" first (with legacy fallback).
-//
-// Tests fail if the fix is reverted: a resource with Fields["status"] set would
-// not be classified correctly when the wrong key is primary.
+// This file used to pin which Fields key the dbi and ddb classifiers read
+// first, canonical "status" over the legacy "db_instance_status" /
+// "table_status". No classifier reads a Fields key any more, so the key
+// precedence it guarded no longer exists and its dbi cases now live in
+// qa_dbi_color_test.go. What survives is the mapping itself, driven the way
+// production drives it: an SDK TableDescription through the ddb fetcher, and a
+// colour computed from the worst finding's severity.
 
 import (
+	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RDS DB Instance (dbi) Color tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestRDSColor_StatusFailed_IsColorBroken verifies Fields["status"]="failed" → ColorBroken.
-func TestRDSColor_StatusFailed_IsColorBroken(t *testing.T) {
-	td := resource.FindResourceType("dbi")
-	r := resource.Resource{
-		ID:     "arn:aws:rds:us-east-1:123456789012:db:prod-db",
-		Name:   "prod-db",
-		Fields: map[string]string{"status": "stopped"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("dbi Color with Fields[status]=stopped = %v, want ColorBroken", got)
+// d1DDBBaseline is a healthy table: active with deletion protection on. The
+// deletion-protection row stacks on top of any lifecycle state, so a baseline
+// without it would make every case below warn for a reason it did not name.
+func d1DDBBaseline() *ddbtypes.TableDescription {
+	return &ddbtypes.TableDescription{
+		TableName:                 aws.String("acme-orders"),
+		TableArn:                  aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders"),
+		TableStatus:               ddbtypes.TableStatusActive,
+		DeletionProtectionEnabled: aws.Bool(true),
 	}
 }
 
-// TestRDSColor_StatusAvailable_IsColorHealthy verifies Fields["status"]="available" → ColorHealthy.
-func TestRDSColor_StatusAvailable_IsColorHealthy(t *testing.T) {
-	td := resource.FindResourceType("dbi")
-	r := resource.Resource{
-		ID:     "arn:aws:rds:us-east-1:123456789012:db:prod-db",
-		Name:   "prod-db",
-		Fields: map[string]string{"status": "available"},
+func d1FetchDDBRow(t *testing.T, table *ddbtypes.TableDescription) resource.Resource {
+	t.Helper()
+	name := aws.ToString(table.TableName)
+	listStub := &ddbListStub{names: []string{name}}
+	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{name: table}}
+	page, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	if err != nil {
+		t.Fatalf("FetchDynamoDBTablesPage: %v", err)
 	}
-	got := td.Color(r)
-	if got != resource.ColorHealthy {
-		t.Errorf("dbi Color with Fields[status]=available = %v, want ColorHealthy", got)
+	if len(page.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(page.Resources))
 	}
+	return page.Resources[0]
 }
 
-// TestRDSColor_StatusCreating_IsColorWarning verifies Fields["status"]="creating" → ColorWarning.
-func TestRDSColor_StatusCreating_IsColorWarning(t *testing.T) {
-	td := resource.FindResourceType("dbi")
-	r := resource.Resource{
-		ID:     "arn:aws:rds:us-east-1:123456789012:db:new-db",
-		Name:   "new-db",
-		Fields: map[string]string{"status": "creating"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("dbi Color with Fields[status]=creating = %v, want ColorWarning", got)
-	}
-}
+// TestDDBColor pins the table status → colour mapping for DynamoDB.
+//
+// The wave-2 point-in-time-recovery row and the "(+N)" suffix row are gone: the
+// enricher owns the first and prowler_w2_ddb covers it, and the suffix is added
+// for display after the severity that decides colour has been read.
+func TestDDBColor(t *testing.T) {
+	cases := []struct {
+		name   string
+		status ddbtypes.TableStatus
+		mutate func(*ddbtypes.TableDescription)
+		want   resource.Color
+	}{
+		{name: "active", status: ddbtypes.TableStatusActive, want: resource.ColorHealthy},
 
-// TestRDSColor_LegacyKeyIsIgnored pins that the legacy "db_instance_status"
-// field name is ignored by the Color func (#284 removed the fallback).
-// Only the canonical "status" key drives classification.
-func TestRDSColor_LegacyKeyIsIgnored(t *testing.T) {
-	td := resource.FindResourceType("dbi")
-	// "status" says available; "db_instance_status" says stopped — legacy key
-	// must be ignored, so the result is ColorHealthy.
-	r := resource.Resource{
-		ID:   "arn:aws:rds:us-east-1:123456789012:db:prod-db",
-		Name: "prod-db",
-		Fields: map[string]string{
-			"status":             "available", // canonical — wins
-			"db_instance_status": "stopped",   // legacy — ignored
+		{name: "creating", status: ddbtypes.TableStatusCreating, want: resource.ColorWarning},
+		{name: "updating", status: ddbtypes.TableStatusUpdating, want: resource.ColorWarning},
+		{name: "deleting", status: ddbtypes.TableStatusDeleting, want: resource.ColorWarning},
+		{name: "archiving", status: ddbtypes.TableStatusArchiving, want: resource.ColorWarning},
+		{
+			name:   "deletion_protection_off",
+			status: ddbtypes.TableStatusActive,
+			mutate: func(td *ddbtypes.TableDescription) { td.DeletionProtectionEnabled = aws.Bool(false) },
+			want:   resource.ColorWarning,
+		},
+
+		{name: "kms_key_inaccessible", status: ddbtypes.TableStatusInaccessibleEncryptionCredentials, want: resource.ColorBroken},
+		{name: "archived_kms_lost", status: ddbtypes.TableStatusArchived, want: resource.ColorBroken},
+		{
+			name:   "broken_status_outranks_deletion_protection_off",
+			status: ddbtypes.TableStatusArchived,
+			mutate: func(td *ddbtypes.TableDescription) { td.DeletionProtectionEnabled = aws.Bool(false) },
+			want:   resource.ColorBroken,
 		},
 	}
-	got := td.Color(r)
-	if got != resource.ColorHealthy {
-		t.Errorf("dbi Color with Fields[status]=available AND Fields[db_instance_status]=stopped = %v, want ColorHealthy — legacy key must be ignored", got)
-	}
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DynamoDB Table (ddb) Color tests — §4 phrases (lowercase, not raw AWS enums)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestDDBColor_StatusBlank_IsColorHealthy verifies Fields["status"]="" (ACTIVE→blank) → ColorHealthy.
-func TestDDBColor_StatusBlank_IsColorHealthy(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/orders",
-		Name:   "orders",
-		Fields: map[string]string{"status": ""},
-	}
-	got := td.Color(r)
-	if got != resource.ColorHealthy {
-		t.Errorf("ddb Color with Fields[status]='' = %v, want ColorHealthy (ACTIVE maps to blank phrase)", got)
-	}
-}
-
-// TestDDBColor_StatusDeleting_IsColorWarning verifies Fields["status"]="deleting" → ColorWarning.
-func TestDDBColor_StatusDeleting_IsColorWarning(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/old-table",
-		Name:   "old-table",
-		Fields: map[string]string{"status": "deleting"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ddb Color with Fields[status]=deleting = %v, want ColorWarning", got)
-	}
-}
-
-// TestDDBColor_StatusCreating_IsColorWarning verifies Fields["status"]="creating" → ColorWarning.
-func TestDDBColor_StatusCreating_IsColorWarning(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/new-table",
-		Name:   "new-table",
-		Fields: map[string]string{"status": "creating"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ddb Color with Fields[status]=creating = %v, want ColorWarning", got)
-	}
-}
-
-// TestDDBColor_StatusUpdating_IsColorWarning verifies Fields["status"]="updating" → ColorWarning.
-func TestDDBColor_StatusUpdating_IsColorWarning(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/sessions-updating",
-		Name:   "sessions-updating",
-		Fields: map[string]string{"status": "updating"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ddb Color with Fields[status]=updating = %v, want ColorWarning", got)
-	}
-}
-
-// TestDDBColor_StatusArchiving_IsColorWarning verifies Fields["status"]="archiving" → ColorWarning.
-func TestDDBColor_StatusArchiving_IsColorWarning(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/legacy-archiving",
-		Name:   "legacy-archiving",
-		Fields: map[string]string{"status": "archiving"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ddb Color with Fields[status]=archiving = %v, want ColorWarning", got)
-	}
-}
-
-// TestDDBColor_StatusKMSInaccessible_IsColorBroken verifies
-// Fields["status"]="kms key inaccessible" → ColorBroken.
-func TestDDBColor_StatusKMSInaccessible_IsColorBroken(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/legacy-kms-lost",
-		Name:   "legacy-kms-lost",
-		Fields: map[string]string{"status": "kms key inaccessible"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("ddb Color with Fields[status]='kms key inaccessible' = %v, want ColorBroken", got)
-	}
-}
-
-// TestDDBColor_StatusArchivedKMSLost_IsColorBroken verifies
-// Fields["status"]="archived: kms key lost" → ColorBroken.
-func TestDDBColor_StatusArchivedKMSLost_IsColorBroken(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/legacy-archived",
-		Name:   "legacy-archived",
-		Fields: map[string]string{"status": "archived: kms key lost"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("ddb Color with Fields[status]='archived: kms key lost' = %v, want ColorBroken", got)
-	}
-}
-
-// TestDDBColor_StatusPITROff_IsColorHealthy verifies that the Wave-2 enrichment
-// finding summary "PITR off" (~ severity) does not degrade Color: ColorHealthy.
-// The Color func reads Fields["status"], not the enrichment summary, so a table
-// with ACTIVE status and a PITR-off finding must remain green.
-func TestDDBColor_StatusPITROff_IsColorHealthy(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/audit-pitr-off",
-		Name:   "audit-pitr-off",
-		Fields: map[string]string{"status": ""},
-	}
-	got := td.Color(r)
-	if got != resource.ColorHealthy {
-		t.Errorf("ddb Color for PITR-off table (ACTIVE status, blank phrase) = %v, want ColorHealthy — Wave-2 ~ finding must not affect Color", got)
-	}
-}
-
-// TestDDBColor_ArchivedKMSLostWithSuffix_StripBeforeColor verifies that a status
-// value that carries a BumpFindingSuffix (e.g. "archived: kms key lost (+1)")
-// is still correctly classified as ColorBroken. The Color func must call
-// StripFindingSuffix before lookup.
-func TestDDBColor_ArchivedKMSLostWithSuffix_StripBeforeColor(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	r := resource.Resource{
-		ID:     "arn:aws:dynamodb:us-east-1:123456789012:table/legacy-archived-plus",
-		Name:   "legacy-archived-plus",
-		Fields: map[string]string{"status": "archived: kms key lost (+1)"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("ddb Color with Fields[status]='archived: kms key lost (+1)' = %v, want ColorBroken — StripFindingSuffix must be applied before color lookup", got)
-	}
-}
-
-// TestDDBColor_LegacyTableStatusIsIgnored pins that the legacy "table_status"
-// key is ignored by the ddb Color func. Only the canonical "status" key drives
-// classification. Uses §4 phrases: blank for ACTIVE, "deleting" for DELETING.
-func TestDDBColor_LegacyTableStatusIsIgnored(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	// "status" = "" (ACTIVE phrase → healthy); "table_status" = "deleting"
-	// (warning under the old fallback). Legacy key must be ignored → ColorHealthy.
-	r := resource.Resource{
-		ID:   "arn:aws:dynamodb:us-east-1:123456789012:table/my-table",
-		Name: "my-table",
-		Fields: map[string]string{
-			"status":       "",         // canonical ACTIVE phrase — wins
-			"table_status": "deleting", // legacy — ignored
-		},
-	}
-	got := td.Color(r)
-	if got != resource.ColorHealthy {
-		t.Errorf("ddb Color with Fields[status]='' AND Fields[table_status]=deleting = %v, want ColorHealthy — legacy key must be ignored", got)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			table := d1DDBBaseline()
+			table.TableStatus = tc.status
+			if tc.mutate != nil {
+				tc.mutate(table)
+			}
+			d1AssertColor(t, d1FetchDDBRow(t, table), tc.want)
+		})
 	}
 }

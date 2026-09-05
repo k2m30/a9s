@@ -1518,7 +1518,16 @@ func Test_AttentionColorCap_BrokenSeverity_CapsToWarnOnHealthyBucket(t *testing.
 // color bucket is ALSO Broken (dbc status "failed: cluster operation") must
 // stay "!" — capping only kicks in when it would contradict a less-severe row.
 func Test_AttentionColorCap_BrokenSeverity_StaysBrokenOnBrokenBucket(t *testing.T) {
-	res := resource.Resource{ID: "dbc-cap-broken", Fields: map[string]string{"status": "failed: cluster operation"}}
+	// The row's colour bucket is decided by its findings, so the Broken bucket
+	// this test needs has to be a finding rather than a status string.
+	res := resource.Resource{
+		ID:     "dbc-cap-broken",
+		Fields: map[string]string{"status": "failed: cluster operation"},
+		Findings: []domain.Finding{{
+			Code: "dbc.broken.failed", Phrase: "failed: cluster operation",
+			Severity: domain.SevBroken, Source: "wave1",
+		}},
+	}
 	c := newDetailController(t, res, "dbc")
 	c.ApplyDetailFinding(&domain.Finding{
 		Code: "dbc.test-broken", Phrase: "encryption key unreachable", Severity: domain.SevBroken, Source: "wave2:test",

@@ -778,6 +778,15 @@ func TestPR03e_OpenSearchFetcher_HealthyEmitsNoFinding(t *testing.T) {
 					EncryptionAtRestOptions: &ostypes.EncryptionAtRestOptions{
 						Enabled: aws.Bool(true),
 					},
+					// Absent means off for both of these, so a literal that
+					// omitted them would carry two posture findings on top of
+					// the one state each test is about.
+					DomainEndpointOptions: &ostypes.DomainEndpointOptions{
+						EnforceHTTPS: aws.Bool(true),
+					},
+					NodeToNodeEncryptionOptions: &ostypes.NodeToNodeEncryptionOptions{
+						Enabled: aws.Bool(true),
+					},
 				},
 			},
 		},
@@ -823,6 +832,15 @@ func TestPR03e_OpenSearchFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 					UpgradeProcessing:      aws.Bool(false),
 					DomainProcessingStatus: ostypes.DomainProcessingStatusTypeIsolated,
 					EncryptionAtRestOptions: &ostypes.EncryptionAtRestOptions{
+						Enabled: aws.Bool(true),
+					},
+					// Absent means off for both of these, so a literal that
+					// omitted them would carry two posture findings on top of
+					// the one state each test is about.
+					DomainEndpointOptions: &ostypes.DomainEndpointOptions{
+						EnforceHTTPS: aws.Bool(true),
+					},
+					NodeToNodeEncryptionOptions: &ostypes.NodeToNodeEncryptionOptions{
 						Enabled: aws.Bool(true),
 					},
 				},
@@ -1801,6 +1819,15 @@ func TestPR03e_OpenSearchFetcher_PendingEmitsWarnFinding(t *testing.T) {
 					UpgradeProcessing:      aws.Bool(false),
 					DomainProcessingStatus: ostypes.DomainProcessingStatusTypeModifying,
 					EncryptionAtRestOptions: &ostypes.EncryptionAtRestOptions{
+						Enabled: aws.Bool(true),
+					},
+					// Absent means off for both of these, so a literal that
+					// omitted them would carry two posture findings on top of
+					// the one state each test is about.
+					DomainEndpointOptions: &ostypes.DomainEndpointOptions{
+						EnforceHTTPS: aws.Bool(true),
+					},
+					NodeToNodeEncryptionOptions: &ostypes.NodeToNodeEncryptionOptions{
 						Enabled: aws.Bool(true),
 					},
 				},

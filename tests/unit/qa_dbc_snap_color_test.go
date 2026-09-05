@@ -1,150 +1,119 @@
 package unit
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-func TestDbcSnapColor(t *testing.T) {
-	td := resource.FindResourceType("dbc-snap")
-	if td == nil {
-		t.Fatal("dbc-snap not registered")
+// d1DbcSnapBaseline is a healthy Aurora cluster snapshot: available, encrypted,
+// and recent enough that the manual-snapshot age predicate stays silent.
+func d1DbcSnapBaseline() rdstypes.DBClusterSnapshot {
+	return rdstypes.DBClusterSnapshot{
+		DBClusterSnapshotIdentifier: aws.String("acme-aurora-prod-snap"),
+		DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:acme-aurora-prod-snap"),
+		DBClusterIdentifier:         aws.String("acme-aurora-prod"),
+		Engine:                      aws.String("aurora-postgresql"),
+		Status:                      aws.String("available"),
+		StorageEncrypted:            aws.Bool(true),
+		SnapshotType:                aws.String("manual"),
+		SnapshotCreateTime:          aws.Time(time.Now().AddDate(0, 0, -3)),
 	}
+}
 
-	twoYearsAgo := time.Now().AddDate(-2, 0, 0).Format("2006-01-02 15:04")
-	recentTime := time.Now().Format("2006-01-02 15:04")
-
+// TestDbcSnapColor pins the status → colour mapping for DB cluster snapshots.
+//
+// Three rows that the old table recorded as Healthy are Warning here, and the
+// difference is the point of the conversion rather than a change of intent: an
+// unencrypted snapshot and a manual snapshot nobody has restored in a year both
+// produce a wave-1 finding. They read as green only when the colour is asked of
+// a Fields map that carries no findings at all.
+//
+// The suffix rows ("failed (+1)", "creating: 47%") are gone: the suffix is
+// added by StatusPhrase for display, and a severity comparison never sees it.
+func TestDbcSnapColor(t *testing.T) {
 	cases := []struct {
 		name   string
-		fields map[string]string
+		status string
+		mutate func(*rdstypes.DBClusterSnapshot)
 		want   resource.Color
 	}{
+		{name: "available", status: "available", want: resource.ColorHealthy},
+		{name: "empty_status", status: "", want: resource.ColorHealthy},
+
+		{name: "creating", status: "creating", want: resource.ColorWarning},
+		// A snapshot being copied is not yet restorable. AWS returns "copying"
+		// for both snapshot types, and neither findings predicate has a branch
+		// for it, so the row reads as ready when it is not.
+		{name: "copying", status: "copying", want: resource.ColorWarning},
+		{name: "failed", status: "failed", want: resource.ColorBroken},
+		{name: "incompatible_restore", status: "incompatible-restore", want: resource.ColorBroken},
+		{name: "incompatible_parameters", status: "incompatible-parameters", want: resource.ColorBroken},
+
 		{
-			name:   "available",
-			fields: map[string]string{"status": "available", "storage_encrypted": "true"},
-			want:   resource.ColorHealthy,
-		},
-		{
-			name:   "creating",
-			fields: map[string]string{"status": "creating", "storage_encrypted": "true"},
-			want:   resource.ColorWarning,
-		},
-		{
-			name:   "failed",
-			fields: map[string]string{"status": "failed"},
-			want:   resource.ColorBroken,
-		},
-		{
-			// storage_encrypted/snapshot age classification now lives entirely in
-			// computeDBCSnapFindings (wave1), which runs against a real DBClusterSnapshot.
-			// A bare Fields map carries no Findings, so colorFromAnyFinding misses and the
-			// fallback only inspects "status" — unencrypted alone no longer warns here.
 			name:   "unencrypted",
-			fields: map[string]string{"status": "available", "storage_encrypted": "false"},
-			want:   resource.ColorHealthy,
-		},
-		{
-			// Same rationale as "unencrypted": manual-snapshot-age is a wave1-only
-			// signal (computeDBCSnapFindings); the fallback path ignores snapshot_type
-			// and snapshot_create_time entirely.
-			name: "manual_old",
-			fields: map[string]string{
-				"status":               "available",
-				"snapshot_type":        "manual",
-				"snapshot_create_time": twoYearsAgo,
-			},
-			want: resource.ColorHealthy,
-		},
-		{
-			name: "automated_old",
-			fields: map[string]string{
-				"status":               "available",
-				"snapshot_type":        "automated",
-				"snapshot_create_time": twoYearsAgo,
-			},
-			want: resource.ColorHealthy,
-		},
-		{
-			name: "manual_recent",
-			fields: map[string]string{
-				"status":               "available",
-				"snapshot_type":        "manual",
-				"snapshot_create_time": recentTime,
-			},
-			want: resource.ColorHealthy,
-		},
-		{
-			name:   "broken_overrides_unencrypted",
-			fields: map[string]string{"status": "failed", "storage_encrypted": "false"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name: "invalid_date_ignored",
-			fields: map[string]string{
-				"status":               "available",
-				"snapshot_type":        "manual",
-				"snapshot_create_time": "garbage",
-			},
-			want: resource.ColorHealthy,
-		},
-		{
-			name:   "empty",
-			fields: map[string]string{"status": ""},
-			want:   resource.ColorHealthy,
-		},
-		// --- Regression pins for Issue 2: dbc-snap Color blind to enriched phrases ---
-		// Bug: dbc-snap Color only matches exact "failed" and "creating".
-		// Cross-ref enricher writes "failed (+1)" (multi-finding suffix) and AWS DocDB
-		// writes "incompatible-restore" / "incompatible-parameters" — all slip through
-		// as ColorHealthy. These FAIL today; they pass once the fix applies
-		// StripFindingSuffix + strings.HasPrefix("incompatible-") to dbc-snap.Color.
-		{
-			// "failed (+1)" has the (+1) suffix appended by BumpFindingSuffix when a
-			// second finding is added. StripFindingSuffix must strip it so the base
-			// phrase "failed" still maps to ColorBroken.
-			// FAILS today: switch only matches exact "failed", returns ColorHealthy.
-			// DBC-SNAP-COLOR-BLIND BUG: enriched "failed (+1)" slips through as green
-			name:   "failed_with_finding_suffix",
-			fields: map[string]string{"status": "failed (+1)"},
-			want:   resource.ColorBroken,
-		},
-		{
-			// AWS status "incompatible-restore" is a hard failure for DocDB cluster snapshots.
-			// dbi-snap Color handles this via strings.HasPrefix(phrase, "incompatible-");
-			// dbc-snap Color does not — it returns ColorHealthy.
-			// FAILS today: returns ColorHealthy. DBC-SNAP-COLOR-BLIND BUG.
-			name:   "incompatible_restore",
-			fields: map[string]string{"status": "incompatible-restore"},
-			want:   resource.ColorBroken,
-		},
-		{
-			// FAILS today: returns ColorHealthy. DBC-SNAP-COLOR-BLIND BUG.
-			name:   "incompatible_parameters",
-			fields: map[string]string{"status": "incompatible-parameters"},
-			want:   resource.ColorBroken,
-		},
-		{
-			// "creating: 47%" is a progress phrase that does NOT match the switch's
-			// exact "creating", so it falls through to the non-broken, non-empty path.
-			// With the fix this should map to ColorWarning (non-empty, non-broken phrase).
-			// FAILS today: "creating: 47%" does not match exact "creating", falls to
-			// default path — but the default in the current switch is no match, so the
-			// function reaches the unencrypted/date checks and returns ColorHealthy.
-			// DBC-SNAP-COLOR-BLIND BUG: "creating: 47%" treated as healthy.
-			name:   "creating_with_percent_suffix",
-			fields: map[string]string{"status": "creating: 47%"},
+			status: "available",
+			mutate: func(s *rdstypes.DBClusterSnapshot) { s.StorageEncrypted = aws.Bool(false) },
 			want:   resource.ColorWarning,
+		},
+		{
+			name:   "manual_old",
+			status: "available",
+			mutate: func(s *rdstypes.DBClusterSnapshot) {
+				s.SnapshotCreateTime = aws.Time(time.Now().AddDate(-2, 0, 0))
+			},
+			want: resource.ColorWarning,
+		},
+		{
+			name:   "automated_old_is_not_an_issue",
+			status: "available",
+			mutate: func(s *rdstypes.DBClusterSnapshot) {
+				s.SnapshotType = aws.String("automated")
+				s.SnapshotCreateTime = aws.Time(time.Now().AddDate(-2, 0, 0))
+			},
+			want: resource.ColorHealthy,
+		},
+		{
+			name:   "no_create_time_is_not_an_issue",
+			status: "available",
+			mutate: func(s *rdstypes.DBClusterSnapshot) { s.SnapshotCreateTime = nil },
+			want:   resource.ColorHealthy,
+		},
+		{
+			name:   "broken_status_outranks_unencrypted",
+			status: "failed",
+			mutate: func(s *rdstypes.DBClusterSnapshot) { s.StorageEncrypted = aws.Bool(false) },
+			want:   resource.ColorBroken,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := td.Color(resource.Resource{Fields: tc.fields})
-			if got != tc.want {
-				t.Errorf("Color(%v) = %v, want %v", tc.fields, got, tc.want)
+			snap := d1DbcSnapBaseline()
+			snap.Status = aws.String(tc.status)
+			if tc.mutate != nil {
+				tc.mutate(&snap)
 			}
+			mock := &dbcSnapRDSSinglePageMock{
+				output: &rds.DescribeDBClusterSnapshotsOutput{
+					DBClusterSnapshots: []rdstypes.DBClusterSnapshot{snap},
+				},
+			}
+			page, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+			if err != nil {
+				t.Fatalf("FetchRDSDBClusterSnapshotsPage: %v", err)
+			}
+			if len(page.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(page.Resources))
+			}
+			d1AssertColor(t, page.Resources[0], tc.want)
 		})
 	}
 }

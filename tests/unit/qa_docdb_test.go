@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -150,22 +151,30 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 		t.Fatal("dbc Color func is nil")
 	}
 
-	dbcRes := func(status string) resource.Resource {
-		return resource.Resource{
+	// The probe carries the finding its phrase came from: severity travels with
+	// the finding, so a row holding only a Fields entry has nothing to colour by.
+	dbcRes := func(status string, sev domain.Severity) resource.Resource {
+		r := resource.Resource{
 			ID:     "cluster-001",
 			Fields: map[string]string{"status": status},
 		}
+		if status != "" {
+			r.Findings = []domain.Finding{{
+				Code: "dbc.probe", Phrase: status, Severity: sev, Source: "wave1",
+			}}
+		}
+		return r
 	}
 
 	// Post-refactor Fields["status"] carries the §4 PHRASE, not the raw AWS
 	// keyword. Healthy = blank; transitional = "<status>: in progress"; Broken
 	// phrases are spelled out per spec §4.
-	availableStyle := styles.ColorStyle(td.Color(dbcRes("")))
+	availableStyle := styles.ColorStyle(td.Color(dbcRes("", domain.SevOK)))
 	if availableStyle.GetForeground() != styles.ColRunning {
 		t.Errorf("dbc healthy (blank): expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
 	}
 
-	creatingStyle := styles.ColorStyle(td.Color(dbcRes("creating: in progress")))
+	creatingStyle := styles.ColorStyle(td.Color(dbcRes("creating: in progress", domain.SevWarn)))
 	if creatingStyle.GetForeground() != styles.ColPending {
 		t.Errorf("dbc 'creating: in progress': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
@@ -174,7 +183,7 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 	// modifying, backing-up, maintenance, upgrading, starting, stopping,
 	// resetting-master-credentials, renaming are. Use 'modifying' as the
 	// transitional-warning probe.
-	modifyingStyle := styles.ColorStyle(td.Color(dbcRes("modifying: in progress")))
+	modifyingStyle := styles.ColorStyle(td.Color(dbcRes("modifying: in progress", domain.SevWarn)))
 	if modifyingStyle.GetForeground() != styles.ColPending {
 		t.Errorf("dbc 'modifying: in progress': expected ColPending (Warning per spec), got %v", modifyingStyle.GetForeground())
 	}

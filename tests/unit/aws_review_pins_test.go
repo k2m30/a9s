@@ -93,59 +93,14 @@ func TestEFS_FixtureENIGroupNamesMatchSecurityGroups(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// P2 PIN — Redshift Color func must classify derived-phrase inputs correctly
-// when probed with only Fields["status"] populated (phraseTier probe path used
-// by the unified Attention detail renderer).
-//
-// Previously the Color func keyed only on Fields["cluster_status"], so a
-// synthetic probe {Fields["status"]: "broken: storage-full"} classified as
-// Healthy and the detail Attention entry's per-entry severity was wrong.
+// The Redshift phrase-probe pin is gone. It asserted that the Color func could
+// classify a resource carrying nothing but Fields["status"], because the
+// unified Attention renderer used to probe severity by handing the classifier a
+// synthetic phrase. Severity now travels on the finding that produced the
+// phrase, so there is no probe to answer and no phrase table to keep in step
+// with the fetcher. The status to colour mapping it stood in for is pinned
+// against the fetcher in qa_redshift_color_test.go.
 // ---------------------------------------------------------------------------
-
-func TestRedshiftColor_PhraseProbeFallback(t *testing.T) {
-	td := resource.FindResourceType("redshift")
-	if td == nil {
-		t.Fatal("redshift not registered")
-	}
-
-	cases := []struct {
-		phrase string
-		want   resource.Color
-	}{
-		// Broken §4 phrases — must return ColorBroken even without cluster_status.
-		{"broken: incompatible-hsm", resource.ColorBroken},
-		{"broken: incompatible-network", resource.ColorBroken},
-		{"broken: incompatible-parameters", resource.ColorBroken},
-		{"broken: incompatible-restore", resource.ColorBroken},
-		{"broken: hardware-failure", resource.ColorBroken},
-		{"broken: storage-full", resource.ColorBroken},
-		{"unavailable", resource.ColorBroken},
-		{"failed", resource.ColorBroken},
-
-		// Warning §4 phrases — derived warnings must upgrade to ColorWarning
-		// even when cluster_status is absent.
-		{"pending change queued", resource.ColorWarning},
-		{"maintenance deferred", resource.ColorWarning},
-		{"publicly accessible", resource.ColorWarning},
-		{"unencrypted at rest", resource.ColorWarning},
-
-		// Rule-7 suffix must not affect bucket classification.
-		{"broken: storage-full (+2)", resource.ColorBroken},
-		{"pending change queued (+1)", resource.ColorWarning},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.phrase, func(t *testing.T) {
-			got := td.Color(resource.Resource{
-				Fields: map[string]string{"status": tc.phrase},
-			})
-			if got != tc.want {
-				t.Errorf("Color({status:%q}) = %v, want %v (phraseTier probe must classify by phrase when cluster_status is absent)",
-					tc.phrase, got, tc.want)
-			}
-		})
-	}
-}
 
 // ---------------------------------------------------------------------------
 // P2 PIN — OpenSearch enricher must NOT emit a finding for a Deleted domain
