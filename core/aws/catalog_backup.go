@@ -73,7 +73,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/events?stackId="+arn)
 		},
 		Columns: resource.CfnEventColumns(),
-		Color:   colorWave1OrHealthy,
+		Color:   colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"timestamp", "logical_resource_id", "resource_type",
 			"resource_status", "resource_status_reason", "stack_arn",
@@ -98,7 +98,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/resources?stackId="+arn)
 		},
 		Columns: resource.CfnResourceColumns(),
-		Color:   colorWave1OrHealthy,
+		Color:   colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"logical_resource_id", "physical_resource_id", "resource_type",
 			"resource_status", "drift_status", "last_updated", "stack_arn",

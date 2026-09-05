@@ -108,16 +108,19 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
+Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
+sentence would restate it. Their S5 cell reads `—`.
+
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` | `TGW is still provisioning — wait for state to reach available.` |
-| `State==modifying` | 1 | Warning | n/a | S2, S4 | `modifying: config change` | `TGW configuration change in progress — attachments may flap briefly.` |
-| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | `TGW is being deleted — attachments are being torn down.` |
-| `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` | `TGW has been deleted; record will age out shortly.` |
-| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` | `One or more TGW attachments failed — check VPC, Direct Connect, or peer status.` |
-| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment rejected` | `Cross-account attachment request was rejected by the accepter account.` |
-| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment awaiting accept` | `Cross-account VPC attachment request pending acceptance for more than 24h.` |
-| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S2, S4, S5 | `auto-accepts shared attachments` | `Any account this gateway is shared with can attach a VPC to it without review.` |
+| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` | — |
+| `State==modifying` | 1 | Warning | n/a | S2, S4 | `modifying: config change` | — |
+| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | — |
+| `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` | — |
+| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` | — |
+| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment rejected` | — |
+| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment awaiting accept` | — |
+| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S2, S4, S5 | `auto-accepts shared attachments` | `Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly.` |
 
 ## 4.1 UX review (two sentences)
 

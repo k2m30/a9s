@@ -48,7 +48,7 @@ func colorVPC(r domain.Resource) domain.Color {
 }
 
 func colorSubnet(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {
@@ -75,7 +75,7 @@ func colorRTB(r domain.Resource) domain.Color {
 }
 
 func colorNAT(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {
@@ -92,7 +92,7 @@ func colorNAT(r domain.Resource) domain.Color {
 }
 
 func colorIGW(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {
@@ -107,7 +107,7 @@ func colorIGW(r domain.Resource) domain.Color {
 }
 
 func colorEIP(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	if r.Fields["association_id"] == "" && r.Fields["instance_id"] == "" {
@@ -117,7 +117,7 @@ func colorEIP(r domain.Resource) domain.Color {
 }
 
 func colorVPCE(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {
@@ -151,7 +151,7 @@ func colorTGW(r domain.Resource) domain.Color {
 }
 
 func colorENI(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["status"] {
@@ -853,7 +853,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return consolelink.Regional(region, "ec2/home?region="+region+"#ELBListenerV2:listenerArn="+r.ID)
 		},
 		Columns: resource.ELBListenerColumns(),
-		Color:   colorWave1OrHealthy,
+		Color:   colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"port", "protocol", "default_action_type", "default_action_target",
 			"ssl_policy", "certificate_short", "listener_display",
@@ -900,7 +900,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return consolelink.Regional(region, "ec2/home?region="+region+"#TargetGroup:targetGroupArn="+arn)
 		},
 		Columns:      resource.TargetHealthColumns(),
-		Color:        colorWave1OrHealthy,
+		Color:        colorAnyFindingOrHealthy,
 		LifecycleKey: "health",
 		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description", "target_group_arn"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
@@ -925,7 +925,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			{Key: "partner_profile", Title: "Partner Profile", Width: 16, Sortable: true},
 			{Key: "base_directory", Title: "Base Directory", Width: 30, Sortable: false},
 		},
-		Color: colorWave1OrHealthy,
+		Color: colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"agreement_id", "description", "status", "local_profile", "partner_profile", "base_directory", "server_id",
 		},

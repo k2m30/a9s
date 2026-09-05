@@ -1018,7 +1018,7 @@ var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 		Columns:   resource.DbiEventColumns(),
 		CopyField: "message",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"timestamp", "event_categories", "message",
 			"source_identifier", "source_type", "source_arn",

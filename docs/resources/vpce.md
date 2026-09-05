@@ -204,7 +204,7 @@ One row per §3 signal (Healthy case omitted per rule):
 | `State == Rejected` | 1 | Broken | n/a | S2, S4 | `rejected by service owner` | n/a |
 | `State == Expired` | 1 | Broken | n/a | S2, S4 | `expired` | n/a |
 | `State == Partial` | 1 | Broken | n/a | S2, S4 | `partial: some AZ ENIs missing` | n/a |
-| `PolicyDocument` grants a wildcard action to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy allows any principal` | `The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts.` |
+| `PolicyDocument` grants a wildcard action to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy allows any principal` | `The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach.` |
 | `LastError` non-empty | 1 | Broken | n/a | S2, S4 | `<LastError.Code>: <LastError.Message>` | n/a |
 | interface, `NetworkInterfaceIds == []` | 1 | Broken | n/a | S2, S4 | `interface: no ENIs — unreachable` | n/a |
 | gateway, `RouteTableIds == []` | 1 | Warning | n/a | S2, S4 | `gateway: no route tables attached` | n/a |

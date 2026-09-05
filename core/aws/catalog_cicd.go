@@ -334,7 +334,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns:   resource.CBBuildColumns(),
 		CopyField: "build_id",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"build_number", "build_status", "start_time", "end_time",
 			"duration", "source_version_short", "initiator", "build_id",
@@ -387,7 +387,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns:   resource.PipelineStageColumns(),
 		CopyField: "external_url",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"stage_name", "stage_status", "action_name", "action_status",
 			"last_change_time", "external_url", "action_token",

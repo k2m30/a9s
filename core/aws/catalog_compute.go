@@ -1005,7 +1005,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
 		},
 		Columns: resource.LambdaInvocationColumns(),
-		Color:   colorWave1OrHealthy,
+		Color:   colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"request_id", "timestamp", "status", "duration_ms",
 			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
@@ -1033,7 +1033,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
 		},
 		Columns:   resource.LambdaInvocationLogColumns(),
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"timestamp", "message", "log_group", "log_stream"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
@@ -1050,7 +1050,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 			return consolelink.Regional(region, "ec2/home?region="+region+"#AutoScalingGroupDetails:id="+url.PathEscape(name)+";view=activity")
 		},
 		Columns:   resource.AsgActivityColumns(),
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"start_time", "status_code", "description", "cause", "asg_name"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchAsgActivities(ctx, c.AutoScaling, parentCtx, continuationToken)

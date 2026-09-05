@@ -322,7 +322,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
 		},
 		Columns:   resource.LogEventColumns(),
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group", "log_stream"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
@@ -343,7 +343,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#alarmsV2:alarm/"+url.PathEscape(name))
 		},
 		Columns:   resource.AlarmHistoryColumns(),
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"timestamp", "history_item_type", "history_summary", "alarm_name"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)

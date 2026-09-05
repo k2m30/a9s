@@ -158,15 +158,18 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
+Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
+sentence would restate it. Their S5 cell reads `—`.
+
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning: <State.Reason>` (fallback `provisioning: coming up`) | `Load balancer still provisioning — not yet accepting traffic.` |
-| `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `impaired: <State.Reason>` (fallback `impaired: scaling behind`) | `Load balancer is routing but lacks resources to scale — AWS is degraded.` |
-| `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed: <State.Reason>` | `Load balancer could not be set up — see State.Reason for cause.` |
-| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` | `The load balancer forwards requests it knows are ambiguous instead of rejecting them.` |
-| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` | `Headers that are not valid HTTP are passed through to the targets instead of being dropped.` |
-| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `listener without TLS on port <port>` | `This listener carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path.` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on listener <port>` | `The listener's security policy still negotiates older protocol versions or ciphers without forward secrecy.` |
+| `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning: <State.Reason>` (fallback `provisioning: coming up`) | — |
+| `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `impaired: <State.Reason>` (fallback `impaired: scaling behind`) | — |
+| `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed: <State.Reason>` | — |
+| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` | `The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest.` |
+| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` | `Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields.` |
+| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `listener without TLS on port <port>` | `This listener carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path. Terminate TLS on the listener, or redirect it to an HTTPS listener.` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on listener <port>` | `The listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection. Move the listener to one of the modern security policies that require version 1.2 or later.` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 

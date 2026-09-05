@@ -33,22 +33,10 @@ func colorFromSeverity(sev domain.Severity) domain.Color {
 	}
 }
 
-// colorFromWave1 returns the Color implied by the first wave1 Finding on r and
-// ok=true. ok=false signals no wave1 Finding — the caller should fall through
-// to its structural classifier.
-func colorFromWave1(r domain.Resource) (domain.Color, bool) {
-	for i := range r.Findings {
-		if r.Findings[i].Source == "wave1" {
-			return colorFromSeverity(r.Findings[i].Severity), true
-		}
-	}
-	return domain.ColorHealthy, false
-}
-
 // colorFromAnyFinding returns the Color for the worst-severity Finding on r
 // (wave1 or wave2, source prefix "wave2:") and ok=true. ok=false signals no
 // Finding at all — the caller should fall through to its structural
-// classifier. Unlike colorFromWave1, this also surfaces wave2-only findings
+// classifier. It surfaces wave2-only findings
 // (e.g. elb's deletion-protection check, vpc's flow-logs check, tgw's
 // attachment-health check) that a wave1-only lookup silently drops.
 func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
@@ -67,19 +55,6 @@ func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
 // Finding when off-Healthy, so there is no raw-field fallback to keep.
 func colorAnyFindingOrHealthy(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return domain.ColorHealthy
-}
-
-// colorWave1OrHealthy classifies r from its first wave1 Finding, defaulting to
-// healthy when none is present. Used by child-type catalog entries whose only
-// severity signal comes from fetcher-emitted wave1 Findings (cb_builds,
-// cfn_resources, glue_runs, log_events, lambda_invocation_logs,
-// role_policies, ecr_images, ecs_svc_logs, dbi_events, eb_rule_targets,
-// sns_subscriptions, elb_listeners).
-func colorWave1OrHealthy(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
 		return c
 	}
 	return domain.ColorHealthy

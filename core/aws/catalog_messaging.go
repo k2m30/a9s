@@ -34,7 +34,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 		Columns:   resource.EbRuleTargetColumns(),
 		CopyField: "target_arn",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary", "rule_name", "event_bus"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
@@ -55,7 +55,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 		Columns:   resource.SFNExecutionColumns(),
 		CopyField: "execution_arn",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"execution_arn", "name", "status", "start_date", "stop_date",
 			"duration", "state_machine_arn", "state_machine_alias_arn",
@@ -89,7 +89,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 		Columns:   resource.SFNExecutionHistoryColumns(),
 		CopyField: "event_detail",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"timestamp", "event_type", "event_type_short",
 			"state_name", "event_detail", "event_id", "previous_event_id", "execution_arn",
@@ -113,7 +113,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 		Columns:   resource.SnsSubscriptionColumns(),
 		CopyField: "endpoint",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn",
 		},
@@ -176,7 +176,7 @@ func colorEBRule(r domain.Resource) domain.Color {
 }
 
 func colorKinesis(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["stream_status"] {
@@ -195,7 +195,7 @@ func colorKinesis(r domain.Resource) domain.Color {
 }
 
 func colorMSK(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {

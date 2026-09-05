@@ -186,6 +186,17 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
 }
 
+// sgWideOpenDetail and sgDangerousPortsDetail are the S5 operator sentences
+// for the two internet-exposure findings.
+const (
+	sgWideOpenDetail = "One ingress rule opens every port and protocol to the whole internet, so nothing this " +
+		"group protects is reachable only from where you intended. Replace it with rules naming the ports each " +
+		"workload actually serves and the addresses allowed to reach them."
+	sgDangerousPortsDetail = "An administrative or database port on this group accepts connections from any " +
+		"address on the internet, which is how credential-stuffing and direct database access start. Narrow the " +
+		"rule to the addresses that need it, or move the access behind a bastion or private link."
+)
+
 // sgWideOpenPhrase is the single owner-worded source for the all-protocols
 // exposure phrase, shared by risk_summary (display) and sgRiskFindings
 // (the Broken-color explanation) so the two never drift.
@@ -224,12 +235,12 @@ func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.F
 	switch {
 	case wideOpen == "true":
 		return []domain.Finding{{
-			Code: sgCodeWideOpen, Phrase: sgWideOpenPhrase,
+			Code: sgCodeWideOpen, Phrase: sgWideOpenPhrase, Detail: sgWideOpenDetail,
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
 		return []domain.Finding{{
-			Code: sgCodeDangerousPorts, Phrase: riskSummary,
+			Code: sgCodeDangerousPorts, Phrase: riskSummary, Detail: sgDangerousPortsDetail,
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
 	}

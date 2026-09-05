@@ -382,8 +382,8 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 			}
 			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(role))
 		},
-		Columns: resource.RolePolicyColumns(),
-		Color:   colorWave1OrHealthy,
+		Columns:   resource.RolePolicyColumns(),
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"policy_name", "policy_arn", "policy_type"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)

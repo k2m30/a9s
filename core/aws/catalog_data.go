@@ -204,7 +204,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns:   resource.GlueRunColumns(),
 		CopyField: "error_message",
-		Color:     colorWave1OrHealthy,
+		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
 			"run_id_short", "job_run_state", "started_on",
 			"execution_time_human", "error_message", "dpu_hours",

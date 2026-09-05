@@ -196,7 +196,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			case "routing.http.drop_invalid_header_fields.enabled":
 				if isALB && *attr.Value != "true" {
 					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, "invalid HTTP headers not dropped", "~", "elb",
-						[]domain.DetailRow{{Label: "Drop invalid headers", Value: *attr.Value, Tier: "~"}},
+						[]domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: "~"}},
 						elbInvalidHeadersKeptDetail)
 				}
 			}

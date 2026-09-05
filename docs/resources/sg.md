@@ -125,16 +125,17 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S2 + S4 | `ports 22 open to 0.0.0.0/0` (`all ports open to 0.0.0.0/0` for an all-protocols rule) | `Ingress rule allows TCP 22 from 0.0.0.0/0 — SSH is reachable from the entire internet.` |
-| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S2 + S4 + S5 | `default group allows traffic` | `The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group.` |
-| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` | `No network interface in this account references this group, so its rules protect nothing.` |
+| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S2 + S4 + S5 | `ports 22 open to 0.0.0.0/0` | `An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link.` |
+| an all-protocols (`-1`) rule open to `0.0.0.0/0` | 1 | Broken | `!` | S2 + S4 + S5 | `all ports open to 0.0.0.0/0` | `One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them.` |
+| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S2 + S4 + S5 | `default group allows traffic` | `The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group.` |
+| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` | `No network interface in this account references this group, so its rules protect nothing and its name still gets picked from the console list. Delete it, or attach it to the workload it was written for.` |
 
 Rules for filling list and detail text:
 
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`open`, `orphan`, `unused`) in the List text column is not acceptable. Pair it with the cause (port+CIDR for exposure, reason for orphan).
 - For `0.0.0.0/0`-on-admin-port findings that trip multiple rules on the same SG (e.g. both 22 and 3389), the list text should show the lowest/most-famous port first and pluralize (`open: 22, 3389 to 0.0.0.0/0`). Detail text enumerates all offending rules, one per line.
-- Keep both columns short enough to fit: List text ≤ 40 chars, Detail text ≤ 100 chars.
+- Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
 
 ## 4.1 UX review (two sentences)
 
