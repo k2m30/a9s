@@ -13,6 +13,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -45,6 +46,7 @@ type pw1ECSTaskFake struct {
 	defs        map[string]ecstypes.TaskDefinition // definition ARN → definition
 	defErr      map[string]error                   // definition ARN → error
 	tasksErr    error
+	mu          sync.Mutex
 	defRequests []string
 }
 
@@ -68,7 +70,9 @@ func (f *pw1ECSTaskFake) DescribeTasks(_ context.Context, in *ecs.DescribeTasksI
 
 func (f *pw1ECSTaskFake) DescribeTaskDefinition(_ context.Context, in *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	arn := aws.ToString(in.TaskDefinition)
+	f.mu.Lock()
 	f.defRequests = append(f.defRequests, arn)
+	f.mu.Unlock()
 	if err, ok := f.defErr[arn]; ok {
 		return nil, err
 	}

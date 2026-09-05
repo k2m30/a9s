@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -128,6 +129,7 @@ type pw1EC2EnrichFake struct {
 	awsclient.EC2API
 	userData    map[string]string // instance ID → raw (undecoded) script
 	attrErr     map[string]error  // instance ID → DescribeInstanceAttribute error
+	mu          sync.Mutex
 	attrCalls   []string
 	statusPages int
 }
@@ -139,7 +141,9 @@ func (f *pw1EC2EnrichFake) DescribeInstanceStatus(_ context.Context, _ *ec2.Desc
 
 func (f *pw1EC2EnrichFake) DescribeInstanceAttribute(_ context.Context, in *ec2.DescribeInstanceAttributeInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceAttributeOutput, error) {
 	id := aws.ToString(in.InstanceId)
+	f.mu.Lock()
 	f.attrCalls = append(f.attrCalls, id)
+	f.mu.Unlock()
 	if err, ok := f.attrErr[id]; ok {
 		return nil, err
 	}

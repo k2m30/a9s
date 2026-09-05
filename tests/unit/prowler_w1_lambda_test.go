@@ -16,6 +16,7 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -54,12 +55,15 @@ type pw1LambdaPostureFake struct {
 	policyErr  map[string]error                           // function name → GetPolicy error
 	urlConfigs map[string][]lambdatypes.FunctionUrlConfig // function name → URL configs
 	urlErr     map[string]error
+	mu         sync.Mutex
 	getPolicy  []string
 }
 
 func (f *pw1LambdaPostureFake) GetPolicy(_ context.Context, in *lambda.GetPolicyInput, _ ...func(*lambda.Options)) (*lambda.GetPolicyOutput, error) {
 	name := aws.ToString(in.FunctionName)
+	f.mu.Lock()
 	f.getPolicy = append(f.getPolicy, name)
+	f.mu.Unlock()
 	if err, ok := f.policyErr[name]; ok {
 		return nil, err
 	}
