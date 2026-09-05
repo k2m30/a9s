@@ -264,6 +264,13 @@ func FetchOpenSearchDomainsAt(
 				addWave1Rows(&r, opensearchCodeUpdateForced, rows...)
 			}
 
+			if vpcEnabled == "false" && accessPolicyPublic == "true" {
+				addWave1Rows(&r, opensearchCodePublic,
+					domainpkg.DetailRow{Label: "Endpoint", Value: "public", Tier: "!"},
+					domainpkg.DetailRow{Label: "Access policy", Value: "open", Tier: "!"},
+				)
+			}
+
 			resources = append(resources, r)
 		}
 	}
