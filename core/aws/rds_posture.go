@@ -98,19 +98,19 @@ func rdsPostureFindings(p rdsPosture, c rdsPostureCodes) ([]domain.Finding, map[
 
 	if !p.SkipSingleAZ && !p.IsReadReplica && p.MultiAZ != nil && !*p.MultiAZ {
 		add(c.singleAZ, "single-AZ", c.singleAZDetail,
-			[]domain.DetailRow{{Label: "MultiAZ", Value: "false", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Multi-AZ", Value: "false", Tier: "~"}})
 	}
 	if p.AutoMinorVersionUpgrade != nil && !*p.AutoMinorVersionUpgrade {
 		add(c.minorUpgrade, "auto minor version upgrade off", c.minorUpgradeDetail,
-			[]domain.DetailRow{{Label: "AutoMinorVersionUpgrade", Value: "false", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Auto minor version upgrade", Value: "false", Tier: "~"}})
 	}
 	if engineSupportsIAMAuth(p.Engine) && p.IAMAuthEnabled != nil && !*p.IAMAuthEnabled {
 		add(c.iamAuth, "IAM database authentication off", c.iamAuthDetail,
-			[]domain.DetailRow{{Label: "IAMDatabaseAuthenticationEnabled", Value: "false", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Database authentication", Value: "identity-based, off", Tier: "~"}})
 	}
 	if p.MasterUsername != nil && isDefaultMasterUsername(*p.MasterUsername) {
 		add(c.defaultMasterUser, "default master username", c.defaultMasterUserDetail,
-			[]domain.DetailRow{{Label: "MasterUsername", Value: *p.MasterUsername, Tier: "~"}})
+			[]domain.DetailRow{{Label: "Master username", Value: *p.MasterUsername, Tier: "~"}})
 	}
 
 	if len(details) == 0 {
@@ -157,7 +157,7 @@ func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code dom
 		Source:   "wave1",
 	}
 	rows := []domain.DetailRow{
-		{Label: "CA", Value: caID, Tier: tier},
+		{Label: "Certificate authority", Value: caID, Tier: tier},
 		{Label: "Valid till", Value: validTill.Format("2006-01-02"), Tier: tier},
 	}
 	return f, rows

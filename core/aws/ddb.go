@@ -55,7 +55,7 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 			Source:   "wave1",
 		}), map[domain.FindingCode]domain.AttentionDetail{
 			CodeDDBDeletionProtectionOff: {Rows: []domain.DetailRow{
-				{Label: "DeletionProtectionEnabled", Value: "false", Tier: "~"},
+				{Label: "Deletion protection", Value: "off", Tier: "~"},
 			}},
 		}
 }

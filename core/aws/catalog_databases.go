@@ -603,6 +603,11 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: dbcCodeMaintenanceOverdue, Phrase: "maintenance overdue", Severity: domain.SevBroken, Source: "wave2"},
+			// Both cluster fetchers emit single-AZ and default-master-username.
+			// The other two come only from Aurora / Multi-AZ clusters: the
+			// DocumentDB SDK's DBCluster carries neither AutoMinorVersionUpgrade
+			// nor IAMDatabaseAuthenticationEnabled, so a DocumentDB row is
+			// silent on both rather than reporting a setting AWS never sent.
 			{Code: CodeDBCSingleAZ, Phrase: "single-AZ", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCMinorUpgradeOff, Phrase: "auto minor version upgrade off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCIAMAuthOff, Phrase: "IAM database authentication off", Severity: domain.SevWarn, Source: "wave1"},

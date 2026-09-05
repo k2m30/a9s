@@ -58,7 +58,7 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 			Source:   "wave1",
 		}), map[domain.FindingCode]domain.AttentionDetail{
 			CodeEFSUnencrypted: {Rows: []domain.DetailRow{
-				{Label: "Encrypted", Value: "false", Tier: "~"},
+				{Label: "Encryption at rest", Value: "off", Tier: "~"},
 			}},
 		}
 }

@@ -77,7 +77,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			MarkSkipped(&result, r.ID, &failures, "DescribeLoggingStatus", logErr)
 		case !aws.ToBool(logging.LoggingEnabled):
 			setWave2Finding(&result, r.ID, redshiftCodeAuditLoggingOff, "audit logging off", "~", "redshift",
-				[]domain.DetailRow{{Label: "LoggingEnabled", Value: "false", Tier: "~"}}, redshiftAuditLoggingOffDetail)
+				[]domain.DetailRow{{Label: "Audit logging", Value: "off", Tier: "~"}}, redshiftAuditLoggingOffDetail)
 		}
 
 		value, ok := redshiftRequireSSL(ctx, clients, r, requireSSLByGroup, &result, &failures)
@@ -87,7 +87,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 				shown = "unset"
 			}
 			setWave2Finding(&result, r.ID, redshiftCodeRequireSSLOff, "SSL not required", "~", "redshift",
-				[]domain.DetailRow{{Label: "require_ssl", Value: shown, Tier: "~"}}, redshiftRequireSSLOffDetail)
+				[]domain.DetailRow{{Label: "Requires encrypted connections", Value: shown, Tier: "~"}}, redshiftRequireSSLOffDetail)
 		}
 	})
 

@@ -220,12 +220,12 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 
 	if !aws.ToBool(rg.AtRestEncryptionEnabled) {
 		add(CodeRedisAtRestOff, "encryption at rest off", redisAtRestOffDetail, domain.SevWarn,
-			[]domain.DetailRow{{Label: "AtRestEncryptionEnabled", Value: "false", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Encryption at rest", Value: "off", Tier: "~"}})
 	}
 	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
 	if !transitOn {
 		add(CodeRedisTransitOff, "encryption in transit off", redisTransitOffDetail, domain.SevWarn,
-			[]domain.DetailRow{{Label: "TransitEncryptionEnabled", Value: "false", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Encryption in transit", Value: "off", Tier: "~"}})
 	}
 	// AWS only accepts an AUTH token on a group that also encrypts in
 	// transit, so a group without in-transit encryption is already reported
@@ -233,11 +233,11 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	// the same misconfiguration twice.
 	if transitOn && !aws.ToBool(rg.AuthTokenEnabled) {
 		add(CodeRedisNoAuth, "no authentication token", redisNoAuthDetail, domain.SevBroken,
-			[]domain.DetailRow{{Label: "AuthTokenEnabled", Value: "false", Tier: "!"}})
+			[]domain.DetailRow{{Label: "Authentication token", Value: "none", Tier: "!"}})
 	}
 	if rg.SnapshotRetentionLimit == nil || *rg.SnapshotRetentionLimit == 0 {
 		add(CodeRedisNoBackup, "automatic backups off", redisNoBackupDetail, domain.SevWarn,
-			[]domain.DetailRow{{Label: "SnapshotRetentionLimit", Value: "0", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Snapshot retention", Value: "0 days", Tier: "~"}})
 	}
 
 	if len(details) == 0 {

@@ -131,7 +131,7 @@ func TestW2RedshiftAuditLoggingOff(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeAuditLoggingOff, "audit logging off", domain.SevWarn, w2RedshiftSource)
-	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeAuditLoggingOff), "LoggingEnabled", "false")
+	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeAuditLoggingOff), "Audit logging", "off")
 	w2AssertNoCode(t, res.Findings["acme-analytics"], w2RedshiftCodeAuditLoggingOff)
 	w2AssertFindingDef(t, "redshift", w2RedshiftCodeAuditLoggingOff, "audit logging off", domain.SevWarn, "wave2")
 }
@@ -148,7 +148,7 @@ func TestW2RedshiftRequireSSLOff(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, w2RedshiftSource)
-	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "require_ssl", "false")
+	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "Requires encrypted connections", "false")
 	w2AssertNoCode(t, res.Findings["acme-analytics"], w2RedshiftCodeRequireSSLOff)
 	w2AssertFindingDef(t, "redshift", w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, "wave2")
 }
@@ -195,8 +195,8 @@ func TestW2RedshiftBothConditionsOnOneCluster(t *testing.T) {
 
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeAuditLoggingOff, "audit logging off", domain.SevWarn, w2RedshiftSource)
 	w2AssertFinding(t, res.Findings["acme-reporting"], w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, w2RedshiftSource)
-	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeAuditLoggingOff), "LoggingEnabled", "false")
-	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "require_ssl", "false")
+	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeAuditLoggingOff), "Audit logging", "off")
+	w2AssertRow(t, w2Rows(t, res, "acme-reporting", w2RedshiftCodeRequireSSLOff), "Requires encrypted connections", "false")
 }
 
 func TestW2RedshiftErrorOnOneClusterKeepsTheRest(t *testing.T) {
