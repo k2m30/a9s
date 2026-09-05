@@ -634,13 +634,6 @@ var nonPaginatedAPIs = []string{
 	// ListResourcesForWebACL — WAFv2 returns all associated resource ARNs in
 	// a single response (no NextToken in output); not a paginated operation.
 	"ListResourcesForWebACL",
-	// ListAttachedRolePolicies / ListAttachedUserPolicies — IAM caps managed
-	// policies at 20 per principal (quota "Managed policies per role/user",
-	// hard maximum), well inside one page, so the first page is the whole
-	// list. The enrichers read it only to answer "is an admin policy
-	// attached?".
-	"ListAttachedRolePolicies",
-	"ListAttachedUserPolicies",
 }
 
 // TestNoSingleCallListAPIEnrichers walks core/aws/*_issue_enrichment.go via
