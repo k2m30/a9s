@@ -215,8 +215,11 @@ func TestLambda_PublicPolicy_SingleStatementObject(t *testing.T) {
 // document in that form, and a raw json.Unmarshal fails on it.
 func TestLambda_PublicPolicy_URLEncodedDocument(t *testing.T) {
 	const name = "acme-encoded"
+	// Path-style escaping, which is what AWS emits: a document is percent-encoded
+	// per RFC 3986 and a literal '+' stays a '+'. Inverted from url.QueryEscape,
+	// whose form-style '+' for space leaves the JSON unparsable — do not restore it.
 	fake := &pw1LambdaPostureFake{policies: map[string]string{
-		name: url.QueryEscape(pw1PublicInvokePolicy),
+		name: url.PathEscape(pw1PublicInvokePolicy),
 	}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
