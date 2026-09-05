@@ -284,7 +284,17 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Route53: fakeR53}
 
-	// Cache entry present but empty resource list — checker uses DNS-extracted IDs as fallback.
+	// Cache entry PRESENT but holding nothing. INVERTED for row 2: this used
+	// to assert the checker fell back to the API id parsed out of the alias
+	// hostname and reported it as a resolved related resource. That is the
+	// defect — an alias DNS name is not an apigw ID, so the panel offered a
+	// row that navigated to nothing, and an account with zero APIs rendered a
+	// resolved count equal to its alias records. Do not restore it.
+	//
+	// A present entry is a complete answer even when empty (row 1,
+	// FetchRelatedTarget's cache-hit path), so the answer here is a resolved
+	// zero, not Unknown. Unknown is for a cache MISS with no fetcher, pinned
+	// separately in r53_related_nil_cache_test.go.
 	cache := resource.ResourceCache{
 		"apigw": resource.ResourceCacheEntry{Resources: nil},
 	}
@@ -293,11 +303,15 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	source := resource.Resource{ID: "Z5NILLIST", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (nil cache list → IDs from DNS hostname)", result.Count())
+	if got := result.EffectiveState(); got != domain.RelatedResolved {
+		t.Errorf("state = %v, want RelatedResolved: a present cache entry is a complete answer", got)
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != apiID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 — the account holds no APIs, so the zone's aliases resolve to none", result.Count())
+	}
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none — %q is parsed out of an alias hostname, not an apigw ID",
+			result.ResourceIDs(), apiID)
 	}
 }
 
