@@ -331,11 +331,12 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	c := app.New(core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
-	// reviewNow (Jul 15, 2026) trailing 12 months covers Aug'25-Jul'26,
-	// which includes the fixture's planted anomaly month (Jan'26 —
-	// core/demo/fixtures/costs.go's CostsGrowthMonth, anchored off the
-	// fixed CostsAnchorMonth constant, never time.Now()).
-	c.EnsureCostsState(reviewNow)
+	// The controller's `now` is taken from the demo fixture's OWN anchor
+	// month, never a date literal: the trailing month window built from it
+	// then ends at the anchor and is therefore guaranteed to contain the
+	// fixture's planted anomaly month (core/demo/fixtures/costs.go's
+	// CostsGrowthMonth, a fixed offset inside that same window).
+	c.EnsureCostsState(costsFixtureAnchorNow(t))
 
 	// Force the default root frame's shape fetch and execute it for real
 	// against the demo transport — the exact code path FR-014's anomaly
@@ -387,18 +388,22 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	if rowIdx == -1 {
 		t.Fatalf("no grid row labeled %q found after the demo fetch landed", growthRowLabel)
 	}
+	// The flagged column is named by deriving the label from the fixture's
+	// own planted-anomaly month, so this pin follows the dataset's anchor
+	// instead of asserting whichever month the literal was written in.
+	growthColLabel := costsFixtureMonthLabel(t, fixtures.CostsGrowthMonth)
 	for ci, col := range vs.Body.Costs.Columns {
-		if col.Label == "Jan'26" {
+		if col.Label == growthColLabel {
 			colIdx = ci
 			break
 		}
 	}
 	if colIdx == -1 {
-		t.Fatalf("no visible column labeled %q (the planted anomaly month) found", "Jan'26")
+		t.Fatalf("no visible column labeled %q (the planted anomaly month) found", growthColLabel)
 	}
 
 	if !vs.Body.Costs.Rows[rowIdx].Cells[colIdx].Anomaly {
-		t.Errorf("CostCell.Anomaly is false at the planted anomaly's own (row=%q, col=%q) cell — the fetched Anomalies never reached the rendered grid cell (buildCostsBody/costs.BuildGrid must set it on matching cells)", growthRowLabel, "Jan'26")
+		t.Errorf("CostCell.Anomaly is false at the planted anomaly's own (row=%q, col=%q) cell — the fetched Anomalies never reached the rendered grid cell (buildCostsBody/costs.BuildGrid must set it on matching cells)", growthRowLabel, growthColLabel)
 	}
 
 	// Move the cursor onto that exact cell and confirm the footer surfaces

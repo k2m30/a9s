@@ -669,92 +669,25 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 		Requests: 1,
 	})
 
-	// Enter on the SERVICE row -> pins SERVICE=EC2, drills to USAGE_TYPE.
-	// screen.Select's WaitForRows now gates on Loading unconditionally (the
-	// architecture refactor removed the old "blind drill-through on a
-	// never-fetched shape" carve-out), so the USAGE_TYPE frame's own fetch
-	// must land before the second Enter can advance at all. Range is left
-	// zero-valued so ApplyCostsLoaded matches by CacheKey (shape) alone —
-	// this pure-TUI layer cannot observe the exact drilled window/anchor
-	// (see the resourceIDRecords wide-tiling comment below for the same
-	// constraint) — and the records tile a wide daily span around "now" so
-	// SOME period lands inside whatever window the drill actually built.
-	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
-
-	// The pushed USAGE_TYPE frame opens with its cursor on costsCurrentCol's
-	// pick (applyCostsSelect's PushDrill case) — the newest window column
-	// whose Start has already begun, i.e. the week containing today, never
-	// the raw last (possibly not-yet-elapsed) column and never the oldest
-	// column. That week's Start is at most 6 days before today, so it is
-	// always inside the RESOURCE_ID 14-day retention window regardless of
-	// today's day-of-month or month boundary — no manual scrolling needed.
-	usageTypeQuery := costs.Query{
-		Granularity: costs.GranularityDay.APIGranularity(),
-		GroupBy:     []costs.Dimension{costs.DimensionUsageType},
-		Filter: costs.Filter{Equals: map[costs.Dimension][]string{
-			costs.DimensionService: {"Amazon Elastic Compute Cloud - Compute"},
-		}},
-	}
-	usageTypeToday := time.Now().UTC().Truncate(24 * time.Hour)
-	var usageTypeRecords []costs.Record
-	for i := range 60 {
-		day := usageTypeToday.AddDate(0, 0, -i)
-		p := costs.Period{Start: day.Format("2006-01-02"), End: day.AddDate(0, 0, 1).Format("2006-01-02")}
-		usageTypeRecords = append(usageTypeRecords, costs.Record{
-			Period:  p,
-			Keys:    []string{"USE1-BoxUsage:m5.large"},
-			Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 3, Unit: "USD"}},
-		})
-	}
-	m, _ = rootApplyMsg(m, messages.CostsLoaded{
-		Query:    usageTypeQuery,
-		Grid:     costs.GridResult{Fetched: true, Records: usageTypeRecords},
-		Requests: 1,
-	})
-
+	// Enter on the SERVICE row -> pins SERVICE=EC2, drills to USAGE_TYPE;
 	// Enter again -> pins USAGE_TYPE, drills to RESOURCE_ID.
-	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	//
+	// screen.Select's WaitForRows gates on Loading unconditionally, so each
+	// child frame's own fetch must land before the next Enter can advance.
+	// Each of those deliveries is built from the frame's OWN emitted fetch
+	// task — its Query and its Window, drained out of the tea.Cmd the drill
+	// returned — never reconstructed from literals here. The child's shape
+	// cascades off the selected cell (granularity, pinned filter, and the
+	// exact period tiling of the window), so a hand-written query and a
+	// hand-tiled record set are a second source of truth for something only
+	// the app knows: they match on the day they were written and silently
+	// stop matching afterwards, leaving the child frame Loading forever and
+	// the drill unable to advance at all.
+	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	m = reviewAnswerCostsFetch(t, m, cmd, "USE1-BoxUsage:m5.large")
 
-	// RESOURCE_ID frame: one row keyed by the demo EC2 instance ID. The
-	// Query's Filter is reconstructed manually (CacheKey — Granularity +
-	// GroupBy + Filter — is all ApplyCostsLoaded matches against when no
-	// Range is set) to mirror exactly what the drill above pinned:
-	// SERVICE=EC2 at USAGE_TYPE's frame, then USAGE_TYPE="USE1-BoxUsage:
-	// m5.large" (the real row usageTypeRecords seeded and Enter resolved —
-	// screen.Select never pins an empty value now) at RESOURCE_ID's.
-	// Granularity is DAY: applyCostsSelect's drill makes each child frame
-	// ONE STEP FINER than its parent (finerGranularity), so two drills down
-	// from the MONTH root (MONTH -> WEEK -> DAY) land here at DAY, not
-	// MONTH. The window's exact anchor cascades through each drilled
-	// frame's own selected-cell Start (month-start, then week-start), not
-	// literally time.Now(), and isn't independently observable at this
-	// pure-TUI layer — so this tiles 60 raw daily periods ending today
-	// (wider than any plausible drilled window near "now") instead of
-	// trying to replicate the exact anchor chain.
-	resourceIDQuery := costs.Query{
-		Granularity: costs.GranularityDay.APIGranularity(),
-		GroupBy:     []costs.Dimension{costs.DimensionResourceID},
-		Filter: costs.Filter{Equals: map[costs.Dimension][]string{
-			costs.DimensionService:   {"Amazon Elastic Compute Cloud - Compute"},
-			costs.DimensionUsageType: {"USE1-BoxUsage:m5.large"},
-		}},
-	}
-	today := time.Now().UTC().Truncate(24 * time.Hour)
-	resourceIDRecords := make([]costs.Record, 0, 60)
-	for i := range 60 {
-		day := today.AddDate(0, 0, -i)
-		p := costs.Period{Start: day.Format("2006-01-02"), End: day.AddDate(0, 0, 1).Format("2006-01-02")}
-		resourceIDRecords = append(resourceIDRecords, costs.Record{
-			Period:  p,
-			Keys:    []string{demoEC2InstanceID},
-			Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 3, Unit: "USD"}},
-		})
-	}
-	m, _ = rootApplyMsg(m, messages.CostsLoaded{
-		Query:    resourceIDQuery,
-		Grid:     costs.GridResult{Fetched: true, Records: resourceIDRecords},
-		Requests: 1,
-	})
+	m, cmd = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	m = reviewAnswerCostsFetch(t, m, cmd, demoEC2InstanceID)
 
 	before := stripANSI(rootViewContent(m))
 	if !strings.Contains(before, demoEC2InstanceID) {
@@ -764,7 +697,7 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 	// Enter on the RESOURCE_ID row — the seam under test. This emits
 	// KindFetchByIDDetail (round8 item 3, already green); the bug is what
 	// happens to that task afterward at the TUI layer.
-	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	m, cmd = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		if follow := cmd(); follow != nil {
 			m, _ = rootApplyMsg(m, follow)
@@ -775,4 +708,47 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 	if !strings.Contains(view, "detail --") || !strings.Contains(view, demoEC2InstanceID) {
 		t.Errorf("Enter on the RESOURCE_ID row (EC2, a mapped by-ID-capable type) did not navigate to the EC2 detail view — handleCostsKeyMsg routes every task through the generic executeTaskCmd, which fetches but never emits messages.Navigate{Target: TargetDetail} for KindFetchByIDDetail (unlike runtime_adapter_related.go's special-cased m.fetchByIDDetail); got:\n%s", view)
 	}
+}
+
+// reviewAnswerCostsFetch answers a costs drill's own fetch. It drains the
+// tea.Cmd the drill returned, takes the CostsLoaded the frame's fetch
+// produced — its Query and its Window — and re-delivers that exact shape as
+// a successful result whose records tile that same Window under rowKey.
+//
+// Answering the app's own request, rather than guessing it, is what keeps a
+// drill-chain test independent of the calendar: the drilled granularity,
+// the pinned filter and the window's period tiling are all derived from the
+// selected cell, and a test that spells them out instead pins whichever
+// month it was written in. The drained model is deliberately discarded —
+// only the shape of the request is wanted, never the (client-less) error
+// result the drain itself produced.
+func reviewAnswerCostsFetch(t *testing.T, m tui.Model, cmd tea.Cmd, rowKey string) tui.Model {
+	t.Helper()
+	_, msgs := drainCmds(t, m, cmd, 4)
+	for _, msg := range msgs {
+		cl, ok := msg.(messages.CostsLoaded)
+		if !ok {
+			continue
+		}
+		if len(cl.Window) == 0 {
+			t.Fatalf("the drilled child frame's fetch carried an empty Window (query %+v) — there is no period tiling to answer it with", cl.Query)
+		}
+		recs := make([]costs.Record, 0, len(cl.Window))
+		for _, p := range cl.Window {
+			recs = append(recs, costs.Record{
+				Period:  p,
+				Keys:    []string{rowKey},
+				Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 3, Unit: "USD"}},
+			})
+		}
+		out, _ := rootApplyMsg(m, messages.CostsLoaded{
+			Query:    cl.Query,
+			Window:   cl.Window,
+			Grid:     costs.GridResult{Fetched: true, Records: recs},
+			Requests: 1,
+		})
+		return out
+	}
+	t.Fatalf("the drilled child frame emitted no CostsLoaded to answer (drained %d messages) — the drill dispatched no fetch of its own", len(msgs))
+	return m
 }

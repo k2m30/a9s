@@ -256,7 +256,13 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 // ===========================================================================
 
 func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
+	// A real clock, not a pinned literal — for the same reason scenario A
+	// gives: this scenario drives the TUI lane too, and the TUI lane's
+	// costs clock is always time.Now(). A pinned month makes the headless
+	// half build its window around that month while the TUI half builds
+	// one around today's, so the two stop being the same scenario the
+	// moment the calendar leaves the literal behind.
+	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
@@ -311,7 +317,9 @@ func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
 // ===========================================================================
 
 func TestCostsLaneParity_C_ForceRefresh(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
+	// Real clock, same rule as scenario A — the TUI lane driven below has
+	// no other clock to share.
+	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
@@ -521,7 +529,9 @@ func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 // ===========================================================================
 
 func TestCostsLaneParity_F_EscFromLoadingChild(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
+	// Real clock, same rule as scenario A — the TUI lane driven below has
+	// no other clock to share.
+	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}

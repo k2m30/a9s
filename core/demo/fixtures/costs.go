@@ -2,10 +2,11 @@
 
 // Package fixtures — costs.go provides the synthetic Cost Explorer dataset
 // served by the demo transport's ce:* handlers (core/demo/handlers.go).
-// Evergreen: CostsAnchorMonth is resolved once, from the real wall clock,
-// when the process starts — not per-render, so a single run stays
-// internally consistent, and every demo session opens on a genuinely
-// current (never stale) trailing window.
+// Evergreen: the dataset's anchor month comes from a caller-supplied clock.
+// Demo mode passes costsProcessNow, one wall-clock instant read at process
+// start — not per-render, so a single run stays internally consistent, and
+// every demo session opens on a genuinely current (never stale) trailing
+// window. Tests pass their own anchor.
 package fixtures
 
 import (
@@ -15,13 +16,38 @@ import (
 	"github.com/k2m30/a9s/v3/core/costs"
 )
 
-// CostsAnchorMonth is the last (open) month in the demo dataset — 13
-// trailing months end here — resolved once at process start from the real
-// current month.
-var CostsAnchorMonth = currentMonthStart(time.Now())
+// CostsWindowMonths is how many trailing months the dataset spans, and
+// CostsGrowthMonthIndex is the planted growth story's index within that
+// window (see CostsGrowthMonthAt).
+const (
+	CostsWindowMonths     = 13
+	CostsGrowthMonthIndex = 6
+)
 
-func currentMonthStart(t time.Time) string {
-	return costs.FormatDate(time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC))
+// costsProcessNow is the single wall-clock instant demo mode anchors on,
+// read once so CostsAnchorMonth, CostsGrowthMonth and NewCostsFixtures
+// cannot straddle a month boundary between one another.
+var costsProcessNow = time.Now()
+
+// CostsAnchorMonth is the last (open) month of the demo-mode dataset — the
+// window's CostsWindowMonths trailing months end here.
+var CostsAnchorMonth = CostsAnchorMonthAt(costsProcessNow)
+
+// CostsAnchorMonthAt returns the "YYYY-MM-01" anchor month for now.
+func CostsAnchorMonthAt(now time.Time) string {
+	return costs.FormatDate(time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC))
+}
+
+// CostsMonthsAt returns the CostsWindowMonths trailing "YYYY-MM-01" month
+// labels ending, inclusive, at now's month.
+func CostsMonthsAt(now time.Time) []string {
+	return costsMonthsEndingAt(CostsAnchorMonthAt(now), CostsWindowMonths)
+}
+
+// CostsGrowthMonthAt returns the planted growth story's month for now —
+// the month the anomaly NewCostsFixturesAt(now) plants is dated to.
+func CostsGrowthMonthAt(now time.Time) string {
+	return CostsMonthsAt(now)[CostsGrowthMonthIndex]
 }
 
 // Shared dimension values every synthetic row carries for REGION/
@@ -72,10 +98,8 @@ const (
 	CostsGrowthUsageType = "USE1-BoxUsage:g5.xlarge"
 )
 
-// CostsGrowthMonth is the growth-story month: index 6 of the 13-month
-// window costsMonthsEndingAt builds (matching growthMonthIdx below), i.e.
-// 6 months before CostsAnchorMonth.
-var CostsGrowthMonth = costsMonthsEndingAt(CostsAnchorMonth, 13)[6]
+// CostsGrowthMonth is the demo-mode dataset's growth-story month.
+var CostsGrowthMonth = CostsGrowthMonthAt(costsProcessNow)
 
 // CostsResourceRow is one (resource ID, daily amount) fact for the
 // GetCostAndUsageWithResources synthetic dataset — resource IDs reference
@@ -190,9 +214,15 @@ var costsServiceSpecs = []costsServiceSpec{
 	{"Tax", "Tax", 263, "Tax"},
 }
 
-// NewCostsFixtures builds the 13-month demo dataset.
+// NewCostsFixtures builds the demo-mode dataset on the process clock.
 func NewCostsFixtures() *CostsFixtures {
-	months := costsMonthsEndingAt(CostsAnchorMonth, 13)
+	return NewCostsFixturesAt(costsProcessNow)
+}
+
+// NewCostsFixturesAt builds the CostsWindowMonths-month dataset ending at
+// now's month.
+func NewCostsFixturesAt(now time.Time) *CostsFixtures {
+	months := CostsMonthsAt(now)
 
 	var rows []CostsRow
 	for _, sp := range costsServiceSpecs {
@@ -221,14 +251,15 @@ func NewCostsFixtures() *CostsFixtures {
 		)
 	}
 
-	growthMonthIdx, prevMonthIdx := 6, 5 // CostsGrowthMonth vs the month before it
+	growthMonthIdx := CostsGrowthMonthIndex
+	prevMonthIdx := growthMonthIdx - 1
 
 	return &CostsFixtures{
 		Months: months,
 		Rows:   splitRowsAcrossAccounts(rows),
 		Anomaly: CostsAnomaly{
 			ID:        "anomaly-ec2compute-g5xlarge",
-			Month:     CostsGrowthMonth,
+			Month:     months[growthMonthIdx],
 			Service:   CostsGrowthService,
 			UsageType: CostsGrowthUsageType,
 			Impact:    ec2ComputeG5xlargeMonthly[growthMonthIdx] - ec2ComputeG5xlargeMonthly[prevMonthIdx],

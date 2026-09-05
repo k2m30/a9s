@@ -66,7 +66,7 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 		// Open marks the current period; RenderCosts appends the "*" suffix
 		// (wireframe.md) — Label stays the bare period text so a renderer
 		// never needs to strip a baked-in marker back out.
-		columns[i] = CostColumn{Label: periodLabel(p, top.Granularity), Open: !p.Closed(cs.Now)}
+		columns[i] = CostColumn{Label: PeriodLabel(p, top.Granularity), Open: !p.Closed(cs.Now)}
 	}
 
 	rows := make([]CostRow, len(vm.Rows))
@@ -260,10 +260,10 @@ func formatAPICost(calls int) string {
 	return fmt.Sprintf("$%.2f", float64(calls)*apiCostPerCall)
 }
 
-// periodLabel formats p for column headers / breadcrumbs at granularity g:
+// PeriodLabel formats p for column headers / breadcrumbs at granularity g:
 // "Jul'26" (month), "2026" (year), "Jan 1-4" (week, clipped to month
 // boundary per wireframe.md), "Jan 5" (day).
-func periodLabel(p costs.Period, g costs.Granularity) string {
+func PeriodLabel(p costs.Period, g costs.Granularity) string {
 	start, err := costs.ParseDate(p.Start)
 	if err != nil {
 		return p.Start
