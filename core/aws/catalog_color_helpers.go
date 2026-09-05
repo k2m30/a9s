@@ -4,7 +4,6 @@ package aws
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -67,14 +66,6 @@ func colorAnyFindingOrHealthy(r domain.Resource) domain.Color {
 		return c
 	}
 	return domain.ColorHealthy
-}
-
-// findingSuffixRe strips the trailing " (+N)" suffix from a status phrase.
-var findingSuffixRe = regexp.MustCompile(` \(\+\d+\)$`)
-
-// stripFindingSuffix removes any trailing " (+N)" from a Status phrase.
-func stripFindingSuffix(s string) string {
-	return findingSuffixRe.ReplaceAllString(s, "")
 }
 
 // cfnStackColor maps CloudFormation stack status strings to a Color.

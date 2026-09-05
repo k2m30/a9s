@@ -199,8 +199,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counts the rest, instead of showing whichever finding happened to be first.
   Route tables, SNS subscriptions, SSM parameters, CloudTrail trails,
   CloudWatch alarms, CloudTrail events, SES identities, IAM users and
-  policies, auto scaling groups and ECS services all classified from raw AWS
-  fields beside the findings that described the same thing; they no longer do.
+  policies, auto scaling groups, ECS clusters and services, RDS and DocumentDB
+  instances, clusters and snapshots, Redis, DynamoDB, Redshift, OpenSearch and
+  EFS all classified from raw AWS fields or from the rendered Status text
+  beside the findings that described the same thing; they no longer do.
+- SES identities now colour when the account's 24-hour sending quota is over
+  80% consumed, instead of showing the warning glyph on a green row.
+- An OpenSearch domain with a forced software update pending now reads as a
+  warning rather than as broken: the update is scheduled, not a failure.
 - OpenSearch domains report the software-update and encryption-at-rest checks
   as soon as the list loads rather than a moment later, and the "+N" in the
   Status column now matches the number of findings the detail view shows.

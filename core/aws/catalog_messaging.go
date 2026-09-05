@@ -206,26 +206,7 @@ func colorMSK(r domain.Resource) domain.Color {
 }
 
 func colorSES(r domain.Resource) domain.Color {
-	// The quota signal's spec surfaces are S3/S4/S5 only
-	// (docs/resources/ses.md §4): it earns a glyph and a phrase but leaves
-	// the row green. It is dropped from the slice the colour is taken from
-	// rather than short-circuiting the selection, so every other finding
-	// still competes on severity.
-	colouring := make([]domain.Finding, 0, len(r.Findings))
-	for _, f := range r.Findings {
-		if f.Code != sesCodeQuota {
-			colouring = append(colouring, f)
-		}
-	}
-	if top, ok := domain.TopFinding(colouring); ok {
-		return colorFromSeverity(top.Severity)
-	}
-	// Reached only by a Resource built outside the fetcher, which carries the
-	// Status phrase in Fields but no Findings.
-	if f, ok := sesFindingForPhrase(stripFindingSuffix(r.Fields["status"])); ok {
-		return colorFromSeverity(f.Severity)
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var

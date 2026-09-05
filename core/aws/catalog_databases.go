@@ -14,273 +14,51 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// Every classifier below takes the row's colour from its findings and nothing
+// else. Each type's fetcher attaches a Finding for every non-healthy signal it
+// can see, and the disk cache round-trips Findings (core/cache: TypeFile
+// `findings`), so a row that reaches these with no Finding has no signal to
+// report — it is not a row whose rendered Status phrase should be parsed back
+// into a colour.
+
 func colorDBI(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	status := r.Fields["status"]
-	stripped := stripFindingSuffix(status)
-	switch stripped {
-	case "failed", "storage-full", "restore-error", "stopped",
-		"incompatible-network", "incompatible-option-group",
-		"incompatible-parameters", "incompatible-restore",
-		"encryption key unavailable":
-		return domain.ColorBroken
-	}
-	if strings.HasPrefix(stripped, "incompatible-") || strings.HasPrefix(stripped, "inaccessible-") {
-		return domain.ColorBroken
-	}
-	switch stripped {
-	case "no automated backups", "publicly accessible",
-		"unencrypted storage", "deletion protection off":
-		return domain.ColorWarning
-	}
-	if stripped != "" && stripped != "available" && stripped != "maintenance scheduled" {
-		if strings.Contains(stripped, ":") {
-			return domain.ColorWarning
-		}
-		switch stripped {
-		case "creating", "modifying", "backing-up", "rebooting",
-			"renaming", "resetting-master-credentials", "starting",
-			"stopping", "upgrading", "maintenance",
-			"configuring-enhanced-monitoring", "configuring-iam-database-auth",
-			"configuring-log-exports", "converting-to-vpc", "moving-to-vpc",
-			"storage-optimization", "deleting":
-			return domain.ColorWarning
-		}
-	}
-	base := domain.ColorHealthy
-	if r.Fields["publicly_accessible"] == "true" {
-		if base < domain.ColorWarning {
-			base = domain.ColorWarning
-		}
-	}
-	if r.Fields["storage_encrypted"] == "false" {
-		if base < domain.ColorWarning {
-			base = domain.ColorWarning
-		}
-	}
-	if r.Fields["deletion_protection"] == "false" {
-		if base < domain.ColorWarning {
-			base = domain.ColorWarning
-		}
-	}
-	if r.Fields["backup_retention_period"] == "0" {
-		if base < domain.ColorWarning {
-			base = domain.ColorWarning
-		}
-	}
-	return base
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorS3(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorRedis(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	switch phrase {
-	case "create failed — see events":
-		return domain.ColorBroken
-	}
-	switch phrase {
-	case "creating — new group",
-		"modifying — config change",
-		"snapshotting — backup running",
-		"deleting — teardown",
-		"multi-AZ without auto-failover":
-		return domain.ColorWarning
-	}
-	if strings.HasPrefix(phrase, "shard ") {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorDBC(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	switch phrase {
-	case "":
-		return domain.ColorHealthy
-	case "failed: cluster operation",
-		"encryption key unreachable",
-		"parameter group incompatible",
-		"no writer: reads only":
-		return domain.ColorBroken
-	case "delete-protection off",
-		"not encrypted at rest",
-		"no automated backups":
-		return domain.ColorWarning
-	case "maintenance overdue":
-		return domain.ColorHealthy
-	}
-	if strings.HasSuffix(phrase, ": in progress") {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorDDB(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	switch phrase {
-	case "":
-		return domain.ColorHealthy
-	case "creating", "updating", "deleting", "archiving":
-		return domain.ColorWarning
-	case "kms key inaccessible", "archived: kms key lost":
-		return domain.ColorBroken
-	case "point-in-time recovery disabled":
-		return domain.ColorHealthy
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorOpenSearch(r domain.Resource) domain.Color {
-	if r.Fields["deleted"] == "true" {
-		return domain.ColorDim
-	}
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	stripped := stripFindingSuffix(r.Fields["status"])
-	if strings.HasPrefix(stripped, "isolated:") || r.Fields["domain_processing_status"] == "Isolated" {
-		return domain.ColorBroken
-	}
-	if strings.HasPrefix(stripped, "processing:") ||
-		r.Fields["processing"] == "true" ||
-		r.Fields["upgrade_processing"] == "true" {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorRedshift(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	switch phrase {
-	case "unavailable", "failed":
-		return domain.ColorBroken
-	}
-	if len(phrase) >= len("broken:") && phrase[:len("broken:")] == "broken:" {
-		return domain.ColorBroken
-	}
-	var base domain.Color
-	switch r.Fields["cluster_status"] {
-	case "available":
-		base = domain.ColorHealthy
-	case "creating", "modifying", "resizing", "rebooting", "renaming", "deleting":
-		base = domain.ColorWarning
-	case "incompatible-hsm", "incompatible-network", "incompatible-parameters",
-		"incompatible-restore", "hardware-failure", "storage-full":
-		base = domain.ColorBroken
-	default:
-		base = domain.ColorHealthy
-	}
-	if base == domain.ColorBroken {
-		return domain.ColorBroken
-	}
-	switch r.Fields["cluster_availability_status"] {
-	case "Unavailable", "Failed":
-		return domain.ColorBroken
-	case "Maintenance", "Modifying":
-		if base == domain.ColorHealthy {
-			base = domain.ColorWarning
-		}
-	}
-	if base == domain.ColorBroken {
-		return domain.ColorBroken
-	}
-	switch phrase {
-	case "pending change queued", "maintenance deferred",
-		"maintenance", "modifying",
-		"publicly accessible", "unencrypted at rest":
-		if base == domain.ColorHealthy {
-			base = domain.ColorWarning
-		}
-	}
-	if r.Fields["publicly_accessible"] == "true" && base == domain.ColorHealthy {
-		base = domain.ColorWarning
-	}
-	if r.Fields["encrypted"] == "false" && base == domain.ColorHealthy {
-		base = domain.ColorWarning
-	}
-	return base
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorEFS(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	switch phrase {
-	case "":
-		return domain.ColorHealthy
-	case "error", "no mount targets", "mount target down":
-		return domain.ColorBroken
-	case "creating", "updating", "deleting":
-		return domain.ColorWarning
-	default:
-		return domain.ColorHealthy
-	}
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorDBISnap(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	if phrase == "failed" {
-		return domain.ColorBroken
-	}
-	if strings.HasPrefix(phrase, "incompatible-") {
-		return domain.ColorBroken
-	}
-	if phrase == "" || phrase == "available" {
-		if r.Fields["encrypted"] == "false" {
-			return domain.ColorWarning
-		}
-		return domain.ColorHealthy
-	}
-	return domain.ColorWarning
+	return colorAnyFindingOrHealthy(r)
 }
 
-// colorDBCSnap classifies a dbc-snap row. Every Warning/Broken bucket here is
-// backed by a domain.Finding — wave1 (failed, incompatible-*, creating,
-// manual age > 365d, unencrypted) emitted by computeDBCSnapFindings /
-// computeRDSDBClusterSnapshotFindings, or wave2 (orphan, past-retention)
-// emitted by enrichDBCSnapCrossRef — colorFromAnyFinding always resolves
-// first, so the phrase-parsing fallback below only classifies rows whose
-// RawStruct predates a Findings-carrying fetch (e.g. cache replay of an
-// older schema).
 func colorDBCSnap(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	phrase := stripFindingSuffix(r.Fields["status"])
-	if phrase == "failed" {
-		return domain.ColorBroken
-	}
-	if strings.HasPrefix(phrase, "incompatible-") {
-		return domain.ColorBroken
-	}
-	if phrase != "" && phrase != "available" {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
@@ -716,7 +494,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeOpenSearchDeleting, Phrase: "deleting: removal in progress", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeOpenSearchIsolated, Phrase: "isolated: quarantined by AWS", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: opensearchCodePublic, Phrase: "reachable outside a VPC", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced", Severity: domain.SevWarn, Source: "wave2"},

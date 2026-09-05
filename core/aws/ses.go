@@ -101,23 +101,3 @@ func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {
 	}
 	return findings
 }
-
-// sesFindingForPhrase maps a Status cell phrase back to the finding that
-// produced it, by running the fetcher's own predicate over every verification
-// status rather than restating the phrase-to-severity mapping a second time.
-// Only rows built outside the fetcher need it — a fetched identity carries the
-// finding itself.
-func sesFindingForPhrase(phrase string) (domain.Finding, bool) {
-	probes := []sesv2types.IdentityInfo{{SendingEnabled: false}}
-	for _, st := range sesv2types.VerificationStatusPending.Values() {
-		probes = append(probes, sesv2types.IdentityInfo{VerificationStatus: st, SendingEnabled: true})
-	}
-	for _, probe := range probes {
-		for _, f := range sesIdentityFindings(probe) {
-			if f.Phrase == phrase {
-				return f, true
-			}
-		}
-	}
-	return domain.Finding{}, false
-}

@@ -62,7 +62,7 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	if openSearchUpdateForcedSoon(d, now) {
 		findings = append(findings, domainpkg.Finding{
 			Code: opensearchCodeUpdateForced, Phrase: "software update forced soon",
-			Detail: opensearchUpdateForcedDetail, Severity: domainpkg.SevBroken, Source: "wave1",
+			Detail: opensearchUpdateForcedDetail, Severity: domainpkg.SevWarn, Source: "wave1",
 		})
 	}
 	if d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled {
@@ -228,7 +228,7 @@ func FetchOpenSearchDomainsAt(
 			if updateAvailable == "true" {
 				var rows []domainpkg.DetailRow
 				if updateDate != "" {
-					rows = append(rows, domainpkg.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "!"})
+					rows = append(rows, domainpkg.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "~"})
 				}
 				if currentVersion != "" {
 					rows = append(rows, domainpkg.DetailRow{Label: "Current Version", Value: currentVersion})

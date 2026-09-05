@@ -137,7 +137,7 @@ One row per signal from §3:
 | `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S2, S4 | `sending disabled` | `Sending paused on this identity — re-enable to resume outbound mail.` |
 | `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account PROBATION` | `SES account is on probation — AWS flagged reputation issues; fix bounces/complaints before SES shuts sending down.` |
 | `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `account SHUTDOWN` | `SES account sending is paused by AWS — open a support case after fixing the underlying issue.` |
-| `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S3, S4, S5 | `quota 80%+ used` | `24h sending quota is over 80% consumed — request a quota increase before throttling begins.` |
+| `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S1, S2, S3, S4, S5 | `quota 80%+ used` | `24h sending quota is over 80% consumed — request a quota increase before throttling begins.` |
 
 Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the account, not any single identity — a9s-devops: surface the finding on **every** identity row's S4 with the compact `account ...:` prefix so a glance at the list correctly attributes the problem to the account, not the identity; S1 counts the account-level finding once, not N times.
 

@@ -65,15 +65,7 @@ func colorECSCluster(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["status"] {
-	case "ACTIVE":
-		return domain.ColorHealthy
-	case "PROVISIONING", "DEPROVISIONING":
-		return domain.ColorWarning
-	case "FAILED", "INACTIVE":
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(ecsClusterFindings(r.Fields["status"]))
 }
 
 func colorECSTask(r domain.Resource) domain.Color {

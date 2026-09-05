@@ -421,7 +421,7 @@ resource-list frame title. The frame-title rules:
 | opensearch | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
 | opensearch | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
 | opensearch | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
-| opensearch | opensearch.update-forced | software update forced soon | broken | wave1 |
+| opensearch | opensearch.update-forced | software update forced soon | warn | wave1 |
 | opensearch | opensearch.encryption-off | encryption at rest off | warn | wave1 |
 | opensearch | opensearch.public | reachable outside a VPC | broken | wave2 |
 | opensearch | opensearch.https-not-enforced | HTTPS not enforced | warn | wave2 |

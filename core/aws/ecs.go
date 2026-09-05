@@ -58,20 +58,7 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 			pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
 			servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
 
-			// emit wave1 Findings for non-healthy lifecycle states.
-			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
-			// so the existing structural Color path works as fallback.
-			var findings []domain.Finding
-			switch status {
-			case "PROVISIONING":
-				findings = []domain.Finding{{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
-			case "DEPROVISIONING":
-				findings = []domain.Finding{{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
-			case "FAILED":
-				findings = []domain.Finding{{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
-			case "INACTIVE":
-				findings = []domain.Finding{{Code: CodeECSStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
-			}
+			findings := ecsClusterFindings(status)
 
 			r := resource.Resource{
 				ID:   clusterName,
@@ -112,4 +99,21 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// ecsClusterFindings is the one predicate for a cluster's lifecycle state.
+// ACTIVE reports nothing. colorECSCluster runs it over Fields for rows built
+// outside the fetcher.
+func ecsClusterFindings(status string) []domain.Finding {
+	switch status {
+	case "PROVISIONING":
+		return []domain.Finding{{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
+	case "DEPROVISIONING":
+		return []domain.Finding{{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
+	case "FAILED":
+		return []domain.Finding{{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "INACTIVE":
+		return []domain.Finding{{Code: CodeECSStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	return nil
 }

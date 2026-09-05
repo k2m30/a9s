@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: OpenSearch Domains
 - **AWS API reference**: <https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html>
 - **List API**: `ListDomainNames` (returns per-domain `DomainName` + `EngineType` only — no state, no config).
-- **Describe API (if any)**: `DescribeDomains` (bounded fan-out, up to 5 domain names per call; returns full `DomainStatus[]`). Used in Wave 2.
+- **Describe API (if any)**: `DescribeDomains` (bounded fan-out, up to 5 domain names per call; returns full `DomainStatus[]`). Called by the fetcher, since `ListDomainNames` returns nothing classifiable.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -87,8 +87,6 @@ Transcribed from `docs/attention-signals.md`.
 
 `ListDomainNames` returns only `DomainName` and `EngineType`, so the fetcher pairs it with `DescribeDomains` (bounded fan-out, up to 5 names per call) and every signal readable from `DomainStatus` is decided there: the hard states (`Deleted`, `Isolated`, `Processing`/`UpgradeProcessing`) and the two background checks (`ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`). A domain being deleted reports nothing else.
 
-### 3.2 Wave 2 — bounded extra API calls
-
 One bullet per distinct signal.
 
 - **Signal**: `DomainStatus.Deleted == true`.
@@ -98,7 +96,7 @@ One bullet per distinct signal.
 
 - **Signal**: `DomainStatus.Processing == true` OR `DomainStatus.UpgradeProcessing == true`.
   - **State bucket**: Warning.
-  - **API call**: `DescribeDomains` — bounded fan-out (shared with other Wave 2 signals; one DescribeDomains call returns all the fields).
+  - **API call**: `DescribeDomains` — bounded fan-out (shared; one DescribeDomains call returns all the fields).
   - **Cost shape**: hybrid.
 
 - **Signal**: `DomainStatus.DomainProcessingStatus == "Isolated"`.
@@ -115,6 +113,27 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
   - **Cost shape**: hybrid.
+
+### 3.2 Wave 2 — bounded extra API calls
+
+No extra API calls. The network-posture enricher reads fields
+`FetchOpenSearchDomains` already wrote from the same `DescribeDomains`
+response, so these cost nothing beyond the list load.
+
+- **Signal**: no `VPCOptions` AND the access policy allows any principal.
+  - **State bucket**: Broken.
+  - **API call**: none.
+  - **Cost shape**: free.
+
+- **Signal**: `DomainStatus.DomainEndpointOptions.EnforceHTTPS` not true.
+  - **State bucket**: Warning.
+  - **API call**: none.
+  - **Cost shape**: free.
+
+- **Signal**: `DomainStatus.NodeToNodeEncryptionOptions.Enabled` not true.
+  - **State bucket**: Warning.
+  - **API call**: none.
+  - **Cost shape**: free.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -147,7 +166,7 @@ One row per signal from §3:
 | `Deleted==true` | 2 | Dim | n/a | S2, S4 | `deleting: removal in progress` | `Domain is being deleted — awaiting AWS to tear down ENIs and release the endpoint.` |
 | `Processing==true` or `UpgradeProcessing==true` | 2 | Warning | n/a | S2, S4 | `processing: config change in flight` | `AWS is applying a configuration or version change — writes continue, brief brownouts possible.` |
 | `DomainProcessingStatus=="Isolated"` | 2 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` | `AWS has quarantined the domain (billing, policy, or health) — no reads/writes until resolved.` |
-| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 2 | Healthy | `!` | S1, S3, S4, S5 | `software update forced soon` | `Service-software update is available; AWS will apply it automatically any day — plan the window.` |
+| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` | `Service-software update is available; AWS will apply it automatically any day — plan the window.` |
 | `EncryptionAtRestOptions.Enabled==false` | 2 | Healthy | `~` | S3, S4, S5 | `encryption at rest off` | `Indexes are stored unencrypted on disk — enable at-rest encryption for compliance.` |
 | No `VPCOptions` AND access policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `reachable outside a VPC` | `The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals.` |
 | `DomainEndpointOptions.EnforceHTTPS` not true | 2 | Warning | `~` | S2, S4, S5 | `HTTPS not enforced` | `The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options.` |
@@ -199,7 +218,7 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
 | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
-| opensearch.update-forced | software update forced soon | broken | wave1 |
+| opensearch.update-forced | software update forced soon | warn | wave1 |
 | opensearch.encryption-off | encryption at rest off | warn | wave1 |
 | opensearch.public | reachable outside a VPC | broken | wave2 |
 | opensearch.https-not-enforced | HTTPS not enforced | warn | wave2 |
