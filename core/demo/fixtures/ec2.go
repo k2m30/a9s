@@ -136,14 +136,12 @@ const (
 	SGDefaultWithRules = "sg-0default000000001"
 	// SGUnused is the only demo group no network interface references.
 	SGUnused = "sg-0unused0000000001"
-	// SubnetMixedSeverity is the only demo row of the five networking types
-	// carrying findings of two different severities: its broken lifecycle
-	// state plus the auto-assign warning. It is the witness that a row's
-	// colour and its Status phrase both come from the WORST finding.
-	SubnetMixedSeverity = "subnet-0failed111111c"
-	// SubnetAutoPublicIP is the only healthy-lifecycle demo subnet that
-	// auto-assigns public addresses.
+	// SubnetAutoPublicIP is the only demo subnet that auto-assigns public IPs.
 	SubnetAutoPublicIP = fixtProdPublicSubnetA
+	// TGWMixedSeverity is the only demo row of the five networking types
+	// whose findings run [Warn, Broken]: a gateway still modifying, with a
+	// failed attachment the wave-2 enricher appends behind that state.
+	TGWMixedSeverity = "tgw-0modifying111111g"
 	// TGWAutoAccept is the only demo transit gateway that auto-accepts
 	// shared attachments.
 	TGWAutoAccept = "tgw-0aaa111111111111a"
@@ -1849,7 +1847,7 @@ func buildSubnets() []ec2types.Subnet {
 			AvailabilityZone:        aws.String("us-east-1c"),
 			State:                   ec2types.SubnetState("failed"),
 			AvailableIpAddressCount: aws.Int32(0),
-			MapPublicIpOnLaunch:     aws.Bool(true),
+			MapPublicIpOnLaunch:     aws.Bool(false),
 			DefaultForAz:            aws.Bool(false),
 			OwnerId:                 aws.String("123456789012"),
 			Tags: []ec2types.Tag{
@@ -2500,6 +2498,26 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 			CreationTime:               aws.Time(time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("dr-tgw-vpn-failed")},
+			},
+		},
+		// Modifying TGW → attachment State=failed. The gateway's own wave-1
+		// finding is "modifying" (SevWarn) and the enricher appends
+		// tgw.attachment-failed (SevBroken) AFTER it, so this is the one demo
+		// row of the five networking types whose finding slice runs
+		// [Warn, Broken]. Picking the head instead of the worst renders it
+		// yellow reading "modifying"; TGWMixedSeverity is what makes that
+		// visible.
+		{
+			TransitGatewayAttachmentId: aws.String("tgw-attach-0mixed11111111i"),
+			TransitGatewayId:           aws.String(TGWMixedSeverity),
+			ResourceType:               ec2types.TransitGatewayAttachmentResourceTypeVpn,
+			ResourceId:                 aws.String("vpn-0mixed0000000001i"),
+			State:                      ec2types.TransitGatewayAttachmentStateFailed,
+			TransitGatewayOwnerId:      aws.String("123456789012"),
+			ResourceOwnerId:            aws.String("123456789012"),
+			CreationTime:               aws.Time(time.Date(2026, 4, 5, 10, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("modifying-tgw-vpn-failed")},
 			},
 		},
 		// Hub TGW → attachment State=modifying → EnrichTGWAttachments emits
