@@ -107,10 +107,10 @@ const (
 	// AdministratorAccess attachment is the natural witness for
 	// iam-group.admin-attached.
 	IAMGroupAdminAttached = "admins"
-	// IAMGroupPowerUserAttached carries PowerUserAccess, the other member of
+	// IAMGroupPowerUser carries PowerUserAccess, the other member of
 	// adminManagedPolicyARNs, so the finding's Policy row is witnessed naming
 	// something other than AdministratorAccess.
-	IAMGroupPowerUserAttached = "platform-engineers"
+	IAMGroupPowerUser = "platform-engineers"
 )
 
 func IsCustomerManagedPolicyARN(policyARN string) bool {
@@ -701,7 +701,7 @@ func buildIAMPolicies() []iamtypes.Policy {
 			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
-		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUserAttached so
+		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUser so
 		// the admin-attached finding's Policy row is witnessed naming a policy
 		// other than AdministratorAccess.
 		{
@@ -925,9 +925,9 @@ func buildIAMGroups() []iamtypes.Group {
 			CreateDate: aws.Time(time.Date(2024, 3, 1, 8, 10, 0, 0, time.UTC)),
 		},
 		{
-			GroupName:  aws.String(IAMGroupPowerUserAttached),
+			GroupName:  aws.String(IAMGroupPowerUser),
 			GroupId:    aws.String("AGPAEXAMPLE555555555"),
-			Arn:        aws.String("arn:aws:iam::123456789012:group/" + IAMGroupPowerUserAttached),
+			Arn:        aws.String("arn:aws:iam::123456789012:group/" + IAMGroupPowerUser),
 			Path:       aws.String("/"),
 			CreateDate: aws.Time(time.Date(2024, 5, 6, 9, 0, 0, 0, time.UTC)),
 		},
@@ -989,7 +989,7 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.AttachedGroupPolicies["admins"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
 	}
-	f.AttachedGroupPolicies[IAMGroupPowerUserAttached] = []iamtypes.AttachedPolicy{
+	f.AttachedGroupPolicies[IAMGroupPowerUser] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("PowerUserAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/PowerUserAccess")},
 	}
 	f.AttachedGroupPolicies["developers"] = []iamtypes.AttachedPolicy{
@@ -1006,7 +1006,7 @@ func buildIAMRelations(f *IAMFixtures) {
 		{UserName: aws.String("bob.smith"), UserId: aws.String("AIDAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:user/bob.smith"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 9, 1, 10, 30, 0, 0, time.UTC))},
 	}
 
-	f.GroupUsers[IAMGroupPowerUserAttached] = []iamtypes.User{
+	f.GroupUsers[IAMGroupPowerUser] = []iamtypes.User{
 		{UserName: aws.String("bob.smith"), UserId: aws.String("AIDAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:user/bob.smith"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 9, 1, 10, 30, 0, 0, time.UTC))},
 	}
 
@@ -1030,7 +1030,7 @@ func buildIAMRelations(f *IAMFixtures) {
 	}
 	f.EntitiesForPolicy["arn:aws:iam::aws:policy/PowerUserAccess"] = &PolicyEntities{
 		Groups: []iamtypes.PolicyGroup{
-			{GroupName: aws.String(IAMGroupPowerUserAttached), GroupId: aws.String("AGPAEXAMPLE555555555")},
+			{GroupName: aws.String(IAMGroupPowerUser), GroupId: aws.String("AGPAEXAMPLE555555555")},
 		},
 	}
 	f.EntitiesForPolicy["arn:aws:iam::aws:policy/AdministratorAccess"] = &PolicyEntities{

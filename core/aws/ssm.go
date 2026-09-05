@@ -67,13 +67,12 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			description = *param.Description
 		}
 
-		// Compute risk: STALE if SecureString older than 365d; PLAINTEXT if String with sensitive name
 		risk := ""
 		lowerName := strings.ToLower(paramName)
 		if paramType == "SecureString" && param.LastModifiedDate != nil && time.Since(*param.LastModifiedDate) > 365*24*time.Hour {
-			risk = "STALE"
+			risk = riskStaleValue
 		} else if paramType == "String" && (strings.Contains(lowerName, "/password") || strings.Contains(lowerName, "/secret") || strings.Contains(lowerName, "/token")) {
-			risk = "PLAINTEXT"
+			risk = riskPlaintextValue
 		}
 
 		r := resource.Resource{
