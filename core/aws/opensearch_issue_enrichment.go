@@ -91,12 +91,10 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 			}, opensearchPublicDetail)
 		}
 		if r.Fields["enforce_https"] == "false" {
-			setWave2Finding(&result, r.ID, opensearchCodeHTTPSNotForced, "HTTPS not enforced", "~", "opensearch",
-				[]domain.DetailRow{{Label: "Encrypted transport", Value: "not required", Tier: "~"}}, opensearchHTTPSNotForcedDetail)
+			setWave2Finding(&result, r.ID, opensearchCodeHTTPSNotForced, "HTTPS not enforced", "~", "opensearch", nil, opensearchHTTPSNotForcedDetail)
 		}
 		if r.Fields["node_to_node_encryption_enabled"] == "false" {
-			setWave2Finding(&result, r.ID, opensearchCodeN2NOff, "node-to-node encryption off", "~", "opensearch",
-				[]domain.DetailRow{{Label: "Encryption between nodes", Value: "off", Tier: "~"}}, opensearchN2NOffDetail)
+			setWave2Finding(&result, r.ID, opensearchCodeN2NOff, "node-to-node encryption off", "~", "opensearch", nil, opensearchN2NOffDetail)
 		}
 
 		if !updateAvailable && !encOff {

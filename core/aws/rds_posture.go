@@ -98,11 +98,10 @@ func rdsPostureFindings(p rdsPosture, c rdsPostureCodes) ([]domain.Finding, map[
 
 	if !p.SkipSingleAZ && !p.IsReadReplica && p.MultiAZ != nil && !*p.MultiAZ {
 		add(c.singleAZ, "single-AZ", c.singleAZDetail,
-			[]domain.DetailRow{{Label: "Multi-AZ", Value: "false", Tier: "~"}})
+			[]domain.DetailRow{{Label: "Multi-AZ", Value: "no", Tier: "~"}})
 	}
 	if p.AutoMinorVersionUpgrade != nil && !*p.AutoMinorVersionUpgrade {
-		add(c.minorUpgrade, "auto minor version upgrade off", c.minorUpgradeDetail,
-			[]domain.DetailRow{{Label: "Auto minor version upgrade", Value: "false", Tier: "~"}})
+		add(c.minorUpgrade, "auto minor version upgrade off", c.minorUpgradeDetail, nil)
 	}
 	if engineSupportsIAMAuth(p.Engine) && p.IAMAuthEnabled != nil && !*p.IAMAuthEnabled {
 		add(c.iamAuth, "IAM database authentication off", c.iamAuthDetail,

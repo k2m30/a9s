@@ -62,9 +62,9 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			if s == gluetypes.JobRunStateFailed || s == gluetypes.JobRunStateError || s == gluetypes.JobRunStateTimeout {
 				stateVal := string(s)
 				statePhrase := domain.HumanizeStatusPhrase(stateVal)
-				rows := []domain.DetailRow{
-					{Label: "State", Value: statePhrase, Tier: "!"},
-				}
+				// No State row: the phrase below already is "latest run
+				// <state>", so a State row would print it a second time.
+				var rows []domain.DetailRow
 				if run.CompletedOn != nil {
 					rows = append(rows, domain.DetailRow{Label: "Ended", Value: run.CompletedOn.Format("2006-01-02")})
 				}

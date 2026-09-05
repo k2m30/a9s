@@ -147,7 +147,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		if firstBad.AvailabilityZoneName != nil {
 			az = *firstBad.AvailabilityZoneName
 		}
-		state := string(firstBad.LifeCycleState)
+		state := efsMountTargetState(firstBad.LifeCycleState)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -216,24 +216,21 @@ func enrichEFSPolicies(
 		}
 	}
 
-	status := ""
+	// A file system with no backup policy at all is as unbacked-up as one
+	// whose policy is disabled, so both answer the same way.
+	backedUp := false
 	switch {
 	case isEFSPolicyNotFound(backupErr):
-		status = "not configured"
 	case backupErr != nil:
 		MarkSkipped(result, fsID, failures, "DescribeBackupPolicy", backupErr)
 		return
 	case backupOut.BackupPolicy != nil:
-		status = string(backupOut.BackupPolicy.Status)
+		backedUp = backupOut.BackupPolicy.Status == efstypes.StatusEnabled
 	}
-	if strings.EqualFold(status, string(efstypes.StatusEnabled)) {
+	if backedUp {
 		return
 	}
-	if status == "" {
-		status = "not configured"
-	}
-	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, "automatic backups off", "~", "efs",
-		[]domain.DetailRow{{Label: "Backup policy", Value: status, Tier: "~"}}, efsNoBackupPolicyDetail)
+	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, "automatic backups off", "~", "efs", nil, efsNoBackupPolicyDetail)
 }
 
 // isEFSPolicyNotFound reports whether err is EFS's "no policy is set" answer
@@ -250,4 +247,15 @@ func isEFSPolicyNotFound(err error) bool {
 	}
 	var apiErr smithy.APIError
 	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PolicyNotFound"
+}
+
+// efsMountTargetState words a mount target's lifecycle state for a detail
+// row. AWS reports a failed mount target as the bare state "error", which
+// says nothing the row's colour has not already said; the others describe
+// themselves.
+func efsMountTargetState(s efstypes.LifeCycleState) string {
+	if s == efstypes.LifeCycleStateError {
+		return "mount failed"
+	}
+	return string(s)
 }

@@ -47,16 +47,12 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 		return lifecycle, nil
 	}
 	return append(lifecycle, domain.Finding{
-			Code:     CodeDDBDeletionProtectionOff,
-			Phrase:   "deletion protection off",
-			Detail:   ddbDeletionProtectionOffDetail,
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		}), map[domain.FindingCode]domain.AttentionDetail{
-			CodeDDBDeletionProtectionOff: {Rows: []domain.DetailRow{
-				{Label: "Deletion protection", Value: "off", Tier: "~"},
-			}},
-		}
+		Code:     CodeDDBDeletionProtectionOff,
+		Phrase:   "deletion protection off",
+		Detail:   ddbDeletionProtectionOffDetail,
+		Severity: domain.SevWarn,
+		Source:   "wave1",
+	}), nil
 }
 
 // FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get

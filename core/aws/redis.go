@@ -219,13 +219,11 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	}
 
 	if !aws.ToBool(rg.AtRestEncryptionEnabled) {
-		add(CodeRedisAtRestOff, "encryption at rest off", redisAtRestOffDetail, domain.SevWarn,
-			[]domain.DetailRow{{Label: "Encryption at rest", Value: "off", Tier: "~"}})
+		add(CodeRedisAtRestOff, "encryption at rest off", redisAtRestOffDetail, domain.SevWarn, nil)
 	}
 	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
 	if !transitOn {
-		add(CodeRedisTransitOff, "encryption in transit off", redisTransitOffDetail, domain.SevWarn,
-			[]domain.DetailRow{{Label: "Encryption in transit", Value: "off", Tier: "~"}})
+		add(CodeRedisTransitOff, "encryption in transit off", redisTransitOffDetail, domain.SevWarn, nil)
 	}
 	// AWS only accepts an AUTH token on a group that also encrypts in
 	// transit, so a group without in-transit encryption is already reported

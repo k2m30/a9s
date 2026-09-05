@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -113,14 +114,14 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		// Append the latest failed phase if build is not complete.
 		if !b.BuildComplete {
 			if b.CurrentPhase != nil && *b.CurrentPhase != "" {
-				rows = append(rows, domain.DetailRow{Label: "Current Phase", Value: *b.CurrentPhase, Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Current Phase", Value: cbPhaseWords(*b.CurrentPhase), Tier: "~"})
 			}
 		} else {
 			// Find the latest failed phase.
 			for i := len(b.Phases) - 1; i >= 0; i-- {
 				ph := b.Phases[i]
 				if ph.PhaseStatus == cbtypes.StatusTypeFailed {
-					rows = append(rows, domain.DetailRow{Label: "Phase", Value: string(ph.PhaseType), Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Phase", Value: cbPhaseWords(string(ph.PhaseType)), Tier: "!"})
 					break
 				}
 			}
@@ -134,4 +135,12 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	}
 	result.Truncated = truncated
 	return result, nil
+}
+
+// cbPhaseWords words a CodeBuild phase name for a detail row.
+// HumanizeStatusPhrase splits the underscored names ("DOWNLOAD_SOURCE") but
+// returns a single all-caps word ("COMPLETED") untouched, so lowercase what
+// it hands back.
+func cbPhaseWords(phase string) string {
+	return strings.ToLower(domain.HumanizeStatusPhrase(phase))
 }

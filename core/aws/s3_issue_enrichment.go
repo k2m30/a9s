@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -236,15 +237,14 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	case err == nil:
 		switch {
 		case versioningOut.Status != s3types.BucketVersioningStatusEnabled:
-			state := string(versioningOut.Status)
-			if state == "" {
-				state = "never enabled"
+			state := "never enabled"
+			if versioningOut.Status != "" {
+				state = strings.ToLower(string(versioningOut.Status))
 			}
 			add(s3CodeVersioningOff, "versioning off", "~", s3VersioningOffDetail,
 				[]domain.DetailRow{{Label: "Versioning", Value: state, Tier: "~"}})
 		case versioningOut.MFADelete != s3types.MFADeleteStatusEnabled:
-			add(s3CodeMFADeleteOff, "MFA delete off", "~", s3MFADeleteOffDetail,
-				[]domain.DetailRow{{Label: "MFA delete", Value: "disabled", Tier: "~"}})
+			add(s3CodeMFADeleteOff, "MFA delete off", "~", s3MFADeleteOffDetail, nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true
@@ -259,8 +259,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	switch {
 	case err == nil:
 		if loggingOut.LoggingEnabled == nil {
-			add(s3CodeAccessLoggingOff, "access logging off", "~", s3AccessLoggingOffDetail,
-				[]domain.DetailRow{{Label: "Access logging", Value: "off", Tier: "~"}})
+			add(s3CodeAccessLoggingOff, "access logging off", "~", s3AccessLoggingOffDetail, nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true
@@ -301,8 +300,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		locked := lockOut != nil && lockOut.ObjectLockConfiguration != nil &&
 			lockOut.ObjectLockConfiguration.ObjectLockEnabled == s3types.ObjectLockEnabledEnabled
 		if !locked {
-			add(s3CodeNoObjectLock, "object lock off", "~", s3NoObjectLockDetail,
-				[]domain.DetailRow{{Label: "Object lock", Value: "off", Tier: "~"}})
+			add(s3CodeNoObjectLock, "object lock off", "~", s3NoObjectLockDetail, nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true
