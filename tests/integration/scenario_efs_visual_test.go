@@ -38,12 +38,23 @@ const (
 	efsMTDownPhrase            = "mount target down"
 	efsMTDownDetailCapitalized = "Mount target down"
 
-	// Expected S1 badge count — distinct instances with Wave-1 color.IsIssue()
-	// OR a Wave-2 `!` finding. Eight of nine fixtures carry an issue bucket:
-	// creating/updating/deleting (Warning), error/no-mount-targets/multi (Broken),
-	// updating-mt-down (W2 escalates to Broken), healthy-mt-down (W2 escalates).
-	// Only the graph-root (prod-efs-app-data) is Healthy with no finding.
-	efsExpectedIssueCount = 8
+	// Expected S1 badge count — rows whose Wave-1-only colour IsIssue, plus
+	// Healthy rows carrying a Wave-2 `!`. Recount over the 12 efs fixtures:
+	//   Wave-1 Broken (3):  fs-0brokenerror00001, fs-0brokennomt000001,
+	//                       fs-0warnmulti0000001
+	//   Wave-1 Warning (5): fs-0warncreating0001, fs-0warnupdating0001,
+	//                       fs-0warndeleting0001, fs-0warnupdmtdown001,
+	//                       plus fs-0unencrypted00001, which the databases
+	//                       batch added — efs.unencrypted is Wave-1 `~`
+	//   Healthy + Wave-2 `!` (2): fs-0healthymtdown001 (mount-target-down)
+	//                       and fs-0publicpolicy0001 (efs.public-policy),
+	//                       the latter from the databases batch
+	//   Not counted (2): prod-efs-app-data (clean) and fs-0nobackuppolicy01 —
+	//                    its efs.no-backup-policy is Wave-2 `~`, which never
+	//                    bumps the badge. That is why the batch added three
+	//                    efs findings but the badge moved by two.
+	// 3 + 5 + 2 = 10.
+	efsExpectedIssueCount = 10
 )
 
 func TestScenario_EFSVisual(t *testing.T) {
@@ -98,12 +109,13 @@ func TestScenario_EFSVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(efsWarnMulti, "no mount targets (+1)")
 
 	// ---------------------------------------------------------------
-	// U7b — W1 Warning + W2 Broken stack. Post-AS-140 priority rule:
-	// the Wave-1 non-healthy Status wins over the Wave-2 finding.
-	// warn-efs-updating-mt-down: "updating" (Warning W1) tops, the
-	// hidden Wave-2 "mount target down" bumps the suffix → "updating (+1)".
+	// U7b — W1 Warning + W2 Broken stack. The Broken one tops: domain.TopFinding
+	// selects by severity for both the Status phrase and the row colour, so a
+	// row coloured red by efs.mount-target-down cannot read "updating".
+	// warn-efs-updating-mt-down carries Wave-1 `~` updating and Wave-2 `!`
+	// mount target down → "mount target down (+1)".
 	// ---------------------------------------------------------------
-	scenario.ExpectRowStatusEquals(efsWarnUpdatingMTDown, "updating (+1)")
+	scenario.ExpectRowStatusEquals(efsWarnUpdatingMTDown, "mount target down (+1)")
 
 	// ---------------------------------------------------------------
 	// Wave-2 on Healthy escalates to Broken (no suffix, single finding).

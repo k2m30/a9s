@@ -68,13 +68,24 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// S1 menu badge — assert BEFORE OpenList while the main menu is
 	// still the current view.
 	//
-	// Expected: 7 = the `!`-severity Wave-2 fixtures plus the
-	// listed-but-denied witness (warn-ddb-details-denied), whose degraded
-	// name-only row is Warning-colored and therefore issue-counted. Per
-	// universal rule 4, `~` severity findings never bump the badge, so
-	// `audit-pitr-off` (Healthy + `~`) does not contribute.
+	// Recount over the 12 ddb fixtures — rows whose Wave-1-only colour
+	// IsIssue, plus Healthy rows carrying a Wave-2 `!`:
+	//   Wave-1 Broken (2):  legacy-kms-lost, legacy-archived
+	//   Wave-1 Warning (5): sessions-creating, sessions-updating,
+	//                       analytics-deleting, legacy-archiving,
+	//                       warn-ddb-details-denied (degraded name-only row)
+	//                       plus sessions-no-delete-protection, which the
+	//                       databases batch added — ddb.deletion-protection-off
+	//                       is Wave-1 `~`, and a Wave-1 `~` colours the row
+	//                       Warning, which IsIssue
+	//   Healthy + Wave-2 `!` (1): public-catalog-open (ddb.public-policy),
+	//                       also from the databases batch
+	//   Not counted (3): orders-prod (clean), audit-pitr-off and
+	//                    partner-feed-shared — Healthy with only a Wave-2 `~`,
+	//                    which never bumps the badge
+	// 2 + 6 + 1 = 9. Was 7 before those two rows.
 	// ---------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("ddb", 7)
+	scenario.ExpectMenuIssueCount("ddb", 9)
 
 	scenario.OpenList("ddb")
 

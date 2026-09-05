@@ -567,19 +567,53 @@ func (s *fullIntegrationScenario) currentView() string {
 // ("│…│") qualify — the header flash banner can quote a resource ID inside an
 // error message (e.g. a composite fetch error naming a denied environment)
 // and must never be mistaken for the row. Returns "" if no such line exists.
+// findRow returns the rendered table line for resourceID.
+//
+// The match is on a whole cell, not a substring: "warn-dbc-no-bkp" is a prefix
+// of "warn-dbc-no-bkp-plus-maint", and a plain Contains returns whichever of
+// the two the table happens to sort first — so an assertion about one row
+// silently grades the other. A cell ends at a column boundary or run of
+// padding, so requiring a space or a table rule on each side is enough.
+// Falls back to the substring match when nothing matches cell-wise, so a row
+// whose identity cell is truncated by column width is still found.
 func (s *fullIntegrationScenario) findRow(resourceID string) string {
 	s.t.Helper()
+	var fallback string
 	for _, line := range strings.Split(s.currentView(), "\n") {
 		if !strings.Contains(line, resourceID) {
 			continue
 		}
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "│") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "│") {
 			continue
 		}
-		return line
+		if isWholeCellMatch(line, resourceID) {
+			return line
+		}
+		if fallback == "" {
+			fallback = line
+		}
 	}
-	return ""
+	return fallback
+}
+
+// isWholeCellMatch reports whether resourceID appears in line bounded by a
+// space or a table rule on both sides, i.e. as its own cell rather than as the
+// prefix of a longer identifier.
+func isWholeCellMatch(line, resourceID string) bool {
+	for i := 0; ; {
+		j := strings.Index(line[i:], resourceID)
+		if j < 0 {
+			return false
+		}
+		start := i + j
+		end := start + len(resourceID)
+		beforeOK := start == 0 || line[start-1] == ' ' || strings.HasSuffix(line[:start], "│")
+		afterOK := end == len(line) || line[end] == ' ' || strings.HasPrefix(line[end:], "│")
+		if beforeOK && afterOK {
+			return true
+		}
+		i = start + 1
+	}
 }
 
 // ExpectRowStatusBlank asserts that the row for resourceID does not contain any

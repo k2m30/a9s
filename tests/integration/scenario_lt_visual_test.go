@@ -53,11 +53,18 @@ func TestScenario_LTVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// S1 menu badge — issue-COLORED rows: imdsv1, imdsv1-default,
-	// unencrypted, multi, denied = 5. The deprecated-AMI `~` background
-	// check deliberately does NOT bump the badge (spec §4 — the dbi
-	// maintenance-scheduled treatment).
-	scenario.ExpectMenuIssueCount("lt", 5)
+	// S1 menu badge — rows whose Wave-1-only colour IsIssue, plus Healthy
+	// rows carrying a Wave-2 `!`. Recount over the 10 lt fixtures:
+	//   Wave-1 Warning (5): lt-0warnimdsv11111a, lt-0warnimdsvdef111a,
+	//                       lt-0warnunencrypt1a, lt-0warnmulti111111a,
+	//                       lt-0warndenied11111a (degraded name-only row)
+	//   Healthy + Wave-2 `!` (1): lt-0warnuserdata111a, which the compute
+	//                       batch added — lt.user-data-secret is `!`
+	//   Not counted (4): the three clean templates, and lt-0warndeprecated1a
+	//                    whose deprecated-AMI check is Wave-2 `~` and
+	//                    deliberately never bumps the badge
+	// 5 + 1 = 6.
+	scenario.ExpectMenuIssueCount("lt", 6)
 
 	scenario.OpenList("lt")
 

@@ -30,12 +30,16 @@ import (
 // §4 phrases pinned locally — any drift in the fetcher or enricher surfaces
 // here instead of in unit tests that could be rewritten without noticing.
 const (
-	openSearchPhraseDeleting      = "deleting: removal in progress"
-	openSearchPhraseIsolated      = "isolated: quarantined by AWS"
-	openSearchPhraseProcessing    = "processing: config change in flight"
-	openSearchPhraseUpdate        = "software update forced soon"
-	openSearchPhraseEncryption    = "encryption at rest off"
-	openSearchPhraseProcessingP1  = "processing: config change in flight (+1)"
+	openSearchPhraseDeleting   = "deleting: removal in progress"
+	openSearchPhraseIsolated   = "isolated: quarantined by AWS"
+	openSearchPhraseProcessing = "processing: config change in flight"
+	openSearchPhraseUpdate     = "software update forced soon"
+	openSearchPhraseEncryption = "encryption at rest off"
+	// acme-search-alpha carries Wave-1 `~` processing and Wave-2 `!`
+	// update-forced. domain.TopFinding picks the worst, so the update leads
+	// and processing becomes the (+1) — the phrase and the row colour resolve
+	// through the same selection, so a red row never reads as a warning.
+	openSearchPhraseProcessingP1  = "software update forced soon (+1)"
 	openSearchPhraseUpdateP1      = "software update forced soon (+1)"
 	openSearchDetailPhraseUpdate  = "Software update forced soon"
 	openSearchDetailPhraseEncOff  = "Encryption at rest off"
@@ -60,12 +64,23 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	//   - UpdateAvailableDomain     (Healthy + `!`)
 	//   - MultiBackgroundDomain     (Healthy + `!`)
 	// DeletingDomain (Dim) does not count; `~` never bumps.
-	// Plus the listed-but-unavailable witness (absent from the DescribeDomains
-	// response — a non-auth degradation, "details unavailable", not an IAM
-	// denial): the degraded name-only row is Warning-colored, so it bumps the
-	// badge.
+	// Recount over the 13 opensearch fixtures — rows whose Wave-1-only colour
+	// IsIssue, plus Healthy rows carrying a Wave-2 `!`:
+	//   Wave-1 Broken (1):  legacy-search-isolated
+	//   Wave-1 Warning (3): acme-events, acme-search-alpha,
+	//                       warn-os-details-unavailable (degraded name-only
+	//                       row — absent from the DescribeDomains response,
+	//                       a non-auth degradation rather than an IAM denial)
+	//   Healthy + Wave-2 `!` (3): acme-product-search and acme-metrics
+	//                       (update-forced), plus acme-public-search, which
+	//                       the databases batch added — opensearch.public, `!`
+	//   Not counted (6): three clean domains, obsolete-tenant-logs (Dim), and
+	//                    acme-http-search / acme-plaintext-nodes, whose new
+	//                    findings are Wave-2 `~`. That is why the batch added
+	//                    three opensearch findings and the badge moved by one.
+	// 1 + 3 + 3 = 7.
 	// -----------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("opensearch", 6)
+	scenario.ExpectMenuIssueCount("opensearch", 7)
 
 	scenario.OpenList("opensearch")
 

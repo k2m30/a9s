@@ -29,10 +29,16 @@ const (
 	s3PartialPABID   = "a9s-demo-partial-pab"
 	s3MultiFailPABID = "a9s-demo-multifail-pab"
 	s3NilCfgPABID    = "a9s-demo-nilcfg"
-	// S1 rule: the issues badge counts only `!`-severity findings plus
-	// wave-1 issue-colored rows. All 4 PAB findings are `~` SevWarn and s3
-	// has no wave-1 signals, so the s3 entry renders no badge at all.
-	s3ExpectedIssueBkt = 0
+	// S1 rule: the badge counts rows whose Wave-1-only colour IsIssue, plus
+	// Healthy rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so
+	// only the second clause can fire. Of the 42 bucket fixtures exactly one
+	// carries a `!`: acme-public-datasets, whose bucket policy status is
+	// public (s3.public, `!`), added by the databases batch.
+	// Every other s3 finding — the four PAB fixtures and that batch's
+	// versioning, MFA-delete, access-logging, lifecycle and object-lock
+	// witnesses — is Wave-2 `~` and never bumps the badge. Six new findings,
+	// badge moves by one.
+	s3ExpectedIssueBkt = 1
 
 	// Wave-2 Rows row labels/values emitted by EnrichS3Posture.
 	s3Row_BlockPublicAcls    = "BlockPublicAcls"

@@ -20,16 +20,22 @@ func TestScenario_RedisVisual(t *testing.T) {
 	runDemoStartup(t, scenario)
 
 	// -----------------------------------------------------------------
-	// S1 menu badge — count of redis fixtures whose row color is Warning
-	// or Broken (app counts ResolveColor(r).IsIssue() rows). Per §3.1:
-	//   Warning: creating, modifying, snapshotting, deleting,
-	//            multi-AZ-no-failover, multi-W1, multi-shard-modifying-0001,
-	//            multi-shard-two-transitioning = 8
-	//   Broken:  create-failed = 1
-	// → total 9. Healthy fixtures (prod + staging + multi-shard-healthy) and
-	// the Valkey fixture (engine-filtered, not in the redis list) do not bump.
+	// S1 menu badge — rows whose Wave-1-only colour IsIssue (redis has no
+	// Wave-2 enricher). Recount over the 16 redis fixtures:
+	//   Broken (2):   bad-config-redis (create-failed) and
+	//                 broken-redis-no-auth, which the databases batch added —
+	//                 redis.no-auth is the one `!` of that batch's four
+	//   Warning (11): dev-feature-redis, prod-redis-cache, prod-redis-analytics,
+	//                 old-redis-unused, legacy-redis-analytics,
+	//                 legacy-redis-billing, multi-shard-modifying-0001,
+	//                 multi-shard-2-transitioning, plus the three the databases
+	//                 batch added — warn-redis-{at-rest-off,transit-off,
+	//                 no-backup}. Their findings are Wave-1 `~`, and a Wave-1
+	//                 `~` colours the row Warning, which IsIssue.
+	// 2 + 11 = 13. Was 9 before those four rows. The Healthy fixtures and the
+	// Valkey fixture (engine-filtered, absent from the redis list) do not bump.
 	// -----------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("redis", 9)
+	scenario.ExpectMenuIssueCount("redis", 13)
 
 	scenario.OpenList("redis")
 

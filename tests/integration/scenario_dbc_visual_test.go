@@ -23,11 +23,19 @@ func TestScenario_DBCVisual(t *testing.T) {
 	// -----------------------------------------------------------------
 	// S1 menu badge — assert BEFORE OpenList (menu is the root view).
 	// -----------------------------------------------------------------
-	// N = count of DBC instances with at least one attention signal (Wave-1
-	// non-green + Wave-2 `!` on Healthy rows). Per the 12 non-aurora dbc
-	// fixtures: 10 non-green (4 broken + 1 transitional + 3 single-warn + 1
-	// multi-warn + 1 warn-plus-maint) + 1 healthy-overdue = 11.
-	scenario.ExpectMenuIssueCount("dbc", 11)
+	// N = rows whose Wave-1-only colour IsIssue, plus Healthy rows carrying a
+	// Wave-2 `!`. Recount over the 17 dbc fixtures:
+	//   Wave-1 Broken (4):   broken-dbc-{failed,no-writer,incompat-params,
+	//                        enc-unreachable}
+	//   Wave-1 Warning (10): warn-dbc-{modifying,no-bkp,no-prot,unenc,multi,
+	//                        no-bkp-plus-maint} and the four the databases
+	//                        batch added — warn-dbc-{single-az,
+	//                        minor-upgrade-off,iam-auth-off,default-master-user}
+	//   Healthy + Wave-2 `!` (1): healthy-dbc-maint-overdue
+	//   Not counted (2): acme-docdb-prod, prod-aurora-cluster — Healthy, no finding
+	// 4 + 10 + 1 = 15. Was 11 before the databases batch: its four new
+	// Wave-1 `~` findings each colour a previously-Healthy row Warning.
+	scenario.ExpectMenuIssueCount("dbc", 15)
 
 	scenario.OpenList("dbc")
 
@@ -64,8 +72,13 @@ func TestScenario_DBCVisual(t *testing.T) {
 	// Rule 7 U7a — multi-W1: 3 warnings → top + (+2). §4 precedence = delete-protection first.
 	scenario.ExpectRowStatusEquals("warn-dbc-multi", "delete-protection off (+2)")
 
-	// Rule 7 U7b — W1 + W2 stack: Warning phrase + (+1) for the hidden Wave-2 finding.
-	scenario.ExpectRowStatusEquals(demofixtures.WarnDbcNoBkpMaintID, "no automated backups (+1)")
+	// Rule 7 U7b — W1 + W2 stack. The cell leads with the WORST finding, not
+	// the Wave-1 one: domain.TopFinding is the single selection the Status
+	// phrase and the row colour share, "so a red row can never read as a
+	// warning". Here Wave-2 dbc.maintenance-overdue is `!` and Wave-1
+	// no_automated_backups is `~`, so maintenance overdue tops and the
+	// backups finding becomes the (+1).
+	scenario.ExpectRowStatusEquals(demofixtures.WarnDbcNoBkpMaintID, "maintenance overdue (+1)")
 
 	// dbcCodeMaintenanceOverdue is Severity: SevBroken (catalog_databases.go),
 	// so colorFromAnyFinding resolves the row color to Broken directly — the

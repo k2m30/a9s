@@ -179,19 +179,34 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	// Each entry is the exact substring that must appear in the ANSI-stripped
 	// main menu after Wave 1 completes. Counts are pinned against the demo
 	// fixture data that ships with the binary.
+	//
+	// These badges are measured at the WAVE-1 stage, so they are lower than
+	// the settled badges the scenario tests pin — a Healthy row carrying only
+	// a Wave-2 `!` has not been counted yet. Two live examples: DB Clusters
+	// reads 14 here and 15 in scenario_dbc_visual_test.go (healthy-dbc-maint-
+	// overdue is Wave-2 only), and EFS File Systems reads 8 here and 10 in
+	// scenario_efs_visual_test.go (fs-0healthymtdown001 and
+	// fs-0publicpolicy0001 are Wave-2 only). A mismatch between the two is
+	// expected; a mismatch in the same direction on a type with no Wave-2
+	// enricher, like redis, is not.
+	//
+	// Seven moved when the compute, databases and security batches landed —
+	// both the row count, because each batch added witness fixtures, and the
+	// badge, because those fixtures carry findings. The per-row derivations
+	// live next to the scenario pins for each type.
 	pins := []string{
-		"EC2 Instances (40) issues:12",
+		"EC2 Instances (40) issues:15",
 		"ECS Services (25) issues:6",
-		"DB Instances (44) issues:37",
+		"DB Instances (50) issues:42",
 		"EBS Volumes (8) issues:5",
 		"Elastic Beanstalk (7) issues:4",
-		"EBS Snapshots (9) issues:4",
+		"EBS Snapshots (9) issues:5",
 		"EKS Clusters (6) issues:4",
-		"ElastiCache Redis (12) issues:9",
-		"DB Clusters (13) issues:10",
-		"EFS File Systems (9) issues:7",
+		"ElastiCache Redis (16) issues:13",
+		"DB Clusters (17) issues:14",
+		"EFS File Systems (12) issues:8",
 		"NAT Gateways (6) issues:3",
-		"AMIs (8) issues:3",
+		"AMIs (9) issues:4",
 		"Load Balancers (24) issues:3",
 	}
 

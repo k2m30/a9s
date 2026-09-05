@@ -39,9 +39,19 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	//     WarnDBISnapOrphanID                          Warning  (orphan: source DB deleted)
 	//     WarnDBISnapPastRetentionID                   Warning  (automated, 23d past retention)
 	//
-	// dbi-snap has no Wave-2 `!` signals (Wave 2 = None per spec §3.2), so
-	// every contributing instance is Wave-1 colored. Total: 8.
-	scenario.ExpectMenuIssueCount("dbi-snap", 8)
+	// dbi-snap DOES now have a Wave-2 `!` signal. Recount over the 11
+	// fixtures — rows whose Wave-1-only colour IsIssue, plus Healthy rows
+	// carrying a Wave-2 `!`:
+	//   Wave-1 Broken (3):  prod-dbi-1-failed-snap, failed-with-unenc-snap,
+	//                       legacy-mysql-snap-incompatible
+	//   Wave-1 Warning (3): dev-feature-branch-snap, unenc-pre-migration-snap,
+	//                       multi-orphan-unenc-snap
+	//   Healthy + Wave-2 `!` (3): orphan-deleted-db-snap (orphan),
+	//                       rds:retention-test-2026-03-25 (past-retention),
+	//                       and shared-with-all-dbi-snap, which the databases
+	//                       batch added — dbi-snap.public, `!`
+	// 3 + 3 + 3 = 9. Was 8 before that one row.
+	scenario.ExpectMenuIssueCount("dbi-snap", 9)
 
 	scenario.OpenList("dbi-snap")
 
@@ -78,9 +88,11 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBISnapOrphanID, "orphan: source DB deleted")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBISnapPastRetentionID, "automated, 23d past retention")
 
-	// U7a — multi-W1: unencrypted (fetcher) + orphan (enricher) → top phrase + (+1).
-	// Per §0.1 ladder: unencrypted < orphan: source DB deleted, so unencrypted is the top.
-	scenario.ExpectRowStatusEquals(demofixtures.MultiW1DBISnapID, "unencrypted (+1)")
+	// U7a — W1 unencrypted (fetcher, `~`) + W2 orphan (enricher, `!`) → top
+	// phrase + (+1). The top is decided by severity, not by wave or by a
+	// phrase ladder: domain.TopFinding takes the worst entry, so the `!`
+	// orphan leads and the `~` unencrypted becomes the (+1).
+	scenario.ExpectRowStatusEquals(demofixtures.MultiW1DBISnapID, "orphan: source DB deleted (+1)")
 
 	// -----------------------------------------------------------------
 	// Glyph rules.

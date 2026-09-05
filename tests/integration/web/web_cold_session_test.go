@@ -58,14 +58,15 @@ const (
 	coldS3Wave2Phrase = "public access block incomplete"
 
 	// coldS3ExpectedIssueCount is the canonical s3 demo-fixture badge count.
-	// The 4 PAB-finding buckets in core/demo/fixtures/s3.go — a9s-demo-nopab
-	// (nil → NoSuchPublicAccessBlockConfiguration), a9s-demo-partial-pab
-	// (BlockPublicAcls=false), a9s-demo-multifail-pab (two flags false),
-	// a9s-demo-nilcfg (nil inner config) — all carry `~` SevWarn findings,
-	// and the S1 badge counts only `!`-severity findings plus wave-1
-	// issue-colored rows, so the s3 badge is 0. Pinned as
-	// s3ExpectedIssueBkt=0 in tests/integration/scenario_s3_visual_test.go.
-	coldS3ExpectedIssueCount = 0
+	// The badge counts rows whose Wave-1-only colour IsIssue, plus Healthy
+	// rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so only the
+	// second clause can fire, and exactly one of the 42 bucket fixtures
+	// satisfies it: acme-public-datasets, whose bucket policy status is public
+	// (s3.public, `!`), added by the databases batch. The four PAB fixtures
+	// and that batch's other five s3 witnesses are all Wave-2 `~` and never
+	// bump the badge. Pinned as s3ExpectedIssueBkt=1 in
+	// tests/integration/scenario_s3_visual_test.go.
+	coldS3ExpectedIssueCount = 1
 )
 
 // coldSessionCoreTypes are the resource types whose availability counts must
