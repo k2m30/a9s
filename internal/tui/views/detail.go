@@ -102,4 +102,3 @@ func inferDetailResourceType(res resource.Resource) string {
 	}
 	return ""
 }
-

@@ -156,4 +156,3 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 
 	return r
 }
-

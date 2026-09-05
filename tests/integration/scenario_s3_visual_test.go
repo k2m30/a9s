@@ -25,10 +25,10 @@ import (
 const (
 	// Bucket IDs for the 4 PAB-finding fixtures. No constants were exported
 	// from fixtures/s3.go for these names, so the test pins them locally.
-	s3NoPABBucketID    = "a9s-demo-nopab"
-	s3PartialPABID     = "a9s-demo-partial-pab"
-	s3MultiFailPABID   = "a9s-demo-multifail-pab"
-	s3NilCfgPABID = "a9s-demo-nilcfg"
+	s3NoPABBucketID  = "a9s-demo-nopab"
+	s3PartialPABID   = "a9s-demo-partial-pab"
+	s3MultiFailPABID = "a9s-demo-multifail-pab"
+	s3NilCfgPABID    = "a9s-demo-nilcfg"
 	// S1 rule: the issues badge counts only `!`-severity findings plus
 	// wave-1 issue-colored rows. All 4 PAB findings are `~` SevWarn and s3
 	// has no wave-1 signals, so the s3 entry renders no badge at all.

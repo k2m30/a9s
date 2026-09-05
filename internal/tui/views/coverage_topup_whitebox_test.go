@@ -243,13 +243,13 @@ func topUpConfigModel(res resource.Resource) DetailModel {
 	const rt = "topup-renderfromconfig-type"
 	vc := &config.ViewsConfig{Views: map[string]config.ViewDef{
 		rt: {Detail: []config.DetailField{
-			{Key: "state", Label: "State"},                      // Key-form, present
-			{Key: "missing_key", Label: "Missing"},               // Key-form, absent -> "-"
-			{Path: "Name", Label: "Name"},                        // Path-form, exact Fields match
-			{Path: "InstanceType", Label: "Type"},                // Path-form, snake_case Fields fallback
-			{Path: "Nested.Value", Label: "Nested"},              // Path-form, RawStruct fallback
-			{Path: "NoSuchField", Label: "Missing Path"},         // Path-form, resolves to "-"
-			{Path: "Notes", Label: "Notes"},                      // Path-form, multiline value
+			{Key: "state", Label: "State"},               // Key-form, present
+			{Key: "missing_key", Label: "Missing"},       // Key-form, absent -> "-"
+			{Path: "Name", Label: "Name"},                // Path-form, exact Fields match
+			{Path: "InstanceType", Label: "Type"},        // Path-form, snake_case Fields fallback
+			{Path: "Nested.Value", Label: "Nested"},      // Path-form, RawStruct fallback
+			{Path: "NoSuchField", Label: "Missing Path"}, // Path-form, resolves to "-"
+			{Path: "Notes", Label: "Notes"},              // Path-form, multiline value
 		}},
 	}}
 	m := NewDetailWithCtrl(res, rt, vc, keys.Default(), nil)

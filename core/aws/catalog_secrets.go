@@ -102,7 +102,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Reveal: revealWithClients(func(ctx context.Context, c *ServiceClients, resourceID string) (string, error) {
 			return RevealSecret(ctx, c.SecretsManager, resourceID)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichSecretsPolicy, Priority: 100},
+		Wave2:     IssueEnricher{Fn: EnrichSecretsPolicy, Priority: 100},
 		FieldKeys: []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn", "status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true, Truncated: true},

@@ -303,7 +303,9 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 
 // ===========================================================================
 // (f) background RowStore write while ls.Rows is nil — the listScreenResources
-//     fallback branch (list_state.go:152-157)
+//
+//	fallback branch (list_state.go:152-157)
+//
 // ===========================================================================
 //
 // openListController pushes a resource-list screen via ActionCommand but

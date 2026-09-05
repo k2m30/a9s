@@ -87,7 +87,6 @@ func TestRelatedCacheLRU_Clear(t *testing.T) {
 	}
 }
 
-
 // TestRelatedCacheLRU_Delete verifies that Delete() removes a specific key
 // while leaving other entries intact.
 func TestRelatedCacheLRU_Delete(t *testing.T) {

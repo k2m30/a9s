@@ -47,4 +47,3 @@ func FormatExact(n int) string {
 func FormatTruncated(n int) string {
 	return strconv.Itoa(n) + "+"
 }
-

@@ -510,7 +510,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	// realistic default key policy shape.
 	keyPolicies := map[string]string{
 		"a1b2c3d4-5678-90ab-cdef-111111111111": `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowKeyUseByEC2InstanceRole","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ec2-instance-profile"},"Action":["kms:Decrypt","kms:GenerateDataKey"],"Resource":"*"}]}`,
-		KMSPublicPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowAnyoneToDecrypt","Effect":"Allow","Principal":"*","Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
+		KMSPublicPolicy:                        `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowAnyoneToDecrypt","Effect":"Allow","Principal":"*","Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
 	}
 
 	// RotationEnabled — the primary production key is the sole demo CMK with
