@@ -9,8 +9,10 @@ package unit_test
 // everything" next to the sentence for the lesser problem.
 //
 // This is the demo-bench half of tests/unit/prowler_w1_status_phrase_test.go,
-// which pins domain.TopFinding's own rules; here the colour and the cell are
-// checked against that same selector's verdict.
+// which pins domain.TopFinding's own rules. The expectation here is computed
+// in the test instead: an oracle that called TopFinding would move in lockstep
+// with the selector it is meant to check, and would pass for any rule the
+// selector implements, including a broken one.
 
 import (
 	"fmt"
@@ -22,6 +24,19 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// netWorstSeverity is the test's own oracle: the highest severity among r's
+// findings, computed without the selector under test. false when r carries
+// none.
+func netWorstSeverity(r resource.Resource) (domain.Severity, bool) {
+	worst, ok := domain.Severity(0), false
+	for _, f := range r.Findings {
+		if !ok || f.Severity > worst {
+			worst, ok = f.Severity, true
+		}
+	}
+	return worst, ok
+}
 
 // TestNetworkingColorAndPhrase_ComeFromTheSameFinding sweeps every demo row of
 // the five networking types and fails when the Status cell names a finding
@@ -44,13 +59,13 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 		merged := mergeWave2Findings(t, *td, fixtures, cache, demoClients)
 
 		for _, res := range merged {
-			top, ok := domain.TopFinding(res.Findings)
+			worst, ok := netWorstSeverity(res)
 			if !ok {
 				continue
 			}
-			if got, want := td.ResolveColor(res), resource.ColorFromSeverity(top.Severity); got != want {
-				bad = append(bad, fmt.Sprintf("%s/%s: row colour = %v, want %v from the top finding %q on the row %v",
-					short, res.ID, got, want, top.Phrase, netPhrases(res)))
+			if got, want := td.ResolveColor(res), resource.ColorFromSeverity(worst); got != want {
+				bad = append(bad, fmt.Sprintf("%s/%s: row colour = %v, want %v from the worst finding on the row %v",
+					short, res.ID, got, want, netPhrases(res)))
 			}
 			cell, found := listStatusCellFor(t, *td, merged, res.ID)
 			if !found || strings.TrimSpace(cell) == "" {
@@ -71,7 +86,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 			}
 			agrees := false
 			for _, f := range named {
-				if f.Severity == top.Severity {
+				if f.Severity == worst {
 					agrees = true
 				}
 			}
@@ -79,7 +94,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 				bad = append(bad, fmt.Sprintf(
 					"%s/%s: colour comes from a %v finding but the Status cell %q names only %v — "+
 						"the row's colour and its words disagree about what is wrong",
-					short, res.ID, top.Severity, cell, netSeverities(named)))
+					short, res.ID, worst, cell, netSeverities(named)))
 			}
 		}
 	}
