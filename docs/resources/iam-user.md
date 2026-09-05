@@ -106,7 +106,7 @@ One row per signal from §3:
 | Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` | `Console password has never been used since the account was created — an unguarded sign-in path.` |
 | Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` | `Access key …4QJZ has not signed a request in 120 days — deactivate it, then delete it.` |
 | Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` | `Both access-key slots are active, which doubles exposure and blocks a clean rotation.` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has AdministratorAccess` | `The user carries an AWS-managed policy granting administrator-equivalent access.` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` | `The user carries an AWS-managed policy granting administrator-equivalent access.` |
 | Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` | `User has console password but zero MFA devices — add MFA or remove password.` |
 
 Rules applied:
@@ -152,7 +152,7 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 | --- | --- | --- | --- |
 | iam-user.no-mfa | console user without MFA | broken | wave2 |
 | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
-| iam-user.admin-attached | has AdministratorAccess | warn | wave2 |
+| iam-user.admin-attached | has an administrator policy | warn | wave2 |
 | iam-user.console-never-used | console password never used | warn | wave2 |
 | iam-user.access-key-unused | access key unused for <N> days | warn | wave2 |
 | iam-user.two-active-keys | two active access keys | warn | wave2 |

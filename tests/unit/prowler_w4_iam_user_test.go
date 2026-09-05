@@ -161,7 +161,7 @@ func TestW4UserAdminAttached(t *testing.T) {
 	})
 
 	w4AssertFinding(t, res.Findings["acme-ops-user"], w4CodeUserAdminAttached,
-		"has AdministratorAccess", domain.SevWarn, w4SourceUserWave2)
+		"has an administrator policy", domain.SevWarn, w4SourceUserWave2)
 	w4AssertRows(t, res.AttentionDetails["acme-ops-user"], w4CodeUserAdminAttached,
 		[]domain.DetailRow{{Label: "Policy", Value: "AdministratorAccess"}})
 	w4AssertNoCode(t, res.Findings["acme-reports-user"], w4CodeUserAdminAttached)
@@ -437,7 +437,7 @@ func TestW4UserFindingDefs(t *testing.T) {
 		code   domain.FindingCode
 		phrase string
 	}{
-		{w4CodeUserAdminAttached, "has AdministratorAccess"},
+		{w4CodeUserAdminAttached, "has an administrator policy"},
 		{w4CodeUserConsoleNeverUse, w4PhraseUserConsoleNever},
 		{w4CodeUserKeyUnused, "access key unused for <N> days"},
 		{w4CodeUserTwoActiveKeys, w4PhraseUserTwoActiveKeys},

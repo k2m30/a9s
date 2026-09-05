@@ -203,7 +203,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 
 		if adminPolicy := adminAttachedPolicyName(allAttached); adminPolicy != "" {
-			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, "has AdministratorAccess", "~", "iam-group",
+			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, adminAttachedPhrase, "~", "iam-group",
 				adminAttachedRows(adminPolicy), adminAttachedDetail)
 		}
 

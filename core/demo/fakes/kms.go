@@ -24,10 +24,10 @@ func NewKMS() *KMSFake {
 }
 
 func (f *KMSFake) ListKeys(_ context.Context, _ *kms.ListKeysInput, _ ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
-	keys := make([]kmstypes.KeyListEntry, 0, len(f.fix.Keys))
-	for id, meta := range f.fix.Keys {
+	keys := make([]kmstypes.KeyListEntry, 0, len(f.fix.KeyList))
+	for _, meta := range f.fix.KeyList {
 		keys = append(keys, kmstypes.KeyListEntry{
-			KeyId:  &id,
+			KeyId:  meta.KeyId,
 			KeyArn: meta.Arn,
 		})
 	}

@@ -32,7 +32,7 @@ const (
 
 	w4PhraseRoleWildcardTrust  = "anyone can assume this role"
 	w4PhraseRoleConfusedDeputy = "service can assume without source scoping"
-	w4PhraseRoleAdminAttached  = "has AdministratorAccess"
+	w4PhraseRoleAdminAttached  = "has an administrator policy"
 
 	// The role enricher stamps its Wave-2 findings with the "iam-role"
 	// short name; a second finding from the same enricher keeps that

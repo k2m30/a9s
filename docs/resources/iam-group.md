@@ -91,7 +91,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | Empty group >30d old | 2 | Warning | `~` | S3, S4, S5 | `empty group, created <age>d ago` | `Group has no members and was created <age> days ago — likely orphaned; detach policies and delete if unused.` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has AdministratorAccess` | `Every member of the group carries administrator-equivalent access through an AWS-managed policy.` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` | `Every member of the group carries administrator-equivalent access through an AWS-managed policy.` |
 
 ## 4.1 UX review (two sentences)
 
@@ -130,7 +130,7 @@ iam-group — SECURITY & IAM. Lifecycle key: none (the list API returns no lifec
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 |
-| iam-group.admin-attached | has AdministratorAccess | warn | wave2 |
+| iam-group.admin-attached | has an administrator policy | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

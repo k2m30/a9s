@@ -87,10 +87,10 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		// Check if the policy is not attached to any entity — orphan.
 		attachCount := r.Fields["attachment_count"]
 		if attachCount == "0" {
-			riskVal = "ORPHAN"
+			riskVal = riskUnattached
 		}
 		if isAdminStarPolicy(doc) {
-			riskVal = "ADMIN_ALL"
+			riskVal = riskAdminPolicy
 			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (allows * on *)", "!", "iam-policy", []domain.DetailRow{
 				{Label: "Action", Value: "*", Tier: "!"},
 				{Label: "Resource", Value: "*", Tier: "!"},

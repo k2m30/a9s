@@ -101,7 +101,7 @@ func TestW4GroupAdminAttached(t *testing.T) {
 	})
 
 	w4AssertFinding(t, res.Findings["acme-admins"], w4CodeGroupAdminAttached,
-		"has AdministratorAccess", domain.SevWarn, w4SourceGroupWave2)
+		"has an administrator policy", domain.SevWarn, w4SourceGroupWave2)
 	w4AssertRows(t, res.AttentionDetails["acme-admins"], w4CodeGroupAdminAttached,
 		[]domain.DetailRow{{Label: "Policy", Value: "AdministratorAccess"}})
 	w4AssertNoCode(t, res.Findings["acme-readers"], w4CodeGroupAdminAttached)
@@ -119,7 +119,7 @@ func TestW4GroupAdminAndOrphanAreIndependent(t *testing.T) {
 	res := w4EnrichGroups(t, fake, []resource.Resource{w4GroupResource("acme-empty-admins")})
 
 	w4AssertFinding(t, res.Findings["acme-empty-admins"], w4CodeGroupAdminAttached,
-		"has AdministratorAccess", domain.SevWarn, w4SourceGroupWave2)
+		"has an administrator policy", domain.SevWarn, w4SourceGroupWave2)
 	if _, ok := w4FindingByCode(t, res.Findings["acme-empty-admins"], "iam-group.orphan-or-noop"); !ok {
 		t.Errorf("the existing membership finding was displaced; got %s",
 			w4CodesOf(res.Findings["acme-empty-admins"]))
@@ -129,8 +129,8 @@ func TestW4GroupAdminAndOrphanAreIndependent(t *testing.T) {
 // TestW4GroupFindingDef pins the registry row for the new group code.
 func TestW4GroupFindingDef(t *testing.T) {
 	def := w4FindingDef(t, "iam-group", w4CodeGroupAdminAttached)
-	if def.Phrase != "has AdministratorAccess" {
-		t.Errorf("Phrase = %q, want %q", def.Phrase, "has AdministratorAccess")
+	if def.Phrase != "has an administrator policy" {
+		t.Errorf("Phrase = %q, want %q", def.Phrase, "has an administrator policy")
 	}
 	if def.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", def.Severity)
@@ -172,7 +172,7 @@ func TestW4AdminPolicySetIsSharedAcrossPrincipals(t *testing.T) {
 			w4UserResource("acme-power-user", 400, "2026-01-02 09:00"),
 		})
 		w4AssertFinding(t, res.Findings["acme-power-user"], w4CodeUserAdminAttached,
-			"has AdministratorAccess", domain.SevWarn, w4SourceUserWave2)
+			"has an administrator policy", domain.SevWarn, w4SourceUserWave2)
 		w4AssertRows(t, res.AttentionDetails["acme-power-user"], w4CodeUserAdminAttached,
 			[]domain.DetailRow{{Label: "Policy", Value: "PowerUserAccess"}})
 	})
@@ -186,7 +186,7 @@ func TestW4AdminPolicySetIsSharedAcrossPrincipals(t *testing.T) {
 		}
 		res := w4EnrichGroups(t, fake, []resource.Resource{w4GroupResource("acme-power-group")})
 		w4AssertFinding(t, res.Findings["acme-power-group"], w4CodeGroupAdminAttached,
-			"has AdministratorAccess", domain.SevWarn, w4SourceGroupWave2)
+			"has an administrator policy", domain.SevWarn, w4SourceGroupWave2)
 		w4AssertRows(t, res.AttentionDetails["acme-power-group"], w4CodeGroupAdminAttached,
 			[]domain.DetailRow{{Label: "Policy", Value: "PowerUserAccess"}})
 	})

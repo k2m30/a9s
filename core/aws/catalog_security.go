@@ -119,7 +119,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: roleCodeInlinePrivEsc, Phrase: "inline policy allows privilege escalation: <combo>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: iamRoleCodeDormant, Phrase: "dormant role (>90d)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamRoleCodeAdminAttached, Phrase: "has AdministratorAccess", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: iamRoleCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -255,7 +255,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Findings: []catalog.FindingDef{
 			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: iamUserCodeOldKey, Phrase: "key <keyID> >90d (rotation)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamUserCodeAdminAttached, Phrase: "has AdministratorAccess", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: iamUserCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeConsoleNeverUsed, Phrase: "console password never used", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeKeyUnused, Phrase: "access key unused for <N> days", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: iamUserCodeTwoActiveKeys, Phrase: "two active access keys", Severity: domain.SevWarn, Source: "wave2"},
@@ -297,7 +297,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 		Findings: []catalog.FindingDef{
 			{Code: iamGroupCodeOrphanOrNoop, Phrase: "group has no members (orphan)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamGroupCodeAdminAttached, Phrase: "has AdministratorAccess", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: iamGroupCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

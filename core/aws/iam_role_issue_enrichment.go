@@ -78,7 +78,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if adminPolicy != "" {
-			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, "has AdministratorAccess", "~", "iam-role",
+			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, adminAttachedPhrase, "~", "iam-role",
 				adminAttachedRows(adminPolicy), adminAttachedDetail)
 		}
 		if err != nil {

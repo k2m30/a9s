@@ -12,7 +12,13 @@ import (
 
 // KMSFixtures holds typed fixture data for KMS.
 type KMSFixtures struct {
-	// Keys maps key ID to KeyMetadata (used by DescribeKey).
+	// KeyList is the account's keys in declaration order, one entry per key —
+	// what ListKeys returns. Keys is a lookup index that deliberately holds
+	// each key twice, so listing from it would emit every key twice and in
+	// map order.
+	KeyList []*kmstypes.KeyMetadata
+	// Keys maps both the bare key ID and the full key ARN to KeyMetadata
+	// (used by DescribeKey, which accepts either form).
 	Keys map[string]*kmstypes.KeyMetadata
 	// Aliases is the full list of key aliases (returned by ListAliases).
 	Aliases []kmstypes.AliasListEntry
@@ -513,7 +519,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		"a1b2c3d4-5678-90ab-cdef-111111111111": true,
 	}
 
-	return &KMSFixtures{Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies, RotationEnabled: rotationEnabled}
+	return &KMSFixtures{KeyList: keyMetadata, Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies, RotationEnabled: rotationEnabled}
 })
 
 func NewKMSFixtures() *KMSFixtures {

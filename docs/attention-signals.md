@@ -547,18 +547,18 @@ resource-list frame title. The frame-title rules:
 | role | role.trust.confused-deputy | service can assume without source scoping | warn | wave1 |
 | role | role.inline-privilege-escalation | inline policy allows privilege escalation: <combo> | broken | wave1 |
 | role | iam-role.dormant | dormant role (>90d) | warn | wave2 |
-| role | role.admin-attached | has AdministratorAccess | warn | wave2 |
+| role | role.admin-attached | has an administrator policy | warn | wave2 |
 | policy | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
 | policy | iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 |
 | policy | policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 |
 | iam-user | iam-user.no-mfa | console user without MFA | broken | wave2 |
 | iam-user | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
-| iam-user | iam-user.admin-attached | has AdministratorAccess | warn | wave2 |
+| iam-user | iam-user.admin-attached | has an administrator policy | warn | wave2 |
 | iam-user | iam-user.console-never-used | console password never used | warn | wave2 |
 | iam-user | iam-user.access-key-unused | access key unused for <N> days | warn | wave2 |
 | iam-user | iam-user.two-active-keys | two active access keys | warn | wave2 |
 | iam-group | iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 |
-| iam-group | iam-group.admin-attached | has AdministratorAccess | warn | wave2 |
+| iam-group | iam-group.admin-attached | has an administrator policy | warn | wave2 |
 | waf | waf.no-logging | no logging configuration | warn | wave2 |
 | waf | waf.no-rules | web ACL has no rules | warn | wave2 |
 | cfn | cfn.stack.failed | <status, lowercased> | broken | wave1 |

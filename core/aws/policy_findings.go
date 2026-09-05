@@ -40,6 +40,12 @@ func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 	return ""
 }
 
+// adminAttachedPhrase is the S4 cause for every admin-attached finding. It
+// names the class rather than one policy, because adminManagedPolicyARNs
+// holds both AdministratorAccess and PowerUserAccess; the Policy row says
+// which one is attached.
+const adminAttachedPhrase = "has an administrator policy"
+
 // adminAttachedDetail is the S5 sentence stamped on every admin-attached
 // finding, whatever principal carries it.
 const adminAttachedDetail = "This principal is attached to an AWS-managed policy that grants " +

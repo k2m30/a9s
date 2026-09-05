@@ -129,7 +129,7 @@ One row per signal from §3:
 | an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S2, S4, S5 | `service can assume without source scoping` | `A service can assume this role for any caller, so another customer's resource can trick it into using your role.` |
 | an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S2, S4, S5 | `inline policy allows privilege escalation` | `An inline policy grants a set of actions that lets its holder grant itself full administrator.` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `unused >90d` | `No AssumeRole activity in the last 90 days (region-scoped — may miss usage in other regions).` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `has AdministratorAccess` | `The role carries an AWS-managed policy granting administrator-equivalent access.` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `has an administrator policy` | `The role carries an AWS-managed policy granting administrator-equivalent access.` |
 
 Rules for filling list and detail text:
 
@@ -176,7 +176,7 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 | role.trust.confused-deputy | service can assume without source scoping | warn | wave1 |
 | role.inline-privilege-escalation | inline policy allows privilege escalation: <combo> | broken | wave1 |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 |
-| role.admin-attached | has AdministratorAccess | warn | wave2 |
+| role.admin-attached | has an administrator policy | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

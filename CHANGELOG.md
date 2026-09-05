@@ -202,6 +202,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Demo mode listed every KMS key twice, in a different order on each run.
+  The list was being built from the lookup table that deliberately holds each
+  key under both its bare ID and its full ARN, rather than from the account's
+  key list. Each key now appears once, in a stable order.
+
 - Drilling into a related resource no longer overwrites the full list it
   came from. After loading all 200 instances of a type, opening a pivot
   that matched 3 of them replaced the cached list with just those 3 —
