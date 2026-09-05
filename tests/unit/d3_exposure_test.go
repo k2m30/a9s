@@ -312,7 +312,7 @@ func d3FetchVPCE(t *testing.T, policy string) resource.Resource {
 func TestD3VPCEServiceWideActionWildcardIsOpen(t *testing.T) {
 	r := d3FetchVPCE(t, d3VPCEPolicy("s3:*"))
 	w4AssertFinding(t, r.Findings, d3CodeVPCEPolicyOpen,
-		"endpoint policy open to any principal", domain.SevWarn, "wave1")
+		"endpoint policy open to anyone", domain.SevWarn, "wave1")
 }
 
 // TestD3VPCESingleActionIsNotOpen pins the negative case: one named action

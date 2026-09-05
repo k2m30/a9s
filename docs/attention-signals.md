@@ -320,7 +320,7 @@ resource-list frame title. The frame-title rules:
 | vpce | vpce.state.expired | expired | broken | wave1 |
 | vpce | vpce.state.partial | partial | broken | wave1 |
 | vpce | vpce.state.deleted | deleted | dim | wave1 |
-| vpce | vpce.policy-open | endpoint policy open to any principal | warn | wave1 |
+| vpce | vpce.policy-open | endpoint policy open to anyone | warn | wave1 |
 | tgw | tgw.state.pending | pending | warn | wave1 |
 | tgw | tgw.state.modifying | modifying | warn | wave1 |
 | tgw | tgw.state.deleting | deleting | warn | wave1 |

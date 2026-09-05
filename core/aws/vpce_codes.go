@@ -20,7 +20,7 @@ const (
 )
 
 // VPCEPolicyOpenPhrase is the S4 status phrase for CodeVPCEPolicyOpen.
-const VPCEPolicyOpenPhrase = "endpoint policy open to any principal"
+const VPCEPolicyOpenPhrase = "endpoint policy open to anyone"
 
 // VPCEPolicyOpenDetail is the S5 operator sentence for CodeVPCEPolicyOpen.
 const VPCEPolicyOpenDetail = "The endpoint policy grants every action to every principal, so any identity that " +

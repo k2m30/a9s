@@ -26,7 +26,7 @@ const (
 	w3CodeVPCEPending    = domain.FindingCode("vpce.state.pending")
 	w3CodeVPCEDeleted    = domain.FindingCode("vpce.state.deleted")
 
-	w3PhraseVPCEPolicyOpen = "endpoint policy open to any principal"
+	w3PhraseVPCEPolicyOpen = "endpoint policy open to anyone"
 )
 
 // w3VPCEDefaultPolicy is the full-access document AWS attaches to a gateway
