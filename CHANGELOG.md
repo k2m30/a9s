@@ -264,6 +264,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter name they name, and an Athena workgroup's unenforced settings
   read `no` with its unencrypted results reading `off` rather than `nil`.
 
+- Demo mode flagged four Athena workgroups for unencrypted query results and
+  none for unenforced settings, so the signal had no single carrier and the
+  type never appeared in the sweeps that check every other type's rendered
+  rows. One workgroup now carries both halves and the rest encrypt their
+  results.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's

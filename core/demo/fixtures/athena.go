@@ -11,6 +11,12 @@ import (
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 )
 
+// AthenaGovernanceMisconfigured is the ONE demo workgroup that neither
+// enforces its own configuration nor encrypts its query results, so the
+// governance finding has a single carrier. Every other workgroup below sets
+// both explicitly to the healthy value.
+const AthenaGovernanceMisconfigured = "acme-ungoverned-queries"
+
 // AthenaFixtures holds typed fixture data for Athena.
 type AthenaFixtures struct {
 	WorkGroups       []athenatypes.WorkGroupSummary
@@ -85,6 +91,16 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					SelectedEngineVersion:  aws.String("PySpark engine version 3"),
 				},
 			},
+			{
+				Name:         aws.String(AthenaGovernanceMisconfigured),
+				State:        athenatypes.WorkGroupStateEnabled,
+				Description:  aws.String("Ad-hoc workgroup analysts may override per query"),
+				CreationTime: aws.Time(mustParseAthenaTime("2025-09-18T11:00:00+00:00")),
+				EngineVersion: &athenatypes.EngineVersion{
+					EffectiveEngineVersion: aws.String("Athena engine version 3"),
+					SelectedEngineVersion:  aws.String("AUTO"),
+				},
+			},
 			// acme-etl-orders workgroup — required for the glue:athena
 			// related-panel pivot. checkGlueAthena matches wg.ID == jobName;
 			// this workgroup is provisioned for analysts querying the ETL
@@ -133,6 +149,10 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					Configuration: &athenatypes.WorkGroupConfiguration{
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/analytics-results/"),
+							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{
+								EncryptionOption: athenatypes.EncryptionOptionSseKms,
+								KmsKey:           aws.String(S3BucketKMSKeyID),
+							},
 						},
 					},
 				},
@@ -144,6 +164,10 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					Configuration: &athenatypes.WorkGroupConfiguration{
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/data-science-results/"),
+							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{
+								EncryptionOption: athenatypes.EncryptionOptionSseKms,
+								KmsKey:           aws.String(S3BucketKMSKeyID),
+							},
 						},
 					},
 				},
@@ -155,6 +179,10 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					Configuration: &athenatypes.WorkGroupConfiguration{
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/etl-orders-results/"),
+							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{
+								EncryptionOption: athenatypes.EncryptionOptionSseKms,
+								KmsKey:           aws.String(S3BucketKMSKeyID),
+							},
 						},
 					},
 				},
@@ -166,6 +194,26 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					Configuration: &athenatypes.WorkGroupConfiguration{
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/athena-results/"),
+							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{
+								EncryptionOption: athenatypes.EncryptionOptionSseKms,
+								KmsKey:           aws.String(S3BucketKMSKeyID),
+							},
+						},
+					},
+				},
+			},
+			// The witness for athena.governance-misconfigured: settings are not
+			// enforced, so a caller can override them per query, and results
+			// land unencrypted. Both halves on one workgroup, because the
+			// finding carries a row per half and nothing else exercises two.
+			AthenaGovernanceMisconfigured: {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String(AthenaGovernanceMisconfigured),
+					State: athenatypes.WorkGroupStateEnabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						EnforceWorkGroupConfiguration: aws.Bool(false),
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/adhoc-results/"),
 						},
 					},
 				},
