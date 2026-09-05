@@ -3,16 +3,14 @@ package unit_test
 // qa_networking_color_phrase_agree_test.go — ruling M for the five networking
 // types.
 //
-// The row colour takes the worst severity on the row. The Status cell took the
-// first issue-severity finding in slice order (colorFromWave1 still selects
-// that way). A row whose findings arrive warn-then-broken therefore renders red
-// while reading as the warning, so the operator sees the colour that says
-// "drop everything" next to the sentence for the lesser problem.
+// One selector decides both the row colour and the Status cell. When they were
+// chosen separately, a row whose findings arrived warn-then-broken rendered red
+// while reading as the warning, so the operator saw the colour that says "drop
+// everything" next to the sentence for the lesser problem.
 //
-// This is the demo-bench half of tests/unit/prowler_w1_status_phrase_test.go on
-// main, which pins domain.TopFinding's own rules. That selector does not exist
-// in this worktree yet, so the invariant is asserted directly: whichever
-// finding the cell names must be one of the worst-severity findings on the row.
+// This is the demo-bench half of tests/unit/prowler_w1_status_phrase_test.go,
+// which pins domain.TopFinding's own rules; here the colour and the cell are
+// checked against that same selector's verdict.
 
 import (
 	"fmt"
@@ -24,34 +22,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// netWorstSeverity returns the highest severity among r's findings, and false
-// when the row carries none.
-func netWorstSeverity(r resource.Resource) (domain.Severity, bool) {
-	worst, ok := domain.Severity(0), false
-	for _, f := range r.Findings {
-		if !ok || f.Severity > worst {
-			worst, ok = f.Severity, true
-		}
-	}
-	return worst, ok
-}
-
-// netColorForSeverity mirrors the display mapping core/aws applies, so the
-// test computes the expected colour from the worst finding rather than
-// trusting the classifier it is checking.
-func netColorForSeverity(sev domain.Severity) domain.Color {
-	switch sev {
-	case domain.SevBroken:
-		return domain.ColorBroken
-	case domain.SevWarn:
-		return domain.ColorWarning
-	case domain.SevDim:
-		return domain.ColorDim
-	default:
-		return domain.ColorHealthy
-	}
-}
 
 // TestNetworkingColorAndPhrase_ComeFromTheSameFinding sweeps every demo row of
 // the five networking types and fails when the Status cell names a finding
@@ -74,13 +44,13 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 		merged := mergeWave2Findings(t, *td, fixtures, cache, demoClients)
 
 		for _, res := range merged {
-			worst, ok := netWorstSeverity(res)
+			top, ok := domain.TopFinding(res.Findings)
 			if !ok {
 				continue
 			}
-			if got, want := td.ResolveColor(res), netColorForSeverity(worst); got != want {
-				bad = append(bad, fmt.Sprintf("%s/%s: row colour = %v, want %v from the worst finding on the row %v",
-					short, res.ID, got, want, netPhrases(res)))
+			if got, want := td.ResolveColor(res), resource.ColorFromSeverity(top.Severity); got != want {
+				bad = append(bad, fmt.Sprintf("%s/%s: row colour = %v, want %v from the top finding %q on the row %v",
+					short, res.ID, got, want, top.Phrase, netPhrases(res)))
 			}
 			cell, found := listStatusCellFor(t, *td, merged, res.ID)
 			if !found || strings.TrimSpace(cell) == "" {
@@ -101,7 +71,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 			}
 			agrees := false
 			for _, f := range named {
-				if f.Severity == worst {
+				if f.Severity == top.Severity {
 					agrees = true
 				}
 			}
@@ -109,7 +79,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 				bad = append(bad, fmt.Sprintf(
 					"%s/%s: colour comes from a %v finding but the Status cell %q names only %v — "+
 						"the row's colour and its words disagree about what is wrong",
-					short, res.ID, worst, cell, netSeverities(named)))
+					short, res.ID, top.Severity, cell, netSeverities(named)))
 			}
 		}
 	}

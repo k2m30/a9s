@@ -74,11 +74,11 @@ func TestColorTakesWorstSeverity_DemoBench(t *testing.T) {
 			continue
 		}
 		for _, res := range mergeWave2Findings(t, td, fixtures, cache, clients) {
-			worst, ok := netWorstSeverity(res)
+			top, ok := domain.TopFinding(res.Findings)
 			if !ok {
 				continue
 			}
-			if got, want := td.ResolveColor(res), netColorForSeverity(worst); got != want {
+			if got, want := td.ResolveColor(res), resource.ColorFromSeverity(top.Severity); got != want {
 				bad = append(bad, fmt.Sprintf("%s/%s: %v, want %v", td.ShortName, res.ID, got, want))
 			}
 		}
