@@ -188,3 +188,62 @@ func TestApplyWave2ToRow_RepeatedFoldIsStable(t *testing.T) {
 		t.Errorf("Findings = %+v, want exactly the wave-1 and wave-2 findings", r.Findings)
 	}
 }
+
+// TestApplyWave2ToRow_NeverWritesThroughSharedBacking pins the property that
+// lets every caller hand the fold a shallow row copy: the fold must replace
+// Findings and AttentionDetails with freshly allocated ones, never append into
+// the spare capacity of the slice the caller still shares with its pre-Amend
+// rows.
+//
+// The amend callbacks in core/app, core/runtime and internal/tui all do
+// copy(out, rows), which duplicates the row structs but not the arrays behind
+// their slice headers. If the fold ever grew Findings in place, the write
+// would land in the store's own backing array and in any snapshot taken
+// before the amend — a corruption no caller could see or defend against.
+// One test here covers all four call sites.
+func TestApplyWave2ToRow_NeverWritesThroughSharedBacking(t *testing.T) {
+	// A row whose Findings slice has room to grow, as a fetcher's append loop
+	// naturally leaves it.
+	backing := make([]domain.Finding, 1, 8)
+	backing[0] = domain.Finding{
+		Code: foldWave1Code, Phrase: "default group allows traffic",
+		Severity: domain.SevWarn, Source: "wave1",
+	}
+	callerDetails := map[domain.FindingCode]domain.AttentionDetail{
+		foldWave1Code: {Rows: []domain.DetailRow{{Label: "Ingress rules", Value: "1", Tier: "~"}}},
+	}
+
+	// What the store still sees: the same array, and the same map.
+	shared := backing[:cap(backing)]
+	r := &domain.Resource{ID: "sg-0default11111111", Findings: backing, AttentionDetails: callerDetails}
+
+	runtime.ApplyWave2ToRow(r, foldTypeDef(),
+		map[string][]domain.Finding{
+			r.ID: {{Code: foldWave2Code, Phrase: "not attached to anything", Severity: domain.SevWarn, Source: "wave2:sg"}},
+		},
+		map[string]map[domain.FindingCode]domain.AttentionDetail{
+			r.ID: {foldWave2Code: {Rows: []domain.DetailRow{{Label: "Network interfaces referencing", Value: "0", Tier: "~"}}}},
+		},
+	)
+
+	if _, ok := w3FindingByCode(r.Findings, foldWave2Code); !ok {
+		t.Fatalf("precondition: the fold did not append the wave-2 finding; Findings=%+v", r.Findings)
+	}
+	for i := 1; i < len(shared); i++ {
+		if shared[i].Code != "" {
+			t.Errorf("the fold wrote %q into shared spare capacity at index %d; the store's own rows would see it",
+				shared[i].Code, i)
+		}
+	}
+	if shared[0].Code != foldWave1Code {
+		t.Errorf("shared[0] = %q, want the caller's untouched wave-1 finding %q", shared[0].Code, foldWave1Code)
+	}
+
+	// The caller's map must likewise be left alone, not adopted and extended.
+	if _, ok := callerDetails[foldWave2Code]; ok {
+		t.Error("the fold wrote the wave-2 AttentionDetail into the caller's own map instead of a fresh one")
+	}
+	if len(callerDetails) != 1 {
+		t.Errorf("caller's AttentionDetails = %+v, want its single original entry", callerDetails)
+	}
+}
