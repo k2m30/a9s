@@ -93,6 +93,11 @@ func DrainFixtures(t *testing.T, td resource.ResourceTypeDef, clients *awsclient
 
 // CollectAllPages drains fetch and hands back the error instead of failing, for
 // tests whose subject is the error itself. The page bound still applies.
+//
+// It discards every row on any error, unlike DrainPages/FetchRelatedTarget's
+// "only a row-less error aborts" rule — 100+ call sites rely on that strict
+// stop, so it is not changed here. A demo cache builder needs DrainPages, not
+// this.
 func CollectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
