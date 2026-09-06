@@ -355,6 +355,18 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				"state":    "running",
 				"image_id": "ami-00000001",
 			},
+			RawStruct: ec2types.Instance{
+				InstanceId: aws.String("i-00000001"),
+				VpcId:      aws.String("vpc-00000001"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("test-stack")},
+					{Key: aws.String("eks:cluster-name"), Value: aws.String("test-cluster")},
+					{Key: aws.String("eks:nodegroup-name"), Value: aws.String("test-ng")},
+				},
+				BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{{
+					Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-00000001")},
+				}},
+			},
 		},
 		"ami": {
 			ID:   "ami-00000001",
@@ -362,6 +374,13 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Fields: map[string]string{
 				"state":        "available",
 				"architecture": "x86_64",
+			},
+			RawStruct: ec2types.Image{
+				ImageId: aws.String("ami-00000001"),
+				Tags: []ec2types.Tag{{
+					Key:   aws.String("aws:cloudformation:stack-name"),
+					Value: aws.String("test-stack"),
+				}},
 			},
 		},
 		// Row 7: the parents below carry the RawStruct their fetcher
@@ -388,6 +407,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Name: "test-cluster",
 			Fields: map[string]string{
 				"status": "ACTIVE",
+			},
+			RawStruct: ekstypes.Cluster{
+				Name: aws.String("test-cluster"),
+				Tags: map[string]string{"aws:cloudformation:stack-name": "test-stack"},
 			},
 		},
 		"elb": {
@@ -487,6 +510,13 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Name: "test-rtb",
 			Fields: map[string]string{
 				"vpc_id": "vpc-00000001",
+			},
+			RawStruct: ec2types.RouteTable{
+				RouteTableId: aws.String("rtb-00000001"),
+				Tags: []ec2types.Tag{{
+					Key:   aws.String("aws:cloudformation:stack-name"),
+					Value: aws.String("test-stack"),
+				}},
 			},
 		},
 		"vpce": {
@@ -607,6 +637,12 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Fields: map[string]string{
 				"status": "available",
 			},
+			RawStruct: rdstypes.DBCluster{
+				DBClusterIdentifier: aws.String("test-docdb"),
+				MasterUserSecret: &rdstypes.MasterUserSecret{
+					SecretArn: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:docdb!cluster-test-AbCdEf"),
+				},
+			},
 		},
 		"efs": {
 			ID:   "fs-00000001",
@@ -646,6 +682,14 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Name: "test-snapshot",
 			Fields: map[string]string{
 				"state": "completed",
+			},
+			RawStruct: ec2types.Snapshot{
+				SnapshotId:  aws.String("snap-00000001"),
+				Description: aws.String("Created by AWS Backup"),
+				Tags: []ec2types.Tag{{
+					Key:   aws.String("aws:backup:source-resource"),
+					Value: aws.String("arn:aws:ec2:us-east-1:123456789012:volume/vol-00000001"),
+				}},
 			},
 		},
 		"role": {
@@ -813,7 +857,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				}
 				if result.State() != domain.RelatedResolved {
 					t.Errorf("checker %s with truncated-empty %q cache returned State=%s "+
-						"(anti-pattern: drops honest lower bound); want RelatedResolved with Count=0, Truncated=true. "+
+						"(anti-pattern: drops honest lower bound); want RelatedResolved. "+
+						"Only the state is asserted: whether Truncated came back set depends on "+
+						"whether the checker reached the target read or exited on the parent's "+
+						"own fields first, and this harness cannot tell those apart. "+
 						"Result: %+v", key, def.TargetType, result.State(), result)
 				}
 
