@@ -166,11 +166,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				[]domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: "!"}}, iamUserNoMFADetail)
 		}
 
-		consolePasswordFlag := "false"
-		if hasConsolePassword {
-			consolePasswordFlag = "true"
-		}
-		for _, f := range iamUserConsoleDormantFindings(consolePasswordFlag, r.Fields["password_last_used"]) {
+		for _, f := range iamUserConsoleDormantFindings(consolePasswordVal, r.Fields["password_last_used"]) {
 			if riskLabel == "" {
 				riskLabel = riskConsoleDormant
 			}

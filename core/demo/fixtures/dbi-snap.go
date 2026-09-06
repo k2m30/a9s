@@ -37,12 +37,14 @@ const (
 	ProdDBISnapID  = "rds:prod-dbi-1-2026-04-15"
 	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
-	// WarnDBISnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
 	// WarnDBISnapCopyingID is the witness for dbi-snap.warn.transitional: a
 	// state the predicate does not enumerate and cannot restore from yet.
+	// Its parent is ProdDbiID and it is manual, so neither wave-2 cross-ref
+	// fires and the row's Status column stays "copying".
 	WarnDBISnapCopyingID  = "cross-region-copy-snap"
 	WarnDBISnapCopyingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:cross-region-copy-snap"
 
+	// WarnDBISnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
 	WarnDBISnapCreatingID  = "dev-feature-branch-snap"
 	WarnDBISnapCreatingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:dev-feature-branch-snap"
 
@@ -177,7 +179,7 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 		{
 			DBSnapshotIdentifier: aws.String(WarnDBISnapCopyingID),
 			DBSnapshotArn:        aws.String(WarnDBISnapCopyingARN),
-			DBInstanceIdentifier: aws.String("dev-feature-branch"),
+			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("copying"),
 			Engine:               aws.String("aurora-postgresql"),
 			EngineVersion:        aws.String("16.4"),

@@ -71,6 +71,9 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `DBSnapshot.Status` on the `DescribeDBSnapshots` response.
 
 - **Signal**: `Status == "creating"` → Warning.
+  - **State bucket**: Warning.
+  - **How obtained**: `DBSnapshot.Status` on the `DescribeDBSnapshots` response.
+
 - **Signal**: `Status` is any other value that is neither `available` nor an enumerated broken state (e.g. `copying`, `pending`) → Warning. The snapshot cannot be restored from yet, and passing the keyword through keeps a state AWS adds later visible instead of reading as ready.
   - **State bucket**: Warning.
   - **How obtained**: `DBSnapshot.Status` on the `DescribeDBSnapshots` response.
