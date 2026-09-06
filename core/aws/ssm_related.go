@@ -16,6 +16,9 @@ import (
 func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	param, ok := assertStruct[ssmtypes.ParameterMetadata](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 

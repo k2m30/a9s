@@ -119,6 +119,9 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 	// handed us a valid truncated cache would drop the honest lower bound.
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("backup")
+		}
 		return resource.KnownRelated("backup", nil, false)
 	}
 	if fs.FileSystemArn == nil || *fs.FileSystemArn == "" {

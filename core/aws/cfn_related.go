@@ -20,6 +20,9 @@ import (
 func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	if stack.RoleARN == nil || *stack.RoleARN == "" {
@@ -36,6 +39,9 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("cfn")
+		}
 		return resource.KnownRelated("cfn", nil, false)
 	}
 

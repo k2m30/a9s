@@ -98,8 +98,11 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok || rg.ARN == nil || *rg.ARN == "" {
-		// Without the ARN we cannot call ListTagsForResource to find the CFN stack.
-		// Return 0 rather than -1 so we do not signal an error condition.
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("cfn")
+		}
+		// A group that carries no ARN cannot be passed to ListTagsForResource,
+		// so no stack can own it.
 		return resource.KnownRelated("cfn", nil, false)
 	}
 	c, cok := clients.(*ServiceClients)
@@ -219,6 +222,9 @@ func checkRedisKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
 		// Without RawStruct we cannot read KmsKeyId — report 0 (no known key).
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	if rg.KmsKeyId == nil || *rg.KmsKeyId == "" {
@@ -234,6 +240,9 @@ func checkRedisKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("logs")
+		}
 		return resource.KnownRelated("logs", nil, false)
 	}
 	var names []string

@@ -156,6 +156,9 @@ func ecrCFNStackName(ctx context.Context, clients any, res resource.Resource) (s
 func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*repo.EncryptionConfiguration.KmsKey, res.Type)

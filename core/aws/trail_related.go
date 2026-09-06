@@ -17,6 +17,9 @@ import (
 func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.S3BucketName == nil || *trail.S3BucketName == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("s3")
+		}
 		return resource.KnownRelated("s3", nil, false)
 	}
 	bucketName := *trail.S3BucketName
@@ -45,6 +48,9 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsLogGroupArn == nil || *trail.CloudWatchLogsLogGroupArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("logs")
+		}
 		return resource.KnownRelated("logs", nil, false)
 	}
 
@@ -75,6 +81,9 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.SnsTopicARN == nil || *trail.SnsTopicARN == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("sns")
+		}
 		return resource.KnownRelated("sns", nil, false)
 	}
 	topicARN := *trail.SnsTopicARN
@@ -101,6 +110,9 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.KmsKeyId == nil || *trail.KmsKeyId == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	kmsRef := *trail.KmsKeyId
@@ -132,6 +144,9 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 func checkTrailRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsRoleArn == nil || *trail.CloudWatchLogsRoleArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *trail.CloudWatchLogsRoleArn

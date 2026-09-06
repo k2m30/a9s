@@ -21,6 +21,9 @@ import (
 func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
@@ -63,6 +66,9 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("lambda")
+		}
 		return resource.KnownRelated("lambda", nil, false)
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {

@@ -18,6 +18,9 @@ import (
 func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("ec2")
+		}
 		return resource.KnownRelated("ec2", nil, false)
 	}
 	if raw.Attachment == nil || raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
@@ -32,6 +35,9 @@ func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("sg")
+		}
 		return resource.KnownRelated("sg", nil, false)
 	}
 	// In-body: the ENI's own Groups[].GroupId are the related security groups.
@@ -49,6 +55,9 @@ func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("eip")
+		}
 		return resource.KnownRelated("eip", nil, false)
 	}
 	if raw.Association == nil || raw.Association.AllocationId == nil || *raw.Association.AllocationId == "" {

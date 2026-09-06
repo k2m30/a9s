@@ -103,6 +103,9 @@ func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		cluster.Configuration.ExecuteCommandConfiguration == nil ||
 		cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == nil ||
 		*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId, res.Type)

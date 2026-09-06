@@ -20,6 +20,9 @@ import (
 func checkLambdaRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	if fn.Role == nil || *fn.Role == "" {
@@ -116,6 +119,9 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*fn.KMSKeyArn, res.Type)

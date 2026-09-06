@@ -33,6 +33,9 @@ func tgARN(res resource.Resource) string {
 func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.TargetGroup](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("elb")
+		}
 		return resource.KnownRelated("elb", nil, false)
 	}
 	if len(raw.LoadBalancerArns) == 0 {

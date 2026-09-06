@@ -144,9 +144,11 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		// Parent isn't a DBInstance — cannot read MasterUserSecret.
-		// Returning -1 here drops the honest lower bound; 0 is correct because
-		// without a recognizable parent shape there are no DBInstance-secret links to find.
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("secrets")
+		}
+		// A parent that is not a DBInstance carries no MasterUserSecret, so
+		// there is no link to find.
 		return resource.KnownRelated("secrets", nil, false)
 	}
 	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {
@@ -179,6 +181,9 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	inst, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok || inst.DBSubnetGroup == nil || inst.DBSubnetGroup.VpcId == nil || *inst.DBSubnetGroup.VpcId == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("vpc")
+		}
 		return resource.KnownRelated("vpc", nil, false)
 	}
 	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
@@ -190,6 +195,9 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("dbc")
+		}
 		return resource.KnownRelated("dbc", nil, false)
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {

@@ -46,6 +46,9 @@ func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("lambda")
+		}
 		return resource.KnownRelated("lambda", nil, false)
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *cluster.ClusterArn, cache)
@@ -191,6 +194,9 @@ func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("secrets")
+		}
 		return resource.KnownRelated("secrets", nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
@@ -228,6 +234,9 @@ func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		cluster.Provisioned.EncryptionInfo.EncryptionAtRest == nil ||
 		cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == nil ||
 		*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})

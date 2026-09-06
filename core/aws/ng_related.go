@@ -51,6 +51,9 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	if ng.NodeRole == nil || *ng.NodeRole == "" {
@@ -66,6 +69,9 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("asg")
+		}
 		return resource.KnownRelated("asg", nil, false)
 	}
 	if ng.Resources == nil || len(ng.Resources.AutoScalingGroups) == 0 {

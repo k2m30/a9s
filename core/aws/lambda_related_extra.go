@@ -548,6 +548,9 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("secrets")
+		}
 		return resource.KnownRelated("secrets", nil, false)
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
@@ -590,6 +593,9 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("ssm")
+		}
 		return resource.KnownRelated("ssm", nil, false)
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {

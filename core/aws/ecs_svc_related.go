@@ -145,6 +145,9 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("elb")
+		}
 		return resource.KnownRelated("elb", nil, false)
 	}
 	if len(raw.LoadBalancers) == 0 {
@@ -235,6 +238,9 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("logs")
+		}
 		return resource.KnownRelated("logs", nil, false)
 	}
 	taskDefARN := ""
@@ -298,6 +304,9 @@ func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *raw.RoleArn

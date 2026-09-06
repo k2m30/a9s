@@ -330,6 +330,9 @@ func ctJSONStringSlice(m map[string]any, itemKey string, keys ...string) []strin
 func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("ec2")
+		}
 		return resource.KnownRelated("ec2", nil, false)
 	}
 
@@ -361,6 +364,9 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("s3")
+		}
 		return resource.KnownRelated("s3", nil, false)
 	}
 
@@ -387,6 +393,9 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("lambda")
+		}
 		return resource.KnownRelated("lambda", nil, false)
 	}
 
@@ -420,6 +429,9 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("dbi")
+		}
 		return resource.KnownRelated("dbi", nil, false)
 	}
 
@@ -449,6 +461,9 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 
@@ -479,6 +494,9 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("secrets")
+		}
 		return resource.KnownRelated("secrets", nil, false)
 	}
 
@@ -505,6 +523,9 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("vpce")
+		}
 		return resource.KnownRelated("vpce", nil, false)
 	}
 
@@ -527,6 +548,9 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("sg")
+		}
 		return resource.KnownRelated("sg", nil, false)
 	}
 
@@ -553,6 +577,9 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("ddb")
+		}
 		return resource.KnownRelated("ddb", nil, false)
 	}
 
@@ -585,6 +612,9 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("ct-events")
+		}
 		return resource.KnownRelated("ct-events", nil, false)
 	}
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
@@ -634,6 +664,9 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 	}
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("ct-events")
+		}
 		return resource.KnownRelated("ct-events", nil, false)
 	}
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
@@ -660,6 +693,9 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("trail")
+		}
 		return resource.KnownRelated("trail", nil, false)
 	}
 
@@ -688,6 +724,9 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("cfn")
+		}
 		return resource.KnownRelated("cfn", nil, false)
 	}
 

@@ -19,6 +19,9 @@ import (
 func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("subnet")
+		}
 		return resource.KnownRelated("subnet", nil, false)
 	}
 	// In-body: RouteTable.Associations[].SubnetId ARE the associated subnets.
@@ -36,6 +39,9 @@ func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("nat")
+		}
 		return resource.KnownRelated("nat", nil, false)
 	}
 	// In-body: RouteTable.Routes[].NatGatewayId ARE the referenced NAT gateways.
@@ -58,6 +64,9 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("igw")
+		}
 		return resource.KnownRelated("igw", nil, false)
 	}
 	// In-body: RouteTable.Routes[].GatewayId with the igw- prefix ARE the IGWs.
@@ -129,6 +138,9 @@ func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("eni")
+		}
 		return resource.KnownRelated("eni", nil, false)
 	}
 	// In-body: RouteTable.Routes[].NetworkInterfaceId ARE the referenced ENIs.
@@ -150,6 +162,9 @@ func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("tgw")
+		}
 		return resource.KnownRelated("tgw", nil, false)
 	}
 	// In-body: RouteTable.Routes[].TransitGatewayId ARE the referenced TGWs.

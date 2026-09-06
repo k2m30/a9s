@@ -437,6 +437,9 @@ func checkEC2VPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok || inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil || *inst.IamInstanceProfile.Arn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *inst.IamInstanceProfile.Arn

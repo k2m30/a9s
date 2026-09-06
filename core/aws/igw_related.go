@@ -17,6 +17,9 @@ import (
 func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("vpc")
+		}
 		return resource.KnownRelated("vpc", nil, false)
 	}
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {

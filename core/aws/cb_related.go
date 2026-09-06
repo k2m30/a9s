@@ -104,6 +104,9 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*project.EncryptionKey, res.Type)

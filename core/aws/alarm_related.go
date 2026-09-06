@@ -52,6 +52,9 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("asg")
+		}
 		return resource.KnownRelated("asg", nil, false)
 	}
 

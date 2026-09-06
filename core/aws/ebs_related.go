@@ -74,6 +74,9 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("cfn")
+		}
 		return resource.KnownRelated("cfn", nil, false)
 	}
 	stackName := ""

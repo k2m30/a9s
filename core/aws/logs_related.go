@@ -62,6 +62,9 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 func checkLogsKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct)
 	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*lg.KmsKeyId, res.Type)

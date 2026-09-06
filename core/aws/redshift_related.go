@@ -80,6 +80,9 @@ func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resour
 func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*cluster.KmsKeyId, res.Type)

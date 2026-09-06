@@ -100,6 +100,9 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("vpc")
+		}
 		return resource.KnownRelated("vpc", nil, false)
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {

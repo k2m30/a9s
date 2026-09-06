@@ -156,6 +156,9 @@ func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		raw.EncryptionConfig[0].Provider == nil ||
 		raw.EncryptionConfig[0].Provider.KeyArn == nil ||
 		*raw.EncryptionConfig[0].Provider.KeyArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("kms")
+		}
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsKeyIDFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
@@ -168,6 +171,9 @@ func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
+		if res.RawStruct == nil {
+			return resource.UnknownRelated("role")
+		}
 		return resource.KnownRelated("role", nil, false)
 	}
 	arn := *raw.RoleArn
