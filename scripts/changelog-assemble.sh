@@ -112,7 +112,7 @@ awk -v tmpdir="$tmp" -v order="$SECTION_ORDER" '
   inside { buf[n++] = $0; next }
   { print }
   END { if (inside) emit() }
-' "$changelog" > "$tmp/CHANGELOG.md"
+' "$changelog" | cat -s > "$tmp/CHANGELOG.md"
 
 # A fragment is the only copy of its lines, so nothing is deleted until every
 # one of them is in the rewritten file. A heading the assembler does not place

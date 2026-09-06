@@ -97,6 +97,9 @@ func unreleasedSections(t *testing.T, root string) map[string][]string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(string(raw), "\n\n\n") {
+		t.Errorf("assembly left consecutive blank lines, which mdlint refuses:\n%s", raw)
+	}
 	sections := make(map[string][]string)
 	inside := false
 	current := ""
