@@ -26,6 +26,11 @@ truncated), not two — the number is how many were found, the `+` is the
 truncation marker. There is no separate "zero" result and no "approximate": a
 truncated scan sets `Truncated` for any N via one helper (`relatedResultTrunc`).
 
+The most common Unknown is a source row restored from the on-disk type cache:
+it carries Fields but no SDK struct, so a checker whose filter lives only in the
+struct cannot count until enrichment refills the row. A checker whose filter
+comes from the row's own ID or Fields answers the real count either way.
+
 ---
 
 ## 2. What a checker returns
