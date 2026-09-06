@@ -127,13 +127,12 @@ var knownStateCoverageGaps = map[string]bool{
 	// no entry carries the matching Severity). With neither a structural
 	// path nor a registered Finding of that severity, no fixture of any
 	// shape could ever witness this bucket — it is not a fixture gap.
-	"alarm:dim":    true,
-	"apigw:broken": true, "apigw:dim": true,
+	"alarm:dim":     true,
+	"apigw:dim":     true,
 	"asg:dim":       true,
 	"athena:broken": true, "athena:dim": true,
-	"backup:dim":       true,
-	"cb:dim":           true,
-	"cf:broken":        true,
+	"backup:dim": true,
+	"cb:dim":     true, "cb:warning": true,
 	"codeartifact:dim": true,
 	"dbc:dim":          true,
 	"dbc-snap:dim":     true,
@@ -158,8 +157,8 @@ var knownStateCoverageGaps = map[string]bool{
 	"msk:dim":      true,
 	"ng:dim":       true,
 	"pipeline:dim": true, "pipeline:warning": true,
-	"policy:dim": true,
-	"r53:broken": true, "r53:dim": true,
+	"policy:dim":     true,
+	"r53:dim":        true,
 	"redshift:dim":   true,
 	"role:dim":       true,
 	"rtb:dim":        true,

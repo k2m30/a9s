@@ -84,7 +84,7 @@ func cfDistroResources(ids ...string) []resource.Resource {
 // cfDistroConfigRedirectHTTPS builds a DistributionConfig with ViewerProtocolPolicy=redirect-to-https
 // and all origins using https-only origin protocol.
 func cfDistroConfigRedirectHTTPS(id string) *cftypes.DistributionConfig {
-	return &cftypes.DistributionConfig{
+	return cfHealthyForW6ARows(&cftypes.DistributionConfig{
 		Comment: aws.String("test distribution " + id),
 		Enabled: aws.Bool(true),
 		DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
@@ -105,7 +105,40 @@ func cfDistroConfigRedirectHTTPS(id string) *cftypes.DistributionConfig {
 				},
 			},
 		},
+	})
+}
+
+// cfHealthyForW6ARows fills the settings batch w6a added rows for — access
+// logging, a default root object, a geo restriction, a custom certificate at
+// TLS 1.2, and an origin access control on every S3 origin. These tests are
+// about cf.insecure-protocol; without this their minimal configs also trip
+// six unrelated rows, and the assertions below count findings rather than
+// look one up by code.
+func cfHealthyForW6ARows(cfg *cftypes.DistributionConfig) *cftypes.DistributionConfig {
+	cfg.DefaultRootObject = aws.String("index.html")
+	cfg.Logging = &cftypes.LoggingConfig{
+		Enabled: aws.Bool(true),
+		Bucket:  aws.String("acme-cdn-logs.s3.amazonaws.com"),
+		Prefix:  aws.String("cf/"),
 	}
+	cfg.Restrictions = &cftypes.Restrictions{GeoRestriction: &cftypes.GeoRestriction{
+		RestrictionType: cftypes.GeoRestrictionTypeWhitelist,
+		Quantity:        aws.Int32(1),
+		Items:           []string{"DE"},
+	}}
+	cfg.ViewerCertificate = &cftypes.ViewerCertificate{
+		ACMCertificateArn:            aws.String("arn:aws:acm:us-east-1:123456789012:certificate/1a2b3c4d-5e6f-7081-92a3-b4c5d6e7f809"),
+		CloudFrontDefaultCertificate: aws.Bool(false),
+		MinimumProtocolVersion:       cftypes.MinimumProtocolVersionTLSv122021,
+	}
+	if cfg.Origins != nil {
+		for i := range cfg.Origins.Items {
+			if cfg.Origins.Items[i].S3OriginConfig != nil {
+				cfg.Origins.Items[i].OriginAccessControlId = aws.String("E1A2B3C4D5E6F7")
+			}
+		}
+	}
+	return cfg
 }
 
 const (
@@ -142,7 +175,7 @@ func TestEnrichCloudFrontDistribution_HTTPSRedirectAndTLSOriginsProducesNoFindin
 // that when distro-1 has ViewerProtocolPolicy=allow-all, a finding with severity "~" and
 // a summary containing "HTTPS redirect" is produced for distro-1 only.
 func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTilde(t *testing.T) {
-	distro1NoHTTPS := &cftypes.DistributionConfig{
+	distro1NoHTTPS := cfHealthyForW6ARows(&cftypes.DistributionConfig{
 		Comment: aws.String("test distribution " + cfDistroID1),
 		Enabled: aws.Bool(true),
 		DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
@@ -163,7 +196,7 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 				},
 			},
 		},
-	}
+	})
 	fake := &cfGetDistributionConfigFake{
 		results: map[string]*cftypes.DistributionConfig{
 			cfDistroID1: distro1NoHTTPS,
@@ -197,7 +230,7 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 // distro-1 has an origin with OriginProtocolPolicy=http-only, a finding with severity "~"
 // and a summary containing "origin" and "TLS" is produced for distro-1 only.
 func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *testing.T) {
-	distro1HTTPOrigin := &cftypes.DistributionConfig{
+	distro1HTTPOrigin := cfHealthyForW6ARows(&cftypes.DistributionConfig{
 		Comment: aws.String("test distribution " + cfDistroID1),
 		Enabled: aws.Bool(true),
 		DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
@@ -218,7 +251,7 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 				},
 			},
 		},
-	}
+	})
 	fake := &cfGetDistributionConfigFake{
 		results: map[string]*cftypes.DistributionConfig{
 			cfDistroID1: distro1HTTPOrigin,

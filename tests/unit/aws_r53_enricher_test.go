@@ -37,6 +37,36 @@ type r53GetHostedZoneFake struct {
 	errByID map[string]error
 }
 
+// ListQueryLoggingConfigs and ListResourceRecordSets answer healthily rather
+// than falling through to the embedded nil interface. EnrichRoute53Zone calls
+// both for every public zone, and a nil embedded field dereferences into a
+// SIGSEGV that takes the whole unit package down before any other test
+// reports; the static interface assertion cannot catch it, because embedding
+// satisfies the interface whether or not the field is set. One config and no
+// records keep r53.query-logging-off and r53.dangling-record out of tests
+// written about the orphan-private-zone row.
+func (f *r53GetHostedZoneFake) ListQueryLoggingConfigs(
+	_ context.Context,
+	_ *route53.ListQueryLoggingConfigsInput,
+	_ ...func(*route53.Options),
+) (*route53.ListQueryLoggingConfigsOutput, error) {
+	return &route53.ListQueryLoggingConfigsOutput{
+		QueryLoggingConfigs: []r53types.QueryLoggingConfig{{
+			Id:                        aws.String("qlc-0000000000000000"),
+			HostedZoneId:              aws.String("Z0A1B2C3D4E5F6G7H8I9"),
+			CloudWatchLogsLogGroupArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/route53/acme:*"),
+		}},
+	}, nil
+}
+
+func (f *r53GetHostedZoneFake) ListResourceRecordSets(
+	_ context.Context,
+	_ *route53.ListResourceRecordSetsInput,
+	_ ...func(*route53.Options),
+) (*route53.ListResourceRecordSetsOutput, error) {
+	return &route53.ListResourceRecordSetsOutput{}, nil
+}
+
 func (f *r53GetHostedZoneFake) GetHostedZone(
 	_ context.Context,
 	in *route53.GetHostedZoneInput,

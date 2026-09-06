@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	apigwv1types "github.com/aws/aws-sdk-go-v2/service/apigateway/types"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 )
 
@@ -153,6 +154,15 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 					AuthorizerCredentialsArn: aws.String("arn:aws:iam::123456789012:role/acme-ci-deploy-role"),
 				},
 			},
+			// The healthy API must carry an authorizer too, or
+			// apigw.no-authorizer colours the one row that witnesses the
+			// Healthy bucket.
+			HealthyAPIGWID: {
+				{
+					AuthorizerId: aws.String("auth-healthy-api-1"),
+					Name:         aws.String("acme-healthy-authorizer"),
+				},
+			},
 		},
 		// DomainNames + ApiMappings — required for the apigw:acm pivot
 		// witness (checkApigwACM: GetDomainNames -> GetApiMappings match on
@@ -222,7 +232,7 @@ const (
 	APIGWRESTNoAuthorizer = "rst001noauth"
 
 	// APIGWHTTPNoAuthorizer is the HTTP API with no authorizer.
-	APIGWHTTPNoAuthorizer = "htp001noauth"
+	APIGWHTTPNoAuthorizer = "efg567hij8"
 
 	// APIGWRESTNoAccessLogs is the REST API whose stage records no access logs.
 	APIGWRESTNoAccessLogs = "rst002nologs"
@@ -238,3 +248,90 @@ const (
 	// that variable.
 	APIGWRESTStageSecretStage = "prod"
 )
+
+// APIGWV1Fixtures holds typed fixture data for the API Gateway v1 (REST)
+// lane. The a9s apigw list merges v1 and v2, and the four REST posture rows
+// have no v2 equivalent, so demo mode needs REST APIs to demonstrate them.
+type APIGWV1Fixtures struct {
+	RestApis []apigwv1types.RestApi
+	// Authorizers maps RestApiId -> authorizers, served by GetAuthorizers.
+	Authorizers map[string][]apigwv1types.Authorizer
+	// Stages maps RestApiId -> stages, served by GetStages.
+	Stages map[string][]apigwv1types.Stage
+}
+
+// apigwV1RestAPI builds one REST API row with the given endpoint type.
+func apigwV1RestAPI(id, name, endpoint string) apigwv1types.RestApi {
+	return apigwv1types.RestApi{
+		Id:          aws.String(id),
+		Name:        aws.String(name),
+		Description: aws.String("demo REST API"),
+		CreatedDate: aws.Time(time.Date(2026, 2, 1, 9, 0, 0, 0, time.UTC)),
+		EndpointConfiguration: &apigwv1types.EndpointConfiguration{
+			Types: []apigwv1types.EndpointType{apigwv1types.EndpointType(endpoint)},
+		},
+	}
+}
+
+// apigwV1HealthyStage returns a REST stage with access logging on, tracing on
+// and no credential in its variables, so it trips none of the REST rows.
+func apigwV1HealthyStage(name string) apigwv1types.Stage {
+	return apigwv1types.Stage{
+		StageName:      aws.String(name),
+		DeploymentId:   aws.String("dep001"),
+		TracingEnabled: true,
+		AccessLogSettings: &apigwv1types.AccessLogSettings{
+			DestinationArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/apigw/acme-rest:*"),
+			Format:         aws.String("$context.requestId"),
+		},
+		Variables: map[string]string{"backendStage": "prod"},
+	}
+}
+
+// NewAPIGWV1Fixtures constructs the REST-lane fixtures. Each API is the one
+// witness for its row; every other API is explicitly healthy for that row.
+var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:gochecknoglobals // fixture singleton, matching this package's shape
+	noLogs := apigwV1HealthyStage(APIGWRESTStageSecretStage)
+	noLogs.AccessLogSettings = nil
+
+	untraced := apigwV1HealthyStage(APIGWRESTStageSecretStage)
+	untraced.TracingEnabled = false
+
+	leaky := apigwV1HealthyStage(APIGWRESTStageSecretStage)
+	leaky.Variables = map[string]string{
+		"backendStage": "prod",
+		// A synthetic value: the finding reports the key and the kind, never
+		// the value, and nothing here is a real credential.
+		"DB_PASSWORD": "demo-placeholder-not-a-real-secret",
+	}
+
+	authorizer := []apigwv1types.Authorizer{{
+		Id:   aws.String("auth-rest-1"),
+		Name: aws.String("acme-rest-authorizer"),
+		Type: apigwv1types.AuthorizerTypeRequest,
+	}}
+
+	return &APIGWV1Fixtures{
+		RestApis: []apigwv1types.RestApi{
+			apigwV1RestAPI(APIGWRESTNoAuthorizer, "acme-orders-rest", "EDGE"),
+			apigwV1RestAPI(APIGWRESTNoAccessLogs, "acme-unlogged-rest", "REGIONAL"),
+			apigwV1RestAPI(APIGWRESTTracingOff, "acme-untraced-rest", "REGIONAL"),
+			apigwV1RestAPI(APIGWRESTStageSecret, "acme-leaky-rest", "REGIONAL"),
+		},
+		Authorizers: map[string][]apigwv1types.Authorizer{
+			// APIGWRESTNoAuthorizer deliberately has none — it is the witness.
+			APIGWRESTNoAccessLogs: authorizer,
+			APIGWRESTTracingOff:   authorizer,
+			APIGWRESTStageSecret:  authorizer,
+		},
+		Stages: map[string][]apigwv1types.Stage{
+			APIGWRESTNoAuthorizer: {apigwV1HealthyStage("prod")},
+			APIGWRESTNoAccessLogs: {noLogs},
+			APIGWRESTTracingOff:   {untraced},
+			APIGWRESTStageSecret:  {leaky},
+		},
+	}
+})
+
+// NewAPIGWV1Fixtures returns the shared REST-lane fixtures.
+func NewAPIGWV1Fixtures() *APIGWV1Fixtures { return sharedAPIGWV1Fixtures() }

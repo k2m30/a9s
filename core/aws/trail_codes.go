@@ -65,7 +65,7 @@ const (
 const (
 	trailSingleRegionDetail = "The account has no multi-region trail, so API activity in every other region goes unrecorded. Recreate this trail with multi-region delivery enabled, or add one trail that covers all regions."
 
-	trailNoCloudWatchLogsDetail = "Events are delivered to S3 only, so no metric filter or alarm can watch them and nobody is paged on suspicious API activity. Attach a CloudWatch Logs log group to this trail."
+	trailNoCloudWatchLogsDetail = "Events are delivered to the bucket only, so no metric filter or alarm can watch them and nobody is paged on suspicious account activity. Attach a log group to this trail."
 
 	trailNoKMSDetail = "Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control."
 

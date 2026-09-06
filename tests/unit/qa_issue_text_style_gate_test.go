@@ -86,6 +86,11 @@ var knownAcronymExemptions = map[string]bool{
 	// around it would make the status cell vaguer, not clearer.
 	"DKIM": true,
 	"CIDR": true, "NAT": true, "IGW": true, "EIP": true, "ENI": true, "EBS": true, "SSRF": true,
+	// Cryptographic key-algorithm families. An operator reads "RSA 1024" and
+	// "ECDSA" as the algorithm names they are; the SDK's own spelling is
+	// "RSA_1024", so the space is the humanized form and there is nothing
+	// further to convert them to.
+	"RSA": true, "ECDSA": true,
 	// AWS service-name / protocol acronyms that appear inline in
 	// hand-written prose (e.g. "no HTTPS redirect", "isolated: quarantined
 	// by AWS", "orphan: source DB deleted", "AccessDenied: ... S3 bucket

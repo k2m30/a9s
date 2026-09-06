@@ -51,6 +51,25 @@ type apigwPaginatedFake struct {
 	callCounts map[string]int
 }
 
+// GetAuthorizers answers empty rather than leaving the call to the embedded
+// nil interface. EnrichAPIGatewayStage calls it for every v2 API, and a nil
+// embedded field dereferences into a SIGSEGV that takes the whole unit
+// package down before any other test reports. See apigwGetStagesFake in
+// aws_apigw_enricher_test.go for the same fix and the reason the static
+// interface assertion cannot catch it.
+func (f *apigwPaginatedFake) GetAuthorizers(
+	_ context.Context,
+	_ *apigatewayv2.GetAuthorizersInput,
+	_ ...func(*apigatewayv2.Options),
+) (*apigatewayv2.GetAuthorizersOutput, error) {
+	// One authorizer, so apigw.no-authorizer stays out of tests written
+	// before it existed and about something else.
+	return &apigatewayv2.GetAuthorizersOutput{Items: []apigwtypes.Authorizer{{
+		AuthorizerId: aws.String("auth-default"),
+		Name:         aws.String("acme-jwt"),
+	}}}, nil
+}
+
 func newAPiGWPaginatedFake() *apigwPaginatedFake {
 	return &apigwPaginatedFake{
 		pages:      make(map[string][]*apigatewayv2.GetStagesOutput),

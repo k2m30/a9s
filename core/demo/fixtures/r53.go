@@ -101,6 +101,18 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 		RecordSets: map[string][]r53types.ResourceRecordSet{
 			"/hostedzone/Z0123456789ABCDEFGHIJ": {
 				{
+					// R53DanglingA: the one record pointing at an address no
+					// elastic IP, instance or network interface fixture holds.
+					// Every other A record here resolves to a held address or
+					// is an alias, so nothing else trips r53.dangling-record.
+					Name: aws.String(R53DanglingA),
+					Type: r53types.RRTypeA,
+					TTL:  aws.Int64(300),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String(R53DanglingATarget)},
+					},
+				},
+				{
 					Name: aws.String("acme-corp.com."),
 					Type: r53types.RRTypeA,
 					AliasTarget: &r53types.AliasTarget{
@@ -285,6 +297,18 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 				HostedZoneId:              aws.String("Z0123456789ABCDEFGHIJ"),
 				CloudWatchLogsLogGroupArn: aws.String(PublicZoneQueryLogGroupARN),
 			},
+			// Every public zone but R53QueryLoggingOff carries a config, so
+			// that zone is the single witness for r53.query-logging-off.
+			"/hostedzone/Z2345678901ABCDEFGHIJ": {
+				Id:                        aws.String("qlc-acme-corp-002"),
+				HostedZoneId:              aws.String("Z2345678901ABCDEFGHIJ"),
+				CloudWatchLogsLogGroupArn: aws.String(PublicZoneQueryLogGroupARN),
+			},
+			"/hostedzone/Z4567890123ABCDEFGHIJ": {
+				Id:                        aws.String("qlc-acme-corp-003"),
+				HostedZoneId:              aws.String("Z4567890123ABCDEFGHIJ"),
+				CloudWatchLogsLogGroupArn: aws.String(PublicZoneQueryLogGroupARN),
+			},
 		},
 	}
 })
@@ -296,7 +320,7 @@ func NewR53Fixtures() *R53Fixtures {
 // Witness zones and records for the w6a Prowler batch.
 const (
 	// R53QueryLoggingOff is the public zone with no query-logging config.
-	R53QueryLoggingOff = "no-query-logging.acme-corp.com."
+	R53QueryLoggingOff = "unused-zone.example.com."
 
 	// R53DanglingA is the A record whose address is held by no EIP, instance
 	// or network interface in the demo account.

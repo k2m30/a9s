@@ -47,11 +47,14 @@ type tildeOnlyEnricherCase struct {
 // ddb and dbi are deliberately absent: their enrichers now also emit "!"
 // findings (an open resource policy, a deprecated engine version), so a capped
 // walk really can hide an issue and Truncated is the correct answer for them.
+//
+// cf and apigw joined them in batch w6a: cf.origin-bucket-missing,
+// apigw.no-authorizer-public and apigw.stage-variable-secret are all "!", so
+// both are covered by TestCapBoundedEnrichers_OverEnrichmentCap_TruncatedTrue
+// below instead.
 func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
-		{"apigw", awsclient.EnrichAPIGatewayStage},
 		{"athena", awsclient.EnrichAthenaWorkGroup},
-		{"cf", awsclient.EnrichCloudFrontDistribution},
 		{"eb", awsclient.EnrichEBEnvironmentHealth},
 		{"ecs", awsclient.EnrichECSClusters},
 		{"elb", awsclient.EnrichELBAttributes},
@@ -122,6 +125,8 @@ func TestTildeOnlyEnrichers_OverEnrichmentCap_TruncatedFalse(t *testing.T) {
 // Truncated = false would sail through the gap. That is what this pins.
 func brokenEmittingEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
+		{"apigw", awsclient.EnrichAPIGatewayStage},
+		{"cf", awsclient.EnrichCloudFrontDistribution},
 		{"msk", awsclient.EnrichMSKCluster},
 		{"sns", awsclient.EnrichSNSSubscriptions},
 		{"sqs", awsclient.EnrichSQSAttributes},

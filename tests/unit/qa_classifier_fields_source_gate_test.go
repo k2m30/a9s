@@ -35,8 +35,6 @@ var classifiersOffTheSharedFallback = map[string]string{ //nolint:gochecknogloba
 	"colorEKSCluster":   "not yet on the shared fallback",
 	"colorEKSNodeGroup": "not yet on the shared fallback",
 	"colorAthena":       "not yet on the shared fallback",
-	"colorCF":           "not yet on the shared fallback",
-	"colorLogs":         "not yet on the shared fallback",
 	"colorELB":          "not yet on the shared fallback",
 	"colorVPC":          "not yet on the shared fallback",
 	"colorSubnet":       "not yet on the shared fallback",
@@ -50,7 +48,6 @@ var classifiersOffTheSharedFallback = map[string]string{ //nolint:gochecknogloba
 	"colorCFN":          "not yet on the shared fallback: parses a phrase through cfnStackColor",
 	// These two live in catalog_color_helpers.go rather than a catalog_<cat>.go
 	// data file, which is why a sweep of the category files did not see them.
-	"acmColor": "not yet on the shared fallback",
 	"r53Color": "not yet on the shared fallback",
 }
 

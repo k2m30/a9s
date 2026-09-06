@@ -18,20 +18,12 @@ import (
 // color from their own Finding; the raw-field checks below are the
 // identical-precedence fallback for callers that construct a Resource with
 // only Fields set (e.g. qa_cf_color_test.go).
+// colorCF derives the row colour from the distribution's findings alone. The
+// fetcher emits cfCodeDisabled for Enabled==false and cfCodeInProgress for a
+// propagating change, so the two states this classifier used to read out of
+// Fields a second time already arrive as Findings.
 func colorCF(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	if r.Fields["enabled"] == "false" {
-		return domain.ColorDim
-	}
-	switch r.Fields["status"] {
-	case "Deployed":
-		return domain.ColorHealthy
-	case "InProgress":
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 // colorAPIGW classifies an API Gateway. All signals are Wave-2-only

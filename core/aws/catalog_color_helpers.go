@@ -3,7 +3,6 @@
 package aws
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -95,39 +94,11 @@ func cfnStackColor(status string) domain.Color {
 // Finding; the raw-field switch below is the identical-precedence fallback
 // for callers that construct a Resource with only Fields set (e.g.
 // qa_acm_color_test.go, qa_acm_validation_timed_out_test.go).
+// acmColor derives the row colour from the certificate's findings alone. The
+// fetcher emits one for every state this classifier used to re-derive from
+// Fields: the two expiry windows, the orphan case, and each non-issued status.
 func acmColor(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	switch domain.HumanizeStatusPhrase(r.Fields["status"]) {
-	case "issued":
-		dl := r.Fields["days_left"]
-		if dl == "expired" {
-			return domain.ColorBroken
-		}
-		if dl != "" {
-			var n int
-			if _, err := fmt.Sscanf(dl, "%d days", &n); err == nil {
-				if n < 7 {
-					return domain.ColorBroken
-				}
-				if n < 30 {
-					return domain.ColorWarning
-				}
-			}
-		}
-		if r.Fields["in_use"] == "false" {
-			return domain.ColorWarning
-		}
-		return domain.ColorHealthy
-	case "pending validation":
-		return domain.ColorWarning
-	case "expired", "revoked", "failed", "validation timed out":
-		return domain.ColorBroken
-	case "inactive":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 // r53Color classifies a Route53 hosted zone resource. Prefers

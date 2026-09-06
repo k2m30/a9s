@@ -289,37 +289,7 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 		// the Lambda@Edge association already on its DistributionSummary and
 		// adds an access-log destination pointing at the a9s-demo-logs bucket
 		// (s3.go LogsBucketName).
-		DistributionConfigs: map[string]*cftypes.DistributionConfig{
-			"E1A2B3C4D5E6F7": {
-				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
-					TargetOriginId:       aws.String("s3-static-assets"),
-					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
-					LambdaFunctionAssociations: &cftypes.LambdaFunctionAssociations{
-						Quantity: aws.Int32(1),
-						Items: []cftypes.LambdaFunctionAssociation{
-							{
-								EventType:         cftypes.EventTypeViewerRequest,
-								LambdaFunctionARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer:1"),
-							},
-						},
-					},
-				},
-				Logging: &cftypes.LoggingConfig{
-					Enabled: aws.Bool(true),
-					Bucket:  aws.String(LogsBucketName + ".s3.amazonaws.com"),
-				},
-			},
-			// E5E6F7G8H9I0J1 — required for the Wave-2 issue-coverage gate
-			// (TestDemoIssueCoverage). Mirrors its DistributionSummary's
-			// already-modeled insecure ViewerProtocolPolicyAllowAll so
-			// EnrichCloudFrontDistribution's viewer-protocol check fires.
-			"E5E6F7G8H9I0J1": {
-				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
-					TargetOriginId:       aws.String("alb-old-api"),
-					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyAllowAll,
-				},
-			},
-		},
+		DistributionConfigs: cfDistributionConfigs(),
 	}
 })
 
@@ -332,30 +302,114 @@ func NewCloudFrontFixtures() *CloudFrontFixtures {
 const (
 	// CFOriginBucketMissing is the distribution whose S3 origin names a
 	// bucket no s3 fixture holds.
-	CFOriginBucketMissing = "E6F7G8H9I0J1K2"
+	CFOriginBucketMissing = "E8H9I0J1K2L3M4"
 
 	// CFOriginBucketMissingDomain is that origin's domain name, built on a
 	// bucket absent from the s3 fixtures.
-	CFOriginBucketMissingDomain = "acme-deleted-origin.s3.us-east-1.amazonaws.com"
+	CFOriginBucketMissingDomain = "acme-new-launch-assets.s3.amazonaws.com"
 
 	// CFDeprecatedTLS is the distribution whose minimum protocol version is
 	// below TLS 1.2.
-	CFDeprecatedTLS = "E7G8H9I0J1K2L3"
+	CFDeprecatedTLS = "E2B3C4D5E6F7G8"
 
 	// CFLoggingOff is the distribution with access logging switched off.
-	CFLoggingOff = "E8H9I0J1K2L3M4"
+	CFLoggingOff = "E5E6F7G8H9I0J1"
 
 	// CFNoRootObject is the distribution with no default root object.
-	CFNoRootObject = "E9I0J1K2L3M4N5"
+	CFNoRootObject = "E4D5E6F7G8H9I0"
 
 	// CFS3OriginNoOAC is the distribution whose S3 origin has neither an
 	// origin access control nor a legacy origin access identity.
-	CFS3OriginNoOAC = "EA0J1K2L3M4N5O"
+	CFS3OriginNoOAC = "E7G8H9I0J1K2L3"
 
 	// CFDefaultCert is the distribution serving custom aliases with the
 	// default CloudFront certificate.
-	CFDefaultCert = "EB1K2L3M4N5O6P"
+	CFDefaultCert = CFS3OriginNoOAC
 
 	// CFNoGeoRestriction is the distribution with no geographic restriction.
-	CFNoGeoRestriction = "EC2L3M4N5O6P7Q"
+	CFNoGeoRestriction = "E6F7G8H9I0J1K2"
 )
+
+// cfHealthyConfig is the baseline every demo distribution config starts from:
+// access logging on, a default root object, a custom certificate at TLS 1.2,
+// a geo restriction, and an S3 origin behind an origin access control. Each
+// witness below switches off exactly the one setting it demonstrates, so the
+// demo bench shows one row per cf finding.
+func cfHealthyConfig(originID, originDomain, alias string) *cftypes.DistributionConfig {
+	return &cftypes.DistributionConfig{
+		Enabled:           aws.Bool(true),
+		Comment:           aws.String("demo distribution"),
+		DefaultRootObject: aws.String("index.html"),
+		Aliases:           &cftypes.Aliases{Quantity: aws.Int32(1), Items: []string{alias}},
+		Origins: &cftypes.Origins{
+			Quantity: aws.Int32(1),
+			Items: []cftypes.Origin{{
+				Id:                    aws.String(originID),
+				DomainName:            aws.String(originDomain),
+				OriginAccessControlId: aws.String("EOAC1A2B3C4D5E"),
+			}},
+		},
+		DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+			TargetOriginId:       aws.String(originID),
+			ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
+		},
+		ViewerCertificate: &cftypes.ViewerCertificate{
+			ACMCertificateArn:            aws.String(ProdACMCertARN1),
+			CloudFrontDefaultCertificate: aws.Bool(false),
+			MinimumProtocolVersion:       cftypes.MinimumProtocolVersionTLSv122021,
+		},
+		Logging: &cftypes.LoggingConfig{
+			Enabled: aws.Bool(true),
+			Bucket:  aws.String(LogsBucketName + ".s3.amazonaws.com"),
+			Prefix:  aws.String("cf/"),
+		},
+		Restrictions: &cftypes.Restrictions{
+			GeoRestriction: &cftypes.GeoRestriction{
+				RestrictionType: cftypes.GeoRestrictionTypeWhitelist,
+				Quantity:        aws.Int32(2),
+				Items:           []string{"DE", "FR"},
+			},
+		},
+	}
+}
+
+// cfDistributionConfigs returns one config per demo distribution. Every
+// distribution needs one: an absent config reads as no logging and no default
+// root object, which would colour every row instead of the named witnesses.
+func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
+	cfgs := map[string]*cftypes.DistributionConfig{
+		// Healthy, and the carrier for the cf→lambda and cf→logs pivots.
+		"E1A2B3C4D5E6F7": cfHealthyConfig("s3-static-assets", "webapp-assets-prod.s3.amazonaws.com", "www.acme-corp.com"),
+		CFDeprecatedTLS:  cfHealthyConfig("alb-legacy-api", "legacy-api.acme-corp.com", "legacy.acme-corp.com"),
+		// Enabled=false on the summary makes this the dim row; its config is
+		// healthy so nothing else colours it.
+		"E3C4D5E6F7G8H9":      cfHealthyConfig("s3-archive", "acme-logs-archive.s3.amazonaws.com", "archive.acme-corp.com"),
+		CFNoRootObject:        cfHealthyConfig("s3-media", "ml-training-data.s3.amazonaws.com", "media.acme-corp.com"),
+		CFLoggingOff:          cfHealthyConfig("alb-old-api", "old-api.acme-corp.com", "old.acme-corp.com"),
+		CFNoGeoRestriction:    cfHealthyConfig("s3-demo-healthy", HealthyBucketName+".s3.us-east-1.amazonaws.com", "demo.acme-corp.com"),
+		CFS3OriginNoOAC:       cfHealthyConfig("s3-nopab", "a9s-demo-nopab.s3.amazonaws.com", "pab.acme-corp.com"),
+		CFOriginBucketMissing: cfHealthyConfig("s3-new-launch", CFOriginBucketMissingDomain, "new-launch.acme-corp.com"),
+	}
+
+	cfgs[CFDeprecatedTLS].ViewerCertificate.MinimumProtocolVersion = cftypes.MinimumProtocolVersionTLSv12016
+	cfgs[CFNoRootObject].DefaultRootObject = aws.String("")
+	cfgs[CFLoggingOff].Logging = nil
+	// The distribution keeps its insecure viewer policy from the summary.
+	cfgs[CFLoggingOff].DefaultCacheBehavior.ViewerProtocolPolicy = cftypes.ViewerProtocolPolicyAllowAll
+	cfgs[CFNoGeoRestriction].Restrictions.GeoRestriction.RestrictionType = cftypes.GeoRestrictionTypeNone
+	// CFS3OriginNoOAC also carries the default-certificate witness: the two
+	// conditions are independent and this row demonstrates both.
+	cfgs[CFS3OriginNoOAC].Origins.Items[0].OriginAccessControlId = aws.String("")
+	cfgs[CFS3OriginNoOAC].Origins.Items[0].S3OriginConfig = &cftypes.S3OriginConfig{OriginAccessIdentity: aws.String("")}
+	cfgs[CFS3OriginNoOAC].ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
+
+	// Lambda@Edge association on the healthy distribution, for checkCfLambda.
+	cfgs["E1A2B3C4D5E6F7"].DefaultCacheBehavior.LambdaFunctionAssociations = &cftypes.LambdaFunctionAssociations{
+		Quantity: aws.Int32(1),
+		Items: []cftypes.LambdaFunctionAssociation{{
+			EventType:         cftypes.EventTypeViewerRequest,
+			LambdaFunctionARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer:1"),
+		}},
+	}
+	return cfgs
+}

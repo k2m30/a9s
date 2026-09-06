@@ -1,13 +1,22 @@
 package unit
 
-// qa_acm_validation_timed_out_test.go — Regression: ACM VALIDATION_TIMED_OUT → ColorBroken.
+// qa_acm_validation_timed_out_test.go — ACM certificate status no longer
+// colours a row on its own.
 //
-// Bug: VALIDATION_TIMED_OUT was not included in the ColorBroken case group,
-// causing expired/timed-out certificates to appear as healthy (default return).
-// Fix: VALIDATION_TIMED_OUT added to the case "EXPIRED", "REVOKED", "FAILED", "VALIDATION_TIMED_OUT".
+// INVERTED for batch w6a. This file used to hold six one-status tests pinning
+// the raw-field switch in acmColor: VALIDATION_TIMED_OUT, EXPIRED, REVOKED and
+// FAILED to Broken, PENDING_VALIDATION to Warning, INACTIVE to Dim. That
+// switch is gone. Colour derives from findings only, so a resource carrying no
+// findings is Healthy whatever its status field says, and each of these states
+// is reported by the finding the ACM fetcher emits for it.
 //
-// Tests fail if the fix is reverted: VALIDATION_TIMED_OUT would fall through to
-// the default return (ColorHealthy) instead of ColorBroken.
+// The six statuses are kept as one table because the enumeration is the point:
+// each one must stay uncoloured on the bare-Fields path. Do not "restore" the
+// old expectations — a raw-field branch coming back is what this now catches.
+//
+// The original bug this file was opened for (VALIDATION_TIMED_OUT falling
+// through to the default) is now impossible in the same way: every status
+// falls through, and the finding carries the severity.
 
 import (
 	"testing"
@@ -23,59 +32,24 @@ func acmResource(status string) resource.Resource {
 	}
 }
 
-// TestACMColor_ValidationTimedOut_IsColorBroken verifies VALIDATION_TIMED_OUT → ColorBroken.
-// Regresses if the case is removed and status falls through to ColorHealthy default.
-func TestACMColor_ValidationTimedOut_IsColorBroken(t *testing.T) {
+func TestACMColor_StatusAloneNeverColoursARow(t *testing.T) {
 	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("VALIDATION_TIMED_OUT")); got != resource.ColorBroken {
-		t.Errorf("acm Color status=VALIDATION_TIMED_OUT = %v, want ColorBroken — was the VALIDATION_TIMED_OUT case removed?", got)
+	if td == nil {
+		t.Fatal("acm type not registered")
 	}
-}
-
-// TestACMColor_Issued_IsColorHealthy verifies ISSUED → ColorHealthy.
-func TestACMColor_Issued_IsColorHealthy(t *testing.T) {
-	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("ISSUED")); got != resource.ColorHealthy {
-		t.Errorf("acm Color status=ISSUED = %v, want ColorHealthy", got)
-	}
-}
-
-// TestACMColor_PendingValidation_IsColorWarning verifies PENDING_VALIDATION → ColorWarning.
-func TestACMColor_PendingValidation_IsColorWarning(t *testing.T) {
-	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("PENDING_VALIDATION")); got != resource.ColorWarning {
-		t.Errorf("acm Color status=PENDING_VALIDATION = %v, want ColorWarning", got)
-	}
-}
-
-// TestACMColor_Expired_IsColorBroken verifies EXPIRED → ColorBroken.
-func TestACMColor_Expired_IsColorBroken(t *testing.T) {
-	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("EXPIRED")); got != resource.ColorBroken {
-		t.Errorf("acm Color status=EXPIRED = %v, want ColorBroken", got)
-	}
-}
-
-// TestACMColor_Revoked_IsColorBroken verifies REVOKED → ColorBroken.
-func TestACMColor_Revoked_IsColorBroken(t *testing.T) {
-	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("REVOKED")); got != resource.ColorBroken {
-		t.Errorf("acm Color status=REVOKED = %v, want ColorBroken", got)
-	}
-}
-
-// TestACMColor_Failed_IsColorBroken verifies FAILED → ColorBroken.
-func TestACMColor_Failed_IsColorBroken(t *testing.T) {
-	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("FAILED")); got != resource.ColorBroken {
-		t.Errorf("acm Color status=FAILED = %v, want ColorBroken", got)
-	}
-}
-
-// TestACMColor_Inactive_IsColorDim verifies INACTIVE → ColorDim.
-func TestACMColor_Inactive_IsColorDim(t *testing.T) {
-	td := resource.FindResourceType("acm")
-	if got := td.Color(acmResource("INACTIVE")); got != resource.ColorDim {
-		t.Errorf("acm Color status=INACTIVE = %v, want ColorDim", got)
+	for _, status := range []string{
+		"VALIDATION_TIMED_OUT",
+		"ISSUED",
+		"PENDING_VALIDATION",
+		"EXPIRED",
+		"REVOKED",
+		"FAILED",
+		"INACTIVE",
+	} {
+		t.Run(status, func(t *testing.T) {
+			if got := td.Color(acmResource(status)); got != resource.ColorHealthy {
+				t.Errorf("acm Color status=%s = %v, want ColorHealthy; acmColor reads the status field again", status, got)
+			}
+		})
 	}
 }

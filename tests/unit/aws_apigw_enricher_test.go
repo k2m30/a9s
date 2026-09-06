@@ -26,15 +26,45 @@ import (
 )
 
 // apigwGetStagesFake implements APIGatewayV2API for enrichment testing.
-// It embeds the aggregate interface and overrides only GetStages.
-// The results map is keyed by API ID so the fake can serve different
+// It embeds the aggregate interface and answers the two calls the enricher
+// makes. The results map is keyed by API ID so the fake can serve different
 // responses per resource.
+//
+// GetAuthorizers is answered rather than left to the embedded nil interface:
+// the enricher calls every method of the aggregate it is given, and a nil
+// embedded field dereferences into a SIGSEGV that takes the whole unit
+// package down before any other test reports. The static
+// `var _ APIGatewayV2API` assertion cannot catch it, because embedding
+// satisfies the interface at compile time whether or not the field is set.
 type apigwGetStagesFake struct {
 	awsclient.APIGatewayV2API
 	// results maps API ID → slice of Stage.
 	results map[string][]apigwtypes.Stage
 	// errByID maps API ID → error; overrides results when set.
 	errByID map[string]error
+	// authorizers maps API ID → slice of Authorizer. A nil map means every
+	// API has one: these tests predate apigw.no-authorizer and are about the
+	// stage-config rows, so an unauthorized API would add a finding none of
+	// them is asking about. Set it to exercise row 18.
+	authorizers map[string][]apigwtypes.Authorizer
+}
+
+func (f *apigwGetStagesFake) GetAuthorizers(
+	_ context.Context,
+	in *apigatewayv2.GetAuthorizersInput,
+	_ ...func(*apigatewayv2.Options),
+) (*apigatewayv2.GetAuthorizersOutput, error) {
+	id := ""
+	if in != nil && in.ApiId != nil {
+		id = *in.ApiId
+	}
+	if f.authorizers == nil {
+		return &apigatewayv2.GetAuthorizersOutput{Items: []apigwtypes.Authorizer{{
+			AuthorizerId: aws.String("auth-default"),
+			Name:         aws.String("acme-jwt"),
+		}}}, nil
+	}
+	return &apigatewayv2.GetAuthorizersOutput{Items: f.authorizers[id]}, nil
 }
 
 func (f *apigwGetStagesFake) GetStages(

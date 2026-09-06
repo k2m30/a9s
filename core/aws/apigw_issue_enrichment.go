@@ -43,15 +43,15 @@ const (
 
 // S5 detail sentences for the apigw wave-2 findings.
 const (
-	apigwNoAuthorizerPublicDetail = "Anyone on the internet can call every route on this API, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it."
+	apigwNoAuthorizerPublicDetail = "Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it."
 
-	apigwNoAuthorizerDetail = "Nothing checks the caller's identity on this API, so any client that can reach the network it sits on can call every route. Attach an authorizer."
+	apigwNoAuthorizerDetail = "Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer."
 
 	apigwNoAccessLogsDetail = "The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group."
 
 	apigwTracingOffDetail = "Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage."
 
-	apigwStageVariableSecretDetail = "A stage variable holds what looks like a credential, and stage variables are readable by anyone who can describe the API. Move the value into Secrets Manager and reference it from the integration."
+	apigwStageVariableSecretDetail = "A stage variable holds what looks like a credential, and stage variables are readable by anyone who can read the gateway's configuration. Move the value into Secrets Manager and reference it from the integration."
 )
 
 // EnrichAPIGatewayStage calls GetStages per API (cap EnrichmentCap)
@@ -210,9 +210,10 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		}
 		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows)
 	})
-	// All API Gateway findings are severity "~" (informational).
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	// apigw.no-authorizer-public and apigw.stage-variable-secret are "!", so
+	// the cap now bounds the issue count and a capped pass must say so rather
+	// than under-report the badge.
+	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
 }
 

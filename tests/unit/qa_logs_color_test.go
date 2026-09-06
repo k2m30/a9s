@@ -11,6 +11,16 @@ package unit
 //   - stored_bytes=0 with old creation_time (>90d orphan) → ColorWarning.
 //   - Empty fields → ColorWarning (multiple defaults trigger Warning).
 
+// INVERTED for batch w6a. This table used to assert the colours colorLogs
+// picked by reading Fields directly. That branch is gone: colour now derives
+// from findings only, so a resource carrying no findings is Healthy whatever
+// its fields say, and the state each row names is reported by the finding the
+// fetcher emits for it (see prowler_w6a_*_test.go).
+//
+// The table is kept as the enumeration of states that must no longer colour a
+// row on their own. Do not "restore" the old wants — a raw-field branch coming
+// back is exactly what this now catches.
+
 import (
 	"testing"
 	"time"
@@ -98,8 +108,8 @@ func TestLogsColor(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := td.Color(resource.Resource{Fields: tc.fields})
-			if got != tc.want {
-				t.Errorf("Color(%v) = %v, want %v", tc.name, got, tc.want)
+			if got != resource.ColorHealthy {
+				t.Errorf("Color(%v) = %v, want ColorHealthy; the raw-field branch that returned %v is gone", tc.name, got, tc.want)
 			}
 		})
 	}
