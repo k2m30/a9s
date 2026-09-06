@@ -215,3 +215,44 @@ func TestW6AEveryFindingFiresOnItsNamedWitnessOnly(t *testing.T) {
 		})
 	}
 }
+
+// TestW6ADemoRowsRenderTheMappedWords pins rows 22 and 23 where they are read
+// rather than where they are computed: on the demo row the renderer consumes.
+//
+// The per-row tests drive enrichers over hand-built input, so they pass on a
+// value the demo never produces. These two rows exist because an SDK enum and
+// an empty field each reached a rendered surface once already.
+func TestW6ADemoRowsRenderTheMappedWords(t *testing.T) {
+	clients := demo.NewServiceClients()
+	byType, cache := buildVisibilityTypeCache(t)
+
+	for _, tc := range []struct {
+		short, witness, code, label, value string
+	}{
+		{"cf", fixtures.CFDeprecatedTLS, "cf.deprecated-tls", "Minimum TLS version", "TLS 1.0 (2016)"},
+		{"apigw", fixtures.APIGWRESTNoAuthorizer, "apigw.no-authorizer-public", "Endpoint", "edge"},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			td := resource.FindResourceType(tc.short)
+			if td == nil {
+				t.Fatalf("%s not registered", tc.short)
+			}
+			for _, res := range mergeWave2Findings(t, *td, byType[tc.short], cache, clients) {
+				if res.ID != tc.witness && res.Name != tc.witness {
+					continue
+				}
+				for _, row := range res.AttentionDetails[domain.FindingCode(tc.code)].Rows {
+					if row.Label != tc.label {
+						continue
+					}
+					if row.Value != tc.value {
+						t.Errorf("%s row %q = %q, want %q", tc.code, tc.label, row.Value, tc.value)
+					}
+					return
+				}
+				t.Fatalf("%s on %s carries no %q row", tc.code, tc.witness, tc.label)
+			}
+			t.Fatalf("witness %q not found among the %s demo rows", tc.witness, tc.short)
+		})
+	}
+}

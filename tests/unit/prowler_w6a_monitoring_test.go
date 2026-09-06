@@ -490,3 +490,28 @@ func w6aAssertRow(t *testing.T, r resource.Resource, code, label, value string) 
 	}
 	w2AssertRow(t, ad.Rows, label, value)
 }
+
+// TestW6ATrailLogBucket_MissingBucketIsSkippedNotUnlogged pins the one answer
+// the demo fake cannot give: a bucket that does not exist.
+//
+// S3 returns NoSuchBucket, and the enricher has to mark the trail unknown. The
+// demo fake answers every bucket name it is handed — an absent logging config
+// reads as an empty GetBucketLogging output, which is indistinguishable from
+// "logging is off" — so a trail pointing at an unfixtured bucket would show a
+// finding production never emits. Nothing else pins the difference.
+func TestW6ATrailLogBucket_MissingBucketIsSkippedNotUnlogged(t *testing.T) {
+	gone := &s3types.NoSuchBucket{Message: aws.String("NoSuchBucket: The specified bucket does not exist")}
+	res := w6aEnrichTrail(t,
+		&w6aTrailS3Fake{
+			statusErr:  map[string]error{"acme-deleted-audit-logs": gone},
+			loggingErr: map[string]error{"acme-deleted-audit-logs": gone},
+		},
+		w6aTrailRes("acme-orphan-bucket-trail", "acme-deleted-audit-logs"),
+	)
+
+	if !res.TruncatedIDs["acme-orphan-bucket-trail"] {
+		t.Error("a trail whose log bucket does not exist was not marked truncated")
+	}
+	w2AssertNoCode(t, res.Findings["acme-orphan-bucket-trail"], w6aTrailBucketNoAccess)
+	w2AssertNoCode(t, res.Findings["acme-orphan-bucket-trail"], w6aTrailBucketPublic)
+}
