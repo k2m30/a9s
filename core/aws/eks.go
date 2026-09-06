@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -200,19 +201,11 @@ func eksVersionCatalogue(ctx context.Context, api EKSAPI) map[string]ekstypes.Cl
 }
 
 // eksSupportWords renders a version status as the words AWS uses in its own
-// console. VersionStatus is the current field; the deprecated lowercase Status
-// is never read, because a reader that consults it sees "" for every version
-// and silently stops flagging anything.
+// console: EXTENDED_SUPPORT reads "extended support". The input is always
+// VersionStatus, never the deprecated lowercase Status, which AWS leaves empty
+// — a reader that consults it flags nothing and says nothing about why.
 func eksSupportWords(status ekstypes.VersionStatus) string {
-	switch status {
-	case ekstypes.VersionStatusExtendedSupport:
-		return "extended support"
-	case ekstypes.VersionStatusUnsupported:
-		return "unsupported"
-	case ekstypes.VersionStatusStandardSupport:
-		return "standard support"
-	}
-	return ""
+	return strings.ToLower(strings.ReplaceAll(string(status), "_", " "))
 }
 
 // addEKSPostureFindings evaluates the four w6b posture signals against the
@@ -227,20 +220,12 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 		// AWS defaults PublicAccessCidrs to 0.0.0.0/0 and omits it when it was
 		// never narrowed, so an empty list on a public endpoint is the open
 		// case rather than the unknown one.
-		open := len(vpc.PublicAccessCidrs) == 0
-		for _, cidr := range vpc.PublicAccessCidrs {
-			if cidr == "0.0.0.0/0" {
-				open = true
-			}
-		}
+		open := len(vpc.PublicAccessCidrs) == 0 || slices.Contains(vpc.PublicAccessCidrs, "0.0.0.0/0")
 		severity := domain.SevWarn
 		if open {
 			severity = domain.SevBroken
 		}
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeEKSPublicEndpoint, Phrase: "cluster endpoint reachable from the internet",
-			Detail: eksPublicEndpointDetail, Severity: severity, Source: "wave1",
-		})
+		addWave1Finding(r, CodeEKSPublicEndpoint, "cluster endpoint reachable from the internet", eksPublicEndpointDetail, severity)
 		ranges := "0.0.0.0/0"
 		if len(vpc.PublicAccessCidrs) > 0 {
 			ranges = strings.Join(vpc.PublicAccessCidrs, ", ")
@@ -271,10 +256,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 		}
 	}
 	if len(missing) > 0 {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeEKSControlPlaneLoggingOff, Phrase: "control plane logging incomplete",
-			Detail: eksControlPlaneLoggingOffDetail, Severity: domain.SevWarn, Source: "wave1",
-		})
+		addWave1Finding(r, CodeEKSControlPlaneLoggingOff, "control plane logging incomplete", eksControlPlaneLoggingOffDetail, domain.SevWarn)
 		addWave1Rows(r, CodeEKSControlPlaneLoggingOff, domain.DetailRow{
 			Label: "Not being sent", Value: strings.Join(missing, ", "), Tier: "~",
 		})
@@ -297,10 +279,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 		}
 	}
 	if !secretsEncrypted {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeEKSSecretsNotKMS, Phrase: "secrets not encrypted with KMS",
-			Detail: eksSecretsNotKMSDetail, Severity: domain.SevWarn, Source: "wave1",
-		})
+		addWave1Finding(r, CodeEKSSecretsNotKMS, "secrets not encrypted with KMS", eksSecretsNotKMSDetail, domain.SevWarn)
 	}
 
 	// A version absent from the catalogue, or a catalogue that could not be
@@ -310,10 +289,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 	if !known || info.VersionStatus == ekstypes.VersionStatusStandardSupport || info.VersionStatus == "" {
 		return
 	}
-	r.Findings = append(r.Findings, domain.Finding{
-		Code: CodeEKSVersionUnsupported, Phrase: "Kubernetes " + version + " is out of standard support",
-		Detail: eksVersionUnsupportedDetail, Severity: domain.SevBroken, Source: "wave1",
-	})
+	addWave1Finding(r, CodeEKSVersionUnsupported, "Kubernetes "+version+" is out of standard support", eksVersionUnsupportedDetail, domain.SevBroken)
 	support := eksSupportWords(info.VersionStatus)
 	if info.EndOfStandardSupportDate != nil {
 		support += ", standard support ended " + info.EndOfStandardSupportDate.Format("2006-01-02")

@@ -9,6 +9,7 @@ package aws
 import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // addWave1Rows attaches supporting rows to a Wave-1 Finding already appended
@@ -24,4 +25,28 @@ func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.
 	ad := r.AttentionDetails[code]
 	ad.Rows = append(ad.Rows, rows...)
 	r.AttentionDetails[code] = ad
+}
+
+// addWave1Finding appends a Wave-1 posture Finding. Every wave-1 fetcher in
+// the batch emits the same five fields with only the first four varying, so
+// the Source literal lives here once rather than at every call site.
+func addWave1Finding(r *resource.Resource, code domain.FindingCode, phrase, detail string, severity domain.Severity) {
+	r.Findings = append(r.Findings, domain.Finding{
+		Code: code, Phrase: phrase, Detail: detail, Severity: severity, Source: "wave1",
+	})
+}
+
+// addSecretScanFinding scans kv and, on any hit, emits the finding plus one
+// supporting row per hit. Rows carry Where and Kind only — the value never
+// reaches a rendered surface, which is the property worth having in one place
+// rather than repeated at each caller.
+func addSecretScanFinding(r *resource.Resource, code domain.FindingCode, phrase, detail string, kv map[string]string) {
+	hits := secretscan.ScanKV(kv)
+	if len(hits) == 0 {
+		return
+	}
+	addWave1Finding(r, code, phrase, detail, domain.SevBroken)
+	for _, h := range hits {
+		addWave1Rows(r, code, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+	}
 }

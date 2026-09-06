@@ -13,7 +13,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchCloudFormationStacksPage fetches a single page of CloudFormation stacks.
@@ -146,23 +145,12 @@ func addCFNPostureFindings(r *resource.Resource, stack cfntypes.Stack) {
 	// the setting on a child and deletes it with the root. Reporting it would
 	// name a setting the operator cannot change.
 	if stack.ParentId == nil && !aws.ToBool(stack.EnableTerminationProtection) {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off",
-			Detail: cfnTerminationProtectionOffDetail, Severity: domain.SevWarn, Source: "wave1",
-		})
+		addWave1Finding(r, CodeCFNTerminationProtectionOff, "termination protection off", cfnTerminationProtectionOffDetail, domain.SevWarn)
 	}
 
 	outputs := make(map[string]string, len(stack.Outputs))
 	for _, o := range stack.Outputs {
 		outputs[aws.ToString(o.OutputKey)] = aws.ToString(o.OutputValue)
 	}
-	if hits := secretscan.ScanKV(outputs); len(hits) > 0 {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs",
-			Detail: cfnOutputSecretDetail, Severity: domain.SevBroken, Source: "wave1",
-		})
-		for _, h := range hits {
-			addWave1Rows(r, CodeCFNOutputSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
-		}
-	}
+	addSecretScanFinding(r, CodeCFNOutputSecret, "credential in stack outputs", cfnOutputSecretDetail, outputs)
 }

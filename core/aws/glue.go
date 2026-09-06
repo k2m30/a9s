@@ -14,7 +14,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchGlueJobsPage fetches a single page of Glue jobs.
@@ -128,18 +127,12 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	// bookmark encryption all live on the security configuration a job either
 	// names or does not, so a job naming none fails all three at once.
 	if aws.ToString(job.SecurityConfiguration) == "" {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeGlueNoSecurityConfiguration, Phrase: "no security configuration",
-			Detail: glueNoSecurityConfigDetail, Severity: domain.SevWarn, Source: "wave1",
-		})
+		addWave1Finding(r, CodeGlueNoSecurityConfiguration, "no security configuration", glueNoSecurityConfigDetail, domain.SevWarn)
 	}
 
 	// The flag is a string, so "false" is off exactly as surely as absent.
 	if job.DefaultArguments[glueContinuousLogArgument] != "true" {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeGlueContinuousLoggingOff, Phrase: "continuous logging off",
-			Detail: glueContinuousLoggingOffDetail, Severity: domain.SevWarn, Source: "wave1",
-		})
+		addWave1Finding(r, CodeGlueContinuousLoggingOff, "continuous logging off", glueContinuousLoggingOffDetail, domain.SevWarn)
 		addWave1Rows(r, CodeGlueContinuousLoggingOff, domain.DetailRow{
 			Label: "Argument to add", Value: glueContinuousLogArgument, Tier: "~",
 		})
@@ -152,13 +145,5 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	for k, v := range job.DefaultArguments {
 		args[strings.TrimPrefix(k, "--")] = v
 	}
-	if hits := secretscan.ScanKV(args); len(hits) > 0 {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeGlueArgumentSecret, Phrase: "credential in job arguments",
-			Detail: glueArgumentSecretDetail, Severity: domain.SevBroken, Source: "wave1",
-		})
-		for _, h := range hits {
-			addWave1Rows(r, CodeGlueArgumentSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
-		}
-	}
+	addSecretScanFinding(r, CodeGlueArgumentSecret, "credential in job arguments", glueArgumentSecretDetail, args)
 }

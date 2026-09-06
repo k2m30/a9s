@@ -14,7 +14,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchCodeBuildProjectsPage fetches one page of project names from ListProjects
@@ -182,25 +181,16 @@ func cbSourceLocationCredential(src *cbtypes.ProjectSource) (string, bool) {
 // findings.
 func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 	if project.ProjectVisibility == cbtypes.ProjectVisibilityTypePublicRead {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeCBPublicBuilds, Phrase: "build results publicly visible",
-			Detail: cbPublicBuildsDetail, Severity: domain.SevBroken, Source: "wave1",
-		})
+		addWave1Finding(r, CodeCBPublicBuilds, "build results publicly visible", cbPublicBuildsDetail, domain.SevBroken)
 	}
 
 	if spec, ok := cbBuildspecFromSource(project.Source); ok {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository",
-			Detail: cbBuildspecFromSourceDetail, Severity: domain.SevWarn, Source: "wave1",
-		})
+		addWave1Finding(r, CodeCBBuildspecFromSource, "buildspec taken from the source repository", cbBuildspecFromSourceDetail, domain.SevWarn)
 		addWave1Rows(r, CodeCBBuildspecFromSource, domain.DetailRow{Label: "Buildspec", Value: spec, Tier: "~"})
 	}
 
 	if redacted, ok := cbSourceLocationCredential(project.Source); ok {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address",
-			Detail: cbSourceURLCredentialDetail, Severity: domain.SevBroken, Source: "wave1",
-		})
+		addWave1Finding(r, CodeCBSourceURLCredential, "credential in the source repository address", cbSourceURLCredentialDetail, domain.SevBroken)
 		addWave1Rows(r, CodeCBSourceURLCredential, domain.DetailRow{Label: "Repository", Value: redacted, Tier: "!"})
 	}
 
@@ -216,13 +206,5 @@ func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 			plaintext[aws.ToString(ev.Name)] = aws.ToString(ev.Value)
 		}
 	}
-	if hits := secretscan.ScanKV(plaintext); len(hits) > 0 {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeCBEnvSecret, Phrase: "credential in environment variables",
-			Detail: cbEnvSecretDetail, Severity: domain.SevBroken, Source: "wave1",
-		})
-		for _, h := range hits {
-			addWave1Rows(r, CodeCBEnvSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
-		}
-	}
+	addSecretScanFinding(r, CodeCBEnvSecret, "credential in environment variables", cbEnvSecretDetail, plaintext)
 }
