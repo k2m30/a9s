@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -119,5 +118,5 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 // longer exists — the expected race between listing and describing.
 func isKinesisStreamGone(err error) bool {
 	var notFound *kinesistypes.ResourceNotFoundException
-	return errors.As(err, &notFound) || strings.Contains(err.Error(), "ResourceNotFoundException")
+	return errors.As(err, &notFound)
 }

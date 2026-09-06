@@ -14,24 +14,26 @@ import (
 // environment each for managed platform updates off
 // (eb.managed-updates-off), basic health reporting
 // (eb.enhanced-health-off) and no log streaming (eb.cloudwatch-logs-off).
-// Every other environment has all three turned on.
 // The eb rows are keyed by environment ID, which is what the list renders
-// and what the witness gate compares against. All three name environments
-// that already existed: an environment's configuration is orthogonal to its
-// health, so the settings ride on three ordinary Ready environments rather
-// than on three new rows nobody would otherwise look at.
+// and what the witness gate compares against.
+//
+// All three are Green and Ready and carry no other finding. A configuration
+// signal is severity "~", so an environment already reporting a health
+// warning would render THAT phrase in its Status cell and the configuration
+// phrase would reach no list row at all — the finding would exist and be
+// invisible where an operator looks for it.
 const (
-	EBManagedUpdatesOff = "e-acmestagapi"
-	EBEnhancedHealthOff = "e-acmeprodweb"
-	EBCWLogsOff         = "e-acmelegacy"
+	EBManagedUpdatesOff = "e-acmeprodapi"
+	EBEnhancedHealthOff = "e-acmeprodwkr"
+	EBCWLogsOff         = "e-acmestagweb"
 )
 
 // The environment names those three rows carry, used as the
 // ConfigurationSettings keys the enricher addresses them by.
 const (
-	ebEnvUnmanaged   = "acme-staging-api"
-	ebEnvBasicHealth = "acme-prod-web"
-	ebEnvNoLogs      = "acme-legacy-worker"
+	ebEnvUnmanaged   = "acme-prod-api"
+	ebEnvBasicHealth = "acme-prod-worker"
+	ebEnvNoLogs      = "acme-staging-web"
 )
 
 // ebRegion/ebAccountID back every synthetic EnvironmentArn below — the eb
@@ -97,12 +99,17 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 							OptionName: aws.String("ServiceRole"),
 							Value:      aws.String("acme-ci-deploy-role"),
 						},
+						// EBManagedUpdatesOff rides this environment, so its
+						// three settings sit alongside the pivot options
+						// above rather than replacing them.
+						ebManagedActionsOption("false"),
+						ebHealthSystemOption("enhanced"),
+						ebStreamLogsOption("true"),
 					},
 				},
 			},
-			"acme-api/" + ebEnvUnmanaged:   ebOptionSet("acme-api", ebEnvUnmanaged, "false", "enhanced", "true"),
-			"acme-web/" + ebEnvBasicHealth: ebOptionSet("acme-web", ebEnvBasicHealth, "true", "basic", "true"),
-			"acme-worker/" + ebEnvNoLogs:   ebOptionSet("acme-worker", ebEnvNoLogs, "true", "enhanced", "false"),
+			"acme-worker/" + ebEnvBasicHealth: ebOptionSet("acme-worker", ebEnvBasicHealth, "true", "basic", "true"),
+			"acme-web/" + ebEnvNoLogs:         ebOptionSet("acme-web", ebEnvNoLogs, "true", "enhanced", "false"),
 		},
 		// EnvironmentResources — required for eb:elb and eb:tg related-panel
 		// pivot witnesses (checkEbELB / checkEbTG). acme-prod-web is a real
@@ -153,23 +160,35 @@ func ebOptionSet(app, env, managedActions, healthSystem, streamLogs string) []eb
 		ApplicationName: aws.String(app),
 		EnvironmentName: aws.String(env),
 		OptionSettings: []ebtypes.ConfigurationOptionSetting{
-			{
-				Namespace:  aws.String("aws:elasticbeanstalk:managedactions"),
-				OptionName: aws.String("ManagedActionsEnabled"),
-				Value:      aws.String(managedActions),
-			},
-			{
-				Namespace:  aws.String("aws:elasticbeanstalk:healthreporting:system"),
-				OptionName: aws.String("SystemType"),
-				Value:      aws.String(healthSystem),
-			},
-			{
-				Namespace:  aws.String("aws:elasticbeanstalk:cloudwatch:logs"),
-				OptionName: aws.String("StreamLogs"),
-				Value:      aws.String(streamLogs),
-			},
+			ebManagedActionsOption(managedActions),
+			ebHealthSystemOption(healthSystem),
+			ebStreamLogsOption(streamLogs),
 		},
 	}}
+}
+
+func ebManagedActionsOption(v string) ebtypes.ConfigurationOptionSetting {
+	return ebtypes.ConfigurationOptionSetting{
+		Namespace:  aws.String("aws:elasticbeanstalk:managedactions"),
+		OptionName: aws.String("ManagedActionsEnabled"),
+		Value:      aws.String(v),
+	}
+}
+
+func ebHealthSystemOption(v string) ebtypes.ConfigurationOptionSetting {
+	return ebtypes.ConfigurationOptionSetting{
+		Namespace:  aws.String("aws:elasticbeanstalk:healthreporting:system"),
+		OptionName: aws.String("SystemType"),
+		Value:      aws.String(v),
+	}
+}
+
+func ebStreamLogsOption(v string) ebtypes.ConfigurationOptionSetting {
+	return ebtypes.ConfigurationOptionSetting{
+		Namespace:  aws.String("aws:elasticbeanstalk:cloudwatch:logs"),
+		OptionName: aws.String("StreamLogs"),
+		Value:      aws.String(v),
+	}
 }
 
 func buildEBEnvironments() []ebtypes.EnvironmentDescription {
@@ -273,6 +292,50 @@ func buildEBEnvironments() []ebtypes.EnvironmentDescription {
 			CNAME:             aws.String("acme-batch-worker-old.us-east-1.elasticbeanstalk.com"),
 			DateCreated:       aws.Time(mustTime("2023-02-15T10:00:00Z")),
 			DateUpdated:       aws.Time(mustTime("2026-05-01T09:00:00Z")),
+		},
+		// EBEnhancedHealthOff and EBCWLogsOff. Green and Ready, so the
+		// configuration phrase is the only thing in their Status cell.
+		{
+			EnvironmentName:   aws.String(ebEnvBasicHealth),
+			EnvironmentId:     aws.String(EBEnhancedHealthOff),
+			ApplicationName:   aws.String("acme-worker"),
+			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-worker/" + ebEnvBasicHealth),
+			VersionLabel:      aws.String("v3.1.0"),
+			SolutionStackName: aws.String("64bit Amazon Linux 2023 v4.0.1 running Docker"),
+			Health:            ebtypes.EnvironmentHealthGreen,
+			Status:            ebtypes.EnvironmentStatusReady,
+			CNAME:             aws.String(ebEnvBasicHealth + ".us-east-1.elasticbeanstalk.com"),
+			DateCreated:       aws.Time(mustTime("2025-06-01T09:00:00Z")),
+			DateUpdated:       aws.Time(mustTime("2026-06-01T09:00:00Z")),
+		},
+		// The healthy bucket's own row: Green, Ready, and with no
+		// ConfigurationSettings entry, so all three settings read as unknown
+		// and it carries no finding at all.
+		{
+			EnvironmentName:   aws.String("acme-prod-events"),
+			EnvironmentId:     aws.String("e-acmeprodevents"),
+			ApplicationName:   aws.String("acme-api"),
+			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-api/acme-prod-events"),
+			VersionLabel:      aws.String("v1.9.3"),
+			SolutionStackName: aws.String("64bit Amazon Linux 2023 v4.0.1 running Docker"),
+			Health:            ebtypes.EnvironmentHealthGreen,
+			Status:            ebtypes.EnvironmentStatusReady,
+			CNAME:             aws.String("acme-prod-events.us-east-1.elasticbeanstalk.com"),
+			DateCreated:       aws.Time(mustTime("2025-08-19T09:00:00Z")),
+			DateUpdated:       aws.Time(mustTime("2026-06-03T09:00:00Z")),
+		},
+		{
+			EnvironmentName:   aws.String(ebEnvNoLogs),
+			EnvironmentId:     aws.String(EBCWLogsOff),
+			ApplicationName:   aws.String("acme-web"),
+			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-web/" + ebEnvNoLogs),
+			VersionLabel:      aws.String("v2.2.0"),
+			SolutionStackName: aws.String("64bit Amazon Linux 2023 v4.0.1 running Docker"),
+			Health:            ebtypes.EnvironmentHealthGreen,
+			Status:            ebtypes.EnvironmentStatusReady,
+			CNAME:             aws.String(ebEnvNoLogs + ".us-east-1.elasticbeanstalk.com"),
+			DateCreated:       aws.Time(mustTime("2025-07-12T09:00:00Z")),
+			DateUpdated:       aws.Time(mustTime("2026-06-02T09:00:00Z")),
 		},
 	}
 }

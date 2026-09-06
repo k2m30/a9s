@@ -123,6 +123,11 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 		if name == "" || app == "" {
 			return
 		}
+		// Rule 4: an environment being torn down has no posture worth
+		// reporting, and its settings are about to stop existing.
+		if ebLifecycleEnded(r.Fields["status"]) {
+			return
+		}
 		key := r.ID
 		if key == "" {
 			key = name
@@ -168,4 +173,11 @@ func ebOptionValue(options []ebtypes.ConfigurationOptionSetting, namespace, name
 		}
 	}
 	return "", false
+}
+
+// ebLifecycleEnded reports whether an environment is on its way out, or
+// already gone. Fields["status"] carries the raw DescribeEnvironments value.
+func ebLifecycleEnded(status string) bool {
+	return status == string(ebtypes.EnvironmentStatusTerminating) ||
+		status == string(ebtypes.EnvironmentStatusTerminated)
 }

@@ -126,6 +126,9 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | Recent failed execution (single) | 2 | Warning | `~` | S3, S4, S5 | `last run failed` |
 | Consecutive failed executions (failure loop) | 2 | Broken | `!` | S1, S3, S4, S5 | `failing: consecutive failures` |
+| `LoggingConfiguration` absent or level OFF | 2 | Warning | `~` | S3, S4, S5 | `execution logging off` |
+| `EncryptionConfiguration` not a customer managed key | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with a customer key` |
+| a credential in the `Definition` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in state machine definition` |
 
 ## 4.1 UX review (two sentences)
 

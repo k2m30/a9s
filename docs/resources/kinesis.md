@@ -129,6 +129,8 @@ One row per signal from §3:
 | `StreamStatus == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
 | `StreamStatus == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating: resharding` |
 | `StreamStatus == DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `EncryptionType` NONE or absent | 2 | Warning | `~` | S3, S4, S5 | `not encrypted at rest` |
+| `RetentionPeriodHours` at or below the 24-hour default | 2 | Warning | `~` | S3, S4, S5 | `24h retention` |
 
 Rules for filling list and detail text:
 

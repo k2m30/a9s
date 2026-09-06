@@ -180,6 +180,8 @@ One row per signal from §3:
 | `State == HEALING` | 1 | Warning | n/a | S2, S4 | `healing broker` |
 | `State == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting` |
 | `State == FAILED` | 1 | Broken | n/a | S2, S4 | `failed: <StateInfo.Code>` |
+| `PublicAccess.Type` publishes the brokers | 2 | Broken | `!` | S1, S3, S4, S5 | `brokers reachable from the internet` |
+| `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S3, S4, S5 | `unauthenticated access allowed` |
 
 Notes:
 

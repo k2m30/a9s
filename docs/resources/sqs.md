@@ -144,6 +144,8 @@ One row per signal from §3:
 | `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `oldest msg age: <D>` |
 | `is-DLQ with messages` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `DLQ has <N> msgs` |
 | `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S4, S5 | `no DLQ configured` |
+| `KmsMasterKeyId` unset | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
+| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `queue policy open to anyone` |
 
 ## 4.1 UX review
 

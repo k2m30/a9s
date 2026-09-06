@@ -142,6 +142,7 @@ One row per signal from §3:
 | `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account PROBATION` |
 | `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `account SHUTDOWN` |
 | `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S1, S2, S3, S4, S5 | `quota 80%+ used` |
+| a domain identity not signing its outbound mail | 2 | Warning | `~` | S3, S4, S5 | `DKIM not enabled` |
 
 Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the account, not any single identity — a9s-devops: surface the finding on **every** identity row's S4 with the compact `account ...:` prefix so a glance at the list correctly attributes the problem to the account, not the identity; S1 counts the account-level finding once, not N times.
 

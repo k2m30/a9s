@@ -21,7 +21,7 @@ func backupDefaultViews() map[string]ViewDef {
 		"ses": {
 			List: []ListColumn{
 				{Title: "Identity", Path: "IdentityName", Width: 36},
-				{Title: "Type", Path: "IdentityType", Width: 16},
+				{Title: "Type", Key: "identity_type", Width: 16},
 				{Title: "Status", Key: "status", Width: 36},
 			},
 			Detail: []DetailField{

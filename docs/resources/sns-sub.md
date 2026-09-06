@@ -101,6 +101,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `SubscriptionArn == "PendingConfirmation"` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `pending confirmation` |
+| `Protocol == "http"` | 1 | Warning | `~` | S2, S4, S5 | `delivers over plain HTTP` |
 
 ### 4.1 UX review (two sentences)
 

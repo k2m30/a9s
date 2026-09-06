@@ -111,7 +111,8 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | zero subscriptions on the topic | 2 | Warning | `~` | S3, S4, S5 | `no subscribers` |
 | all subscriptions unconfirmed | 2 | Warning | `~` | S3, S4, S5 | `all pending confirmation` |
-| `KmsMasterKeyId absent on sensitive topic` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S3, S4, S5 (pending trigger definition) | `not encrypted` |
+| `KmsMasterKeyId` absent or empty | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
+| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `topic policy open to anyone` |
 
 ## 4.1 UX review
 

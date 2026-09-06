@@ -3,7 +3,7 @@ list:
     path: IdentityName
     width: 36
   Type:
-    path: IdentityType
+    key: identity_type
     width: 16
   Status:
     key: status

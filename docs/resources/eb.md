@@ -162,6 +162,9 @@ One row per signal from §3:
 | `Health == Red` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `unresponsive: 3+ health checks failed` |
 | `Status == Terminated` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `terminated` |
 | `Causes[]` non-empty | 2 | Warning (adds detail to an existing non-green row) | n/a | S4 (dedupe), S5 | `<first Cause, truncated to 40 chars>` |
+| managed platform updates not enabled | 2 | Warning | `~` | S3, S4, S5 | `managed platform updates off` |
+| health reporting not `enhanced` | 2 | Warning | `~` | S3, S4, S5 | `enhanced health reporting off` |
+| log streaming to CloudWatch not enabled | 2 | Warning | `~` | S3, S4, S5 | `log streaming to CloudWatch off` |
 
 Notes on the `Causes[]` row:
 
