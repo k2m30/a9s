@@ -342,14 +342,3 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 	}
 	return relatedResult("s3", buckets)
 }
-
-// ebRelatedResources returns the resource list for target from cache or fetches it.
-func ebRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}

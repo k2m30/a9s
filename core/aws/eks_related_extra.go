@@ -45,7 +45,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if clusterName == "" {
 		return resource.KnownRelated("asg", nil, false)
 	}
-	ngList, truncated, err := eksRelatedResourcesExtra(ctx, clients, cache, "ng")
+	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -82,7 +82,7 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	if clusterName == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := eksRelatedResourcesExtra(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -302,18 +302,6 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	// Errored) keeps the row actionable rather than discarding confirmed
 	// matches as a dead end.
 	return relatedResultTrunc("ec2", ids, ngAggErr != nil)
-}
-
-// eksRelatedResourcesExtra — companion helper so we don't duplicate the
-// pattern from eks_related.go.
-func eksRelatedResourcesExtra(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // autoscalingEC2InstanceID is a local type helper to keep ec2types in scope.

@@ -29,7 +29,7 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("lambda", nil, false)
 	}
 
-	lambdaList, truncated, err := ecrRelatedResources(ctx, clients, cache, "lambda")
+	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -61,7 +61,7 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 		return resource.KnownRelated("cb", nil, false)
 	}
 
-	cbList, truncated, err := ecrRelatedResources(ctx, clients, cache, "cb")
+	cbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cb")
 	if err != nil {
 		return resource.ErrorRelated("cb", err)
 	}
@@ -94,7 +94,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.KnownRelated("cfn", nil, false)
 	}
 
-	cfnList, truncated, err := ecrRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}

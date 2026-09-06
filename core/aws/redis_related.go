@@ -539,8 +539,12 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 	if cc == nil || cc.CacheSubnetGroupName == nil || *cc.CacheSubnetGroupName == "" {
 		return nil, nil
 	}
+	// A member cluster came back, so redisMemberCluster already proved the
+	// ElastiCache client is usable; only the typed pointer is needed again,
+	// and an unchecked assertion would panic into the "?" this file just
+	// stopped rendering.
 	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil || c.ElastiCache == nil {
+	if !cok {
 		return nil, errRedisNoGroupDetail
 	}
 	name := *cc.CacheSubnetGroupName

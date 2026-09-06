@@ -21,7 +21,7 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	if repoName == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := ecrRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -49,7 +49,7 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 	if repoName == "" {
 		return resource.KnownRelated("ecs-task", nil, false)
 	}
-	taskList, truncated, err := ecrRelatedResources(ctx, clients, cache, "ecs-task")
+	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
 		return resource.ErrorRelated("ecs-task", err)
 	}
@@ -254,16 +254,4 @@ func addRoleARNs(raw json.RawMessage, seen map[string]struct{}) {
 // isRoleARN returns true if s is an IAM role ARN (arn:aws:iam::*:role/*).
 func isRoleARN(s string) bool {
 	return strings.HasPrefix(s, "arn:") && strings.Contains(s, ":role/")
-}
-
-// ecrRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func ecrRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
