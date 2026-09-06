@@ -21,6 +21,10 @@ const CodeSNSSubPendingConfirmation domain.FindingCode = "sns-sub.state.pending-
 // endpoint has been deleted.
 const CodeSNSSubDeleted domain.FindingCode = "sns-sub.state.deleted"
 
+// CodeSNSSubPlainHTTP is the canonical FindingCode for a subscription that
+// delivers over unencrypted HTTP.
+const CodeSNSSubPlainHTTP domain.FindingCode = "sns-sub.plain-http"
+
 // FetchSNSSubscriptionsPage fetches a single page of SNS subscriptions.
 func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &sns.ListSubscriptionsInput{}
@@ -71,7 +75,7 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 				"endpoint":         endpoint,
 				"subscription_arn": subscriptionArn,
 			},
-			Findings:  snsSubStateFindings(subscriptionArn),
+			Findings:  snsSubFindings(subscriptionArn, protocol),
 			RawStruct: sub,
 		}
 
@@ -104,6 +108,15 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// snsSubFindings is the single source of every sns-sub wave-1 finding: the
+// fetcher calls it over the SDK subscription, and colorSNSSub calls it again
+// over the row's own Fields when a cache-restored row arrives with no
+// Findings attached. Both arguments are therefore Fields keys, never SDK
+// structs, so the two paths cannot disagree.
+func snsSubFindings(subscriptionArn, protocol string) []domain.Finding {
+	return snsSubStateFindings(subscriptionArn)
 }
 
 // snsSubStateFindings mirrors colorSNSSub's own precedence: AWS returns the

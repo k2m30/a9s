@@ -19,7 +19,8 @@ import (
 
 // sqs canonical FindingCodes.
 const (
-	sqsCodeMissingDLQ domain.FindingCode = "sqs.missing-dlq"
+	sqsCodeMissingDLQ   domain.FindingCode = "sqs.missing-dlq"
+	sqsCodePublicPolicy domain.FindingCode = "sqs.public-policy"
 )
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)

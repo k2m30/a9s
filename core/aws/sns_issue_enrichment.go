@@ -19,6 +19,8 @@ import (
 const (
 	snsCodeNoSubscribers domain.FindingCode = "sns.no-subscribers"
 	snsCodeAllPending    domain.FindingCode = "sns.all-pending-confirmation"
+	snsCodePublicPolicy  domain.FindingCode = "sns.public-policy"
+	snsCodeNoKMS         domain.FindingCode = "sns.no-kms"
 )
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)

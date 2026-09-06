@@ -10,6 +10,15 @@ import (
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 )
 
+// KinesisUnencrypted names the one demo stream with no encryption at rest
+// (kinesis.unencrypted), and KinesisMinRetention the one stream still on the
+// 24-hour default (kinesis.min-retention). Every other stream is KMS
+// encrypted and retains longer than a day.
+const (
+	KinesisUnencrypted  = "kinesis-unencrypted"
+	KinesisMinRetention = "kinesis-min-retention"
+)
+
 // KinesisFixtures holds typed fixture data for Kinesis.
 type KinesisFixtures struct {
 	Streams []kinesistypes.StreamSummary

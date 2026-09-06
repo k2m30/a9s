@@ -10,6 +10,17 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 )
 
+// EBManagedUpdatesOff, EBEnhancedHealthOff and EBCWLogsOff name the one demo
+// environment each for managed platform updates off
+// (eb.managed-updates-off), basic health reporting
+// (eb.enhanced-health-off) and no log streaming (eb.cloudwatch-logs-off).
+// Every other environment has all three turned on.
+const (
+	EBManagedUpdatesOff = "acme-eb-unmanaged"
+	EBEnhancedHealthOff = "acme-eb-basic-health"
+	EBCWLogsOff         = "acme-eb-no-logs"
+)
+
 // ebRegion/ebAccountID back every synthetic EnvironmentArn below — the eb
 // ConsoleURL builder (core/aws/catalog_messaging.go) parses app/env out of
 // EnvironmentArn, so every environment fixture needs a well-formed one.

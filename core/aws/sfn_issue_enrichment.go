@@ -21,6 +21,10 @@ import (
 // sfn canonical FindingCodes.
 const (
 	sfnCodeLatestExecutionFailed domain.FindingCode = "sfn.latest-execution-failed"
+	sfnCodeLoggingOff            domain.FindingCode = "sfn.logging-off"
+	sfnCodeNoCMK                 domain.FindingCode = "sfn.no-cmk"
+	//nolint:gosec // G101 false positive: a finding code, not a credential
+	sfnCodeDefinitionSecret domain.FindingCode = "sfn.definition-secret"
 )
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).

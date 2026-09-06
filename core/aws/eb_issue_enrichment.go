@@ -19,6 +19,9 @@ import (
 // eb canonical FindingCodes.
 const (
 	ebCodeEnvironmentCauses domain.FindingCode = "eb.environment-causes"
+	ebCodeManagedUpdatesOff domain.FindingCode = "eb.managed-updates-off"
+	ebCodeEnhancedHealthOff domain.FindingCode = "eb.enhanced-health-off"
+	ebCodeCWLogsOff         domain.FindingCode = "eb.cloudwatch-logs-off"
 )
 
 // EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic

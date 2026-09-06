@@ -10,6 +10,18 @@ import (
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 )
 
+// SFNLoggingOff, SFNNoCMK and SFNDefinitionSecret name the one demo state
+// machine each for execution logging off (sfn.logging-off), AWS-owned-key
+// encryption (sfn.no-cmk) and a credential in the definition
+// (sfn.definition-secret). Every other state machine logs at ALL, uses a
+// customer managed key, and has a clean definition.
+const (
+	SFNLoggingOff = "sfn-logging-off"
+	SFNNoCMK      = "sfn-no-cmk"
+	//nolint:gosec // G101 false positive: a fixture resource name, not a credential
+	SFNDefinitionSecret = "sfn-definition-secret"
+)
+
 // SFNFixtures holds typed fixture data for Step Functions (SFN).
 type SFNFixtures struct {
 	StateMachines []sfntypes.StateMachineListItem

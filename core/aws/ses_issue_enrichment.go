@@ -18,6 +18,7 @@ const (
 	sesCodeShutdown  domain.FindingCode = "ses.account-shutdown"
 	sesCodeProbation domain.FindingCode = "ses.account-probation"
 	sesCodeQuota     domain.FindingCode = "ses.quota-high"
+	sesCodeDKIMOff   domain.FindingCode = "ses.dkim-off"
 )
 
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates

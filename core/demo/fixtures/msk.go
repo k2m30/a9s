@@ -10,6 +10,15 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 )
 
+// MSKPublic names the one demo cluster whose brokers are published to the
+// internet (msk.public-access), and MSKUnauthenticated the one cluster
+// accepting clients with no credentials (msk.unauthenticated). Every other
+// cluster keeps public access off and unauthenticated access disabled.
+const (
+	MSKPublic          = "msk-public"
+	MSKUnauthenticated = "msk-unauthenticated"
+)
+
 // MSKFixtures holds typed fixture data for MSK (Managed Streaming for Kafka).
 type MSKFixtures struct {
 	Clusters []kafkatypes.Cluster

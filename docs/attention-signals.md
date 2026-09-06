@@ -117,7 +117,7 @@ resource-list frame title. The frame-title rules:
 | `sns` | SNS Topics | None — `ListTopics` returns ARN only | `ListSubscriptionsByTopic` per topic: zero subscriptions → Warning (orphan topic); all subscriptions stuck `PendingConfirmation` → Warning; `KmsMasterKeyId` absent on sensitive topic → Warning — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | CloudWatch `NumberOfNotificationsFailed` | [GetTopicAttributes](https://docs.aws.amazon.com/sns/latest/api/API_GetTopicAttributes.html) |
 | `sns-sub` | SNS Subscriptions | `SubscriptionArn == "PendingConfirmation"` → Warning (never confirmed); `SubscriptionArn == "Deleted"` → Dim (endpoint deleted) | None | `GetSubscriptionAttributes` per subscription (DLQ); CloudWatch `NumberOfNotificationsFailed` per endpoint | [ListSubscriptions](https://docs.aws.amazon.com/sns/latest/api/API_ListSubscriptions.html) |
 | `eb-rule` | EventBridge Rules | `State`: `ENABLED`→Healthy; `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`→Healthy; `DISABLED`→Dim (admin-off) | `ListTargetsByRule` per rule: rule `State==ENABLED` AND `len(Targets)==0` → Broken (rule matches but goes nowhere); rule `State==DISABLED` AND `len(Targets)>0` → Warning (disabled rule with targets — probable oversight); any target without `DeadLetterConfig` → Warning | CloudWatch `FailedInvocations`/`ThrottledRules` per rule | [ListTargetsByRule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListTargetsByRule.html) |
-| `kinesis` | Kinesis Streams | `StreamStatus`: `ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`→Warning | None | CloudWatch `GetRecords.IteratorAgeMilliseconds` (consumer lag), `WriteProvisionedThroughputExceeded`, `ReadProvisionedThroughputExceeded` | [DescribeStreamSummary](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_DescribeStreamSummary.html) |
+| `kinesis` | Kinesis Streams | `StreamStatus`: `ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`→Warning | `DescribeStreamSummary` per stream: no encryption at rest, or retention still at the 24-hour default → Warning | CloudWatch `GetRecords.IteratorAgeMilliseconds` (consumer lag), `WriteProvisionedThroughputExceeded`, `ReadProvisionedThroughputExceeded` | [DescribeStreamSummary](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_DescribeStreamSummary.html) |
 <!-- amended by a9s-resource-spec during msk gen: SDK kafka/types.ClusterState enum also defines HEALING (auto-broker-replacement); bucketed Warning by operator semantics (capacity degraded during auto-heal). -->
 | `msk` | MSK Clusters | `State`: `ACTIVE`→Healthy; `CREATING`/`UPDATING`/`MAINTENANCE`/`REBOOTING_BROKER`/`HEALING`→Warning; `DELETING`→Dim; `FAILED`→Broken | `DescribeClusterV2` per provisioned cluster (serverless skipped): Kafka version < 2.8 → Warning (`broker software outdated`); `EncryptionInfo.EncryptionInTransit.ClientBroker != TLS` → Warning (`encryption in transit not enforced`). Per-broker runtime state stays unobservable (`ListNodes` returns node metadata but no `RUNNING` enum) | CloudWatch `ActiveControllerCount`, `OfflinePartitionsCount`, `UnderReplicatedPartitions`, `KafkaDataLogsDiskUsed` | [ListClustersV2](https://docs.aws.amazon.com/msk/1.0/apireference/v2-clusters.html) |
 | `sfn` | Step Functions | None — `ListStateMachines` is config-only | `ListExecutions(maxResults=1)` per state machine (EXPRESS machines skipped — the API rejects them): latest execution `FAILED`/`TIMED_OUT`/`ABORTED` → Broken | CloudWatch `ExecutionsFailed`/`ExecutionsTimedOut`/`ExecutionThrottled` trend | [ListExecutions](https://docs.aws.amazon.com/step-functions/latest/apireference/API_ListExecutions.html) |
@@ -499,10 +499,14 @@ resource-list frame title. The frame-title rules:
 | ct-events | ct\_event.severity.attention | root account activity | warn | wave1 |
 | ct-events | ct\_event.severity.info | routine event | dim | wave1 |
 | sqs | sqs.missing-dlq | no DLQ configured | warn | wave2 |
+| sqs | sqs.public-policy | queue policy open to anyone | broken | wave2 |
 | sns | sns.no-subscribers | topic has no subscribers | warn | wave2 |
 | sns | sns.all-pending-confirmation | all pending confirmation | warn | wave2 |
+| sns | sns.public-policy | topic policy open to anyone | broken | wave2 |
+| sns | sns.no-kms | not encrypted with KMS | warn | wave2 |
 | sns-sub | sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 |
 | sns-sub | sns-sub.state.deleted | endpoint deleted | dim | wave1 |
+| sns-sub | sns-sub.plain-http | delivers over plain HTTP | warn | wave1 |
 | eb | eb.health.red | health: red | broken | wave1 |
 | eb | eb.health.yellow | health: yellow | warn | wave1 |
 | eb | eb.health.grey | health: grey | warn | wave1 |
@@ -510,11 +514,16 @@ resource-list frame title. The frame-title rules:
 | eb | eb.status.launching | launching | warn | wave1 |
 | eb | eb.status.terminating | terminating | dim | wave1 |
 | eb | eb.environment-causes | EB causes: <first cause> | warn | wave2 |
+| eb | eb.managed-updates-off | managed platform updates off | warn | wave2 |
+| eb | eb.enhanced-health-off | enhanced health reporting off | warn | wave2 |
+| eb | eb.cloudwatch-logs-off | log streaming to CloudWatch off | warn | wave2 |
 | eb-rule | eb-rule.state.disabled | disabled | dim | wave1 |
 | eb-rule | eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 |
 | kinesis | kinesis.warn.creating | creating | warn | wave1 |
 | kinesis | kinesis.warn.updating | updating | warn | wave1 |
 | kinesis | kinesis.warn.deleting | deleting | warn | wave1 |
+| kinesis | kinesis.unencrypted | not encrypted at rest | warn | wave2 |
+| kinesis | kinesis.min-retention | 24h retention | warn | wave2 |
 | msk | msk.warn.creating | creating | warn | wave1 |
 | msk | msk.warn.updating | updating | warn | wave1 |
 | msk | msk.warn.maintenance | maintenance | warn | wave1 |
@@ -524,7 +533,12 @@ resource-list frame title. The frame-title rules:
 | msk | msk.broken.failed | failed | broken | wave1 |
 | msk | msk.broker-outdated | broker software outdated | warn | wave2 |
 | msk | msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 |
+| msk | msk.public-access | brokers reachable from the internet | broken | wave2 |
+| msk | msk.unauthenticated | unauthenticated access allowed | broken | wave2 |
 | sfn | sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 |
+| sfn | sfn.logging-off | execution logging off | warn | wave2 |
+| sfn | sfn.no-cmk | not encrypted with a customer key | warn | wave2 |
+| sfn | sfn.definition-secret | credential in state machine definition | broken | wave2 |
 | ses | ses.verification.failed | verification failed | broken | wave1 |
 | ses | ses.verification.temp\_failure | verify: temp failure | broken | wave1 |
 | ses | ses.verification.not\_started | verification not started | broken | wave1 |
@@ -533,6 +547,7 @@ resource-list frame title. The frame-title rules:
 | ses | ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 |
 | ses | ses.account-probation | account under review (probation) | broken | wave2 |
 | ses | ses.quota-high | quota 80%+ used | warn | wave2 |
+| ses | ses.dkim-off | DKIM not enabled | warn | wave2 |
 | secrets | secrets.state.deleted | deleted | broken | wave1 |
 | secrets | secrets.state.rotation\_overdue | rotation overdue | warn | wave1 |
 | secrets | secrets.state.dormant | dormant | warn | wave1 |

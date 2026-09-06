@@ -8,6 +8,11 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
+// SQSPublicPolicy names the one demo queue whose access policy grants send
+// or receive to every principal (sqs.public-policy). Every other queue's
+// Policy attribute is either absent or account-scoped.
+const SQSPublicPolicy = "sqs-public-policy"
+
 // SQSFixtures holds typed fixture data for SQS.
 type SQSFixtures struct {
 	// Queues maps queue URL to its attributes row.

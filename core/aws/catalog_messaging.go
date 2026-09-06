@@ -129,6 +129,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		Findings: []catalog.FindingDef{
 			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }
@@ -158,7 +159,7 @@ func colorSNSSub(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	return colorFromFindings(snsSubStateFindings(r.Fields["subscription_arn"]))
+	return colorFromFindings(snsSubFindings(r.Fields["subscription_arn"], r.Fields["protocol"]))
 }
 
 func colorEBRule(r domain.Resource) domain.Color {
@@ -230,6 +231,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Findings: []catalog.FindingDef{
 			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: sqsCodePublicPolicy, Phrase: "queue policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -273,6 +275,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Findings: []catalog.FindingDef{
 			{Code: snsCodeNoSubscribers, Phrase: "topic has no subscribers", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: snsCodeAllPending, Phrase: "all pending confirmation", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: snsCodePublicPolicy, Phrase: "topic policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: snsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -311,6 +315,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Findings: []catalog.FindingDef{
 			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -371,6 +376,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBTerminating, Phrase: "terminating", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ebCodeEnvironmentCauses, Phrase: "EB causes: <first cause>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebCodeManagedUpdatesOff, Phrase: "managed platform updates off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebCodeEnhancedHealthOff, Phrase: "enhanced health reporting off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebCodeCWLogsOff, Phrase: "log streaming to CloudWatch off", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -444,6 +452,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
 		}),
+		Wave2:     IssueEnricher{Fn: EnrichKinesisStreamSummary, Priority: 100},
 		FieldKeys: []string{"stream_name", "status", "stream_mode", "creation_time"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true, Truncated: true},
@@ -457,6 +466,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: kinesisCodeUnencrypted, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: kinesisCodeMinRetention, Phrase: "24h retention", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -510,6 +521,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: mskCodeBrokerOutdated, Phrase: "broker software outdated", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: mskCodeEncryptionNotTLS, Phrase: "encryption in transit not enforced", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: mskCodePublicAccess, Phrase: "brokers reachable from the internet", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: mskCodeUnauthenticated, Phrase: "unauthenticated access allowed", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -567,6 +580,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Findings: []catalog.FindingDef{
 			{Code: sfnCodeLatestExecutionFailed, Phrase: "latest execution <STATUS>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sfnCodeLoggingOff, Phrase: "execution logging off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: sfnCodeNoCMK, Phrase: "not encrypted with a customer key", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: sfnCodeDefinitionSecret, Phrase: "credential in state machine definition", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -607,6 +623,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: sesCodeShutdown, Phrase: "sending paused by AWS (shutdown)", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: sesCodeProbation, Phrase: "account under review (probation)", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: sesCodeDKIMOff, Phrase: "DKIM not enabled", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 }

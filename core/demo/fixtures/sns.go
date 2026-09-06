@@ -10,6 +10,20 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
 
+// SNSPublicPolicy names the one demo topic whose access policy grants
+// publish or subscribe to every principal (sns.public-policy), and SNSNoKMS
+// the one topic with no KmsMasterKeyId (sns.no-kms). Every other topic
+// carries an account-scoped policy and a KMS key.
+const (
+	SNSPublicPolicy = "sns-public-policy"
+	SNSNoKMS        = "sns-unencrypted"
+)
+
+// SNSSubPlainHTTP is the subscription ARN of the one demo sns-sub row
+// delivering over unencrypted HTTP (sns-sub.plain-http). Every other
+// subscription uses https, sqs, lambda or email.
+const SNSSubPlainHTTP = "arn:aws:sns:us-east-1:123456789012:sns-public-policy:9f8e7d6c-5b4a-3210-9876-543210fedcba"
+
 // SNSFixtures holds typed fixture data for SNS.
 type SNSFixtures struct {
 	Topics        []snstypes.Topic

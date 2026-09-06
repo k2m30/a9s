@@ -22,6 +22,8 @@ import (
 const (
 	mskCodeBrokerOutdated   domain.FindingCode = "msk.broker-outdated"
 	mskCodeEncryptionNotTLS domain.FindingCode = "msk.encryption-not-tls"
+	mskCodePublicAccess     domain.FindingCode = "msk.public-access"
+	mskCodeUnauthenticated  domain.FindingCode = "msk.unauthenticated"
 )
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)

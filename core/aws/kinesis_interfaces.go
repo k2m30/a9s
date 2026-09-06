@@ -27,4 +27,5 @@ type KinesisListTagsForStreamAPI interface {
 // *kinesis.Client structurally satisfies this interface.
 type KinesisAPI interface {
 	KinesisListStreamsAPI
+	KinesisDescribeStreamSummaryAPI
 }

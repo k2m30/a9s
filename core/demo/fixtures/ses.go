@@ -13,6 +13,10 @@ import (
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 )
 
+// SESDKIMOff names the one demo domain identity with DKIM signing off
+// (ses.dkim-off). Every other domain identity signs its outbound mail.
+const SESDKIMOff = "nodkim.acme-corp.com"
+
 // Exported ID/ARN constants — referenced by this file, sibling fixtures, and QA tests.
 const (
 	// SESGraphRootIdentity is the domain identity used as the demo graph-root.
