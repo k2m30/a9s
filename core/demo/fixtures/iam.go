@@ -826,7 +826,7 @@ func buildIAMUsers() []iamtypes.User {
 			Arn:              aws.String("arn:aws:iam::123456789012:user/alice.johnson"),
 			Path:             aws.String("/"),
 			CreateDate:       aws.Time(time.Date(2024, 6, 15, 9, 0, 0, 0, time.UTC)),
-			PasswordLastUsed: aws.Time(time.Date(2026, 3, 20, 14, 22, 0, 0, time.UTC)),
+			PasswordLastUsed: aws.Time(time.Now().AddDate(0, 0, -10)),
 		},
 		{
 			UserName:         aws.String("bob.smith"),

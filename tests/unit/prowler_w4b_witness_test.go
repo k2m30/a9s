@@ -322,7 +322,10 @@ func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 		}
 	}
 
-	const wantWitnessed = 14
+	// 15, not 14: iam-user.console-dormant joined the bench with its own
+	// witness (lapsed-console-user). The count moves with the witness, which
+	// is what this pin exists to force.
+	const wantWitnessed = 15
 	if singles != wantWitnessed {
 		t.Errorf("%d witness-backed wave-2 codes on the bench, want %d — a witness was added or lost "+
 			"without this count moving with it; codes seen: %v", singles, wantWitnessed, codes)

@@ -390,7 +390,7 @@ var docQuoteBurnDown = map[string]int{
 	"ebs-snap":     8,
 	"ec2":          9,
 	"ecr":          3,
-	"ecs-svc":      8,
+	"ecs-svc":      7,
 	"ecs-task":     14,
 	"efs":          6,
 	"eks":          5,

@@ -203,8 +203,8 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `status == DRAINING` | 1 | Dim | n/a | S2, S4 | `draining` | `Service is draining; tasks shutting down ahead of delete.` |
 | `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive` | `Service is inactive — not scheduling tasks; safe to delete.` |
-| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S4, S5 | `no tasks running` | `The service is asking for tasks and none of them are running, so it is serving nothing.` |
-| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S4, S5 | `running below desired count` | `Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity.` |
+| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S4, S5 | `no tasks running` | `The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes.` |
+| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S4, S5 | `running below desired count` | `Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks.` |
 | `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S2, S4, S5, S1 (via Broken color + finding count) | `deploy failed` | `Latest deployment failed to reach steady state; rollout halted.` |
 | `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S2, S4, S5, S1 | `running 2/4: no active deploy` | `Task shortfall without an active deployment — placement or health-check blocked.` |
 | `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `unable to place` | `Scheduler cannot place tasks — check subnet IPs, capacity providers, constraints.` |

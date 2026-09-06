@@ -104,7 +104,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` | `Console password has never been used since the account was created — an unguarded sign-in path.` |
-| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` | `Nobody has signed in to this console login for over 90 days — confirm the person still needs it.` |
+| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` | `Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not.` |
 | Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` | `Access key …4QJZ has not signed a request in 120 days — deactivate it, then delete it.` |
 | Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` | `Both access-key slots are active, which doubles exposure and blocks a clean rotation.` |
 | `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` | `The user carries an AWS-managed policy granting administrator-equivalent access.` |

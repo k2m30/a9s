@@ -42,7 +42,6 @@ var classifiersOffTheSharedFallback = map[string]string{ //nolint:gochecknogloba
 	"colorSubnet":       "not yet on the shared fallback",
 	"colorNAT":          "not yet on the shared fallback",
 	"colorIGW":          "not yet on the shared fallback",
-	"colorEIP":          "not yet on the shared fallback",
 	"colorVPCE":         "not yet on the shared fallback",
 	"colorTGW":          "not yet on the shared fallback",
 	"colorENI":          "not yet on the shared fallback",
