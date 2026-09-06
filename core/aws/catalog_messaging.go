@@ -159,7 +159,8 @@ func colorSNSSub(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	return colorFromFindings(snsSubFindings(r.Fields["subscription_arn"], r.Fields["protocol"]))
+	findings, _ := snsSubFindings(r.Fields["subscription_arn"], r.Fields["protocol"], r.Fields["endpoint"])
+	return colorFromFindings(findings)
 }
 
 func colorEBRule(r domain.Resource) domain.Color {
@@ -231,6 +232,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Findings: []catalog.FindingDef{
 			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: sqsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: sqsCodePublicPolicy, Phrase: "queue policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},

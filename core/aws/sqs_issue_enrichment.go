@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,13 +15,22 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // sqs canonical FindingCodes.
 const (
 	sqsCodeMissingDLQ   domain.FindingCode = "sqs.missing-dlq"
+	sqsCodeNoKMS        domain.FindingCode = "sqs.no-kms"
 	sqsCodePublicPolicy domain.FindingCode = "sqs.public-policy"
+)
+
+// S5 operator sentences for the queue posture codes above.
+const (
+	sqsMissingDLQDetail   = "Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue."
+	sqsNoKMSDetail        = "Messages sit unencrypted in the queue, so anyone who reaches the backing storage reads their contents. Set a KMS key on the queue so AWS encrypts each message at rest."
+	sqsPublicPolicyDetail = "The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue."
 )
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
@@ -38,6 +48,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	if clients.SQS == nil {
 		return result, nil
 	}
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -58,6 +69,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 					sqstypes.QueueAttributeNameRedrivePolicy,
 					sqstypes.QueueAttributeNameVisibilityTimeout,
 					sqstypes.QueueAttributeNameKmsMasterKeyId,
+					sqstypes.QueueAttributeNamePolicy,
 				},
 			})
 		})
@@ -76,25 +88,25 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		result.FieldUpdates[r.ID] = map[string]string{
 			"dlq": dlqVal,
 		}
-		var rows []domain.DetailRow
+		// Each condition is its own code with its own phrase: a queue
+		// missing only encryption must not report the dead-letter code.
+		// Neither carries a supporting row — the phrase is the whole fact,
+		// and a row repeating it is the detail block saying it twice.
 		if !hasDLQ {
-			rows = append(rows, domain.DetailRow{
-				Label: "DLQ",
-				Value: "no DLQ configured",
-				Tier:  "~",
-			})
+			setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, "no DLQ configured", "~", "sqs", nil)
 		}
-		if _, ok := out.Attributes["KmsMasterKeyId"]; !ok {
-			rows = append(rows, domain.DetailRow{
-				Label: "Encryption",
-				Value: "no KMS encryption configured",
-				Tier:  "~",
-			})
+		if out.Attributes["KmsMasterKeyId"] == "" {
+			setWave2Finding(&result, r.ID, sqsCodeNoKMS, "not encrypted with KMS", "~", "sqs", nil)
 		}
-		if len(rows) == 0 {
-			return
+		if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
+			if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
+				setWave2Finding(&result, r.ID, sqsCodePublicPolicy, "queue policy open to anyone", "!", "sqs",
+					[]domain.DetailRow{
+						{Label: "Principal", Value: "*", Tier: "!"},
+						{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
+					})
+			}
 		}
-		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows)
 	})
 	sort.Strings(failures)
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

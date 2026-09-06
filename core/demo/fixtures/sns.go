@@ -14,15 +14,28 @@ import (
 // publish or subscribe to every principal (sns.public-policy), and SNSNoKMS
 // the one topic with no KmsMasterKeyId (sns.no-kms). Every other topic
 // carries an account-scoped policy and a KMS key.
+// The sns rows are keyed by topic ARN, which is what the list renders and
+// what the witness gate compares against.
 const (
-	SNSPublicPolicy = "sns-public-policy"
-	SNSNoKMS        = "sns-unencrypted"
+	SNSPublicPolicy = SNSPublicPolicyARN
+	SNSNoKMS        = SNSNoKMSARN
 )
+
+const (
+	snsPublicPolicyTopicName = "sns-public-policy"
+	snsNoKMSTopicName        = "sns-unencrypted"
+
+	SNSPublicPolicyARN = "arn:aws:sns:us-east-1:123456789012:" + snsPublicPolicyTopicName
+	SNSNoKMSARN        = "arn:aws:sns:us-east-1:123456789012:" + snsNoKMSTopicName
+)
+
+// SNSDemoKMSKeyID is the at-rest key every demo topic but SNSNoKMS carries.
+const SNSDemoKMSKeyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 
 // SNSSubPlainHTTP is the subscription ARN of the one demo sns-sub row
 // delivering over unencrypted HTTP (sns-sub.plain-http). Every other
 // subscription uses https, sqs, lambda or email.
-const SNSSubPlainHTTP = "arn:aws:sns:us-east-1:123456789012:sns-public-policy:9f8e7d6c-5b4a-3210-9876-543210fedcba"
+const SNSSubPlainHTTP = SNSPublicPolicyARN + ":9f8e7d6c-5b4a-3210-9876-543210fedcba"
 
 // SNSFixtures holds typed fixture data for SNS.
 type SNSFixtures struct {
@@ -62,6 +75,11 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		// (sns.all-pending-confirmation). Required for EnrichSNSSubscriptions's
 		// Wave-2 all-pending check.
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending")},
+		// SNSPublicPolicy: the only topic whose access policy names a
+		// wildcard principal. Also the topic SNSSubPlainHTTP hangs off.
+		{TopicArn: aws.String(SNSPublicPolicyARN)},
+		// SNSNoKMS: the only topic served without a KmsMasterKeyId.
+		{TopicArn: aws.String(SNSNoKMSARN)},
 	}
 
 	subscriptions := []snstypes.Subscription{
@@ -112,6 +130,16 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		},
 	}
 
+	// SNSSubPlainHTTP: the only subscription delivering over unencrypted
+	// HTTP. Every other subscription above uses https, sqs, lambda or email.
+	subscriptions = append(subscriptions, snstypes.Subscription{
+		TopicArn:        aws.String(SNSPublicPolicyARN),
+		Protocol:        aws.String("http"),
+		Endpoint:        aws.String("http://hooks.acme-corp.com/sns/orders"),
+		SubscriptionArn: aws.String(SNSSubPlainHTTP),
+		Owner:           aws.String("123456789012"),
+	})
+
 	// Grouped by each subscription's own TopicArn, not by position — the
 	// six base subscriptions above are NOT laid out in topic-contiguous
 	// blocks (order-events subscriptions interleave with alarm-notifications
@@ -138,18 +166,21 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 	subsByTopic[ProdRedisSNSTopicARN] = minimalSubscriptions(ProdRedisSNSTopicARN, "email", "redis-oncall@acme-corp.com")
 	subsByTopic["arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName] = minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler")
 	subsByTopic[BackupAlertsSNSTopicARN] = minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com")
+	subsByTopic[SNSNoKMSARN] = minimalSubscriptions(SNSNoKMSARN, "sqs", "arn:aws:sqs:us-east-1:123456789012:acme-alerts-queue")
 
 	// TopicAttributes — required for the sns:kms and sns:role related-panel
 	// pivots (checkSNSKMS / checkSNSRole via GetTopicAttributes). The
-	// alarm-notifications topic carries an at-rest encryption key and an
-	// access policy granting the CI deploy role publish access. No other
-	// topic gets KmsMasterKeyId/Policy — those two keys are what the
-	// sns:kms/sns:role pivots key off, and their counts are pinned by
-	// smoke/unit assertions.
+	// alarm-notifications topic carries an access policy granting the CI
+	// deploy role publish access, which is what the sns:role pivot keys off.
+	// Every topic but SNSNoKMS carries an at-rest encryption key: an
+	// unencrypted topic is a finding, so exactly one demo row may be
+	// missing it, and the sns:kms pivot resolves for the rest.
 	topicAttributes := map[string]map[string]string{
 		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": {
-			"KmsMasterKeyId": "a1b2c3d4-5678-90ab-cdef-111111111111",
-			"Policy":         `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"sns:Publish","Resource":"arn:aws:sns:us-east-1:123456789012:alarm-notifications"}]}`,
+			"Policy": `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"sns:Publish","Resource":"arn:aws:sns:us-east-1:123456789012:alarm-notifications"}]}`,
+		},
+		SNSPublicPolicyARN: {
+			"Policy": `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sns:Publish","sns:Subscribe"],"Resource":"` + SNSPublicPolicyARN + `"}]}`,
 		},
 	}
 
@@ -168,6 +199,8 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		BackupAlertsSNSTopicARN: "Backup Vault Alerts",
 		"arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts":       "Staging Deploy Alerts",
 		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": "Webhook Integration (Pending)",
+		SNSPublicPolicyARN: "Public Order Events",
+		SNSNoKMSARN:        "Unencrypted Alerts",
 	}
 	for arn, displayName := range topicDisplayNames {
 		confirmed, pending, deleted := 0, 0, 0
@@ -186,6 +219,9 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		attrs := topicAttributes[arn]
 		if attrs == nil {
 			attrs = map[string]string{}
+		}
+		if arn != SNSNoKMSARN {
+			attrs["KmsMasterKeyId"] = SNSDemoKMSKeyID
 		}
 		attrs["TopicArn"] = arn
 		attrs["Owner"] = "123456789012"

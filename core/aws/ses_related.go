@@ -249,10 +249,10 @@ func extractEventBusName(arn string) string {
 //
 // Scoping rules:
 //   - len(rule.Recipients) == 0 → rule applies to all identities.
-//   - For EMAIL_ADDRESS identities (identityType == "EMAIL_ADDRESS"):
-//     a recipient matches if it equals the identity exactly, equals the
-//     identity's domain, or is a parent domain of the identity's domain.
-//   - For DOMAIN identities: a recipient matches if it equals the domain
+//   - For single-address identities: a recipient matches if it equals the
+//     identity exactly, equals the identity's domain, or is a parent domain
+//     of the identity's domain.
+//   - For domain identities: a recipient matches if it equals the domain
 //     exactly, is a subdomain of it, or is an email address whose domain
 //     equals or is a subdomain of the identity domain.
 //
@@ -278,8 +278,10 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 		return true
 	}
 
+	// identityType is Fields["identity_type"], which carries the rendered
+	// word, not the SDK enum.
 	switch identityType {
-	case "EMAIL_ADDRESS":
+	case sesIdentityTypeEmailAddress:
 		// Derive domain from identity (e.g. "billing@sub.acme.com" → "sub.acme.com").
 		domain := ""
 		if idx := strings.LastIndex(identityName, "@"); idx >= 0 {

@@ -170,6 +170,14 @@ func buildSESIdentities() []sesv2types.IdentityInfo {
 			SendingEnabled:     false,
 			VerificationStatus: sesv2types.VerificationStatusSuccess,
 		},
+		// SESDKIMOff: verified and sending, so the only thing wrong with it
+		// is that its outbound mail is unsigned.
+		{
+			IdentityName:       aws.String(SESDKIMOff),
+			IdentityType:       sesv2types.IdentityTypeDomain,
+			SendingEnabled:     true,
+			VerificationStatus: sesv2types.VerificationStatusSuccess,
+		},
 		// FIXTURE: warn-ses-multi — U7a: multi-W1 suffix test vehicle
 		// Both FAILED verification AND sending disabled. Fetcher produces
 		// Status = "verification failed (+1)", Issues = ["verification failed", "sending disabled"].
@@ -203,13 +211,48 @@ func buildSESAccountHealthy() *sesv2.GetAccountOutput {
 // ---------------------------------------------------------------------------
 
 func buildSESEmailIdentityMap() map[string]*sesv2.GetEmailIdentityOutput {
-	return map[string]*sesv2.GetEmailIdentityOutput{
+	m := map[string]*sesv2.GetEmailIdentityOutput{
 		// Graph-root: returns ConfigurationSetName so the eb-rule, kinesis, and sns
 		// pivots can call GetConfigurationSetEventDestinations.
 		SESGraphRootIdentity: {
 			ConfigurationSetName: aws.String(SESConfigSetName),
+			IdentityType:         sesv2types.IdentityTypeDomain,
+			DkimAttributes:       sesSigningDkim(true),
 		},
-		// All other identities have no configuration set configured.
+		// SESDKIMOff: the only domain that does not sign its outbound mail.
+		SESDKIMOff: {
+			IdentityType:   sesv2types.IdentityTypeDomain,
+			DkimAttributes: sesSigningDkim(false),
+		},
+	}
+	// Every other domain identity signs, so exactly one demo row reads as
+	// unsigned. Single-address identities cannot carry DKIM at all and are
+	// never a finding, so they are answered as themselves.
+	for _, id := range buildSESIdentities() {
+		name := aws.ToString(id.IdentityName)
+		if _, ok := m[name]; ok {
+			continue
+		}
+		out := &sesv2.GetEmailIdentityOutput{IdentityType: id.IdentityType}
+		if id.IdentityType == sesv2types.IdentityTypeDomain {
+			out.DkimAttributes = sesSigningDkim(true)
+		}
+		m[name] = out
+	}
+	return m
+}
+
+// sesSigningDkim builds the DKIM attributes of an identity that either signs
+// its outbound mail or does not.
+func sesSigningDkim(signing bool) *sesv2types.DkimAttributes {
+	status := sesv2types.DkimStatusSuccess
+	if !signing {
+		status = sesv2types.DkimStatusNotStarted
+	}
+	return &sesv2types.DkimAttributes{
+		SigningEnabled:          signing,
+		Status:                  status,
+		SigningAttributesOrigin: sesv2types.DkimSigningAttributesOriginAwsSes,
 	}
 }
 

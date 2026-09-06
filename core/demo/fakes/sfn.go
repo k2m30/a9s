@@ -69,7 +69,16 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 	}
 	// Real DescribeStateMachine always returns a Status — there is no
 	// "unknown" state for an existing state machine.
-	out := &sfn.DescribeStateMachineOutput{StateMachineArn: &arn, Definition: &definition, Status: sfntypes.StateMachineStatusActive}
+	level := fixtures.SFNHealthyLogLevel
+	if l, ok := f.fix.LoggingLevels[arn]; ok {
+		level = l
+	}
+	out := &sfn.DescribeStateMachineOutput{
+		StateMachineArn:      &arn,
+		Definition:           &definition,
+		Status:               sfntypes.StateMachineStatusActive,
+		LoggingConfiguration: &sfntypes.LoggingConfiguration{Level: level},
+	}
 	if roleArn, ok := f.fix.RoleArns[arn]; ok {
 		out.RoleArn = &roleArn
 	}

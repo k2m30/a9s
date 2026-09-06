@@ -92,6 +92,8 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 		id = fmt.Sprintf("pending/%s/%s", protocol, endpoint)
 	}
 
+	findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
+
 	return resource.Resource{
 		ID:   id,
 		Name: endpoint,
@@ -103,10 +105,11 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 			"subscription_arn":    subscriptionArn,
 			"topic_arn":           topicArn,
 		},
-		// snsSubStateFindings (sns_sub.go) is reused verbatim: both fetchers
-		// observe the same AWS quirk where SubscriptionArn literally reads
-		// "PendingConfirmation"/"Deleted" in those states.
-		Findings:  snsSubFindings(subscriptionArn, protocol),
-		RawStruct: sub,
+		// snsSubFindings (sns_sub.go) is the single source both fetchers
+		// and the colour fallback share, so this list can never differ from
+		// what the top-level subscription list shows for the same row.
+		Findings:         findings,
+		AttentionDetails: details,
+		RawStruct:        sub,
 	}
 }

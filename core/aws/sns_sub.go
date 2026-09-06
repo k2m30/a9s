@@ -25,6 +25,9 @@ const CodeSNSSubDeleted domain.FindingCode = "sns-sub.state.deleted"
 // delivers over unencrypted HTTP.
 const CodeSNSSubPlainHTTP domain.FindingCode = "sns-sub.plain-http"
 
+// snsSubPlainHTTPDetail is the S5 operator sentence for CodeSNSSubPlainHTTP.
+const snsSubPlainHTTPDetail = "The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint."
+
 // FetchSNSSubscriptionsPage fetches a single page of SNS subscriptions.
 func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &sns.ListSubscriptionsInput{}
@@ -66,6 +69,8 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 			topicName = parts[len(parts)-1]
 		}
 
+		findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
+
 		r := resource.Resource{
 			ID:   subscriptionArn,
 			Name: topicName,
@@ -75,8 +80,9 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 				"endpoint":         endpoint,
 				"subscription_arn": subscriptionArn,
 			},
-			Findings:  snsSubFindings(subscriptionArn, protocol),
-			RawStruct: sub,
+			Findings:         findings,
+			AttentionDetails: details,
+			RawStruct:        sub,
 		}
 
 		resources = append(resources, r)
@@ -111,12 +117,43 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 }
 
 // snsSubFindings is the single source of every sns-sub wave-1 finding: the
-// fetcher calls it over the SDK subscription, and colorSNSSub calls it again
-// over the row's own Fields when a cache-restored row arrives with no
-// Findings attached. Both arguments are therefore Fields keys, never SDK
-// structs, so the two paths cannot disagree.
-func snsSubFindings(subscriptionArn, protocol string) []domain.Finding {
-	return snsSubStateFindings(subscriptionArn)
+// top-level fetcher, the by-topic child fetcher and colorSNSSub's
+// cache-restored fallback all call it. Every argument is a Fields key, never
+// an SDK struct, so no caller can see a finding another one cannot.
+func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	findings := snsSubStateFindings(subscriptionArn)
+	// A subscription AWS reports as Deleted or still unconfirmed is not
+	// carrying traffic, so its transport is not a posture problem yet.
+	if subscriptionArn == "Deleted" || protocol != "http" {
+		return findings, nil
+	}
+	findings = append(findings, domain.Finding{
+		Code:     CodeSNSSubPlainHTTP,
+		Phrase:   "delivers over plain HTTP",
+		Detail:   snsSubPlainHTTPDetail,
+		Severity: domain.SevWarn,
+		Source:   "wave1",
+	})
+	return findings, map[domain.FindingCode]domain.AttentionDetail{
+		CodeSNSSubPlainHTTP: {Rows: []domain.DetailRow{
+			// Scheme and host only. A webhook path is routinely the shared
+			// secret that authenticates the caller (rule 7).
+			{Label: "Endpoint", Value: snsSubEndpointOrigin(endpoint), Tier: "~"},
+		}},
+	}
+}
+
+// snsSubEndpointOrigin keeps the scheme and host of a URL endpoint and drops
+// the path, query and fragment.
+func snsSubEndpointOrigin(endpoint string) string {
+	rest, ok := strings.CutPrefix(endpoint, "http://")
+	if !ok {
+		return endpoint
+	}
+	host, _, _ := strings.Cut(rest, "/")
+	host, _, _ = strings.Cut(host, "?")
+	host, _, _ = strings.Cut(host, "#")
+	return "http://" + host
 }
 
 // snsSubStateFindings mirrors colorSNSSub's own precedence: AWS returns the

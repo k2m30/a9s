@@ -15,10 +15,23 @@ import (
 // (eb.managed-updates-off), basic health reporting
 // (eb.enhanced-health-off) and no log streaming (eb.cloudwatch-logs-off).
 // Every other environment has all three turned on.
+// The eb rows are keyed by environment ID, which is what the list renders
+// and what the witness gate compares against. All three name environments
+// that already existed: an environment's configuration is orthogonal to its
+// health, so the settings ride on three ordinary Ready environments rather
+// than on three new rows nobody would otherwise look at.
 const (
-	EBManagedUpdatesOff = "acme-eb-unmanaged"
-	EBEnhancedHealthOff = "acme-eb-basic-health"
-	EBCWLogsOff         = "acme-eb-no-logs"
+	EBManagedUpdatesOff = "e-acmestagapi"
+	EBEnhancedHealthOff = "e-acmeprodweb"
+	EBCWLogsOff         = "e-acmelegacy"
+)
+
+// The environment names those three rows carry, used as the
+// ConfigurationSettings keys the enricher addresses them by.
+const (
+	ebEnvUnmanaged   = "acme-staging-api"
+	ebEnvBasicHealth = "acme-prod-web"
+	ebEnvNoLogs      = "acme-legacy-worker"
 )
 
 // ebRegion/ebAccountID back every synthetic EnvironmentArn below — the eb
@@ -87,6 +100,9 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 					},
 				},
 			},
+			"acme-api/" + ebEnvUnmanaged:   ebOptionSet("acme-api", ebEnvUnmanaged, "false", "enhanced", "true"),
+			"acme-web/" + ebEnvBasicHealth: ebOptionSet("acme-web", ebEnvBasicHealth, "true", "basic", "true"),
+			"acme-worker/" + ebEnvNoLogs:   ebOptionSet("acme-worker", ebEnvNoLogs, "true", "enhanced", "false"),
 		},
 		// EnvironmentResources — required for eb:elb and eb:tg related-panel
 		// pivot witnesses (checkEbELB / checkEbTG). acme-prod-web is a real
@@ -127,6 +143,33 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 
 func NewEBFixtures() *EBFixtures {
 	return sharedEBFixtures()
+}
+
+// ebOptionSet builds the configuration set for one environment, naming all
+// three of the settings rows 13-15 read so each witness trips exactly one
+// and is explicitly healthy on the other two.
+func ebOptionSet(app, env, managedActions, healthSystem, streamLogs string) []ebtypes.ConfigurationSettingsDescription {
+	return []ebtypes.ConfigurationSettingsDescription{{
+		ApplicationName: aws.String(app),
+		EnvironmentName: aws.String(env),
+		OptionSettings: []ebtypes.ConfigurationOptionSetting{
+			{
+				Namespace:  aws.String("aws:elasticbeanstalk:managedactions"),
+				OptionName: aws.String("ManagedActionsEnabled"),
+				Value:      aws.String(managedActions),
+			},
+			{
+				Namespace:  aws.String("aws:elasticbeanstalk:healthreporting:system"),
+				OptionName: aws.String("SystemType"),
+				Value:      aws.String(healthSystem),
+			},
+			{
+				Namespace:  aws.String("aws:elasticbeanstalk:cloudwatch:logs"),
+				OptionName: aws.String("StreamLogs"),
+				Value:      aws.String(streamLogs),
+			},
+		},
+	}}
 }
 
 func buildEBEnvironments() []ebtypes.EnvironmentDescription {

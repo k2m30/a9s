@@ -27,8 +27,11 @@ var (
 	jwtRe        = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
 	// keywordRe: a credential word, optionally suffixed (SECRET_KEY, DB_PASSWORD_V2),
 	// followed by = or : and a value of 6+ characters. Word boundaries would
-	// reject the underscore-joined names that are the common case.
-	keywordRe = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret)(?:[_-][a-z0-9_-]*)?\s*[=:]\s*["']?([^\s"',;]{6,})`)
+	// reject the underscore-joined names that are the common case. The
+	// optional quote before the separator is what makes a JSON object key
+	// match: `"DB_PASSWORD": "..."` is the shape a credential takes when it
+	// is pasted into a state machine definition or a task definition.
+	keywordRe = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret)(?:[_-][a-z0-9_-]*)?["']?\s*[=:]\s*["']?([^\s"',;]{6,})`)
 	// userinfoRe: scheme://user:password@host — the password is group 1.
 	userinfoRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s/:@]+:([^\s/@]+)@`)
 	kvKeyRe    = regexp.MustCompile(`(?i)(secret|passw(or)?d|passwd|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret|credential|auth[_-]?token|db[_-]?pass)`)

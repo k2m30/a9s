@@ -45,8 +45,14 @@ func (f *KinesisFake) DescribeStreamSummary(_ context.Context, input *kinesis.De
 		name = *input.StreamName
 	}
 	var keyID *string
+	encryption := kinesistypes.EncryptionTypeNone
 	if k, ok := f.fix.KeyIDByStream[name]; ok {
 		keyID = aws.String(k)
+		encryption = kinesistypes.EncryptionTypeKms
+	}
+	retention := fixtures.KinesisHealthyRetentionHours
+	if h, ok := f.fix.RetentionHoursByStream[name]; ok {
+		retention = h
 	}
 	for _, s := range f.fix.Streams {
 		if aws.ToString(s.StreamName) == name {
@@ -57,7 +63,8 @@ func (f *KinesisFake) DescribeStreamSummary(_ context.Context, input *kinesis.De
 					StreamStatus:            s.StreamStatus,
 					StreamModeDetails:       s.StreamModeDetails,
 					KeyId:                   keyID,
-					RetentionPeriodHours:    aws.Int32(24),
+					EncryptionType:          encryption,
+					RetentionPeriodHours:    aws.Int32(retention),
 					OpenShardCount:          aws.Int32(1),
 					EnhancedMonitoring:      []kinesistypes.EnhancedMetrics{},
 					StreamCreationTimestamp: s.StreamCreationTimestamp,

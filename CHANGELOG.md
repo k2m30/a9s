@@ -58,6 +58,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   eks_cluster_uses_a_supported_version.
 - The Health column on an ECS service's task list now reads `healthy` /
   `unhealthy` / `unknown` instead of the API's uppercase spelling.
+- SQS queues now flag an access policy that grants send or receive to every
+  principal. Closes prowler `sqs_queues_not_publicly_accessible`.
+- SNS topics now flag an access policy open to every principal, and a topic
+  stored without a KMS key. Closes prowler
+  `sns_topics_not_publicly_accessible` and
+  `sns_topics_kms_encryption_at_rest_enabled`.
+- SNS subscriptions delivering over plain HTTP are now flagged. The endpoint
+  is shown as scheme and host only, because a webhook path is routinely the
+  secret that authenticates the caller. Closes prowler
+  `sns_subscription_not_using_http_endpoints`.
+- MSK clusters now flag brokers published to the internet and clusters that
+  accept clients presenting no credentials. Closes prowler
+  `kafka_cluster_is_public` and `kafka_cluster_unrestricted_access_disabled`.
+- Kinesis streams now flag records stored unencrypted and streams still on
+  the 24-hour default retention. Closes prowler
+  `kinesis_stream_encrypted_at_rest` and
+  `kinesis_stream_data_retention_period`.
+- Step Functions state machines now flag execution logging turned off,
+  encryption on an AWS-owned key rather than your own, and a credential
+  written into the definition. Closes prowler
+  `stepfunctions_statemachine_logging_enabled`,
+  `stepfunctions_statemachine_encrypted_with_cmk` and
+  `stepfunctions_statemachine_no_secrets_in_definition`.
+- SES domain identities that do not sign their outbound mail are now
+  flagged. Closes prowler `ses_identity_dkim_enabled`.
+- Elastic Beanstalk environments now flag managed platform updates turned
+  off, basic rather than enhanced health reporting, and instance logs not
+  streaming to CloudWatch. Closes prowler
+  `elasticbeanstalk_environment_managed_updates_enabled`,
+  `elasticbeanstalk_environment_enhanced_health_reporting` and
+  `elasticbeanstalk_environment_cloudwatch_logging_enabled`.
 
 - A database instance being deleted now reads as a warning instead of green.
 - A snapshot in a state neither ready nor failed, such as one still copying,
@@ -249,6 +280,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- An SQS queue missing encryption now says so. It previously reported the
+  missing dead-letter queue code with an encryption message, so a queue that
+  had a dead-letter queue and no key was filed under the wrong issue.
+- Step Functions express workflows are now checked for logging, encryption
+  and definition secrets. The whole workflow used to be skipped because the
+  execution listing rejects that type, which silently exempted every express
+  workflow in an account from all three checks.
+- The SES Type column reads `domain` and `email address` instead of the raw
+  API values.
+- A credential written as a JSON object key, which is how one reaches a state
+  machine definition or a task definition, is now found by the secret
+  scanner. Only unquoted `KEY=value` and `KEY: value` forms matched before.
 - Row colour and the Status column now come from one selection for every
   resource type, EventBridge rules, Kinesis streams and MSK clusters
   included. A row that carries several findings shows the worst one and

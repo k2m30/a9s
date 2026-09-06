@@ -20,7 +20,18 @@ const (
 	SFNNoCMK      = "sfn-no-cmk"
 	//nolint:gosec // G101 false positive: a fixture resource name, not a credential
 	SFNDefinitionSecret = "sfn-definition-secret"
+
+	sfnARNPrefix           = "arn:aws:states:us-east-1:123456789012:stateMachine:"
+	sfnARNLoggingOff       = sfnARNPrefix + SFNLoggingOff
+	sfnARNNoCMK            = sfnARNPrefix + SFNNoCMK
+	sfnARNDefinitionSecret = sfnARNPrefix + SFNDefinitionSecret
+
+	sfnDemoKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 )
+
+// SFNHealthyLogLevel is the execution logging level every demo state machine
+// runs at except the one SFNLoggingOff names.
+const SFNHealthyLogLevel = sfntypes.LogLevelAll
 
 // SFNFixtures holds typed fixture data for Step Functions (SFN).
 type SFNFixtures struct {
@@ -42,6 +53,10 @@ type SFNFixtures struct {
 	// DescribeStateMachine. Required for the sfn:kms related-panel pivot
 	// witness (checkSFNKMS). Shared prod KMS key used across fixtures.
 	EncryptionKeyIDs map[string]string
+	// LoggingLevels maps state machine ARN -> its execution logging level,
+	// served by DescribeStateMachine. A machine absent from this map is
+	// served SFNHealthyLogLevel, so exactly one demo row reads as unlogged.
+	LoggingLevels map[string]sfntypes.LogLevel
 	// History maps execution ARN -> GetExecutionHistory events, served by
 	// SFNFake.GetExecutionHistory. Required for the sfn_execution_history
 	// child view and its sfn-execution-history.broken.event_failed finding
@@ -81,6 +96,26 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 				StateMachineArn: aws.String(smARNOrderFulfillment),
 				Type:            sfntypes.StateMachineTypeStandard,
 				CreationDate:    aws.Time(time.Date(2025, 5, 12, 9, 15, 0, 0, time.UTC)),
+			},
+			// SFNLoggingOff / SFNNoCMK / SFNDefinitionSecret: one machine per
+			// configuration signal, each explicitly healthy on the other two.
+			{
+				Name:            aws.String(SFNLoggingOff),
+				StateMachineArn: aws.String(sfnARNLoggingOff),
+				Type:            sfntypes.StateMachineTypeStandard,
+				CreationDate:    aws.Time(time.Date(2025, 9, 1, 10, 0, 0, 0, time.UTC)),
+			},
+			{
+				Name:            aws.String(SFNNoCMK),
+				StateMachineArn: aws.String(sfnARNNoCMK),
+				Type:            sfntypes.StateMachineTypeStandard,
+				CreationDate:    aws.Time(time.Date(2025, 9, 8, 10, 0, 0, 0, time.UTC)),
+			},
+			{
+				Name:            aws.String(SFNDefinitionSecret),
+				StateMachineArn: aws.String(sfnARNDefinitionSecret),
+				Type:            sfntypes.StateMachineTypeStandard,
+				CreationDate:    aws.Time(time.Date(2025, 9, 15, 10, 0, 0, 0, time.UTC)),
 			},
 			{
 				Name:            aws.String("data-pipeline-orchestrator"),
@@ -198,6 +233,10 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 		// invokes api-gateway-authorizer (real lambda.go fixture) — required
 		// for the sfn:lambda related-panel pivot witness (checkSFNLambda).
 		Definitions: map[string]string{
+			// The only demo definition with a credential written into it.
+			// The value is synthetic; secretscan reports the key and the
+			// kind, never the value itself.
+			sfnARNDefinitionSecret: `{"Comment":"Partner settlement","StartAt":"CallPartner","States":{"CallPartner":{"Type":"Task","Resource":"arn:aws:states:::http:invoke","Parameters":{"ApiEndpoint":"https://partner.example.com/settle","DB_PASSWORD":"hunter2-correct-horse-battery"},"End":true}}}`,
 			smARNOrderFulfillment: `{
 				"Comment": "Order fulfillment workflow",
 				"StartAt": "RunFulfillmentTask",
@@ -317,8 +356,19 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 			smARNOrderFulfillment: fixtIAMProdLambdaRoleARN,
 		},
 		// order-fulfillment-workflow encryption key — required for sfn:kms.
+		// Every machine but SFNNoCMK carries one: an AWS-owned key is a
+		// finding, so exactly one demo row may be without.
 		EncryptionKeyIDs: map[string]string{
-			smARNOrderFulfillment: "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111",
+			smARNOrderFulfillment: sfnDemoKMSKeyARN,
+			"arn:aws:states:us-east-1:123456789012:stateMachine:data-pipeline-orchestrator": sfnDemoKMSKeyARN,
+			smARNPaymentValidation: sfnDemoKMSKeyARN,
+			smARNUserOnboarding:    sfnDemoKMSKeyARN,
+			sfnARNLoggingOff:       sfnDemoKMSKeyARN,
+			sfnARNDefinitionSecret: sfnDemoKMSKeyARN,
+		},
+		// Only SFNLoggingOff records nothing about its executions.
+		LoggingLevels: map[string]sfntypes.LogLevel{
+			sfnARNLoggingOff: sfntypes.LogLevelOff,
 		},
 		// exec-2026-0322-0200-b2c3d4e5's history: RunFulfillmentTask's ECS
 		// task fails to pull its container image, which fails the .sync

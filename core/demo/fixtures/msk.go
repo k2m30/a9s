@@ -17,6 +17,9 @@ import (
 const (
 	MSKPublic          = "msk-public"
 	MSKUnauthenticated = "msk-unauthenticated"
+
+	mskPublicARN          = "arn:aws:kafka:us-east-1:123456789012:cluster/" + MSKPublic + "/f1a2b3c4"
+	mskUnauthenticatedARN = "arn:aws:kafka:us-east-1:123456789012:cluster/" + MSKUnauthenticated + "/f5a6b7c8"
 )
 
 // MSKFixtures holds typed fixture data for MSK (Managed Streaming for Kafka).
@@ -89,6 +92,61 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 					// related-panel pivot (checkMSKCFN). Points at acme-vpc-stack
 					// (cfn.go).
 					"aws:cloudformation:stack-name": "acme-vpc-stack",
+				},
+			},
+			// MSKPublic: the only cluster whose brokers carry their own
+			// public addresses. Authentication is required, so it trips
+			// msk.public-access alone.
+			{
+				ClusterName:    aws.String(MSKPublic),
+				ClusterArn:     aws.String(mskPublicARN),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateActive,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-07-14T09:00:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					NumberOfBrokerNodes:       aws.Int32(3),
+					CurrentBrokerSoftwareInfo: &kafkatypes.BrokerSoftwareInfo{KafkaVersion: aws.String("3.6.0")},
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						InstanceType: aws.String("kafka.m5.large"),
+						ConnectivityInfo: &kafkatypes.ConnectivityInfo{
+							PublicAccess: &kafkatypes.PublicAccess{Type: aws.String("SERVICE_PROVIDED_EIPS")},
+						},
+					},
+					ClientAuthentication: &kafkatypes.ClientAuthentication{
+						Sasl:            &kafkatypes.Sasl{Iam: &kafkatypes.Iam{Enabled: aws.Bool(true)}},
+						Unauthenticated: &kafkatypes.Unauthenticated{Enabled: aws.Bool(false)},
+					},
+					EncryptionInfo: &kafkatypes.EncryptionInfo{
+						EncryptionInTransit: &kafkatypes.EncryptionInTransit{ClientBroker: kafkatypes.ClientBrokerTls},
+					},
+				},
+			},
+			// MSKUnauthenticated: the only cluster accepting clients with no
+			// credentials. Public access is off, so it trips
+			// msk.unauthenticated alone.
+			{
+				ClusterName:    aws.String(MSKUnauthenticated),
+				ClusterArn:     aws.String(mskUnauthenticatedARN),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateActive,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-08-03T13:20:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					NumberOfBrokerNodes:       aws.Int32(3),
+					CurrentBrokerSoftwareInfo: &kafkatypes.BrokerSoftwareInfo{KafkaVersion: aws.String("3.6.0")},
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						InstanceType: aws.String("kafka.m5.large"),
+						ConnectivityInfo: &kafkatypes.ConnectivityInfo{
+							PublicAccess: &kafkatypes.PublicAccess{Type: aws.String("DISABLED")},
+						},
+					},
+					ClientAuthentication: &kafkatypes.ClientAuthentication{
+						Unauthenticated: &kafkatypes.Unauthenticated{Enabled: aws.Bool(true)},
+					},
+					EncryptionInfo: &kafkatypes.EncryptionInfo{
+						EncryptionInTransit: &kafkatypes.EncryptionInTransit{ClientBroker: kafkatypes.ClientBrokerTls},
+					},
 				},
 			},
 			{

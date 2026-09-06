@@ -37,7 +37,7 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 			identityName = *identity.IdentityName
 		}
 
-		identityType := string(identity.IdentityType)
+		identityType := sesIdentityTypeWord(identity.IdentityType)
 		sendingEnabled := strconv.FormatBool(identity.SendingEnabled)
 		verificationStatus := string(identity.VerificationStatus)
 
@@ -82,6 +82,27 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// The words the Type column renders for the two SES identity kinds. The
+// SDK's own DOMAIN / EMAIL_ADDRESS constants never reach a rendered surface,
+// and Fields["identity_type"] carries the word, so every consumer of that
+// field compares against these.
+const (
+	sesIdentityTypeDomain       = "domain"
+	sesIdentityTypeEmailAddress = "email address"
+)
+
+// sesIdentityTypeWord maps the SDK identity type onto the rendered word.
+func sesIdentityTypeWord(t sesv2types.IdentityType) string {
+	switch t {
+	case sesv2types.IdentityTypeEmailAddress:
+		return sesIdentityTypeEmailAddress
+	case sesv2types.IdentityTypeDomain:
+		return sesIdentityTypeDomain
+	default:
+		return domain.HumanizeStatusPhrase(string(t))
+	}
 }
 
 func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {

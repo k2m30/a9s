@@ -6,8 +6,11 @@ package aws
 import (
 	"context"
 	"strconv"
+	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -20,6 +23,9 @@ const (
 	sesCodeQuota     domain.FindingCode = "ses.quota-high"
 	sesCodeDKIMOff   domain.FindingCode = "ses.dkim-off"
 )
+
+// S5 operator sentence for the identity signing code above.
+const sesDKIMOffDetail = "Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you."
 
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates
 // the single account-level finding onto every identity row in the input slice.
@@ -53,19 +59,55 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 		return result, err
 	}
 
-	// Decide the single account-level finding using §4 precedence.
+	// Decide the single account-level finding using §4 precedence, then
+	// replicate it onto every identity row.
 	code, phrase, severityGlyph, rows, hasFinding := sesAccountFinding(out)
-	if !hasFinding {
-		return result, nil
+	if hasFinding {
+		for _, res := range resources {
+			setWave2Finding(&result, res.ID, code, phrase, severityGlyph, "ses", rows)
+		}
 	}
 
-	// Replicate the finding onto every identity row.
-	for _, res := range resources {
-		setWave2Finding(&result, res.ID, code, phrase, severityGlyph, "ses", rows)
-	}
+	// DKIM is per identity, not per account: one unsigned domain says
+	// nothing about the others, so this runs alongside the replication
+	// above rather than sharing its shape.
+	sesIdentityDKIM(ctx, clients, &result, resources)
 
 	result.Truncated = false
 	return result, nil
+}
+
+// sesIdentityDKIM calls GetEmailIdentity per identity (cap EnrichmentCap) and
+// reports a domain that does not sign its outbound mail. A single verified
+// address cannot carry DKIM at all, so only domains are checked.
+func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) {
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
+		if r.ID == "" {
+			return
+		}
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetEmailIdentityOutput, error) {
+			return clients.SESv2.GetEmailIdentity(ctx, &sesv2.GetEmailIdentityInput{
+				EmailIdentity: aws.String(r.ID),
+			})
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			result.TruncatedIDs[r.ID] = true
+			return
+		}
+		if out.IdentityType != sesv2types.IdentityTypeDomain {
+			return
+		}
+		if out.DkimAttributes != nil && out.DkimAttributes.SigningEnabled {
+			return
+		}
+		setWave2Finding(result, r.ID, sesCodeDKIMOff, "DKIM not enabled", "~", "ses",
+			[]domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: "~"}})
+	})
 }
 
 // sesAccountFinding derives the single account-level finding from GetAccount output.

@@ -9,6 +9,15 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+	"sync"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	kinesissvc "github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -19,6 +28,16 @@ const (
 	kinesisCodeUnencrypted  domain.FindingCode = "kinesis.unencrypted"
 	kinesisCodeMinRetention domain.FindingCode = "kinesis.min-retention"
 )
+
+// S5 operator sentences for the stream posture codes above.
+const (
+	kinesisUnencryptedDetail  = "Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key."
+	kinesisMinRetentionDetail = "The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need."
+)
+
+// kinesisDefaultRetentionHours is the retention a stream is created with. At
+// or below it, a day-long consumer outage is data loss.
+const kinesisDefaultRetentionHours int32 = 24
 
 // EnrichKinesisStreamSummary calls DescribeStreamSummary per stream (cap
 // EnrichmentCap) to surface encryption-at-rest and retention posture.
@@ -31,5 +50,74 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 	if clients.Kinesis == nil {
 		return result, nil
 	}
-	return result, nil
+	api, ok := clients.Kinesis.(KinesisDescribeStreamSummaryAPI)
+	if !ok {
+		return result, nil
+	}
+	var failures []string
+	total := 0
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
+		name := r.Fields["stream_name"]
+		if name == "" {
+			name = r.ID
+		}
+		if name == "" {
+			return
+		}
+		// Rule 4: a stream being torn down has no posture worth reporting.
+		if r.Fields["stream_status"] == string(kinesistypes.StreamStatusDeleting) {
+			return
+		}
+		mu.Lock()
+		total++
+		mu.Unlock()
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesissvc.DescribeStreamSummaryOutput, error) {
+			return api.DescribeStreamSummary(ctx, &kinesissvc.DescribeStreamSummaryInput{
+				StreamName: aws.String(name),
+			})
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			// A stream that vanished between the listing and this call is
+			// gone, not unreadable — unknown either way, but not a failure
+			// worth surfacing in the error log.
+			if !isKinesisStreamGone(err) {
+				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			}
+			result.TruncatedIDs[r.ID] = true
+			return
+		}
+		sum := out.StreamDescriptionSummary
+		if sum == nil {
+			result.TruncatedIDs[r.ID] = true
+			return
+		}
+		// AWS omits EncryptionType for an unencrypted stream and returns
+		// NONE for others; both are the same fact.
+		if sum.EncryptionType == "" || sum.EncryptionType == kinesistypes.EncryptionTypeNone {
+			setWave2Finding(&result, r.ID, kinesisCodeUnencrypted, "not encrypted at rest", "~", "kinesis",
+				[]domain.DetailRow{{Label: "Encryption key", Value: "none", Tier: "~"}})
+		}
+		if h := sum.RetentionPeriodHours; h != nil && *h <= kinesisDefaultRetentionHours {
+			setWave2Finding(&result, r.ID, kinesisCodeMinRetention, "24h retention", "~", "kinesis",
+				// The phrase names the default; a stream set BELOW it needs
+				// the row to say what it is actually keeping.
+				[]domain.DetailRow{{Label: "Records kept", Value: fmt.Sprintf("%dh", *h), Tier: "~"}})
+		}
+	})
+	sort.Strings(failures)
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count.
+	result.Truncated = false
+	return result, AggregateFailures("kinesis-enrich: DescribeStreamSummary", failures, total)
+}
+
+// isKinesisStreamGone reports whether err is Kinesis saying the stream no
+// longer exists — the expected race between listing and describing.
+func isKinesisStreamGone(err error) bool {
+	var notFound *kinesistypes.ResourceNotFoundException
+	return errors.As(err, &notFound) || strings.Contains(err.Error(), "ResourceNotFoundException")
 }

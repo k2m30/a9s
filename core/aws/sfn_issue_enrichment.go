@@ -16,6 +16,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // sfn canonical FindingCodes.
@@ -25,6 +26,14 @@ const (
 	sfnCodeNoCMK                 domain.FindingCode = "sfn.no-cmk"
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	sfnCodeDefinitionSecret domain.FindingCode = "sfn.definition-secret"
+)
+
+// S5 operator sentences for the state-machine posture codes above.
+const (
+	sfnLoggingOffDetail = "The state machine records nothing about its executions, so a failed run leaves no trace of which state failed or what it was handed. Turn on execution logging to a CloudWatch log group."
+	sfnNoCMKDetail      = "Execution history and state data are encrypted with an AWS-owned key you cannot audit, rotate, or revoke. Point the state machine at a customer managed KMS key."
+	//nolint:gosec // G101 false positive: operator prose about a credential, not one
+	sfnDefinitionSecretDetail = "A credential is written into the state machine's definition, so it is readable by anyone who can call states:DescribeStateMachine and it travels with every export of the workflow. Move the value to Secrets Manager and reference it at run time, then rotate it."
 )
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
@@ -56,9 +65,15 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if smARN == "" {
 			return
 		}
+		// The configuration checks read DescribeStateMachine, which every
+		// state machine answers. They run before the execution listing and
+		// are not subject to its EXPRESS skip.
+		sfnConfigurationPosture(ctx, clients, &result, &mu, r.ID, smARN)
+
 		// EXPRESS state machines reject ListExecutions outright
-		// (StateMachineTypeNotSupported) — skip the call entirely rather than
-		// reacting to the guaranteed error.
+		// (StateMachineTypeNotSupported) — skip THAT CALL rather than the
+		// whole item, which would exempt an EXPRESS workflow from every
+		// configuration check above.
 		if r.Fields["type"] == "EXPRESS" {
 			return
 		}
@@ -120,4 +135,40 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	result.Truncated = truncated
 	return result,
 		AggregateFailures("sfn-enrich: ListExecutions", failures, total)
+}
+
+// sfnConfigurationPosture reads DescribeStateMachine and records the three
+// configuration signals it carries: execution logging, the encryption key,
+// and whether a credential is pasted into the definition. Takes the
+// enricher's mutex itself, so it can be called from the parallel body.
+func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, mu *sync.Mutex, id, smARN string) {
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
+		return clients.SFN.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{
+			StateMachineArn: aws.String(smARN),
+		})
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if err != nil {
+		result.TruncatedIDs[id] = true
+		return
+	}
+	// Absent configuration and an explicit OFF are the same fact: nothing is
+	// being recorded.
+	if out.LoggingConfiguration == nil || out.LoggingConfiguration.Level == "" || out.LoggingConfiguration.Level == sfntypes.LogLevelOff {
+		setWave2Finding(result, id, sfnCodeLoggingOff, "execution logging off", "~", "sfn",
+			[]domain.DetailRow{{Label: "Logging level", Value: "off", Tier: "~"}})
+	}
+	if out.EncryptionConfiguration == nil || out.EncryptionConfiguration.Type != sfntypes.EncryptionTypeCustomerManagedKmsKey {
+		setWave2Finding(result, id, sfnCodeNoCMK, "not encrypted with a customer key", "~", "sfn",
+			[]domain.DetailRow{{Label: "Key owner", Value: "amazon", Tier: "~"}})
+	}
+	// Rule 7: the rows carry Where and Kind, never the value itself.
+	var rows []domain.DetailRow
+	for _, hit := range secretscan.ScanText(aws.ToString(out.Definition)) {
+		rows = append(rows, domain.DetailRow{Label: hit.Where, Value: hit.Kind, Tier: "!"})
+	}
+	if len(rows) > 0 {
+		setWave2Finding(result, id, sfnCodeDefinitionSecret, "credential in state machine definition", "!", "sfn", rows)
+	}
 }

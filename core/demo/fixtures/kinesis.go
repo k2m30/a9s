@@ -27,8 +27,19 @@ type KinesisFixtures struct {
 	TagsByStream map[string][]kinesistypes.Tag
 	// KeyIDByStream maps stream name to its KMS KeyId — backs
 	// kinesis:DescribeStreamSummary for the kinesis:kms related-panel pivot.
+	// A stream absent from this map is served with EncryptionType NONE, which
+	// is what makes KinesisUnencrypted the only unencrypted row.
 	KeyIDByStream map[string]string
+	// RetentionHoursByStream maps stream name to its retention. A stream
+	// absent from this map is served the healthy default so only
+	// KinesisMinRetention sits at or below 24 hours.
+	RetentionHoursByStream map[string]int32
 }
+
+// KinesisHealthyRetentionHours is what every demo stream keeps except the
+// one KinesisMinRetention names — comfortably above the 24-hour default the
+// kinesis.min-retention row flags.
+const KinesisHealthyRetentionHours int32 = 168
 
 func mustParseKinesisTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
@@ -87,6 +98,28 @@ var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
 					StreamMode: kinesistypes.StreamModeProvisioned,
 				},
 			},
+			// KinesisUnencrypted: the only stream with no KMS key, so the
+			// only one DescribeStreamSummary reports as unencrypted.
+			{
+				StreamName:              aws.String(KinesisUnencrypted),
+				StreamARN:               aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/" + KinesisUnencrypted),
+				StreamStatus:            kinesistypes.StreamStatusActive,
+				StreamCreationTimestamp: aws.Time(mustParseKinesisTime("2025-11-02T14:00:00+00:00")),
+				StreamModeDetails: &kinesistypes.StreamModeDetails{
+					StreamMode: kinesistypes.StreamModeOnDemand,
+				},
+			},
+			// KinesisMinRetention: the only stream still on the 24-hour
+			// default retention. Encrypted, so it trips that row alone.
+			{
+				StreamName:              aws.String(KinesisMinRetention),
+				StreamARN:               aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/" + KinesisMinRetention),
+				StreamStatus:            kinesistypes.StreamStatusActive,
+				StreamCreationTimestamp: aws.Time(mustParseKinesisTime("2025-12-09T08:30:00+00:00")),
+				StreamModeDetails: &kinesistypes.StreamModeDetails{
+					StreamMode: kinesistypes.StreamModeProvisioned,
+				},
+			},
 			// Issue: StreamStatus=UPDATING → wave1 finding (CodeKinesisUpdating,
 			// SevWarn) → Warning (shard split/merge or mode change in progress).
 			{
@@ -111,8 +144,21 @@ var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
 		// KeyIDByStream — required for the kinesis:kms related-panel pivot
 		// (checkKinesisKMS → kinesis:DescribeStreamSummary). Reuses the
 		// primary production KMS key (kms.go).
+		// Every stream but KinesisUnencrypted carries a key, so exactly one
+		// demo row reads as unencrypted at rest.
 		KeyIDByStream: map[string]string{
-			"clickstream-ingest": "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"clickstream-ingest":     "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"order-events-stream":    "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"audit-log-stream":       "a1b2c3d4-5678-90ab-cdef-111111111111",
+			OrdersProdKinesisStream:  "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"kinesis-deleting":       "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"payments-ledger-stream": "a1b2c3d4-5678-90ab-cdef-111111111111",
+			KinesisMinRetention:      "a1b2c3d4-5678-90ab-cdef-111111111111",
+		},
+		// Only KinesisMinRetention sits at the 24-hour default; every other
+		// stream is served KinesisHealthyRetentionHours.
+		RetentionHoursByStream: map[string]int32{
+			KinesisMinRetention: 24,
 		},
 	}
 })

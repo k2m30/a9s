@@ -26,6 +26,13 @@ const (
 	mskCodeUnauthenticated  domain.FindingCode = "msk.unauthenticated"
 )
 
+// S5 operator sentences for the broker exposure codes above. Neither carries
+// a supporting row: the phrase is the whole fact.
+const (
+	mskPublicAccessDetail    = "Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network."
+	mskUnauthenticatedDetail = "The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods."
+)
+
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
 // and raises findings for:
 //   - Broker software version below 2.8 (major.minor) → "~" "broker software outdated"
@@ -91,6 +98,18 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
 			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil)
 		}
+		// A nil anywhere down either chain is unknown, not misconfigured.
+		if bng := prov.BrokerNodeGroupInfo; bng != nil &&
+			bng.ConnectivityInfo != nil &&
+			bng.ConnectivityInfo.PublicAccess != nil &&
+			aws.ToString(bng.ConnectivityInfo.PublicAccess.Type) == mskPublicAccessOn {
+			setWave2Finding(&result, r.ID, mskCodePublicAccess, "brokers reachable from the internet", "!", "msk", nil)
+		}
+		if ca := prov.ClientAuthentication; ca != nil &&
+			ca.Unauthenticated != nil &&
+			aws.ToBool(ca.Unauthenticated.Enabled) {
+			setWave2Finding(&result, r.ID, mskCodeUnauthenticated, "unauthenticated access allowed", "!", "msk", nil)
+		}
 	})
 	sort.Strings(failures)
 	// All MSK findings are severity "~" (informational) and do not contribute to the
@@ -100,6 +119,11 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }
+
+// mskPublicAccessOn is the one PublicAccess.Type value that means the brokers
+// carry their own public addresses; every other value, including DISABLED,
+// keeps them inside the VPC.
+const mskPublicAccessOn = "SERVICE_PROVIDED_EIPS"
 
 // isMSKVersionOutdated returns true when the given Kafka version string is below the
 // conservative current cutoff of 2.8 (major.minor). Versions that cannot be parsed

@@ -13,6 +13,10 @@ import (
 // Policy attribute is either absent or account-scoped.
 const SQSPublicPolicy = "sqs-public-policy"
 
+// sqsPublicPolicyQueueURL is the same queue addressed the way
+// GetQueueAttributes wants it; the row itself is keyed by queue name.
+const sqsPublicPolicyQueueURL = "https://sqs.us-east-1.amazonaws.com/123456789012/" + SQSPublicPolicy
+
 // SQSFixtures holds typed fixture data for SQS.
 type SQSFixtures struct {
 	// Queues maps queue URL to its attributes row.
@@ -69,6 +73,21 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					"FifoQueue":                             "true",
 					"ContentBasedDeduplication":             "true",
 					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:webhook-ingest-queue.fifo",
+				},
+			},
+			// SQSPublicPolicy: the only queue whose access policy names a
+			// wildcard principal. Encrypted and with a redrive policy, so
+			// it trips that one row alone.
+			{
+				QueueURL:  sqsPublicPolicyQueueURL,
+				QueueName: SQSPublicPolicy,
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "3",
+					"ApproximateNumberOfMessagesNotVisible": "0",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + SQSPublicPolicy,
+					"RedrivePolicy":                         `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
+					"KmsMasterKeyId":                        OrdersProdKMSKeyID,
+					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sqs:ReceiveMessage","sqs:SendMessage"],"Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSPublicPolicy + `"}]}`,
 				},
 			},
 			// S3 healthy-bucket dead-letter queue (checkS3SQS pivot).
