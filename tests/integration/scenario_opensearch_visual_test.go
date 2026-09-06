@@ -6,19 +6,17 @@ package integration
 // resource. Verifies the rendered TUI output (not fetcher return values) matches
 // the universal UI rules and the §4 contract in docs/resources/opensearch.md.
 //
-// opensearch has NO Wave-1 signals (ListDomainNames returns only names +
-// engine). All five §4 signals are Wave-2, and colorOpenSearch resolves
-// color via colorFromAnyFinding for every one of them — no signal here
-// leaves its row Healthy, so there is no name-glyph on this resource type:
-//   - Deleted         → Dim, "deleting: removal in progress"
-//   - Isolated        → Broken, "isolated: quarantined by AWS"
-//   - Processing      → Warning, "processing: config change in flight"
-//   - UpdateAvailable → Broken, "software update forced soon"
-//   - EncryptionOff   → Warning, "encryption at rest off"
-//
-// Because the Wave-2 enricher reads signal flags the fetcher already wrote
-// from DescribeDomains, both waves fire in the same demo startup pass —
-// every fixture lands with its Status/Issues/Finding populated.
+// Every opensearch signal is Wave 1. DescribeDomains is the fetcher's own call
+// and DomainStatus carries all of them, so there is no second pass and no
+// signal that shows a glyph without colouring its own row:
+//   - Deleted           → Dim,     "deleting: removal in progress"
+//   - Isolated          → Broken,  "isolated: quarantined by AWS"
+//   - PolicyPublic      → Broken,  "reachable outside a VPC"
+//   - Processing        → Warning, "processing: config change in flight"
+//   - UpdateForcedSoon  → Warning, "software update forced soon"
+//   - EncryptionOff     → Warning, "encryption at rest off"
+//   - HTTPSNotEnforced  → Warning, "HTTPS not enforced"
+//   - NodeToNodeOff     → Warning, "node-to-node encryption off"
 
 import (
 	"testing"
@@ -35,11 +33,12 @@ const (
 	openSearchPhraseProcessing = "processing: config change in flight"
 	openSearchPhraseUpdate     = "software update forced soon"
 	openSearchPhraseEncryption = "encryption at rest off"
-	// acme-search-alpha carries Wave-1 `~` processing and Wave-2 `!`
-	// update-forced. domain.TopFinding picks the worst, so the update leads
-	// and processing becomes the (+1) — the phrase and the row colour resolve
-	// through the same selection, so a red row never reads as a warning.
-	openSearchPhraseProcessingP1  = "software update forced soon (+1)"
+	// acme-search-alpha carries processing and update-forced, acme-metrics
+	// carries update-forced and encryption-off. All four are Wave-1 warnings,
+	// so the phrase and the row colour resolve through one selection and the
+	// tie falls to the order the predicate emits them in: the lifecycle state
+	// leads on the first row, the update on the second.
+	openSearchPhraseProcessingP1  = "processing: config change in flight (+1)"
 	openSearchPhraseUpdateP1      = "software update forced soon (+1)"
 	openSearchDetailPhraseUpdate  = "Software update forced soon"
 	openSearchDetailPhraseEncOff  = "Encryption at rest off"
@@ -54,34 +53,27 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	runDemoStartup(t, scenario)
 
 	// -----------------------------------------------------------------
-	// S1 menu badge — `unifiedIssueCount` is the union of:
-	//   (a) rows whose Color.IsIssue() (Warning/Broken), and
-	//   (b) rows carrying a `!` severity EnrichmentFinding.
-	// For opensearch:
-	//   - IsolatedDomain            (Broken)
-	//   - ProcessingDomain          (Warning)
-	//   - ProcessingPlusUpdateDomain (Warning)
-	//   - UpdateAvailableDomain     (Healthy + `!`)
-	//   - MultiBackgroundDomain     (Healthy + `!`)
-	// DeletingDomain (Dim) does not count; `~` never bumps.
-	// Recount over the 13 opensearch fixtures — rows whose Wave-1-only colour
-	// IsIssue, plus Healthy rows carrying a Wave-2 `!`:
-	//   Wave-1 Broken (1):  legacy-search-isolated
-	//   Wave-1 Warning (3): acme-events, acme-search-alpha,
-	//                       warn-os-details-unavailable (degraded name-only
-	//                       row — absent from the DescribeDomains response,
-	//                       a non-auth degradation rather than an IAM denial)
-	//   Healthy + Wave-2 `!` (3): acme-product-search and acme-metrics
-	//                       (update-forced), plus acme-public-search, which
-	//                       the databases batch added — opensearch.public, `!`
-	//   Not counted (6): two clean domains, obsolete-tenant-logs (Dim), and
-	//                    legacy-analytics (encryption at rest off) /
-	//                    acme-http-search / acme-plaintext-nodes, whose
-	//                    findings are Wave-2 `~`. That is why the batch added
-	//                    three opensearch findings and the badge moved by one.
-	// 1 + 3 + 3 = 7.
+	// S1 menu badge — the count of rows whose colour is an issue. Colour is
+	// the worst severity among a row's findings, so a Warn finding counts
+	// wherever it came from and a Dim one never does.
+	// Over the 13 opensearch fixtures:
+	//   Broken (2):  legacy-search-isolated (isolated),
+	//                acme-public-search (reachable outside a VPC)
+	//   Warning (8): acme-events and acme-search-alpha (processing),
+	//                acme-product-search and acme-metrics (update forced),
+	//                legacy-analytics (encryption at rest off),
+	//                acme-http-search (HTTPS not enforced),
+	//                acme-plaintext-nodes (node-to-node encryption off),
+	//                warn-os-details-unavailable (degraded name-only row —
+	//                absent from the DescribeDomains response, a non-auth
+	//                degradation rather than an IAM denial)
+	//   Not counted (3): staging-analytics and acme-logs are clean, and
+	//                obsolete-tenant-logs is Dim.
+	// 2 + 8 = 10. The three encryption and transport rows moved into this
+	// count when their findings became Wave 1: they used to be Wave-2 rows
+	// that showed a glyph without colouring their own row.
 	// -----------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("opensearch", 7)
+	scenario.ExpectMenuIssueCount("opensearch", 10)
 
 	scenario.OpenList("opensearch")
 
@@ -122,10 +114,9 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	// Rule 7 — multi-finding suffix.
 	// Processing + UpdateAvailable → hard-state wins, suffix +1.
 	scenario.ExpectRowStatusEquals(demofixtures.ProcessingPlusUpdateDomain, openSearchPhraseProcessingP1)
-	// Post-AS-140 the multi-background row carries a single visible Wave-2
-	// finding (the `~` encryption-off signal is no longer counted as an
-	// extra hidden finding), so no `(+1)` suffix.
-	scenario.ExpectRowStatusEquals(demofixtures.MultiBackgroundDomain, openSearchPhraseUpdate)
+	// The multi-background row carries update-forced and encryption-off, both
+	// Wave-1 warnings, so the update leads and the suffix counts the second.
+	scenario.ExpectRowStatusEquals(demofixtures.MultiBackgroundDomain, openSearchPhraseUpdateP1)
 
 	// -----------------------------------------------------------------
 	// Glyph rules.
@@ -181,12 +172,12 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	scenario.Back()
 
 	// -----------------------------------------------------------------
-	// Rule 7 U7c — S5 Attention section surfaces every Wave-2 finding
-	// on the multi-background fixture. The list Status is
-	// "software update forced soon (+1)" (rolled-up); the detail must
-	// enumerate BOTH conditions as their OWN Attention entry (#52: each
-	// wave-2 finding is independent — no more "Additional" cramming),
-	// each rendered with its first letter capitalized.
+	// Rule 7 U7c — the S5 Attention section surfaces every finding on the
+	// multi-background fixture. The list Status rolls them up as
+	// "software update forced soon (+1)"; the detail must enumerate BOTH
+	// conditions as their own Attention entry (#52: each finding is
+	// independent — no more "Additional" cramming), each rendered with its
+	// first letter capitalized.
 	// -----------------------------------------------------------------
 	multi := selectOpenSearchByID(t, scenario, demofixtures.MultiBackgroundDomain)
 	scenario.OpenDetailResource("opensearch", multi)
@@ -215,14 +206,14 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 
 	// Capitalized Wave-1-carrying hard-state phrase.
 	scenario.ExpectViewContains(openSearchDetailPhraseProcess)
-	// The Wave-2 finding attached to the Warning row still surfaces in S5
+	// The second finding on the Warning row still surfaces in S5
 	// (rule 7 — "no finding silently disappears").
 	scenario.ExpectViewContains(openSearchDetailPhraseUpdate)
 }
 
 // TestScenario_OpenSearchVisual_HealthyRowsHaveNoAttentionSection asserts spec
 // §4 "Healthy silence": Healthy rows must render with no Attention section
-// and no Wave-2 phrase in their detail view. Regression pin for
+// and no signal phrase in their detail view. Regression pin for
 // false-positive noise on the showroom instance.
 func TestScenario_OpenSearchVisual_HealthyRowsHaveNoAttentionSection(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

@@ -87,14 +87,12 @@ func snapResourceWithStatus(snap rdstypes.DBSnapshot, preStatus string) resource
 	return r
 }
 
-// dbiCacheFromFixtures builds a ResourceCache with the "dbi" key populated
-// from the canonical DBI fixtures. Used for tests that need a real dbi list.
+// dbiCacheFromFixtures builds the "dbi" cache entry from the same list
+// DescribeDBInstances serves. Built from the canonical set alone it would
+// report every snapshot whose parent lives in the legacy pool as an orphan,
+// which is a verdict no running demo produces.
 func dbiCacheFromFixtures(t *testing.T) resource.ResourceCache {
 	t.Helper()
-	// The same list DescribeDBInstances serves: the canonical set plus the
-	// legacy pool. Built from the canonical set alone, this cache reports every
-	// snapshot whose parent lives in the legacy pool as an orphan, which is a
-	// verdict no running demo produces.
 	instances := fixtures.NewRDSFixtures().DBInstances
 	res := make([]resource.Resource, 0, len(instances))
 	for _, db := range instances {

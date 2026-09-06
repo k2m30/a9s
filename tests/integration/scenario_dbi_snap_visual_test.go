@@ -24,34 +24,24 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	runDemoStartup(t, scenario)
 
 	// -----------------------------------------------------------------
-	// S1 menu badge — assert BEFORE OpenList (menu is the root view).
-	// N = count of distinct dbi-snap instances whose final color is yellow/red:
-	//
-	//   Fetcher-direct (6):
-	//     WarnDBISnapCreatingID                        Warning  (creating: 42%)
-	//     BrokenDBISnapFailedID                        Broken   (failed)
-	//     BrokenDBISnapIncompatibleID                  Broken   (incompatible-restore)
-	//     WarnDBISnapUnencryptedID                     Warning  (unencrypted)
-	//     MultiW1DBISnapID                             Warning  (unencrypted (+1))
-	//     SeverityBrokenWarnDBISnapID                  Broken   (failed; W1 unenc suppressed)
-	//
-	//   Cross-ref enricher (2):
-	//     WarnDBISnapOrphanID                          Warning  (orphan: source DB deleted)
-	//     WarnDBISnapPastRetentionID                   Warning  (automated, 23d past retention)
-	//
-	// dbi-snap DOES now have a Wave-2 `!` signal. Recount over the 11
-	// fixtures — rows whose Wave-1-only colour IsIssue, plus Healthy rows
-	// carrying a Wave-2 `!`:
+	// S1 menu badge — assert BEFORE OpenList (the menu is the root view).
+	// The count is the rows whose colour is an issue, and colour is the worst
+	// severity among a row's findings across both waves.
+	// Over the 12 dbi-snap fixtures:
 	//   Wave-1 Broken (3):  prod-dbi-1-failed-snap, failed-with-unenc-snap,
 	//                       legacy-mysql-snap-incompatible
-	//   Wave-1 Warning (3): dev-feature-branch-snap, unenc-pre-migration-snap,
+	//   Wave-1 Warning (4): dev-feature-branch-snap (creating: 42%),
+	//                       cross-region-copy-snap (copying),
+	//                       unenc-pre-migration-snap,
 	//                       multi-orphan-unenc-snap
-	//   Healthy + Wave-2 `!` (3): orphan-deleted-db-snap (orphan),
-	//                       rds:retention-test-2026-03-25 (past-retention),
-	//                       and shared-with-all-dbi-snap, which the databases
-	//                       batch added — dbi-snap.public, `!`
-	// 3 + 3 + 3 = 9. Was 8 before that one row.
-	scenario.ExpectMenuIssueCount("dbi-snap", 9)
+	//   Wave-2 only (3):    orphan-deleted-db-snap (orphan),
+	//                       rds:retention-test-2026-03-25 (past retention),
+	//                       shared-with-all-dbi-snap (shared with all accounts)
+	//   Not counted (2):    rds:prod-dbi-1-2026-04-15 and
+	//                       awsbackup:job-deadbeef-snap are clean.
+	// 3 + 4 + 3 = 10. The copying row is the one this batch added, as the
+	// witness for a snapshot state a9s does not enumerate by name.
+	scenario.ExpectMenuIssueCount("dbi-snap", 10)
 
 	scenario.OpenList("dbi-snap")
 

@@ -194,9 +194,13 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	// both the row count, because each batch added witness fixtures, and the
 	// badge, because those fixtures carry findings. The per-row derivations
 	// live next to the scenario pins for each type.
+	//
+	// ECS Services moved again for the same reason: acme-svc-stalled is the
+	// witness for a service that wants tasks and is running none, so it adds
+	// one row and one Broken badge.
 	pins := []string{
 		"EC2 Instances (40) issues:15",
-		"ECS Services (25) issues:6",
+		"ECS Services (26) issues:7",
 		// d4 row 1: 42 -> 28. Sixteen rows carried
 		// dbi.warn.deletion_protection_off because the bulk pool left
 		// DeletionProtection unset; the pool now sets it and only
