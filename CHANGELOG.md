@@ -16,6 +16,221 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the on-disk count for the type, where it outlived the session that produced
   it.
 
+- A Redis replication group or database cluster whose subnets cannot be reached
+  now says which it is. The panel showed a bare `?` for three different
+  answers: the group has no member cluster to read, the member is not in a
+  subnet group at all, or the call to look failed. The first two now read as a
+  proven zero and the third reads as the error, on the Subnets and VPC rows of
+  both types. A group with no members reads zero on its Security Groups and SNS
+  Topics rows too, which used to render a label with no count beside it.
+- A CloudTrail event that names a secret by its full ARN now finds it. Secrets
+  Manager appends six random characters to the ARN that the secret's name does
+  not carry, so the event could never be matched against the secrets list and
+  the row read zero. The panel now matches an event's ARN against the list's
+  own ARN, which is exact rather than guessed.
+- A hosted zone no longer reports load balancers, CloudFront distributions or
+  other targets that do not exist. Its alias records name a DNS target, and the
+  panel used to turn that name straight into a count, so a zone whose alias
+  pointed at a deleted load balancer showed one anyway and dead-ended on Enter.
+  Every alias pivot now reports only what the target list confirms, and reads
+  as unknown when no list has been read.
+
+- A related row no longer reads as a confident zero when nothing behind it was
+  read at all. Twenty-nine pivots across S3, Redis, Document DB, RDS, DynamoDB,
+  EC2, ECS, EKS, EFS, Lambda, SES and WAF now read as unknown when the list they
+  answer from was never fetched, instead of a zero, or a zero with a "more to
+  come" marker that implied a list had been seen. A cluster snapshot no longer
+  reports the parent cluster it names as present without checking. A list that
+  was fetched but came back partial still reports what it found, marked as a
+  lower bound.
+
+- The role a CloudTrail event names is now reported only once the role list
+  confirms it still exists. An event body records what was there at the time,
+  so an event naming a since-deleted role used to answer with a count that
+  went nowhere on Enter. With no role list read yet, the row now reads as
+  unknown rather than guessing, and a role filed under a path is matched by
+  its whole name instead of a trailing fragment that could belong to a
+  different role. Where only part of the list was read, every CloudTrail event
+  pivot now reports what those pages confirmed, marked as a lower bound, which
+  is the same reading the rest of the related panel uses.
+
+- A load balancer with several listeners in the clear, or several on a weak
+  TLS policy, now names every affected port rather than the first one, and its
+  listeners are read to the end instead of one page deep, so a listener no
+  longer hides behind whichever listeners AWS returned first. Each supporting
+  row leads with its port, so a balancer with three of them says which three.
+
+- An IAM user whose access-key last use could not be read now reads as
+  unknown rather than clean. The key that could not be read is exactly the
+  one that might be idle.
+
+- A role opened from another view now reports the same problems as the same
+  role in its list. The drill skipped inline policies, so a privilege-
+  escalation policy was visible one way and invisible the other.
+
+- Pending-maintenance results survive a failed page. A later page failing
+  used to discard the instances the earlier pages had already named.
+
+- CodeArtifact repository policies are read by parsing them, not by matching
+  text, so a pretty-printed policy is no longer missed and one scoped to an
+  organisation is no longer called public.
+
+- A VPC endpoint that grants every action of its own service to every
+  principal now reports as open. The endpoint only ever fronts that service,
+  so the narrower wildcard withholds nothing.
+
+- Policy documents decode one way everywhere. A literal "+" inside a policy
+  survived at one site and became a space at another, so the same document
+  read differently depending on which view asked.
+
+- Redshift parameter groups are read once each and concurrently, instead of
+  serialising every cluster in the pass behind one lock.
+
+- An ECS service event newer than the window is no longer missed because an
+  older event preceded it in the list.
+- Demo mode showed sixteen database instances with deletion protection
+  turned off, burying the one instance that exists to demonstrate the
+  signal. The bulk filler pool left the setting unstated, so every filler
+  row inherited the warning. One instance carries it now.
+
+- Demo mode stated two different public addresses for the same instance:
+  the instance said one and its Elastic IP said another. They agree now,
+  on both the public and the private address.
+
+- Demo mode had no network load balancer carrying a cleartext listener, so
+  half of that signal went unshown. One network balancer now serves TCP on
+  port 443, where the port promises TLS and the protocol never terminates
+  it.
+
+- Demo mode had no resource whose related panel drilled to an IAM role with
+  a finding on it, so the role's issues could only be seen from the role
+  list. One build project now uses the role whose inline policy allows
+  privilege escalation.
+
+- Detail rows say what is true of the account rather than how the SDK spells
+  it. A public image and a public snapshot read `yes` instead of `true`, an
+  auto-scaling group's health check reads `ec2` instead of `EC2`, its public
+  address assignment reads `enabled`, Redshift's encrypted-connection
+  parameter and the four S3 public-access-block flags read `off` beside the
+  parameter name they name, and an Athena workgroup's unenforced settings
+  read `no` with its unencrypted results reading `off` rather than `nil`.
+
+- Demo mode flagged four Athena workgroups for unencrypted query results and
+  none for unenforced settings, so the signal had no single carrier and the
+  type never appeared in the sweeps that check every other type's rendered
+  rows. One workgroup now carries both halves and the rest encrypt their
+  results.
+
+- An Athena workgroup's governance problems now read as sentences. The list
+  cell said `Workgroup settings enforced (2 findings)`, which was the label of
+  the row underneath it and left the reader to work out which way "enforced"
+  pointed. Unenforced settings and unencrypted results are two independent
+  settings, so they are two signals: `settings can be overridden per query`
+  and `query results stored unencrypted`, each with a sentence saying what it
+  exposes and what to change, and the second naming where the results land.
+
+- A load balancer with one listener in the clear now says `port 443`, not
+  `ports 443`, and its explanation says "this listener" rather than "these
+  listeners". The same on weak TLS policies. A single port under a plural
+  heading reads as a list that got truncated.
+
+- An Elastic IP attached to a NAT gateway no longer shows as idle. The colour
+  was decided a second time from two of the three attachment fields, and a NAT
+  gateway's address — which has an interface but no association and no
+  instance — looked unattached to it. The one place that decides attachment is
+  the finding the list already carries.
+
+- Demo mode said three different things about one instance's addresses: its
+  Elastic IP, its network interface and the instance list each named a
+  different pair, and the address was a NAT gateway's allocation, which cannot
+  belong to an instance. All three now agree, and the allocation belongs to
+  the NAT gateway alone.
+
+- Every demo address now has one owner. Two NAT gateway allocations were also
+  serving as instance Elastic IPs, one of them advertised on two interfaces
+  with two different public addresses, and a staging allocation named a
+  production instance's interface. The instances keep their own allocations,
+  the NAT gateways keep theirs, and each address appears on one interface and
+  one instance.
+
+- Demo mode listed every KMS key twice, in a different order on each run.
+  The list was being built from the lookup table that deliberately holds each
+  key under both its bare ID and its full ARN, rather than from the account's
+  key list. Each key now appears once, in a stable order.
+
+- Drilling into a related resource no longer overwrites the full list it
+  came from. After loading all 200 instances of a type, opening a pivot
+  that matched 3 of them replaced the cached list with just those 3 —
+  the main menu then reported `3` as an exact count, and the wrong count
+  was written to the on-disk cache, so it survived a restart. Lookups by
+  ID and child lists corrupted the same way. Each fetch now states which
+  kind it is, and only a full list of a type may replace that type's
+  cached rows. The same corruption was reachable by a second route — a
+  late drill or by-ID result arriving while that type's full list was
+  open on screen — which is closed too; such a result now finds the view
+  it actually belongs to instead of overwriting the list it merely
+  shares a type with.
+
+- A failed "load more" no longer leaves a resource list stuck. In the
+  web UI, when loading the next page failed, the list kept showing its
+  loading indicator indefinitely with no way to retry — only that one
+  failure path forgot to switch it off. Every path that ends a fetch now
+  clears all of its indicators together.
+
+- A fetch that partly failed no longer erases its own error message.
+  When a result came back with some rows and an error, the rows landing
+  cleared the error marker, so the failure went unreported.
+
+- Fixed a crash and occasional wrong rows in resource lists. A list
+  screen and the shared cache held the same rows in memory while
+  guarding them with separate locks, so loading another page could
+  overwrite what the cache held without it noticing, and a background
+  refresh landing at the wrong moment could take the app down. Each now
+  keeps its own copy.
+
+- A related-resource pivot no longer reports a confident `0` when the
+  AWS call behind it failed or was denied. Fifteen checkers turned an
+  error into a proven dead end — a log group actively streaming to
+  Kinesis showed `(0)` if `logs:DescribeSubscriptionFilters` was not
+  granted, a Redis replication group showed `(0)` across four pivots
+  when one lookup was throttled, an IAM group with three inline
+  policies showed `(0)` when only one of two list calls was permitted.
+  These now render as unknown, which is the truth: we could not look.
+  Where several calls back one pivot and only some succeed, the count
+  renders as `N+` instead of a false exact total. A throttled
+  EventBridge enrichment also no longer invents a critical "enabled
+  rule has no targets" alarm for a healthy rule.
+
+  The pipeline pivots on CodeBuild projects and ECR repositories were
+  the last two holdouts: they inspect each pipeline in turn, and a
+  lookup that failed was quietly skipped, so a project used by five
+  pipelines reported an exact `2` when three lookups were throttled.
+  The ECR one was worse — without permission to read pipelines at all
+  it reported an exact `0`, a definitive "nothing uses this
+  repository" arrived at without a single successful call.
+
+- Web mode: detail enrichment now works end to end — results fold into
+  the shared controller state and directly opened YAML/JSON views
+  dispatch enrichment, so the web view shows what the terminal shows.
+- Web mode: related-panel drill-ins find targets outside the cached
+  list (lazy-add previously ran only in the terminal), and background
+  task execution no longer reads session state unlocked while request
+  handlers mutate it.
+- Enrichment and related-panel errors surface as an error flash in the
+  terminal again; both previously rendered no feedback at all.
+- Documents keep numeric fidelity: integers above 2^53 in policy
+  documents, templates, ASL definitions, and topic attributes no longer
+  silently round (9007199254740993 stayed ...992 before), and a
+  malformed document with a stray trailing brace still displays
+  verbatim rather than being reshaped into structure.
+- YAML and JSON views render the same shape for the same resource: the
+  YAML view promotes embedded struct fields exactly like the JSON view
+  (`encoding/json` semantics) instead of nesting them under the
+  embedded type's name.
+- Related-panel counts over truncated target populations render "N+"
+  instead of a misleading exact "N", and an empty truncated page no
+  longer erases the truncation marker from the cached row store.
+
 ### Added
 
 - Volumes, databases, clusters and tables that no backup plan selects now say
@@ -311,6 +526,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `efs_encryption_at_rest_enabled`, `efs_not_publicly_accessible`,
   `efs_have_backup_enabled`.
 
+- Detail views fetch what the list APIs don't return (#261). Opening a
+  detail, YAML, or JSON view now enriches on demand: Step Functions
+  show the full ASL definition, live status, and role; CloudFormation
+  stacks show the template body (session-cached, version-keyed so an
+  updated stack never serves its pre-update template); Lambda functions
+  show state, code metadata, and reserved concurrency; EC2 instances
+  show decoded user data (base64 and gzip handled); SNS topics show
+  their full attribute set including effective delivery policy; S3
+  buckets show bucket policy, CORS rules, and lifecycle configuration.
+  These six and the two IAM document enrichers run on one generic
+  engine (Transfer agreements keep their own resolver), and a dedicated
+  demo smoke gate walks all nine of them on every push.
+- Detail open/refresh runs under a single operation identity: the
+  enrichment and every related-panel check created by one user action
+  share one generation, one set of AWS clients, and one call-coalescing
+  namespace, and their results are accepted only while that operation
+  is still the active one. A refresh supersedes in-flight work instead
+  of racing it; concurrent calls within one operation collapse to a
+  single AWS request per API (an SFN refresh performs one
+  `DescribeStateMachine` in total); rotation invalidates everything
+  in flight.
+- `--trace <path>` writes a structured, JSON-lines diagnostic stream of
+  the detail-operation lifecycle — an operation beginning, each AWS
+  call as executed or served without a new request, an enrichment
+  cache hit/miss/write, and a result fold's accept/reject decision
+  (#488). Off by default; writes only to the given file, never stdout.
+- `make changelog` assembles `CHANGELOG.md`'s Unreleased section from one
+  fragment file per task under `changelog.d/`, so two tasks landing at once no
+  longer conflict in the changelog. `make ready-to-release` refuses while a
+  fragment is unassembled.
+- `scripts/task-file-overlap.sh` names the files two task branches both touch,
+  which is the check the "no two live tasks share a file" rule needed.
+
 ### Changed
 
 - An SQS queue missing encryption now says so. It previously reported the
@@ -373,6 +621,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redis and Redshift rows now take their color from the worst finding on
   the row rather than the first Wave 1 one, so a Broken signal can no
   longer hide behind a Warning that happened to be evaluated earlier.
+- `docs/attention-signals.md` states every signal once, generated from the
+  registered findings, instead of a hand-written table per category that every
+  change had to edit. The ideas no code emits yet moved to a "Not yet
+  implemented" list on the same page.
+- Each resource type's demo row count, issue badge and state-coverage
+  allowlist now live beside its fixtures instead of in two shared test files.
 
 ### Fixed (security)
 
@@ -385,254 +639,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identity fetch on the new account also left the old ARN in the header
   indefinitely. Both are closed, with regression coverage for identity,
   revealed values and costs.
-
-### Fixed
-
-- A Redis replication group or database cluster whose subnets cannot be reached
-  now says which it is. The panel showed a bare `?` for three different
-  answers: the group has no member cluster to read, the member is not in a
-  subnet group at all, or the call to look failed. The first two now read as a
-  proven zero and the third reads as the error, on the Subnets and VPC rows of
-  both types. A group with no members reads zero on its Security Groups and SNS
-  Topics rows too, which used to render a label with no count beside it.
-- A CloudTrail event that names a secret by its full ARN now finds it. Secrets
-  Manager appends six random characters to the ARN that the secret's name does
-  not carry, so the event could never be matched against the secrets list and
-  the row read zero. The panel now matches an event's ARN against the list's
-  own ARN, which is exact rather than guessed.
-- A hosted zone no longer reports load balancers, CloudFront distributions or
-  other targets that do not exist. Its alias records name a DNS target, and the
-  panel used to turn that name straight into a count, so a zone whose alias
-  pointed at a deleted load balancer showed one anyway and dead-ended on Enter.
-  Every alias pivot now reports only what the target list confirms, and reads
-  as unknown when no list has been read.
-
-- A related row no longer reads as a confident zero when nothing behind it was
-  read at all. Twenty-nine pivots across S3, Redis, Document DB, RDS, DynamoDB,
-  EC2, ECS, EKS, EFS, Lambda, SES and WAF now read as unknown when the list they
-  answer from was never fetched, instead of a zero, or a zero with a "more to
-  come" marker that implied a list had been seen. A cluster snapshot no longer
-  reports the parent cluster it names as present without checking. A list that
-  was fetched but came back partial still reports what it found, marked as a
-  lower bound.
-
-- The role a CloudTrail event names is now reported only once the role list
-  confirms it still exists. An event body records what was there at the time,
-  so an event naming a since-deleted role used to answer with a count that
-  went nowhere on Enter. With no role list read yet, the row now reads as
-  unknown rather than guessing, and a role filed under a path is matched by
-  its whole name instead of a trailing fragment that could belong to a
-  different role. Where only part of the list was read, every CloudTrail event
-  pivot now reports what those pages confirmed, marked as a lower bound, which
-  is the same reading the rest of the related panel uses.
-
-- A load balancer with several listeners in the clear, or several on a weak
-  TLS policy, now names every affected port rather than the first one, and its
-  listeners are read to the end instead of one page deep, so a listener no
-  longer hides behind whichever listeners AWS returned first. Each supporting
-  row leads with its port, so a balancer with three of them says which three.
-
-- An IAM user whose access-key last use could not be read now reads as
-  unknown rather than clean. The key that could not be read is exactly the
-  one that might be idle.
-
-- A role opened from another view now reports the same problems as the same
-  role in its list. The drill skipped inline policies, so a privilege-
-  escalation policy was visible one way and invisible the other.
-
-- Pending-maintenance results survive a failed page. A later page failing
-  used to discard the instances the earlier pages had already named.
-
-- CodeArtifact repository policies are read by parsing them, not by matching
-  text, so a pretty-printed policy is no longer missed and one scoped to an
-  organisation is no longer called public.
-
-- A VPC endpoint that grants every action of its own service to every
-  principal now reports as open. The endpoint only ever fronts that service,
-  so the narrower wildcard withholds nothing.
-
-- Policy documents decode one way everywhere. A literal "+" inside a policy
-  survived at one site and became a space at another, so the same document
-  read differently depending on which view asked.
-
-- Redshift parameter groups are read once each and concurrently, instead of
-  serialising every cluster in the pass behind one lock.
-
-- An ECS service event newer than the window is no longer missed because an
-  older event preceded it in the list.
-- Demo mode showed sixteen database instances with deletion protection
-  turned off, burying the one instance that exists to demonstrate the
-  signal. The bulk filler pool left the setting unstated, so every filler
-  row inherited the warning. One instance carries it now.
-
-- Demo mode stated two different public addresses for the same instance:
-  the instance said one and its Elastic IP said another. They agree now,
-  on both the public and the private address.
-
-- Demo mode had no network load balancer carrying a cleartext listener, so
-  half of that signal went unshown. One network balancer now serves TCP on
-  port 443, where the port promises TLS and the protocol never terminates
-  it.
-
-- Demo mode had no resource whose related panel drilled to an IAM role with
-  a finding on it, so the role's issues could only be seen from the role
-  list. One build project now uses the role whose inline policy allows
-  privilege escalation.
-
-- Detail rows say what is true of the account rather than how the SDK spells
-  it. A public image and a public snapshot read `yes` instead of `true`, an
-  auto-scaling group's health check reads `ec2` instead of `EC2`, its public
-  address assignment reads `enabled`, Redshift's encrypted-connection
-  parameter and the four S3 public-access-block flags read `off` beside the
-  parameter name they name, and an Athena workgroup's unenforced settings
-  read `no` with its unencrypted results reading `off` rather than `nil`.
-
-- Demo mode flagged four Athena workgroups for unencrypted query results and
-  none for unenforced settings, so the signal had no single carrier and the
-  type never appeared in the sweeps that check every other type's rendered
-  rows. One workgroup now carries both halves and the rest encrypt their
-  results.
-
-- An Athena workgroup's governance problems now read as sentences. The list
-  cell said `Workgroup settings enforced (2 findings)`, which was the label of
-  the row underneath it and left the reader to work out which way "enforced"
-  pointed. Unenforced settings and unencrypted results are two independent
-  settings, so they are two signals: `settings can be overridden per query`
-  and `query results stored unencrypted`, each with a sentence saying what it
-  exposes and what to change, and the second naming where the results land.
-
-- A load balancer with one listener in the clear now says `port 443`, not
-  `ports 443`, and its explanation says "this listener" rather than "these
-  listeners". The same on weak TLS policies. A single port under a plural
-  heading reads as a list that got truncated.
-
-- An Elastic IP attached to a NAT gateway no longer shows as idle. The colour
-  was decided a second time from two of the three attachment fields, and a NAT
-  gateway's address — which has an interface but no association and no
-  instance — looked unattached to it. The one place that decides attachment is
-  the finding the list already carries.
-
-- Demo mode said three different things about one instance's addresses: its
-  Elastic IP, its network interface and the instance list each named a
-  different pair, and the address was a NAT gateway's allocation, which cannot
-  belong to an instance. All three now agree, and the allocation belongs to
-  the NAT gateway alone.
-
-- Every demo address now has one owner. Two NAT gateway allocations were also
-  serving as instance Elastic IPs, one of them advertised on two interfaces
-  with two different public addresses, and a staging allocation named a
-  production instance's interface. The instances keep their own allocations,
-  the NAT gateways keep theirs, and each address appears on one interface and
-  one instance.
-
-- Demo mode listed every KMS key twice, in a different order on each run.
-  The list was being built from the lookup table that deliberately holds each
-  key under both its bare ID and its full ARN, rather than from the account's
-  key list. Each key now appears once, in a stable order.
-
-- Drilling into a related resource no longer overwrites the full list it
-  came from. After loading all 200 instances of a type, opening a pivot
-  that matched 3 of them replaced the cached list with just those 3 —
-  the main menu then reported `3` as an exact count, and the wrong count
-  was written to the on-disk cache, so it survived a restart. Lookups by
-  ID and child lists corrupted the same way. Each fetch now states which
-  kind it is, and only a full list of a type may replace that type's
-  cached rows. The same corruption was reachable by a second route — a
-  late drill or by-ID result arriving while that type's full list was
-  open on screen — which is closed too; such a result now finds the view
-  it actually belongs to instead of overwriting the list it merely
-  shares a type with.
-
-- A failed "load more" no longer leaves a resource list stuck. In the
-  web UI, when loading the next page failed, the list kept showing its
-  loading indicator indefinitely with no way to retry — only that one
-  failure path forgot to switch it off. Every path that ends a fetch now
-  clears all of its indicators together.
-
-- A fetch that partly failed no longer erases its own error message.
-  When a result came back with some rows and an error, the rows landing
-  cleared the error marker, so the failure went unreported.
-
-- Fixed a crash and occasional wrong rows in resource lists. A list
-  screen and the shared cache held the same rows in memory while
-  guarding them with separate locks, so loading another page could
-  overwrite what the cache held without it noticing, and a background
-  refresh landing at the wrong moment could take the app down. Each now
-  keeps its own copy.
-
-- A related-resource pivot no longer reports a confident `0` when the
-  AWS call behind it failed or was denied. Fifteen checkers turned an
-  error into a proven dead end — a log group actively streaming to
-  Kinesis showed `(0)` if `logs:DescribeSubscriptionFilters` was not
-  granted, a Redis replication group showed `(0)` across four pivots
-  when one lookup was throttled, an IAM group with three inline
-  policies showed `(0)` when only one of two list calls was permitted.
-  These now render as unknown, which is the truth: we could not look.
-  Where several calls back one pivot and only some succeed, the count
-  renders as `N+` instead of a false exact total. A throttled
-  EventBridge enrichment also no longer invents a critical "enabled
-  rule has no targets" alarm for a healthy rule.
-
-  The pipeline pivots on CodeBuild projects and ECR repositories were
-  the last two holdouts: they inspect each pipeline in turn, and a
-  lookup that failed was quietly skipped, so a project used by five
-  pipelines reported an exact `2` when three lookups were throttled.
-  The ECR one was worse — without permission to read pipelines at all
-  it reported an exact `0`, a definitive "nothing uses this
-  repository" arrived at without a single successful call.
-
-### Added
-
-- Detail views fetch what the list APIs don't return (#261). Opening a
-  detail, YAML, or JSON view now enriches on demand: Step Functions
-  show the full ASL definition, live status, and role; CloudFormation
-  stacks show the template body (session-cached, version-keyed so an
-  updated stack never serves its pre-update template); Lambda functions
-  show state, code metadata, and reserved concurrency; EC2 instances
-  show decoded user data (base64 and gzip handled); SNS topics show
-  their full attribute set including effective delivery policy; S3
-  buckets show bucket policy, CORS rules, and lifecycle configuration.
-  These six and the two IAM document enrichers run on one generic
-  engine (Transfer agreements keep their own resolver), and a dedicated
-  demo smoke gate walks all nine of them on every push.
-- Detail open/refresh runs under a single operation identity: the
-  enrichment and every related-panel check created by one user action
-  share one generation, one set of AWS clients, and one call-coalescing
-  namespace, and their results are accepted only while that operation
-  is still the active one. A refresh supersedes in-flight work instead
-  of racing it; concurrent calls within one operation collapse to a
-  single AWS request per API (an SFN refresh performs one
-  `DescribeStateMachine` in total); rotation invalidates everything
-  in flight.
-- `--trace <path>` writes a structured, JSON-lines diagnostic stream of
-  the detail-operation lifecycle — an operation beginning, each AWS
-  call as executed or served without a new request, an enrichment
-  cache hit/miss/write, and a result fold's accept/reject decision
-  (#488). Off by default; writes only to the given file, never stdout.
-
-### Fixed
-
-- Web mode: detail enrichment now works end to end — results fold into
-  the shared controller state and directly opened YAML/JSON views
-  dispatch enrichment, so the web view shows what the terminal shows.
-- Web mode: related-panel drill-ins find targets outside the cached
-  list (lazy-add previously ran only in the terminal), and background
-  task execution no longer reads session state unlocked while request
-  handlers mutate it.
-- Enrichment and related-panel errors surface as an error flash in the
-  terminal again; both previously rendered no feedback at all.
-- Documents keep numeric fidelity: integers above 2^53 in policy
-  documents, templates, ASL definitions, and topic attributes no longer
-  silently round (9007199254740993 stayed ...992 before), and a
-  malformed document with a stray trailing brace still displays
-  verbatim rather than being reshaped into structure.
-- YAML and JSON views render the same shape for the same resource: the
-  YAML view promotes embedded struct fields exactly like the JSON view
-  (`encoding/json` semantics) instead of nesting them under the
-  embedded type's name.
-- Related-panel counts over truncated target populations render "N+"
-  instead of a misleading exact "N", and an empty truncated page no
-  longer erases the truncation marker from the cached row store.
 
 ## [3.56.0] - 2026-07-21
 
