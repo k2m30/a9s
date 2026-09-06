@@ -130,7 +130,7 @@ One row per signal from §3:
 | `*_IN_PROGRESS` > 1h | 1 | Broken | n/a | S2, S4 | `stuck: in progress 2h` (actual age) | `Stack has been <StackStatus> for <age> — likely stuck, check stack events.` |
 | `DriftInformation.StackDriftStatus == DRIFTED` | 1 | Warning | n/a | S2, S4 | `drifted since <LastCheckTimestamp>` | `Stack configuration differs from template; last drift check <LastCheckTimestamp>.` |
 | Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | n/a | S2 (row already red), S4 (deduped), S5 | `failed: <LogicalResourceId>` | `Recent event: <LogicalResourceId> <ResourceStatus> — <ResourceStatusReason>.` |
-| Termination protection off (top-level stack) | 1 | Warning | `~` | S2, S4, S5 | `termination protection off` | `A single delete call removes this stack and every resource it owns...` |
+| Termination protection off (top-level stack) | 1 | Warning | `~` | S2, S4, S5 | `termination protection off` | `A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted.` |
 | Credential in `Outputs[]` | 1 | Broken | `!` | S1, S2, S4, S5 | `credential in stack outputs` | `A stack output holds what looks like a credential...` Rows name the output key and the kind of match, never the value. |
 
 Rules for filling list and detail text:
