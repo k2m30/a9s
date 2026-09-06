@@ -191,28 +191,60 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 	return relatedResultTrunc(target, matched, truncated)
 }
 
-// ctIDAlternatives returns the candidate ids for one value an event named, as
-// written first and then stripped of its prefix. Which form is the id varies
-// per target type: an ARN's is the last segment, a Secrets Manager name keeps
-// its slashes, a qualified Lambda ARN ends ":<alias>" whose function is the
-// segment before it. They are alternatives — ctEventsMatchTarget takes at most
-// one per group — so offering every form costs nothing and guessing one costs
-// the pivot.
+// ctIDAlternatives returns the candidate ids for one value an event named,
+// derived from what the event wrote and never from the ARN's fixed grammar.
+// An ARN contributes only the id inside its resource part — everything after
+// the type word, as one string — so no segment of the grammar and no type word
+// can answer for a resource. Anything else contributes itself. A fragment of a
+// name is not a form of it.
 func ctIDAlternatives(v string) []string {
-	out := []string{v}
-	tails := func(s string) {
-		for _, sep := range []string{"/", ":"} {
-			if i := strings.LastIndex(s, sep); i >= 0 && i < len(s)-1 {
-				out = append(out, s[i+1:])
-			}
+	if parts := strings.SplitN(v, ":", 6); strings.HasPrefix(v, "arn:") && len(parts) == 6 {
+		return ctStripTypeWord(parts[5], "/:")
+	}
+	// Not an ARN: the value IS the id. An event may still write the resource
+	// part alone ("instance/i-abc"), so the type-word strip is offered behind
+	// it — on "/" only, because a trailing ":qualifier" on a bare name is
+	// Lambda's business and its head is the function.
+	return ctStripTypeWord(v, "/")
+}
+
+// ctStripTypeWord returns res and the forms inside it, most specific first:
+// res as written, then without its leading "<type><sep>"
+// ("instance/i-abc" → "i-abc", "secret:prod/api/key" → "prod/api/key"), then
+// that remainder's own last segment. Whole forms lead, so a name that
+// genuinely contains slashes resolves entire and only falls back to a
+// fragment when nothing holds the whole.
+func ctStripTypeWord(res, seps string) []string {
+	out := []string{res}
+	i := strings.IndexAny(res, seps)
+	if i < 0 || i >= len(res)-1 {
+		return out
+	}
+	rest := res[i+1:]
+	out = append(out, rest)
+	if j := strings.LastIndex(rest, "/"); j >= 0 && j < len(rest)-1 {
+		out = append(out, rest[j+1:])
+	}
+	return out
+}
+
+// ctLambdaAlternatives is ctIDAlternatives plus the Lambda-only rule: a
+// function may be named with a trailing ":<alias>" qualifier, so the head
+// before it is a candidate after the as-written form.
+func ctLambdaAlternatives(group []string) []string {
+	// The type word is what precedes the first separator of the widest
+	// candidate; a head that equals it is grammar, not a function name.
+	typeWord := ""
+	if len(group) > 1 {
+		if i := strings.IndexAny(group[0], "/:"); i > 0 && group[0][i+1:] == group[1] {
+			typeWord = group[0][:i]
 		}
 	}
-	tails(v)
-	// A Lambda ARN or name qualified by an alias ends ":<alias>", so its
-	// function is what comes BEFORE the last colon, stripped the same way.
-	if i := strings.LastIndex(v, ":"); i > 0 {
-		out = append(out, v[:i])
-		tails(v[:i])
+	out := group
+	for _, c := range group {
+		if i := strings.LastIndex(c, ":"); i > 0 && c[:i] != typeWord {
+			out = append(out, c[:i])
+		}
 	}
 	return out
 }
@@ -244,14 +276,13 @@ func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [
 // generic last-segment trim (extractCTResourceIDs) would keep the uuid, but cfn
 // resources are keyed by stack name. A bare name (no "stack/" segment) passes
 // through unchanged.
-func cfnStackNameFromResourceName(s string) string {
-	if _, rest, ok := strings.Cut(s, ":stack/"); ok {
-		if name, _, ok := strings.Cut(rest, "/"); ok {
-			return name
-		}
-		return rest
+func cfnStackNameFromResourceName(group []string) []string {
+	s := group[0]
+	if len(group) > 1 {
+		s = group[1] // the id after the "stack/" type word: "<name>/<uuid>"
 	}
-	return s
+	name, _, _ := strings.Cut(s, "/")
+	return []string{name}
 }
 
 // ctJSONString walks a parsed CT event JSON map along the given keys and
@@ -366,13 +397,16 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::Lambda::Function")
+	for i, group := range ids {
+		ids[i] = ctLambdaAlternatives(group)
+	}
 
 	if len(ids) == 0 {
 		parsed := parseCTEventJSON(event.CloudTrailEvent)
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if fn := ctJSONString(req, "functionName"); fn != "" {
-				ids = append(ids, ctIDAlternatives(fn))
+				ids = append(ids, ctLambdaAlternatives(ctIDAlternatives(fn)))
 			}
 		}
 	}
@@ -663,12 +697,11 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.KnownRelated("cfn", nil, false)
 	}
 
-	// cfn resources are keyed by stack name, and a stack ARN is
-	// ".../stack/<name>/<uuid>" — the extractor's last-segment candidate would
-	// be the uuid, so the name is derived first and offered on its own.
+	// cfn resources are keyed by stack NAME and a stack id is "<name>/<uuid>",
+	// so the uuid is dropped from whatever the extractor produced.
 	var ids [][]string
 	for _, group := range extractCTResourceIDs(event, "AWS::CloudFormation::Stack") {
-		ids = append(ids, ctIDAlternatives(cfnStackNameFromResourceName(group[0])))
+		ids = append(ids, cfnStackNameFromResourceName(group))
 	}
 
 	if len(ids) == 0 {
@@ -676,7 +709,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "stackName"); name != "" {
-				ids = append(ids, ctIDAlternatives(name))
+				ids = append(ids, cfnStackNameFromResourceName(ctIDAlternatives(name)))
 			}
 		}
 	}
