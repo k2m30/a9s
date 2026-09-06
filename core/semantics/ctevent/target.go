@@ -106,12 +106,17 @@ func resourceRefToRow(ref ResourceRef, recipientAccountID string) Row {
 		val = ref.ARN
 	}
 	isNav, target := navFromLabel(key)
-	// NavID is the bare resource identifier stripped of any type/ prefix
-	// (e.g. "instance/i-0abc" → "i-0abc", "bucket-name" → "").
-	// When the display value already lacks a "/" prefix, NavID is left empty
-	// so the navigation layer falls back to Value directly.
+	// NavID is the bare resource identifier stripped of its type prefix
+	// (e.g. "instance/i-0abc" → "i-0abc", "bucket-name" → ""). Cut at the
+	// FIRST separator, not the last: the prefix is what comes before it, and
+	// everything after is the id — a Secrets Manager secret is named
+	// "prod/api/stripe-key", and taking the last segment left "stripe-key",
+	// which names no resource. The separator is "/" for the path forms and
+	// ":" for the ones AWS writes as "secret:<name>".
+	// When the value carries no prefix, NavID is left empty so the navigation
+	// layer falls back to Value directly.
 	navID := ""
-	if idx := strings.LastIndex(val, "/"); idx >= 0 {
+	if idx := strings.IndexAny(val, "/:"); idx >= 0 {
 		navID = val[idx+1:]
 	}
 	return Row{Key: key, Value: val, IsNavigable: isNav, TargetType: target, NavID: navID}

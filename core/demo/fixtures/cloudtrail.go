@@ -18,6 +18,11 @@ import (
 // about the past, not a related resource the panel may offer.
 const CtEventDeletedBucket = "evt-0a1b2c3d4e5f60009"
 
+// CtEventPathNamedSecret is the demo event naming a secret whose id contains
+// slashes ("prod/api/stripe-key"). Its Secrets pivot must resolve: the id is
+// the name as written, and trimming it to the last segment matched nothing.
+const CtEventPathNamedSecret = "evt-0a1b2c3d4e5f60010"
+
 // CloudTrailFixtures holds all CloudTrail domain objects served by the fake.
 type CloudTrailFixtures struct {
 	Trails      []cloudtrailtypes.Trail
@@ -272,6 +277,18 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"Root","principalId":"123456789012","arn":"arn:aws:iam::123456789012:root","accountId":"123456789012","sessionContext":{"sessionCredentialFromConsole":"true","attributes":{"mfaAuthenticated":"true","creationDate":"2026-03-28T14:20:00Z"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"s3.amazonaws.com","eventName":"CreateBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"signin.amazonaws.com","requestParameters":{"bucketName":"webapp-assets-prod"},"responseElements":null,"requestID":"req-s3-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:s3:::webapp-assets-prod","accountId":"123456789012","type":"AWS::S3::Bucket"}]}`),
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("webapp-assets-prod")},
+			},
+		},
+		{
+			EventId:         aws.String(CtEventPathNamedSecret),
+			EventName:       aws.String("GetSecretValue"),
+			EventTime:       aws.Time(t2),
+			EventSource:     aws.String("secretsmanager.amazonaws.com"),
+			Username:        aws.String("alice.johnson"),
+			ReadOnly:        aws.String("true"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:55:00Z","eventSource":"secretsmanager.amazonaws.com","eventName":"GetSecretValue","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":{"secretId":"prod/api/stripe-key"},"responseElements":null,"requestID":"req-sm-get-001","eventID":"` + CtEventPathNamedSecret + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/stripe-key","accountId":"123456789012","type":"AWS::SecretsManager::Secret"}]}`),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::SecretsManager::Secret"), ResourceName: aws.String("prod/api/stripe-key")},
 			},
 		},
 		// CtEventDeletedBucket — the witness for the row-6 rule. The event
