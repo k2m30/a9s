@@ -56,6 +56,7 @@ func TestW6AColorDerivesFromFindings(t *testing.T) {
 		"state":                       "INSUFFICIENT_DATA",
 		"status":                      "EXPIRED",
 		"enabled":                     "false",
+		"record_count":                "2",
 	}
 
 	for _, short := range w6aBatchTypes {
