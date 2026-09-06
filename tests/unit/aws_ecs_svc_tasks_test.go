@@ -97,10 +97,14 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		}
 	})
 
+	// Inverted deliberately: this used to expect "HEALTHY". Fields["health"]
+	// is drawn straight into the Health column, and the SDK's enum spelling is
+	// not a word an operator uses, so the cell reads in lowercase words. Do
+	// not "restore" the uppercase expectation.
 	t.Run("task_0_health", func(t *testing.T) {
 		r := result.Resources[0]
-		if r.Fields["health"] != "HEALTHY" {
-			t.Errorf("Fields[health]: expected %q, got %q", "HEALTHY", r.Fields["health"])
+		if r.Fields["health"] != "healthy" {
+			t.Errorf("Fields[health]: expected %q, got %q", "healthy", r.Fields["health"])
 		}
 	})
 
