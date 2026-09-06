@@ -13,7 +13,7 @@ import (
 // (which omit Color) behave sensibly without requiring every type to set up Color.
 //
 // Used by ResolveColor in types.go; per-type classifiers (e.g. colorEC2) and
-// other shared helpers (colorFromSeverity, stripFindingSuffix, cfnStackColor,
+// other shared helpers (colorFromSeverity, cfnStackColor,
 // acmColor, r53Color) live alongside the catalog data in
 // core/aws/catalog_color_helpers.go.
 func colorFallback(status string) domain.Color {

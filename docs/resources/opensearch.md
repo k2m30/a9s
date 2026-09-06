@@ -155,7 +155,7 @@ Every signal from §3.1 must land on one or more of these five existing surfaces
 Wave → surface mapping applied here:
 
 - The hard states (`Deleted`, `Processing/UpgradeProcessing`, `Isolated`) drive **S2 + S4** (color + cause).
-- The background checks (`UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`) drive **S1 + S2 + S3 + S4 + S5**. `UpdateAvailable` past the auto-update cutoff is a pressing background concern (`!`); missing at-rest encryption is a posture finding (`~`) — see §6 user decision.
+- The background checks (`UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`) drive **S1 + S2 + S3 + S4 + S5**. `UpdateAvailable` past the auto-update cutoff is a warning (`~`), since a pending forced update is not an outage; missing at-rest encryption is a posture finding (`~`) — see §6 user decision.
 - The network-posture checks (`reachable outside a VPC`, `HTTPS not enforced`, `node-to-node encryption off`) drive **S1 + S2 + S3 + S4 + S5** on the same terms.
 
 One row per signal from §3:
@@ -191,7 +191,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `ct-events` universal pivot — `docs/related-resources.md` § `Policy` point 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.
 - AWS SDK Go v2 — `ListDomainNames` returns only `DomainName` + `EngineType` per entry — `AWS SDK Go v2 — opensearch/types.DomainInfo § DomainName, EngineType`.
-- AWS SDK Go v2 — `DomainStatus` Wave-2 fields — `AWS SDK Go v2 — opensearch/types.DomainStatus § Deleted, Processing, UpgradeProcessing, DomainProcessingStatus, ServiceSoftwareOptions, EncryptionAtRestOptions, VPCOptions, DomainEndpointOptions, LogPublishingOptions`.
+- AWS SDK Go v2 — `DomainStatus` fields the fetcher reads — `AWS SDK Go v2 — opensearch/types.DomainStatus § Deleted, Processing, UpgradeProcessing, DomainProcessingStatus, ServiceSoftwareOptions, EncryptionAtRestOptions, VPCOptions, DomainEndpointOptions, LogPublishingOptions`.
 - AWS SDK Go v2 — `ServiceSoftwareOptions.UpdateAvailable` and `AutomatedUpdateDate` — `AWS SDK Go v2 — opensearch/types.ServiceSoftwareOptions § UpdateAvailable, AutomatedUpdateDate`.
 - AWS SDK Go v2 — `DomainProcessingStatusType` enum values (incl. `Isolated`) — `AWS SDK Go v2 — opensearch/types.DomainProcessingStatusType`.
 - AWS SDK Go v2 — `EncryptionAtRestOptions` field — `AWS SDK Go v2 — opensearch/types.EncryptionAtRestOptions § Enabled, KmsKeyId`.
@@ -203,8 +203,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `acm` discovery via `DomainEndpointOptions.CustomEndpointCertificateArn` — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. Cert is surfaced only when CustomEndpointEnabled; no cert for default *.es.amazonaws.com endpoints.`
 - a9s-devops consultation — `alarm` discovery via reverse-scan on `AWS/ES` namespace + `DomainName` dimension — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. OpenSearch retains the AWS/ES namespace for backward compatibility; the DomainName dimension is the join key.`
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag (requires `opensearch:ListTags`) — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. CFN tag is the canonical managed-by marker; DomainStatus carries no stack reference.`
-- a9s-devops consultation — Wave 2 batching with `DescribeDomains` (up to 5 domain names per call) — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. DescribeDomains is the only API that returns full DomainStatus; batching caps fan-out at N/5 calls, well within Wave 2 bounds.`
+- a9s-devops consultation — batching with `DescribeDomains` (up to 5 domain names per call; the fetcher's own call, wave 1) — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. DescribeDomains is the only API that returns full DomainStatus; batching caps fan-out at N/5 calls, well within Wave 2 bounds.`
 - user decision — severity for `ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate` — `user (2026-04-20): decide →`!`. Rationale: AWS will auto-apply any day, causing a rolling restart; operator wants this flagged so the window can be planned. Consistent with ACM`!`for imminent cert expiry.`
+- orchestrator ruling (2026-09-06) — supersedes the decision above: severity is the one axis with no exemptions, and a pending forced update is a warning, not an outage, so the finding is `~` (Warning) in the fetcher, the catalog and the tables here.
 - user decision — severity for `EncryptionAtRestOptions.Enabled==false` — `user (2026-04-20): decide →`~`. Rationale: posture/compliance finding, not an outage risk. Consistent with RDS`StorageEncrypted==false`and S3 encryption defaults treated as background annotations.`
 
 <!-- BEGIN GENERATED: header -->
