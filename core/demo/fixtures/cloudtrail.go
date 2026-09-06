@@ -13,14 +13,12 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 )
 
-// CtEventDeletedBucket is the demo event whose body names a bucket no demo S3
-// fixture carries — the witness that an id read out of an event is a claim
-// about the past, not a related resource the panel may offer.
+// CtEventDeletedBucket names a bucket no demo S3 fixture carries; its Buckets
+// pivot must resolve to none.
 const CtEventDeletedBucket = "evt-0a1b2c3d4e5f60009"
 
-// CtEventPathNamedSecret is the demo event naming a secret whose id contains
-// slashes ("prod/api/stripe-key"). Its Secrets pivot must resolve: the id is
-// the name as written, and trimming it to the last segment matched nothing.
+// CtEventPathNamedSecret names a secret whose id contains slashes
+// ("prod/api/stripe-key"); its Secrets pivot must resolve.
 const CtEventPathNamedSecret = "evt-0a1b2c3d4e5f60010"
 
 // CloudTrailFixtures holds all CloudTrail domain objects served by the fake.
@@ -291,11 +289,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				{ResourceType: aws.String("AWS::SecretsManager::Secret"), ResourceName: aws.String("prod/api/stripe-key")},
 			},
 		},
-		// CtEventDeletedBucket — the witness for the row-6 rule. The event
-		// names a bucket that no demo S3 fixture carries, exactly as a real
-		// DeleteBucket leaves behind: the resource was there when the call was
-		// recorded and is not there now. Its S3 Buckets panel must render the
-		// honest answer rather than offering a row that navigates to nothing.
 		{
 			EventId:         aws.String(CtEventDeletedBucket),
 			EventName:       aws.String("DeleteBucket"),

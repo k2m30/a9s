@@ -191,16 +191,10 @@ func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [
 		if r.ResourceName == nil || *r.ResourceName == "" {
 			continue
 		}
-		// Emit BOTH the name as written and its last slash segment, and let
-		// the target list decide. The trim is right for an ARN, where the id
-		// is the last segment ("...:instance/i-abc"), and wrong for a plain
-		// name that legitimately contains slashes — a Secrets Manager secret
-		// is named "prod/database/primary", and trimming it to "primary"
-		// matched nothing, so that pivot read Unknown forever. Which form is
-		// the id varies per target type, so neither is preferred here.
-		// Offering both costs nothing: ctEventsMatchTarget resolves only the
-		// ids the list confirms, so a candidate that names no resource is
-		// dropped rather than counted.
+		// Which form is the id varies per target type — an ARN's is the last
+		// segment, a Secrets Manager name keeps its slashes — so both go in
+		// and the list picks. Safe because ctEventsMatchTarget counts only
+		// ids the list confirms.
 		name := *r.ResourceName
 		ids = append(ids, name)
 		if idx := strings.LastIndex(name, "/"); idx >= 0 && idx < len(name)-1 {
