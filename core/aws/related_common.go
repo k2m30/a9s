@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 
@@ -14,6 +15,24 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// errRawStructMissing marks the one reason a checker cannot read its own row
+// that is not a failure: the row carries no RawStruct. Rows restored from the
+// on-disk cache never do — it is deliberately not persisted (core/cache) — and
+// the detail operation runs the checkers against the row as it stands, before
+// enrichment refills it. Nothing was read and nothing failed, so the panel owes
+// a "?".
+var errRawStructMissing = errors.New("resource details have not been read yet")
+
+// relatedFromErr turns the error a two-hop helper returned into the result the
+// panel owes. It is the single place that knows "we have not read this row yet"
+// is Unknown while every other error is Error.
+func relatedFromErr(target string, err error) resource.RelatedCheckResult {
+	if errors.Is(err, errRawStructMissing) {
+		return resource.UnknownRelated(target)
+	}
+	return resource.ErrorRelated(target, err)
+}
 
 // assertStruct extracts a value of type T from an interface that may hold
 // either T or *T. Used for RawStruct type assertions across related checkers.

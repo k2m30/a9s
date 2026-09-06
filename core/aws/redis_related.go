@@ -23,10 +23,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// errRedisNoGroupDetail is the answer when the row carries no replication-group
-// struct to read a member from, so the pivot has neither a fact nor a failed
-// call to report.
-var errRedisNoGroupDetail = errors.New("replication group details are not loaded")
+// errRedisNoGroupDetail is the answer when the row holds something that is not
+// a replication group, or the ElastiCache client is unusable. Distinct from
+// errRawStructMissing: there the row was never read, here what we have cannot
+// be used.
+var errRedisNoGroupDetail = errors.New("the replication group could not be read")
 
 // checkRedisAlarms checks the alarm cache for CloudWatch alarms with a
 // CacheClusterId dimension matching any member cluster of this replication group.
@@ -345,7 +346,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc, err := redisMemberCluster(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return relatedFromErr("sg", err)
 	}
 	if cc == nil {
 		return resource.KnownRelated("sg", nil, false)
@@ -390,7 +391,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc, err := redisMemberCluster(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return relatedFromErr("sns", err)
 	}
 	if cc == nil {
 		return resource.KnownRelated("sns", nil, false)
@@ -436,7 +437,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := redisSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return relatedFromErr("subnet", err)
 	}
 	if sng == nil {
 		return resource.KnownRelated("subnet", nil, false)
@@ -481,7 +482,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := redisSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return relatedFromErr("vpc", err)
 	}
 	if sng == nil {
 		return resource.KnownRelated("vpc", nil, false)
@@ -500,6 +501,9 @@ func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ re
 func redisMemberCluster(ctx context.Context, clients any, res resource.Resource) (*elasticachetypes.CacheCluster, error) {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
+		if res.RawStruct == nil {
+			return nil, errRawStructMissing
+		}
 		return nil, errRedisNoGroupDetail
 	}
 	if len(rg.MemberClusters) == 0 {

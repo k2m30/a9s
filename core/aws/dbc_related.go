@@ -17,10 +17,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// errDbcNoClusterDetail is the answer when the row carries no DB-cluster struct
-// to read a subnet-group name from, so the pivot has neither a fact nor a
-// failed call to report.
-var errDbcNoClusterDetail = errors.New("cluster details are not loaded")
+// errDbcNoClusterDetail is the answer when the row holds something that is not
+// a DB cluster, or the engine's client is unusable. Distinct from
+// errRawStructMissing: there the row was never read, here what we have cannot
+// be used.
+var errDbcNoClusterDetail = errors.New("the cluster could not be read")
 
 // dbcSubnetGroupInfo is a minimal, engine-agnostic view of a DBSubnetGroup that
 // the dbc → subnet and dbc → vpc pivots need. Both dbcDocDBSubnetGroup and
@@ -248,7 +249,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := dbcSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return relatedFromErr("subnet", err)
 	}
 	if sng == nil {
 		return resource.KnownRelated("subnet", nil, false)
@@ -268,7 +269,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := dbcSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return relatedFromErr("vpc", err)
 	}
 	if sng == nil {
 		return resource.KnownRelated("vpc", nil, false)
@@ -293,6 +294,9 @@ func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) (*d
 	}
 	if _, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok {
 		return dbcDocDBSubnetGroup(ctx, clients, res)
+	}
+	if res.RawStruct == nil {
+		return nil, errRawStructMissing
 	}
 	return nil, errDbcNoClusterDetail
 }
