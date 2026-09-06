@@ -64,17 +64,22 @@ const (
 	cfNoGeoRestrictionDetail = "Content is served to every country, including any the account is not meant to serve. Add a geographic restriction if the distribution should be limited."
 )
 
-// cfTLSBelow12 reports whether the minimum protocol version is one AWS still
-// accepts but that sits below TLS 1.2.
-func cfTLSBelow12(v cftypes.MinimumProtocolVersion) bool {
+// cfTLSBelow12Word maps a minimum protocol version AWS still accepts but that
+// sits below TLS 1.2 to the word the row renders, and returns "" for the
+// versions that are fine. The two enums that both mean TLS 1.0 carry their
+// policy year so the row stays distinct.
+func cfTLSBelow12Word(v cftypes.MinimumProtocolVersion) string {
 	switch v {
-	case cftypes.MinimumProtocolVersionSSLv3,
-		cftypes.MinimumProtocolVersionTLSv1,
-		cftypes.MinimumProtocolVersionTLSv12016,
-		cftypes.MinimumProtocolVersionTLSv112016:
-		return true
+	case cftypes.MinimumProtocolVersionSSLv3:
+		return "SSL 3.0"
+	case cftypes.MinimumProtocolVersionTLSv1:
+		return "TLS 1.0"
+	case cftypes.MinimumProtocolVersionTLSv12016:
+		return "TLS 1.0 (2016)"
+	case cftypes.MinimumProtocolVersionTLSv112016:
+		return "TLS 1.1 (2016)"
 	default:
-		return false
+		return ""
 	}
 }
 
@@ -131,9 +136,9 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 	}
 
 	if vc := cfg.ViewerCertificate; vc != nil {
-		if cfTLSBelow12(vc.MinimumProtocolVersion) {
+		if word := cfTLSBelow12Word(vc.MinimumProtocolVersion); word != "" {
 			emit(CodeCFDeprecatedTLS, "minimum TLS below 1.2", "~",
-				domain.DetailRow{Label: "Minimum TLS version", Value: string(vc.MinimumProtocolVersion), Tier: "~"})
+				domain.DetailRow{Label: "Minimum TLS version", Value: word, Tier: "~"})
 		}
 		// A distribution with no alias legitimately serves on its
 		// cloudfront.net name with the default certificate.

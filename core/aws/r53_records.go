@@ -151,8 +151,10 @@ func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) re
 // cursor rather than a token, so the walk lives here beside the cursor
 // encoding rather than in the enricher that consumes it.
 //
-// complete is false when the zone is longer than the cap or a page failed, so
-// the caller reports the zone unknown rather than judging it on a prefix.
+// complete is false when the zone is longer than the cap or a page failed. A
+// dangling record found in the pages that did arrive is still real, so the
+// caller reports those and marks the zone truncated: what a short walk cannot
+// say is that the rest of the zone is clean.
 func listAllR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (records []r53types.ResourceRecordSet, complete bool) {
 	input := &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID}
 	for range PerParentPageCap {

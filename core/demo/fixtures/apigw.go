@@ -163,6 +163,14 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 					Name:         aws.String("acme-healthy-authorizer"),
 				},
 			},
+			// APIGWHTTPNoAuthorizer is the one demo API without an authorizer,
+			// so the internal API carries one.
+			"klm901nop2": {
+				{
+					AuthorizerId: aws.String("auth-internal-api-1"),
+					Name:         aws.String("acme-internal-authorizer"),
+				},
+			},
 		},
 		// DomainNames + ApiMappings — required for the apigw:acm pivot
 		// witness (checkApigwACM: GetDomainNames -> GetApiMappings match on

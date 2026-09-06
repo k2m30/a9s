@@ -363,6 +363,22 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		})
 	}
 
+	// Row 6's witness is the only demo group without a customer key. Every
+	// other group is encrypted here rather than in forty literals, so a group
+	// added later cannot quietly become a second carrier of logs.no-kms.
+	for i := range logGroups {
+		if logGroups[i].KmsKeyId == nil {
+			logGroups[i].KmsKeyId = aws.String(demoLogsKMSKeyARN)
+		}
+	}
+	logGroups = append(logGroups, cwlogstypes.LogGroup{
+		LogGroupName:    aws.String(LogGroupNoKMS),
+		Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupNoKMS + ":*"),
+		StoredBytes:     aws.Int64(8388608),
+		RetentionInDays: aws.Int32(90),
+		CreationTime:    aws.Int64(1735689600000),
+	})
+
 	// The second page. Every other group in this file is the target of some
 	// pivot, so cutting the list anywhere inside them lowers a count a scenario
 	// pins; this one is named to match no pivot's convention and is appended
@@ -374,6 +390,15 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		RetentionInDays: aws.Int32(30),
 		CreationTime:    aws.Int64(1756704000000),
 	})
+
+	// Row 6's witness is the only demo group without a customer key. Every
+	// other group is encrypted here rather than in forty literals, so a group
+	// added later cannot quietly become a second carrier of logs.no-kms.
+	for i := range logGroups {
+		if logGroups[i].KmsKeyId == nil && aws.ToString(logGroups[i].LogGroupName) != LogGroupNoKMS {
+			logGroups[i].KmsKeyId = aws.String(demoLogsKMSKeyARN)
+		}
+	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{
 		"/aws/lambda/api-gateway-authorizer": {
@@ -595,7 +620,7 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 40
+const LogGroupsPageSize = 41
 
 func NewCWLogsFixtures() *CWLogsFixtures {
 	return sharedCWLogsFixtures()
@@ -616,6 +641,10 @@ func minimalLogStreams(suffix string) []cwlogstypes.LogStream {
 		},
 	}
 }
+
+// demoLogsKMSKeyARN is the synthetic customer key every demo log group but
+// LogGroupNoKMS carries.
+const demoLogsKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 
 // LogGroupNoKMS is the ONE demo log group with no KMS key for the w6a batch.
 // Every other log group fixture carries a synthetic KmsKeyId so the demo

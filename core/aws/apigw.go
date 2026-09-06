@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
@@ -41,6 +42,15 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 				apiID := aws.ToString(item.Id)
 				name := aws.ToString(item.Name)
 				description := aws.ToString(item.Description)
+				// The endpoint type decides whether an unauthorized API is
+				// exposed at all. The enum is one word (PRIVATE, REGIONAL,
+				// EDGE) and the console prints it lowercased; absent
+				// configuration stays empty, which reads as unknown rather
+				// than as public.
+				endpoint := ""
+				if ec := item.EndpointConfiguration; ec != nil && len(ec.Types) > 0 {
+					endpoint = strings.ToLower(string(ec.Types[0]))
+				}
 				r := resource.Resource{
 					ID:   apiID,
 					Name: name,
@@ -48,7 +58,7 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 						"api_id":      apiID,
 						"name":        name,
 						"protocol":    "REST",
-						"endpoint":    "",
+						"endpoint":    endpoint,
 						"description": description,
 					},
 					RawStruct: item,

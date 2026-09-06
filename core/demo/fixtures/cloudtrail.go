@@ -151,6 +151,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(true),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			Name:                       aws.String("security-audit-trail"),
@@ -165,6 +167,7 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(true),
 			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			Name:                       aws.String("acme-audit-trail"),
@@ -177,12 +180,14 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(true),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		// LogFileValidationEnabled=false → Wave-1 Warning
 		{
 			Name:                       aws.String("legacy-validation-disabled"),
 			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/legacy-validation-disabled"),
-			S3BucketName:               aws.String("legacy-audit-logs-bucket"),
+			S3BucketName:               aws.String("cloudtrail-audit-logs"),
 			HomeRegion:                 aws.String("us-east-1"),
 			IsMultiRegionTrail:         aws.Bool(false),
 			IsOrganizationTrail:        aws.Bool(false),
@@ -190,6 +195,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		// LatestDeliveryTime stale (>1h) while IsLogging=true → Wave-2 Broken
 		// "silent delivery failure" (docs/resources/trail.md §3.2).
@@ -204,6 +211,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		// S3 healthy-bucket trail (checkS3Trail pivot).
 		// checkS3Trail uses assertStruct[Trail] and checks S3BucketName == bucketName.
@@ -218,6 +227,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		// Audit trails for PAB-issue buckets — give the operator a
 		// "who's watching this?" pivot from the public-access findings.
@@ -232,6 +243,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			Name:                       aws.String("a9s-demo-s3-partial-audit"),
@@ -244,6 +257,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			Name:                       aws.String("a9s-demo-s3-multifail-audit"),
@@ -256,6 +271,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			Name:                       aws.String("a9s-demo-s3-nilcfg-audit"),
@@ -268,6 +285,40 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+		},
+		{
+			// TrailNoCWLogs: writes to S3 only, so there is no live stream to
+			// alarm on. Every other demo trail names a log group.
+			Name:                       aws.String(TrailNoCWLogs),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/" + TrailNoCWLogs),
+			S3BucketName:               aws.String("cloudtrail-audit-logs"),
+			S3KeyPrefix:                aws.String("s3-only"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+		},
+		{
+			// TrailNoKMS: log files written with the default S3 encryption and
+			// no customer key. Every other demo trail names one.
+			Name:                       aws.String(TrailNoKMS),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/" + TrailNoKMS),
+			S3BucketName:               aws.String("cloudtrail-audit-logs"),
+			S3KeyPrefix:                aws.String("unencrypted"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
 		},
 	}
 }

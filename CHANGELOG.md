@@ -108,8 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ACM certificates on an RSA key below 2048 bits now read as a warning.
 - API Gateways now say when nothing checks the caller's identity, which reads
   as broken for a REST API reachable from the internet and as a warning
-  otherwise. REST stages also say when they record no access logs, when
-  tracing is off, and when a stage variable holds what looks like a credential.
+  otherwise. The REST list carries the endpoint type as a word, so a private
+  API reads as the warning it is and an API whose endpoint type is not
+  published says nothing at all rather than being called internet-facing. REST
+  stages also say when they record no access logs, when tracing is off, and
+  when a stage variable holds what looks like a credential.
 
 - A database instance being deleted now reads as a warning instead of green.
 - A snapshot in a state neither ready nor failed, such as one still copying,

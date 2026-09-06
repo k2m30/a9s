@@ -263,7 +263,7 @@ forbid s3_circular.txt "(?)" "re-entered warm detail carries no (?) for cache-co
 
 # 9. The lower bound renders. Without these the "+" has no witness on the
 # bench and a regression to a bare count, or back to Unknown, is invisible.
-expect logs_list.txt "logs(40+)" "the paginated log-group list reports its count as a lower bound"
+expect logs_list.txt "logs(41+)" "the paginated log-group list reports its count as a lower bound"
 expect docdb_prod_detail.txt "Log Groups (2+)" "a pivot matching inside a partial list reads (N+), not (N)"
 expect docdb_unenc_detail.txt "Log Groups (0+)" "a pivot matching nothing in a partial list reads (0+), not (0) or (?)"
 

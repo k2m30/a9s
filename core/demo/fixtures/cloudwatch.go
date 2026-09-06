@@ -531,10 +531,11 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("VolumeId"), Value: aws.String("vol-0a1b2c3d4e5f60001")},
 				},
 			},
-			// Issue: OK state but ActionsEnabled=false → Warning (alarm silenced/muted)
+			// AlarmActionsDisabled: OK state but ActionsEnabled=false — the
+			// alarm looks wired up and pages nobody.
 			{
-				AlarmName:             aws.String("alarm-muted"),
-				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:alarm-muted"),
+				AlarmName:             aws.String(AlarmActionsDisabled),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + AlarmActionsDisabled),
 				AlarmDescription:      aws.String("Alarm with actions disabled — notifications will not fire"),
 				StateValue:            cwtypes.StateValueOk,
 				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (50.0)."),

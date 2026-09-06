@@ -252,6 +252,9 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 		switch {
 		case scoped:
 			// guarded by the policy — no finding
+		case endpoint == "":
+			// The endpoint type is unknown, and the common contract's nil rule
+			// makes an unread field unknown rather than misconfigured.
 		case endpoint == "private":
 			emit(CodeAPIGWNoAuthorizer, "no authorizer", "~",
 				domain.DetailRow{Label: "Authorizers", Value: "0", Tier: "~"},
