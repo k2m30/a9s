@@ -144,6 +144,7 @@ The orchestrator dispatches, integrates, and writes nothing else — with one fa
 4. On the landing tree: `go vet ./...`, `make test`, `make lint` (retry once on the cross-worktree lock), `make check-catalogen`, `make mdlint`, `make security`.
 5. Fast-forward `main`; if the primary checkout has uncommitted work on a file the branch touches, set that file aside (`git diff` to a file, `git checkout --`), fast-forward, restore with `git apply --3way`, unstage, and confirm the primary tree still builds.
 6. Acceptance on a fresh detached worktree at the new tip; delete the batch branch and worktree only after that dispatch.
+7. `graphify update .` on the fast-forwarded main tip, so the graph every dispatch is told to query describes the tree the next task starts from.
 
 ## Ending a round
 
