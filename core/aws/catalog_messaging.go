@@ -8,6 +8,9 @@ import (
 	"net/url"
 	"strings"
 
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -162,47 +165,21 @@ func colorEBRule(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch strings.ToUpper(r.Fields["state"]) {
-	case "ENABLED", "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS":
-		return domain.ColorHealthy
-	case "DISABLED":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(ebRuleStateFindings(r.Fields["state"]))
 }
 
 func colorKinesis(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["stream_status"] {
-	case "ACTIVE":
-		return domain.ColorHealthy
-	case "CREATING", "UPDATING", "DELETING":
-		return domain.ColorWarning
-	}
-	switch r.Fields["status"] {
-	case "ACTIVE":
-		return domain.ColorHealthy
-	case "CREATING", "UPDATING", "DELETING":
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(computeKinesisFindings(kinesistypes.StreamStatus(r.Fields["stream_status"])))
 }
 
 func colorMSK(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "ACTIVE":
-		return domain.ColorHealthy
-	case "CREATING", "UPDATING", "MAINTENANCE", "REBOOTING_BROKER", "HEALING":
-		return domain.ColorWarning
-	case "FAILED":
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(computeMSKFindings(kafkatypes.ClusterState(r.Fields["state"])))
 }
 
 func colorSES(r domain.Resource) domain.Color {

@@ -200,7 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Row colour and the Status column now come from one selection for every
-  resource type. A row that carries several findings shows the worst one and
+  resource type, EventBridge rules, Kinesis streams and MSK clusters
+  included. A row that carries several findings shows the worst one and
   counts the rest, instead of showing whichever finding happened to be first.
   Route tables, SNS subscriptions, SSM parameters, CloudTrail trails,
   CloudWatch alarms, CloudTrail events, SES identities, IAM users and
