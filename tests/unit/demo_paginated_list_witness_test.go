@@ -76,6 +76,18 @@ func TestDemoLogGroups_SecondPageCompletesTheList(t *testing.T) {
 		t.Errorf("the two pages hold %d groups, want %d — the fixture set is not covered exactly once",
 			got, total)
 	}
+
+	// Page two holds the one group no pivot matches, and nothing else. Every
+	// other group in the file is some pivot's witness, so a group that drifts
+	// onto page two takes a count a scenario pins down with it.
+	if len(second.Resources) != 1 || second.Resources[0].ID != demofixtures.LogGroupSecondPageOnly {
+		var ids []string
+		for _, r := range second.Resources {
+			ids = append(ids, r.ID)
+		}
+		t.Errorf("page two holds %v, want only %q — any other group there costs its pivot a count",
+			ids, demofixtures.LogGroupSecondPageOnly)
+	}
 	if second.Pagination != nil && second.Pagination.IsTruncated {
 		t.Error("second page reports truncation; the list would never settle")
 	}

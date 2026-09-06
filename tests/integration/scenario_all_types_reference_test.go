@@ -32,7 +32,7 @@ import (
 const allTypesSampledRows = 5
 
 func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
-	counts := demofixtures.ExpectedTopLevelCountsForTest()
+	expected := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCountsForTest())
 
 	// One startup scenario renders the availability-prefetched main menu for
 	// every type at once; per-type walk scenarios skip the startup chain to
@@ -62,15 +62,17 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 			if rt == nil {
 				t.Fatalf("resource type %q not found in registry", shortName)
 			}
-			count, ok := counts[shortName]
+			exp, ok := expected[shortName]
 			if !ok {
 				t.Fatalf("no ExpectedTopLevelCounts entry for %q — every top-level type needs a demo count oracle (core/demo/fixtures/counts.go)", shortName)
 			}
+			count := exp.count
 
 			t.Run("menu", func(t *testing.T) {
 				// Same "Name (count)" render fullIntegrationAssertMainMenuCounts
-				// keys on; for count==0 this asserts the dim "(0)" row.
-				want := fmt.Sprintf("%s (%d)", rt.Name, count)
+				// keys on; for count==0 this asserts the dim "(0)" row, and for a
+				// type whose first page is not the whole list the "(N+)" one.
+				want := fmt.Sprintf("%s (%s)", rt.Name, fullIntegrationExpectedDisplay(exp))
 				if !strings.Contains(menuView, want) {
 					t.Fatalf("main menu missing %q for type %s\nmenu view:\n%s", want, shortName, menuView)
 				}
@@ -87,7 +89,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 				relatedSnapshot map[string]messages.RelatedCheckResult
 			)
 
-			frameTitle := fullIntegrationFrameCount(shortName, fullIntegrationCountExpectation{count: count})
+			frameTitle := fullIntegrationFrameCount(shortName, exp)
 
 			t.Run("list", func(t *testing.T) {
 				sc.Command(shortName)
@@ -203,8 +205,9 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 				sc.ExpectFrameContains(frameTitle)
 				sc.Back()
 				// The list visit synced the exact total to the menu row
-				// (core/app/handle.go syncExactTotalToMenu).
-				sc.ExpectViewContains(fmt.Sprintf("%s (%d)", rt.Name, count))
+				// (core/app/handle.go syncExactTotalToMenu), and a list that
+				// answered with more behind it syncs the lower bound.
+				sc.ExpectViewContains(fmt.Sprintf("%s (%s)", rt.Name, fullIntegrationExpectedDisplay(exp)))
 			})
 
 			t.Run("cache", func(t *testing.T) {

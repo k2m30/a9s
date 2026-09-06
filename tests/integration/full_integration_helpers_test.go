@@ -15,6 +15,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -37,10 +38,15 @@ type fullIntegrationRelatedHopScenario struct {
 
 type fullIntegrationCountResolver func(t *testing.T, resourceType string) fullIntegrationCountExpectation
 
+// fullIntegrationCountExpectationsFromCounts pairs each demo count with whether
+// that type's first page is the whole list. Both come from the fixtures, so a
+// type whose list starts paging changes one number in counts.go and every
+// expectation follows; nothing here names a type.
 func fullIntegrationCountExpectationsFromCounts(counts map[string]int) map[string]fullIntegrationCountExpectation {
+	truncated := demofixtures.ExpectedTopLevelTruncationForTest()
 	expected := make(map[string]fullIntegrationCountExpectation, len(counts))
 	for shortName, count := range counts {
-		expected[shortName] = fullIntegrationCountExpectation{count: count}
+		expected[shortName] = fullIntegrationCountExpectation{count: count, truncated: truncated[shortName]}
 	}
 	return expected
 }
@@ -134,8 +140,8 @@ func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.Service
 	detailContext := fullIntegrationDetailContext(rt.ShortName+" baseline detail", selected)
 	t.Logf("%s selected resource: id=%s name=%q", rt.ShortName, selected.ID, selected.Name)
 	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, rt.ShortName, selected)
-	coldUnknown := fullIntegrationAssertRelatedResults(t, rt.ShortName, expectedRelated, relatedResults, detailContext)
-	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, coldUnknown, detailContext)
+	coldUnknown, coldUnknownTrunc := fullIntegrationAssertRelatedResults(t, rt.ShortName, expectedRelated, relatedResults, detailContext)
+	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, coldUnknown, coldUnknownTrunc, detailContext)
 }
 
 func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.ServiceClients, m *tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation, scenario fullIntegrationRelatedHopScenario) {
@@ -160,15 +166,15 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 	sourceContext := fullIntegrationDetailContext(scenario.name+" source detail", firstResource)
 	t.Logf("%s source selected resource: id=%s name=%q", scenario.name, firstResource.ID, firstResource.Name)
 	expectedFirst := fullIntegrationExpectedRelatedCounts(t, clients, scenario.sourceType, firstResource)
-	coldUnknownFirst := fullIntegrationAssertRelatedResults(t, scenario.sourceType, expectedFirst, firstResults, sourceContext)
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, coldUnknownFirst, sourceContext)
+	coldUnknownFirst, coldUnknownFirstTrunc := fullIntegrationAssertRelatedResults(t, scenario.sourceType, expectedFirst, firstResults, sourceContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, coldUnknownFirst, coldUnknownFirstTrunc, sourceContext)
 
 	relatedResource, relatedResults := fullIntegrationEnterRelatedSingleDetail(t, m, scenario.firstTargetType, scenario.firstDisplayName)
 	firstRelatedContext := fullIntegrationDetailContext(scenario.name+" first related detail", relatedResource)
 	t.Logf("%s first related selected resource: id=%s name=%q", scenario.name, relatedResource.ID, relatedResource.Name)
 	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, scenario.firstTargetType, relatedResource)
-	coldUnknownRelated := fullIntegrationAssertRelatedResults(t, scenario.firstTargetType, expectedRelated, relatedResults, firstRelatedContext)
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, coldUnknownRelated, firstRelatedContext)
+	coldUnknownRelated, coldUnknownRelatedTrunc := fullIntegrationAssertRelatedResults(t, scenario.firstTargetType, expectedRelated, relatedResults, firstRelatedContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, coldUnknownRelated, coldUnknownRelatedTrunc, firstRelatedContext)
 
 	returnCount := expectedRelated[scenario.returnDisplayName]
 	if returnCount <= 0 {
@@ -186,8 +192,8 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 	returnContext := fullIntegrationDetailContext(scenario.name+" return detail", returnResource)
 	t.Logf("%s return selected resource: id=%s name=%q", scenario.name, returnResource.ID, returnResource.Name)
 	expectedReturn := fullIntegrationExpectedRelatedCounts(t, clients, scenario.returnTargetType, returnResource)
-	coldUnknownReturn := fullIntegrationAssertRelatedResults(t, scenario.returnTargetType, expectedReturn, returnResults, returnContext)
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, coldUnknownReturn, returnContext)
+	coldUnknownReturn, coldUnknownReturnTrunc := fullIntegrationAssertRelatedResults(t, scenario.returnTargetType, expectedReturn, returnResults, returnContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, coldUnknownReturn, coldUnknownReturnTrunc, returnContext)
 }
 
 func fullIntegrationNewReadyModelWithClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients) tui.Model {
@@ -467,7 +473,7 @@ func fullIntegrationCollectMessages(msg tea.Msg) []tea.Msg {
 // NeedsTargetCache — a no-prefetch checker answering -1 ("?") where the
 // oracle computed a real count is the documented cold-cache contract, not a
 // mismatch. The returned set lets the view assertion skip those rows.
-func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expected map[string]int, got []messages.RelatedCheckResult, context string) map[string]bool {
+func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expected map[string]int, got []messages.RelatedCheckResult, context string) (coldUnknownOut, truncatedOut map[string]bool) {
 	t.Helper()
 	prefetched := make(map[string]bool)
 	for _, def := range resource.GetRelated(sourceType) {
@@ -478,6 +484,11 @@ func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expect
 		gotByName[result.DefDisplayName] = result.Result
 	}
 	coldUnknown := make(map[string]bool)
+	// A row whose target list was read in part renders its count as a lower
+	// bound. Which rows those are is a property of the cache this scenario
+	// built, not of the fixtures: the same pivot reads "(1)" when the list was
+	// fetched whole and "(1+)" when it was fetched a page at a time.
+	truncated := make(map[string]bool)
 	for name, want := range expected {
 		rr, ok := gotByName[name]
 		if !ok {
@@ -501,11 +512,12 @@ func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expect
 		if rr.Count() != want {
 			t.Fatalf("%s: related result %q count = %d, expected %d; all results %v", context, name, rr.Count(), want, gotByName)
 		}
+		truncated[name] = rr.Truncated()
 	}
-	return coldUnknown
+	return coldUnknown, truncated
 }
 
-func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceType string, expected map[string]int, coldUnknown map[string]bool, context string) {
+func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceType string, expected map[string]int, coldUnknown, truncated map[string]bool, context string) {
 	t.Helper()
 	plain := fullIntegrationStripANSI(fullIntegrationViewContent(m))
 	if !strings.Contains(plain, "RELATED") {
@@ -522,7 +534,10 @@ func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceT
 		}
 		want := name
 		if count >= 0 {
-			want = fmt.Sprintf("%s (%d)", name, count)
+			want = fmt.Sprintf("%s (%s)", name, fullIntegrationExpectedDisplay(fullIntegrationCountExpectation{
+				count:     count,
+				truncated: truncated[name],
+			}))
 		}
 		displayed, ok := fullIntegrationFindRelatedDisplayCount(plain, name)
 		if ok {
@@ -603,7 +618,7 @@ func fullIntegrationFindFrameDisplayCount(plain, resourceType string) (string, b
 }
 
 func fullIntegrationFindRelatedDisplayCount(plain, displayName string) (string, bool) {
-	re := regexp.MustCompile(regexp.QuoteMeta(displayName) + `(?: \((\d+)\))?`)
+	re := regexp.MustCompile(regexp.QuoteMeta(displayName) + `(?: \((\d+\+?)\))?`)
 	m := re.FindStringSubmatch(plain)
 	if len(m) == 0 {
 		return "", false
