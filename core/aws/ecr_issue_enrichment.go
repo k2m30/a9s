@@ -22,6 +22,13 @@ import (
 // ecr canonical FindingCodes.
 const (
 	ecrCodeVulnerabilities domain.FindingCode = "ecr.vulnerabilities"
+
+	// ecrCodePublicPolicy — the repository's resource policy grants a
+	// wildcard principal (GetRepositoryPolicy, evaluated by iampolicy).
+	ecrCodePublicPolicy domain.FindingCode = "ecr.public-policy"
+
+	// ecrCodeNoLifecyclePolicy — GetLifecyclePolicy reports no policy.
+	ecrCodeNoLifecyclePolicy domain.FindingCode = "ecr.no-lifecycle-policy"
 )
 
 // ECRImagesPerRepo caps how many recent images are inspected per repository.

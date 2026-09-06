@@ -214,3 +214,15 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 func NewGlueFixtures() *GlueFixtures {
 	return sharedGlueFixtures()
 }
+
+// Witness jobs for the glue posture findings. Each names the ONE demo job
+// that carries its finding; every other job is set to the healthy value for
+// that condition.
+const (
+	// GlueNoSecurityConfig — the job names no security configuration.
+	GlueNoSecurityConfig = "acme-data-catalog-crawler"
+	// GlueLoggingOff — continuous CloudWatch logging is not turned on.
+	GlueLoggingOff = "acme-etl-clickstream"
+	// GlueArgumentSecret — a default argument value looks like a credential.
+	GlueArgumentSecret = "glue-error-run"
+)

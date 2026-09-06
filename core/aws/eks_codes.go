@@ -28,3 +28,24 @@ const (
 	// qa_eks_color_test.go's active_with_issues -> ColorWarning contract.
 	CodeEKSHealthIssue domain.FindingCode = "eks.health-issue"
 )
+
+// Wave-1 posture findings (Prowler gap closure). eks.go's fetcher calls
+// DescribeCluster per cluster, so all four read data already held.
+const (
+	// CodeEKSPublicEndpoint — ResourcesVpcConfig.EndpointPublicAccess is
+	// true. Severity depends on the CIDR list: SevBroken when it contains
+	// 0.0.0.0/0, SevWarn when the public access is scoped to named ranges.
+	CodeEKSPublicEndpoint domain.FindingCode = "eks.public-endpoint"
+
+	// CodeEKSControlPlaneLoggingOff — the enabled control-plane log types do
+	// not cover all five AWS emits.
+	CodeEKSControlPlaneLoggingOff domain.FindingCode = "eks.control-plane-logging-off"
+
+	// CodeEKSSecretsNotKMS — no EncryptionConfig entry covers "secrets".
+	//nolint:gosec // G101 false positive: a finding code, not a credential
+	CodeEKSSecretsNotKMS domain.FindingCode = "eks.secrets-not-kms"
+
+	// CodeEKSVersionUnsupported — the cluster's Kubernetes minor is older
+	// than eksOldestStandardSupport (eks.go).
+	CodeEKSVersionUnsupported domain.FindingCode = "eks.version-unsupported"
+)

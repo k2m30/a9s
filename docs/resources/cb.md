@@ -202,6 +202,10 @@ cb — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 |
+| cb.public-builds | build results publicly visible | broken | wave1 |
+| cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 |
+| cb.source-url-credential | credential in the source repository address | broken | wave1 |
+| cb.env-secret | credential in environment variables | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

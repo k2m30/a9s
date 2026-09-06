@@ -422,3 +422,20 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 		},
 	}
 }
+
+// Witness clusters for the eks posture findings. Each names the ONE demo
+// cluster that carries its finding; every other cluster is set to the
+// healthy value for that condition.
+const (
+	// EKSPublicEndpoint — the Kubernetes endpoint is open to 0.0.0.0/0.
+	EKSPublicEndpoint = "acme-dev"
+	// EKSPublicEndpointScoped — public endpoint restricted to one /24, the
+	// warn-severity counterpart of EKSPublicEndpoint.
+	EKSPublicEndpointScoped = "acme-staging"
+	// EKSLoggingIncomplete — not all control-plane log types are enabled.
+	EKSLoggingIncomplete = "acme-degraded-prod"
+	// EKSSecretsNoKMS — no encryption configuration covers secrets.
+	EKSSecretsNoKMS = "acme-prod-updating"
+	// EKSVersionUnsupported — Kubernetes minor past standard support.
+	EKSVersionUnsupported = "acme-staging-failed"
+)

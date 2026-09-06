@@ -101,6 +101,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: CodeCFNStackDeleted, Phrase: "delete_complete", Severity: domain.SevDim, Source: "wave1"},
 			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure: <ResourceType/LogicalResourceId>", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{
@@ -209,6 +211,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status> (<date>)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeCBPublicBuilds, Phrase: "build results publicly visible", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCBEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{
@@ -258,6 +264,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeECRScanOnPushOff, Phrase: "scan on push off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECRMutableTags, Phrase: "tags are mutable", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{

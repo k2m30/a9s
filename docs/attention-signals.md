@@ -276,6 +276,10 @@ resource-list frame title. The frame-title rules:
 | eks | eks.state.updating | updating | warn | wave1 |
 | eks | eks.state.failed | failed | broken | wave1 |
 | eks | eks.health-issue | issue: <Issue.Code> | warn | wave1 |
+| eks | eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 |
+| eks | eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 |
+| eks | eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 |
+| eks | eks.version-unsupported | Kubernetes <version> is out of standard support | broken | wave1 |
 | eks | eks.warn.details\_denied | details denied | warn | wave1 |
 | eks | eks.warn.details\_unavailable | details unavailable | warn | wave1 |
 | ng | ng.state.creating | creating | warn | wave1 |
@@ -577,12 +581,25 @@ resource-list frame title. The frame-title rules:
 | cfn | cfn.stack.deleted | delete\_complete | dim | wave1 |
 | cfn | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 |
 | cfn | cfn.stack-drifted | stack drifted from template | warn | wave2 |
+| cfn | cfn.termination-protection-off | termination protection off | warn | wave1 |
+| cfn | cfn.output-secret | credential in stack outputs | broken | wave1 |
 | pipeline | pipeline.stage-failed | stage <stage> failed | broken | wave2 |
 | cb | cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 |
+| cb | cb.public-builds | build results publicly visible | broken | wave1 |
+| cb | cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 |
+| cb | cb.source-url-credential | credential in the source repository address | broken | wave1 |
+| cb | cb.env-secret | credential in environment variables | broken | wave1 |
 | ecr | ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 |
+| ecr | ecr.public-policy | repository policy open to anyone | broken | wave2 |
+| ecr | ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 |
+| ecr | ecr.scan-on-push-off | scan on push off | warn | wave1 |
+| ecr | ecr.mutable-tags | tags are mutable | warn | wave1 |
 | codeartifact | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 |
 | codeartifact | codeartifact.public-access-policy | public access policy | broken | wave2 |
 | glue | glue.latest-run-failed | latest run <STATUS> | broken | wave2 |
+| glue | glue.no-security-configuration | no security configuration | warn | wave1 |
+| glue | glue.continuous-logging-off | continuous logging off | warn | wave1 |
+| glue | glue.argument-secret | credential in job arguments | broken | wave1 |
 | athena | athena.workgroup-disabled | disabled | warn | wave1 |
 | athena | athena.settings-not-enforced | settings can be overridden per query | warn | wave2 |
 | athena | athena.results-unencrypted | query results stored unencrypted | warn | wave2 |

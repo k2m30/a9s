@@ -44,12 +44,26 @@ type ECRListImagesAPI interface {
 	ListImages(ctx context.Context, params *ecr.ListImagesInput, optFns ...func(*ecr.Options)) (*ecr.ListImagesOutput, error)
 }
 
+// ECRGetLifecyclePolicyAPI defines the interface for the ECR
+// GetLifecyclePolicy operation. Used by the Wave 2 EnrichECRRepository
+// enricher: the absence of a policy (LifecyclePolicyNotFoundException) is
+// itself the finding, so there is no way to read this from
+// DescribeRepositories.
+//
+// Deliberately NOT part of the aggregate ECRAPI: the enricher type-asserts
+// for it the way it already does for ECRDescribeImagesAPI, so a caller
+// wired with a client that predates this call degrades to "no lifecycle
+// finding" instead of failing to construct. *ecr.Client satisfies it.
+type ECRGetLifecyclePolicyAPI interface {
+	GetLifecyclePolicy(ctx context.Context, params *ecr.GetLifecyclePolicyInput, optFns ...func(*ecr.Options)) (*ecr.GetLifecyclePolicyOutput, error)
+}
+
 // ECRAPI is the aggregate interface covering all ECR operations used by a9s fetchers.
 // *ecr.Client structurally satisfies this interface.
 type ECRAPI interface {
 	ECRDescribeRepositoriesAPI
 	ECRDescribeImagesAPI
 	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
-	ECRGetRepositoryPolicyAPI       // related-panel: ecr→role
+	ECRGetRepositoryPolicyAPI       // related-panel: ecr→role, Wave 2 public-policy
 	ECRListTagsForResourceAPI       // related-panel: ecr→cfn
 }

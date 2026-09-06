@@ -237,6 +237,10 @@ eks — CONTAINERS. Lifecycle key: `status`.
 | eks.state.updating | updating | warn | wave1 |
 | eks.state.failed | failed | broken | wave1 |
 | eks.health-issue | issue: <Issue.Code> | warn | wave1 |
+| eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 |
+| eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 |
+| eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 |
+| eks.version-unsupported | Kubernetes <version> is out of standard support | broken | wave1 |
 | eks.warn.details\_denied | details denied | warn | wave1 |
 | eks.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->

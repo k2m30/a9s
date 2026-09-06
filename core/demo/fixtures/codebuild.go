@@ -189,3 +189,17 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 func NewCodeBuildFixtures() *CodeBuildFixtures {
 	return sharedCodeBuildFixtures()
 }
+
+// Witness projects for the cb posture findings. Each names the ONE demo
+// project that carries its finding; every other project is set to the
+// healthy value for that condition.
+const (
+	// CBPublicBuilds — build results are readable without an AWS account.
+	CBPublicBuilds = "acme-docs-publish"
+	// CBBuildspecFromSource — the buildspec is a file in the source repo.
+	CBBuildspecFromSource = "acme-frontend-build"
+	// CBSourceURLCredential — the source location embeds a credential.
+	CBSourceURLCredential = "acme-legacy-mirror"
+	// CBEnvSecret — a plaintext environment variable holds a credential.
+	CBEnvSecret = "acme-integration-tests"
+)

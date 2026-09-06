@@ -85,3 +85,22 @@ func (f *ECRFake) ListTagsForResource(_ context.Context, input *ecr.ListTagsForR
 	}
 	return &ecr.ListTagsForResourceOutput{Tags: f.fix.Tags[arn]}, nil
 }
+
+// GetLifecyclePolicy returns the fixture lifecycle policy for the requested
+// repository, or LifecyclePolicyNotFoundException when the repository has
+// none — the absence is what EnrichECRRepository reports, so the not-found
+// error is a normal answer here rather than a failure.
+func (f *ECRFake) GetLifecyclePolicy(_ context.Context, input *ecr.GetLifecyclePolicyInput, _ ...func(*ecr.Options)) (*ecr.GetLifecyclePolicyOutput, error) {
+	var repoName string
+	if input != nil && input.RepositoryName != nil {
+		repoName = *input.RepositoryName
+	}
+	policyText, ok := f.fix.LifecyclePolicies[repoName]
+	if !ok {
+		return nil, &ecrtypes.LifecyclePolicyNotFoundException{Message: aws.String("no lifecycle policy configured for this repository")}
+	}
+	return &ecr.GetLifecyclePolicyOutput{
+		RepositoryName:      input.RepositoryName,
+		LifecyclePolicyText: &policyText,
+	}, nil
+}

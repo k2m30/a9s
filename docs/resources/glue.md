@@ -178,6 +178,9 @@ glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycl
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | glue.latest-run-failed | latest run <STATUS> | broken | wave2 |
+| glue.no-security-configuration | no security configuration | warn | wave1 |
+| glue.continuous-logging-off | continuous logging off | warn | wave1 |
+| glue.argument-secret | credential in job arguments | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

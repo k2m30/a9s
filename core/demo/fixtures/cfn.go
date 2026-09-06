@@ -507,3 +507,14 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 func NewCFNFixtures() *CFNFixtures {
 	return sharedCFNFixtures()
 }
+
+// Witness stacks for the cfn posture findings. Each names the ONE demo stack
+// that carries its finding; every other non-nested stack is set to the
+// healthy value for that condition.
+const (
+	// CFNTerminationProtectionOff — a live top-level stack that can be
+	// deleted in one call.
+	CFNTerminationProtectionOff = "acme-legacy-api"
+	// CFNOutputSecret — a stack output whose value looks like a credential.
+	CFNOutputSecret = "acme-rds-aurora"
+)

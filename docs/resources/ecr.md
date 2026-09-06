@@ -194,6 +194,10 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 |
+| ecr.public-policy | repository policy open to anyone | broken | wave2 |
+| ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 |
+| ecr.scan-on-push-off | scan on push off | warn | wave1 |
+| ecr.mutable-tags | tags are mutable | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

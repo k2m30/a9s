@@ -88,6 +88,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		IssueEnricherFieldKeys: []string{"last_run"},
 		Findings: []catalog.FindingDef{
 			{Code: glueCodeLatestRunFailed, Phrase: "latest run <STATUS>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeGlueNoSecurityConfiguration, Phrase: "no security configuration", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeGlueContinuousLoggingOff, Phrase: "continuous logging off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeGlueArgumentSecret, Phrase: "credential in job arguments", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{

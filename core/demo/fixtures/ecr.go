@@ -22,7 +22,25 @@ type ECRFixtures struct {
 	// GetRepositoryPolicy) — required for the ecr:role related-panel pivot
 	// (checkECRRole).
 	Policies map[string]string
+	// LifecyclePolicies maps repository name to its lifecycle policy JSON
+	// (for GetLifecyclePolicy). A repository absent from this map has no
+	// lifecycle policy, which is what ECRNoLifecycle witnesses.
+	LifecyclePolicies map[string]string
 }
+
+// Witness repositories for the ecr posture findings. Each names the ONE demo
+// repository that carries its finding; every other repository is set to the
+// healthy value for that condition.
+const (
+	// ECRPublicPolicy — repository policy grants a wildcard principal.
+	ECRPublicPolicy = "acme/public-mirror"
+	// ECRScanOnPushOff — scan on push is off.
+	ECRScanOnPushOff = "acme/base-images"
+	// ECRMutableTags — image tags can be overwritten.
+	ECRMutableTags = "acme/frontend"
+	// ECRNoLifecycle — no lifecycle policy is configured.
+	ECRNoLifecycle = "acme/batch-processor"
+)
 
 // APIServiceRepoPolicyRoleName is the IAM role name granted pull access via
 // the acme/api-service repository policy — matches the acme-ci-deploy-role
@@ -138,11 +156,14 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 		"acme/api-service": `{"Version":"2012-10-17","Statement":[{"Sid":"AllowCIPull","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/` + APIServiceRepoPolicyRoleName + `"},"Action":["ecr:GetDownloadUrlForLayer","ecr:BatchGetImage","ecr:BatchCheckLayerAvailability"]}]}`,
 	}
 
+	lifecyclePolicies := map[string]string{}
+
 	return &ECRFixtures{
-		Repositories: repos,
-		Images:       images,
-		Tags:         tags,
-		Policies:     policies,
+		Repositories:      repos,
+		Images:            images,
+		Tags:              tags,
+		Policies:          policies,
+		LifecyclePolicies: lifecyclePolicies,
 	}
 })
 
