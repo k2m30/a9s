@@ -261,6 +261,12 @@ func TestW6BEKSDemoClusterVersionsAreAllInTheRegistry(t *testing.T) {
 
 	flagged := 0
 	for _, r := range rows {
+		if r.ID == fixtures.WarnEKSDetailsDeniedID || r.ID == fixtures.WarnEKSDetailsUnavailableID {
+			// A degraded row is built from a Cluster carrying nothing but a
+			// name (DegradedDetails), so it has no version to report by
+			// construction — that is the finding, not a registry gap.
+			continue
+		}
 		if r.Fields["version"] == "" {
 			t.Errorf("%s reports no version; row 18 cannot classify it", r.ID)
 		}

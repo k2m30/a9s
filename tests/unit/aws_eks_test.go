@@ -11,6 +11,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -278,5 +279,60 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 	}
 	if got := bad.Fields["status"]; got != "details unavailable" {
 		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
+	}
+}
+
+// TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow pins the w6b/w27
+// rebase fold fix (core/aws/ng.go, healthIssueFindingSev): the Attention rows
+// start at the second reported issue code, since the first is already the
+// Phrase. acme-degraded-prod's demo fixture carries two Health.Issues codes
+// (ConfigurationConflict, AccessDenied) so this is witnessed end to end
+// through the real demo fetcher, not a hand-built Health struct.
+func TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow(t *testing.T) {
+	clients := demo.NewServiceClients()
+	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
+	if err != nil && len(result.Resources) == 0 {
+		t.Fatalf("FetchEKSClustersPage: %v", err)
+	}
+
+	var cluster resource.Resource
+	found := false
+	for _, r := range result.Resources {
+		if r.ID == "acme-degraded-prod" {
+			cluster, found = r, true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("demo fixtures no longer carry \"acme-degraded-prod\"")
+	}
+
+	var finding domain.Finding
+	haveFinding := false
+	for _, f := range cluster.Findings {
+		if f.Code == awsclient.CodeEKSHealthIssue {
+			finding, haveFinding = f, true
+			break
+		}
+	}
+	if !haveFinding {
+		t.Fatalf("acme-degraded-prod carries no %s finding, got %v", awsclient.CodeEKSHealthIssue, cluster.Findings)
+	}
+	if finding.Phrase != "configuration conflict" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "configuration conflict")
+	}
+
+	issueRows := 0
+	for _, row := range cluster.AttentionDetails[awsclient.CodeEKSHealthIssue].Rows {
+		if row.Label != "Issue" {
+			continue
+		}
+		issueRows++
+		if row.Value == "configuration conflict" {
+			t.Errorf("row repeats the phrase %q one line below itself", row.Value)
+		}
+	}
+	if issueRows != 1 {
+		t.Errorf("%d \"Issue\" rows, want exactly 1 (the second issue only)", issueRows)
 	}
 }

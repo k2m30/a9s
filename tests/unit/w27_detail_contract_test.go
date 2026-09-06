@@ -77,11 +77,14 @@ func runFullCatalogDetailBench(t *testing.T) detailBenchResult {
 	clients := demo.NewServiceClients()
 	cache := resource.ResourceCache{}
 
-	// sg.unused scans the "eni" cache and the vpc-peer route findings the
-	// "rtb" cache (zero-call enrichers); load both so the bench sees what a
-	// demo user who has opened those lists sees.
+	// sg.unused scans the "eni" cache, the vpc-peer route findings the "rtb"
+	// cache, and the not-in-backup-plan / no-snapshot findings the "backup"
+	// and "ebs-snap" caches (all zero-call enrichers); load all four so the
+	// bench sees what a demo user who has opened those lists sees.
 	for _, td := range resource.AllResourceTypes() {
-		if td.ShortName != "eni" && td.ShortName != "rtb" {
+		switch td.ShortName {
+		case "eni", "rtb", "backup", "ebs-snap":
+		default:
 			continue
 		}
 		if rows, ok := DrainFixtures(t, td, clients); ok {
