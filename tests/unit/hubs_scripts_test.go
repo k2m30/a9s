@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -277,6 +278,15 @@ func TestChangelogAssemble_NeverDeletesContentItDidNotWrite(t *testing.T) {
 			fragment:  "## Added\n\n- Alpha added.\n",
 			line:      "- Alpha added.",
 		},
+		{
+			// A dropped line that reads as part of a line already in the
+			// file is still a dropped line. The entry that swallows it says
+			// something else, and nobody is looking for the difference.
+			name:      "dropped line is a substring of a line already present",
+			changelog: "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- Alpha noted something. It also did more.\n",
+			fragment:  "## Notes\n\n- Alpha noted something.\n",
+			line:      "- Alpha noted something.",
+		},
 	}
 
 	for _, tc := range cases {
@@ -293,7 +303,9 @@ func TestChangelogAssemble_NeverDeletesContentItDidNotWrite(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if strings.Contains(string(raw), tc.line) {
+			// Whole lines only: a bullet that survives as part of a longer
+			// sentence someone else wrote has not survived.
+			if slices.Contains(strings.Split(string(raw), "\n"), tc.line) {
 				return
 			}
 			for _, n := range fragmentNames(t, root) {
