@@ -239,3 +239,41 @@ func TestW5SecretScan_ARNAdjacentAccessKeyIsStillFound(t *testing.T) {
 		t.Errorf("no aws-access-key hit; the structural patterns run over the line before any ARN is blanked. got %+v", secretscan.ScanText(line))
 	}
 }
+
+// The reference rule's boundary, both sides of it in one table. A bare
+// dollar value names where a secret lives only when what follows is an
+// identifier and nothing else; anything that continues past the identifier,
+// or does not start one, is the credential itself.
+//
+// The cases are chosen so the rule cannot be satisfied by a prefix test, by
+// a first-character test, or by a list of known hash formats: an identifier
+// followed by a hyphen starts valid and fails later, a digit fails
+// immediately, and argon2 starts with letters and fails at its separator.
+func TestW5SecretScan_DollarReferenceBoundary(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantHit bool
+		why     string
+	}{
+		{"identifier", "$ACME_API_KEY", false, "a name for a secret held elsewhere"},
+		{"identifier with a leading underscore", "$_ACME_KEY", false, "still an identifier"},
+		{"identifier with digits", "$ACME_KEY_V2", false, "still an identifier"},
+		{"identifier then a hyphen", "$LITERAL-SECRET-9f8e7d6c5b", true, "starts as a name and keeps going, so it is a value"},
+		{"digit straight after the dollar", "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad", true, "bcrypt, a credential"},
+		{"argon2 identifier then a separator", "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ", true, "argon2, a credential"},
+		{"braced reference", "${ACME_API_KEY}", false, "shell interpolation"},
+		{"braced reference with a default", "${ACME_API_KEY:-fallback}", false, "shell interpolation with a default"},
+		{"braced terraform reference", "${var.acme_api_key}", false, "terraform interpolation"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			line := "DB_PASSWORD=" + tc.value
+			got := w5HasKeywordHit(secretscan.ScanText(line))
+			if got != tc.wantHit {
+				t.Errorf("ScanText(%q) reported=%v, want %v — %s", line, got, tc.wantHit, tc.why)
+			}
+		})
+	}
+}
