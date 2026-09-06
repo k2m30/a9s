@@ -133,6 +133,8 @@ func TestW2DetailAttentionNeverRepeatsItself(t *testing.T) {
 	batchTypes := map[string]bool{
 		"s3": true, "redis": true, "dbi": true, "dbc": true, "dbi-snap": true,
 		"dbc-snap": true, "ddb": true, "opensearch": true, "redshift": true, "efs": true,
+		// w7 adds backup-coverage rows to ebs; dbi, dbc and ddb are already here.
+		"ebs": true,
 	}
 
 	clients := demo.NewServiceClients()
