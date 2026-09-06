@@ -160,18 +160,44 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 			// before it are dropped rather than applied, so no group reports a
 			// clean posture on a partial read.
 			var failures []string
+			groups := 0
 			for _, name := range names {
 				for _, id := range groupsByLC[name] {
 					MarkSkipped(result, id, &failures, op, err)
+					groups++
 				}
 			}
-			return Finish(result, failures, len(names), op)
+			// One failure per group, so the aggregate's total counts groups
+			// too: several groups can share a launch configuration, and
+			// len(names) would read "8 of 5".
+			return Finish(result, failures, groups, op)
 		}
 		configs = append(configs, out.LaunchConfigurations...)
-		if aws.ToString(out.NextToken) == "" {
+		nextToken = out.NextToken
+		if aws.ToString(nextToken) == "" {
 			break
 		}
-		nextToken = out.NextToken
+	}
+
+	// A token still pending means the cap fell through, not the pages: the
+	// configurations behind it were never read, and a group referencing one is
+	// as uninspected as a group behind a failed page. Only those groups are
+	// marked — a group whose configuration DID arrive was inspected, and
+	// hiding its finding behind a "?" would lose a real one.
+	if aws.ToString(nextToken) != "" {
+		result.Truncated = true
+		read := make(map[string]bool, len(configs))
+		for _, lc := range configs {
+			read[aws.ToString(lc.LaunchConfigurationName)] = true
+		}
+		for _, name := range names {
+			if read[name] {
+				continue
+			}
+			for _, id := range groupsByLC[name] {
+				result.TruncatedIDs[id] = true
+			}
+		}
 	}
 
 	for _, lc := range configs {

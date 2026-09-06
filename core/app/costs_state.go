@@ -981,18 +981,18 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 		// screen state left to apply to AND no disk cache to touch, so this
 		// is a pure no-op rather than a stray read+write. now falls back to
 		// lastCostsNow (the clock this session's costs screen was last
-		// seeded with) rather than a raw wall-clock read, so this merge's
-		// FetchedAt stays consistent with whatever clock the rest of the
-		// session used — significant for a fixed injected-clock test,
-		// harmless in production (lastCostsNow is itself always seeded from
-		// time.Now() there).
+		// seeded with) rather than a fresh read, so this merge's FetchedAt
+		// stays consistent with whatever clock the rest of the session used —
+		// significant for a fixed injected-clock test, harmless in production.
+		// The zero-value fallback goes through the package seam like every
+		// other clock read here.
 		if ev.Err != nil || c.core.NoCache() {
 			return nil
 		}
 		store := costs.LoadStore(c.core.Profile())
 		now := c.lastCostsNow
 		if now.IsZero() {
-			now = time.Now()
+			now = Now()
 		}
 		store.ApplyFetchResult(costs.FetchResult{
 			Query:     ev.Query,
