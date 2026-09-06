@@ -485,3 +485,7 @@ func buildActivitiesFor(asgName string) []asgtypes.Activity {
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "asg", Rows: 9, Issues: 7, CoverageGaps: []string{"dim"}})
+}

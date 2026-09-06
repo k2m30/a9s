@@ -90,3 +90,7 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 func NewWAFFixtures() *WAFFixtures {
 	return sharedWAFFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "waf", Rows: 4, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
+}

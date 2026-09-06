@@ -448,3 +448,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 func NewSFNFixtures() *SFNFixtures {
 	return sharedSFNFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "sfn", Rows: 7, Issues: 0, CoverageGaps: []string{"dim"}})
+}

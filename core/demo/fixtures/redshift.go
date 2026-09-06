@@ -556,3 +556,7 @@ func mustParseRedshiftTime(s string) time.Time {
 	}
 	return t
 }
+
+func init() {
+	Register(Pin{ShortName: "redshift", Rows: 30, Issues: 24, CoverageGaps: []string{"dim"}})
+}

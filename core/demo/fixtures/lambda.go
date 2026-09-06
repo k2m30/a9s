@@ -734,3 +734,7 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 	}
 	return mappings
 }
+
+func init() {
+	Register(Pin{ShortName: "lambda", Rows: 36, Issues: 16})
+}

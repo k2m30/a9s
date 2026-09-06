@@ -145,3 +145,7 @@ func buildVpcPeerConnections() []ec2types.VpcPeeringConnection {
 		peer(WarnPeerBlackholeID, ec2types.VpcPeeringConnectionStateReasonCodeActive, "", []string{"10.0.0.0/16"}, []string{"10.30.0.0/16"}),
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "vpc-peer", Rows: 12, Issues: 8})
+}

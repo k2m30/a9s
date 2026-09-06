@@ -642,3 +642,7 @@ const demoLogsKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-
 // Every other log group fixture carries a synthetic KmsKeyId so the demo
 // bench shows exactly one row for logs.no-kms.
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
+
+func init() {
+	Register(Pin{ShortName: "logs", Rows: 41, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+}

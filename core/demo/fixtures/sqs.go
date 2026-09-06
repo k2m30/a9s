@@ -108,3 +108,7 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 func NewSQSFixtures() *SQSFixtures {
 	return sharedSQSFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "sqs", Rows: 6, Issues: 0, CoverageGaps: []string{"dim"}})
+}

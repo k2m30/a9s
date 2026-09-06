@@ -17,10 +17,10 @@ same voice as `CHANGELOG.md`:
 - A failed related check no longer reports a confident zero.
 ```
 
-`make changelog` assembles the fragments in file-name order into the
-`## [Unreleased]` section of `CHANGELOG.md`, merging same-named sections and
-keeping every line already there. Nothing else writes `CHANGELOG.md` outside a
-release. `make ready-to-release` refuses a tree that still has unassembled
-fragments.
+`make changelog` moves the fragments in file-name order into the
+`## [Unreleased]` section of `CHANGELOG.md`, merging same-named sections,
+keeping every line already there, and deleting each fragment it consumed.
+Nothing else writes `CHANGELOG.md` outside a release, and a task branch never
+edits it. `make ready-to-release` refuses while a fragment is still here.
 
 This README is not a fragment; the assembler ignores it.

@@ -837,3 +837,7 @@ func buildS3CommonPrefixes() map[string]map[string][]s3types.CommonPrefix {
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "s3", Rows: 42, Issues: 0, CoverageGaps: []string{"dim"}})
+}

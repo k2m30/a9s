@@ -330,3 +330,7 @@ const (
 	// the eip, ec2 and eni fixtures for the finding to hold.
 	R53DanglingATarget = "203.0.113.201"
 )
+
+func init() {
+	Register(Pin{ShortName: "r53", Rows: 6, Issues: 2, CoverageGaps: []string{"dim"}})
+}

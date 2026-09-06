@@ -546,3 +546,7 @@ const (
 	// CFNOutputSecret — a stack output whose value looks like a credential.
 	CFNOutputSecret = "acme-rds-aurora"
 )
+
+func init() {
+	Register(Pin{ShortName: "cfn", Rows: 16, Issues: 5})
+}

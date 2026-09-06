@@ -343,3 +343,7 @@ var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:go
 
 // NewAPIGWV1Fixtures returns the shared REST-lane fixtures.
 func NewAPIGWV1Fixtures() *APIGWV1Fixtures { return sharedAPIGWV1Fixtures() }
+
+func init() {
+	Register(Pin{ShortName: "apigw", Rows: 8, Issues: 0, CoverageGaps: []string{"dim"}})
+}

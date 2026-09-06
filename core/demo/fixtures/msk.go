@@ -309,3 +309,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 func NewMSKFixtures() *MSKFixtures {
 	return sharedMSKFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "msk", Rows: 11, Issues: 7, CoverageGaps: []string{"dim"}})
+}

@@ -578,3 +578,9 @@ func buildEFSAccessPoints() map[string][]efstypes.AccessPointDescription {
 		},
 	}
 }
+
+func init() {
+	// efs issues is 8 here and 10 in scenario_efs_visual_test.go:
+	// fs-0healthymtdown001 and fs-0publicpolicy0001 are Wave-2 only.
+	Register(Pin{ShortName: "efs", Rows: 12, Issues: 8, CoverageGaps: []string{"dim"}})
+}

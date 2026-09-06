@@ -1084,3 +1084,11 @@ func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
 		}
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "ecs", Rows: 7, Issues: 4, CoverageGaps: []string{"dim"}})
+	// acme-svc-stalled is the witness for a service that wants tasks and runs
+	// none; it carries one of the 26 rows and one of the 7 Broken badges.
+	Register(Pin{ShortName: "ecs-svc", Rows: 26, Issues: 7, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ecs-task", Rows: 17, Issues: 9})
+}

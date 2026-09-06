@@ -610,3 +610,8 @@ func buildRules(f *ELBFixtures) {
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "elb", Rows: 24, Issues: 3, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "tg", Rows: 5, Issues: 0, CoverageGaps: []string{"dim"}})
+}

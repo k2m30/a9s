@@ -525,3 +525,10 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 func NewKMSFixtures() *KMSFixtures {
 	return sharedKMSFixtures()
 }
+
+func init() {
+	// dim: colorKMS (core/aws/catalog_secrets.go) has exactly three branches —
+	// Enabled→Healthy, Disabled→Warning, Pending*/Unavailable→Broken — and
+	// docs/resources/kms.md §3.1/§3.2 documents no Dim-producing signal.
+	Register(Pin{ShortName: "kms", Rows: 22, Issues: 8, CoverageGaps: []string{"dim"}})
+}

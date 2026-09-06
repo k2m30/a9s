@@ -239,3 +239,7 @@ var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 func NewCodePipelineFixtures() *CodePipelineFixtures {
 	return sharedCodePipelineFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "pipeline", Rows: 3, Issues: 0, CoverageGaps: []string{"dim", "warning"}})
+}

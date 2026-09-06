@@ -111,3 +111,7 @@ var sharedCodeArtifactFixtures = sync.OnceValue(func() *CodeArtifactFixtures {
 func NewCodeArtifactFixtures() *CodeArtifactFixtures {
 	return sharedCodeArtifactFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "codeartifact", Rows: 4, Issues: 0, CoverageGaps: []string{"dim"}})
+}

@@ -257,3 +257,7 @@ const (
 	// GlueArgumentSecret — a default argument value looks like a credential.
 	GlueArgumentSecret = "glue-error-run"
 )
+
+func init() {
+	Register(Pin{ShortName: "glue", Rows: 5, Issues: 3, CoverageGaps: []string{"dim"}})
+}

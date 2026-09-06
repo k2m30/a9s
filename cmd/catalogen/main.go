@@ -10,7 +10,8 @@
 //	go run ./cmd/catalogen
 //
 // Output files (relative to the repo root):
-//   - docs/attention-signals.md  — findings × severity table
+//   - docs/attention-signals.md  — ONLY the marked signals section; the
+//     "Not yet implemented" list and the surface prose are hand-maintained
 //   - docs/related-resources.md  — ONLY the marked related-table section;
 //     the per-type contract prose (mechanisms, citations, budget-excluded
 //     annotations) is hand-maintained and NOT generated
@@ -70,12 +71,8 @@ func run() error {
 		return fmt.Errorf("locate repo root: %w", err)
 	}
 
-	if err := generateAttentionSignals(repoRoot, types); err != nil {
-		return fmt.Errorf("attention-signals.md: %w", err)
-	}
-
 	if err := generateSignalTables(repoRoot, types); err != nil {
-		return fmt.Errorf("attention-signals.md signals: %w", err)
+		return fmt.Errorf("attention-signals.md: %w", err)
 	}
 
 	if err := generateRelatedResources(repoRoot, types); err != nil {
@@ -114,25 +111,6 @@ func runVerify() error {
 		return fmt.Errorf("missing docs/resources/<short>.md for: %s", strings.Join(missing, ", "))
 	}
 	return nil
-}
-
-// generateAttentionSignals writes docs/attention-signals.md between its
-// BEGIN/END GENERATED markers. Content is a Findings × Severity table.
-func generateAttentionSignals(repoRoot string, types []catalog.ResourceTypeDef) error {
-	path := filepath.Join(repoRoot, "docs", "attention-signals.md")
-
-	var rows strings.Builder
-	rows.WriteString("| Type | Code | Phrase | Severity | Source |\n")
-	rows.WriteString("| --- | --- | --- | --- | --- |\n")
-	for _, rt := range types {
-		for _, f := range rt.Findings {
-			fmt.Fprintf(&rows, "| %s | %s | %s | %s | %s |\n",
-				escapeMarkdownCell(rt.ShortName), escapeMarkdownCell(string(f.Code)),
-				escapeMarkdownCell(f.Phrase), severityLabel(f.Severity), escapeMarkdownCell(f.Source))
-		}
-	}
-
-	return updateGeneratedSection(path, "findings-table", rows.String())
 }
 
 // generateRelatedResources writes docs/related-resources.md between its markers.
@@ -365,10 +343,18 @@ func lifecycleFragment(rt catalog.ResourceTypeDef) string {
 }
 
 // generateSignalTables writes the per-category signal tables of
-// docs/attention-signals.md from the registered FindingDefs. The section is
-// optional: a page without the markers is left untouched.
+// docs/attention-signals.md from the registered FindingDefs — the page's whole
+// signal inventory, so nothing outside the block states a signal.
 func generateSignalTables(repoRoot string, types []catalog.ResourceTypeDef) error {
 	path := filepath.Join(repoRoot, "docs", "attention-signals.md")
+
+	// Child types carry FindingDefs of their own and are stored in a map, so
+	// they arrive in no particular order.
+	children := catalog.AllChildren()
+	slices.SortFunc(children, func(a, b catalog.ResourceTypeDef) int {
+		return strings.Compare(a.ShortName, b.ShortName)
+	})
+	types = append(slices.Clone(types), children...)
 
 	var categories []string
 	for _, rt := range types {
@@ -387,16 +373,16 @@ func generateSignalTables(repoRoot string, types []catalog.ResourceTypeDef) erro
 				continue
 			}
 			for _, f := range rt.Findings {
-				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s | %s | %s |\n",
+				fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | %s | %s | %s |\n",
 					escapeMarkdownCell(rt.ShortName), escapeMarkdownCell(rt.Name),
-					escapeMarkdownCell(f.Source), escapeMarkdownCell(string(f.Code)),
-					escapeMarkdownCell(f.Phrase), severityLabel(f.Severity), detailCell(f))
+					escapeMarkdownCell(f.Source), f.Code,
+					phraseCell(f.Phrase), severityLabel(f.Severity), detailCell(f))
 			}
 		}
 	}
 	b.WriteString("\n")
 
-	return updateOptionalSection(path, "signals", b.String())
+	return updateGeneratedSection(path, "signals", b.String())
 }
 
 // categoryLabel title-cases a catalog category ("COMPUTE" -> "Compute") for
@@ -407,4 +393,16 @@ func categoryLabel(category string) string {
 	}
 	lower := strings.ToLower(category)
 	return strings.ToUpper(lower[:1]) + lower[1:]
+}
+
+// phraseCell renders a finding's operator-facing phrase verbatim, so a reader
+// can search the page for the words the row shows. Only the pipe is escaped,
+// which would otherwise end the cell; a phrase carrying an asterisk or an
+// underscore goes in a code span, where markdown reads neither as emphasis.
+func phraseCell(phrase string) string {
+	cell := strings.ReplaceAll(phrase, `|`, `\|`)
+	if strings.ContainsAny(phrase, "*_") && !strings.Contains(phrase, "`") {
+		return "`" + cell + "`"
+	}
+	return cell
 }

@@ -476,3 +476,7 @@ func ddbPostureWitnessTable(name, arn string, deletionProtection bool) *ddbtypes
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "ddb", Rows: 13, Issues: 9, CoverageGaps: []string{"dim"}})
+}

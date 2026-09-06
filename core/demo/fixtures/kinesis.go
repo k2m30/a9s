@@ -166,3 +166,7 @@ var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
 func NewKinesisFixtures() *KinesisFixtures {
 	return sharedKinesisFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "kinesis", Rows: 8, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
+}

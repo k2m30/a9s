@@ -264,3 +264,7 @@ const (
 	// CBEnvSecret — a plaintext environment variable holds a credential.
 	CBEnvSecret = "acme-integration-tests"
 )
+
+func init() {
+	Register(Pin{ShortName: "cb", Rows: 6, Issues: 4, CoverageGaps: []string{"dim"}})
+}

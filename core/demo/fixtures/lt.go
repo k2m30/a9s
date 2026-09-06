@@ -291,3 +291,10 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 		// is denied for this id (see LTFixtures.DeniedIDs).
 	}
 }
+
+func init() {
+	// dim: colorLT (core/aws/catalog_compute.go) is colorFromAnyFinding-only
+	// and no registered lt.* FindingDef is SevDim; docs/resources/lt.md §4
+	// documents no Dim-producing signal.
+	Register(Pin{ShortName: "lt", Rows: 11, Issues: 6, CoverageGaps: []string{"dim"}})
+}

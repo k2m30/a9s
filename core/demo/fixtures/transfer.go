@@ -382,3 +382,11 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 func NewTransferFixtures() *TransferFixtures {
 	return sharedTransferFixtures()
 }
+
+func init() {
+	// dim: colorTransfer (core/aws/catalog_networking.go) is
+	// colorFromAnyFinding-only with no SevDim finding registered, and
+	// DescribeServer's State enum (OFFLINE|ONLINE|STARTING|STOPPING|
+	// START_FAILED|STOP_FAILED) has no terminal deleted value to model.
+	Register(Pin{ShortName: "transfer", Rows: 13, Issues: 10, CoverageGaps: []string{"dim"}})
+}

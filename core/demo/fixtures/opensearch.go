@@ -441,3 +441,11 @@ func osDeletingDim() ostypes.DomainStatus {
 	d.Deleted = aws.Bool(true)
 	return d
 }
+
+func init() {
+	// details_denied: DescribeDomains is one batched call, so a denial degrades
+	// every listed domain at once and cannot stand beside healthy rows. The
+	// demo witnesses the absent-from-response case (details_unavailable); the
+	// AUTH path is covered by the batch-denial stub in the unit tests.
+	Register(Pin{ShortName: "opensearch", Rows: 13, Issues: 10, CoverageGaps: []string{"opensearch.warn.details_denied"}})
+}

@@ -89,7 +89,7 @@ check-deps:
 # stops. Excluding here keeps unrelated doc PRs from being gated by lint
 # regressions inside in-flight refactor documents.
 mdlint:
-	markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
+	markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "changelog.d/**/*.md" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
 
 coverage:
 	go test ./core/... ./internal/... ./tests/... -coverpkg=./core/...,./internal/... -coverprofile=coverage.out -covermode=atomic

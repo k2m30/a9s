@@ -239,3 +239,7 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 func NewEventBridgeFixtures() *EventBridgeFixtures {
 	return sharedEventBridgeFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "eb-rule", Rows: 12, Issues: 0})
+}

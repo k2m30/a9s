@@ -345,3 +345,11 @@ func buildSESActiveReceiptRuleSet() *ses.DescribeActiveReceiptRuleSetOutput {
 		},
 	}
 }
+
+func init() {
+	// The three account codes: SES exposes one GetAccount-shaped Wave-2 signal
+	// per account with no per-resource dimension to vary, and the demo account
+	// is modeled healthy so the rest of the fleet has a working sending
+	// identity to reference. The distress shapes are built inline in QA tests.
+	Register(Pin{ShortName: "ses", Rows: 9, Issues: 6, CoverageGaps: []string{"dim", "ses.account-shutdown", "ses.account-probation", "ses.quota-high"}})
+}

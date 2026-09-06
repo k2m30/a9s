@@ -20,8 +20,24 @@ type Pin struct {
 	// Issues is the Wave-1 issue badge on the main menu — lower than the
 	// settled badge for a type whose findings arrive in Wave 2.
 	Issues int
+	// Truncated is true when the page cap cuts this type's demo list, so the
+	// menu renders both numbers with a "+" and Rows and Issues are lower
+	// bounds rather than totals.
+	Truncated bool
 	// CoverageGaps are the "<bucket>" or "<finding code>" keys this type may
-	// still miss a fixture witness for. The ratchet only ever shrinks it.
+	// still miss a fixture witness for. The ratchet only ever shrinks it: a
+	// gap that gains a witness fails until it is removed here.
+	//
+	// A bucket gap says no fixture of this type resolves to that
+	// domain.Color, and every one of them is there for one of two reasons.
+	// Either the classifier and the FindingDef table have no path to that
+	// color at all — most "dim" entries: the Color func has no Dim branch and
+	// no registered finding carries SevDim, so no fixture of any shape could
+	// witness it. Or AWS itself cannot present the state beside healthy rows —
+	// a torn-down resource stops appearing in the list API rather than
+	// reporting a deleted status. A finding-code gap says no fixture produces
+	// that documented finding yet, which is fixture debt and is expected to
+	// burn down.
 	CoverageGaps []string
 }
 

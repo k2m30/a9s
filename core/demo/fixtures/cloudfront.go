@@ -413,3 +413,7 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	}
 	return cfgs
 }
+
+func init() {
+	Register(Pin{ShortName: "cf", Rows: 8, Issues: 1})
+}

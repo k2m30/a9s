@@ -513,3 +513,8 @@ var EKSVersionSupport = map[string]ekstypes.VersionStatus{ //nolint:gochecknoglo
 // EKSEndOfStandardSupport is the date the demo registry reports for the one
 // minor that has left standard support.
 var EKSEndOfStandardSupport = time.Date(2025, 11, 26, 0, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // static demo data
+
+func init() {
+	Register(Pin{ShortName: "eks", Rows: 8, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ng", Rows: 10, Issues: 8, CoverageGaps: []string{"dim"}})
+}

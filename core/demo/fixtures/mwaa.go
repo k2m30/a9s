@@ -270,3 +270,7 @@ var sharedMWAAFixtures = sync.OnceValue(func() *MWAAFixtures {
 func NewMWAAFixtures() *MWAAFixtures {
 	return sharedMWAAFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "mwaa", Rows: 18, Issues: 14})
+}

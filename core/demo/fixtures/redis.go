@@ -920,3 +920,11 @@ func buildRedisTagLists() map[string][]elasticachetypes.Tag {
 		ProdRedisMemberClusterARN: cfnTag,
 	}
 }
+
+func init() {
+	// dim: colorRedis (core/aws/catalog_databases.go) has no Dim branch, and a
+	// torn-down replication group stops appearing in DescribeReplicationGroups
+	// rather than reporting a deleted status — see docs/resources/redis.md
+	// §3.1/§3.2/§5 and the Bug 4 pin in aws_classifier_fivepack_test.go.
+	Register(Pin{ShortName: "redis", Rows: 17, Issues: 13, CoverageGaps: []string{"dim"}})
+}

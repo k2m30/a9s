@@ -339,3 +339,7 @@ func buildEBEnvironments() []ebtypes.EnvironmentDescription {
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "eb", Rows: 10, Issues: 4})
+}

@@ -167,3 +167,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 func NewSSMFixtures() *SSMFixtures {
 	return sharedSSMFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "ssm", Rows: 25, Issues: 3, CoverageGaps: []string{"dim"}})
+}

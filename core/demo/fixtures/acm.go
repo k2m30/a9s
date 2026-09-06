@@ -276,3 +276,7 @@ func NewACMFixtures() *ACMFixtures {
 // the w6a batch. Every other certificate fixture carries RSA 2048 or an
 // elliptic-curve algorithm.
 const ACMWeakKey = "acme-corp.com"
+
+func init() {
+	Register(Pin{ShortName: "acm", Rows: 12, Issues: 9})
+}

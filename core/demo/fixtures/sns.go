@@ -259,3 +259,8 @@ func minimalSubscriptions(topicARN, protocol, endpoint string) []snstypes.Subscr
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "sns", Rows: 11, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sns-sub", Rows: 7, Issues: 2, CoverageGaps: []string{"broken"}})
+}

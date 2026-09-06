@@ -216,3 +216,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 func NewECRFixtures() *ECRFixtures {
 	return sharedECRFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "ecr", Rows: 6, Issues: 2, CoverageGaps: []string{"dim"}})
+}

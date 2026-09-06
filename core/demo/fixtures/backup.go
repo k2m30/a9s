@@ -656,3 +656,7 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 func NewBackupFixtures() *BackupFixtures {
 	return sharedBackupFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "backup", Rows: 9, Issues: 0, CoverageGaps: []string{"dim"}})
+}

@@ -3549,3 +3549,20 @@ func buildImages() []ec2types.Image {
 		},
 	}
 }
+
+func init() {
+	Register(Pin{ShortName: "ec2", Rows: 40, Issues: 15})
+	Register(Pin{ShortName: "ebs", Rows: 8, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs-snap", Rows: 9, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
+	Register(Pin{ShortName: "eip", Rows: 9, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "eni", Rows: 47, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "igw", Rows: 5, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "nat", Rows: 6, Issues: 3})
+	Register(Pin{ShortName: "rtb", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sg", Rows: 41, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "subnet", Rows: 37, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "tgw", Rows: 8, Issues: 5})
+	Register(Pin{ShortName: "vpc", Rows: 7, Issues: 1, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "vpce", Rows: 12, Issues: 8})
+}

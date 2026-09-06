@@ -246,3 +246,7 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 func NewAthenaFixtures() *AthenaFixtures {
 	return sharedAthenaFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "athena", Rows: 7, Issues: 1, CoverageGaps: []string{"broken", "dim"}})
+}

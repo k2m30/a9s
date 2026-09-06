@@ -374,3 +374,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 func NewSecretsFixtures() *SecretsFixtures {
 	return sharedSecretsFixtures()
 }
+
+func init() {
+	Register(Pin{ShortName: "secrets", Rows: 38, Issues: 21, CoverageGaps: []string{"dim"}})
+}

@@ -1117,3 +1117,7 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 // for the w6a batch. It has actions configured, so it is distinct from the
 // no-actions witness.
 const AlarmActionsDisabled = "acme-actions-disabled-alarm"
+
+func init() {
+	Register(Pin{ShortName: "alarm", Rows: 47, Issues: 6, CoverageGaps: []string{"dim"}})
+}
