@@ -275,7 +275,7 @@ resource-list frame title. The frame-title rules:
 | eks | eks.state.creating | creating | warn | wave1 |
 | eks | eks.state.updating | updating | warn | wave1 |
 | eks | eks.state.failed | failed | broken | wave1 |
-| eks | eks.health-issue | issue: <Issue.Code> | warn | wave1 |
+| eks | eks.health-issue | issue: <health issue code> | warn | wave1 |
 | eks | eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 |
 | eks | eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 |
 | eks | eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 |

@@ -208,7 +208,7 @@ ng — CONTAINERS. Lifecycle key: `status`.
 | ng.state.deleting | deleting | warn | wave1 | — |
 | ng.state.create-failed | create failed | broken | wave1 | — |
 | ng.state.delete-failed | delete failed | broken | wave1 | — |
-| ng.state.degraded | degraded | broken | wave1 | The node group is degraded: AWS reports the health issues listed below, so some nodes are failing or not joining. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
+| ng.state.degraded | degraded | broken | wave1 | The node group is degraded, so some nodes are failing or not joining; when AWS reports health issues, the first is the phrase and any others follow as rows. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
 | ng.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
 | ng.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
