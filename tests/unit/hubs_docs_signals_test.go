@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -42,7 +44,10 @@ func attentionSignalsDoc(t *testing.T) (generated, handWritten string) {
 
 // TestAttentionSignals_GeneratedBlockCarriesEveryFindingDef pins that the one
 // generated block is the whole signal inventory: every registered FindingDef
-// of every type has a row there, under the column set the page promises.
+// of every type has a row there, under the column set the page promises. Child
+// types are walked too — they live in a separate registry, so a generator that
+// reads only the parent catalog leaves their findings off the page with every
+// gate green.
 func TestAttentionSignals_GeneratedBlockCarriesEveryFindingDef(t *testing.T) {
 	generated, _ := attentionSignalsDoc(t)
 
@@ -52,7 +57,7 @@ func TestAttentionSignals_GeneratedBlockCarriesEveryFindingDef(t *testing.T) {
 	}
 
 	rows := strings.Split(generated, "\n")
-	for _, td := range resource.AllResourceTypes() {
+	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...) {
 		for _, fd := range td.Findings {
 			cell := fmt.Sprintf("| `%s` |", td.ShortName)
 			found := false
@@ -68,6 +73,53 @@ func TestAttentionSignals_GeneratedBlockCarriesEveryFindingDef(t *testing.T) {
 				t.Errorf("generated signals block has no row for %s finding %q (phrase %q)",
 					td.ShortName, fd.Code, fd.Phrase)
 			}
+		}
+	}
+}
+
+// TestAttentionSignals_CodeSpansAreNotEscaped pins that a cell wrapped in
+// backticks is not also markdown-escaped. Markdown does not process escapes
+// inside a code span, so `foo\_bar` renders the backslash to the reader and
+// the page cannot be searched for the name the app uses.
+func TestAttentionSignals_CodeSpansAreNotEscaped(t *testing.T) {
+	generated, _ := attentionSignalsDoc(t)
+
+	escapedSpan := regexp.MustCompile("`[^`\n]*\\\\[_*][^`\n]*`")
+	seen := make(map[string]bool)
+	for _, span := range escapedSpan.FindAllString(generated, -1) {
+		seen[span] = true
+	}
+	var spans []string
+	for span := range seen {
+		spans = append(spans, span)
+	}
+	sort.Strings(spans)
+	for _, span := range spans {
+		t.Errorf("code span carries a markdown escape and renders the backslash: %s", span)
+	}
+}
+
+// TestAttentionSignals_CategoryHeadingsMatchTheCatalog pins that a generated
+// category heading is the category the catalog declares and the main menu
+// shows. Resource docs cite sections of this page by category name, and a
+// heading that re-cases the label ("CI/CD" as "Ci/cd") breaks the citation and
+// disagrees with the app on screen.
+func TestAttentionSignals_CategoryHeadingsMatchTheCatalog(t *testing.T) {
+	known := map[string]bool{"Other": true}
+	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...) {
+		if td.Category != "" {
+			known[td.Category] = true
+		}
+	}
+
+	generated, _ := attentionSignalsDoc(t)
+	for _, line := range strings.Split(generated, "\n") {
+		heading, ok := strings.CutPrefix(strings.TrimSpace(line), "### ")
+		if !ok {
+			continue
+		}
+		if !known[heading] {
+			t.Errorf("generated heading %q is not a category any type declares", heading)
 		}
 	}
 }

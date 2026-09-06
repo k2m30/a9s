@@ -239,6 +239,79 @@ func TestChangelogAssemble_IdempotentWithNoFragments(t *testing.T) {
 	}
 }
 
+// TestChangelogAssemble_NeverDeletesContentItDidNotWrite pins the one thing
+// assembly must never do. It deletes each fragment as it consumes it, so a
+// line it silently drops instead of writing is gone from the tree with no
+// copy anywhere and exit 0 to say it went fine. Both cases below are inputs
+// the script accepts today and answers with a deleted fragment and a
+// CHANGELOG.md that never received the content.
+func TestChangelogAssemble_NeverDeletesContentItDidNotWrite(t *testing.T) {
+	cases := []struct {
+		name      string
+		changelog string
+		fragment  string
+		line      string
+	}{
+		{
+			// Keep a Changelog names six sections; a fragment heading outside
+			// that set, from a typo or a section the project adds later, has
+			// no place to land.
+			name:      "section the assembler does not know",
+			changelog: hubsBaseChangelog,
+			fragment:  "## Added\n\n- Alpha added.\n\n## Notes\n\n- Alpha noted something.\n",
+			line:      "- Alpha noted something.",
+		},
+		{
+			// Every line is filed under the heading above it, so a fragment
+			// written as a bare list has no heading to be filed under.
+			name:      "fragment with no section heading",
+			changelog: hubsBaseChangelog,
+			fragment:  "- Alpha forgot the heading.\n",
+			line:      "- Alpha forgot the heading.",
+		},
+		{
+			// The whole fragment lands in the Unreleased block, so a
+			// changelog without one has nowhere to put any of it.
+			name:      "changelog with no Unreleased heading",
+			changelog: "# Changelog\n\n## [3.47.0] - 2026-07-07\n\n### Fixed\n\n- An older release line.\n",
+			fragment:  "## Added\n\n- Alpha added.\n",
+			line:      "- Alpha added.",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := hubsScriptRoot(t, "changelog-assemble.sh")
+			writeChangelogFixture(t, root, map[string]string{"task-alpha.md": tc.fragment})
+			if err := os.WriteFile(filepath.Join(root, "CHANGELOG.md"), []byte(tc.changelog), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			out, exit := runHubsScript(t, root, "changelog-assemble.sh")
+
+			raw, err := os.ReadFile(filepath.Join(root, "CHANGELOG.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(raw), tc.line) {
+				return
+			}
+			for _, n := range fragmentNames(t, root) {
+				if n == "task-alpha.md" {
+					// Refusing and keeping the fragment is a fine answer:
+					// the content is still on disk to fix and re-run.
+					if exit == 0 {
+						t.Errorf("%q never reached CHANGELOG.md but the assembler reported success\n%s", tc.line, out)
+					}
+					return
+				}
+			}
+			t.Errorf("%q never reached CHANGELOG.md and the fragment was deleted anyway (exit %d) — "+
+				"the content is gone with nothing to recover it from\n%s", tc.line, exit, out)
+		})
+	}
+}
+
 // TestChangelogAssemble_CheckRefusesWhileAFragmentExists pins the
 // ready-to-release gate: an unassembled fragment fails the check even when
 // its lines happen to be in Unreleased already, because the release notes are

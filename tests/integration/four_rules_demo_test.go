@@ -171,9 +171,10 @@ func TestFourRules_Demo_R4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 }
 
 // renderedMenuCounts parses the Wave-1 main menu into the numbers it shows per
-// type — "EC2 Instances (40) issues:15" — keyed by shortName. A truncated
-// count's "+" is dropped: a fixtures.Pin carries numbers, not truncation. A
-// type the menu shows without a count is absent from the result.
+// type — "EC2 Instances (40) issues:15", or "CloudWatch Log Groups (41+)
+// issues:3+" where the page cap cut the list. The "+" is kept as truncated,
+// because it changes what the two numbers mean: lower bounds rather than
+// totals. A type the menu shows without a count is absent from the result.
 func renderedMenuCounts(t *testing.T, view string) map[string]menuCounts {
 	t.Helper()
 	out := make(map[string]menuCounts)
@@ -192,7 +193,9 @@ func renderedMenuCounts(t *testing.T, view string) map[string]menuCounts {
 			t.Fatalf("malformed menu count for %q in line %q", rt.Name, rest)
 		}
 		var counts menuCounts
-		if _, err := parseInt2(strings.TrimSuffix(rest[:end], "+"), &counts.rows); err != nil {
+		rowField, truncated := strings.CutSuffix(rest[:end], "+")
+		counts.truncated = truncated
+		if _, err := parseInt2(rowField, &counts.rows); err != nil {
 			t.Fatalf("could not parse row count %q for %q", rest[:end], rt.Name)
 		}
 		if badge, ok := strings.CutPrefix(rest[end+1:], " issues:"); ok {
@@ -208,7 +211,10 @@ func renderedMenuCounts(t *testing.T, view string) map[string]menuCounts {
 	return out
 }
 
-type menuCounts struct{ rows, issues int }
+type menuCounts struct {
+	rows, issues int
+	truncated    bool
+}
 
 // TestFourRules_Demo_R1_SpecificTypesShowIssueCounts is a strict regression pin
 // that verifies exact per-type row counts and Wave-1 issue badges. It
@@ -244,6 +250,14 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 			t.Errorf("%s: menu shows (%d) issues:%d, Pin says Rows=%d Issues=%d — "+
 				"move the number in that type's fixture file",
 				p.ShortName, got.rows, got.issues, p.Rows, p.Issues)
+		}
+		// The marker is half of what the numbers mean: without it, a demo
+		// list that stopped hitting its page cap would leave Rows and Issues
+		// pinned as lower bounds of a list that is now complete, and nothing
+		// would say so.
+		if got.truncated != p.Truncated {
+			t.Errorf("%s: menu renders truncated=%t, Pin says Truncated=%t",
+				p.ShortName, got.truncated, p.Truncated)
 		}
 	}
 }
