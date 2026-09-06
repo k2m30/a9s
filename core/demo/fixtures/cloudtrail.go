@@ -959,3 +959,26 @@ func buildCTEvents() []cloudtrailtypes.Event {
 		},
 	}
 }
+
+// Witness trails for the w6a Prowler batch. Each names the ONE demo trail
+// that carries its finding; every other trail is set to the healthy value for
+// that condition.
+const (
+	// TrailSingleRegion is the trail that is single-region while no trail in
+	// the account is multi-region.
+	TrailSingleRegion = "acme-region-local-trail"
+
+	// TrailNoCWLogs is the trail delivering to S3 only.
+	TrailNoCWLogs = "acme-s3-only-trail"
+
+	// TrailNoKMS is the trail whose log files carry no KMS key.
+	TrailNoKMS = "acme-unencrypted-trail"
+
+	// TrailLogBucketPublic is the trail delivering to fixtures.S3BucketPublic,
+	// the bucket the s3 enricher reports as public.
+	TrailLogBucketPublic = "acme-public-bucket-trail"
+
+	// TrailLogBucketNoLogging is the trail delivering to the bucket the s3
+	// enricher reports as having no access logging.
+	TrailLogBucketNoLogging = "acme-unlogged-bucket-trail"
+)

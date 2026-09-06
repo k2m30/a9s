@@ -35,6 +35,26 @@ const (
 	// been delivered recently even though the trail believes it's logging.
 	// Severity: SevBroken.
 	CodeTrailDeliveryStale domain.FindingCode = "trail.delivery-stale"
+
+	// CodeTrailSingleRegion — this trail is single-region and no trail in the
+	// account is multi-region. Severity: SevWarn.
+	CodeTrailSingleRegion domain.FindingCode = "trail.single-region"
+
+	// CodeTrailNoCloudWatchLogs — CloudWatchLogsLogGroupArn empty. Events land
+	// in S3 only, so no metric filter or alarm can watch them. Severity: SevWarn.
+	CodeTrailNoCloudWatchLogs domain.FindingCode = "trail.no-cloudwatch-logs"
+
+	// CodeTrailNoKMS — KmsKeyId empty. Delivered log files are encrypted with
+	// S3-managed keys only. Severity: SevWarn.
+	CodeTrailNoKMS domain.FindingCode = "trail.no-kms"
+
+	// CodeTrailLogBucketPublic — the S3 bucket this trail delivers to carries
+	// the s3.public finding. Severity: SevBroken.
+	CodeTrailLogBucketPublic domain.FindingCode = "trail.log-bucket-public"
+
+	// CodeTrailLogBucketNoAccessLogging — the S3 bucket this trail delivers to
+	// carries the s3.access-logging-off finding. Severity: SevWarn.
+	CodeTrailLogBucketNoAccessLogging domain.FindingCode = "trail.log-bucket-no-access-logging"
 )
 
 // trailDeliveryIsStale reports whether latestDeliveryTime (RFC3339) is older

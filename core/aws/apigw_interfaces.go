@@ -59,6 +59,25 @@ type APIGatewayV2GetAuthorizersAPI interface {
 	GetAuthorizers(ctx context.Context, params *apigatewayv2.GetAuthorizersInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error)
 }
 
+// The two Wave 2 interfaces below are deliberately NOT folded into
+// APIGatewayV1API. The enricher type-asserts for them off clients.APIGatewayV1
+// the way EnrichCodeArtifactRepository does for CodeArtifactListPackagesAPI,
+// so a client or fake that predates these calls keeps satisfying the
+// aggregate instead of failing to compile.
+
+// APIGatewayV1GetAuthorizersAPI lists the authorizers configured for a REST
+// API. Used by Wave 2 enrichment to tell an unauthenticated API from one
+// behind an authorizer.
+type APIGatewayV1GetAuthorizersAPI interface {
+	GetAuthorizers(ctx context.Context, params *apigateway.GetAuthorizersInput, optFns ...func(*apigateway.Options)) (*apigateway.GetAuthorizersOutput, error)
+}
+
+// APIGatewayV1GetStagesAPI lists the stages of a REST API. Used by Wave 2
+// enrichment to inspect access logging, tracing and stage variables.
+type APIGatewayV1GetStagesAPI interface {
+	GetStages(ctx context.Context, params *apigateway.GetStagesInput, optFns ...func(*apigateway.Options)) (*apigateway.GetStagesOutput, error)
+}
+
 // APIGatewayV1API is the aggregate interface covering APIGateway v1 (REST) operations used by a9s fetchers.
 // *apigateway.Client structurally satisfies this interface.
 type APIGatewayV1API interface {

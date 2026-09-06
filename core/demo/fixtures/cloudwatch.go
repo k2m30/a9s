@@ -1111,3 +1111,8 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 		},
 	}
 }
+
+// AlarmActionsDisabled is the ONE demo alarm with its actions switched off
+// for the w6a batch. It has actions configured, so it is distinct from the
+// no-actions witness.
+const AlarmActionsDisabled = "acme-actions-disabled-alarm"

@@ -326,3 +326,36 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 func NewCloudFrontFixtures() *CloudFrontFixtures {
 	return sharedCloudFrontFixtures()
 }
+
+// Witness distributions for the w6a Prowler batch. Each names the ONE demo
+// distribution carrying its finding.
+const (
+	// CFOriginBucketMissing is the distribution whose S3 origin names a
+	// bucket no s3 fixture holds.
+	CFOriginBucketMissing = "E6F7G8H9I0J1K2"
+
+	// CFOriginBucketMissingDomain is that origin's domain name, built on a
+	// bucket absent from the s3 fixtures.
+	CFOriginBucketMissingDomain = "acme-deleted-origin.s3.us-east-1.amazonaws.com"
+
+	// CFDeprecatedTLS is the distribution whose minimum protocol version is
+	// below TLS 1.2.
+	CFDeprecatedTLS = "E7G8H9I0J1K2L3"
+
+	// CFLoggingOff is the distribution with access logging switched off.
+	CFLoggingOff = "E8H9I0J1K2L3M4"
+
+	// CFNoRootObject is the distribution with no default root object.
+	CFNoRootObject = "E9I0J1K2L3M4N5"
+
+	// CFS3OriginNoOAC is the distribution whose S3 origin has neither an
+	// origin access control nor a legacy origin access identity.
+	CFS3OriginNoOAC = "EA0J1K2L3M4N5O"
+
+	// CFDefaultCert is the distribution serving custom aliases with the
+	// default CloudFront certificate.
+	CFDefaultCert = "EB1K2L3M4N5O6P"
+
+	// CFNoGeoRestriction is the distribution with no geographic restriction.
+	CFNoGeoRestriction = "EC2L3M4N5O6P7Q"
+)

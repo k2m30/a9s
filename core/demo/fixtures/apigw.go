@@ -213,3 +213,28 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 func NewAPIGWFixtures() *APIGWFixtures {
 	return sharedAPIGWFixtures()
 }
+
+// Witness APIs and stages for the w6a Prowler batch. The REST witnesses need
+// the v1 lane, which the demo fake currently returns empty for.
+const (
+	// APIGWRESTNoAuthorizer is the REST API with no authorizer and a
+	// resource policy that is absent or public.
+	APIGWRESTNoAuthorizer = "rst001noauth"
+
+	// APIGWHTTPNoAuthorizer is the HTTP API with no authorizer.
+	APIGWHTTPNoAuthorizer = "htp001noauth"
+
+	// APIGWRESTNoAccessLogs is the REST API whose stage records no access logs.
+	APIGWRESTNoAccessLogs = "rst002nologs"
+
+	// APIGWRESTTracingOff is the REST API whose stage has tracing switched off.
+	APIGWRESTTracingOff = "rst003notrace"
+
+	// APIGWRESTStageSecret is the REST API whose stage variables hold a value
+	// that scans as a credential. The value itself never leaves the fixture.
+	APIGWRESTStageSecret = "rst004secret"
+
+	// APIGWRESTStageSecretStage is the stage on APIGWRESTStageSecret carrying
+	// that variable.
+	APIGWRESTStageSecretStage = "prod"
+)

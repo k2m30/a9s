@@ -616,3 +616,8 @@ func minimalLogStreams(suffix string) []cwlogstypes.LogStream {
 		},
 	}
 }
+
+// LogGroupNoKMS is the ONE demo log group with no KMS key for the w6a batch.
+// Every other log group fixture carries a synthetic KmsKeyId so the demo
+// bench shows exactly one row for logs.no-kms.
+const LogGroupNoKMS = "/app/acme-unencrypted-audit"

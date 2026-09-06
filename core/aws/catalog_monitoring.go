@@ -193,10 +193,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		// log_file_validation_enabled at fetch time. The wave2-source
 		// FindingDefs below feed the generated table in
 		// docs/attention-signals.md, kept in sync by `make check-catalogen` and
-		// tests/unit/docs_attention_signals_sync_test.go. InFetcherWave2Sentinel
-		// records the in-fetcher contract itself; see its doc comment in
-		// issue_enrichment.go for what does (and does not) guard that wiring.
-		Wave2:     IssueEnricher{Fn: InFetcherWave2Sentinel, Priority: 100},
+		// tests/unit/docs_attention_signals_sync_test.go.
+		//
+		// EnrichTrailLogBucket carries the log-bucket signals on top of that
+		// in-fetcher work. It is cache-only, so Priority 200 lets the s3
+		// enricher (100) populate the bucket findings it reads.
+		Wave2:     IssueEnricher{Fn: EnrichTrailLogBucket, Priority: 200},
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true},

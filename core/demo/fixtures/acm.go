@@ -268,3 +268,8 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 func NewACMFixtures() *ACMFixtures {
 	return sharedACMFixtures()
 }
+
+// ACMWeakKey is the ONE demo certificate with an RSA key below 2048 bits for
+// the w6a batch. Every other certificate fixture carries RSA 2048 or an
+// elliptic-curve algorithm.
+const ACMWeakKey = "legacy-weak-key.acme-corp.com"

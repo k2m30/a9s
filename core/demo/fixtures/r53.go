@@ -292,3 +292,17 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 func NewR53Fixtures() *R53Fixtures {
 	return sharedR53Fixtures()
 }
+
+// Witness zones and records for the w6a Prowler batch.
+const (
+	// R53QueryLoggingOff is the public zone with no query-logging config.
+	R53QueryLoggingOff = "no-query-logging.acme-corp.com."
+
+	// R53DanglingA is the A record whose address is held by no EIP, instance
+	// or network interface in the demo account.
+	R53DanglingA = "dangling.acme-corp.com."
+
+	// R53DanglingATarget is that record's address. It must stay absent from
+	// the eip, ec2 and eni fixtures for the finding to hold.
+	R53DanglingATarget = "203.0.113.201"
+)

@@ -21,3 +21,11 @@ func NewAPIGWV1() *APIGWV1Fake { return &APIGWV1Fake{} }
 func (f *APIGWV1Fake) GetRestApis(_ context.Context, _ *apigateway.GetRestApisInput, _ ...func(*apigateway.Options)) (*apigateway.GetRestApisOutput, error) {
 	return &apigateway.GetRestApisOutput{Items: []apigwv1types.RestApi{}}, nil
 }
+
+func (f *APIGWV1Fake) GetAuthorizers(_ context.Context, _ *apigateway.GetAuthorizersInput, _ ...func(*apigateway.Options)) (*apigateway.GetAuthorizersOutput, error) {
+	return &apigateway.GetAuthorizersOutput{Items: []apigwv1types.Authorizer{}}, nil
+}
+
+func (f *APIGWV1Fake) GetStages(_ context.Context, _ *apigateway.GetStagesInput, _ ...func(*apigateway.Options)) (*apigateway.GetStagesOutput, error) {
+	return &apigateway.GetStagesOutput{Item: []apigwv1types.Stage{}}, nil
+}
