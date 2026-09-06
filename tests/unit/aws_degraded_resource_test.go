@@ -35,7 +35,7 @@ func TestDegradedDetails_ClassifiesAuthVsNonAuth(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := awsclient.DegradedDetails("svc", "res-1", nil, tc.err)
+			r := awsclient.DegradedDetails("svc", "res-1", tc.err)
 			if len(r.Findings) != 1 {
 				t.Fatalf("want exactly 1 finding, got %+v", r.Findings)
 			}
