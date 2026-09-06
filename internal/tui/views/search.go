@@ -49,10 +49,23 @@ type SearchModel struct {
 // searchPasteMsg carries clipboard text pasted into a search query.
 type searchPasteMsg string
 
+// clipboardRead is this package's read of the OS clipboard. Tests replace it
+// via SetClipboardReadForTest and assert on what they fed in, because the OS
+// clipboard is one shared resource across every parallel worktree.
+var clipboardRead = clipboard.ReadAll
+
+// SetClipboardReadForTest replaces clipboardRead and returns a function that
+// restores the previous one.
+func SetClipboardReadForTest(fn func() (string, error)) func() {
+	prev := clipboardRead
+	clipboardRead = fn
+	return func() { clipboardRead = prev }
+}
+
 // searchReadClipboard is a tea.Cmd that reads the system clipboard and
 // returns a searchPasteMsg with the content, or nil on error.
 func searchReadClipboard() tea.Msg {
-	str, err := clipboard.ReadAll()
+	str, err := clipboardRead()
 	if err != nil {
 		return nil
 	}

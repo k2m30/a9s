@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -347,7 +346,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 
 	case runtime.NavigateKindPushCosts:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
-		m.ctrl.EnsureCostsState(time.Now())
+		m.ctrl.EnsureCostsState(app.Now())
 		// SC-002: HandleNavigate itself never fetches unconditionally —
 		// EnsureCostsFetch is the sole cache-first decision point, so a
 		// warm cache opens with zero CE calls.
@@ -785,11 +784,25 @@ func (m Model) handleToggleRelated() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// clipboardWrite is this package's write to the OS clipboard. Tests replace
+// it via SetClipboardWriteForTest and assert on what was captured, because the
+// OS clipboard is one shared resource across every parallel worktree and
+// reading it back makes the assertion depend on whoever wrote last.
+var clipboardWrite = clipboard.WriteAll
+
+// SetClipboardWriteForTest replaces clipboardWrite and returns a function that
+// restores the previous one.
+func SetClipboardWriteForTest(fn func(string) error) func() {
+	prev := clipboardWrite
+	clipboardWrite = fn
+	return func() { clipboardWrite = prev }
+}
+
 // copyToClipboard returns a tea.Cmd that writes content to the system
 // clipboard and emits a FlashMsg with the success label or error text.
 func copyToClipboard(content, successLabel string) tea.Cmd {
 	return func() tea.Msg {
-		err := clipboard.WriteAll(content)
+		err := clipboardWrite(content)
 		if err != nil {
 			return messages.Flash{Text: fmt.Sprintf("Copy failed: %v", err), IsError: true}
 		}

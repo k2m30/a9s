@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -96,7 +95,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 
 	case runtime.NavigateKindPushCosts:
 		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
-		c.ensureCostsState(time.Now())
+		c.ensureCostsState(Now())
 		// HandleNavigate no longer fetches unconditionally (SC-002) —
 		// ensureCostsShapeFetched is the sole decider: a warm cache opens
 		// with zero CE calls, a cold one gets exactly the one task it needs.
