@@ -52,12 +52,17 @@ func TestDetailCell_DeclaredSentenceOrEmDash(t *testing.T) {
 			want: "An administrative or database port on this group accepts connections from any address on the internet.",
 		},
 		{
-			name: "a declared sentence needing markdown-cell escaping",
+			// Inverted with hubs row 4 finding 2: a Detail sentence is authored
+			// markdown, so its backticks are code spans it means to render and
+			// escaping them showed the reader a backslash. Only the pipe, which
+			// would end the table cell, is escaped. Do not restore the escaped
+			// form — TestAttentionSignals_CodeSpansAreNotEscaped fails on it.
+			name: "a declared sentence carrying markdown",
 			def: catalog.FindingDef{
 				Code:   "test.escape",
 				Detail: "Uses `backticks`, pipes | and _underscores_.",
 			},
-			want: "Uses \\`backticks\\`, pipes \\| and \\_underscores\\_.",
+			want: "Uses `backticks`, pipes \\| and _underscores_.",
 		},
 	}
 	for _, tc := range cases {
