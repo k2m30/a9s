@@ -48,3 +48,10 @@ var dbcPostureCodes = rdsPostureCodes{
 	defaultMasterUser:       CodeDBCDefaultMasterUser,
 	defaultMasterUserDetail: dbcDefaultMasterUserDetail,
 }
+
+// CodeDBCNotInBackupPlan — no backup plan selection matches this cluster
+// (Aurora or DocumentDB). Severity: SevWarn.
+const CodeDBCNotInBackupPlan domain.FindingCode = "dbc.not-in-backup-plan"
+
+// dbcNotInBackupPlanDetail is the S5 operator sentence for it.
+const dbcNotInBackupPlanDetail = "No backup plan selects this cluster, so its retention is whatever the cluster's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on."

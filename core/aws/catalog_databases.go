@@ -135,6 +135,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: dbiCodePendingMaintenance, Phrase: "maintenance scheduled", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: CodeDBISingleAZ, Phrase: "single-AZ", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBIMinorUpgradeOff, Phrase: "auto minor version upgrade off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBINotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: CodeDBIIAMAuthOff, Phrase: "IAM database authentication off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBIDefaultMasterUser, Phrase: "default master username", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBICACertExpiring, Phrase: "server certificate expires in <N> days", Severity: domain.SevWarn, Source: "wave1"},
@@ -383,6 +384,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBCMinorUpgradeOff, Phrase: "auto minor version upgrade off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCIAMAuthOff, Phrase: "IAM database authentication off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCDefaultMasterUser, Phrase: "default master username", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCNotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -432,6 +434,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDDBDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ddbCodeCrossAccountPolicy, Phrase: "resource policy grants another account", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: ddbCodePublicPolicy, Phrase: "resource policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeDDBNotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2"},
 			DetailsDeniedFindingDef("ddb"),
 			DetailsUnavailableFindingDef("ddb"),
 		},

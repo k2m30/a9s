@@ -41,6 +41,11 @@ const (
 	// DDBDeletionProtectionOff is the table without deletion protection.
 	DDBDeletionProtectionOff    = "sessions-no-delete-protection"
 	ddbDeletionProtectionOffARN = "arn:aws:dynamodb:us-east-1:123456789012:table/sessions-no-delete-protection"
+	// DDBNotInBackupPlan is the only demo table no backup plan selects;
+	// every other table is covered by acme-daily-backup.
+	DDBNotInBackupPlan    = "audit-log-unplanned"
+	DDBNotInBackupPlanARN = "arn:aws:dynamodb:us-east-1:123456789012:table/audit-log-unplanned"
+
 	// DDBCrossAccountPolicyID has a resource policy naming a foreign account.
 	DDBCrossAccountPolicyID  = "partner-feed-shared"
 	DDBCrossAccountPolicyARN = "arn:aws:dynamodb:us-east-1:123456789012:table/partner-feed-shared"

@@ -49,6 +49,11 @@ const (
 	WarnDbiNoBackupsID  = "warn-dbi-no-backups"
 	WarnDbiNoBackupsARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-no-backups"
 
+	// DBINotInBackupPlan is the only demo instance no backup plan selects;
+	// every other instance is covered by acme-daily-backup.
+	DBINotInBackupPlan    = "warn-dbi-unplanned"
+	DBINotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-unplanned"
+
 	// warn-dbi-public — Warning (CIS RDS.2)
 	WarnDbiPublicID  = "warn-dbi-public"
 	WarnDbiPublicARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-public"

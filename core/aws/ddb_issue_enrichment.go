@@ -35,12 +35,17 @@ const (
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
 // Severity is "~" (informational); PITR-disabled findings do not bump the menu badge.
-func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}
+	// Backup coverage is a cache-only join, so it runs before the client guard
+	// below: a type whose own API client is missing is still either selected by
+	// a plan or not.
+	addBackupCoverage(cache, "ddb", resources, &result)
+
 	if clients.DynamoDB == nil {
 		return result, nil
 	}

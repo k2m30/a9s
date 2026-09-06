@@ -795,6 +795,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeEBSOrphanUnattached, Phrase: "orphan: unattached Nd", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBSUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ebsCodeVolumeIODegraded, Phrase: "volume I/O degraded", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeEBSNotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeEBSNoSnapshot, Phrase: "no snapshot exists", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

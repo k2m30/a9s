@@ -56,3 +56,11 @@ var dbiPostureCodes = rdsPostureCodes{
 	defaultMasterUser:       CodeDBIDefaultMasterUser,
 	defaultMasterUserDetail: dbiDefaultMasterUserDetail,
 }
+
+// CodeDBINotInBackupPlan — no backup plan selection matches this instance.
+// Automated backups are a separate setting and do not satisfy it.
+// Severity: SevWarn.
+const CodeDBINotInBackupPlan domain.FindingCode = "dbi.not-in-backup-plan"
+
+// dbiNotInBackupPlanDetail is the S5 operator sentence for it.
+const dbiNotInBackupPlanDetail = "No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on."

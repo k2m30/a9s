@@ -41,6 +41,11 @@ const (
 	MaintDbcOverdueID  = "healthy-dbc-maint-overdue"
 	MaintDbcOverdueARN = "arn:aws:rds:us-east-1:123456789012:cluster:healthy-dbc-maint-overdue"
 
+	// DBCNotInBackupPlan is the only demo cluster no backup plan selects;
+	// every other cluster is covered by acme-daily-backup.
+	DBCNotInBackupPlan    = "acme-aurora-unplanned"
+	DBCNotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:cluster:acme-aurora-unplanned"
+
 	// WarnDbcNoBkpMaintID / WarnDbcNoBkpMaintARN — Wave-1 warn + overdue maintenance.
 	WarnDbcNoBkpMaintID  = "warn-dbc-no-bkp-plus-maint"
 	WarnDbcNoBkpMaintARN = "arn:aws:rds:us-east-1:123456789012:cluster:warn-dbc-no-bkp-plus-maint"

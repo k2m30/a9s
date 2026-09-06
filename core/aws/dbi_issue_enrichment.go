@@ -32,12 +32,17 @@ const dbiEngineDeprecatedDetail = "AWS no longer supports this engine version, s
 // S4 status phrase (e.g. "maintenance scheduled" alone, or "stopped (+1)" stacked
 // over a Wave-1 finding) is computed at render time from r.Findings via
 // domain.StatusPhrase; this enricher only emits Findings.
-func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}
+
+	// Backup coverage is a cache-only join, so it runs before the client guard
+	// below: a type whose own API client is missing is still either selected by
+	// a plan or not.
+	addBackupCoverage(cache, "dbi", resources, &result)
 
 	if clients == nil || clients.RDS == nil {
 		return result, nil
