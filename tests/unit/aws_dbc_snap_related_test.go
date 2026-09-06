@@ -393,3 +393,71 @@ func assertDbcSnapTruncatedZero(t *testing.T, shape, ghostCluster string, result
 		t.Errorf("checkDbcSnapDBC (%s): Truncated = false, want true — a later page may carry the cluster", shape)
 	}
 }
+
+// TestRelated_DbcSnap_DBC_ColdCacheIsUnknown pins row 16 case 1 at the dbc
+// snapshot pivot. When the dbc list was never read, the snapshot's own
+// DBClusterIdentifier is the only thing left, and it is a field of the source
+// resource rather than an answer from the target list — the same claim about
+// the past that a CloudTrail event body makes. The panel must say it does not
+// know, not offer a cluster nobody looked up.
+func TestRelated_DbcSnap_DBC_ColdCacheIsUnknown(t *testing.T) {
+	for _, tc := range []struct {
+		shape string
+		res   resource.Resource
+	}{
+		{"docdb", dbcSnapDBC_SnapshotWithDocDBRaw("my-docdb-cluster")},
+		{"rds", dbcSnapDBC_SnapshotWithRDSRaw("my-aurora-cluster")},
+	} {
+		t.Run(tc.shape, func(t *testing.T) {
+			checker := dbcSnapCheckerByTarget(t, "dbc")
+			result := checker(context.Background(), nil, tc.res, resource.ResourceCache{})
+
+			if result.State() != domain.RelatedUnknown {
+				t.Errorf("checkDbcSnapDBC (%s): cold cache: state = %v (Count=%d, IDs=%v), want Unknown — nothing read the dbc list",
+					tc.shape, result.State(), result.Count(), result.ResourceIDs())
+			}
+		})
+	}
+}
+
+// TestRelated_DbcSnap_DBC_MatchOnTruncatedPageIsALowerBound pins the other half
+// of row 16 at this pivot. Before this batch the checker returned through a
+// helper that dropped the truncation flag on every matching path, so a parent
+// confirmed on a partial page rendered as an exact count. It is a lower bound:
+// the parent is real, and a page nobody read may carry another cluster of the
+// same name.
+func TestRelated_DbcSnap_DBC_MatchOnTruncatedPageIsALowerBound(t *testing.T) {
+	for _, tc := range []struct {
+		shape     string
+		clusterID string
+		res       resource.Resource
+	}{
+		{"docdb", "my-docdb-cluster", dbcSnapDBC_SnapshotWithDocDBRaw("my-docdb-cluster")},
+		{"rds", "my-aurora-cluster", dbcSnapDBC_SnapshotWithRDSRaw("my-aurora-cluster")},
+	} {
+		t.Run(tc.shape, func(t *testing.T) {
+			cache := resource.ResourceCache{
+				"dbc": resource.ResourceCacheEntry{
+					IsTruncated: true,
+					Resources: []resource.Resource{
+						{ID: "other-cluster", Name: "other-cluster"},
+						{ID: tc.clusterID, Name: tc.clusterID},
+					},
+				},
+			}
+
+			checker := dbcSnapCheckerByTarget(t, "dbc")
+			result := checker(context.Background(), nil, tc.res, cache)
+
+			if result.State() != domain.RelatedResolved {
+				t.Fatalf("checkDbcSnapDBC (%s): state = %v, want Resolved", tc.shape, result.State())
+			}
+			if result.Count() != 1 || result.ResourceIDs()[0] != tc.clusterID {
+				t.Errorf("checkDbcSnapDBC (%s): ResourceIDs = %v, want [%s]", tc.shape, result.ResourceIDs(), tc.clusterID)
+			}
+			if !result.Truncated() {
+				t.Errorf("checkDbcSnapDBC (%s): Truncated = false, want true — the parent was confirmed on a page that was cut short", tc.shape)
+			}
+		})
+	}
+}

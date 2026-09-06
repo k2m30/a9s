@@ -791,3 +791,70 @@ func TestCtEventsLambda_TheTypeWordIsNotAFunction(t *testing.T) {
 			result.Count(), result.ResourceIDs())
 	}
 }
+
+// TestCtEventsRole_DemoBenchWitnesses is row 12's bench pair, driven through
+// the real role checker over the demo fixtures.
+//
+// One event assumes a role filed under an IAM path, so its ARN's resource part
+// is "acme/platform/<name>" and only the bare name is a form the role list can
+// answer — the list identifies roles by name and carries no path. The other
+// assumes a role no fixture carries, which is what an AssumeRole recorded
+// before a deletion looks like.
+//
+// The deleted one's answer depends on what was read, which is the whole of row
+// 16: against the complete demo list it is a resolved zero, and only a list
+// that was never read is Unknown. Row 12's own wording predates that amendment.
+func TestCtEventsRole_DemoBenchWitnesses(t *testing.T) {
+	byType, _ := buildVisibilityTypeCache(t)
+	events := byType["ct-events"]
+	roles := byType["role"]
+	if len(events) == 0 || len(roles) == 0 {
+		t.Fatal("demo ct-events or role fixtures missing — the witnesses cannot be seen")
+	}
+	complete := resource.ResourceCache{"role": resource.ResourceCacheEntry{Resources: roles}}
+	checker := ctEventsCheckerByTarget(t, "role")
+
+	byID := make(map[string]resource.Resource, len(events))
+	for _, e := range events {
+		byID[e.ID] = e
+	}
+	event := func(id string) resource.Resource {
+		e, ok := byID[id]
+		if !ok {
+			t.Fatalf("demo fixture %s missing", id)
+		}
+		return e
+	}
+
+	t.Run("a role filed under a path resolves to itself", func(t *testing.T) {
+		result := checker(context.Background(), nil, event(demofixtures.CtEventPathNamedRole), complete)
+
+		if result.State() != domain.RelatedResolved {
+			t.Fatalf("state = %v, want Resolved: the demo role list is complete", result.State())
+		}
+		if result.Count() != 1 || result.ResourceIDs()[0] != demofixtures.RolePathNamed {
+			t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), demofixtures.RolePathNamed)
+		}
+	})
+
+	t.Run("a role that is gone is a zero against a complete list", func(t *testing.T) {
+		result := checker(context.Background(), nil, event(demofixtures.CtEventDeletedRole), complete)
+
+		if result.State() != domain.RelatedResolved {
+			t.Fatalf("state = %v, want Resolved: the demo role list is complete", result.State())
+		}
+		if result.Count() != 0 {
+			t.Errorf("Count = %d, want 0; IDs = %v — the event names the role, the list is what answers",
+				result.Count(), result.ResourceIDs())
+		}
+	})
+
+	t.Run("a role that is gone is Unknown against a list nobody read", func(t *testing.T) {
+		result := checker(context.Background(), nil, event(demofixtures.CtEventDeletedRole), resource.ResourceCache{})
+
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("state = %v (Count=%d, IDs=%v), want Unknown: nothing read the role list",
+				result.State(), result.Count(), result.ResourceIDs())
+		}
+	})
+}

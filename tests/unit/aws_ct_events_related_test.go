@@ -1378,3 +1378,38 @@ func TestCtJSONStringSlice_NonSliceLeaf(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (non-slice leaf → nil from ctJSONStringSlice → no IDs)", result.Count())
 	}
 }
+
+// TestRelated_CtEvents_User_MatchOnTruncatedPageIsALowerBound pins the half of
+// row 16 that the no-match pins cannot see. Before this batch the user pivot
+// returned through a helper that took no truncation flag, so a user confirmed
+// on a page that was cut short rendered as an exact count and read as complete.
+// It is a lower bound: the user is real, and a page nobody read may carry
+// another of the same name.
+func TestRelated_CtEvents_User_MatchOnTruncatedPageIsALowerBound(t *testing.T) {
+	cache := resource.ResourceCache{
+		"iam-user": resource.ResourceCacheEntry{
+			IsTruncated: true,
+			Resources: []resource.Resource{
+				{ID: "AIDAOTHER", Name: "other-user"},
+				{ID: "AIDAEXAMPLE", Name: "admin-user"},
+			},
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-0a1b2c3d4e5f60001",
+		Fields: map[string]string{"user": "admin-user"},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.State() != domain.RelatedResolved {
+		t.Fatalf("State = %v, want Resolved", result.State())
+	}
+	if result.Count() != 1 || result.ResourceIDs()[0] != "AIDAEXAMPLE" {
+		t.Errorf("ResourceIDs = %v, want [AIDAEXAMPLE]", result.ResourceIDs())
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true — the user was confirmed on a page that was cut short")
+	}
+}
