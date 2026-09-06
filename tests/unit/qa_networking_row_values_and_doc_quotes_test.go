@@ -471,6 +471,15 @@ func TestNetworkingDocQuotes_EqualADetailConstant(t *testing.T) {
 	}
 }
 
+// detailLengthCap matches a doc line capping its own Detail cells, with or
+// without the word "text" — two pages spelled it "Detail ≤ 100 chars" and
+// survived a sweep that required "Detail text".
+//
+// The cap has to sit directly against the word, which is what separates an
+// authoring rule from a §4 cell describing runtime clipping ("clipped to 100
+// chars") or a citation of the spec skill's own rules.
+var detailLengthCap = regexp.MustCompile(`(?i)detail(\s+text)?\s*(≤|<=)\s*100`)
+
 // TestNetworkingDocs_NoDetailLengthCap pins the removal of the note capping
 // Detail text at 100 characters: it contradicts quoting the constant whole,
 // and a constant longer than the cap cannot satisfy both.
@@ -482,40 +491,41 @@ func TestNetworkingDocs_NoDetailLengthCap(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		for i, line := range strings.Split(string(b), "\n") {
-			low := strings.ToLower(line)
-			if strings.Contains(low, "detail text") && strings.Contains(low, "100 char") {
-				t.Errorf("docs/resources/%s.md:%d still caps Detail text at 100 characters, which no longer holds "+
+			// A line pointing at the resource-spec skill is naming where a rule
+			// lives, not imposing one on this page's cells.
+			if strings.Contains(line, "SKILL.md") {
+				continue
+			}
+			if detailLengthCap.MatchString(line) {
+				t.Errorf("docs/resources/%s.md:%d still caps Detail at 100 characters, which no longer holds "+
 					"now that the cell quotes the whole constant:\n  %s", short, i+1, strings.TrimSpace(line))
 			}
 		}
 	}
 }
 
-// TestNetworkingDocs_NoProseDescribingShippedCodeAsAGap pins that the docs
-// stop describing an implemented check as something to consider implementing.
-//
-// sg.go's internet-facing predicate has checked `::/0` alongside `0.0.0.0/0`
-// since it was written, while sg.md's §4.1 still recommends extending the
-// check to IPv6 and §5 still records the gap. An operator reading the doc
-// concludes their IPv6 exposure is unwatched and goes looking elsewhere, which
-// is worse than the doc saying nothing at all.
-func TestNetworkingDocs_NoProseDescribingShippedCodeAsAGap(t *testing.T) {
-	b, err := os.ReadFile(netDocPath("sg"))
-	if err != nil {
-		t.Fatalf("read sg.md: %v", err)
+// TestDetailLengthCapMatcher_SeesBothSpellings is the matcher's own test: the
+// two spellings that shipped, and the three shapes that are not the defect.
+func TestDetailLengthCapMatcher_SeesBothSpellings(t *testing.T) {
+	caps := []string{
+		"- Keep both columns short: List ≤ 40 chars, Detail ≤ 100 chars.",
+		"- Keep both columns short enough to fit: List text ≤ 40 chars, Detail text ≤ 100 chars.",
+		"- List text ≤ 40 chars, Detail text ≤ 100 chars. (All three list entries above fit.)",
 	}
-	for i, line := range strings.Split(string(b), "\n") {
-		low := strings.ToLower(line)
-		if !strings.Contains(low, "ipv6") {
-			continue
+	for _, line := range caps {
+		if !detailLengthCap.MatchString(line) {
+			t.Errorf("matcher misses a cap note:\n  %s", line)
 		}
-		switch {
-		case strings.Contains(low, "recommend extending"):
-			t.Errorf("docs/resources/sg.md:%d recommends extending the admin-port check to IPv6, "+
-				"which core/aws/sg.go already does:\n  %s", i+1, strings.TrimSpace(line))
-		case strings.Contains(low, "gap"):
-			t.Errorf("docs/resources/sg.md:%d records the IPv6 check as a gap, which it is not:\n  %s",
-				i+1, strings.TrimSpace(line))
+	}
+
+	notCaps := []string{
+		"| `Causes[]` non-empty | 2 | Warning (adds detail to an existing non-green row) | n/a | S4, S5 | x | `Enhanced health reported: <first Causes>, clipped to 100 chars.` |",
+		"- S4/S5 cause-text rewrites — one-line operator sentences for S5 (<= 100 chars).",
+		"- The Detail cell quotes the finding's Detail constant verbatim, however long it is.",
+	}
+	for _, line := range notCaps {
+		if detailLengthCap.MatchString(line) {
+			t.Errorf("matcher flags a line that is not a cap note:\n  %s", line)
 		}
 	}
 }

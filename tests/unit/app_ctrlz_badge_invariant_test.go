@@ -118,11 +118,13 @@ var appCtrlZRawFieldFixtures = map[string]appCtrlZFieldPair{
 // appCtrlZHealthyFieldOverrides carries extra Fields for the healthy fixture
 // of Finding-driven types whose raw-field fallback path (reached because the
 // healthy row has no Finding) treats an all-empty Fields map as a Warning:
-// colorEIP (empty association_id/instance_id), colorIGW (attachments_count
-// defaults to 0), colorLogs (empty retention_days). Without these the
-// healthy fixture would itself resolve to an issue color.
+// colorIGW (attachments_count defaults to 0) and colorLogs (empty
+// retention_days). Without these the healthy fixture would itself resolve to
+// an issue color.
+//
+// eip no longer needs one: its classifier reads findings only, so a row with
+// none is Healthy whatever its Fields say.
 var appCtrlZHealthyFieldOverrides = map[string]map[string]string{
-	"eip":  {"association_id": "eipassoc-0123456789abcdef0"},
 	"igw":  {"attachments_count": "1"},
 	"logs": {"retention_days": "30"},
 }

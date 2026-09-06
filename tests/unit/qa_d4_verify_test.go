@@ -398,3 +398,106 @@ func athenaDocQuotes(t *testing.T) []string {
 	}
 	return out
 }
+
+// TestD4Row25_AthenaDocRowsSitInTheWarningBucket pins the glyph surface of the
+// two workgroup findings.
+//
+// Both codes are Warning and the witness renders yellow, so a §4 row claiming
+// bucket Healthy on S3 promises a glyph on a green row that the operator will
+// never see. §3.2 already said Warning, so the page disagreed with itself.
+func TestD4Row25_AthenaDocRowsSitInTheWarningBucket(t *testing.T) {
+	b, err := os.ReadFile("../../docs/resources/athena.md")
+	if err != nil {
+		t.Fatalf("read athena.md: %v", err)
+	}
+	want := map[string]bool{
+		"EnforceWorkGroupConfiguration == false":             false,
+		"ResultConfiguration.EncryptionConfiguration == nil": false,
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "|") {
+			continue
+		}
+		for signal := range want {
+			if !strings.Contains(line, signal) {
+				continue
+			}
+			want[signal] = true
+			cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
+			if len(cells) < 5 {
+				t.Errorf("§4 row for %s has %d cells: %s", signal, len(cells), strings.TrimSpace(line))
+				continue
+			}
+			if bucket := strings.TrimSpace(cells[2]); bucket != "Warning" {
+				t.Errorf("%s: state bucket = %q, want Warning — the code is SevWarn and the witness renders yellow",
+					signal, bucket)
+			}
+			if surfaces := strings.TrimSpace(cells[4]); surfaces != "S2, S4, S5" {
+				t.Errorf("%s: surfaces = %q, want %q", signal, surfaces, "S2, S4, S5")
+			}
+		}
+	}
+	for signal, seen := range want {
+		if !seen {
+			t.Errorf("athena.md §4 has no row for %s", signal)
+		}
+	}
+}
+
+// TestD4Row26_ListenerPhrasesAgreeInNumber pins that both merged phrases and
+// their Detail sentences count.
+//
+// The phrase pluralised unconditionally, so a balancer with one offending
+// listener read "ports 443 in the clear" while its Detail said "This listener".
+// One is a grammar slip the operator reads as a second port they cannot find.
+func TestD4Row26_ListenerPhrasesAgreeInNumber(t *testing.T) {
+	rows, _ := d4FoldedRows(t, "elb")
+
+	cases := []struct {
+		id       string
+		code     domain.FindingCode
+		singular bool
+	}{
+		{fixtures.ELBPlainTCPListener, "elb.plain-http-listener", true},
+		{fixtures.ELBPlainHTTP, "elb.plain-http-listener", false},
+		{fixtures.ELBWeakTLS, "elb.weak-tls-policy", false},
+	}
+
+	sawSingular, sawPlural := false, false
+	for _, c := range cases {
+		r := d4RowByID(t, rows, c.id)
+		f := d4FindingByCode(t, r, c.code)
+
+		wantNoun, otherNoun := "ports ", "port "
+		if c.singular {
+			wantNoun, otherNoun = "port ", "ports "
+			sawSingular = true
+		} else {
+			sawPlural = true
+		}
+		if !strings.Contains(f.Phrase, wantNoun) || strings.Contains(f.Phrase, otherNoun) {
+			t.Errorf("%s %s: phrase = %q, want it to say %q", c.id, c.code, f.Phrase, strings.TrimSpace(wantNoun))
+		}
+
+		// The Detail has to agree with the phrase, or the two lines of the
+		// Attention block contradict each other about how many listeners there
+		// are.
+		detailSingular := strings.Contains(f.Detail, "This listener") || strings.Contains(f.Detail, "this listener")
+		detailPlural := strings.Contains(f.Detail, "These listeners") || strings.Contains(f.Detail, "each listener")
+		if c.singular && !detailSingular {
+			t.Errorf("%s %s: phrase names one port but Detail does not read as one listener:\n  %q",
+				c.id, c.code, f.Detail)
+		}
+		if !c.singular && !detailPlural {
+			t.Errorf("%s %s: phrase names several ports but Detail does not read as several listeners:\n  %q",
+				c.id, c.code, f.Detail)
+		}
+		if detailSingular && detailPlural {
+			t.Errorf("%s %s: Detail reads both ways:\n  %q", c.id, c.code, f.Detail)
+		}
+	}
+
+	if !sawSingular || !sawPlural {
+		t.Fatal("the bench does not witness both counts, so this pins only one of them")
+	}
+}
