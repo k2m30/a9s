@@ -278,6 +278,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `query results stored unencrypted`, each with a sentence saying what it
   exposes and what to change, and the second naming where the results land.
 
+- A load balancer with one listener in the clear now says `port 443`, not
+  `ports 443`, and its explanation says "this listener" rather than "these
+  listeners". The same on weak TLS policies. A single port under a plural
+  heading reads as a list that got truncated.
+
+- An Elastic IP attached to a NAT gateway no longer shows as idle. The colour
+  was decided a second time from two of the three attachment fields, and a NAT
+  gateway's address — which has an interface but no association and no
+  instance — looked unattached to it. The one place that decides attachment is
+  the finding the list already carries.
+
+- Demo mode said three different things about one instance's addresses: its
+  Elastic IP, its network interface and the instance list each named a
+  different pair, and the address was a NAT gateway's allocation, which cannot
+  belong to an instance. All three now agree, and the allocation belongs to
+  the NAT gateway alone.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's

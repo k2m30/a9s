@@ -126,8 +126,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled: no new queries accepted` | `Workgroup is disabled — queries submitted here will be rejected until re-enabled.` |
-| `EnforceWorkGroupConfiguration == false` | 2 | Healthy | `~` | S3, S4 | `settings can be overridden per query` | `Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query.` |
-| `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Healthy | `~` | S3, S4, S5 | `query results stored unencrypted` | `Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration.` |
+| `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S4, S5 | `settings can be overridden per query` | `Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query.` |
+| `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S4, S5 | `query results stored unencrypted` | `Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration.` |
 | `BytesScannedCutoffPerQuery` unset | 2 | Healthy | `~` | S3, S4, S5 | `no per-query scan limit` | `No data-scan ceiling — a runaway query can bill unbounded dollars.` |
 
 Rules for filling list and detail text:

@@ -215,8 +215,8 @@ elb — NETWORKING. Lifecycle key: `state`.
 | elb.misconfigured | deletion protection disabled | warn | wave2 |
 | elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 |
 | elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 |
-| elb.plain-http-listener | ports <ports> in the clear | warn | wave2 |
-| elb.weak-tls-policy | weak TLS policy on ports <ports> | warn | wave2 |
+| elb.plain-http-listener | <ports> in the clear | warn | wave2 |
+| elb.weak-tls-policy | weak TLS policy on <ports> | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

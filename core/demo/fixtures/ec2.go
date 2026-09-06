@@ -2223,11 +2223,13 @@ func buildAddresses() []ec2types.Address {
 				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
+		// nat-0bbb222222222222b's own address. A NAT gateway allocation cannot
+		// carry an InstanceId, so this row has none; it exists so the nat→eip
+		// pivot, which resolves by AllocationId, has a row to land on.
 		{
 			AllocationId: aws.String("eipalloc-0bbb222222222222b"), PublicIp: aws.String("54.210.33.201"),
-			AssociationId: aws.String("eipassoc-0bbb222222222222b"), InstanceId: aws.String("i-0a1b2c3d4e5f60002"),
 			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
-			NetworkInterfaceId: aws.String("eni-0bbb222222222222b"), PrivateIpAddress: aws.String("10.0.2.50"),
+			NetworkInterfaceId: aws.String("eni-0nat0000000000002b"), PrivateIpAddress: aws.String("10.0.2.50"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-nat-eip-1b")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
@@ -2828,19 +2830,23 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("prod-nat-eni-1a")}},
 		},
 		{
+			// web-prod-02's interface. It is attached to an instance and
+			// carries an EC2 security group, so it is not the NAT gateway's
+			// interface however it was once described — nat-0bbb222222222222b
+			// has its own, eni-0nat0000000000002b.
 			NetworkInterfaceId: aws.String("eni-0bbb222222222222b"),
 			Status:             ec2types.NetworkInterfaceStatusInUse,
-			InterfaceType:      ec2types.NetworkInterfaceTypeNatGateway,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
 			VpcId:              aws.String(fixtProdVPCID),
-			SubnetId:           aws.String(fixtProdPublicSubnetB),
-			AvailabilityZone:   aws.String("us-east-1b"),
-			PrivateIpAddress:   aws.String("10.0.2.50"),
-			PrivateDnsName:     aws.String("ip-10-0-2-50.ec2.internal"),
+			SubnetId:           aws.String(fixtProdPublicSubnetA),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.0.1.11"),
+			PrivateDnsName:     aws.String("ip-10-0-1-11.ec2.internal"),
 			MacAddress:         aws.String("0a:1b:2c:3d:4e:02"),
-			Description:        aws.String("Interface for NAT Gateway nat-0bbb222222222222b"),
+			Description:        aws.String("Primary network interface for web-prod-02"),
 			OwnerId:            aws.String("123456789012"),
-			RequesterManaged:   aws.Bool(true),
-			SourceDestCheck:    aws.Bool(false),
+			RequesterManaged:   aws.Bool(false),
+			SourceDestCheck:    aws.Bool(true),
 			Attachment: &ec2types.NetworkInterfaceAttachment{
 				AttachmentId: aws.String("eni-attach-02"), InstanceId: aws.String("i-0a1b2c3d4e5f60002"),
 				DeviceIndex: aws.Int32(0), Status: ec2types.AttachmentStatusAttached, DeleteOnTermination: aws.Bool(true),
@@ -2848,10 +2854,7 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			Groups: []ec2types.GroupIdentifier{
 				{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
 			},
-			Association: &ec2types.NetworkInterfaceAssociation{
-				PublicIp: aws.String("54.210.33.113"), IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0bbb222222222222b"),
-			},
-			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("prod-nat-eni-1b")}},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-02-eni")}},
 		},
 		{
 			NetworkInterfaceId: aws.String("eni-0eee555555555555e"),

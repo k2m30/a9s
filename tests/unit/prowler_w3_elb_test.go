@@ -346,7 +346,8 @@ func TestW3ELBPlainHTTP_ALBHTTPListenerFlagged(t *testing.T) {
 	if !ok {
 		t.Fatalf("HTTP listener forwarding to a target group produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
-	if want := "ports 80 in the clear"; f.Phrase != want {
+	// d4 row 26: one listener, so "port". Do not restore the plural.
+	if want := "port 80 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 	if f.Severity != domain.SevWarn {
@@ -405,7 +406,8 @@ func TestW3ELBPlainHTTP_NLBPort443WithoutTLS(t *testing.T) {
 	if !ok {
 		t.Fatalf("NLB TCP listener on 443 produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
-	if want := "ports 443 in the clear"; f.Phrase != want {
+	// d4 row 26: one listener, so "port". Do not restore the plural.
+	if want := "port 443 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 	w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBPlainHTTP].Rows, [][2]string{
@@ -462,7 +464,8 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 			// balancer at once, the way the cleartext phrase does, so a
 			// balancer with three weak listeners no longer reports one and
 			// hides the rest. One listener still reads as a list of one.
-			if want := "weak TLS policy on ports 443"; f.Phrase != want {
+			// d4 row 26: one listener, so "port". Do not restore the plural.
+			if want := "weak TLS policy on port 443"; f.Phrase != want {
 				t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 			}
 			if f.Severity != domain.SevWarn {
@@ -529,7 +532,8 @@ func TestW3ELBWeakTLS_AppliesToNLBTLSListener(t *testing.T) {
 		t.Fatalf("NLB TLS listener on a retired policy produced no %s; findings=%+v", w3CodeELBWeakTLS, res.Findings[r.ID])
 	}
 	// d3 row 18: ports, plural, however many there are.
-	if want := "weak TLS policy on ports 8443"; f.Phrase != want {
+	// d4 row 26: one listener, so "port". Do not restore the plural.
+	if want := "weak TLS policy on port 8443"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 }

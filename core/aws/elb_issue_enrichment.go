@@ -41,9 +41,15 @@ const (
 	elbPlainHTTPListenerDetail = "This listener carries traffic in the clear, so credentials and session cookies " +
 		"cross the network readable by anyone on the path. Terminate TLS on the listener, or redirect it to an " +
 		"HTTPS listener."
+	elbPlainHTTPListenersDetail = "These listeners carry traffic in the clear, so credentials and session cookies " +
+		"cross the network readable by anyone on the path. Terminate TLS on each listener, or redirect it to an " +
+		"HTTPS listener."
 	elbWeakTLSPolicyDetail = "The listener's security policy still negotiates older protocol versions or ciphers " +
 		"without forward secrecy, so a client can be steered onto a breakable connection. Move the listener to one " +
 		"of the modern security policies that require version 1.2 or later."
+	elbWeakTLSPoliciesDetail = "These listeners' security policies still negotiate older protocol versions or " +
+		"ciphers without forward secrecy, so a client can be steered onto a breakable connection. Move each " +
+		"listener to one of the modern security policies that require version 1.2 or later."
 )
 
 // elbDesyncMonitorMode is the desync mitigation mode that only observes.
@@ -241,11 +247,13 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodePlainHTTPListener]); ports != "" {
 			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener,
-				"ports "+ports+" in the clear", "~", "elb", rows, elbPlainHTTPListenerDetail)
+				elbCount(rows, "port ", "ports ")+ports+" in the clear", "~", "elb", rows,
+				elbCount(rows, elbPlainHTTPListenerDetail, elbPlainHTTPListenersDetail))
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodeWeakTLSPolicy]); ports != "" {
 			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy,
-				"weak TLS policy on ports "+ports, "~", "elb", rows, elbWeakTLSPolicyDetail)
+				"weak TLS policy on "+elbCount(rows, "port ", "ports ")+ports, "~", "elb", rows,
+				elbCount(rows, elbWeakTLSPolicyDetail, elbWeakTLSPoliciesDetail))
 		}
 	})
 	sort.Strings(failures)
@@ -302,4 +310,14 @@ func elbOffendersInPortOrder(offenders []elbOffendingListener) (string, []domain
 		rows = append(rows, o.row)
 	}
 	return strings.Join(ports, ", "), rows
+}
+
+// elbCount picks the singular wording when exactly one listener offends — one
+// port under a plural heading reads as a list that got truncated. There is one
+// row per offending listener, so the rows are the count.
+func elbCount(rows []domain.DetailRow, one, many string) string {
+	if len(rows) == 1 {
+		return one
+	}
+	return many
 }

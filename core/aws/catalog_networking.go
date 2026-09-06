@@ -106,16 +106,6 @@ func colorIGW(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorEIP(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	if r.Fields["association_id"] == "" && r.Fields["instance_id"] == "" {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
-}
-
 func colorVPCE(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
@@ -228,8 +218,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: elbCodeMisconfigured, Phrase: "deletion protection disabled", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: elbCodePlainHTTPListener, Phrase: "ports <ports> in the clear", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on ports <ports>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodePlainHTTPListener, Phrase: "<ports> in the clear", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on <ports>", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -561,7 +551,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "instance_id", Title: "Instance", Width: 20, Sortable: true},
 			{Key: "domain", Title: "Domain", Width: 8, Sortable: true},
 		},
-		Color: colorEIP,
+		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, _ string) (resource.FetchResult, error) {
 			resources, err := FetchElasticIPs(ctx, c.EC2)
 			if err != nil {
