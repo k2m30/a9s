@@ -51,7 +51,7 @@ type tildeOnlyEnricherCase struct {
 // cf, apigw and r53 joined them in batch w6a: cf.origin-bucket-missing,
 // apigw.no-authorizer-public, apigw.stage-variable-secret and
 // r53.dangling-record are all "!", so all three are covered by
-// TestCapBoundedEnrichers_OverEnrichmentCap_TruncatedTrue below instead.
+// TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated below instead.
 func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
 		{"athena", awsclient.EnrichAthenaWorkGroup},

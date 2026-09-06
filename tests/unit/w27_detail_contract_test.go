@@ -78,12 +78,14 @@ func runFullCatalogDetailBench(t *testing.T) detailBenchResult {
 	cache := resource.ResourceCache{}
 
 	// sg.unused scans the "eni" cache, the vpc-peer route findings the "rtb"
-	// cache, and the not-in-backup-plan / no-snapshot findings the "backup"
-	// and "ebs-snap" caches (all zero-call enrichers); load all four so the
-	// bench sees what a demo user who has opened those lists sees.
+	// cache, the not-in-backup-plan / no-snapshot findings the "backup" and
+	// "ebs-snap" caches, cf.origin-bucket-missing the "s3" cache, and
+	// r53.dangling-record the "eip", "ec2" and "eni" caches (all zero-call
+	// enrichers); load them all so the bench sees what a demo user who has
+	// opened those lists sees.
 	for _, td := range resource.AllResourceTypes() {
 		switch td.ShortName {
-		case "eni", "rtb", "backup", "ebs-snap":
+		case "eni", "rtb", "backup", "ebs-snap", "s3", "eip", "ec2":
 		default:
 			continue
 		}
