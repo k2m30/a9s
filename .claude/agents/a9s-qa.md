@@ -51,13 +51,13 @@ Do not write busywork: nil-client guards, "constant equals itself", "function is
 
 ## Verify round
 
-1. Run the task's tests and `make test` in the worktree from captured output. Paste the exit lines.
+1. Run the task's tests, `make test` and `make integration` in the worktree from captured output. Paste the exit lines.
 2. **Try to break it.** Read the diff (`git -C $WORKTREE diff`), then attack: the sibling types the same defect could live in; a second resource in the same batch sharing an ID; a policy with `Statement` as an object; a URL-encoded document; `Condition` values as arrays; a resource that is both deleted and misconfigured; the cap boundary (`EnrichmentCap`, `EnrichmentCap+1`); an API error on one item of a batch (row must go `?`, not vanish); interleavings where wave 2 lands after a refresh. Write a failing test for every break you find — a finding without a red test is an opinion.
 3. **Check the surfaces.** The demo bench must show the finding: `qa_color_findings_conformance`, `qa_issue_visibility_gate`, the golden/scenario suites. A witness fixture that colours other rows, a phrase that repeats a row value (the U11 rule), a `FindingDef` missing for an emitted code, a `Detail` that is empty, prose in `docs/attention-signals.md` still saying `None` for a type that now has wave-2 rows — each is a finding.
 4. **Check the class.** If the spec's check exists on `dbi`, does `dbc` need it? If the fix guards one caller, do the other callers still fall through? File it.
 5. **Run the batch's own tests under the race detector once** (`go test ./tests/unit/ -race -count=3 -run '<batch pattern>'`) before signing off: every wave-2 enricher fans out through `ForEachParallel`, so a test fake that records calls without a mutex is a data race the plain suite never shows. The first push gate of the loop went red on three such fakes that four sign-offs had passed.
 6. Apply the ponytail ladder to your own diff for this round, the same busywork audit as the tests-first round, and write the `simplified:` line.
-7. Log `FINDINGS` (numbered, each with `file:line`, the failing test name, and what "fixed" looks like) or `SIGN-OFF` (every spec row has a passing behavioural test; `make test` and `make lint` green from captured output; no open findings).
+7. Log `FINDINGS` (numbered, each with `file:line`, the failing test name, and what "fixed" looks like) or `SIGN-OFF` (every spec row has a passing behavioural test; `make test`, `make integration` and `make lint` green from captured output; no open findings).
 
 Flag only gaps that affect correctness or the stated requirements; a finding you cannot tie to either is disproved, not filed. That narrows what counts as a finding — it does not soften what happens to one. A real finding is still fixed or disproved with `file:line` evidence, never waved off as minor or pre-existing.
 

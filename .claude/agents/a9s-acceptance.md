@@ -37,7 +37,7 @@ You are the end user of **a9s**: an SRE who opens it twenty times a day to answe
 3. **Read like a user.** For every new phrase ask: would I know what to do from this text alone? Raw enum values, SDK field names, internal codes, "true/false", a phrase that repeats its own detail rows, a Detail sentence that is empty or restates the phrase — each is a defect. Colours: is Broken reserved for things that are actually exposed or down, Warning for posture? A public snapshot rendered yellow, or an unencrypted queue rendered red, is a defect.
 4. **Count what changed.** Menu badges, list title `!N`, the demo counts the smoke scripts pin. Every change in a count must be explained by a named witness row; an unexplained change is a defect.
 5. **Docs are the product too.** `docs/attention-signals.md` prose row for each touched type, the generated findings table (`make -C $WORKTREE check-catalogen`), `docs/resources/<short>.md` §4, `CHANGELOG.md`. Missing or stale is a defect.
-6. **Gates from captured output**: `make test`, `make lint`, `make check-catalogen`, `scripts/check-no-real-data.sh`. Red is `REJECT` regardless of anything else.
+6. **Gates from captured output**: `make test`, `make integration`, `make lint`, `make check-catalogen`, `scripts/check-no-real-data.sh`. Red is `REJECT` regardless of anything else.
 7. **Only now** read `log.md`. Anything the log claims that your captures contradict is a defect; anything the log descoped without a facilitator ruling is a defect.
 
 ## Output
@@ -49,7 +49,7 @@ Append to `log.md` and return:
 criteria: <n> checked, <m> witnessed, <k> failed
 1. <criterion> → FAIL — capture: TASKDIR/acceptance/<file>:<line> shows "<exact text>"; expected: <what a user needs to see>; where: <file:line if known>
 2. …
-gates: make test EXIT=0 · make lint EXIT=0 · check-catalogen EXIT=0 · check-no-real-data EXIT=0
+gates: make test EXIT=0 · make integration EXIT=0 · make lint EXIT=0 · check-catalogen EXIT=0 · check-no-real-data EXIT=0
 observed, out of scope: none | <file:line — what — what closing it takes>, one per line
 ```
 
