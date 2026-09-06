@@ -129,7 +129,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		Findings: []catalog.FindingDef{
 			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
-			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1", Detail: "The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint."},
 		},
 	},
 }
@@ -231,9 +231,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sqs")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: sqsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: sqsCodePublicPolicy, Phrase: "queue policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2", Detail: "Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue."},
+			{Code: sqsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2", Detail: "Messages sit unencrypted in the queue, so anyone who reaches the backing storage reads their contents. Set a KMS key on the queue so AWS encrypts each message at rest."},
+			{Code: sqsCodePublicPolicy, Phrase: "queue policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue."},
 		},
 	},
 	{
@@ -275,10 +275,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		DetailEnrich: enrichSns,
 		Findings: []catalog.FindingDef{
-			{Code: snsCodeNoSubscribers, Phrase: "topic has no subscribers", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: snsCodeAllPending, Phrase: "all pending confirmation", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: snsCodePublicPolicy, Phrase: "topic policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: snsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: snsCodeNoSubscribers, Phrase: "topic has no subscribers", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing is subscribed to this topic, so every message published to it is discarded on arrival. Either subscribe the endpoint that was meant to receive them, or delete the topic and whatever still publishes to it."},
+			{Code: snsCodeAllPending, Phrase: "all pending confirmation", Severity: domain.SevWarn, Source: "wave2", Detail: "Every subscription on this topic is still waiting for its endpoint to confirm, so no message is being delivered to anyone. Confirm the subscriptions from their endpoints, or remove the ones that were never wanted."},
+			{Code: snsCodePublicPolicy, Phrase: "topic policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The topic's access policy grants publish or subscribe to every AWS principal, so anyone can read what this topic broadcasts or inject messages its subscribers will trust. Scope the policy's Principal to the accounts and roles that actually use the topic."},
+			{Code: snsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2", Detail: "Messages sit unencrypted in the topic, so anyone who reaches the backing storage or a raw log of it reads their contents. Set a KMS key on the topic so AWS encrypts each message at rest."},
 		},
 	},
 	{
@@ -317,7 +317,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Findings: []catalog.FindingDef{
 			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
-			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1", Detail: "The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint."},
 		},
 	},
 	{
@@ -378,9 +378,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBTerminating, Phrase: "terminating", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ebCodeEnvironmentCauses, Phrase: "EB causes: <first cause>", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: ebCodeManagedUpdatesOff, Phrase: "managed platform updates off", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: ebCodeEnhancedHealthOff, Phrase: "enhanced health reporting off", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: ebCodeCWLogsOff, Phrase: "log streaming to CloudWatch off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebCodeManagedUpdatesOff, Phrase: "managed platform updates off", Severity: domain.SevWarn, Source: "wave2", Detail: "The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window."},
+			{Code: ebCodeEnhancedHealthOff, Phrase: "enhanced health reporting off", Severity: domain.SevWarn, Source: "wave2", Detail: "Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced."},
+			{Code: ebCodeCWLogsOff, Phrase: "log streaming to CloudWatch off", Severity: domain.SevWarn, Source: "wave2", Detail: "Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs."},
 		},
 	},
 	{
@@ -468,8 +468,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: kinesisCodeUnencrypted, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: kinesisCodeMinRetention, Phrase: "24h retention", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: kinesisCodeUnencrypted, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave2", Detail: "Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key."},
+			{Code: kinesisCodeMinRetention, Phrase: "24h retention", Severity: domain.SevWarn, Source: "wave2", Detail: "The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need."},
 		},
 	},
 	{
@@ -523,8 +523,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: mskCodeBrokerOutdated, Phrase: "broker software outdated", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: mskCodeEncryptionNotTLS, Phrase: "encryption in transit not enforced", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: mskCodePublicAccess, Phrase: "brokers reachable from the internet", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: mskCodeUnauthenticated, Phrase: "unauthenticated access allowed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: mskCodePublicAccess, Phrase: "brokers reachable from the internet", Severity: domain.SevBroken, Source: "wave2", Detail: "Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network."},
+			{Code: mskCodeUnauthenticated, Phrase: "unauthenticated access allowed", Severity: domain.SevBroken, Source: "wave2", Detail: "The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods."},
 		},
 	},
 	{
@@ -582,9 +582,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Findings: []catalog.FindingDef{
 			{Code: sfnCodeLatestExecutionFailed, Phrase: "latest execution <STATUS>", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: sfnCodeLoggingOff, Phrase: "execution logging off", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: sfnCodeNoCMK, Phrase: "not encrypted with a customer key", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: sfnCodeDefinitionSecret, Phrase: "credential in state machine definition", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sfnCodeLoggingOff, Phrase: "execution logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "The state machine records nothing about its executions, so a failed run leaves no trace of which state failed or what it was handed. Turn on execution logging to a CloudWatch log group."},
+			{Code: sfnCodeNoCMK, Phrase: "not encrypted with a customer key", Severity: domain.SevWarn, Source: "wave2", Detail: "Execution history and state data are encrypted with an AWS-owned key you cannot audit, rotate, or revoke. Point the state machine at a customer managed KMS key."},
+			{Code: sfnCodeDefinitionSecret, Phrase: "credential in state machine definition", Severity: domain.SevBroken, Source: "wave2", Detail: "A credential is written into the state machine's definition, so it is readable by anyone who can call states:DescribeStateMachine and it travels with every export of the workflow. Move the value to Secrets Manager and reference it at run time, then rotate it."},
 		},
 	},
 	{
@@ -625,7 +625,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: sesCodeShutdown, Phrase: "sending paused by AWS (shutdown)", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: sesCodeProbation, Phrase: "account under review (probation)", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: sesCodeDKIMOff, Phrase: "DKIM not enabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: sesCodeDKIMOff, Phrase: "DKIM not enabled", Severity: domain.SevWarn, Source: "wave2", Detail: "Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you."},
 		},
 	},
 }

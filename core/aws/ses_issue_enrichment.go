@@ -24,9 +24,6 @@ const (
 	sesCodeDKIMOff   domain.FindingCode = "ses.dkim-off"
 )
 
-// S5 operator sentence for the identity signing code above.
-const sesDKIMOffDetail = "Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you."
-
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates
 // the single account-level finding onto every identity row in the input slice.
 //

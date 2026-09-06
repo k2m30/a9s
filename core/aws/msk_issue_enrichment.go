@@ -28,11 +28,6 @@ const (
 
 // S5 operator sentences for the broker exposure codes above. Neither carries
 // a supporting row: the phrase is the whole fact.
-const (
-	mskPublicAccessDetail    = "Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network."
-	mskUnauthenticatedDetail = "The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods."
-)
-
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
 // and raises findings for:
 //   - Broker software version below 2.8 (major.minor) → "~" "broker software outdated"

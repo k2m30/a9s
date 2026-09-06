@@ -29,11 +29,6 @@ const (
 )
 
 // S5 operator sentences for the stream posture codes above.
-const (
-	kinesisUnencryptedDetail  = "Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key."
-	kinesisMinRetentionDetail = "The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need."
-)
-
 // kinesisDefaultRetentionHours is the retention a stream is created with. At
 // or below it, a day-long consumer outage is data loss.
 const kinesisDefaultRetentionHours int32 = 24

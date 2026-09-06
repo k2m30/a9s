@@ -168,8 +168,10 @@ sns — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| sns.no-subscribers | topic has no subscribers | warn | wave2 | — |
-| sns.all-pending-confirmation | all pending confirmation | warn | wave2 | — |
+| sns.no-subscribers | topic has no subscribers | warn | wave2 | Nothing is subscribed to this topic, so every message published to it is discarded on arrival. Either subscribe the endpoint that was meant to receive them, or delete the topic and whatever still publishes to it. |
+| sns.all-pending-confirmation | all pending confirmation | warn | wave2 | Every subscription on this topic is still waiting for its endpoint to confirm, so no message is being delivered to anyone. Confirm the subscriptions from their endpoints, or remove the ones that were never wanted. |
+| sns.public-policy | topic policy open to anyone | broken | wave2 | The topic's access policy grants publish or subscribe to every AWS principal, so anyone can read what this topic broadcasts or inject messages its subscribers will trust. Scope the policy's Principal to the accounts and roles that actually use the topic. |
+| sns.no-kms | not encrypted with KMS | warn | wave2 | Messages sit unencrypted in the topic, so anyone who reaches the backing storage or a raw log of it reads their contents. Set a KMS key on the topic so AWS encrypts each message at rest. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

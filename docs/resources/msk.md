@@ -241,6 +241,8 @@ msk — MESSAGING. Lifecycle key: `state`.
 | msk.broken.failed | failed | broken | wave1 | — |
 | msk.broker-outdated | broker software outdated | warn | wave2 | — |
 | msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 | — |
+| msk.public-access | brokers reachable from the internet | broken | wave2 | Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network. |
+| msk.unauthenticated | unauthenticated access allowed | broken | wave2 | The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -227,6 +227,9 @@ eb — MESSAGING. Lifecycle key: `status`.
 | eb.status.launching | launching | warn | wave1 | — |
 | eb.status.terminating | terminating | dim | wave1 | — |
 | eb.environment-causes | EB causes: <first cause> | warn | wave2 | — |
+| eb.managed-updates-off | managed platform updates off | warn | wave2 | The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window. |
+| eb.enhanced-health-off | enhanced health reporting off | warn | wave2 | Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced. |
+| eb.cloudwatch-logs-off | log streaming to CloudWatch off | warn | wave2 | Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

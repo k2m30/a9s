@@ -25,12 +25,6 @@ const (
 )
 
 // S5 operator sentences for the environment configuration codes above.
-const (
-	ebManagedUpdatesOffDetail = "The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window."
-	ebEnhancedHealthOffDetail = "Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced."
-	ebCWLogsOffDetail         = "Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs."
-)
-
 // The three environment settings rows 13-15 read, each identified by the
 // namespace AND option name AWS returns it under. Matching on the option
 // name alone reads a same-named option from another namespace.

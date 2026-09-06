@@ -203,7 +203,9 @@ sqs — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| sqs.missing-dlq | no DLQ configured | warn | wave2 | — |
+| sqs.missing-dlq | no DLQ configured | warn | wave2 | Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue. |
+| sqs.no-kms | not encrypted with KMS | warn | wave2 | Messages sit unencrypted in the queue, so anyone who reaches the backing storage reads their contents. Set a KMS key on the queue so AWS encrypts each message at rest. |
+| sqs.public-policy | queue policy open to anyone | broken | wave2 | The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

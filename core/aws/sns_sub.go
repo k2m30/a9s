@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -25,9 +26,6 @@ const CodeSNSSubDeleted domain.FindingCode = "sns-sub.state.deleted"
 // CodeSNSSubPlainHTTP is the canonical FindingCode for a subscription that
 // delivers over unencrypted HTTP.
 const CodeSNSSubPlainHTTP domain.FindingCode = "sns-sub.plain-http"
-
-// snsSubPlainHTTPDetail is the S5 operator sentence for CodeSNSSubPlainHTTP.
-const snsSubPlainHTTPDetail = "The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint."
 
 // FetchSNSSubscriptionsPage fetches a single page of SNS subscriptions.
 func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI, continuationToken string) (resource.FetchResult, error) {
@@ -131,7 +129,7 @@ func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Findin
 	findings = append(findings, domain.Finding{
 		Code:     CodeSNSSubPlainHTTP,
 		Phrase:   "delivers over plain HTTP",
-		Detail:   snsSubPlainHTTPDetail,
+		Detail:   catalog.Detail(CodeSNSSubPlainHTTP),
 		Severity: domain.SevWarn,
 		Source:   "wave1",
 	})

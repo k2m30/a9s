@@ -186,6 +186,9 @@ sfn — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 | — |
+| sfn.logging-off | execution logging off | warn | wave2 | The state machine records nothing about its executions, so a failed run leaves no trace of which state failed or what it was handed. Turn on execution logging to a CloudWatch log group. |
+| sfn.no-cmk | not encrypted with a customer key | warn | wave2 | Execution history and state data are encrypted with an AWS-owned key you cannot audit, rotate, or revoke. Point the state machine at a customer managed KMS key. |
+| sfn.definition-secret | credential in state machine definition | broken | wave2 | A credential is written into the state machine's definition, so it is readable by anyone who can call states:DescribeStateMachine and it travels with every export of the workflow. Move the value to Secrets Manager and reference it at run time, then rotate it. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

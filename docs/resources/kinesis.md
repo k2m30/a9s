@@ -111,7 +111,7 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
 
 <!-- BEGIN GENERATED: badge -->
-Badge aggregation for `kinesis`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+Badge aggregation for `kinesis`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
 Wave → surface mapping:
@@ -182,6 +182,8 @@ kinesis — MESSAGING. Lifecycle key: `status`.
 | kinesis.warn.creating | creating | warn | wave1 | — |
 | kinesis.warn.updating | updating | warn | wave1 | — |
 | kinesis.warn.deleting | deleting | warn | wave1 | — |
+| kinesis.unencrypted | not encrypted at rest | warn | wave2 | Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key. |
+| kinesis.min-retention | 24h retention | warn | wave2 | The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

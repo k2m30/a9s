@@ -191,6 +191,7 @@ ses — MESSAGING. Lifecycle key: `status`.
 | ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 | — |
 | ses.account-probation | account under review (probation) | broken | wave2 | — |
 | ses.quota-high | quota 80%+ used | warn | wave2 | — |
+| ses.dkim-off | DKIM not enabled | warn | wave2 | Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -143,6 +143,7 @@ sns-sub — MESSAGING. Lifecycle key: none (the list API returns no lifecycle fi
 | --- | --- | --- | --- | --- |
 | sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 | — |
 | sns-sub.state.deleted | endpoint deleted | dim | wave1 | — |
+| sns-sub.plain-http | delivers over plain HTTP | warn | wave1 | The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
