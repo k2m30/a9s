@@ -48,7 +48,6 @@ var classifiersOffTheSharedFallback = map[string]string{ //nolint:gochecknogloba
 	"colorCFN":          "not yet on the shared fallback: parses a phrase through cfnStackColor",
 	// These two live in catalog_color_helpers.go rather than a catalog_<cat>.go
 	// data file, which is why a sweep of the category files did not see them.
-	"r53Color": "not yet on the shared fallback",
 }
 
 // sharedFallbackCalls are the two helpers a classifier is allowed to hand a

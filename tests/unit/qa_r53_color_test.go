@@ -1,11 +1,19 @@
 package unit
 
-// qa_r53_color_test.go — Behavioral tests for the Route 53 Hosted Zone Color function.
+// qa_r53_color_test.go — a zone's record count no longer colours its row.
 //
-// The Color function for r53 is keyed on the "record_count" field, which is set
-// from HostedZone.ResourceRecordSetCount by the fetcher.  A zone with <= 2 records
-// is considered empty/stub and rendered as ColorWarning; anything >= 3 is ColorHealthy.
-// A missing field defaults to ColorHealthy.
+// INVERTED for batch w6a, the same way qa_acm_color_test.go, qa_cf_color_test.go
+// and qa_logs_color_test.go were. This table used to assert the record_count
+// branch in r53Color: <= 2 records rendered ColorWarning. That branch was a
+// second read of a fact the row already carried — r53CodeUnusedZone fires on
+// the same condition over the same data — so a zone could be coloured for a
+// reason no finding named and the detail view never showed. Colour now derives
+// from findings only, and a resource carrying none is Healthy whatever its
+// fields say.
+//
+// The counts are kept as the enumeration of what must no longer colour a row on
+// its own. Do not "restore" the old wants — a raw-field branch coming back is
+// exactly what this now catches.
 
 import (
 	"testing"
@@ -43,8 +51,8 @@ func TestR53Color(t *testing.T) {
 				fields["record_count"] = tc.recordCount
 			}
 			got := td.Color(resource.Resource{Fields: fields})
-			if got != tc.want {
-				t.Errorf("Color(record_count=%q) = %v, want %v", tc.recordCount, got, tc.want)
+			if got != resource.ColorHealthy {
+				t.Errorf("Color(record_count=%q) = %v, want ColorHealthy; the raw-field branch that returned %v is gone", tc.recordCount, got, tc.want)
 			}
 		})
 	}
