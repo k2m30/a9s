@@ -718,6 +718,16 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				// provided a real cache entry (not nil). A non-Resolved State
 				// combined with IsTruncated=true is the anti-pattern that drops the
 				// honest lower bound.
+				if reason, joins := reverseScanNeedsJoinList[key]; joins {
+					// Row 18: this checker reads a JOIN list the harness leaves out
+					// of the cache, so the target list is never fetched and there
+					// are no pages for a zero to be a lower bound over.
+					if result.State() != domain.RelatedUnknown {
+						t.Errorf("checker %s: state = %s, want Unknown — %s",
+							key, result.State(), reason)
+					}
+					return
+				}
 				if result.State() != domain.RelatedResolved {
 					t.Errorf("checker %s with truncated-empty %q cache returned State=%s "+
 						"(anti-pattern: drops honest lower bound); want RelatedResolved with Count=0, Truncated=true. "+
@@ -741,4 +751,15 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			})
 		}
 	}
+}
+
+// reverseScanNeedsJoinList names the checkers whose answer comes from a list
+// OTHER than their target type. The harness above seeds only the target entry,
+// so for these the join list is absent, the target list is never fetched, and
+// row 18 makes that Unknown rather than a zero nobody counted.
+var reverseScanNeedsJoinList = map[string]string{
+	"ec2→kms":    "reads the ebs list to find the volumes whose keys answer",
+	"eks→asg":    "reads the ng list to find the node groups whose scaling groups answer",
+	"lambda→sns": "reads the sns-subscription list to find the topics that answer",
+	"efs→vpc":    "reads the eni list to find the mount targets whose VPC answers",
 }

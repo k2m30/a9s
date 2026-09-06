@@ -145,7 +145,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.ErrorRelated("cf", err)
 	}
 	if out.DistributionList == nil {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.UnknownRelated("cf")
 	}
 	var ids []string
 	for _, d := range out.DistributionList.Items {

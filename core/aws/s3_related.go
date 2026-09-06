@@ -148,7 +148,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return relatedResultTrunc("cfn", nil, true)
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -273,7 +273,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("athena", err)
 	}
 	if wgList == nil {
-		return relatedResultTrunc("athena", nil, true)
+		return resource.UnknownRelated("athena")
 	}
 	var ids []string
 	for _, wg := range wgList {
@@ -296,7 +296,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("glue", err)
 	}
 	if jobList == nil {
-		return relatedResultTrunc("glue", nil, true)
+		return resource.UnknownRelated("glue")
 	}
 	var ids []string
 	for _, jobRes := range jobList {
@@ -332,7 +332,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("backup", err)
 	}
 	if bkList == nil {
-		return relatedResultTrunc("backup", nil, true)
+		return resource.UnknownRelated("backup")
 	}
 	var ids []string
 	for _, bk := range bkList {
@@ -358,7 +358,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("eb-rule", err)
 	}
 	if ruleList == nil {
-		return relatedResultTrunc("eb-rule", nil, true)
+		return resource.UnknownRelated("eb-rule")
 	}
 	bucketQuoted := `"` + bucket + `"`
 	var ids []string
@@ -394,7 +394,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.ErrorRelated("r53", err)
 	}
 	if zoneList == nil {
-		return relatedResultTrunc("r53", nil, true)
+		return resource.UnknownRelated("r53")
 	}
 	var ids []string
 	for _, zone := range zoneList {
@@ -463,7 +463,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("role", rerr)
 	}
 	if roleList == nil {
-		return relatedResultTrunc("role", nil, true)
+		return resource.UnknownRelated("role")
 	}
 
 	// Match role ARNs against the loaded role cache. Anything that
@@ -545,7 +545,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("trail", err)
 	}
 	if trailList == nil {
-		return relatedResultTrunc("trail", nil, true)
+		return resource.UnknownRelated("trail")
 	}
 
 	var ids []string
@@ -580,7 +580,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.ErrorRelated("cf", err)
 	}
 	if cfList == nil {
-		return relatedResultTrunc("cf", nil, true)
+		return resource.UnknownRelated("cf")
 	}
 
 	var ids []string

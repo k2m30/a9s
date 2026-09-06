@@ -171,13 +171,13 @@ func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsTruncated(t *testing.T) {
 	}
 }
 
-// TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown verifies that
+// TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsDeferred verifies that
 // the CloudTrail events checker returns Count=-1 when the cache entry is
 // truncated and no event in the partial list references the instance.
 // Note: ct-events uses FetchFilter-based navigation and returns Count=-1 (not
 // TruncatedResult) on truncated-zero, because the FetchFilter enables filtered
 // re-fetch from the navigation layer. Batch B did not migrate this checker.
-func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown(t *testing.T) {
+func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsDeferred(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ct-events": {
 			IsTruncated: true,

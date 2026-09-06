@@ -44,8 +44,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("r53", err)
 	}
 	if r53List == nil {
-		// Honest zero — target fetcher not registered or cache empty (r53 not yet fetched).
-		return relatedResultTrunc("r53", nil, true)
+		return resource.UnknownRelated("r53")
 	}
 
 	var ids []string
@@ -213,7 +212,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("eb-rule", cacheErr)
 	}
 	if ebRules == nil {
-		return relatedResultTrunc("eb-rule", nil, true)
+		return resource.UnknownRelated("eb-rule")
 	}
 
 	var ids []string

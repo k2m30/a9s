@@ -36,9 +36,7 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("dbc", err)
 	}
 	if dbcList == nil {
-		// Cache not loaded and fetcher unavailable (nil/non-AWS clients) — fall back
-		// to the forward result: we know the cluster ID from the snapshot itself.
-		return relatedResult("dbc", []string{clusterID})
+		return resource.UnknownRelated("dbc")
 	}
 
 	var ids []string

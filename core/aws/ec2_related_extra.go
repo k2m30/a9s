@@ -69,7 +69,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("kms", err)
 	}
 	if ebsList == nil {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.UnknownRelated("kms")
 	}
 
 	keySet := make(map[string]struct{})

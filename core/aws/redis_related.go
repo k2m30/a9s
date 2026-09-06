@@ -123,7 +123,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return relatedResultTrunc("cfn", nil, true)
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -173,7 +173,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return relatedResultTrunc("ct-events", nil, true)
+		return resource.UnknownRelated("ct-events")
 	}
 
 	var ids []string
@@ -249,7 +249,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return relatedResultTrunc("logs", nil, true)
+		return resource.UnknownRelated("logs")
 	}
 
 	wanted := make(map[string]struct{}, len(names))
@@ -299,7 +299,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return relatedResultTrunc("secrets", nil, true)
+		return resource.UnknownRelated("secrets")
 	}
 
 	namingConvention := rgID + "/auth-token"
@@ -397,7 +397,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("sns", err)
 	}
 	if snsList == nil {
-		return relatedResultTrunc("sns", nil, true)
+		return resource.UnknownRelated("sns")
 	}
 
 	// SNS topic ARN format: arn:aws:sns:region:account:topic-name

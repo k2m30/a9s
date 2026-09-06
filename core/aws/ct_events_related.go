@@ -52,11 +52,12 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 	return ctEventsMatchTarget(ctx, clients, cache, "role", [][]string{candidates})
 }
 
-// ctEventsExtractRoleName attempts to find a role name from the CloudTrail event.
-// It first inspects the event's Resources slice for AWS::IAM::Role entries and
-// extracts the name from the ResourceName ARN (last segment after "/"). If no
-// role resource is found, it falls back to the Username field — some role-based
-// events encode the role as "AWSServiceRole/RoleName".
+// ctEventsRoleCandidates returns the candidate ids for the role a CloudTrail
+// event names, in the order the four sources are trusted: the target roleArn in
+// requestParameters, an AWS::IAM::Role entry in Resources, a Username carrying a
+// service-role path, then the event JSON. Each source's raw value goes through
+// ctRoleAlternatives, so the candidates follow row 11's id rule rather than any
+// role-specific trim.
 func ctEventsRoleCandidates(res resource.Resource) []string {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
@@ -109,11 +110,10 @@ func ctRoleAlternatives(v string) []string {
 }
 
 // ctEventsRelatedResources reads the target list from the session cache ONLY —
-// it never triggers a fetch. A CloudTrail event names its related resources in
-// the event body, so the checkers resolve from that (identity) and use the
-// cache only to canonicalize/confirm an id when it happens to be warm already.
-// Returning nil on a cache miss keeps the ct-event related panel zero-fetch: no
-// ListRoles/DescribeInstances/… just to match ids the event already carries.
+// it never triggers a fetch. The event body names the ids; this list is the only
+// thing that can confirm any of them still exists, and returning nil on a cache
+// miss is what makes an unconfirmable id read as Unknown rather than a count.
+// Zero-fetch is the point: no ListRoles/DescribeInstances/… from opening a row.
 func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	if entry, ok := cache[target]; ok {
 		// A cache hit is authoritative — even a proven-EMPTY one. Normalize a nil
@@ -229,13 +229,13 @@ func ctLambdaAlternatives(group []string) []string {
 
 // extractCTResourceIDs scans the event's Resources slice for entries matching
 // awsResourceType (e.g. "AWS::EC2::Instance") and returns one candidate group
-// per entry, built by ctIDAlternatives: the value as written first, then the
-// same value with its leading type word removed, then that remainder's last
-// slash segment. Which form is the id varies per target type — an ARN's may be
-// the tail, a Secrets Manager name keeps its slashes — so each is offered and
-// the target list picks. They are ALTERNATIVES: one event resource is one
-// resource, so ctEventsMatchTarget takes at most one match per group,
-// preferring the value as written.
+// per entry, built by ctIDAlternatives: at most two forms, the value as written
+// and, when it starts with a type word, everything after that word's separator.
+// Which form is the id varies per target type — a Secrets Manager name keeps its
+// slashes, an ARN's resource part does not — so both are offered and the target
+// list picks. They are ALTERNATIVES: one event resource is one resource, so
+// ctEventsMatchTarget takes at most one match per group, preferring the value as
+// written. No fragment of a name is ever a candidate.
 func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [][]string {
 	var groups [][]string
 	for _, r := range event.Resources {

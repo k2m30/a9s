@@ -159,7 +159,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return relatedResultTrunc("secrets", nil, true)
+		return resource.UnknownRelated("secrets")
 	}
 
 	var ids []string

@@ -418,7 +418,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("sns", err)
 	}
 	if subList == nil {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.UnknownRelated("sns")
 	}
 	topicSet := make(map[string]struct{})
 	for _, subRes := range subList {

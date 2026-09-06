@@ -50,7 +50,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("asg", err)
 	}
 	if ngList == nil {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.UnknownRelated("asg")
 	}
 	seen := make(map[string]struct{})
 	for _, ngRes := range ngList {

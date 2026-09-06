@@ -57,7 +57,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.UnknownRelated("eni")
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -83,7 +83,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("vpc", err)
 	}
 	if eniList == nil {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.UnknownRelated("vpc")
 	}
 	vpcSet := make(map[string]struct{})
 	for _, eniRes := range eniList {

@@ -242,13 +242,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A related row no longer reads as a confident zero when nothing behind it was
-  read at all. Document DB and Aurora cluster log groups, RDS instance
-  snapshots and log groups, and DynamoDB table log groups and gateway endpoints
-  now read as unknown when their list was never fetched, instead of a zero with
-  a "more to come" marker that implied a list had been seen. A list that was
-  fetched but came back partial still reports what it found, marked as a lower
-  bound, which is now also how a cluster snapshot answers for a parent cluster
-  that was not on the page it read.
+  read at all. Twenty-nine pivots across S3, Redis, Document DB, RDS, DynamoDB,
+  EC2, ECS, EKS, EFS, Lambda, SES and WAF now read as unknown when the list they
+  answer from was never fetched, instead of a zero, or a zero with a "more to
+  come" marker that implied a list had been seen. A cluster snapshot no longer
+  reports the parent cluster it names as present without checking. A list that
+  was fetched but came back partial still reports what it found, marked as a
+  lower bound.
 
 - The role a CloudTrail event names is now reported only once the role list
   confirms it still exists. An event body records what was there at the time,

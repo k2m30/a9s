@@ -89,7 +89,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("backup", err)
 	}
 	if backupList == nil {
-		return relatedResultTrunc("backup", nil, true)
+		return resource.UnknownRelated("backup")
 	}
 	var ids []string
 	for _, planRes := range backupList {

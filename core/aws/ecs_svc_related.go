@@ -168,7 +168,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("elb", err)
 	}
 	if tgList == nil {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.UnknownRelated("elb")
 	}
 
 	// Step 3: collect ELB ARNs from matched TGs.

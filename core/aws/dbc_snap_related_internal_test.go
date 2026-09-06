@@ -179,12 +179,9 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		if result.TargetType() != "dbc" {
 			t.Errorf("TargetType = %q, want dbc", result.TargetType())
 		}
-		if result.Count() != 1 {
-			t.Errorf("Count = %d, want 1", result.Count())
-		}
-		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != parentID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), parentID)
-		}
+		// INVERTED under row 18: an empty cache means no cluster list was read,
+		// and the snapshot's own parent id is not evidence the cluster exists.
+		assertDbcSnapParentUnknown(t, result)
 	})
 
 	t.Run("checkDbcSnapDBC_rds", func(t *testing.T) {
@@ -193,12 +190,7 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 		res := resource.Resource{ID: "snap-2", RawStruct: snap}
 		result := checkDbcSnapDBC(context.Background(), nil, res, emptyCache)
-		if result.Count() != 1 {
-			t.Errorf("Count = %d, want 1", result.Count())
-		}
-		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != parentID {
-			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), parentID)
-		}
+		assertDbcSnapParentUnknown(t, result)
 	})
 
 	t.Run("checkDbcSnapDBC_nil_identifier", func(t *testing.T) {
@@ -322,4 +314,16 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 			t.Errorf("dbcResourceARN nil = %q, want empty", got)
 		}
 	})
+}
+
+// assertDbcSnapParentUnknown holds row 18's reading for checkDbcSnapDBC with no
+// cluster list read: Unknown, and never a count taken from the snapshot itself.
+func assertDbcSnapParentUnknown(t *testing.T, result resource.RelatedCheckResult) {
+	t.Helper()
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("state = %v with no dbc list read, want Unknown", result.State())
+	}
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("IDs = %v, want none — the id came from the snapshot, not a list", result.ResourceIDs())
+	}
 }

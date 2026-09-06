@@ -179,7 +179,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("dbi", err)
 	}
 	if dbiList == nil {
-		return relatedResultTrunc("dbi", nil, true)
+		return resource.UnknownRelated("dbi")
 	}
 
 	var ids []string
@@ -213,7 +213,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("dbc-snap", err)
 	}
 	if snapList == nil {
-		return relatedResultTrunc("dbc-snap", nil, true)
+		return resource.UnknownRelated("dbc-snap")
 	}
 
 	var ids []string
@@ -356,7 +356,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return relatedResultTrunc("secrets", nil, true)
+		return resource.UnknownRelated("secrets")
 	}
 
 	var ids []string
