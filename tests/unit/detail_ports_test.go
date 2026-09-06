@@ -79,6 +79,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -846,12 +847,21 @@ func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.
 // asserts against the legacy DetailModel.PlainContent() (DEAD per
 // wave3-map-detail.md).
 func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T) {
+	// Read the definition rather than build the sentence here: task w27 made
+	// catalog.Detail the one owner, and a literal copy in this test would
+	// silently document a retired shape the moment the definition changes.
+	const code domain.FindingCode = "dbi.pending-maintenance"
+	wantDetail := catalog.Detail(code)
+	if wantDetail == "" {
+		t.Fatalf("catalog.Detail(%q) is empty; this test needs a real declared sentence to render", code)
+	}
+
 	res := resource.Resource{ID: "db-maint-wave3-1", Name: "prod-maint-db-wave3"}
 	c := newDetailController(t, res, "dbi")
 	c.ApplyDetailFinding(&domain.Finding{
-		Code:     "dbi.pending-maintenance",
+		Code:     code,
 		Phrase:   "maintenance scheduled",
-		Detail:   "Pending maintenance action overdue: system-update.",
+		Detail:   wantDetail,
 		Severity: domain.SevWarn,
 		Source:   "wave2:test",
 	}, nil)
@@ -867,8 +877,8 @@ func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T
 	if !strings.Contains(strings.ToLower(rows[0].Value), "maintenance scheduled") {
 		t.Errorf("first Attention row must carry the short Phrase; got %+v", rows[0])
 	}
-	if rows[1].Value != "Pending maintenance action overdue: system-update." {
-		t.Errorf("second Attention row must be the full S5 Detail sentence verbatim; got %q", rows[1].Value)
+	if rows[1].Value != wantDetail {
+		t.Errorf("second Attention row must be the full S5 Detail sentence verbatim; got %q, want %q", rows[1].Value, wantDetail)
 	}
 }
 

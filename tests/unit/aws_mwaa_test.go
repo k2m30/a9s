@@ -143,14 +143,29 @@ func TestFetchMWAAEnvironmentsPage_WebserverPublicFinding(t *testing.T) {
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if !strings.Contains(finding.Detail, "reachable from the internet") {
-		t.Errorf("Detail = %q, want it to contain %q", finding.Detail, "reachable from the internet")
+	// Detail is the one static sentence FindingDef declares for
+	// mwaaCodeWebserverPublic (catalog_data.go); the concrete access mode
+	// moved to its own "Access mode" AttentionDetail row, so Detail no
+	// longer embeds it.
+	const wantDetail = "The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC."
+	if finding.Detail != wantDetail {
+		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
+	}
+
+	ad, ok := r.AttentionDetails[finding.Code]
+	if !ok {
+		t.Fatalf("AttentionDetails[%v] not found", finding.Code)
 	}
 	// The WebserverAccessMode enum is humanized (domain.HumanizeStatusPhrase),
 	// not embedded verbatim as "PUBLIC_ONLY".
-	if !strings.Contains(finding.Detail, "access mode: public only") {
-		t.Errorf("Detail = %q, want it to contain the humanized access mode %q",
-			finding.Detail, "access mode: public only")
+	var gotAccessMode string
+	for _, row := range ad.Rows {
+		if row.Label == "Access mode" {
+			gotAccessMode = row.Value
+		}
+	}
+	if gotAccessMode != "public only" {
+		t.Errorf("Access mode row = %q, want the humanized %q", gotAccessMode, "public only")
 	}
 }
 

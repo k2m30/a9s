@@ -344,8 +344,8 @@ func TestWave2_DBI_PendingMaintenanceOverdue_PinsS4S5Strings(t *testing.T) {
 	if finding.Phrase != "maintenance scheduled" {
 		t.Errorf("dbi pending-maintenance Phrase (S4) = %q, want %q (docs/resources/dbi.md §4 — currently a buzzword bug)", finding.Phrase, "maintenance scheduled")
 	}
-	wantDetail := "Pending maintenance action overdue: system-update (New minor engine patch 16.2.3)."
+	wantDetail := "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
 	if finding.Detail != wantDetail {
-		t.Errorf("dbi pending-maintenance Detail (S5) = %q, want %q (docs/resources/dbi.md §4)", finding.Detail, wantDetail)
+		t.Errorf("dbi pending-maintenance Detail (S5) = %q, want %q (the one static sentence FindingDef declares, no longer keyed by Action/Description)", finding.Detail, wantDetail)
 	}
 }

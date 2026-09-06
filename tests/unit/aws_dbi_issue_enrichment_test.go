@@ -131,17 +131,19 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	// Detail is the S5 full operator sentence — docs/resources/dbi.md §4 row
-	// "Pending maintenance overdue": Detail text (S5), concretized with this
-	// fixture's Action="system-update" / Description="New minor engine patch 16.2.3".
-	const wantDetail = "Pending maintenance action overdue: system-update (New minor engine patch 16.2.3)."
+	// Detail is the one static S5 sentence FindingDef declares for
+	// dbiCodePendingMaintenance (catalog_databases.go) — one sentence per
+	// code, never keyed by this fixture's Action/Description. Those concrete
+	// facts live only in AttentionDetail rows below.
+	const wantDetail = "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
 	}
 	// The same facts must be present in AttentionDetail rows.
 	wantRows := map[string]string{
-		"Action":      "system-update",
-		"Description": "New minor engine patch 16.2.3",
+		"Action":          "system-update",
+		"Description":     "New minor engine patch 16.2.3",
+		"Earliest Target": "2026-04-01",
 	}
 	gotRows := map[string]string{}
 	for _, r := range result.AttentionDetails[fixtures.MaintDbiScheduledID][finding.Code].Rows {
@@ -208,16 +210,14 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 		}
 	}
 
-	// Detail (S5): the production template is
-	// "Pending maintenance action overdue: %s (%s)." (ActionType, Description).
-	// EnrichDBIMaintenance only builds Detail when BOTH Action and Description
-	// are non-empty (see dbi_issue_enrichment.go: `if firstAction != "" &&
-	// firstDescription != ""`) — with a nil Description, Detail must be the
-	// empty string, never a malformed "...: os-upgrade ()." with empty
-	// parens. This asserts the clean form; production code already emits it
-	// correctly, no coder fix needed here.
-	if finding.Detail != "" {
-		t.Errorf("Detail = %q, want empty string (Description is nil — Detail must be omitted entirely, not rendered with empty parens)", finding.Detail)
+	// Detail (S5) is the one static sentence FindingDef declares for
+	// dbiCodePendingMaintenance — task w27 moved it off the per-row template,
+	// so it no longer depends on Action/Description being present. A nil
+	// Description omits the Description row (asserted above) but the finding
+	// still fires and still carries its definition's sentence unchanged.
+	const wantDetail = "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
+	if finding.Detail != wantDetail {
+		t.Errorf("Detail = %q, want %q (nil Description must not blank the definition's sentence)", finding.Detail, wantDetail)
 	}
 }
 

@@ -245,12 +245,19 @@ func TestFetchTransferServersPage_LegacyPolicyFinding(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 	const policyName = "TransferSecurityPolicy-2018-11"
-	wantDetail := "Security policy " + policyName + " allows weak ciphers / old TLS; move to a current policy."
+	// Detail is the one static sentence FindingDef declares for
+	// transferCodeLegacyPolicy (catalog_networking.go); the policy name
+	// stays in the resource's own fields (§3.2 SecurityPolicyName), not in
+	// Detail or Phrase.
+	const wantDetail = "The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
 	}
 	if strings.Contains(finding.Phrase, policyName) {
-		t.Errorf("Phrase %q must not contain the policy name %q — it belongs in Detail only", finding.Phrase, policyName)
+		t.Errorf("Phrase %q must not contain the policy name %q — it belongs in the resource's own fields only", finding.Phrase, policyName)
+	}
+	if strings.Contains(finding.Detail, policyName) {
+		t.Errorf("Detail %q must not contain the policy name %q — one sentence per code, never keyed by state", finding.Detail, policyName)
 	}
 }
 

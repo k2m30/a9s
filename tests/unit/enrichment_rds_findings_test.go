@@ -318,10 +318,10 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 		t.Errorf("wave-2 Severity = %v, want SevWarn", wave2.Severity)
 	}
 
-	// Detail (S5) — docs/resources/dbi.md §4 row "Pending maintenance overdue":
-	// Detail text (S5), concretized with this test's Action="system-update" /
-	// Description="Engine patch".
-	const wantWave2Detail = "Pending maintenance action overdue: system-update (Engine patch)."
+	// Detail (S5) is the one static sentence FindingDef declares for
+	// dbiCodePendingMaintenance (catalog_databases.go); it no longer depends
+	// on this test's Action/Description, which live in AttentionDetail rows.
+	const wantWave2Detail = "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
 	if wave2.Detail != wantWave2Detail {
 		t.Errorf("wave-2 Detail = %q, want %q", wave2.Detail, wantWave2Detail)
 	}

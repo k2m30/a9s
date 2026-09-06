@@ -169,9 +169,25 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_PendingAcceptance(t *testing
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantPrefix = "The peer has not accepted; AWS expires the request on "
-	if !strings.HasPrefix(f.Detail, wantPrefix) || !strings.HasSuffix(f.Detail, ".") {
-		t.Errorf("Detail = %q, want prefix %q and a trailing period (S5 template + the actual expiration date)", f.Detail, wantPrefix)
+	// Detail is the one static sentence FindingDef declares for
+	// vpcPeerCodePendingAcceptance (catalog_networking.go); the actual
+	// expiration date moved to its own "Expires" row.
+	const wantDetail = "The peer has not accepted this request yet, and AWS expires it a week after creation; the countdown is in the status and the date is listed below. Ask the accepter to approve it."
+	if f.Detail != wantDetail {
+		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
+	}
+	ad, ok := r.AttentionDetails[f.Code]
+	if !ok {
+		t.Fatalf("AttentionDetails[%v] not found", f.Code)
+	}
+	var gotExpires string
+	for _, row := range ad.Rows {
+		if row.Label == "Expires" {
+			gotExpires = row.Value
+		}
+	}
+	if gotExpires == "" {
+		t.Errorf("Expires row missing or empty: %+v", ad.Rows)
 	}
 }
 
@@ -241,9 +257,25 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_Rejected(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", f.Severity)
 	}
-	const wantDetail = "Rejected by accepter: CIDR conflict"
+	// Detail is the one static sentence FindingDef declares for
+	// vpcPeerCodeRejected (catalog_networking.go); the accepter's status
+	// message moved to its own "Status message" row.
+	const wantDetail = "The accepter rejected this peering request, so nothing will ever route across it; AWS keeps the record listed for a while. Delete it and request again once the other side agrees."
 	if f.Detail != wantDetail {
-		t.Errorf("Detail = %q, want %q (Status.Message verbatim)", f.Detail, wantDetail)
+		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
+	}
+	ad, ok := r.AttentionDetails[f.Code]
+	if !ok {
+		t.Fatalf("AttentionDetails[%v] not found", f.Code)
+	}
+	var gotMessage string
+	for _, row := range ad.Rows {
+		if row.Label == "Status message" {
+			gotMessage = row.Value
+		}
+	}
+	if gotMessage != "Rejected by accepter: CIDR conflict" {
+		t.Errorf("Status message row = %q, want %q (Status.Message verbatim)", gotMessage, "Rejected by accepter: CIDR conflict")
 	}
 }
 
@@ -264,9 +296,25 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_Failed(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", f.Severity)
 	}
-	const wantDetail = "Failed to activate the peering connection due to an internal error"
+	// Detail is the one static sentence FindingDef declares for
+	// vpcPeerCodeFailed (catalog_networking.go); the status message moved to
+	// its own "Status message" row.
+	const wantDetail = "The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one."
 	if f.Detail != wantDetail {
-		t.Errorf("Detail = %q, want %q (Status.Message verbatim)", f.Detail, wantDetail)
+		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
+	}
+	ad, ok := r.AttentionDetails[f.Code]
+	if !ok {
+		t.Fatalf("AttentionDetails[%v] not found", f.Code)
+	}
+	var gotMessage string
+	for _, row := range ad.Rows {
+		if row.Label == "Status message" {
+			gotMessage = row.Value
+		}
+	}
+	if gotMessage != "Failed to activate the peering connection due to an internal error" {
+		t.Errorf("Status message row = %q, want %q (Status.Message verbatim)", gotMessage, "Failed to activate the peering connection due to an internal error")
 	}
 }
 
@@ -396,13 +444,25 @@ func TestFetchVpcPeeringConnectionsPage_CIDROverlapActive(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantPrefix = "Requester and accepter CIDR ranges overlap: "
-	const wantSuffix = "overlapping subsets blackhole."
-	if !strings.HasPrefix(f.Detail, wantPrefix) || !strings.HasSuffix(f.Detail, wantSuffix) {
-		t.Errorf("Detail = %q, want prefix %q and suffix %q", f.Detail, wantPrefix, wantSuffix)
+	// Detail is the one static sentence FindingDef declares for
+	// vpcPeerCodeCidrOverlap (catalog_networking.go); the overlapping range
+	// moved to its own "Overlapping range" row.
+	const wantDetail = "The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap."
+	if f.Detail != wantDetail {
+		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
-	if !strings.Contains(f.Detail, "10.0.0.0/16") {
-		t.Errorf("Detail = %q, want it to name the overlapping range %q", f.Detail, "10.0.0.0/16")
+	ad, ok := r.AttentionDetails[f.Code]
+	if !ok {
+		t.Fatalf("AttentionDetails[%v] not found", f.Code)
+	}
+	var gotRange string
+	for _, row := range ad.Rows {
+		if row.Label == "Overlapping range" {
+			gotRange = row.Value
+		}
+	}
+	if !strings.Contains(gotRange, "10.0.0.0/16") {
+		t.Errorf("Overlapping range row = %q, want it to name %q", gotRange, "10.0.0.0/16")
 	}
 }
 

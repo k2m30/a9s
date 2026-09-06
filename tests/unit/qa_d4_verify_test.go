@@ -12,7 +12,6 @@ package unit
 import (
 	"context"
 	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -360,41 +359,54 @@ func TestD4Row21_AthenaWitnessIsTheOnlyCarrier(t *testing.T) {
 }
 
 // TestD4Row22_AthenaDocQuotesTheDetailConstants pins the doc side of the same
-// change: the §4 cells quote what the two findings now say.
+// change: the §4 cells quote what the two findings now say. Task w27 deleted
+// the hand-written §4 "Detail text (S5)" column this test used to parse
+// (backtick-quoted last cell); the Detail column now lives in the generated
+// findings table catalogen writes (five plain cells, no backticks), so this
+// reads that table's row for each code instead.
 func TestD4Row22_AthenaDocQuotesTheDetailConstants(t *testing.T) {
 	rows, _ := d4FoldedRows(t, "athena")
 	r := d4RowByID(t, rows, fixtures.AthenaGovernanceMisconfigured)
 
-	quotes := map[string]bool{}
-	for _, q := range athenaDocQuotes(t) {
-		quotes[q] = true
-	}
+	generated := athenaGeneratedDocDetails(t)
 	for _, code := range []domain.FindingCode{"athena.settings-not-enforced", "athena.results-unencrypted"} {
 		f := d4FindingByCode(t, r, code)
-		if !quotes[f.Detail] {
-			t.Errorf("docs/resources/athena.md quotes no §4 Detail cell equal to %s's sentence:\n  %q",
-				code, f.Detail)
+		got, ok := generated[code]
+		if !ok {
+			t.Errorf("docs/resources/athena.md's generated findings table has no row for %s", code)
+			continue
+		}
+		if got != f.Detail {
+			t.Errorf("docs/resources/athena.md's generated Detail cell for %s = %q, want %q", code, got, f.Detail)
 		}
 	}
 }
 
-// athenaDocQuotes returns the backtick-quoted Detail cell of every §4 table
-// row on the athena page.
-func athenaDocQuotes(t *testing.T) []string {
+// athenaGeneratedDocDetails returns the generated findings table's Detail
+// column, keyed by Code — the table catalogen writes between
+// "<!-- BEGIN GENERATED: findings -->" and "<!-- END GENERATED: findings -->",
+// five plain (non-backtick) cells: Code | Phrase | Severity | Source | Detail.
+func athenaGeneratedDocDetails(t *testing.T) map[domain.FindingCode]string {
 	t.Helper()
 	b, err := os.ReadFile("../../docs/resources/athena.md")
 	if err != nil {
 		t.Fatalf("read athena.md: %v", err)
 	}
-	pattern := regexp.MustCompile("\\|\\s*`([^`]+)`\\s*\\|?\\s*$")
-	var out []string
+	out := map[domain.FindingCode]string{}
 	for _, line := range strings.Split(string(b), "\n") {
-		if !strings.HasPrefix(strings.TrimSpace(line), "|") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "|") {
 			continue
 		}
-		if m := pattern.FindStringSubmatch(line); m != nil {
-			out = append(out, strings.TrimSpace(m[1]))
+		cells := strings.Split(strings.Trim(line, "|"), "|")
+		if len(cells) != 5 {
+			continue
 		}
+		code := strings.TrimSpace(cells[0])
+		if code == "" || code == "Code" || strings.HasPrefix(code, "---") {
+			continue
+		}
+		out[domain.FindingCode(code)] = strings.TrimSpace(cells[4])
 	}
 	return out
 }
@@ -479,21 +491,38 @@ func TestD4Row26_ListenerPhrasesAgreeInNumber(t *testing.T) {
 			t.Errorf("%s %s: phrase = %q, want it to say %q", c.id, c.code, f.Phrase, strings.TrimSpace(wantNoun))
 		}
 
-		// The Detail has to agree with the phrase, or the two lines of the
-		// Attention block contradict each other about how many listeners there
-		// are.
-		detailSingular := strings.Contains(f.Detail, "This listener") || strings.Contains(f.Detail, "this listener")
-		detailPlural := strings.Contains(f.Detail, "These listeners") || strings.Contains(f.Detail, "each listener")
-		if c.singular && !detailSingular {
-			t.Errorf("%s %s: phrase names one port but Detail does not read as one listener:\n  %q",
-				c.id, c.code, f.Detail)
+		// Task w27: Detail is now one static sentence per code, worded to
+		// cover one-or-many listeners without pluralising ("a listener...
+		// the ports are listed below"), so it no longer needs to agree in
+		// number with the phrase — the actual listener(s) live in their own
+		// rows instead.
+		wantDetail := map[domain.FindingCode]string{
+			"elb.plain-http-listener": "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener.",
+			"elb.weak-tls-policy":     "A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later.",
+		}[c.code]
+		if f.Detail != wantDetail {
+			t.Errorf("%s %s: Detail = %q, want %q", c.id, c.code, f.Detail, wantDetail)
 		}
-		if !c.singular && !detailPlural {
-			t.Errorf("%s %s: phrase names several ports but Detail does not read as several listeners:\n  %q",
-				c.id, c.code, f.Detail)
+		rowLabel := map[domain.FindingCode]string{
+			"elb.plain-http-listener": "Listener",
+			"elb.weak-tls-policy":     "Security policy",
+		}[c.code]
+		ad, ok := r.AttentionDetails[c.code]
+		if !ok {
+			t.Fatalf("%s %s: AttentionDetails not found", c.id, c.code)
 		}
-		if detailSingular && detailPlural {
-			t.Errorf("%s %s: Detail reads both ways:\n  %q", c.id, c.code, f.Detail)
+		rowCount := 0
+		for _, row := range ad.Rows {
+			if row.Label == rowLabel {
+				rowCount++
+			}
+		}
+		wantRows := 1
+		if !c.singular {
+			wantRows = 2
+		}
+		if rowCount != wantRows {
+			t.Errorf("%s %s: %d %q row(s), want %d (one per listener)", c.id, c.code, rowCount, rowLabel, wantRows)
 		}
 	}
 
