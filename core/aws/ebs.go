@@ -109,12 +109,17 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 		}
 
 		// emit canonical Findings for non-healthy volume states.
-		// in-use and available are healthy (no Finding). deleting is terminal (no Finding).
-		// creating → SevWarn. error → SevBroken.
+		// in-use and available are healthy (no Finding).
+		// creating and deleting → SevWarn. error → SevBroken.
 		switch vol.State {
 		case ec2types.VolumeStateCreating:
 			r.Findings = []domain.Finding{{
 				Code: CodeEBSStateCreating, Phrase: "creating",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		case ec2types.VolumeStateDeleting:
+			r.Findings = []domain.Finding{{
+				Code: CodeEBSStateDeleting, Phrase: "deleting",
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
 		case ec2types.VolumeStateError:

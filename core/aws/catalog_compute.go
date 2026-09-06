@@ -791,6 +791,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeEBSOrphanUnattached, Phrase: "orphan: unattached Nd", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it."},
 			{Code: CodeEBSUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1", Detail: "Volume is not encrypted at rest — re-create from encrypted snapshot."},

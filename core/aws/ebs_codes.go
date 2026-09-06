@@ -12,6 +12,10 @@ const (
 	// Severity: SevWarn (transitional).
 	CodeEBSStateCreating domain.FindingCode = "ebs.state.creating"
 
+	// CodeEBSStateDeleting — EBS volume is in the "deleting" lifecycle state.
+	// Severity: SevWarn.
+	CodeEBSStateDeleting domain.FindingCode = "ebs.state.deleting"
+
 	// CodeEBSStateError — EBS volume is in the "error" state.
 	// Severity: SevBroken.
 	CodeEBSStateError domain.FindingCode = "ebs.state.error"

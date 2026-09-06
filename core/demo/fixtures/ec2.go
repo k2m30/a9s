@@ -3214,6 +3214,15 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60006")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("new-db-volume")}},
 		},
+		// Witness for ebs.state.deleting. Encrypted and attached so the state
+		// finding is the only one it carries.
+		{
+			VolumeId: aws.String("vol-0deleting0000000d4"), State: ec2types.VolumeStateDeleting,
+			Size: aws.Int32(50), VolumeType: ec2types.VolumeTypeGp3, Iops: aws.Int32(3000),
+			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1a"), CreateTime: aws.Time(t5),
+			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60004")}},
+			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("retired-cache-volume")}},
+		},
 		// Orphan: Available, no attachments, well over 7 days old (fixed past
 		// date, not relative to time.Now()) → ebs.orphan-unattached finding.
 		{

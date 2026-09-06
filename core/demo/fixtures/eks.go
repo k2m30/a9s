@@ -145,6 +145,22 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "dev",
 			},
 		},
+		// Witness for eks.state.deleting.
+		{
+			Name:    aws.String("acme-sandbox-retiring"),
+			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-sandbox-retiring"),
+			Version: aws.String("1.29"),
+			Status:  ekstypes.ClusterStatusDeleting,
+			RoleArn: aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:     aws.String(eksVPCID),
+				SubnetIds: []string{eksSubnetA},
+			},
+			CreatedAt: aws.Time(mustTime("2026-02-11T09:00:00Z")),
+			Tags: map[string]string{
+				"Environment": "sandbox",
+			},
+		},
 		// Status=FAILED → Color:Broken
 		{
 			Name:    aws.String("acme-staging-failed"),
