@@ -675,15 +675,7 @@ var nonPaginatedAPIs = []string{
 // so the list cannot outlive the work.
 //
 // Key shape: "<file>:<Enrich func>:<SDK operation>".
-var paginationBurnDown = map[string]bool{
-	// asgLaunchConfigurationPosture asks for up to EnrichmentCap (50) launch
-	// configurations by name in one call and never reads the NextToken the
-	// output carries. It fits today only because the API's default page size
-	// is also 50: ask for one more name and the overflow is dropped in
-	// silence, and every row whose launch configuration fell off the page
-	// reads as "nothing to report" rather than "not inspected".
-	"asg_issue_enrichment.go:asgLaunchConfigurationPosture:DescribeLaunchConfigurations": true,
-}
+var paginationBurnDown = map[string]bool{}
 
 // TestNoSingleCallListAPIEnrichers walks core/aws/*_issue_enrichment.go via
 // go/ast and flags any call expression that:

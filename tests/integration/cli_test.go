@@ -34,15 +34,23 @@ func TestMain(m *testing.M) {
 	// ldflags so TestQA_012_VersionFlag's X.Y.Z assertion holds — without
 	// ldflags, buildinfo.ResolveVersion falls back to "dev" and `--version`
 	// prints "a9s dev" with no "." in it (AS-768).
-	tmpDir := os.TempDir()
-	testBinary = filepath.Join(tmpDir, "a9s-test")
+	//
+	// The binary lives in a directory of this run's own, never at a fixed
+	// name under $TMPDIR: several worktrees run this suite at once, and a
+	// shared path means one run's TestMain deletes the binary another run is
+	// still executing.
+	buildDir, err := os.MkdirTemp("", "a9s-cli-test-*")
+	if err != nil {
+		panic("failed to create the test binary directory: " + err.Error())
+	}
+	testBinary = filepath.Join(buildDir, "a9s-test")
 	cmd := exec.Command("go", "build", "-ldflags", "-X main.version=test-0.0.0", "-o", testBinary, "./cmd/a9s/")
 	cmd.Dir = findProjectRoot()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		panic("failed to build test binary: " + string(out) + ": " + err.Error())
 	}
 	code := m.Run()
-	os.Remove(testBinary)
+	os.RemoveAll(buildDir) //nolint:errcheck // best-effort cleanup, the process is exiting
 	os.Exit(code)
 }
 

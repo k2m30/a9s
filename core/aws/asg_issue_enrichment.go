@@ -141,23 +141,40 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 		names = names[:EnrichmentCap]
 	}
 
+	// DescribeLaunchConfigurations pages: asking for EnrichmentCap names fits
+	// one page only because the API's default page size happens to match, and a
+	// configuration that fell off the page would leave its groups reading
+	// "nothing to report" rather than "not inspected".
 	const op = "asg-enrich: DescribeLaunchConfigurations"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
-		return clients.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
-			LaunchConfigurationNames: names,
+	var configs []asgtypes.LaunchConfiguration
+	var nextToken *string
+	for range PerParentPageCap {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
+			return clients.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
+				LaunchConfigurationNames: names,
+				NextToken:                nextToken,
+			})
 		})
-	})
-	if err != nil {
-		var failures []string
-		for _, name := range names {
-			for _, id := range groupsByLC[name] {
-				MarkSkipped(result, id, &failures, op, err)
+		if err != nil {
+			// Any page failing leaves the whole batch uninspected: pages read
+			// before it are dropped rather than applied, so no group reports a
+			// clean posture on a partial read.
+			var failures []string
+			for _, name := range names {
+				for _, id := range groupsByLC[name] {
+					MarkSkipped(result, id, &failures, op, err)
+				}
 			}
+			return Finish(result, failures, len(names), op)
 		}
-		return Finish(result, failures, len(names), op)
+		configs = append(configs, out.LaunchConfigurations...)
+		if aws.ToString(out.NextToken) == "" {
+			break
+		}
+		nextToken = out.NextToken
 	}
 
-	for _, lc := range out.LaunchConfigurations {
+	for _, lc := range configs {
 		name := aws.ToString(lc.LaunchConfigurationName)
 		for _, id := range groupsByLC[name] {
 			applyLaunchConfigurationFindings(result, id, lc)
