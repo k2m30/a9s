@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -101,10 +100,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
 			if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
 				setWave2Finding(&result, r.ID, sqsCodePublicPolicy, "queue policy open to anyone", "!", "sqs",
-					[]domain.DetailRow{
-						{Label: "Principal", Value: "*", Tier: "!"},
-						{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-					})
+					publicPolicyRows(ex))
 			}
 		}
 	})

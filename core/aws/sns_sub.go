@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -144,16 +145,13 @@ func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Findin
 }
 
 // snsSubEndpointOrigin keeps the scheme and host of a URL endpoint and drops
-// the path, query and fragment.
+// the path, query, fragment and any userinfo.
 func snsSubEndpointOrigin(endpoint string) string {
-	rest, ok := strings.CutPrefix(endpoint, "http://")
-	if !ok {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme == "" || u.Host == "" {
 		return endpoint
 	}
-	host, _, _ := strings.Cut(rest, "/")
-	host, _, _ = strings.Cut(host, "?")
-	host, _, _ = strings.Cut(host, "#")
-	return "http://" + host
+	return u.Scheme + "://" + u.Host
 }
 
 // snsSubStateFindings mirrors colorSNSSub's own precedence: AWS returns the

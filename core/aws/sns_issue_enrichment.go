@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -131,10 +130,7 @@ func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *Issue
 	if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
 		if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
 			setWave2Finding(result, topicARN, snsCodePublicPolicy, "topic policy open to anyone", "!", "sns",
-				[]domain.DetailRow{
-					{Label: "Principal", Value: "*", Tier: "!"},
-					{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-				})
+				publicPolicyRows(ex))
 		}
 	}
 	// AWS omits the attribute entirely for an unencrypted topic and returns
