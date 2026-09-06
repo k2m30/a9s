@@ -2210,25 +2210,39 @@ func buildInternetGateways() []ec2types.InternetGateway {
 func buildAddresses() []ec2types.Address {
 	return []ec2types.Address{
 		{
-			AllocationId: aws.String("eipalloc-0aaa111111111111a"), PublicIp: aws.String("54.210.33.112"),
-			AssociationId: aws.String("eipassoc-0aaa111111111111a"), InstanceId: aws.String("i-0a1b2c3d4e5f60001"),
+			AllocationId: aws.String("eipalloc-0fff666666666666f"), PublicIp: aws.String("54.210.33.112"),
+			AssociationId: aws.String("eipassoc-0fff666666666666f"), InstanceId: aws.String("i-0a1b2c3d4e5f60001"),
 			SubnetId: aws.String(fixtProdPublicSubnetA), Domain: ec2types.DomainTypeVpc,
 			NetworkBorderGroup: aws.String("us-east-1"), NetworkInterfaceId: aws.String("eni-0aaa111111111111a"),
 			PrivateIpAddress: aws.String("10.0.1.10"),
 			// aws:cloudformation:stack-name tag — required for eip→cfn related-panel
 			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: []ec2types.Tag{
-				{Key: aws.String("Name"), Value: aws.String("prod-nat-eip-1a")},
+				{Key: aws.String("Name"), Value: aws.String("web-prod-01-eip")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
-		// nat-0bbb222222222222b's own address. A NAT gateway allocation cannot
-		// carry an InstanceId, so this row has none; it exists so the nat→eip
-		// pivot, which resolves by AllocationId, has a row to land on.
+		// nat-0aaa111111111111a's and nat-0bbb222222222222b's own addresses. A
+		// NAT gateway allocation cannot carry an InstanceId, so these rows have
+		// none; they exist so the nat→eip pivot, which resolves by
+		// AllocationId, has a row to land on. Each keeps its association id,
+		// which is what an attached address has and what keeps it out of the
+		// unassociated finding.
+		{
+			AllocationId: aws.String("eipalloc-0aaa111111111111a"), PublicIp: aws.String("54.210.33.200"),
+			AssociationId: aws.String("eipassoc-0aaa111111111111a"),
+			Domain:        ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			PrivateIpAddress: aws.String("10.0.1.50"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-nat-eip-1a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 		{
 			AllocationId: aws.String("eipalloc-0bbb222222222222b"), PublicIp: aws.String("54.210.33.201"),
-			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			AssociationId: aws.String("eipassoc-0bbb222222222222b"),
+			Domain:        ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
 			NetworkInterfaceId: aws.String("eni-0nat0000000000002b"), PrivateIpAddress: aws.String("10.0.2.50"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-nat-eip-1b")},
@@ -2246,10 +2260,11 @@ func buildAddresses() []ec2types.Address {
 			},
 		},
 		{
+			// nat-0ccc333333333333c's own address, in the staging VPC.
 			AllocationId: aws.String("eipalloc-0ccc333333333333c"), PublicIp: aws.String("52.87.100.10"),
 			AssociationId: aws.String("eipassoc-0ccc333333333333c"),
 			Domain:        ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
-			NetworkInterfaceId: aws.String("eni-0aaa111111111111a"), PrivateIpAddress: aws.String("10.1.1.50"),
+			PrivateIpAddress: aws.String("10.1.1.50"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("staging-nat-eip")},
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
@@ -2802,20 +2817,22 @@ func buildNetworkInterfaces(sgs []ec2types.SecurityGroup) []ec2types.NetworkInte
 func namedNetworkInterfaces() []ec2types.NetworkInterface {
 	return []ec2types.NetworkInterface{
 		{
+			// web-prod-01's interface: the instance's own NetworkInterfaces
+			// list names this one, and nat-0aaa111111111111a has no interface
+			// of its own to confuse it with.
 			NetworkInterfaceId: aws.String("eni-0aaa111111111111a"),
 			Status:             ec2types.NetworkInterfaceStatusInUse,
-			InterfaceType:      ec2types.NetworkInterfaceTypeNatGateway,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
 			VpcId:              aws.String(fixtProdVPCID),
 			SubnetId:           aws.String(fixtProdPublicSubnetA),
 			AvailabilityZone:   aws.String("us-east-1a"),
-			PrivateIpAddress:   aws.String("10.0.1.50"),
-			PrivateDnsName:     aws.String("ip-10-0-1-50.ec2.internal"),
+			PrivateIpAddress:   aws.String("10.0.1.10"),
+			PrivateDnsName:     aws.String("ip-10-0-1-10.ec2.internal"),
 			MacAddress:         aws.String("0a:1b:2c:3d:4e:01"),
-			Description:        aws.String("Interface for NAT Gateway nat-0aaa111111111111a"),
+			Description:        aws.String("Primary network interface for web-prod-01"),
 			OwnerId:            aws.String("123456789012"),
-			RequesterId:        aws.String("amazon-elb"),
-			RequesterManaged:   aws.Bool(true),
-			SourceDestCheck:    aws.Bool(false),
+			RequesterManaged:   aws.Bool(false),
+			SourceDestCheck:    aws.Bool(true),
 			Attachment: &ec2types.NetworkInterfaceAttachment{
 				AttachmentId: aws.String("eni-attach-01"), InstanceId: aws.String("i-0a1b2c3d4e5f60001"),
 				DeviceIndex: aws.Int32(0), Status: ec2types.AttachmentStatusAttached, DeleteOnTermination: aws.Bool(true),
@@ -2825,15 +2842,13 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			},
 			Association: &ec2types.NetworkInterfaceAssociation{
 				PublicIp: aws.String("54.210.33.112"), PublicDnsName: aws.String("ec2-54-210-33-112.compute-1.amazonaws.com"),
-				IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0aaa111111111111a"),
+				IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0fff666666666666f"),
 			},
-			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("prod-nat-eni-1a")}},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-01-primary")}},
 		},
 		{
-			// web-prod-02's interface. It is attached to an instance and
-			// carries an EC2 security group, so it is not the NAT gateway's
-			// interface however it was once described — nat-0bbb222222222222b
-			// has its own, eni-0nat0000000000002b.
+			// web-prod-02's interface. nat-0bbb222222222222b has its own,
+			// eni-0nat0000000000002b.
 			NetworkInterfaceId: aws.String("eni-0bbb222222222222b"),
 			Status:             ec2types.NetworkInterfaceStatusInUse,
 			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
@@ -2863,26 +2878,25 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			VpcId:              aws.String(fixtProdVPCID),
 			SubnetId:           aws.String(fixtProdPublicSubnetA),
 			AvailabilityZone:   aws.String("us-east-1a"),
-			PrivateIpAddress:   aws.String("10.0.1.10"),
-			PrivateDnsName:     aws.String("ip-10-0-1-10.ec2.internal"),
+			PrivateIpAddress:   aws.String("10.0.0.5"),
+			PrivateDnsName:     aws.String("ip-10-0-0-5.ec2.internal"),
 			MacAddress:         aws.String("0a:1b:2c:3d:4e:05"),
-			Description:        aws.String("Primary network interface for web-prod-01"),
+			Description:        aws.String("Primary network interface for bastion-prod"),
 			OwnerId:            aws.String("123456789012"),
-			RequesterId:        aws.String("amazon-elb"),
 			RequesterManaged:   aws.Bool(false),
 			SourceDestCheck:    aws.Bool(true),
 			Attachment: &ec2types.NetworkInterfaceAttachment{
-				AttachmentId: aws.String("eni-attach-05"), InstanceId: aws.String("i-0a1b2c3d4e5f60001"),
+				AttachmentId: aws.String("eni-attach-05"), InstanceId: aws.String("i-0a1b2c3d4e5f60005"),
 				DeviceIndex: aws.Int32(0), Status: ec2types.AttachmentStatusAttached, DeleteOnTermination: aws.Bool(true),
 			},
 			Groups: []ec2types.GroupIdentifier{
 				{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
 			},
 			Association: &ec2types.NetworkInterfaceAssociation{
-				PublicIp: aws.String("54.210.33.115"), IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0aaa111111111111a"),
+				PublicIp: aws.String("52.87.221.44"), IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0ddd444444444444d"),
 			},
 			TagSet: []ec2types.Tag{
-				{Key: aws.String("Name"), Value: aws.String("web-prod-01-primary")},
+				{Key: aws.String("Name"), Value: aws.String("bastion-prod-primary")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
@@ -2906,9 +2920,6 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			},
 			Groups: []ec2types.GroupIdentifier{
 				{GroupId: aws.String(fixtProdAPIInternalSGID), GroupName: aws.String("acme-api-internal-sg")},
-			},
-			Association: &ec2types.NetworkInterfaceAssociation{
-				PublicIp: aws.String("54.210.33.116"), IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0ddd444444444444d"),
 			},
 			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("vpce-secrets-eni-1a")}},
 		},
@@ -3035,8 +3046,8 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			VpcId:              aws.String(fixtProdVPCID),
 			SubnetId:           aws.String(fixtProdPublicSubnetB),
 			AvailabilityZone:   aws.String("us-east-1b"),
-			PrivateIpAddress:   aws.String("10.0.2.51"),
-			PrivateDnsName:     aws.String("ip-10-0-2-51.ec2.internal"),
+			PrivateIpAddress:   aws.String("10.0.2.50"),
+			PrivateDnsName:     aws.String("ip-10-0-2-50.ec2.internal"),
 			MacAddress:         aws.String("0a:1b:2c:3d:4e:n2"),
 			Description:        aws.String("Interface for NAT Gateway nat-0bbb222222222222b"),
 			OwnerId:            aws.String("123456789012"),

@@ -295,6 +295,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   belong to an instance. All three now agree, and the allocation belongs to
   the NAT gateway alone.
 
+- Every demo address now has one owner. Two NAT gateway allocations were also
+  serving as instance Elastic IPs, one of them advertised on two interfaces
+  with two different public addresses, and a staging allocation named a
+  production instance's interface. The instances keep their own allocations,
+  the NAT gateways keep theirs, and each address appears on one interface and
+  one instance.
+
 - Demo mode listed every KMS key twice, in a different order on each run.
   The list was being built from the lookup table that deliberately holds each
   key under both its bare ID and its full ARN, rather than from the account's
