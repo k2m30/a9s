@@ -570,6 +570,15 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	}
 })
 
+// LogGroupsPageSize splits the log-group fixtures across two pages so exactly
+// one demo list is paginated. Every other demo list answers in one page, which
+// left the lower-bound rendering with no witness on the bench: "(N+)" for a
+// pivot that matched inside a partial list, "(0+)" for one that matched nothing
+// in it. The boundary is chosen, not arbitrary — the two Document DB audit
+// groups sit on page one and the DynamoDB insights group on page two, so one
+// pivot of each kind has a witness.
+const LogGroupsPageSize = 15
+
 func NewCWLogsFixtures() *CWLogsFixtures {
 	return sharedCWLogsFixtures()
 }

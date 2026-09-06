@@ -241,6 +241,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A hosted zone no longer reports load balancers, CloudFront distributions or
+  other targets that do not exist. Its alias records name a DNS target, and the
+  panel used to turn that name straight into a count, so a zone whose alias
+  pointed at a deleted load balancer showed one anyway and dead-ended on Enter.
+  Every alias pivot now reports only what the target list confirms, and reads
+  as unknown when no list has been read.
+
 - A related row no longer reads as a confident zero when nothing behind it was
   read at all. Twenty-nine pivots across S3, Redis, Document DB, RDS, DynamoDB,
   EC2, ECS, EKS, EFS, Lambda, SES and WAF now read as unknown when the list they

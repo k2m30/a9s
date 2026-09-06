@@ -147,6 +147,31 @@ tmux send-keys -t "$SESSION" 'd'
 sleep 3
 tmux capture-pane -t "$SESSION" -p > "$CAPDIR/ec2_detail.txt"
 
+# --- Witness 9: the lower bound on a partial list -------------------------
+# The log-group fixtures are the one demo list served in two pages, so the
+# related panel's "+" marker has somewhere to come from. A cluster whose
+# groups are on the first page reads (2+); one with none there reads (0+).
+tmux send-keys -t "$SESSION" Escape
+sleep 1
+tmux send-keys -t "$SESSION" Escape
+sleep 1
+open_and_capture logs logs_list.txt 3
+tmux send-keys -t "$SESSION" Escape
+sleep 1
+open_and_capture docdb docdb.txt 3
+tmux send-keys -t "$SESSION" '/acme-docdb-prod' Enter
+sleep 1
+tmux send-keys -t "$SESSION" 'd'
+sleep 3
+tmux capture-pane -t "$SESSION" -p > "$CAPDIR/docdb_prod_detail.txt"
+tmux send-keys -t "$SESSION" Escape
+sleep 1
+tmux send-keys -t "$SESSION" '/warn-dbc-unenc' Enter
+sleep 1
+tmux send-keys -t "$SESSION" 'd'
+sleep 3
+tmux capture-pane -t "$SESSION" -p > "$CAPDIR/docdb_unenc_detail.txt"
+
 expect() {
 	# $1 = capture file, $2 = required substring, $3 = human label
 	if grep -qF -- "$2" "$CAPDIR/$1"; then
@@ -235,6 +260,12 @@ for cap in s3_detail.txt s3_nopab_detail.txt s3_drill_trail.txt s3_circular.txt 
 	forbid_re "$cap" ' [A-Z][A-Z0-9]*(_[A-Z0-9]+)+ ' "no raw UPPER_SNAKE cell in $cap"
 done
 forbid s3_circular.txt "(?)" "re-entered warm detail carries no (?) for cache-computable pivots"
+
+# 9. The lower bound renders. Without these the "+" has no witness on the
+# bench and a regression to a bare count, or back to Unknown, is invisible.
+expect logs_list.txt "logs(15+)" "the paginated log-group list reports its count as a lower bound"
+expect docdb_prod_detail.txt "Log Groups (2+)" "a pivot matching inside a partial list reads (N+), not (N)"
+expect docdb_unenc_detail.txt "Log Groups (0+)" "a pivot matching nothing in a partial list reads (0+), not (0) or (?)"
 
 if [ "$FAILURES" -gt 0 ]; then
 	echo "smoke-related: $FAILURES failure(s); captures kept in $CAPDIR"

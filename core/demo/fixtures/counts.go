@@ -65,7 +65,7 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"dbi-snap":     len(rds.DBSnapshots),
 		"dbc-snap":     len(docdb.DBClusterSnapshots) + len(rds.DBClusterSnapshots),
 		"alarm":        len(NewCloudWatchFixtures().Alarms),
-		"logs":         len(NewCWLogsFixtures().LogGroups),
+		"logs":         min(len(NewCWLogsFixtures().LogGroups), LogGroupsPageSize),
 		"trail":        len(NewCloudTrailFixtures().Trails),
 		"ct-events":    len(NewCloudTrailFixtures().Events),
 		"sqs":          len(NewSQSFixtures().Queues),

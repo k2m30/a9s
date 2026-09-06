@@ -21,8 +21,22 @@ func NewCWLogs() *CWLogsFake {
 	return &CWLogsFake{fix: fixtures.NewCWLogsFixtures()}
 }
 
-func (f *CWLogsFake) DescribeLogGroups(_ context.Context, _ *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
-	return &cloudwatchlogs.DescribeLogGroupsOutput{LogGroups: f.fix.LogGroups}, nil
+func (f *CWLogsFake) DescribeLogGroups(_ context.Context, input *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
+	groups := f.fix.LogGroups
+	if input != nil && input.NextToken != nil && *input.NextToken != "" {
+		if len(groups) > fixtures.LogGroupsPageSize {
+			return &cloudwatchlogs.DescribeLogGroupsOutput{LogGroups: groups[fixtures.LogGroupsPageSize:]}, nil
+		}
+		return &cloudwatchlogs.DescribeLogGroupsOutput{}, nil
+	}
+	if len(groups) > fixtures.LogGroupsPageSize {
+		next := "log-groups-page-2"
+		return &cloudwatchlogs.DescribeLogGroupsOutput{
+			LogGroups: groups[:fixtures.LogGroupsPageSize],
+			NextToken: &next,
+		}, nil
+	}
+	return &cloudwatchlogs.DescribeLogGroupsOutput{LogGroups: groups}, nil
 }
 
 func (f *CWLogsFake) DescribeLogStreams(_ context.Context, input *cloudwatchlogs.DescribeLogStreamsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
