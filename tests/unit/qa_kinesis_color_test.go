@@ -33,11 +33,17 @@ func TestKinesisColor(t *testing.T) {
 		})
 	}
 
-	// Fallback: when stream_status is absent, Color should read Fields["status"].
-	t.Run("status_active_fallback", func(t *testing.T) {
-		got := td.Color(resource.Resource{Fields: map[string]string{"status": "ACTIVE"}})
+	// Fields["status"] holds the rendered phrase, which is lowercase, so the
+	// switch that used to read it as a raw enum could never match and is gone.
+	// The classifier follows the enum: a stream whose phrase disagrees with its
+	// stream_status is coloured by the status.
+	t.Run("rendered_phrase_is_not_an_input", func(t *testing.T) {
+		got := td.Color(resource.Resource{Fields: map[string]string{
+			"stream_status": "ACTIVE",
+			"status":        "creating",
+		}})
 		if got != resource.ColorHealthy {
-			t.Errorf("Color(status=%q) = %v, want %v", "ACTIVE", got, resource.ColorHealthy)
+			t.Errorf("active stream whose phrase says creating = %v, want %v", got, resource.ColorHealthy)
 		}
 	})
 }
