@@ -13,6 +13,7 @@ package unit_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -666,9 +667,15 @@ func TestCtEventsPivots_AnARNSegmentIsNotAnID(t *testing.T) {
 
 // TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName pins which candidate
 // wins when more than one is real. A secret ARN ends ":secret:<name>" and the
-// name may itself contain slashes, so the segment after the last colon is the
-// name and the segment after the last slash is a tail of it. An account may
-// hold both; the event named the first.
+// name may itself contain slashes, so the whole of it after the type word is
+// the secret the event named.
+//
+// The second case is INVERTED against an earlier revision of this file, which
+// expected the trailing segment to resolve when nothing held the whole name.
+// It does not: "stripe-key" is a piece of "prod/api/stripe-key", so a secret
+// under that name is a different secret, and answering with it invents a row
+// for one the account no longer holds. Restoring the old expectation would
+// re-open that.
 func TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName(t *testing.T) {
 	const (
 		name = "prod/api/stripe-key"
@@ -688,26 +695,98 @@ func TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName(t *testing.T) {
 	for _, tc := range []struct {
 		what string
 		list []resource.Resource
-		want string
+		want []string
 	}{
 		{
 			what: "both forms exist",
 			list: []resource.Resource{{ID: name, Name: name}, {ID: tail, Name: tail}},
-			want: name,
+			want: []string{name},
 		},
 		{
-			what: "only the tail exists",
+			what: "only a piece of the name exists",
 			list: []resource.Resource{{ID: tail, Name: tail}},
-			want: tail,
+			want: nil,
 		},
 	} {
 		t.Run(tc.what, func(t *testing.T) {
 			cache := resource.ResourceCache{"secrets": resource.ResourceCacheEntry{Resources: tc.list}}
 			result := ctEventsCheckerByTarget(t, "secrets")(context.Background(), nil, event, cache)
 
-			if result.Count() != 1 || result.ResourceIDs()[0] != tc.want {
-				t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tc.want)
+			if !slices.Equal(result.ResourceIDs(), tc.want) {
+				t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs(), tc.want)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Row 11 — a candidate is a form of the id, never a fragment of one.
+// ---------------------------------------------------------------------------
+
+// TestCtEventsPivots_ANameFragmentIsNotAnID pins rule 5. Stripping one leading
+// type word is a form of the id — "instance/i-abc" and "i-abc" name the same
+// thing. Cutting again is not: an id that survived the strip is the name, and
+// its last segment is a piece of that name, naming a different resource. An
+// account holding a resource under that piece must not answer for one the event
+// named and the account no longer holds, which is the deleted-resource rule
+// from the other side.
+func TestCtEventsPivots_ANameFragmentIsNotAnID(t *testing.T) {
+	for _, p := range ctSlashPivots() {
+		t.Run(p.target, func(t *testing.T) {
+			// The account holds only the fragment, under that name. The
+			// resource the event named is gone.
+			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
+				Resources: []resource.Resource{{ID: p.id, Name: p.id}},
+			}}
+
+			for _, tc := range []struct{ what, named string }{
+				{"a bare name carrying slashes", "prod/api/" + p.id},
+				{"the same name inside an ARN", "arn:aws:example:us-east-1:123456789012:secret:prod/api/" + p.id},
+			} {
+				t.Run(tc.what, func(t *testing.T) {
+					result := ctEventsCheckerByTarget(t, p.target)(context.Background(), nil,
+						ctSlashEvent(p, tc.named), cache)
+
+					if got := result.EffectiveState(); got != domain.RelatedResolved {
+						t.Fatalf("state = %v, want RelatedResolved: the list is complete", got)
+					}
+					if result.Count() != 0 {
+						t.Errorf("Count = %d, want 0: the event named %q, and %q is a fragment of that name, not the resource; IDs = %v",
+							result.Count(), tc.named, p.id, result.ResourceIDs())
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestCtEventsLambda_TheTypeWordIsNotAFunction pins the boundary of the Lambda
+// qualifier rule. An unqualified function ARN ends ":function:<name>", so the
+// head before the last colon is the type word — grammar, not a name. A function
+// really called "function" is legal, and it must not answer for every event that
+// names some other function.
+func TestCtEventsLambda_TheTypeWordIsNotAFunction(t *testing.T) {
+	cache := resource.ResourceCache{"lambda": resource.ResourceCacheEntry{
+		Resources: []resource.Resource{{ID: "function", Name: "function"}},
+	}}
+	event := resource.Resource{
+		ID:   "evt-0a1b2c3d4e5f6a7be",
+		Name: "Invoke",
+		RawStruct: cloudtrailtypes.Event{
+			EventId:   aws.String("evt-0a1b2c3d4e5f6a7be"),
+			EventName: aws.String("Invoke"),
+			CloudTrailEvent: aws.String(
+				`{"requestParameters":{"functionName":"arn:aws:lambda:us-east-1:123456789012:function:acme-order-processor"}}`),
+		},
+	}
+
+	result := ctEventsCheckerByTarget(t, "lambda")(context.Background(), nil, event, cache)
+
+	if got := result.EffectiveState(); got != domain.RelatedResolved {
+		t.Fatalf("state = %v, want RelatedResolved: the lambda list is complete", got)
+	}
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0: acme-order-processor is gone and \"function\" is the ARN's type word; IDs = %v",
+			result.Count(), result.ResourceIDs())
 	}
 }
