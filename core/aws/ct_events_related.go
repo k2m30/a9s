@@ -191,6 +191,32 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 	return relatedResultTrunc(target, matched, truncated)
 }
 
+// ctIDAlternatives returns the candidate ids for one value an event named, as
+// written first and then stripped of its prefix. Which form is the id varies
+// per target type: an ARN's is the last segment, a Secrets Manager name keeps
+// its slashes, a qualified Lambda ARN ends ":<alias>" whose function is the
+// segment before it. They are alternatives — ctEventsMatchTarget takes at most
+// one per group — so offering every form costs nothing and guessing one costs
+// the pivot.
+func ctIDAlternatives(v string) []string {
+	out := []string{v}
+	tails := func(s string) {
+		for _, sep := range []string{"/", ":"} {
+			if i := strings.LastIndex(s, sep); i >= 0 && i < len(s)-1 {
+				out = append(out, s[i+1:])
+			}
+		}
+	}
+	tails(v)
+	// A Lambda ARN or name qualified by an alias ends ":<alias>", so its
+	// function is what comes BEFORE the last colon, stripped the same way.
+	if i := strings.LastIndex(v, ":"); i > 0 {
+		out = append(out, v[:i])
+		tails(v[:i])
+	}
+	return out
+}
+
 // extractCTResourceIDs scans the event's Resources slice for entries matching
 // awsResourceType (e.g. "AWS::EC2::Instance") and returns one candidate group
 // per entry: the ResourceName as written, then its last slash segment. Which
@@ -208,12 +234,7 @@ func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [
 		if r.ResourceName == nil || *r.ResourceName == "" {
 			continue
 		}
-		name := *r.ResourceName
-		group := []string{name}
-		if idx := strings.LastIndex(name, "/"); idx >= 0 && idx < len(name)-1 {
-			group = append(group, name[idx+1:])
-		}
-		groups = append(groups, group)
+		groups = append(groups, ctIDAlternatives(*r.ResourceName))
 	}
 	return groups
 }
@@ -299,7 +320,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 			fromBody := append(ctJSONStringSlice(req, "instanceId", "instancesSet", "items"),
 				ctJSONStringSlice(resp, "instanceId", "instancesSet", "items")...)
 			for _, id := range fromBody {
-				ids = append(ids, []string{id})
+				ids = append(ids, ctIDAlternatives(id))
 			}
 		}
 	}
@@ -325,7 +346,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if b := ctJSONString(req, "bucketName"); b != "" {
-				ids = append(ids, []string{b})
+				ids = append(ids, ctIDAlternatives(b))
 			}
 		}
 	}
@@ -351,11 +372,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if fn := ctJSONString(req, "functionName"); fn != "" {
-				// Strip ARN if present — extract just the function name
-				if idx := strings.LastIndex(fn, ":"); idx >= 0 && idx < len(fn)-1 {
-					fn = fn[idx+1:]
-				}
-				ids = append(ids, []string{fn})
+				ids = append(ids, ctIDAlternatives(fn))
 			}
 		}
 	}
@@ -388,7 +405,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "dBInstanceIdentifier"); id != "" {
-				ids = append(ids, []string{id})
+				ids = append(ids, ctIDAlternatives(id))
 			}
 		}
 	}
@@ -414,11 +431,11 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "keyId"); id != "" {
-				ids = append(ids, []string{stripKMSKeyID(id)})
+				ids = append(ids, ctIDAlternatives(id))
 			}
 			svcDetails, _ := parsed["serviceEventDetails"].(map[string]any)
 			if id := ctJSONString(svcDetails, "keyId"); id != "" {
-				ids = append(ids, []string{stripKMSKeyID(id)})
+				ids = append(ids, ctIDAlternatives(id))
 			}
 		}
 	}
@@ -428,15 +445,6 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "kms", ids)
-}
-
-// stripKMSKeyID strips a KMS key ID or ARN down to the bare UUID
-// (the last path segment after "/").
-func stripKMSKeyID(id string) string {
-	if idx := strings.LastIndex(id, "/"); idx >= 0 && idx < len(id)-1 {
-		return id[idx+1:]
-	}
-	return id
 }
 
 // checkCtEventsSecrets extracts Secrets Manager secret IDs from the CloudTrail event.
@@ -453,7 +461,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "secretId"); id != "" {
-				ids = append(ids, []string{id})
+				ids = append(ids, ctIDAlternatives(id))
 			}
 		}
 	}
@@ -476,7 +484,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 	if parsed != nil {
 		if id := ctJSONString(parsed, "vpcEndpointId"); id != "" {
-			ids = append(ids, []string{id})
+			ids = append(ids, ctIDAlternatives(id))
 		}
 	}
 
@@ -501,7 +509,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "groupId"); id != "" {
-				ids = append(ids, []string{id})
+				ids = append(ids, ctIDAlternatives(id))
 			}
 		}
 	}
@@ -527,7 +535,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "tableName"); name != "" {
-				ids = append(ids, []string{name})
+				ids = append(ids, ctIDAlternatives(name))
 			}
 		}
 	}
@@ -635,12 +643,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 			req, _ := parsed["requestParameters"].(map[string]any)
 			for _, key := range []string{"name", "trailName", "trailARN", "trailArn"} {
 				if v := ctJSONString(req, key); v != "" {
-					// If this looks like a full ARN, extract the trail name suffix.
-					name := v
-					if idx := strings.LastIndex(v, "/"); idx >= 0 && idx < len(v)-1 {
-						name = v[idx+1:]
-					}
-					ids = append(ids, []string{name})
+					ids = append(ids, ctIDAlternatives(v))
 				}
 			}
 		}
@@ -665,7 +668,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 	// be the uuid, so the name is derived first and offered on its own.
 	var ids [][]string
 	for _, group := range extractCTResourceIDs(event, "AWS::CloudFormation::Stack") {
-		ids = append(ids, []string{cfnStackNameFromResourceName(group[0])})
+		ids = append(ids, ctIDAlternatives(cfnStackNameFromResourceName(group[0])))
 	}
 
 	if len(ids) == 0 {
@@ -673,7 +676,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "stackName"); name != "" {
-				ids = append(ids, []string{name})
+				ids = append(ids, ctIDAlternatives(name))
 			}
 		}
 	}
