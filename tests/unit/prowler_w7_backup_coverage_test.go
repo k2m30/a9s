@@ -198,6 +198,16 @@ func TestW7Coverage_MatchingModes(t *testing.T) {
 			name: "selection shape the join does not model",
 			plan: w7Plan("arn:aws:dynamodb:us-east-1:123456789012:table/acme-*-v?", "", ""),
 		},
+		{
+			// Every regex metacharacter except the three that return early
+			// above. The wildcard is compiled, so each of these has to reach
+			// the pattern as a literal; one that did not would either match
+			// the wrong resources or fail to compile, and the compile is not
+			// error-checked.
+			name:          "pattern carrying regex metacharacters",
+			plan:          w7Plan(`arn:aws:dynamodb:*:*:table/(a|b)+$^{2}\`, "", ""),
+			wantUncovered: true,
+		},
 	}
 
 	for _, tc := range tests {
