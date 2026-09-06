@@ -210,7 +210,7 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 		// fails on it.
 		"DB Instances (50) issues:28",
 		"EBS Volumes (8) issues:5",
-		"Elastic Beanstalk (7) issues:4",
+		"Elastic Beanstalk (10) issues:4",
 		"EBS Snapshots (9) issues:5",
 		"EKS Clusters (8) issues:6",
 		"ElastiCache Redis (17) issues:13",

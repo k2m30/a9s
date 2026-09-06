@@ -337,3 +337,38 @@ func TestW5NoProductionComparisonAgainstTheOldIdentityTypeEnum(t *testing.T) {
 	}
 	_ = found
 }
+
+// w5EBStatusWitnesses names each Elastic Beanstalk configuration finding and
+// the environment whose Status cell must carry its phrase.
+var w5EBStatusWitnesses = map[string]string{ //nolint:gochecknoglobals // test-only table
+	"managed platform updates off":    "eb.managed-updates-off",
+	"enhanced health reporting off":   "eb.enhanced-health-off",
+	"log streaming to CloudWatch off": "eb.cloudwatch-logs-off",
+}
+
+// A finding an operator never reads is not a finding. Each of the three
+// Elastic Beanstalk configuration phrases has to reach a Status cell, which
+// means its witness must not be sharing that cell with an equal-severity
+// health finding — StatusPhrase breaks a severity tie by order, so the
+// configuration phrase loses silently and the row reads about something
+// else.
+func TestW5EBConfigurationPhrasesReachTheStatusCell(t *testing.T) {
+	rows := w5Bench(t)["eb"]
+	if len(rows) == 0 {
+		t.Fatal("no demo eb rows")
+	}
+
+	seen := map[string]string{}
+	for _, r := range rows {
+		phrase, _, _ := strings.Cut(domain.StatusPhrase(r.Findings), " (+")
+		if _, wanted := w5EBStatusWitnesses[phrase]; wanted {
+			seen[phrase] = r.ID
+		}
+	}
+
+	for phrase, code := range w5EBStatusWitnesses {
+		if seen[phrase] == "" {
+			t.Errorf("no demo environment's Status cell reads %q; %s exists but never reaches the column an operator reads", phrase, code)
+		}
+	}
+}

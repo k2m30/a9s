@@ -936,3 +936,53 @@ func TestW5_EBCatalogDefs(t *testing.T) {
 	w2AssertFindingDef(t, "eb", "eb.cloudwatch-logs-off",
 		"log streaming to CloudWatch off", domain.SevWarn, "wave2")
 }
+
+// Rule 4: a resource being torn down emits no posture finding. The demo
+// terminated environment escaped only because its fixture happened to carry
+// no configuration settings, so nothing in the code was stopping it — the
+// row below is the one the old code would have coloured, built on purpose:
+// a Terminating and a Terminated environment whose settings trip all three
+// conditions at once.
+func TestW5_EBLifecycleEndedEmitsNoConfigurationFinding(t *testing.T) {
+	for _, status := range []string{"Terminating", "Terminated"} {
+		t.Run(status, func(t *testing.T) {
+			env := "acme-eb-going-away"
+			f := newW5EBFake()
+			f.options[env] = []ebtypes.ConfigurationOptionSetting{
+				w5EBOption("aws:elasticbeanstalk:managedactions", "ManagedActionsEnabled", "false"),
+				w5EBOption("aws:elasticbeanstalk:healthreporting:system", "SystemType", "basic"),
+				w5EBOption("aws:elasticbeanstalk:cloudwatch:logs", "StreamLogs", "false"),
+			}
+
+			r := w5EBRes(env)
+			r.Fields["status"] = status
+
+			res := w5EnrichEB(t, f, r)
+			id := "e-" + env
+			for _, code := range []string{"eb.managed-updates-off", "eb.enhanced-health-off", "eb.cloudwatch-logs-off"} {
+				w2AssertNoCode(t, res.Findings[id], code)
+			}
+		})
+	}
+}
+
+// The guard must be scoped to the ended states, not to anything that merely
+// reads as unhealthy: an environment still running with a red health bar is
+// exactly the one whose configuration an operator wants reported.
+func TestW5_EBRunningEnvironmentStillReportsConfiguration(t *testing.T) {
+	for _, status := range []string{"Ready", "Updating", "Launching"} {
+		t.Run(status, func(t *testing.T) {
+			env := "acme-eb-alive"
+			f := newW5EBFake()
+			f.options[env] = w5SetEBOption("aws:elasticbeanstalk:cloudwatch:logs", "StreamLogs", "false")
+
+			r := w5EBRes(env)
+			r.Fields["status"] = status
+			r.Fields["health"] = "Red"
+
+			res := w5EnrichEB(t, f, r)
+			w2AssertFinding(t, res.Findings["e-"+env], "eb.cloudwatch-logs-off",
+				"log streaming to CloudWatch off", domain.SevWarn, "wave2:eb")
+		})
+	}
+}

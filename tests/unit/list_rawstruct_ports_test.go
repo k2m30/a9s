@@ -44,6 +44,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -182,7 +183,13 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
 		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "ready"}},
-		{"ses", realisticSESIdentity(), []string{"example.com", "DOMAIN"}},
+		// ses's Identity column still takes a RawStruct path
+		// (.a9s/views/ses.yaml: path: IdentityName). Its Type column no
+		// longer does — it reads the mapped identity_type field, because the
+		// rendered column shows words and not the SDK enum — so the example
+		// moved to a cell that still exercises the rule rather than the rule
+		// being weakened to accommodate the column.
+		{"ses", realisticSESIdentity(), []string{"example.com"}},
 		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
 		{"athena", realisticAthena(), []string{"analytics-wg", "enabled"}},
@@ -304,10 +311,14 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 			[]string{"abc123def4", "prod-api"},
 		},
 		{
+			// identity_type is deliberately absent from wrongFields: the Type
+			// column reads that field by key now, so Fields is SUPPOSED to
+			// win there. Identity still resolves through a RawStruct path and
+			// is the cell this case pins.
 			"ses",
 			realisticSESIdentity(),
-			map[string]string{"identity_name": "WRONG-NAME", "identity_type": "WRONG-TYPE"},
-			[]string{"example.com", "DOMAIN"},
+			map[string]string{"identity_name": "WRONG-NAME"},
+			[]string{"example.com"},
 		},
 	}
 
@@ -367,6 +378,34 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 		}
 		if strings.Contains(joined, "stopped") {
 			t.Error("EC2 with production config should NOT show 'stopped' from RawStruct.State.Name")
+		}
+	})
+
+	// The regression row 16 fixed lived in this file's subject: the catalog
+	// column was already keyed to the mapped field, but the GENERATED YAML
+	// still carried a RawStruct path to the SDK enum, and the YAML wins. Only
+	// a render through the on-disk views directory sees that — every other
+	// test in this file builds its config from the Go defaults, which were
+	// never wrong.
+	t.Run("SES", func(t *testing.T) {
+		ident := sesv2types.IdentityInfo{
+			IdentityName:   new("acme-corp.com"),
+			IdentityType:   sesv2types.IdentityTypeDomain,
+			SendingEnabled: true,
+		}
+		c := openListControllerWithConfig(t, "ses", cfg)
+		res := resource.Resource{
+			ID:        "acme-corp.com",
+			Name:      "acme-corp.com",
+			Fields:    map[string]string{"identity_type": "domain"},
+			RawStruct: ident,
+		}
+		joined := wave3RowCellsJoined(t, c, "ses", []resource.Resource{res})
+		if !strings.Contains(joined, "domain") {
+			t.Errorf("SES with production config should show the mapped word %q, got: %q", "domain", joined)
+		}
+		if strings.Contains(joined, "DOMAIN") {
+			t.Errorf("SES with production config shows the raw SDK enum %q; the Type column reads the mapped field, and the generated YAML must not carry a RawStruct path back to the enum. got: %q", "DOMAIN", joined)
 		}
 	})
 
