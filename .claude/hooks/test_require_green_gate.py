@@ -147,6 +147,27 @@ def payload(message, taskdir):
     }
 
 
+QA_SIGNOFF_WITH_WORKTREE = """## a9s-qa · round 2 · SIGN-OFF
+- TASKDIR={taskdir}
+- WORKTREE={worktree}
+- from: 9c2d1e0
+- simplified: ladder on 9c2d1e0..HEAD — nothing proposed
+- deferred: none
+"""
+
+
+def git(worktree, *args):
+    subprocess.run(["git", "-C", worktree, *args], check=True, capture_output=True)
+
+
+def scratch_repo():
+    """A throwaway git repository with one commit, standing in for a task worktree."""
+    repo = tempfile.mkdtemp(prefix="w10-worktree-")
+    git(repo, "init", "-q")
+    git(repo, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "base")
+    return repo
+
+
 class GreenGateHookTest(unittest.TestCase):
     def setUp(self):
         self.taskdir = tempfile.mkdtemp(prefix="w10-taskdir-")
@@ -159,6 +180,29 @@ class GreenGateHookTest(unittest.TestCase):
         if age_seconds:
             when = time.time() - age_seconds
             os.utime(self.gate, (when, when))
+
+    def test_round_end_with_uncommitted_worktree_blocks(self):
+        """QA reported two rounds as done with every test file uncommitted
+        (w27 and w5, 2026-09-06): the next agent's `from:` named a tree that
+        did not hold the work. A round ends with its commit."""
+        repo = scratch_repo()
+        self.addCleanup(shutil.rmtree, repo, True)
+        with open(os.path.join(repo, "stray_test.go"), "w") as fh:
+            fh.write("package unit\n")
+        p = payload(QA_SIGNOFF_WITH_WORKTREE.replace("{worktree}", repo), self.taskdir)
+        p["agent_type"] = "a9s-qa"
+        code, reason = run_hook(p)
+        self.assertEqual(2, code)
+        self.assertIn("uncommitted", reason)
+        self.assertIn("stray_test.go", reason)
+
+    def test_round_end_with_clean_worktree_passes(self):
+        repo = scratch_repo()
+        self.addCleanup(shutil.rmtree, repo, True)
+        p = payload(QA_SIGNOFF_WITH_WORKTREE.replace("{worktree}", repo), self.taskdir)
+        p["agent_type"] = "a9s-qa"
+        code, reason = run_hook(p)
+        self.assertEqual(0, code, reason)
 
     def test_done_without_gate_file_blocks(self):
         """A DONE claim with no captured gate run is unproven, so it blocks."""

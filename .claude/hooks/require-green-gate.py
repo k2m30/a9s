@@ -35,6 +35,7 @@ unlocatable gate is an unproven one.
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 
@@ -105,6 +106,26 @@ def resolve_paths(message, cwd):
     except OSError:
         return None, worktree
     return path_from_lines(body, "TASKDIR"), worktree or path_from_lines(body, "WORKTREE")
+
+
+def uncommitted(worktree):
+    """The porcelain status of the round's worktree, or None when it is clean
+    or cannot be read. A round that ends with edits outside a commit hands the
+    next agent a tree no `from:` line names."""
+    if not worktree or not os.path.isdir(worktree):
+        return None
+    try:
+        proc = subprocess.run(
+            ["git", "-C", worktree, "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
 
 
 def gate_results(text):
@@ -237,10 +258,20 @@ def main():
             )
         sys.exit(2)
 
+    taskdir, worktree = resolve_paths(message, str(payload.get("cwd") or ""))
+
+    dirty = uncommitted(worktree) if agent in ("a9s-dev", "a9s-qa") else None
+    if dirty:
+        sys.stderr.write(
+            "Round entry ends a round but the worktree at %s has uncommitted "
+            "changes:\n%s\nA round is its commit: commit it in the worktree, put the "
+            "hash on the entry, and only then end the round.\n" % (worktree, dirty)
+        )
+        sys.exit(2)
+
     if agent != AGENT or "DONE" not in message:
         return
 
-    taskdir, worktree = resolve_paths(message, str(payload.get("cwd") or ""))
     if not taskdir:
         reason = (
             "the round entry has no `TASKDIR=` line and no .claude/task-context.md "
