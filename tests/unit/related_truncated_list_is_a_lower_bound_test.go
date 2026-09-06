@@ -27,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -138,5 +139,53 @@ func TestRelated_EFS_ENI_ColdCacheIsUnknown(t *testing.T) {
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("cold cache: state = %v (Count=%d), want Unknown — nothing read the eni list, so \"no mount targets\" is a guess",
 			result.State(), result.Count())
+	}
+}
+
+// TestFetchRelatedTarget_NeverReportsTruncationForAListItDidNotReturn pins the
+// invariant every "nil list" branch rests on: nil and truncated are mutually
+// exclusive coming out of the fetch layer. A page that was read is normalised
+// to a non-nil slice even when it holds nothing, so a nil list always means
+// nobody read it and the truncation flag beside it is always false.
+//
+// A checker that guards on "nil AND truncated" is therefore guarding on a state
+// the fetch layer cannot produce, and the branch is dead rather than merely
+// wrong. That distinction decides its fix: such a branch is deleted, not
+// converted to Unknown, because the code after it may still have a live lookup.
+func TestFetchRelatedTarget_NeverReportsTruncationForAListItDidNotReturn(t *testing.T) {
+	const target = "role"
+	restore := resource.GetPaginatedFetcher(target)
+	t.Cleanup(func() { resource.SetPaginatedForTest(target, restore) })
+
+	for _, tc := range []struct {
+		what string
+		page domain.FetchResult
+	}{
+		{"a first page with nothing on it and more pages behind", domain.FetchResult{
+			Resources:  nil,
+			Pagination: &domain.PaginationMeta{IsTruncated: true},
+		}},
+		{"a first page with nothing on it and nothing behind", domain.FetchResult{
+			Resources:  nil,
+			Pagination: &domain.PaginationMeta{IsTruncated: false},
+		}},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			resource.SetPaginatedForTest(target, func(context.Context, any, string) (domain.FetchResult, error) {
+				return tc.page, nil
+			})
+
+			list, truncated, err := aws.FetchRelatedTarget(context.Background(), nil, resource.ResourceCache{}, target)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if list == nil {
+				t.Error("list is nil for a page that was read; a read page must be an empty slice, not nil")
+			}
+			if list == nil && truncated {
+				t.Error("nil list reported as truncated — the two must never be true together")
+			}
+		})
 	}
 }
