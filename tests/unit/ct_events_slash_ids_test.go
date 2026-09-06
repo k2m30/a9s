@@ -625,3 +625,89 @@ func TestCtEventsKMS_AliasResolvesTheKey(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Row 10 — one id rule for every path. A wider candidate list is only safe
+// while every candidate is a form of the id the event named.
+// ---------------------------------------------------------------------------
+
+// TestCtEventsPivots_AnARNSegmentIsNotAnID pins the boundary of the candidate
+// rule. An ARN is "arn:<partition>:<service>:<region>:<account>:<type>:<id>",
+// and only the last part is an id — the type word is a literal every ARN of
+// that service carries. Offering it lets an account holding a resource named
+// after that word answer for a call on a resource that is gone, which is the
+// row-6 rule broken from the other side: the panel invents a row.
+//
+// The realistic instance is Secrets Manager, whose ARNs end ":secret:<name>"
+// and whose names are free-form, so a secret named "secret" is a legal thing to
+// have. The type word here is synthetic because the rule is not about which
+// word it is.
+func TestCtEventsPivots_AnARNSegmentIsNotAnID(t *testing.T) {
+	for _, p := range ctSlashPivots() {
+		t.Run(p.target, func(t *testing.T) {
+			arn := "arn:aws:example:us-east-1:123456789012:thing:" + p.id
+			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
+				Resources: []resource.Resource{{ID: "thing", Name: "thing"}},
+			}}
+
+			result := ctEventsCheckerByTarget(t, p.target)(context.Background(), nil,
+				ctSlashEvent(p, arn), cache)
+
+			if got := result.EffectiveState(); got != domain.RelatedResolved {
+				t.Fatalf("state = %v, want RelatedResolved: the list is complete", got)
+			}
+			if result.Count() != 0 {
+				t.Errorf("Count = %d, want 0: %q is gone, and \"thing\" is the ARN's type word, not its id; IDs = %v",
+					result.Count(), p.id, result.ResourceIDs())
+			}
+		})
+	}
+}
+
+// TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName pins which candidate
+// wins when more than one is real. A secret ARN ends ":secret:<name>" and the
+// name may itself contain slashes, so the segment after the last colon is the
+// name and the segment after the last slash is a tail of it. An account may
+// hold both; the event named the first.
+func TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName(t *testing.T) {
+	const (
+		name = "prod/api/stripe-key"
+		tail = "stripe-key"
+	)
+	arn := "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + name
+	event := resource.Resource{
+		ID:   "evt-0a1b2c3d4e5f6a7bd",
+		Name: "GetSecretValue",
+		RawStruct: cloudtrailtypes.Event{
+			EventId:         aws.String("evt-0a1b2c3d4e5f6a7bd"),
+			EventName:       aws.String("GetSecretValue"),
+			CloudTrailEvent: aws.String(`{"requestParameters":{"secretId":"` + arn + `"}}`),
+		},
+	}
+
+	for _, tc := range []struct {
+		what string
+		list []resource.Resource
+		want string
+	}{
+		{
+			what: "both forms exist",
+			list: []resource.Resource{{ID: name, Name: name}, {ID: tail, Name: tail}},
+			want: name,
+		},
+		{
+			what: "only the tail exists",
+			list: []resource.Resource{{ID: tail, Name: tail}},
+			want: tail,
+		},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			cache := resource.ResourceCache{"secrets": resource.ResourceCacheEntry{Resources: tc.list}}
+			result := ctEventsCheckerByTarget(t, "secrets")(context.Background(), nil, event, cache)
+
+			if result.Count() != 1 || result.ResourceIDs()[0] != tc.want {
+				t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tc.want)
+			}
+		})
+	}
+}
