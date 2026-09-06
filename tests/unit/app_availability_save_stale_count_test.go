@@ -3,6 +3,7 @@ package unit
 import (
 	"testing"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
@@ -88,5 +89,46 @@ func TestExactCanonicalShrink_LowersTheMenuCount(t *testing.T) {
 	}
 	if got := ctrl.GetMenuAvailability()[provenancePinType]; got != 5 {
 		t.Errorf("menu availability for %s = %d after an exact canonical result of 5 rows, want 5 — the row list and the badge disagree in the same session", provenancePinType, got)
+	}
+}
+
+// TestExactCanonicalShrink_ClearsTheLowerBoundMarker pins the other half of
+// the same observation: the count and its lower-bound marker are one fact and
+// move together.
+//
+// A stored 200 that came from a truncated page means "at least 200". A later
+// result that reached the end of the type and found 5 answers both halves —
+// the count is 5, and it is no longer a lower bound. Leaving the marker set
+// would render "5+" for a list the app enumerated to the end, which reads as
+// "there may be more" about the one case where there provably is not.
+func TestExactCanonicalShrink_ClearsTheLowerBoundMarker(t *testing.T) {
+	ctrl, _, _, _ := newProvenancePinController(t)
+	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: provenancePinType})
+
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: provenancePinType,
+		Resources:    provenancePinEC2Rows(200, "i-canon"),
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-more"},
+		Provenance:   messages.FetchProvenanceCanonicalList,
+	})
+	if got := ctrl.GetMenuAvailability()[provenancePinType]; got != 200 {
+		t.Fatalf("precondition: menu availability = %d, want 200", got)
+	}
+	if !ctrl.GetMenuTruncated()[provenancePinType] {
+		t.Fatal("precondition: the seeded count must be a truncated lower bound")
+	}
+
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: provenancePinType,
+		Resources:    provenancePinEC2Rows(5, "i-refresh"),
+		Pagination:   &resource.PaginationMeta{IsTruncated: false},
+		Provenance:   messages.FetchProvenanceCanonicalList,
+	})
+
+	if got := ctrl.GetMenuAvailability()[provenancePinType]; got != 5 {
+		t.Errorf("menu availability = %d after an exact result of 5 rows, want 5", got)
+	}
+	if ctrl.GetMenuTruncated()[provenancePinType] {
+		t.Error("menu truncated = true after an exact result, want false — the list was enumerated to the end, so the count is not a lower bound")
 	}
 }
