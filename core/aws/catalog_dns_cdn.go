@@ -79,8 +79,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Findings: []catalog.FindingDef{
 			{Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: r53CodeOrphanPrivateZone, Phrase: "private zone with no VPC associations (orphan)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeR53QueryLoggingOff, Phrase: "query logging off", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeR53DanglingRecord, Phrase: "record points at a released address", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeR53QueryLoggingOff, Phrase: "query logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing records who resolves names in this public zone, so a subdomain being probed or abused leaves no evidence. Create a query logging configuration for the zone."},
+			{Code: CodeR53DanglingRecord, Phrase: "record points at a released address", Severity: domain.SevBroken, Source: "wave2", Detail: "The record still answers with an address the account no longer holds, so whoever claims that address next receives traffic for this name. Delete the record or repoint it at an address you own."},
 		},
 	},
 	{
@@ -126,13 +126,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		// checkCf* related checkers at runtime. WebACLId is on GetDistributionConfig, not the summary.
 		Findings: []catalog.FindingDef{
 			{Code: cfCodeInsecureProtocol, Phrase: "no HTTPS redirect (insecure); origin without TLS", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFOriginBucketMissing, Phrase: "S3 origin bucket does not exist", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: CodeCFDeprecatedTLS, Phrase: "minimum TLS below 1.2", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFLoggingOff, Phrase: "access logging off", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFNoDefaultRootObject, Phrase: "no default root object", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFS3OriginNoOAC, Phrase: "S3 origin without origin access control", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFDefaultCertificate, Phrase: "uses the default CloudFront certificate", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFNoGeoRestriction, Phrase: "no geo restriction", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFOriginBucketMissing, Phrase: "S3 origin bucket does not exist", Severity: domain.SevBroken, Source: "wave2", Detail: "The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it."},
+			{Code: CodeCFDeprecatedTLS, Phrase: "minimum TLS below 1.2", Severity: domain.SevWarn, Source: "wave2", Detail: "Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later."},
+			{Code: CodeCFLoggingOff, Phrase: "access logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination."},
+			{Code: CodeCFNoDefaultRootObject, Phrase: "no default root object", Severity: domain.SevWarn, Source: "wave2", Detail: "A request for the distribution root returns whatever the origin serves there, which can expose object names you did not mean to publish. Set a default root object such as index.html."},
+			{Code: CodeCFS3OriginNoOAC, Phrase: "S3 origin without origin access control", Severity: domain.SevWarn, Source: "wave2", Detail: "The bucket behind this origin must be open to reach it through CloudFront, so viewers can bypass the distribution and read from the bucket directly. Attach an origin access control and restrict the bucket policy to it."},
+			{Code: CodeCFDefaultCertificate, Phrase: "uses the default CloudFront certificate", Severity: domain.SevWarn, Source: "wave2", Detail: "The distribution serves custom domains with the default CloudFront certificate, so viewers reaching those names get a certificate mismatch warning. Attach a certificate that covers the aliases."},
+			{Code: CodeCFNoGeoRestriction, Phrase: "no geo restriction", Severity: domain.SevWarn, Source: "wave2", Detail: "Content is served to every country, including any the account is not meant to serve. Add a geographic restriction if the distribution should be limited."},
 		},
 	},
 	{
@@ -173,7 +173,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Code: acmCodeExpiresCritical, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: acmCodeExpiresSoon, Phrase: "expires in <N> days", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeACMWeakKey, Phrase: "weak key algorithm", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeACMWeakKey, Phrase: "weak key algorithm", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key."},
 		},
 	},
 	{
@@ -216,11 +216,11 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Findings: []catalog.FindingDef{
 			{Code: apigwCodeNoDeployedStages, Phrase: "no deployed stages", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: apigwCodeStageConfigIssues, Phrase: "no throttling configured (DoS risk); access logs disabled", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeAPIGWNoAccessLogs, Phrase: "no access logs", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeAPIGWTracingOff, Phrase: "X-Ray tracing off", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeAPIGWStageVariableSecret, Phrase: "credential in stage variables", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2", Detail: "Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it."},
+			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer."},
+			{Code: CodeAPIGWNoAccessLogs, Phrase: "no access logs", Severity: domain.SevWarn, Source: "wave2", Detail: "The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group."},
+			{Code: CodeAPIGWTracingOff, Phrase: "X-Ray tracing off", Severity: domain.SevWarn, Source: "wave2", Detail: "Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage."},
+			{Code: CodeAPIGWStageVariableSecret, Phrase: "credential in stage variables", Severity: domain.SevBroken, Source: "wave2", Detail: "A stage variable holds what looks like a credential, and stage variables are readable by anyone who can read the gateway's configuration. Move the value into Secrets Manager and reference it from the integration."},
 		},
 	},
 }

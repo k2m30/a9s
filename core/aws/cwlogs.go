@@ -29,9 +29,6 @@ const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 // managed KMS key (KmsKeyId empty). docs/resources/logs.md §4.
 const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
 
-// logsNoKMSDetail is the S5 sentence for CodeLogsNoKMS.
-const logsNoKMSDetail = "Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group."
-
 // logsStaleEmptyAge is the age threshold colorLogs uses to flag an empty log
 // group as stale.
 const logsStaleEmptyAge = 90 * 24 * time.Hour

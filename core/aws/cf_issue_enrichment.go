@@ -47,23 +47,6 @@ const (
 	CodeCFNoGeoRestriction domain.FindingCode = "cf.no-geo-restriction"
 )
 
-// S5 detail sentences for the cf wave-2 findings.
-const (
-	cfOriginBucketMissingDetail = "The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it."
-
-	cfDeprecatedTLSDetail = "Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later."
-
-	cfLoggingOffDetail = "The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination."
-
-	cfNoDefaultRootObjectDetail = "A request for the distribution root returns whatever the origin serves there, which can expose object names you did not mean to publish. Set a default root object such as index.html."
-
-	cfS3OriginNoOACDetail = "The bucket behind this origin must be open to reach it through CloudFront, so viewers can bypass the distribution and read from the bucket directly. Attach an origin access control and restrict the bucket policy to it."
-
-	cfDefaultCertificateDetail = "The distribution serves custom domains with the default CloudFront certificate, so viewers reaching those names get a certificate mismatch warning. Attach a certificate that covers the aliases."
-
-	cfNoGeoRestrictionDetail = "Content is served to every country, including any the account is not meant to serve. Add a geographic restriction if the distribution should be limited."
-)
-
 // cfTLSBelow12Word maps a minimum protocol version AWS still accepts but that
 // sits below TLS 1.2 to the word the row renders, and returns "" for the
 // versions that are fine. The two enums that both mean TLS 1.0 carry their

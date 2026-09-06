@@ -43,9 +43,6 @@ const (
 	CodeACMWeakKey domain.FindingCode = "acm.weak-key"
 )
 
-// acmWeakKeyDetail is the S5 sentence for CodeACMWeakKey.
-const acmWeakKeyDetail = "The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key."
-
 // acmRSAMinimumBits is the shortest RSA key still considered sound.
 const acmRSAMinimumBits = 2048
 

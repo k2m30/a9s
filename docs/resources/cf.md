@@ -205,6 +205,13 @@ cf — DNS & CDN. Lifecycle key: `status`.
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | cf.insecure-protocol | no HTTPS redirect (insecure); origin without TLS | warn | wave2 | — |
+| cf.origin-bucket-missing | S3 origin bucket does not exist | broken | wave2 | The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it. |
+| cf.deprecated-tls | minimum TLS below 1.2 | warn | wave2 | Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later. |
+| cf.logging-off | access logging off | warn | wave2 | The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination. |
+| cf.no-default-root-object | no default root object | warn | wave2 | A request for the distribution root returns whatever the origin serves there, which can expose object names you did not mean to publish. Set a default root object such as index.html. |
+| cf.s3-origin-no-oac | S3 origin without origin access control | warn | wave2 | The bucket behind this origin must be open to reach it through CloudFront, so viewers can bypass the distribution and read from the bucket directly. Attach an origin access control and restrict the bucket policy to it. |
+| cf.default-certificate | uses the default CloudFront certificate | warn | wave2 | The distribution serves custom domains with the default CloudFront certificate, so viewers reaching those names get a certificate mismatch warning. Attach a certificate that covers the aliases. |
+| cf.no-geo-restriction | no geo restriction | warn | wave2 | Content is served to every country, including any the account is not meant to serve. Add a geographic restriction if the distribution should be limited. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

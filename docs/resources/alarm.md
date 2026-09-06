@@ -247,6 +247,7 @@ alarm — MONITORING. Lifecycle key: `state`.
 | alarm.state.alarm | alarm triggered | broken | wave1 | — |
 | alarm.state.insufficient\_data | insufficient data | warn | wave1 | — |
 | alarm.no\_actions | no actions | warn | wave1 | — |
+| alarm.actions-disabled | actions disabled | warn | wave1 | The alarm still changes state but runs none of its actions, so nobody is notified when it triggers. Switch actions back on for this alarm. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

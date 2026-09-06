@@ -31,13 +31,6 @@ const (
 	CodeR53DanglingRecord domain.FindingCode = "r53.dangling-record"
 )
 
-// S5 detail sentences for the r53 wave-2 findings.
-const (
-	r53QueryLoggingOffDetail = "Nothing records who resolves names in this public zone, so a subdomain being probed or abused leaves no evidence. Create a query logging configuration for the zone."
-
-	r53DanglingRecordDetail = "The record still answers with an address the account no longer holds, so whoever claims that address next receives traffic for this name. Delete the record or repoint it at an address you own."
-)
-
 // heldPublicAddresses returns every public address the account holds, or nil
 // when any of the three caches is absent or truncated — in which case an
 // address missing from them may simply be on a page nobody loaded.

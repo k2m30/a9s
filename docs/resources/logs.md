@@ -186,6 +186,7 @@ logs — MONITORING. Lifecycle key: none (the list API returns no lifecycle fiel
 | logs.retention-never-expire | retention: never expire | warn | wave1 | No retention policy set — events kept forever, billed indefinitely. |
 | logs.stale-empty | empty, created over 90 days ago | warn | wave1 | — |
 | logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 | — |
+| logs.no-kms | not encrypted with KMS | warn | wave1 | Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

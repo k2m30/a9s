@@ -179,6 +179,10 @@ trail — MONITORING. Lifecycle key: none (the list API returns no lifecycle fie
 | trail.not-logging | not logging | broken | wave2 | — |
 | trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 | — |
 | trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 | — |
+| trail.no-cloudwatch-logs | not delivering to CloudWatch Logs | warn | wave1 | Events are delivered to the bucket only, so no metric filter or alarm can watch them and nobody is paged on suspicious account activity. Attach a log group to this trail. |
+| trail.no-kms | log files not KMS-encrypted | warn | wave1 | Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control. |
+| trail.log-bucket-public | log bucket is publicly accessible | broken | wave2 | The bucket holding this trail's log files is publicly accessible, so the account's audit history can be read by anyone. Remove the public grant from that bucket's policy and access control list. |
+| trail.log-bucket-no-access-logging | log bucket has no access logging | warn | wave2 | The bucket holding this trail's log files records no access logging, so reads of the audit history leave no trace. Enable server access logging on that bucket. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

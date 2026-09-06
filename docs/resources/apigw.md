@@ -219,6 +219,11 @@ apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle fiel
 | --- | --- | --- | --- | --- |
 | apigw.no-deployed-stages | no deployed stages | warn | wave2 | — |
 | apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 | — |
+| apigw.no-authorizer-public | internet-facing with no authorizer | broken | wave2 | Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it. |
+| apigw.no-authorizer | no authorizer | warn | wave2 | Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer. |
+| apigw.no-access-logs | no access logs | warn | wave2 | The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group. |
+| apigw.tracing-off | X-Ray tracing off | warn | wave2 | Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage. |
+| apigw.stage-variable-secret | credential in stage variables | broken | wave2 | A stage variable holds what looks like a credential, and stage variables are readable by anyone who can read the gateway's configuration. Move the value into Secrets Manager and reference it from the integration. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

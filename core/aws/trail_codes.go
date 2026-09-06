@@ -57,34 +57,17 @@ const (
 	CodeTrailLogBucketNoAccessLogging domain.FindingCode = "trail.log-bucket-no-access-logging"
 )
 
-// S5 detail sentences: what is wrong, what it exposes, what fixing it takes.
-const (
-	trailNoCloudWatchLogsDetail = "Events are delivered to the bucket only, so no metric filter or alarm can watch them and nobody is paged on suspicious account activity. Attach a log group to this trail."
-
-	trailNoKMSDetail = "Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control."
-
-	trailLogBucketPublicDetail = "The bucket holding this trail's log files is publicly accessible, so the account's audit history can be read by anyone. Remove the public grant from that bucket's policy and access control list."
-
-	trailLogBucketNoAccessLoggingDetail = "The bucket holding this trail's log files records no access logging, so reads of the audit history leave no trace. Enable server access logging on that bucket."
-)
-
 // trailPostureFindings returns the posture findings readable from the
 // DescribeTrails payload alone, and attaches each one's supporting rows.
 func trailPostureFindings(r *resource.Resource, trail cttypes.Trail) {
 	if aws.ToString(trail.CloudWatchLogsLogGroupArn) == "" {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeTrailNoCloudWatchLogs, Phrase: "not delivering to CloudWatch Logs",
-			Severity: domain.SevWarn, Source: "wave1", Detail: trailNoCloudWatchLogsDetail,
-		})
+		addWave1Finding(r, CodeTrailNoCloudWatchLogs, "not delivering to CloudWatch Logs", domain.SevWarn)
 		addWave1Rows(r, CodeTrailNoCloudWatchLogs, domain.DetailRow{
 			Label: "Log group", Value: "none", Tier: "~",
 		})
 	}
 	if aws.ToString(trail.KmsKeyId) == "" {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeTrailNoKMS, Phrase: "log files not KMS-encrypted",
-			Severity: domain.SevWarn, Source: "wave1", Detail: trailNoKMSDetail,
-		})
+		addWave1Finding(r, CodeTrailNoKMS, "log files not KMS-encrypted", domain.SevWarn)
 		addWave1Rows(r, CodeTrailNoKMS, domain.DetailRow{
 			Label: "KMS key", Value: "none", Tier: "~",
 		})

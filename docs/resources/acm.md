@@ -202,6 +202,7 @@ acm — DNS & CDN. Lifecycle key: `status`.
 | acm.expires-critical | expires in <N> days | broken | wave1 | — |
 | acm.expires-soon | expires in <N> days | warn | wave1 | — |
 | acm.orphan | certificate not in use (orphan) | warn | wave1 | — |
+| acm.weak-key | weak key algorithm | warn | wave1 | The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
