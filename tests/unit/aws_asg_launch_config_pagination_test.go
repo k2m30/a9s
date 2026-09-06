@@ -8,6 +8,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -206,5 +207,63 @@ func TestASGLaunchConfigPosture_PageCapExhaustedMarksTheCountALowerBound(t *test
 	}
 	if !result.Truncated {
 		t.Error("result.Truncated = false after the walk hit the page cap with pages still unread, want true")
+	}
+}
+
+// TestASGLaunchConfigPosture_PageCapMarksOnlyTheGroupsItNeverRead pins the
+// distinction the cap has to make. A group whose launch configuration arrived
+// before the cap was inspected, and hiding its finding behind a "?" would lose
+// a real one; a group whose configuration sat behind the cap was not inspected
+// at all, and reporting it clean would claim a check that never ran. One walk,
+// both outcomes.
+func TestASGLaunchConfigPosture_PageCapMarksOnlyTheGroupsItNeverRead(t *testing.T) {
+	// Every page carries a token, so the walk ends on the cap rather than on
+	// the pages. Only the first page carries a configuration a group
+	// references; the rest are unrelated, so "lc-behind-the-cap" is never
+	// read.
+	pages := []*autoscaling.DescribeLaunchConfigurationsOutput{{
+		LaunchConfigurations: []asgtypes.LaunchConfiguration{imdsv1Config("lc-arrived")},
+		NextToken:            aws.String("more"),
+	}}
+	for i := 2; i <= awsclient.PerParentPageCap; i++ {
+		pages = append(pages, &autoscaling.DescribeLaunchConfigurationsOutput{
+			LaunchConfigurations: []asgtypes.LaunchConfiguration{imdsv1Config(fmt.Sprintf("lc-unrelated-%d", i))},
+			NextToken:            aws.String("more"),
+		})
+	}
+	fake := &asgLaunchConfigPagesFake{pages: pages}
+	clients := &awsclient.ServiceClients{AutoScaling: fake}
+	resources := []resource.Resource{
+		asgGroupOn("asg-arrived", "lc-arrived"),
+		asgGroupOn("asg-behind-the-cap", "lc-behind-the-cap"),
+	}
+
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := fake.callCount(); got != awsclient.PerParentPageCap {
+		t.Fatalf("DescribeLaunchConfigurations called %d times, want %d (PerParentPageCap)", got, awsclient.PerParentPageCap)
+	}
+	if !result.Truncated {
+		t.Error("result.Truncated = false although configurations were left unread behind the cap")
+	}
+
+	arrived := result.Findings["asg-arrived"]
+	if len(arrived) != 1 {
+		t.Fatalf("asg-arrived carries %d finding(s), want 1 — its configuration was read before the cap: %+v", len(arrived), arrived)
+	}
+	if arrived[0].Phrase != "launch configuration allows IMDSv1" {
+		t.Errorf("asg-arrived phrase = %q, want %q", arrived[0].Phrase, "launch configuration allows IMDSv1")
+	}
+	if result.TruncatedIDs["asg-arrived"] {
+		t.Error("asg-arrived is marked uninspected although its configuration arrived — the finding it earned would render as a bare \"?\"")
+	}
+
+	if fs := result.Findings["asg-behind-the-cap"]; len(fs) != 0 {
+		t.Errorf("asg-behind-the-cap carries %d finding(s) although its configuration was never read: %+v", len(fs), fs)
+	}
+	if !result.TruncatedIDs["asg-behind-the-cap"] {
+		t.Error("asg-behind-the-cap is not marked uninspected, so it renders as inspected-and-clean on a check that never ran")
 	}
 }
