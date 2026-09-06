@@ -302,15 +302,24 @@ func apigwRESTPolicy(r resource.Resource) string {
 // apigwHTTPNoAuthorizer evaluates row 18 for one HTTP (v2) API. There is no
 // private endpoint type on v2, so an unauthorized one is always the warn code.
 func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, apiID string) bool {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetAuthorizersOutput, error) {
-		return clients.APIGatewayV2.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: aws.String(apiID)})
-	})
-	if err != nil {
-		return true
+	// One authorizer on any page is enough to clear the row, so the walk stops
+	// at the first page that has one.
+	input := &apigatewayv2.GetAuthorizersInput{ApiId: aws.String(apiID)}
+	for {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetAuthorizersOutput, error) {
+			return clients.APIGatewayV2.GetAuthorizers(ctx, input)
+		})
+		switch {
+		case err != nil:
+			return true
+		case len(out.Items) > 0:
+			return false
+		case out.NextToken == nil:
+			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, "no authorizer", "~", "apigw",
+				[]domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: "~"}})
+			return false
+		}
+		input.NextToken = out.NextToken
 	}
-	if len(out.Items) == 0 {
-		setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, "no authorizer", "~", "apigw",
-			[]domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: "~"}})
-	}
-	return false
+
 }

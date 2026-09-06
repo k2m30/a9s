@@ -154,10 +154,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 		// Independent of status and expiry: a certificate can be issued, in
 		// use, valid for a year, and still built on a key worth attacking.
 		if alg := string(cert.KeyAlgorithm); acmKeyIsWeak(alg) {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code: CodeACMWeakKey, Phrase: "weak key algorithm",
-				Detail: acmWeakKeyDetail, Severity: domain.SevWarn, Source: "wave1",
-			})
+			addWave1Finding(&r, CodeACMWeakKey, "weak key algorithm", domain.SevWarn)
 			addWave1Rows(&r, CodeACMWeakKey, domain.DetailRow{
 				Label: "Key algorithm", Value: acmKeyAlgorithmWords(alg), Tier: "~",
 			})

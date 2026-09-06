@@ -145,3 +145,30 @@ func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) re
 		RawStruct: record,
 	}
 }
+
+// listAllR53Records walks a zone's record sets to PerParentPageCap and reports
+// whether it reached the end. Route 53 paginates records by a three-part
+// cursor rather than a token, so the walk lives here beside the cursor
+// encoding rather than in the enricher that consumes it.
+//
+// complete is false when the zone is longer than the cap or a page failed, so
+// the caller reports the zone unknown rather than judging it on a prefix.
+func listAllR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (records []r53types.ResourceRecordSet, complete bool) {
+	input := &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID}
+	for range PerParentPageCap {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
+			return api.ListResourceRecordSets(ctx, input)
+		})
+		if err != nil {
+			return records, false
+		}
+		records = append(records, out.ResourceRecordSets...)
+		if !out.IsTruncated {
+			return records, true
+		}
+		input.StartRecordName = out.NextRecordName
+		input.StartRecordType = out.NextRecordType
+		input.StartRecordIdentifier = out.NextRecordIdentifier
+	}
+	return records, false
+}

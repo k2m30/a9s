@@ -38,17 +38,14 @@ const (
 	r53DanglingRecordDetail = "The record still answers with an address the account no longer holds, so whoever claims that address next receives traffic for this name. Delete the record or repoint it at an address you own."
 )
 
-// r53AddressCaches are the caches that together hold every public address the
-// account controls. All three must be present and whole for an address to be
-// called released.
-var r53AddressCaches = []string{"eip", "ec2", "eni"} //nolint:gochecknoglobals // static list: intentional package-level var
-
 // heldPublicAddresses returns every public address the account holds, or nil
 // when any of the three caches is absent or truncated — in which case an
 // address missing from them may simply be on a page nobody loaded.
 func heldPublicAddresses(cache resource.ResourceCache) map[string]bool {
 	held := make(map[string]bool)
-	for _, name := range r53AddressCaches {
+	// All three must be present and whole: together they hold every public
+	// address the account controls.
+	for _, name := range []string{"eip", "ec2", "eni"} {
 		entry, ok := cache[name]
 		if !ok || entry.IsTruncated {
 			return nil
@@ -173,32 +170,16 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 // zone whose records cannot be listed is marked truncated rather than reported
 // clean.
 func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, r resource.Resource, zoneID string, held map[string]bool) {
-	logs, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.ListQueryLoggingConfigsOutput, error) {
-		return clients.Route53.ListQueryLoggingConfigs(ctx, &r53svc.ListQueryLoggingConfigsInput{
-			HostedZoneId: aws.String(zoneID),
-		})
-	})
-	switch {
-	case err != nil:
-		result.TruncatedIDs[r.ID] = true
-	case len(logs.QueryLoggingConfigs) == 0:
-		setWave2Finding(result, r.ID, CodeR53QueryLoggingOff, "query logging off", "~", "r53",
-			[]domain.DetailRow{{Label: "Zone type", Value: "public", Tier: "~"}})
-	}
+	r53QueryLoggingFinding(ctx, clients, result, r, zoneID)
 
 	if held == nil {
 		return
 	}
-	records, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.ListResourceRecordSetsOutput, error) {
-		return clients.Route53.ListResourceRecordSets(ctx, &r53svc.ListResourceRecordSetsInput{
-			HostedZoneId: aws.String(zoneID),
-		})
-	})
-	if err != nil {
+	records, complete := listAllR53Records(ctx, clients.Route53, zoneID)
+	if !complete {
 		result.TruncatedIDs[r.ID] = true
-		return
 	}
-	for _, rec := range r53DanglingRecords(records.ResourceRecordSets, held) {
+	for _, rec := range r53DanglingRecords(records, held) {
 		name := aws.ToString(rec.Name)
 		target := ""
 		if len(rec.ResourceRecords) > 0 {
@@ -209,5 +190,29 @@ func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result 
 				{Label: "Record", Value: name, Tier: "!"},
 				{Label: "Target", Value: target, Tier: "!"},
 			})
+	}
+}
+
+// r53QueryLoggingFinding evaluates the query-logging row for one public zone.
+// A zone with no config on any page has none at all, so the walk stops at the
+// first config it sees rather than counting them.
+func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, r resource.Resource, zoneID string) {
+	input := &r53svc.ListQueryLoggingConfigsInput{HostedZoneId: aws.String(zoneID)}
+	for {
+		logs, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.ListQueryLoggingConfigsOutput, error) {
+			return clients.Route53.ListQueryLoggingConfigs(ctx, input)
+		})
+		switch {
+		case err != nil:
+			result.TruncatedIDs[r.ID] = true
+			return
+		case len(logs.QueryLoggingConfigs) > 0:
+			return
+		case logs.NextToken == nil:
+			setWave2Finding(result, r.ID, CodeR53QueryLoggingOff, "query logging off", "~", "r53",
+				[]domain.DetailRow{{Label: "Zone type", Value: "public", Tier: "~"}})
+			return
+		}
+		input.NextToken = logs.NextToken
 	}
 }

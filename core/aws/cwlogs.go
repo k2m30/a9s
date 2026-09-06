@@ -116,13 +116,7 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 		// Independent of the retention/stale pair above: a log group can be
 		// both unencrypted and never-expiring, and fixing one leaves the other.
 		if kmsKeyID == "" {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code:     CodeLogsNoKMS,
-				Phrase:   "not encrypted with KMS",
-				Detail:   logsNoKMSDetail,
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+			addWave1Finding(&r, CodeLogsNoKMS, "not encrypted with KMS", domain.SevWarn)
 			addWave1Rows(&r, CodeLogsNoKMS, domain.DetailRow{
 				Label: "KMS key", Value: "none", Tier: "~",
 			})

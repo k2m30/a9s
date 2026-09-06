@@ -64,13 +64,18 @@ const (
 	cfNoGeoRestrictionDetail = "Content is served to every country, including any the account is not meant to serve. Add a geographic restriction if the distribution should be limited."
 )
 
-// cfDeprecatedTLSVersions are the minimum protocol versions AWS still accepts
-// but that sit below TLS 1.2.
-var cfDeprecatedTLSVersions = map[cftypes.MinimumProtocolVersion]bool{ //nolint:gochecknoglobals // static table: intentional package-level var
-	cftypes.MinimumProtocolVersionSSLv3:      true,
-	cftypes.MinimumProtocolVersionTLSv1:      true,
-	cftypes.MinimumProtocolVersionTLSv12016:  true,
-	cftypes.MinimumProtocolVersionTLSv112016: true,
+// cfTLSBelow12 reports whether the minimum protocol version is one AWS still
+// accepts but that sits below TLS 1.2.
+func cfTLSBelow12(v cftypes.MinimumProtocolVersion) bool {
+	switch v {
+	case cftypes.MinimumProtocolVersionSSLv3,
+		cftypes.MinimumProtocolVersionTLSv1,
+		cftypes.MinimumProtocolVersionTLSv12016,
+		cftypes.MinimumProtocolVersionTLSv112016:
+		return true
+	default:
+		return false
+	}
 }
 
 // cfS3OriginBucket returns the bucket name an S3 origin domain names, and
@@ -101,7 +106,11 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 		setWave2Finding(result, distID, code, phrase, tier, "cf", rows)
 	}
 
-	for _, origin := range originItems(cfg) {
+	var origins []cftypes.Origin
+	if cfg.Origins != nil {
+		origins = cfg.Origins.Items
+	}
+	for _, origin := range origins {
 		domainName := aws.ToString(origin.DomainName)
 		bucket, isS3 := cfS3OriginBucket(domainName)
 		if !isS3 {
@@ -122,7 +131,7 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 	}
 
 	if vc := cfg.ViewerCertificate; vc != nil {
-		if cfDeprecatedTLSVersions[vc.MinimumProtocolVersion] {
+		if cfTLSBelow12(vc.MinimumProtocolVersion) {
 			emit(CodeCFDeprecatedTLS, "minimum TLS below 1.2", "~",
 				domain.DetailRow{Label: "Minimum TLS version", Value: string(vc.MinimumProtocolVersion), Tier: "~"})
 		}
@@ -151,14 +160,6 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 		emit(CodeCFNoGeoRestriction, "no geo restriction", "~",
 			domain.DetailRow{Label: "Countries", Value: "none", Tier: "~"})
 	}
-}
-
-// originItems returns the distribution's origins, or nil when it declares none.
-func originItems(cfg *cftypes.DistributionConfig) []cftypes.Origin {
-	if cfg.Origins == nil {
-		return nil
-	}
-	return cfg.Origins.Items
 }
 
 // cachedBucketNames returns the set of bucket names the s3 cache holds, or nil

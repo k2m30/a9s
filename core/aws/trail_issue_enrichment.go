@@ -38,7 +38,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		TruncatedIDs: make(map[string]bool),
 	}
 	api, ok := clients.S3.(trailLogBucketAPI)
-	if !ok || clients.S3 == nil {
+	if !ok {
 		return result, nil
 	}
 

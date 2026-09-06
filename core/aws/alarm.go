@@ -75,13 +75,7 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 		// in the console. Nil means DescribeAlarms did not resolve the switch,
 		// which is not evidence that it is off.
 		if alarm.ActionsEnabled != nil && !*alarm.ActionsEnabled {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code:     CodeAlarmActionsDisabled,
-				Phrase:   "actions disabled",
-				Detail:   alarmActionsDisabledDetail,
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+			addWave1Finding(&r, CodeAlarmActionsDisabled, "actions disabled", domain.SevWarn)
 			// The phrase already says the actions are off; the row says how
 			// much is wired behind the switch.
 			addWave1Rows(&r, CodeAlarmActionsDisabled, domain.DetailRow{
