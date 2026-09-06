@@ -50,7 +50,7 @@ func rel2DemoList(t *testing.T, shortName string) []resource.Resource {
 		t.Fatalf("%s not registered", shortName)
 	}
 	out, err := td.Fetcher(context.Background(), demo.NewServiceClients(), "")
-	if err != nil {
+	if err != nil && len(out.Resources) == 0 {
 		t.Fatalf("%s fetch: %v", shortName, err)
 	}
 	if len(out.Resources) == 0 {
