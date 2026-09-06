@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: Athena Workgroups
 - **AWS API reference**: <https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html>
 - **List API**: `ListWorkGroups` — returns `WorkGroupSummary[]`. The SDK confirms `Name`, `State`, `CreationTime`, `Description`, `EngineVersion` are on the summary shape, so the Wave 1 `State` signal is reachable with zero extra calls.
-- **Describe API (if any)**: `GetWorkGroup` per workgroup — used in Wave 2 to read `Configuration.EnforceWorkGroupConfiguration`, `Configuration.ResultConfiguration.EncryptionConfiguration`, and `Configuration.BytesScannedCutoffPerQuery`, none of which are on `WorkGroupSummary`.
+- **Describe API (if any)**: `GetWorkGroup` per workgroup — used in Wave 2 to read `Configuration.EnforceWorkGroupConfiguration` and `Configuration.ResultConfiguration.EncryptionConfiguration`, neither of which is on `WorkGroupSummary`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -92,11 +92,6 @@ One bullet per distinct signal.
   - **API call**: same `GetWorkGroup` per workgroup — no additional call.
   - **Cost shape**: per-resource. Query results land in S3 unencrypted, so whatever a query returns is readable by anyone who can read the bucket. Evaluated independently of enforcement: a workgroup can fail either without the other.
 
-- **Signal**: `Configuration.BytesScannedCutoffPerQuery` unset (nil).
-  - **State bucket**: Warning.
-  - **API call**: same `GetWorkGroup` per workgroup — no additional call beyond the governance check above.
-  - **Cost shape**: per-resource. Cost-control gap — a runaway query in this workgroup has no scan-bytes ceiling and can bill unbounded dollars.
-
 ### 3.3 Wave 3 — OUT OF SCOPE
 
 - OUT OF SCOPE: `ListQueryExecutions` + `BatchGetQueryExecution` failure-rate per workgroup.
@@ -128,7 +123,6 @@ One row per signal from §3:
 | `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled: no new queries accepted` | `Workgroup is disabled — queries submitted here will be rejected until re-enabled.` |
 | `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S4, S5 | `settings can be overridden per query` | `Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query.` |
 | `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S4, S5 | `query results stored unencrypted` | `Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration.` |
-| `BytesScannedCutoffPerQuery` unset | 2 | Healthy | `~` | S3, S4, S5 | `no per-query scan limit` | `No data-scan ceiling — a runaway query can bill unbounded dollars.` |
 
 Rules for filling list and detail text:
 
@@ -152,7 +146,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — athena contract row (related targets and AWS API URL) — `docs/related-resources.md` § Per-type contract, row `athena`, and § `athena` subsection.
 - a9s golden doc — Wave 1 `State==ENABLED`/`DISABLED` mapping — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 1 cell.
-- a9s golden doc — Wave 2 `EnforceWorkGroupConfiguration==false`, `ResultConfiguration.EncryptionConfiguration==nil` and `BytesScannedCutoffPerQuery` unset — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 2 cell.
+- a9s golden doc — Wave 2 `EnforceWorkGroupConfiguration==false`, `ResultConfiguration.EncryptionConfiguration==nil` — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 2 cell.
 - a9s golden doc — Wave 3 `ListQueryExecutions`/`BatchGetQueryExecution` is out of scope — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 3 cell.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "a9s is a read-only terminal UI for AWS".
 - AWS Go SDK v2 — `ListWorkGroups` returns `WorkGroupSummary` with `Name`, `State`, `CreationTime`, `Description`, `EngineVersion` — `AWS SDK Go v2 — service/athena/types.WorkGroupSummary § State`.

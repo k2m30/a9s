@@ -373,7 +373,7 @@ var docQuoteBurnDown = map[string]int{
 	"alarm":        6,
 	"apigw":        1,
 	"asg":          11,
-	"athena":       2,
+	"athena":       1,
 	"backup":       2,
 	"cb":           1,
 	"cf":           6,
