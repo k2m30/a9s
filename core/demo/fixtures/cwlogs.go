@@ -363,6 +363,18 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		})
 	}
 
+	// The second page. Every other group in this file is the target of some
+	// pivot, so cutting the list anywhere inside them lowers a count a scenario
+	// pins; this one is named to match no pivot's convention and is appended
+	// last, so LogGroupsPageSize can sit at len-1 and move only this row.
+	logGroups = append(logGroups, cwlogstypes.LogGroup{
+		LogGroupName:    aws.String(LogGroupSecondPageOnly),
+		Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupSecondPageOnly + ":*"),
+		StoredBytes:     aws.Int64(4194304),
+		RetentionInDays: aws.Int32(30),
+		CreationTime:    aws.Int64(1756704000000),
+	})
+
 	logStreams := map[string][]cwlogstypes.LogStream{
 		"/aws/lambda/api-gateway-authorizer": {
 			{
@@ -570,14 +582,20 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	}
 })
 
-// LogGroupsPageSize splits the log-group fixtures across two pages so exactly
-// one demo list is paginated. Every other demo list answers in one page, which
-// left the lower-bound rendering with no witness on the bench: "(N+)" for a
-// pivot that matched inside a partial list, "(0+)" for one that matched nothing
-// in it. The boundary is chosen, not arbitrary — the two Document DB audit
-// groups sit on page one and the DynamoDB insights group on page two, so one
-// pivot of each kind has a witness.
-const LogGroupsPageSize = 15
+// LogGroupSecondPageOnly is the one log group the first page does not carry.
+// It is the target of no pivot, so the split costs no count.
+const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
+
+// LogGroupsPageSize splits the log-group fixtures across two pages, making this
+// the one paginated demo list: the source of the "+" a pivot renders when it
+// matched inside a list that was read only in part. It is one less than the
+// number of groups, the largest split that still truncates, so only
+// LogGroupSecondPageOnly is off page one and no pivot loses a count.
+//
+// A group appended after LogGroupSecondPageOnly would land on page two with it
+// and take its pivot's count down with it; append before it instead, and raise
+// this number in step.
+const LogGroupsPageSize = 40
 
 func NewCWLogsFixtures() *CWLogsFixtures {
 	return sharedCWLogsFixtures()

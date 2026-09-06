@@ -8,6 +8,17 @@ import (
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 )
 
+// ExpectedTopLevelTruncationForTest reports which demo types answer their first
+// page with more behind it, so a caller comparing a rendered count against
+// ExpectedTopLevelCountsForTest knows which ones carry the "+" marker. Derived
+// from the same two numbers as the count itself. Test-only: no production
+// caller.
+func ExpectedTopLevelTruncationForTest() map[string]bool {
+	return map[string]bool{
+		"logs": len(NewCWLogsFixtures().LogGroups) > LogGroupsPageSize,
+	}
+}
+
 // ExpectedTopLevelCountsForTest returns an independent top-level count oracle
 // for demo integration tests, derived directly from the typed fixture
 // datasets rather than from registered app fetchers. Test-only: no
