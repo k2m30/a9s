@@ -5,10 +5,12 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -40,13 +42,22 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		FieldUpdates: make(map[string]map[string]string),
 	}
 
-	// Backup coverage is a cache-only join, so it runs before the client guard
-	// below: a type whose own API client is missing is still either selected by
-	// a plan or not.
-	addBackupCoverage(cache, "dbc", resources, backupARNFromField, &result)
+	// Backup coverage runs before the client guard below: a type whose own API
+	// client is missing is still either selected by a plan or not, and the tag
+	// read it may need is skipped along with everything else in that case.
+	var tagRead backupTagReader
+	if clients != nil && clients.DocDB != nil {
+		if api, ok := clients.DocDB.(DocDBListTagsForResourceAPI); ok {
+			tagRead = func(ctx context.Context, arn string) (map[string]string, error) {
+				return docdbTagsForARN(ctx, api, arn)
+			}
+		}
+	}
+	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
+	addBackupCoverage(cache, "dbc", resources, arnAndTags, &result)
 
 	if clients == nil || clients.DocDB == nil {
-		return result, nil
+		return result, tagErr
 	}
 
 	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
@@ -148,7 +159,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	result.Truncated = truncated
-	return result, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages)
+	return result, errors.Join(tagErr, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages))
 }
 
 // isClusterARN returns true when the ARN's resource-type segment is "cluster".
@@ -156,4 +167,18 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 func isClusterARN(arn string) bool {
 	parts := strings.Split(arn, ":")
 	return len(parts) >= 7 && parts[5] == "cluster"
+}
+
+// docdbTagsForARN reads one cluster's tags. DocumentDB and Aurora clusters
+// both answer this call, and it returns the whole set in one response.
+func docdbTagsForARN(ctx context.Context, api DocDBListTagsForResourceAPI, arn string) (map[string]string, error) {
+	out, err := api.ListTagsForResource(ctx, &docdb.ListTagsForResourceInput{ResourceName: aws.String(arn)})
+	if err != nil {
+		return nil, err
+	}
+	tags := make(map[string]string, len(out.TagList))
+	for _, t := range out.TagList {
+		tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+	}
+	return tags, nil
 }

@@ -107,3 +107,10 @@ func (f *DynamoDBFake) GetResourcePolicy(_ context.Context, input *dynamodb.GetR
 	}
 	return &dynamodb.GetResourcePolicyOutput{Policy: aws.String(policy)}, nil
 }
+
+// ListTagsOfResource answers the coverage join's tag read; see the RDS fake.
+func (f *DynamoDBFake) ListTagsOfResource(_ context.Context, _ *dynamodb.ListTagsOfResourceInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTagsOfResourceOutput, error) {
+	return &dynamodb.ListTagsOfResourceOutput{Tags: []ddbtypes.Tag{
+		{Key: aws.String("Environment"), Value: aws.String("prod")},
+	}}, nil
+}

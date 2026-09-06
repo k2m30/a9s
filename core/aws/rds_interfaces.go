@@ -77,6 +77,14 @@ type RDSDescribeDBClusterSnapshotAttributesAPI interface {
 	DescribeDBClusterSnapshotAttributes(ctx context.Context, params *rds.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error)
 }
 
+// RDSListTagsForResourceAPI reads a DB instance's tags, which a backup plan
+// selection may choose it by. The RDS client is asserted to it where the
+// coverage join needs the tags, so the aggregate below stays the set every
+// fetcher needs.
+type RDSListTagsForResourceAPI interface {
+	ListTagsForResource(ctx context.Context, params *rds.ListTagsForResourceInput, optFns ...func(*rds.Options)) (*rds.ListTagsForResourceOutput, error)
+}
+
 // RDSAPI is the aggregate interface covering all RDS operations used by a9s fetchers.
 // *rds.Client structurally satisfies this interface.
 type RDSAPI interface {

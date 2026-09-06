@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -41,13 +42,22 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}
-	// Backup coverage is a cache-only join, so it runs before the client guard
-	// below: a type whose own API client is missing is still either selected by
-	// a plan or not.
-	addBackupCoverage(cache, "ddb", resources, backupARNFromField, &result)
+	// Backup coverage runs before the client guard below: a type whose own API
+	// client is missing is still either selected by a plan or not, and the tag
+	// read it may need is skipped along with everything else in that case.
+	var tagRead backupTagReader
+	if clients != nil && clients.DynamoDB != nil {
+		if api, ok := clients.DynamoDB.(DynamoDBListTagsOfResourceAPI); ok {
+			tagRead = func(ctx context.Context, arn string) (map[string]string, error) {
+				return dynamoDBTagsForARN(ctx, api, arn)
+			}
+		}
+	}
+	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsOfResource")
+	addBackupCoverage(cache, "ddb", resources, arnAndTags, &result)
 
 	if clients.DynamoDB == nil {
-		return result, nil
+		return result, tagErr
 	}
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
@@ -87,7 +97,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 	})
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
-	return result, err
+	return result, errors.Join(tagErr, err)
 }
 
 // enrichDDBResourcePolicies reads each table's resource policy (cap
@@ -164,4 +174,30 @@ func isDDBPolicyAbsent(err error) bool {
 	}
 	var apiErr smithy.APIError
 	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PolicyNotFoundException"
+}
+
+// dynamoDBTagsForARN reads one table's tags. The call answers ten tags a page,
+// so it walks the pages; a table whose tags run past the page cap is reported
+// as unreadable rather than as carrying only the tags read so far, which would
+// let a selection on a later tag read as no selection at all.
+func dynamoDBTagsForARN(ctx context.Context, api DynamoDBListTagsOfResourceAPI, arn string) (map[string]string, error) {
+	tags := map[string]string{}
+	var token *string
+	for range PerParentPageCap {
+		out, err := api.ListTagsOfResource(ctx, &dynamodb.ListTagsOfResourceInput{
+			ResourceArn: aws.String(arn),
+			NextToken:   token,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range out.Tags {
+			tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+		}
+		if out.NextToken == nil || *out.NextToken == "" {
+			return tags, nil
+		}
+		token = out.NextToken
+	}
+	return nil, fmt.Errorf("ListTagsOfResource: more than %d pages of tags for %s", PerParentPageCap, arn)
 }

@@ -7,6 +7,7 @@ package fakes
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -147,4 +148,13 @@ func restoreAttributeValues(public bool) []string {
 		return []string{"all"}
 	}
 	return nil
+}
+
+// ListTagsForResource answers the coverage join's tag read. Every demo
+// database carries the same environment tag and none carries a tag any plan
+// selects on, so coverage is decided by the selections' ARNs alone.
+func (f *RDSFake) ListTagsForResource(_ context.Context, _ *rds.ListTagsForResourceInput, _ ...func(*rds.Options)) (*rds.ListTagsForResourceOutput, error) {
+	return &rds.ListTagsForResourceOutput{TagList: []rdstypes.Tag{
+		{Key: aws.String("Environment"), Value: aws.String("prod")},
+	}}, nil
 }

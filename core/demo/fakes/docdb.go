@@ -7,6 +7,7 @@ package fakes
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
@@ -71,4 +72,11 @@ func (f *DocDBFake) DescribeDBClusterSnapshotAttributes(_ context.Context, in *d
 			}},
 		},
 	}, nil
+}
+
+// ListTagsForResource answers the coverage join's tag read; see the RDS fake.
+func (f *DocDBFake) ListTagsForResource(_ context.Context, _ *docdb.ListTagsForResourceInput, _ ...func(*docdb.Options)) (*docdb.ListTagsForResourceOutput, error) {
+	return &docdb.ListTagsForResourceOutput{TagList: []docdbtypes.Tag{
+		{Key: aws.String("Environment"), Value: aws.String("prod")},
+	}}, nil
 }

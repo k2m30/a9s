@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -39,13 +40,22 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		FieldUpdates: make(map[string]map[string]string),
 	}
 
-	// Backup coverage is a cache-only join, so it runs before the client guard
-	// below: a type whose own API client is missing is still either selected by
-	// a plan or not.
-	addBackupCoverage(cache, "dbi", resources, backupARNFromField, &result)
+	// Backup coverage runs before the client guard below: a type whose own API
+	// client is missing is still either selected by a plan or not, and the tag
+	// read it may need is skipped along with everything else in that case.
+	var tagRead backupTagReader
+	if clients != nil && clients.RDS != nil {
+		if api, ok := clients.RDS.(RDSListTagsForResourceAPI); ok {
+			tagRead = func(ctx context.Context, arn string) (map[string]string, error) {
+				return rdsTagsForARN(ctx, api, arn)
+			}
+		}
+	}
+	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
+	addBackupCoverage(cache, "dbi", resources, arnAndTags, &result)
 
 	if clients == nil || clients.RDS == nil {
-		return result, nil
+		return result, tagErr
 	}
 
 	// Paginate with a cap. A page that fails ends the walk but keeps the pages
@@ -144,7 +154,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	// Pending maintenance is "~"-only: EnrichmentCap bounds informational
 	// coverage, never the issue count. The engine-deprecated pass below is
 	// "!", and sets Truncated itself when its walk is cut short.
-	return result, walkErr
+	return result, errors.Join(tagErr, walkErr)
 }
 
 // enrichDBIEngineVersions calls DescribeDBEngineVersions once per distinct
@@ -218,4 +228,18 @@ func isDeprecatedEngineVersion(versions []rdstypes.DBEngineVersion) bool {
 		}
 	}
 	return true
+}
+
+// rdsTagsForARN reads one RDS resource's tags. The call answers for instances
+// and clusters alike, and returns the whole set in one response.
+func rdsTagsForARN(ctx context.Context, api RDSListTagsForResourceAPI, arn string) (map[string]string, error) {
+	out, err := api.ListTagsForResource(ctx, &rds.ListTagsForResourceInput{ResourceName: aws.String(arn)})
+	if err != nil {
+		return nil, err
+	}
+	tags := make(map[string]string, len(out.TagList))
+	for _, t := range out.TagList {
+		tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+	}
+	return tags, nil
 }

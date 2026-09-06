@@ -35,6 +35,14 @@ type DynamoDBGetResourcePolicyAPI interface {
 	GetResourcePolicy(ctx context.Context, params *dynamodb.GetResourcePolicyInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetResourcePolicyOutput, error)
 }
 
+// DynamoDBListTagsOfResourceAPI reads a table's tags, which a backup plan
+// selection may choose it by. The DynamoDB client is asserted to it where the
+// coverage join needs the tags, so the aggregate below stays the set every
+// fetcher needs.
+type DynamoDBListTagsOfResourceAPI interface {
+	ListTagsOfResource(ctx context.Context, params *dynamodb.ListTagsOfResourceInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ListTagsOfResourceOutput, error)
+}
+
 // DynamoDBAPI is the aggregate interface covering all DynamoDB operations used by a9s fetchers.
 // *dynamodb.Client structurally satisfies this interface.
 type DynamoDBAPI interface {

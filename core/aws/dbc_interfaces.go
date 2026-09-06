@@ -37,6 +37,14 @@ type DocDBDescribeDBClusterSnapshotAttributesAPI interface {
 	DescribeDBClusterSnapshotAttributes(ctx context.Context, params *docdb.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error)
 }
 
+// DocDBListTagsForResourceAPI reads a cluster's tags, which a backup plan
+// selection may choose it by. DocumentDB and Aurora clusters both answer it.
+// The DocDB client is asserted to it where the coverage join needs the tags,
+// so the aggregate below stays the set every fetcher needs.
+type DocDBListTagsForResourceAPI interface {
+	ListTagsForResource(ctx context.Context, params *docdb.ListTagsForResourceInput, optFns ...func(*docdb.Options)) (*docdb.ListTagsForResourceOutput, error)
+}
+
 // DocDBAPI is the aggregate interface covering all DocumentDB operations used by a9s fetchers.
 // *docdb.Client structurally satisfies this interface.
 type DocDBAPI interface {
