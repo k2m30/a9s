@@ -77,3 +77,4 @@ graphify-out/
 
 # per-dispatch agent context written by the orchestrator into each worktree; never shared
 .claude/task-context.md
+.claude/hooks/__pycache__/
