@@ -14,6 +14,8 @@ package unit
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -23,6 +25,8 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwltypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -30,7 +34,6 @@ import (
 )
 
 const (
-	w6aTrailSingleRegion   = "trail.single-region"
 	w6aTrailNoCWLogs       = "trail.no-cloudwatch-logs"
 	w6aTrailNoKMS          = "trail.no-kms"
 	w6aTrailBucketPublic   = "trail.log-bucket-public"
@@ -91,50 +94,6 @@ func w6aFetchTrails(t *testing.T, trails ...cttypes.Trail) map[string]resource.R
 	return byID
 }
 
-// TestW6ATrailSingleRegion_OnlyWhenTheAccountHasNoMultiRegionTrail pins the
-// account-wide half of row 1. Prowler's check is satisfied by one multi-region
-// trail anywhere in the account, so a single-region trail beside a
-// multi-region one is not a gap and must not be flagged.
-func TestW6ATrailSingleRegion_OnlyWhenTheAccountHasNoMultiRegionTrail(t *testing.T) {
-	local := w6aTrail("acme-region-local-trail")
-	local.IsMultiRegionTrail = aws.Bool(false)
-
-	// Every trail single-region: the account has no multi-region coverage.
-	alone := w6aFetchTrails(t, local)
-	f := w2AssertFinding(t, alone["acme-region-local-trail"].Findings,
-		w6aTrailSingleRegion, "single-region trail", domain.SevWarn, "wave1")
-	if f.Code == "" {
-		t.Fatal("finding lookup returned an empty code")
-	}
-
-	// A multi-region trail elsewhere in the account closes the gap for every
-	// row, including the single-region one.
-	covered := w6aFetchTrails(t, local, w6aTrail("acme-org-wide-trail"))
-	w2AssertNoCode(t, covered["acme-region-local-trail"].Findings, w6aTrailSingleRegion)
-	w2AssertNoCode(t, covered["acme-org-wide-trail"].Findings, w6aTrailSingleRegion)
-}
-
-// TestW6ATrailSingleRegion_NilCountsAsSingleRegion pins row 1's explicit
-// exception to the nil rule: DescribeTrails omits IsMultiRegionTrail only for
-// trails that are not multi-region, so absent is off, not unknown.
-func TestW6ATrailSingleRegion_NilCountsAsSingleRegion(t *testing.T) {
-	absent := w6aTrail("acme-legacy-trail")
-	absent.IsMultiRegionTrail = nil
-
-	got := w6aFetchTrails(t, absent)
-	w2AssertFinding(t, got["acme-legacy-trail"].Findings,
-		w6aTrailSingleRegion, "single-region trail", domain.SevWarn, "wave1")
-}
-
-// TestW6ATrailSingleRegion_Row pins the supporting row. The value is a word,
-// not the SDK bool the field carries.
-func TestW6ATrailSingleRegion_Row(t *testing.T) {
-	local := w6aTrail("acme-region-local-trail")
-	local.IsMultiRegionTrail = aws.Bool(false)
-	got := w6aFetchTrails(t, local)
-	w6aAssertRow(t, got["acme-region-local-trail"], w6aTrailSingleRegion, "Multi-region", "no")
-}
-
 // TestW6ATrailNoCloudWatchLogs pins row 2. A trail that writes only to S3 has
 // no live stream to alarm on, so the delivery target is the evidence.
 func TestW6ATrailNoCloudWatchLogs(t *testing.T) {
@@ -171,13 +130,12 @@ func TestW6ATrailNoKMS(t *testing.T) {
 // the fetcher happens to evaluate.
 func TestW6ATrail_ConditionsAreIndependent(t *testing.T) {
 	bad := w6aTrail("acme-neglected-trail")
-	bad.IsMultiRegionTrail = aws.Bool(false)
 	bad.CloudWatchLogsLogGroupArn = nil
 	bad.KmsKeyId = nil
 
 	got := w6aFetchTrails(t, bad)
 	fs := got["acme-neglected-trail"].Findings
-	for _, code := range []string{w6aTrailSingleRegion, w6aTrailNoCWLogs, w6aTrailNoKMS} {
+	for _, code := range []string{w6aTrailNoCWLogs, w6aTrailNoKMS} {
 		if _, ok := w2Find(fs, code); !ok {
 			t.Errorf("missing %q; got %v", code, w2Codes(fs))
 		}
@@ -186,38 +144,54 @@ func TestW6ATrail_ConditionsAreIndependent(t *testing.T) {
 
 // TestW6ATrail_CatalogDefs pins the catalog rows for the wave-1 trail codes.
 func TestW6ATrail_CatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "trail", w6aTrailSingleRegion, "single-region trail", domain.SevWarn, "wave1")
 	w2AssertFindingDef(t, "trail", w6aTrailNoCWLogs, "not delivering to CloudWatch Logs", domain.SevWarn, "wave1")
 	w2AssertFindingDef(t, "trail", w6aTrailNoKMS, "log files not KMS-encrypted", domain.SevWarn, "wave1")
 }
 
 // ---------------------------------------------------------------------------
-// trail — rows 4-5 (wave 2, cache-only join onto the s3 rows)
+// trail — rows 4-5 (wave 2, read from S3 directly)
 // ---------------------------------------------------------------------------
 
-// w6aS3Cache builds the s3 cache entry the trail enricher joins against. Each
-// bucket carries whatever wave-2 findings the caller names, in the shape the
-// s3 enricher produces.
-func w6aS3Cache(truncated bool, buckets map[string][]string) resource.ResourceCache {
-	entry := domain.ResourceCacheEntry{IsTruncated: truncated}
-	for name, codes := range buckets {
-		r := domain.Resource{ID: name, Name: name}
-		for _, c := range codes {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code:     domain.FindingCode(c),
-				Phrase:   "seeded by the s3 enricher",
-				Severity: domain.SevBroken,
-				Source:   "wave2:s3",
-				Detail:   "seeded",
-			})
-		}
-		entry.Resources = append(entry.Resources, r)
+// w6aTrailS3Fake answers the two read-only bucket calls the trail enricher
+// makes. Buckets default to private with access logging on, so each test
+// switches off only the setting it is about.
+type w6aTrailS3Fake struct {
+	awsclient.S3API
+
+	public     map[string]bool
+	unlogged   map[string]bool
+	statusErr  map[string]error
+	loggingErr map[string]error
+}
+
+func (f *w6aTrailS3Fake) GetBucketPolicyStatus(_ context.Context, in *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
+	b := aws.ToString(in.Bucket)
+	if err, ok := f.statusErr[b]; ok {
+		return nil, err
 	}
-	return resource.ResourceCache{"s3": entry}
+	return &s3.GetBucketPolicyStatusOutput{
+		PolicyStatus: &s3types.PolicyStatus{IsPublic: aws.Bool(f.public[b])},
+	}, nil
+}
+
+func (f *w6aTrailS3Fake) GetBucketLogging(_ context.Context, in *s3.GetBucketLoggingInput, _ ...func(*s3.Options)) (*s3.GetBucketLoggingOutput, error) {
+	b := aws.ToString(in.Bucket)
+	if err, ok := f.loggingErr[b]; ok {
+		return nil, err
+	}
+	if f.unlogged[b] {
+		return &s3.GetBucketLoggingOutput{}, nil
+	}
+	return &s3.GetBucketLoggingOutput{
+		LoggingEnabled: &s3types.LoggingEnabled{
+			TargetBucket: aws.String("acme-access-logs"),
+			TargetPrefix: aws.String("cloudtrail/"),
+		},
+	}, nil
 }
 
 // w6aTrailRes builds the trail row shape the enricher consumes: the fetcher
-// retains the SDK trail, and the log bucket name is read off it.
+// retains the SDK trail, and the log bucket name is read off Fields.
 func w6aTrailRes(name, bucket string) resource.Resource {
 	tr := w6aTrail(name)
 	tr.S3BucketName = aws.String(bucket)
@@ -226,22 +200,19 @@ func w6aTrailRes(name, bucket string) resource.Resource {
 	return r
 }
 
-func w6aEnrichTrail(t *testing.T, cache resource.ResourceCache, rs ...resource.Resource) awsclient.IssueEnricherResult {
+func w6aEnrichTrail(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource) awsclient.IssueEnricherResult {
 	t.Helper()
-	res, err := w2Enricher(t, "trail")(context.Background(), &awsclient.ServiceClients{}, rs, cache)
+	res, err := w2Enricher(t, "trail")(context.Background(), &awsclient.ServiceClients{S3: fake}, rs, nil)
 	w2AssertEnricherInvariants(t, res, err)
 	return res
 }
 
-// TestW6ATrailLogBucketPublic pins row 4. A publicly readable log bucket
-// hands the account's audit trail to anyone, so this is the batch's one
-// Broken trail row.
+// TestW6ATrailLogBucketPublic pins row 4. A publicly readable log bucket hands
+// the account's audit trail to anyone, so this is the batch's one Broken trail
+// row.
 func TestW6ATrailLogBucketPublic(t *testing.T) {
-	cache := w6aS3Cache(false, map[string][]string{
-		"acme-public-audit-logs":  {"s3.public"},
-		"acme-private-audit-logs": {},
-	})
-	res := w6aEnrichTrail(t, cache,
+	res := w6aEnrichTrail(t,
+		&w6aTrailS3Fake{public: map[string]bool{"acme-public-audit-logs": true}},
 		w6aTrailRes("acme-public-bucket-trail", "acme-public-audit-logs"),
 		w6aTrailRes("acme-healthy-trail", "acme-private-audit-logs"),
 	)
@@ -255,11 +226,8 @@ func TestW6ATrailLogBucketPublic(t *testing.T) {
 
 // TestW6ATrailLogBucketNoAccessLogging pins row 5.
 func TestW6ATrailLogBucketNoAccessLogging(t *testing.T) {
-	cache := w6aS3Cache(false, map[string][]string{
-		"acme-unlogged-audit-logs": {"s3.access-logging-off"},
-		"acme-private-audit-logs":  {},
-	})
-	res := w6aEnrichTrail(t, cache,
+	res := w6aEnrichTrail(t,
+		&w6aTrailS3Fake{unlogged: map[string]bool{"acme-unlogged-audit-logs": true}},
 		w6aTrailRes("acme-unlogged-bucket-trail", "acme-unlogged-audit-logs"),
 		w6aTrailRes("acme-healthy-trail", "acme-private-audit-logs"),
 	)
@@ -275,10 +243,13 @@ func TestW6ATrailLogBucketNoAccessLogging(t *testing.T) {
 // the wave-2 pair: one bucket that is both public and unlogged produces both
 // findings on the trail that writes to it.
 func TestW6ATrailLogBucket_BothConditionsOnOneBucket(t *testing.T) {
-	cache := w6aS3Cache(false, map[string][]string{
-		"acme-worst-audit-logs": {"s3.public", "s3.access-logging-off"},
-	})
-	res := w6aEnrichTrail(t, cache, w6aTrailRes("acme-worst-trail", "acme-worst-audit-logs"))
+	res := w6aEnrichTrail(t,
+		&w6aTrailS3Fake{
+			public:   map[string]bool{"acme-worst-audit-logs": true},
+			unlogged: map[string]bool{"acme-worst-audit-logs": true},
+		},
+		w6aTrailRes("acme-worst-trail", "acme-worst-audit-logs"),
+	)
 
 	fs := res.Findings["acme-worst-trail"]
 	for _, code := range []string{w6aTrailBucketPublic, w6aTrailBucketNoAccess} {
@@ -288,44 +259,56 @@ func TestW6ATrailLogBucket_BothConditionsOnOneBucket(t *testing.T) {
 	}
 }
 
-// TestW6ATrailLogBucket_NoWave2FindingsYetEmitsNothing pins the batch note:
-// enricher order across types is not guaranteed, so an s3 cache whose rows
-// carry no wave-2 findings at all means "not evaluated yet", not "clean".
-// Emitting a healthy verdict there would be a false negative that the next
-// refresh silently contradicts.
-func TestW6ATrailLogBucket_NoWave2FindingsYetEmitsNothing(t *testing.T) {
-	entry := domain.ResourceCacheEntry{Resources: []domain.Resource{{
-		ID:   "acme-public-audit-logs",
-		Name: "acme-public-audit-logs",
-		Findings: []domain.Finding{{
-			Code:     domain.FindingCode("s3.no-versioning"),
-			Phrase:   "versioning off",
-			Severity: domain.SevWarn,
-			Source:   "wave1",
+// TestW6ATrailLogBucket_NoBucketPolicyIsNotPublic pins the one S3 error that
+// is an answer rather than a failure: NoSuchBucketPolicy means there is no
+// policy to make the bucket public, so the trail is clean and not unknown.
+func TestW6ATrailLogBucket_NoBucketPolicyIsNotPublic(t *testing.T) {
+	res := w6aEnrichTrail(t,
+		&w6aTrailS3Fake{statusErr: map[string]error{
+			"acme-nopolicy-audit-logs": &s3types.NoSuchBucket{Message: aws.String("NoSuchBucketPolicy")},
 		}},
-	}}}
-	res := w6aEnrichTrail(t, resource.ResourceCache{"s3": entry},
-		w6aTrailRes("acme-public-bucket-trail", "acme-public-audit-logs"))
-
-	if len(res.Findings["acme-public-bucket-trail"]) != 0 {
-		t.Errorf("emitted %v before the s3 wave-2 pass had run", w2Codes(res.Findings["acme-public-bucket-trail"]))
-	}
+		w6aTrailRes("acme-nopolicy-trail", "acme-nopolicy-audit-logs"),
+	)
+	w2AssertNoCode(t, res.Findings["acme-nopolicy-trail"], w6aTrailBucketPublic)
 }
 
-// TestW6ATrailLogBucket_AbsentOrTruncatedCacheEmitsNothing pins the other two
-// unknowns: no s3 cache at all, and a truncated one where the trail's bucket
-// may simply be on a page nobody loaded.
-func TestW6ATrailLogBucket_AbsentOrTruncatedCacheEmitsNothing(t *testing.T) {
-	for name, cache := range map[string]resource.ResourceCache{
-		"absent":    {},
-		"truncated": w6aS3Cache(true, map[string][]string{"acme-other-bucket": {"s3.public"}}),
-	} {
-		t.Run(name, func(t *testing.T) {
-			res := w6aEnrichTrail(t, cache, w6aTrailRes("acme-public-bucket-trail", "acme-public-audit-logs"))
-			if len(res.Findings["acme-public-bucket-trail"]) != 0 {
-				t.Errorf("emitted %v from a %s s3 cache", w2Codes(res.Findings["acme-public-bucket-trail"]), name)
-			}
-		})
+// TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean pins the other side:
+// a bucket whose posture could not be read marks the row truncated rather than
+// reporting it healthy, and the other trails in the batch still resolve.
+func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
+	res := w6aEnrichTrail(t,
+		&w6aTrailS3Fake{
+			statusErr: map[string]error{"acme-denied-audit-logs": errors.New("AccessDenied: not authorized")},
+			public:    map[string]bool{"acme-public-audit-logs": true},
+		},
+		w6aTrailRes("acme-denied-trail", "acme-denied-audit-logs"),
+		w6aTrailRes("acme-public-bucket-trail", "acme-public-audit-logs"),
+	)
+
+	if !res.TruncatedIDs["acme-denied-trail"] {
+		t.Error("a trail whose bucket posture could not be read was not marked truncated")
+	}
+	w2AssertNoCode(t, res.Findings["acme-denied-trail"], w6aTrailBucketPublic)
+	w2AssertFinding(t, res.Findings["acme-public-bucket-trail"], w6aTrailBucketPublic,
+		"log bucket is publicly accessible", domain.SevBroken, "wave2:trail")
+}
+
+// TestW6ATrailLogBucket_CapBoundsTheIssueCount pins that the "!" row makes the
+// cap a lower bound on the issue count, so a capped pass says so.
+func TestW6ATrailLogBucket_CapBoundsTheIssueCount(t *testing.T) {
+	mk := func(n int) []resource.Resource {
+		out := make([]resource.Resource, 0, n)
+		for i := 0; i < n; i++ {
+			name := fmt.Sprintf("acme-trail-%03d", i)
+			out = append(out, w6aTrailRes(name, "acme-private-audit-logs"))
+		}
+		return out
+	}
+	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap)...); res.Truncated {
+		t.Error("exactly EnrichmentCap trails reported Truncated")
+	}
+	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap+1)...); !res.Truncated {
+		t.Error("EnrichmentCap+1 trails did not report Truncated")
 	}
 }
 
