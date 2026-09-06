@@ -107,20 +107,14 @@ func TestW29_StrippedRowFallsBackToTheSameColour(t *testing.T) {
 // findings were derived from, which is the only case where a fallback over
 // Fields can reach the same verdict.
 //
-// A wave-2 finding never can: it is a fact the fetcher went and looked up,
-// like a disabled key rotation or a zone nobody queries. Two wave-1 findings
-// cannot either, because the fetcher reads them off the SDK struct without
-// writing the input into Fields — MapPublicIpOnLaunch for the subnet one and
-// PolicyDocument for the endpoint one. Two ways out of those, and the choice
-// is not QA's: the fetcher surfaces the field, or the fallback under-reports
-// them by design.
+// Only a wave-2 finding fails that now: it is a fact the fetcher went and
+// looked up, like a disabled key rotation or a zone nobody queries, and no
+// predicate over Fields can recover it. The two wave-1 exceptions this pin
+// carried are gone — the subnet and endpoint fetchers surface auto_public_ip
+// and policy_exposure, so their findings are reachable like every other.
 func w29FallbackCanAnswer(r resource.Resource) bool {
-	notInFields := map[domain.FindingCode]bool{
-		"subnet.auto-public-ip": true,
-		"vpce.policy-open":      true,
-	}
 	for _, f := range r.Findings {
-		if f.Source != "wave1" || notInFields[f.Code] {
+		if f.Source != "wave1" {
 			return false
 		}
 	}
@@ -155,5 +149,103 @@ func TestW29_PendingEKSClusterIsAWarning(t *testing.T) {
 	}
 	if len(carriers) != 1 {
 		t.Errorf("%d demo eks rows carry eks.state.pending, want exactly 1: %v", len(carriers), carriers)
+	}
+}
+
+// TestW29_TransitGatewayAutoAcceptReachesTheFallback covers the third field the
+// conversion surfaced. subnet's auto_public_ip and vpce's policy_exposure each
+// have a demo row, so the bench pins above already exercise them; no demo
+// gateway accepts shared attachments, so this one has to be built.
+//
+// A gateway that accepts any attachment offered to it is the finding, and a
+// gateway on its way out is not: an attachment setting on a resource being
+// deleted is not something anyone will act on.
+func TestW29_TransitGatewayAutoAcceptReachesTheFallback(t *testing.T) {
+	td := resource.FindResourceType("tgw")
+	if td == nil {
+		t.Fatal("tgw not registered")
+	}
+
+	cases := []struct {
+		name  string
+		state string
+		auto  string
+		want  resource.Color
+	}{
+		{"available_auto_accept_on", "available", "yes", resource.ColorWarning},
+		{"available_auto_accept_off", "available", "no", resource.ColorHealthy},
+		{"available_auto_accept_absent", "available", "", resource.ColorHealthy},
+		// The deleted row is the one that proves the suppression: its state is
+		// Dim, so an auto-accept finding firing anyway would show as Warning.
+		// The deleting row cannot tell the two apart on colour alone and is
+		// here for the second arm of the same condition.
+		{"deleting_state_only", "deleting", "yes", resource.ColorWarning},
+		{"deleted_suppresses_it", "deleted", "yes", resource.ColorDim},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := td.ResolveColor(resource.Resource{
+				ID:     "tgw-probe",
+				Fields: map[string]string{"state": tc.state, "auto_accept": tc.auto},
+			})
+			if got != tc.want {
+				t.Errorf("state=%q auto_accept=%q → %v, want %v", tc.state, tc.auto, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestW29_KMSKeyStateReachesTheFallback covers the one converted type whose
+// demo rows are all wave-2, so the bench pins above skip it and its fallback is
+// otherwise untested. The predicate is shared with the fetcher, and its default
+// arm reports an unrecognised state as broken — right for a fetched row, where
+// the state is always one AWS returned, and wrong for a row built without one,
+// which is the regression the empty-state arm exists to stop.
+func TestW29_KMSKeyStateReachesTheFallback(t *testing.T) {
+	td := resource.FindResourceType("kms")
+	if td == nil {
+		t.Fatal("kms not registered")
+	}
+
+	cases := []struct {
+		status string
+		want   resource.Color
+	}{
+		{"Enabled", resource.ColorHealthy},
+		{"", resource.ColorHealthy},
+		{"Disabled", resource.ColorWarning},
+		{"PendingDeletion", resource.ColorBroken},
+		{"PendingImport", resource.ColorBroken},
+		{"PendingReplicaDeletion", resource.ColorBroken},
+		{"Unavailable", resource.ColorBroken},
+	}
+
+	for _, tc := range cases {
+		name := tc.status
+		if name == "" {
+			name = "absent"
+		}
+		t.Run(name, func(t *testing.T) {
+			got := td.ResolveColor(resource.Resource{
+				ID:     "key-probe",
+				Fields: map[string]string{"status": tc.status},
+			})
+			if got != tc.want {
+				t.Errorf("status=%q → %v, want %v", tc.status, got, tc.want)
+			}
+		})
+	}
+}
+
+// The fetcher is the predicate's other caller, and a real key always has a
+// state, so the arm that made a stateless row healthy must not have made a
+// stateless row possible on the bench.
+func TestW29_EveryDemoKMSRowHasAState(t *testing.T) {
+	rows, _ := w4bBench(t, "kms")
+	for _, r := range rows {
+		if r.Fields["status"] == "" {
+			t.Errorf("demo kms row %q has no status; the predicate would report nothing for it", r.ID)
+		}
 	}
 }
