@@ -26,6 +26,8 @@ package unit_test
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -750,6 +752,22 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				}
 			})
 		}
+	}
+
+	// An entry naming a checker the harness never reaches is inert: it stops
+	// asserting anything and the next checker to take that key inherits an
+	// exemption nobody wrote for it. A wrong entry already fails loudly above,
+	// because it demands Unknown; only an unreached one can rot quietly.
+	var unreached []string
+	for key := range reverseScanNeedsJoinList {
+		if !tested[key] {
+			unreached = append(unreached, key)
+		}
+	}
+	if len(unreached) > 0 {
+		sort.Strings(unreached)
+		t.Errorf("%d reverseScanNeedsJoinList entr(ies) name a checker this harness no longer runs. "+
+			"Re-derive the key or delete the entry:\n  %s", len(unreached), strings.Join(unreached, "\n  "))
 	}
 }
 

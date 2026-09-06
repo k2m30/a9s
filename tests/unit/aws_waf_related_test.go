@@ -593,3 +593,35 @@ func TestRelated_WAF_CF_CloudfrontScopeEmptyDistributionList(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty distribution list)", result.Count())
 	}
 }
+
+// TestRelated_WAF_CF_NilDistributionListIsUnknown pins the boundary between an
+// empty answer and no answer. An empty DistributionList is CloudFront saying
+// this web ACL protects no distribution, and a zero is the truth. A nil one is
+// a successful call that carried no list at all, which is not a count of any
+// kind — the same "nothing was read" the nil-list branches answer Unknown for,
+// one layer out at the API rather than the cache.
+//
+// The gate that holds the cache-side sites keys on a variable a fetch helper
+// returned, and this is a nil field on a response, so it cannot see this site.
+// The behaviour is pinned here instead.
+func TestRelated_WAF_CF_NilDistributionListIsUnknown(t *testing.T) {
+	res := resource.Resource{
+		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
+		Name: "my-cf-waf",
+		Fields: map[string]string{
+			"name":  "my-cf-waf",
+			"id":    "a1b2c3d4-5678-90ab-cdef-222222222222",
+			"scope": "CLOUDFRONT",
+		},
+	}
+	clients := &awsclient.ServiceClients{CloudFront: &fakeCloudFrontAPI{
+		WebACLOutput: &cloudfront.ListDistributionsByWebACLIdOutput{},
+	}}
+
+	result := wafCheckerByTarget(t, "cf")(context.Background(), clients, res, nil)
+
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("nil DistributionList: state = %v (Count=%d), want Unknown — the response carried no list, which is not a zero",
+			result.State(), result.Count())
+	}
+}
