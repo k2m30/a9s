@@ -579,7 +579,13 @@ func TestW5_Kinesis_APIErrorOnOneStreamTruncatesOnlyThatStream(t *testing.T) {
 func TestW5_Kinesis_NotFoundMarksTruncatedWithoutFailing(t *testing.T) {
 	missing, plain := "acme-vanished", "acme-clickstream-plain"
 	f := newW5KinesisFake()
-	f.errByName[missing] = errors.New("ResourceNotFoundException: Stream acme-vanished under account 123456789012 not found")
+	// The typed exception AWS actually returns, not an errors.New whose text
+	// happens to spell the code. A fake that injects the string leaves the
+	// typed errors.As arm untested and lets a text-match fallback look load
+	// bearing when it is only propping up the fake.
+	f.errByName[missing] = &kinesistypes.ResourceNotFoundException{
+		Message: aws.String("Stream acme-vanished under account 123456789012 not found"),
+	}
 	s := w5StreamSummary(plain)
 	s.EncryptionType = kinesistypes.EncryptionTypeNone
 	f.summaries[plain] = s

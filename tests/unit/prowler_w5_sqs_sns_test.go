@@ -832,29 +832,49 @@ func TestW5_SNSSubPlainHTTP_ByProtocol(t *testing.T) {
 // webhook path is frequently the shared secret that authenticates the
 // caller, and rule 7 keeps secrets out of rendered rows.
 func TestW5_SNSSubPlainHTTP_EndpointRowDropsThePath(t *testing.T) {
-	out, err := awsclient.FetchSNSSubscriptionsPage(
-		context.Background(),
-		&w5SNSSubListFake{subs: []snstypes.Subscription{
-			w5Sub("http", "http://hooks.acme-corp.com/sns/orders?token=s3cr3t"),
-		}},
-		"",
-	)
-	if err != nil {
-		t.Fatalf("FetchSNSSubscriptionsPage: %v", err)
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{"path and query", "http://hooks.acme-corp.com/sns/orders?token=s3cr3t", "http://hooks.acme-corp.com"},
+		{"fragment", "http://hooks.acme-corp.com/sns#orders", "http://hooks.acme-corp.com"},
+		{"port kept", "http://hooks.acme-corp.com:8080/sns/orders", "http://hooks.acme-corp.com:8080"},
+		// Userinfo is the other half of the same rule and the sharper half:
+		// a webhook that authenticates by embedding its credentials in the
+		// URL puts them in front of the host, so keeping "scheme://host"
+		// literally would render the credential on the row.
+		{"userinfo dropped", "http://acme:hunter2secret@hooks.acme-corp.com/sns/orders", "http://hooks.acme-corp.com"},
 	}
-	r := out.Resources[0]
-	ad, ok := r.AttentionDetails[domain.FindingCode("sns-sub.plain-http")]
-	if !ok {
-		t.Fatalf("no AttentionDetail rows for sns-sub.plain-http; got %v", r.AttentionDetails)
-	}
-	var endpoint string
-	for _, row := range ad.Rows {
-		if row.Label == "Endpoint" {
-			endpoint = row.Value
-		}
-	}
-	if endpoint != "http://hooks.acme-corp.com" {
-		t.Errorf("Endpoint row = %q, want %q — scheme and host only, never the path", endpoint, "http://hooks.acme-corp.com")
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := awsclient.FetchSNSSubscriptionsPage(
+				context.Background(),
+				&w5SNSSubListFake{subs: []snstypes.Subscription{w5Sub("http", tc.endpoint)}},
+				"",
+			)
+			if err != nil {
+				t.Fatalf("FetchSNSSubscriptionsPage: %v", err)
+			}
+			r := out.Resources[0]
+			ad, ok := r.AttentionDetails[domain.FindingCode("sns-sub.plain-http")]
+			if !ok {
+				t.Fatalf("no AttentionDetail rows for sns-sub.plain-http; got %v", r.AttentionDetails)
+			}
+			var endpoint string
+			for _, row := range ad.Rows {
+				if row.Label == "Endpoint" {
+					endpoint = row.Value
+				}
+			}
+			if endpoint != tc.want {
+				t.Errorf("Endpoint row = %q, want %q — scheme and host only", endpoint, tc.want)
+			}
+			if strings.Contains(endpoint, "hunter2secret") {
+				t.Errorf("Endpoint row = %q carries the credential embedded in the endpoint", endpoint)
+			}
+		})
 	}
 }
 
