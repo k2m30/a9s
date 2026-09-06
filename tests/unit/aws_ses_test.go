@@ -118,8 +118,11 @@ func TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping(t *testing.T) {
 	if r.ID != "noreply@acme-corp.com" {
 		t.Errorf("ID = %q, want %q", r.ID, "noreply@acme-corp.com")
 	}
-	if r.Fields["identity_type"] != "EMAIL_ADDRESS" {
-		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "EMAIL_ADDRESS")
+	// Inverted deliberately: the Type column renders this field verbatim and
+	// an operator reads a column, not an SDK enum constant. See the same
+	// inversion in qa_ses_test.go.
+	if r.Fields["identity_type"] != "email address" {
+		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "email address")
 	}
 	if r.Fields["sending_enabled"] != "false" {
 		t.Errorf("Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "false")

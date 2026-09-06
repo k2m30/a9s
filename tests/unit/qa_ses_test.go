@@ -57,8 +57,12 @@ func TestFetchSESIdentities_ParsesMultipleIdentities(t *testing.T) {
 	if r.Fields["identity_name"] != "example.com" {
 		t.Errorf("expected Fields[identity_name] 'example.com', got %q", r.Fields["identity_name"])
 	}
-	if r.Fields["identity_type"] != "DOMAIN" {
-		t.Errorf("expected Fields[identity_type] 'DOMAIN', got %q", r.Fields["identity_type"])
+	// Inverted deliberately: the Type column renders this field verbatim, and
+	// an operator reads a column, not an SDK enum. The rendered-surface style
+	// gate forbids raw enum text on any surface, so the fetcher humanizes here
+	// rather than every renderer re-deriving the same mapping.
+	if r.Fields["identity_type"] != "domain" {
+		t.Errorf("expected Fields[identity_type] 'domain', got %q", r.Fields["identity_type"])
 	}
 	if r.Fields["sending_enabled"] != "true" {
 		t.Errorf("expected Fields[sending_enabled] 'true', got %q", r.Fields["sending_enabled"])
@@ -73,8 +77,8 @@ func TestFetchSESIdentities_ParsesMultipleIdentities(t *testing.T) {
 
 	// Second identity
 	r2 := resources[1]
-	if r2.Fields["identity_type"] != "EMAIL_ADDRESS" {
-		t.Errorf("expected Fields[identity_type] 'EMAIL_ADDRESS', got %q", r2.Fields["identity_type"])
+	if r2.Fields["identity_type"] != "email address" {
+		t.Errorf("expected Fields[identity_type] 'email address', got %q", r2.Fields["identity_type"])
 	}
 	if r2.Fields["sending_enabled"] != "false" {
 		t.Errorf("expected Fields[sending_enabled] 'false', got %q", r2.Fields["sending_enabled"])

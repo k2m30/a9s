@@ -81,6 +81,10 @@ var knownAcronymExemptions = map[string]bool{
 	"ARN": true, "ARNS": true, "VPC": true, "TLS": true, "SSL": true, "DNS": true,
 	"WAF": true, "IAM": true, "KMS": true, "SG": true, "AMI": true,
 	"CIS": true, "ACL": true, "MFA": true, "DLQ": true, "PITR": true,
+	// DKIM is the word the SES console and the Prowler check both use, and
+	// there is no humanized form to convert it to; rewriting the phrase
+	// around it would make the status cell vaguer, not clearer.
+	"DKIM": true,
 	"CIDR": true, "NAT": true, "IGW": true, "EIP": true, "ENI": true, "EBS": true, "SSRF": true,
 	// AWS service-name / protocol acronyms that appear inline in
 	// hand-written prose (e.g. "no HTTPS redirect", "isolated: quarantined
