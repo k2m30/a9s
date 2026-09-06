@@ -19,15 +19,11 @@ if ! git rev-parse --verify --quiet "$base" > /dev/null; then
   base=main
 fi
 
-# CHANGELOG.md is the one hub every task still shares; landing resolves it by
-# keeping both sides. Drop the exclusion once changelog.d fragments are in use.
-exclude='^CHANGELOG\.md$'
-
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 for branch in "$@"; do
-  git diff --name-only "$base...$branch" | awk -v skip="$exclude" '$0 !~ skip' | LC_ALL=C sort -u > "$tmp/$(echo "$branch" | tr / _)"
+  git diff --name-only "$base...$branch" | LC_ALL=C sort -u > "$tmp/$(echo "$branch" | tr / _)"
 done
 
 overlap="$(cat "$tmp"/* | LC_ALL=C sort | uniq -d)"
