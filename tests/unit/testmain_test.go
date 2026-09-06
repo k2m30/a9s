@@ -8,6 +8,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -54,6 +55,14 @@ func TestMain(m *testing.M) {
 			cleanupDir = dir
 		}
 	}
+	// Package-wide hermetic default, same reasoning as A9S_CONFIG_FOLDER
+	// above: any test in this binary that drives a copy key and drains the
+	// returned cmd would otherwise overwrite whatever the developer had on
+	// the pasteboard, and would race every other test in every parallel
+	// worktree that does the same. Tests that assert on the copied text
+	// install their own capture over this one (ReadClipboardAfter).
+	tui.SetClipboardWriteForTest(func(string) error { return nil })
+
 	// TEST_SKIP_INSTALL=1 lets sub-process tests exercise the
 	// panic-before-SetTypes path without triggering a bootstrap here.
 	if os.Getenv("TEST_SKIP_INSTALL") != "1" {

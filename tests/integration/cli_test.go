@@ -12,6 +12,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // testBinary is the path to the compiled a9s binary for CLI tests.
@@ -22,6 +23,12 @@ func TestMain(m *testing.M) {
 	// into catalog.Find / catalog.All (transitively via tui.New, etc.).
 	aws.Install()
 	resource.WireProjection()
+
+	// Package-wide hermetic default: a scenario that presses a copy key
+	// would otherwise overwrite whatever the developer had on the
+	// pasteboard, and race every other binary doing the same. Tests that
+	// assert on the copied text install their own capture over this one.
+	tui.SetClipboardWriteForTest(func(string) error { return nil })
 
 	// Build the binary once for all CLI tests. Stamp main.version via
 	// ldflags so TestQA_012_VersionFlag's X.Y.Z assertion holds — without

@@ -22,6 +22,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // TestConsoleOpen_Demo_KeyFlashesDisabledAndNeverExecsBrowser points $BROWSER
@@ -75,21 +77,27 @@ func TestConsoleOpen_Demo_KeyFlashesDisabledAndNeverExecsBrowser(t *testing.T) {
 }
 
 // TestConsoleOpen_Demo_UppercaseOCopiesAnHTTPSConsoleURL presses "O" on a
-// loaded demo resource list and asserts the value that reaches the pasteboard
-// is an https console URL. The read-back goes through readClipboardAfter so a
-// sibling test's copy cannot be mistaken for this one's.
+// loaded demo resource list and asserts the value the app hands to the
+// clipboard is an https console URL. The value is captured at the app's write
+// seam: the OS pasteboard is shared by every process on the machine, so a
+// read-back would assert on whoever wrote last.
 func TestConsoleOpen_Demo_UppercaseOCopiesAnHTTPSConsoleURL(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	scenario.OpenList("ec2")
 
-	got := readClipboardAfter(t, func() {
-		scenario.Press("O")
-
-		if scenario.lastFlash == nil {
-			t.Fatal("pressing 'O' should produce a flash confirming the console-URL copy")
-		}
-		scenario.ExpectNoAPIError()
+	var got string
+	restore := tui.SetClipboardWriteForTest(func(s string) error {
+		got = s
+		return nil
 	})
+	defer restore()
+
+	scenario.Press("O")
+
+	if scenario.lastFlash == nil {
+		t.Fatal("pressing 'O' should produce a flash confirming the console-URL copy")
+	}
+	scenario.ExpectNoAPIError()
 	if !strings.HasPrefix(got, "https://") || !strings.Contains(got, "console.aws.amazon.com") {
 		t.Errorf("clipboard content after 'O' = %q, want an https://...console.aws.amazon.com/... URL", got)
 	}

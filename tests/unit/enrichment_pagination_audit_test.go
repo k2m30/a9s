@@ -640,6 +640,32 @@ var nonPaginatedAPIs = []string{
 	// ListResourcesForWebACL — WAFv2 returns all associated resource ARNs in
 	// a single response (no NextToken in output); not a paginated operation.
 	"ListResourcesForWebACL",
+	// The seven below were surfaced once the audit began walking the
+	// unexported helpers the enrichers delegate to, not only the exported
+	// Enrich* entry points. Each output struct was read off the SDK version
+	// this module pins.
+	//
+	// DescribeDBClusterSnapshotAttributes — one snapshot's attribute list.
+	// rds.DescribeDBClusterSnapshotAttributesOutput carries only
+	// DBClusterSnapshotAttributesResult; there is no token field.
+	"DescribeDBClusterSnapshotAttributes",
+	// DescribeDBSnapshotAttributes — same shape for the instance snapshot.
+	"DescribeDBSnapshotAttributes",
+	// GetResourcePolicy — one table's resource policy document.
+	// dynamodb.GetResourcePolicyOutput carries Policy and RevisionId only.
+	"GetResourcePolicy",
+	// DescribeTaskDefinition — one task definition revision.
+	// ecs.DescribeTaskDefinitionOutput carries TaskDefinition and Tags only.
+	"DescribeTaskDefinition",
+	// DescribeFileSystemPolicy — one file system's policy document.
+	"DescribeFileSystemPolicy",
+	// DescribeBackupPolicy — one file system's backup policy.
+	"DescribeBackupPolicy",
+	// DescribeDBEngineVersions — the enricher filters to a single
+	// Engine + EngineVersion pair, which identifies one version, so the
+	// Marker the output carries is never set. Paginating it would loop over a
+	// one-row answer.
+	"DescribeDBEngineVersions",
 }
 
 // paginationBurnDown is the list of call sites the per-call-site audit already
@@ -649,15 +675,27 @@ var nonPaginatedAPIs = []string{
 // so the list cannot outlive the work.
 //
 // Key shape: "<file>:<Enrich func>:<SDK operation>".
-var paginationBurnDown = map[string]bool{}
+var paginationBurnDown = map[string]bool{
+	// asgLaunchConfigurationPosture asks for up to EnrichmentCap (50) launch
+	// configurations by name in one call and never reads the NextToken the
+	// output carries. It fits today only because the API's default page size
+	// is also 50: ask for one more name and the overflow is dropped in
+	// silence, and every row whose launch configuration fell off the page
+	// reads as "nothing to report" rather than "not inspected".
+	"asg_issue_enrichment.go:asgLaunchConfigurationPosture:DescribeLaunchConfigurations": true,
+}
 
 // TestNoSingleCallListAPIEnrichers walks core/aws/*_issue_enrichment.go via
-// go/ast and flags any Enrich* function that:
+// go/ast and flags any call expression that:
 //
-//  1. Contains a 3-level selector call (clients.X.Op(...)) to an AWS SDK
+//  1. Is a 3-level selector call (clients.X.Op(...)) to an AWS SDK
 //     list/describe operation that is NOT in the nonPaginatedAPIs allowlist, AND
-//  2. Has no identifier reference to NextToken, Marker, or ContinuationToken
-//     anywhere in its function body.
+//  2. Sits in no enclosing loop that drives a NextToken, Marker or
+//     ContinuationToken.
+//
+// Every function in the file is walked, not only the exported Enrich* ones.
+// An enricher that hands the call to an unexported helper has the same defect
+// as one that makes it inline, and the helpers hold a third of the call sites.
 //
 // The test passes when zero such calls are found, meaning every
 // paginated-capable API either has a loop guard or is explicitly allowlisted.
@@ -716,10 +754,6 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 			if fn.Name == nil || fn.Body == nil {
 				continue
 			}
-			if !strings.HasPrefix(fn.Name.Name, "Enrich") {
-				continue
-			}
-
 			funcName := fn.Name.Name
 
 			// Collect all 3-level selector calls: clients.Service.Op(...)

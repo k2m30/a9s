@@ -30,17 +30,14 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ── Shared helper: press Copy and read back the actual clipboard content ────
+// ── Shared helper: press Copy and read back what was copied ────────────────
 //
 // The 'c' key routes through Model.handleCopy() -> copyToClipboard(content,
-// label), which performs a REAL OS clipboard write. On rsKindText/Reveal/
-// Identity the returned messages.Flash.Text carries a constant label (e.g.
-// "Copied YAML to clipboard"), never the copied content itself — so content
-// correctness (uncolored body, exact ARN, ...) can only be verified by
-// reading the clipboard back, mirroring the round-trip already accepted by
-// tests/integration/clipboard_test.go. Skips (not fails) when clipboard
-// access is unavailable in the running environment, matching the existing
-// qa_copy_test.go precedent for write failures.
+// label). On rsKindText/Reveal/Identity the returned messages.Flash.Text
+// carries a constant label (e.g. "Copied YAML to clipboard"), never the
+// copied content itself — so content correctness (uncolored body, exact ARN,
+// ...) can be verified only by capturing what the copy handed to the
+// clipboard, which is what ReadClipboardAfter does.
 func wave3CopyAndReadClipboard(t *testing.T, m tui.Model) string {
 	t.Helper()
 	return ReadClipboardAfter(t, func() {
@@ -53,8 +50,11 @@ func wave3CopyAndReadClipboard(t *testing.T, m tui.Model) string {
 		if !ok {
 			t.Fatalf("expected messages.Flash from copy, got %T", msg)
 		}
+		// The capture seam cannot fail, so an error flash here is the copy
+		// path itself reporting a failure, not a machine without a
+		// pasteboard.
 		if flash.IsError || strings.HasPrefix(flash.Text, "Copy failed:") {
-			t.Skip("clipboard not available in this environment")
+			t.Fatalf("copy reported a failure: %q", flash.Text)
 		}
 	})
 }

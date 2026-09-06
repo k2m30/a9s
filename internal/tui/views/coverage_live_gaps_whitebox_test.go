@@ -8,7 +8,7 @@
 package views
 
 import (
-	"os"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -16,7 +16,6 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -87,46 +86,40 @@ func TestLiveGap_DecodeRune(t *testing.T) {
 // searchReadClipboard (search.go)
 // ---------------------------------------------------------------------------
 
-// TestLiveGap_SearchReadClipboard writes a known value to the host clipboard
-// and reads it back exactly once via searchReadClipboard(), rather than
-// calling clipboard.ReadAll() a second time to compute "want" — a second,
-// separate read is flaky whenever anything else on the host (another test,
-// a user, a background app) changes the clipboard between the two reads.
-// Writing the fixture value first also removes the dependency on whatever
-// pre-existing clipboard content happened to be present in this environment.
-//
-// searchReadClipboard (search.go) calls clipboard.ReadAll() directly with no
-// injectable reader seam, so exercising it live is the only way to cover it
-// at all — but doing so mutates whatever is actually in the host clipboard
-// at the time the suite runs. Opt-in only (A9S_CLIPBOARD_INTEGRATION=1): the
-// normal `make test`/`make test-race` run never touches the host clipboard,
-// so a developer's real clipboard contents are never at risk of being
-// permanently overwritten by CI/local test runs that crash before the
-// t.Cleanup restore below fires.
+// TestLiveGap_SearchReadClipboard drives searchReadClipboard through the
+// clipboardRead seam. The host pasteboard is one mutable object shared by
+// every process on the machine, so reading it back would assert on whoever
+// wrote last and would mutate what the developer had copied; feeding the seam
+// asserts on this test's own value and runs everywhere.
 func TestLiveGap_SearchReadClipboard(t *testing.T) {
-	if os.Getenv("A9S_CLIPBOARD_INTEGRATION") != "1" {
-		t.Skip("set A9S_CLIPBOARD_INTEGRATION=1 to run this host-clipboard-mutating test")
-	}
+	t.Run("the pasted text reaches the message", func(t *testing.T) {
+		restore := SetClipboardReadForTest(func() (string, error) {
+			return "a9s-livegap-clipboard-fixture", nil
+		})
+		defer restore()
 
-	original, readErr := clipboard.ReadAll()
-	if readErr != nil {
-		t.Skip("cannot read and safely restore the system clipboard")
-	}
-	if err := clipboard.WriteAll("a9s-livegap-clipboard-fixture"); err != nil {
-		t.Skip("no system clipboard available in this environment")
-	}
-	t.Cleanup(func() {
-		_ = clipboard.WriteAll(original) //nolint:errcheck // best-effort restore of the host clipboard
+		msg := searchReadClipboard()
+		pasted, ok := msg.(searchPasteMsg)
+		if !ok {
+			t.Fatalf("searchReadClipboard() = %#v (%T), want searchPasteMsg", msg, msg)
+		}
+		if string(pasted) != "a9s-livegap-clipboard-fixture" {
+			t.Errorf("searchReadClipboard() = %q, want %q", string(pasted), "a9s-livegap-clipboard-fixture")
+		}
 	})
 
-	msg := searchReadClipboard()
-	pasted, ok := msg.(searchPasteMsg)
-	if !ok {
-		t.Fatalf("searchReadClipboard() = %#v (%T), want searchPasteMsg", msg, msg)
-	}
-	if string(pasted) != "a9s-livegap-clipboard-fixture" {
-		t.Errorf("searchReadClipboard() = %q, want %q (the fixture value just written)", string(pasted), "a9s-livegap-clipboard-fixture")
-	}
+	// A pasteboard that cannot be read is not an empty pasteboard: pasting
+	// nothing into the query is right, wiping the query with "" is not.
+	t.Run("an unreadable pasteboard pastes nothing", func(t *testing.T) {
+		restore := SetClipboardReadForTest(func() (string, error) {
+			return "", errors.New("no pasteboard here")
+		})
+		defer restore()
+
+		if msg := searchReadClipboard(); msg != nil {
+			t.Errorf("searchReadClipboard() = %#v (%T), want nil when the read fails", msg, msg)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------

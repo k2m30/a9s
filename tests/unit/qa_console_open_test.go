@@ -114,8 +114,10 @@ func TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL(t *testing.T) {
 		if !ok {
 			t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
 		}
+		// The copy is captured at the seam, which cannot fail, so an error
+		// flash is the copy path reporting a real failure.
 		if flash.IsError {
-			t.Skipf("clipboard not available in this environment: %s", flash.Text)
+			t.Fatalf("the console-URL copy reported a failure: %s", flash.Text)
 		}
 	})
 	want := "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=i-0abc123"
@@ -271,8 +273,10 @@ func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
 		if !ok {
 			t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
 		}
+		// The copy is captured at the seam, which cannot fail, so an error
+		// flash is the copy path reporting a real failure.
 		if flash.IsError {
-			t.Skipf("clipboard not available in this environment: %s", flash.Text)
+			t.Fatalf("the console-URL copy reported a failure: %s", flash.Text)
 		}
 	})
 	want := "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=i-0abc123"
@@ -388,8 +392,10 @@ func TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL(t *testing
 		if !ok {
 			t.Fatalf("pressing 'O' should produce messages.Flash, got %T", msg)
 		}
+		// Captured at the seam: an error flash is the copy path failing,
+		// not a machine without a pasteboard.
 		if flash.IsError {
-			t.Skipf("clipboard not available in this environment (%s) — headless side already confirmed %q", flash.Text, headlessURL)
+			t.Fatalf("the TUI console-URL copy reported a failure: %s (headless produced %q)", flash.Text, headlessURL)
 		}
 	})
 	if got != wantURL {

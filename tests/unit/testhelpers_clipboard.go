@@ -1,52 +1,34 @@
 package unit
 
 import (
-	"fmt"
-	"os"
-	"sync"
-	"sync/atomic"
 	"testing"
 
-	"github.com/atotto/clipboard"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// The OS pasteboard is one mutable object shared by every test in the binary.
-// Production copy paths write it for real and report only a constant flash
-// label, so the copied text can be verified only by reading it back — which
-// means two copy tests running in either order can read each other's write.
-// clipboardMu serialises them.
-var clipboardMu sync.Mutex
-
-var clipboardSeq atomic.Uint64
-
-// ReadClipboardAfter runs copyFn, which must perform the real pasteboard
-// write, and returns what landed there.
+// ReadClipboardAfter runs copyFn, which must perform the copy the test is
+// asserting on, and returns the text the app handed to the clipboard.
 //
-// A unique sentinel goes on the pasteboard first, so a write that never
-// happened is a skip instead of an assertion against whatever the previous
-// test left behind. Ceiling: this excludes interference from other tests in
-// this binary, not from another process writing the pasteboard mid-test. A
-// read-back that is neither the sentinel nor the expected text is therefore
-// still reported as a failure, because silently skipping on any unexpected
-// value would turn a real copy regression into a green run.
+// The copy is captured at the app's write seam rather than read back off the
+// OS pasteboard. The pasteboard is one mutable object shared by every process
+// on the machine, so a read-back asserts on whoever wrote last — another test
+// in this binary, a test in a parallel worktree, or the human at the keyboard.
+// Capturing means the assertion sees this copy and no other, and it holds on a
+// headless machine with no pasteboard at all.
+//
+// A copy that never reached the seam fails: the empty string is not any
+// expected content, and the caller's own assertion reports it.
 func ReadClipboardAfter(t *testing.T, copyFn func()) string {
 	t.Helper()
-	clipboardMu.Lock()
-	defer clipboardMu.Unlock()
 
-	sentinel := fmt.Sprintf("a9s-clipboard-sentinel-%d-%d", os.Getpid(), clipboardSeq.Add(1))
-	if err := clipboard.WriteAll(sentinel); err != nil {
-		t.Skipf("clipboard not writable in this environment: %v", err)
-	}
+	var got string
+	restore := tui.SetClipboardWriteForTest(func(s string) error {
+		got = s
+		return nil
+	})
+	defer restore()
 
 	copyFn()
 
-	got, err := clipboard.ReadAll()
-	if err != nil {
-		t.Skipf("clipboard read-back unavailable: %v", err)
-	}
-	if got == sentinel {
-		t.Skip("the copy did not reach the pasteboard in this environment")
-	}
 	return got
 }

@@ -162,3 +162,140 @@ func bodyCallsSelector(body ast.Node, name string) bool {
 	})
 	return found
 }
+
+// cellAssemblyExempt lists helpers that build a Status cell themselves for a
+// reason: the assembly itself is what they pin.
+//
+// Key shape: "<file>:<func>".
+var cellAssemblyExempt = map[string]string{}
+
+// TestWave2FoldConformance_HelpersDoNotAssembleTheStatusCell walks every test
+// file under tests/ and flags a helper that returns a Status-cell string it
+// built from a row's findings — picking the phrase by index, or writing the
+// "(+N)" suffix as a literal — instead of calling domain.StatusPhrase.
+//
+// The cell the operator reads comes from one selection: domain.TopFinding
+// picks the phrase, the same rank picks the colour, and the "(+N)" suffix
+// counts only issue-severity findings. A helper that reimplements any part of
+// that is asserting against its own idea of the screen: it stays green when
+// the real selection changes, and it goes red when the real selection is
+// right and its copy is stale.
+//
+// Only helpers are in scope. A test that asserts a fetcher put "(+1)" in a
+// field is reading production output, which is the point.
+func TestWave2FoldConformance_HelpersDoNotAssembleTheStatusCell(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller(0) failed")
+	}
+	testsRoot := filepath.Dir(filepath.Dir(thisFile))
+
+	fset := token.NewFileSet()
+	var violations []string
+	seenExempt := map[string]bool{}
+
+	err := filepath.WalkDir(testsRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		src, perr := parser.ParseFile(fset, path, nil, 0)
+		if perr != nil {
+			t.Fatalf("parse %s: %v", path, perr)
+		}
+		base := filepath.Base(path)
+		for _, decl := range src.Decls {
+			fn, isFunc := decl.(*ast.FuncDecl)
+			if !isFunc || fn.Name == nil || fn.Body == nil {
+				continue
+			}
+			if strings.HasPrefix(fn.Name.Name, "Test") || !returnsString(fn) {
+				continue
+			}
+			if !selectsPhraseByIndex(fn.Body) && !writesStackedSuffix(fn.Body) {
+				continue
+			}
+			if bodyCallsSelector(fn.Body, "StatusPhrase") {
+				continue
+			}
+			key := base + ":" + fn.Name.Name
+			if _, exempt := cellAssemblyExempt[key]; exempt {
+				seenExempt[key] = true
+				continue
+			}
+			violations = append(violations, fmt.Sprintf(
+				"%s:%d: %s builds a Status cell from findings instead of calling domain.StatusPhrase",
+				base, fset.Position(fn.Pos()).Line, fn.Name.Name))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", testsRoot, err)
+	}
+
+	for key, why := range cellAssemblyExempt {
+		if !seenExempt[key] {
+			t.Errorf("cellAssemblyExempt lists %q (%s), which this gate no longer finds — delete the entry", key, why)
+		}
+	}
+
+	if len(violations) > 0 {
+		sort.Strings(violations)
+		t.Errorf("%d test helper(s) assemble the Status cell themselves:\n  %s\n\n"+
+			"Call domain.StatusPhrase(row.Findings), or add the function to cellAssemblyExempt with the reason the assembly is its subject.",
+			len(violations), strings.Join(violations, "\n  "))
+	}
+}
+
+func returnsString(fn *ast.FuncDecl) bool {
+	if fn.Type.Results == nil {
+		return false
+	}
+	for _, f := range fn.Type.Results.List {
+		if id, ok := f.Type.(*ast.Ident); ok && id.Name == "string" {
+			return true
+		}
+	}
+	return false
+}
+
+// selectsPhraseByIndex reports whether the body reads .Phrase off an indexed
+// expression — findings[0].Phrase, byCode[code].Phrase — which is a selection
+// the renderer does not make.
+func selectsPhraseByIndex(body ast.Node) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "Phrase" {
+			return true
+		}
+		if _, isIndex := sel.X.(*ast.IndexExpr); isIndex {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// writesStackedSuffix reports whether the body contains a string literal
+// carrying the "(+" the renderer appends for stacked findings.
+func writesStackedSuffix(body ast.Node) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING && strings.Contains(lit.Value, "(+") {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
