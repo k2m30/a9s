@@ -117,10 +117,11 @@ func TestCtEventsPivots_TruncatedConfirmsOnlyWhatItSaw(t *testing.T) {
 	}
 }
 
-// TestCtEventsPivots_TruncatedConfirmingNothingIsUnknown pins the third case.
-// A zero off a partial list is a guess in the other direction — the resource
-// may sit on a page nobody read.
-func TestCtEventsPivots_TruncatedConfirmingNothingIsUnknown(t *testing.T) {
+// TestCtEventsPivots_TruncatedConfirmingNothingIsALowerBound pins the third
+// case, INVERTED under the row 16 amendment. It asserted Unknown; a truncated
+// list that confirmed nothing is a resolved zero carrying the truncation flag,
+// rendered "(0+)". Unknown belongs to the case above, where nothing was read.
+func TestCtEventsPivots_TruncatedConfirmingNothingIsALowerBound(t *testing.T) {
 	event := ctPivotEvent()
 	for _, p := range ctPivots() {
 		t.Run(p.target, func(t *testing.T) {
@@ -131,9 +132,12 @@ func TestCtEventsPivots_TruncatedConfirmingNothingIsUnknown(t *testing.T) {
 
 			result := ctEventsCheckerByTarget(t, p.target)(context.Background(), nil, event, cache)
 
-			if got := result.EffectiveState(); got != domain.RelatedUnknown {
-				t.Errorf("state = %v, want RelatedUnknown: a truncated list that confirmed nothing settles neither way; IDs=%v",
+			if got := result.EffectiveState(); got != domain.RelatedResolved {
+				t.Errorf("state = %v, want RelatedResolved: the list was read; IDs=%v",
 					got, result.ResourceIDs())
+			}
+			if !result.Truncated() {
+				t.Error("Truncated = false, want true (a later page may still confirm)")
 			}
 		})
 	}

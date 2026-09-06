@@ -255,7 +255,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   went nowhere on Enter. With no role list read yet, the row now reads as
   unknown rather than guessing, and a role filed under a path is matched by
   its whole name instead of a trailing fragment that could belong to a
-  different role.
+  different role. Where only part of the list was read, every CloudTrail event
+  pivot now reports what those pages confirmed, marked as a lower bound, which
+  is the same reading the rest of the related panel uses.
 
 - A load balancer with several listeners in the clear, or several on a weak
   TLS policy, now names every affected port rather than the first one, and its

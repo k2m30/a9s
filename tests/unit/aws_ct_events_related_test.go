@@ -612,7 +612,7 @@ func TestRelated_CtEvents_Role_AssumedRoleNoMatch(t *testing.T) {
 // (N+). A named resource the list has NOT confirmed is Unknown, not a count.
 // ---------------------------------------------------------------------------
 
-func TestRelated_CtEvents_Role_TruncatedCacheWithoutTheRoleIsUnknown(t *testing.T) {
+func TestRelated_CtEvents_Role_TruncatedCacheWithoutTheRoleIsALowerBound(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
@@ -635,11 +635,19 @@ func TestRelated_CtEvents_Role_TruncatedCacheWithoutTheRoleIsUnknown(t *testing.
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	// INVERTED (was: resolved by identity to (1)). The page is truncated and does
-	// not carry my-role, so the checker cannot tell a deleted role from one on a
-	// page it never read. Unknown is the honest answer.
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("State = %v, want Unknown (truncated page cannot confirm my-role)", result.State())
+	// The event body never becomes a count: the (1) this used to resolve by
+	// identity is gone for good. What replaces it changed once more under the
+	// row 16 amendment — none confirmed among the pages read is a lower bound
+	// carrying the truncation flag, not Unknown, which is reserved for a list
+	// that was never read.
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want Resolved (the page was read)", result.State())
+	}
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (my-role is not among the pages read)", result.Count())
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true (a later page may still carry my-role)")
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
@@ -706,14 +714,15 @@ func TestRelated_CtEvents_EC2_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, cache)
 
-	// INVERTED for row 6. This used to assert the named instance was "resolved
-	// by identity" off a truncated cache that did not contain it. An id in an
-	// event body says the instance existed when the call was recorded; an
-	// unread page confirms nothing, so the honest answer is Unknown. Do not
-	// restore it.
-	if got := result.EffectiveState(); got != domain.RelatedUnknown {
-		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedUnknown; IDs=%v",
-			got, result.ResourceIDs())
+	// INVERTED again under the row 16 amendment. The event body never becomes a
+	// count — that part of row 6 stands — but a truncated list that confirmed
+	// nothing is a resolved zero carrying the truncation flag, rendered "(0+)".
+	// Unknown is reserved for a list that was never read at all.
+	if got := result.EffectiveState(); got != domain.RelatedResolved {
+		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedResolved", got)
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true (a later page may still confirm)")
 	}
 	if len(result.ResourceIDs()) != 0 {
 		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
@@ -743,11 +752,15 @@ func TestRelated_CtEvents_S3_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	// INVERTED for row 6, same reason as the EC2 case above: a truncated list
-	// that did not contain my-bucket confirms nothing about it.
-	if got := result.EffectiveState(); got != domain.RelatedUnknown {
-		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedUnknown; IDs=%v",
-			got, result.ResourceIDs())
+	// INVERTED again under the row 16 amendment. The event body never becomes a
+	// count — that part of row 6 stands — but a truncated list that confirmed
+	// nothing is a resolved zero carrying the truncation flag, rendered "(0+)".
+	// Unknown is reserved for a list that was never read at all.
+	if got := result.EffectiveState(); got != domain.RelatedResolved {
+		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedResolved", got)
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true (a later page may still confirm)")
 	}
 	if len(result.ResourceIDs()) != 0 {
 		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
@@ -793,12 +806,15 @@ func TestRelated_CtEvents_IAMUser_TruncatedCacheResolvesByIdentity(t *testing.T)
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	// INVERTED for row 4, same reason as the nil-cache case above: the first
-	// page of users did not name alice, and there are more pages. Neither the
-	// event nor the partial list settles whether that user exists, so the
-	// honest answer is Unknown rather than a count taken from the event body.
-	if got := result.EffectiveState(); got != domain.RelatedUnknown {
-		t.Errorf("state = %v, want RelatedUnknown: a truncated user list that did not name alice proves nothing either way", got)
+	// INVERTED again under the row 16 amendment. The event body never becomes a
+	// count — that part of row 4 stands — but a truncated list that confirmed
+	// nothing is a resolved zero carrying the truncation flag, rendered "(0+)".
+	// Unknown is reserved for a list that was never read at all.
+	if got := result.EffectiveState(); got != domain.RelatedResolved {
+		t.Errorf("state = %v after a truncated page confirmed none of the event's ids, want RelatedResolved", got)
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true (a later page may still confirm)")
 	}
 	if len(result.ResourceIDs()) != 0 {
 		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())

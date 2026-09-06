@@ -36,12 +36,9 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	// The event names a user that was there when it was recorded; it does not
-	// prove the user is there now. A first page that did not list them is no
-	// answer either way.
-	if len(ids) == 0 && truncated {
-		return resource.UnknownRelated("iam-user")
-	}
-	return relatedResult("iam-user", ids)
+	// prove the user is there now, so only the list answers. A truncated list
+	// that confirmed none gives a lower bound, not a question mark.
+	return relatedResultTrunc("iam-user", ids, truncated)
 }
 
 // checkCtEventsRole extracts role information from the CloudTrail event's
@@ -141,8 +138,8 @@ func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceC
 //     here offered a row that navigates to a resource that may be long gone.
 //   - proven list: the ids the list confirms, by ID or Name.
 //   - truncated list: still only the confirmed ids, because an unread page
-//     cannot confirm anything; Unknown when it confirmed none, since a zero
-//     off a partial list is a guess either way.
+//     cannot confirm anything, and the truncation flag carries the rest — none
+//     confirmed among the pages read is a lower bound, rendered "(0+)".
 func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, groups [][]string) resource.RelatedCheckResult {
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, target)
 	if err != nil {
@@ -175,9 +172,6 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 			}
 			break
 		}
-	}
-	if truncated && len(matched) == 0 {
-		return resource.UnknownRelated(target)
 	}
 	return relatedResultTrunc(target, matched, truncated)
 }
