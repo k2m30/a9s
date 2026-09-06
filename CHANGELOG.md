@@ -315,6 +315,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Status column now matches the number of findings the detail view shows.
 - ECS tasks listed under a service now carry the same unhealthy and
   stop-reason findings the top-level task list has always shown.
+- The queue, topic and Kafka cluster checks now say when a run was cut short
+  by the per-type inspection cap. All three can report a broken-severity
+  issue, so a capped run is a lower bound and the badge said it was a total.
+- The secret scanner no longer reports a value that names where the secret
+  lives rather than carrying one: an environment variable reference such as
+  `$ACME_API_KEY`, and a Secrets Manager ARN, whose own `secret:` segment
+  used to be read as a credential followed by its value.
+- A sentence mentioning a credential word in quotes, such as `The "password":
+  rotate it every ninety days`, is no longer reported as a leak. A quoted key
+  now counts only when its value is quoted too, which is the JSON shape.
 
 - Redis and Redshift rows now take their color from the worst finding on
   the row rather than the first Wave 1 one, so a Broken signal can no

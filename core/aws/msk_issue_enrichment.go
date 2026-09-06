@@ -112,10 +112,9 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		}
 	})
 	sort.Strings(failures)
-	// All MSK findings are severity "~" (informational) and do not contribute to the
-	// attention menu badge.
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	// This enrichment emits a "!" finding, so a capped run is a lower bound
+	// on the issue count and must say so.
+	result.Truncated = len(resources) > EnrichmentCap
 	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }

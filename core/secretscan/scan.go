@@ -27,11 +27,20 @@ var (
 	jwtRe        = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
 	// keywordRe: a credential word, optionally suffixed (SECRET_KEY, DB_PASSWORD_V2),
 	// followed by = or : and a value of 6+ characters. Word boundaries would
-	// reject the underscore-joined names that are the common case. The
-	// optional quote before the separator is what makes a JSON object key
-	// match: `"DB_PASSWORD": "..."` is the shape a credential takes when it
-	// is pasted into a state machine definition or a task definition.
-	keywordRe = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret)(?:[_-][a-z0-9_-]*)?["']?\s*[=:]\s*["']?([^\s"',;]{6,})`)
+	// reject the underscore-joined names that are the common case.
+	//
+	// Two shapes, and the difference between them is what keeps prose out.
+	// A quoted key is only a hit when its value is quoted too, which is what
+	// makes `"DB_PASSWORD": "..."` match while the sentence `The
+	// "password": rotate it every ninety days` does not — a quoted word
+	// followed by a bare word is English, not a JSON object.
+	keywordRe = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret)(?:[_-][a-z0-9_-]*)?(?:["']\s*[=:]\s*["']|\s*[=:]\s*["']?)([^\s"',;]{6,})`)
+	// arnRe matches any ARN. A Secrets Manager ARN carries the literal
+	// "secret:" followed by the secret's own name, so a keyword match lands
+	// INSIDE the ARN and the reference guard below only ever sees the tail.
+	// Blanking ARNs before the keyword pass is what lets isRealValue see the
+	// reference rather than its last segment.
+	arnRe = regexp.MustCompile(`arn:aws[a-z-]*:[^\s"',;]+`)
 	// userinfoRe: scheme://user:password@host — the password is group 1.
 	userinfoRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s/:@]+:([^\s/@]+)@`)
 	kvKeyRe    = regexp.MustCompile(`(?i)(secret|passw(or)?d|passwd|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret|credential|auth[_-]?token|db[_-]?pass)`)
@@ -96,7 +105,9 @@ func scanValue(s string) []string {
 	if len(kinds) > 0 {
 		return kinds
 	}
-	for _, m := range keywordRe.FindAllStringSubmatch(s, -1) {
+	// An ARN is a reference, never a value, and a keyword match landing
+	// inside one would be judged on its last segment alone.
+	for _, m := range keywordRe.FindAllStringSubmatch(arnRe.ReplaceAllString(s, " "), -1) {
 		if isRealValue(m[1]) {
 			kinds = append(kinds, "keyword")
 			if isHighEntropy(m[1]) {
@@ -128,7 +139,10 @@ func isRealValue(v string) bool {
 		return false
 	}
 	lower := strings.ToLower(v)
-	for _, p := range []string{"arn:", "${", "{{", "/", "ssm:", "secretsmanager:"} {
+	// "$" covers both "${var.x}" and a bare "$ACME_API_KEY": an environment
+	// indirection names where the secret lives, which is the practice this
+	// scanner exists to encourage.
+	for _, p := range []string{"arn:", "$", "{{", "/", "ssm:", "secretsmanager:"} {
 		if strings.HasPrefix(lower, p) {
 			return false
 		}

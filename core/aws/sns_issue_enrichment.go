@@ -52,6 +52,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
+		// fetcher emits ID=ARN
 		topicARN := r.ID
 		if topicARN == "" {
 			return
@@ -108,8 +109,9 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			setWave2Finding(&result, r.ID, snsCodeAllPending, "all pending confirmation", "~", "sns", nil)
 		}
 	})
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	// This enrichment emits a "!" finding, so a capped run is a lower bound
+	// on the issue count and must say so.
+	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
 }
 
