@@ -32,7 +32,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 	// no EC2 client still knows whether a plan selects the volume and whether a
 	// snapshot of it exists.
 	account := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	addBackupCoverage(cache, "ebs", resources, func(r resource.Resource) (string, map[string]string, bool) {
+	addBackupCoverage(cache, "ebs", CodeEBSNotInBackupPlan, ebsNotInBackupPlanDetail, resources, func(r resource.Resource) (string, map[string]string, bool) {
 		return ebsVolumeARN(r, account), ebsVolumeTags(r), true
 	}, &result)
 	addEBSSnapshotCoverage(cache, resources, &result)

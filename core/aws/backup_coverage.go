@@ -15,23 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// backupCoverageDef is one type's half of the join: what it reports and the
-// sentence it reports it with.
-type backupCoverageDef struct {
-	code   domain.FindingCode
-	detail string
-}
-
-// backupCoverageCodes pairs each type's not-covered code with its sentence.
-// The join is one implementation with four call sites, so the per-type wording
-// lives here rather than at each caller.
-var backupCoverageCodes = map[string]backupCoverageDef{ //nolint:gochecknoglobals // static table, no init()
-	"ebs": {CodeEBSNotInBackupPlan, ebsNotInBackupPlanDetail},
-	"dbi": {CodeDBINotInBackupPlan, dbiNotInBackupPlanDetail},
-	"dbc": {CodeDBCNotInBackupPlan, dbcNotInBackupPlanDetail},
-	"ddb": {CodeDDBNotInBackupPlan, ddbNotInBackupPlanDetail},
-}
-
 // addBackupCoverage reports every resource no cached backup plan selects.
 //
 // It answers from the cached backup list, so it inherits that list's states: a
@@ -47,14 +30,12 @@ var backupCoverageCodes = map[string]backupCoverageDef{ //nolint:gochecknoglobal
 func addBackupCoverage(
 	cache resource.ResourceCache,
 	shortName string,
+	code domain.FindingCode,
+	detail string,
 	resources []resource.Resource,
 	arnAndTags func(resource.Resource) (string, map[string]string, bool),
 	result *IssueEnricherResult,
 ) {
-	def, ok := backupCoverageCodes[shortName]
-	if !ok {
-		return
-	}
 	entry, ok := cache["backup"]
 	if !ok || entry.IsTruncated {
 		return
@@ -69,8 +50,8 @@ func addBackupCoverage(
 		if arn == "" || !known || backupPlansCover(entry.Resources, arn, tags) {
 			continue
 		}
-		setWave2Finding(result, r.ID, def.code, "not covered by a backup plan", "~", shortName,
-			[]domain.DetailRow{{Label: "Backup plans", Value: "0"}}, def.detail)
+		setWave2Finding(result, r.ID, code, "not covered by a backup plan", "~", shortName,
+			[]domain.DetailRow{{Label: "Backup plans", Value: "0"}}, detail)
 	}
 }
 
@@ -180,25 +161,19 @@ func backupARNListMatches(list, arn string) bool {
 	return false
 }
 
-// backupWildcardRun is every character AWS Backup's selection syntax gives a
-// meaning the join does not model. A pattern using one is matched as covering,
-// so an unfamiliar shape never invents a finding.
-var backupWildcardRun = regexp.MustCompile(`[?\[\]]`) //nolint:gochecknoglobals // compiled once
-
 // backupARNPatternMatches applies one selection pattern, where `*` stands for
-// any run of characters and everything else is literal.
+// any run of characters and everything else is literal. `?`, `[` and `]` are
+// every character AWS Backup gives a meaning the join does not model, and a
+// pattern using one is matched as covering, so an unfamiliar shape never
+// invents a finding.
 func backupARNPatternMatches(pattern, arn string) bool {
-	if backupWildcardRun.MatchString(pattern) {
+	if strings.ContainsAny(pattern, "?[]") {
 		return true
 	}
 	if !strings.Contains(pattern, "*") {
 		return pattern == arn
 	}
-	re, err := regexp.Compile("^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$")
-	if err != nil {
-		return true
-	}
-	return re.MatchString(arn)
+	return regexp.MustCompile("^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$").MatchString(arn)
 }
 
 // backupARNFromField is the accessor for every type whose fetcher already puts

@@ -52,7 +52,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		}
 	}
 	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
-	addBackupCoverage(cache, "dbi", resources, arnAndTags, &result)
+	addBackupCoverage(cache, "dbi", CodeDBINotInBackupPlan, dbiNotInBackupPlanDetail, resources, arnAndTags, &result)
 
 	if clients == nil || clients.RDS == nil {
 		return result, tagErr

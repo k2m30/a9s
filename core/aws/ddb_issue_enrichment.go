@@ -54,7 +54,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 	}
 	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsOfResource")
-	addBackupCoverage(cache, "ddb", resources, arnAndTags, &result)
+	addBackupCoverage(cache, "ddb", CodeDDBNotInBackupPlan, ddbNotInBackupPlanDetail, resources, arnAndTags, &result)
 
 	if clients.DynamoDB == nil {
 		return result, tagErr
