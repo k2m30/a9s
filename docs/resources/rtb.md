@@ -168,10 +168,10 @@ rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| rtb.route.blackhole | blackhole route (target deleted) | broken | wave1 |
-| rtb.orphan-unassociated | no subnet associations | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| rtb.route.blackhole | blackhole route (target deleted) | broken | wave1 | — |
+| rtb.orphan-unassociated | no subnet associations | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

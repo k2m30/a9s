@@ -207,23 +207,23 @@ mwaa — DATA & ANALYTICS. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| mwaa.warn.creating | creating | warn | wave1 |
-| mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 |
-| mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 |
-| mwaa.warn.updating | updating | warn | wave1 |
-| mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 |
-| mwaa.warn.maintenance | maintenance in progress | warn | wave1 |
-| mwaa.broken.create\_failed | create failed | broken | wave1 |
-| mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 |
-| mwaa.broken.unavailable | unavailable: not stable | broken | wave1 |
-| mwaa.dim.deleting | deleting | dim | wave1 |
-| mwaa.dim.deleted | deleted | dim | wave1 |
-| mwaa.warn.last\_update\_failed | last update failed | warn | wave1 |
-| mwaa.warn.webserver\_public | webserver public | warn | wave1 |
-| mwaa.warn.details\_denied | details denied | warn | wave1 |
-| mwaa.warn.details\_unavailable | details unavailable | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| mwaa.warn.creating | creating | warn | wave1 | — |
+| mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 | — |
+| mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 | — |
+| mwaa.warn.updating | updating | warn | wave1 | — |
+| mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 | — |
+| mwaa.warn.maintenance | maintenance in progress | warn | wave1 | — |
+| mwaa.broken.create\_failed | create failed | broken | wave1 | — |
+| mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 | — |
+| mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | — |
+| mwaa.dim.deleting | deleting | dim | wave1 | — |
+| mwaa.dim.deleted | deleted | dim | wave1 | — |
+| mwaa.warn.last\_update\_failed | last update failed | warn | wave1 | — |
+| mwaa.warn.webserver\_public | webserver public | warn | wave1 | — |
+| mwaa.warn.details\_denied | details denied | warn | wave1 | — |
+| mwaa.warn.details\_unavailable | details unavailable | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

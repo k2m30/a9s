@@ -147,10 +147,10 @@ codeartifact — CI/CD. Lifecycle key: none (the list API returns no lifecycle f
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| codeartifact.no-permissions-policy | no permissions policy | warn | wave2 |
-| codeartifact.public-access-policy | public access policy | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| codeartifact.no-permissions-policy | no permissions policy | warn | wave2 | — |
+| codeartifact.public-access-policy | public access policy | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

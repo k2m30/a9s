@@ -207,16 +207,16 @@ elb — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| elb.state.provisioning | provisioning | warn | wave1 |
-| elb.state.active\_impaired | active impaired | warn | wave1 |
-| elb.state.failed | failed | broken | wave1 |
-| elb.misconfigured | deletion protection disabled | warn | wave2 |
-| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 |
-| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 |
-| elb.plain-http-listener | <ports> in the clear | warn | wave2 |
-| elb.weak-tls-policy | weak TLS policy on <ports> | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| elb.state.provisioning | provisioning | warn | wave1 | — |
+| elb.state.active\_impaired | active impaired | warn | wave1 | — |
+| elb.state.failed | failed | broken | wave1 | — |
+| elb.misconfigured | deletion protection disabled | warn | wave2 | — |
+| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 | — |
+| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 | — |
+| elb.plain-http-listener | <ports> in the clear | warn | wave2 | — |
+| elb.weak-tls-policy | weak TLS policy on <ports> | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

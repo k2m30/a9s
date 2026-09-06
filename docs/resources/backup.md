@@ -157,10 +157,10 @@ backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| backup.job-failed | <N> jobs failed in last 24h | broken | wave2 |
-| backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| backup.job-failed | <N> jobs failed in last 24h | broken | wave2 | — |
+| backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

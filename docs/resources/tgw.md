@@ -153,16 +153,16 @@ tgw — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| tgw.state.pending | pending | warn | wave1 |
-| tgw.state.modifying | modifying | warn | wave1 |
-| tgw.state.deleting | deleting | warn | wave1 |
-| tgw.state.failed | failed | broken | wave1 |
-| tgw.state.deleted | deleted | dim | wave1 |
-| tgw.attachment-failed | attachment <id> failed | broken | wave2 |
-| tgw.attachment-transitional | attachment <id> <state> | warn | wave2 |
-| tgw.auto-accept-attachments | auto-accepts shared attachments | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| tgw.state.pending | pending | warn | wave1 | — |
+| tgw.state.modifying | modifying | warn | wave1 | — |
+| tgw.state.deleting | deleting | warn | wave1 | — |
+| tgw.state.failed | failed | broken | wave1 | — |
+| tgw.state.deleted | deleted | dim | wave1 | — |
+| tgw.attachment-failed | attachment <id> failed | broken | wave2 | — |
+| tgw.attachment-transitional | attachment <id> <state> | warn | wave2 | — |
+| tgw.auto-accept-attachments | auto-accepts shared attachments | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

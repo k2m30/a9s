@@ -176,16 +176,16 @@ ses — MESSAGING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ses.verification.failed | verification failed | broken | wave1 |
-| ses.verification.temp\_failure | verify: temp failure | broken | wave1 |
-| ses.verification.not\_started | verification not started | broken | wave1 |
-| ses.verification.pending | pending verification | warn | wave1 |
-| ses.sending.disabled | sending disabled | warn | wave1 |
-| ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 |
-| ses.account-probation | account under review (probation) | broken | wave2 |
-| ses.quota-high | quota 80%+ used | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ses.verification.failed | verification failed | broken | wave1 | — |
+| ses.verification.temp\_failure | verify: temp failure | broken | wave1 | — |
+| ses.verification.not\_started | verification not started | broken | wave1 | — |
+| ses.verification.pending | pending verification | warn | wave1 | — |
+| ses.sending.disabled | sending disabled | warn | wave1 | — |
+| ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 | — |
+| ses.account-probation | account under review (probation) | broken | wave2 | — |
+| ses.quota-high | quota 80%+ used | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

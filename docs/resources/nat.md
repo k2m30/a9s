@@ -172,12 +172,12 @@ nat — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| nat.state.pending | pending | warn | wave1 |
-| nat.state.deleting | deleting | warn | wave1 |
-| nat.state.failed | failed | broken | wave1 |
-| nat.state.deleted | deleted | dim | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| nat.state.pending | pending | warn | wave1 | — |
+| nat.state.deleting | deleting | warn | wave1 | — |
+| nat.state.failed | failed | broken | wave1 | — |
+| nat.state.deleted | deleted | dim | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

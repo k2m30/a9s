@@ -149,15 +149,15 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| iam-user.no-mfa | console user without MFA | broken | wave2 |
-| iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
-| iam-user.admin-attached | has an administrator policy | warn | wave2 |
-| iam-user.console-never-used | console password never used | warn | wave2 |
-| iam-user.console-dormant | console sign-in unused for 90 days | warn | wave2 |
-| iam-user.access-key-unused | access key unused for <N> days | warn | wave2 |
-| iam-user.two-active-keys | two active access keys | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| iam-user.no-mfa | console user without MFA | broken | wave2 | — |
+| iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 | — |
+| iam-user.admin-attached | has an administrator policy | warn | wave2 | — |
+| iam-user.console-never-used | console password never used | warn | wave2 | — |
+| iam-user.console-dormant | console sign-in unused for 90 days | warn | wave2 | — |
+| iam-user.access-key-unused | access key unused for <N> days | warn | wave2 | — |
+| iam-user.two-active-keys | two active access keys | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

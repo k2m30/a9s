@@ -211,15 +211,15 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| secrets.state.deleted | deleted | broken | wave1 |
-| secrets.state.rotation\_overdue | rotation overdue | warn | wave1 |
-| secrets.state.dormant | dormant | warn | wave1 |
-| secrets.rotation.disabled | rotation not enabled | warn | wave1 |
-| secrets.value.stale | value unchanged in over 365 days | warn | wave1 |
-| secrets.public-policy | resource policy open to anyone | broken | wave2 |
-| secrets.cross-account-policy | resource policy grants another account | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| secrets.state.deleted | deleted | broken | wave1 | — |
+| secrets.state.rotation\_overdue | rotation overdue | warn | wave1 | — |
+| secrets.state.dormant | dormant | warn | wave1 | — |
+| secrets.rotation.disabled | rotation not enabled | warn | wave1 | — |
+| secrets.value.stale | value unchanged in over 365 days | warn | wave1 | — |
+| secrets.public-policy | resource policy open to anyone | broken | wave2 | — |
+| secrets.cross-account-policy | resource policy grants another account | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

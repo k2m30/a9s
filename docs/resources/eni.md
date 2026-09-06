@@ -181,11 +181,11 @@ eni — NETWORKING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| eni.state.attaching | attaching | warn | wave1 |
-| eni.state.detaching | detaching | warn | wave1 |
-| eni.state.available | available | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| eni.state.attaching | attaching | warn | wave1 | — |
+| eni.state.detaching | detaching | warn | wave1 | — |
+| eni.state.available | available | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

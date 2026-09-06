@@ -134,10 +134,10 @@ sns-sub — MESSAGING. Lifecycle key: none (the list API returns no lifecycle fi
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 |
-| sns-sub.state.deleted | endpoint deleted | dim | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 | — |
+| sns-sub.state.deleted | endpoint deleted | dim | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

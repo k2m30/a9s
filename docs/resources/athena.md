@@ -165,11 +165,11 @@ athena — DATA & ANALYTICS. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| athena.workgroup-disabled | disabled | warn | wave1 |
-| athena.settings-not-enforced | settings can be overridden per query | warn | wave2 |
-| athena.results-unencrypted | query results stored unencrypted | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| athena.workgroup-disabled | disabled | warn | wave1 | — |
+| athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | — |
+| athena.results-unencrypted | query results stored unencrypted | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

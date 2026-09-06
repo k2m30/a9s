@@ -230,23 +230,23 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ecs-task.state.provisioning | provisioning | warn | wave1 |
-| ecs-task.state.pending | pending | warn | wave1 |
-| ecs-task.state.activating | activating | warn | wave1 |
-| ecs-task.state.deactivating | deactivating | warn | wave1 |
-| ecs-task.state.stopping | stopping | warn | wave1 |
-| ecs-task.state.deprovisioning | deprovisioning | warn | wave1 |
-| ecs-task.state.stopped | stopped | dim | wave1 |
-| ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 |
-| ecs-task.health.unhealthy | unhealthy | broken | wave1 |
-| ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
-| ecs-task.privileged | privileged container | broken | wave2 |
-| ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 |
-| ecs-task.writable-root | writable root filesystem | warn | wave2 |
-| ecs-task.no-logging | container without log driver | warn | wave2 |
-| ecs-task.env-secret | credential in container environment | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ecs-task.state.provisioning | provisioning | warn | wave1 | — |
+| ecs-task.state.pending | pending | warn | wave1 | — |
+| ecs-task.state.activating | activating | warn | wave1 | — |
+| ecs-task.state.deactivating | deactivating | warn | wave1 | — |
+| ecs-task.state.stopping | stopping | warn | wave1 | — |
+| ecs-task.state.deprovisioning | deprovisioning | warn | wave1 | — |
+| ecs-task.state.stopped | stopped | dim | wave1 | — |
+| ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 | — |
+| ecs-task.health.unhealthy | unhealthy | broken | wave1 | — |
+| ecs-task.task-failed | <stop code or container> failed | broken | wave2 | — |
+| ecs-task.privileged | privileged container | broken | wave2 | — |
+| ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | — |
+| ecs-task.writable-root | writable root filesystem | warn | wave2 | — |
+| ecs-task.no-logging | container without log driver | warn | wave2 | — |
+| ecs-task.env-secret | credential in container environment | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

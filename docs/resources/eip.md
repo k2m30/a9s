@@ -183,9 +183,9 @@ eip — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| eip.unassociated | unassociated | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| eip.unassociated | unassociated | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

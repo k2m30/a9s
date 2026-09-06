@@ -191,7 +191,6 @@ One row per signal from §3:
 | `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` | `Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself.` |
 | `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` | `Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities.` |
 | `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
-| No backup plan selection matches the cluster ARN or its tags | 2 | Warning | `~` | S2, S4, S5 | `not covered by a backup plan` | `No backup plan selects this cluster, so its retention is whatever the cluster's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on.` |
 
 Rules for filling list and detail text:
 
@@ -238,22 +237,22 @@ dbc — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| dbc.broken.failed | failed: cluster operation | broken | wave1 |
-| dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 |
-| dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 |
-| dbc.broken.no\_writer | no writer: reads only | broken | wave1 |
-| dbc.warn.transitional | <status>: in progress | warn | wave1 |
-| dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 |
-| dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 |
-| dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 |
-| dbc.maintenance-overdue | maintenance overdue | broken | wave2 |
-| dbc.single-az | single-AZ | warn | wave1 |
-| dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
-| dbc.iam-auth-off | IAM database authentication off | warn | wave1 |
-| dbc.default-master-user | default master username | warn | wave1 |
-| dbc.not-in-backup-plan | not covered by a backup plan | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| dbc.broken.failed | failed: cluster operation | broken | wave1 | — |
+| dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 | — |
+| dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 | — |
+| dbc.broken.no\_writer | no writer: reads only | broken | wave1 | — |
+| dbc.warn.transitional | <status>: in progress | warn | wave1 | — |
+| dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 | — |
+| dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 | — |
+| dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 | — |
+| dbc.maintenance-overdue | maintenance overdue | broken | wave2 | — |
+| dbc.single-az | single-AZ | warn | wave1 | — |
+| dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | — |
+| dbc.iam-auth-off | IAM database authentication off | warn | wave1 | — |
+| dbc.default-master-user | default master username | warn | wave1 | — |
+| dbc.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

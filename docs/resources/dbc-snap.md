@@ -204,17 +204,17 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| dbc-snap.broken.failed | failed | broken | wave1 |
-| dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
-| dbc-snap.warn.creating | creating | warn | wave1 |
-| dbc-snap.warn.transitional | <status> | warn | wave1 |
-| dbc-snap.warn.manual\_unused | manual, unused <N>d | warn | wave1 |
-| dbc-snap.warn.unencrypted | unencrypted | warn | wave1 |
-| dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
-| dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
-| dbc-snap.public | shared with all AWS accounts | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| dbc-snap.broken.failed | failed | broken | wave1 | — |
+| dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 | — |
+| dbc-snap.warn.creating | creating | warn | wave1 | — |
+| dbc-snap.warn.transitional | <status> | warn | wave1 | — |
+| dbc-snap.warn.manual\_unused | manual, unused <N>d | warn | wave1 | — |
+| dbc-snap.warn.unencrypted | unencrypted | warn | wave1 | — |
+| dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 | — |
+| dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 | — |
+| dbc-snap.public | shared with all AWS accounts | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

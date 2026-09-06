@@ -193,7 +193,6 @@ One row per signal from §3:
 | `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
 | `CertificateDetails.ValidTill` within 90d | 1 | Warning (Broken within 30d) | n/a | S2, S4, S5 | `server certificate expires in <N> days` | `The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window.` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S4, S5 | `engine version deprecated` | `AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing.` |
-| No backup plan selection matches the DB instance ARN or its tags | 2 | Warning | `~` | S2, S4, S5 | `not covered by a backup plan` | `No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on.` |
 
 Notes on the table:
 
@@ -251,30 +250,30 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| dbi.broken.failed | failed | broken | wave1 |
-| dbi.broken.storage\_full | storage-full | broken | wave1 |
-| dbi.broken.incompatible\_network | incompatible-network | broken | wave1 |
-| dbi.broken.incompatible\_option\_group | incompatible-option-group | broken | wave1 |
-| dbi.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 |
-| dbi.broken.incompatible\_restore | incompatible-restore | broken | wave1 |
-| dbi.broken.restore\_error | restore-error | broken | wave1 |
-| dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 |
-| dbi.broken.stopped | stopped | broken | wave1 |
-| dbi.warn.transitional | <status>: <pending field> | warn | wave1 |
-| dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 |
-| dbi.warn.publicly\_accessible | publicly accessible | warn | wave1 |
-| dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 |
-| dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 |
-| dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
-| dbi.single-az | single-AZ | warn | wave1 |
-| dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
-| dbi.not-in-backup-plan | not covered by a backup plan | warn | wave2 |
-| dbi.iam-auth-off | IAM database authentication off | warn | wave1 |
-| dbi.default-master-user | default master username | warn | wave1 |
-| dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 |
-| dbi.engine-deprecated | engine version deprecated | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| dbi.broken.failed | failed | broken | wave1 | — |
+| dbi.broken.storage\_full | storage-full | broken | wave1 | — |
+| dbi.broken.incompatible\_network | incompatible-network | broken | wave1 | — |
+| dbi.broken.incompatible\_option\_group | incompatible-option-group | broken | wave1 | — |
+| dbi.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 | — |
+| dbi.broken.incompatible\_restore | incompatible-restore | broken | wave1 | — |
+| dbi.broken.restore\_error | restore-error | broken | wave1 | — |
+| dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 | — |
+| dbi.broken.stopped | stopped | broken | wave1 | — |
+| dbi.warn.transitional | <status>: <pending field> | warn | wave1 | — |
+| dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 | — |
+| dbi.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
+| dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 | — |
+| dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 | — |
+| dbi.pending-maintenance | maintenance scheduled | warn | wave2 | — |
+| dbi.single-az | single-AZ | warn | wave1 | — |
+| dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | — |
+| dbi.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
+| dbi.iam-auth-off | IAM database authentication off | warn | wave1 | — |
+| dbi.default-master-user | default master username | warn | wave1 | — |
+| dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 | — |
+| dbi.engine-deprecated | engine version deprecated | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

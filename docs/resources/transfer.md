@@ -188,17 +188,17 @@ transfer — NETWORKING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| transfer.warn.offline | offline: not accepting transfers | warn | wave1 |
-| transfer.warn.starting | starting | warn | wave1 |
-| transfer.warn.stopping | stopping | warn | wave1 |
-| transfer.broken.start\_failed | start failed | broken | wave1 |
-| transfer.warn.stop\_failed | stop failed | warn | wave1 |
-| transfer.warn.legacy\_policy | legacy security policy | warn | wave1 |
-| transfer.warn.no\_logging | no activity logging | warn | wave1 |
-| transfer.warn.details\_denied | details denied | warn | wave1 |
-| transfer.warn.details\_unavailable | details unavailable | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| transfer.warn.offline | offline: not accepting transfers | warn | wave1 | — |
+| transfer.warn.starting | starting | warn | wave1 | — |
+| transfer.warn.stopping | stopping | warn | wave1 | — |
+| transfer.broken.start\_failed | start failed | broken | wave1 | — |
+| transfer.warn.stop\_failed | stop failed | warn | wave1 | — |
+| transfer.warn.legacy\_policy | legacy security policy | warn | wave1 | — |
+| transfer.warn.no\_logging | no activity logging | warn | wave1 | — |
+| transfer.warn.details\_denied | details denied | warn | wave1 | — |
+| transfer.warn.details\_unavailable | details unavailable | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

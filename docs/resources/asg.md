@@ -201,19 +201,19 @@ asg — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| asg.state.deleting | delete in progress | warn | wave1 |
-| asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 |
-| asg.instances.unhealthy | <N> unhealthy instance(s) | warn | wave1 |
-| asg.scaling.suspended | scaling suspended | warn | wave1 |
-| asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
-| asg.launch-config.legacy | uses a launch configuration | warn | wave1 |
-| asg.single-az | single availability zone | warn | wave1 |
-| asg.no-elb-health-check | no load balancer health check | warn | wave1 |
-| asg.launch-config.imdsv1 | launch configuration allows IMDSv1 | warn | wave2 |
-| asg.launch-config.public-ip | launch configuration assigns public IPs | warn | wave2 |
-| asg.launch-config.secret | credential in launch configuration user data | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| asg.state.deleting | delete in progress | warn | wave1 | — |
+| asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 | — |
+| asg.instances.unhealthy | <N> unhealthy instance(s) | warn | wave1 | — |
+| asg.scaling.suspended | scaling suspended | warn | wave1 | — |
+| asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 | — |
+| asg.launch-config.legacy | uses a launch configuration | warn | wave1 | — |
+| asg.single-az | single availability zone | warn | wave1 | — |
+| asg.no-elb-health-check | no load balancer health check | warn | wave1 | — |
+| asg.launch-config.imdsv1 | launch configuration allows IMDSv1 | warn | wave2 | — |
+| asg.launch-config.public-ip | launch configuration assigns public IPs | warn | wave2 | — |
+| asg.launch-config.secret | credential in launch configuration user data | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

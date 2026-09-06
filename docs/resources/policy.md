@@ -141,11 +141,11 @@ policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycl
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
-| iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 |
-| policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 | — |
+| iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 | — |
+| policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

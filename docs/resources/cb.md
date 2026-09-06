@@ -151,10 +151,6 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S3, S4, S5 (green row stays green; `!` glyph + cause) | `last build failed: <CurrentPhase>` | `Most recent build ended <buildStatus> in phase <CurrentPhase> on <EndTime>.` |
-| `ProjectVisibility` public | 1 | Broken | `!` | S1, S2, S4, S5 | `build results publicly visible` | `Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed.` |
-| Buildspec comes from the repository | 1 | Warning | `~` | S2, S4, S5 | `buildspec taken from the source repository` | `The build instructions come from a file in the source repository...` Row names the path, or `repo default` when the file is implied. |
-| Credential in the source address | 1 | Broken | `!` | S1, S2, S4, S5 | `credential in the source repository address` | `The source repository address embeds a username and password or token...` Row shows the address with the credential removed. |
-| Credential in a plaintext environment variable | 1 | Broken | `!` | S1, S2, S4, S5 | `credential in environment variables` | `A plaintext environment variable... holds what looks like a credential...` Secrets Manager and Parameter Store variables are references and are not scanned. |
 
 Cause-field sources for S4 / S5: `Build.BuildStatus` (enum) plus `Build.CurrentPhase` and `Build.EndTime` from the batched `BatchGetBuilds` response (AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, CurrentPhase, EndTime`). When `BuildStatus==FAULT` the fault usually reflects a platform/infrastructure problem; `FAILED` reflects a user-code/script exit; `TIMED_OUT` reflects the project's `TimeoutInMinutes`. The S4 line uses the status keyword paired with the phase so the operator sees where it broke without opening detail.
 
@@ -203,13 +199,13 @@ cb — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 |
-| cb.public-builds | build results publicly visible | broken | wave1 |
-| cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 |
-| cb.source-url-credential | credential in the source repository address | broken | wave1 |
-| cb.env-secret | credential in environment variables | broken | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 | — |
+| cb.public-builds | build results publicly visible | broken | wave1 | — |
+| cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 | — |
+| cb.source-url-credential | credential in the source repository address | broken | wave1 | — |
+| cb.env-secret | credential in environment variables | broken | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

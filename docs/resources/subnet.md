@@ -234,13 +234,13 @@ subnet — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| subnet.state.pending | pending | warn | wave1 |
-| subnet.state.unavailable | unavailable | broken | wave1 |
-| subnet.state.failed | failed | broken | wave1 |
-| subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 |
-| subnet.auto-public-ip | auto-assigns public IPs | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| subnet.state.pending | pending | warn | wave1 | — |
+| subnet.state.unavailable | unavailable | broken | wave1 | — |
+| subnet.state.failed | failed | broken | wave1 | — |
+| subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 | — |
+| subnet.auto-public-ip | auto-assigns public IPs | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

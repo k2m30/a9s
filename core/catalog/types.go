@@ -188,4 +188,9 @@ type FindingDef struct {
 	// Source is the provenance class: "wave1" (emitted by the fetcher)
 	// or "wave2" (emitted by the Wave 2 enricher).
 	Source string
+	// Detail is the S5 operator sentence the finding renders in the
+	// detail-view Attention section, and the sentence catalogen writes into
+	// the docs. Empty means the finding renders its Phrase alone and the doc
+	// cell reads "—". The emitter copies it from here; nothing else declares it.
+	Detail string
 }

@@ -225,19 +225,19 @@ redis — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| redis.broken.create\_failed | create failed — see events | broken | wave1 |
-| redis.warn.creating | creating — new group | warn | wave1 |
-| redis.warn.deleting | deleting — teardown | warn | wave1 |
-| redis.warn.modifying | modifying — config change | warn | wave1 |
-| redis.warn.snapshotting | snapshotting — backup running | warn | wave1 |
-| redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 |
-| redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 |
-| redis.encryption-at-rest-off | encryption at rest off | warn | wave1 |
-| redis.encryption-in-transit-off | encryption in transit off | warn | wave1 |
-| redis.no-auth | no authentication token | broken | wave1 |
-| redis.no-backup | automatic backups off | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| redis.broken.create\_failed | create failed — see events | broken | wave1 | — |
+| redis.warn.creating | creating — new group | warn | wave1 | — |
+| redis.warn.deleting | deleting — teardown | warn | wave1 | — |
+| redis.warn.modifying | modifying — config change | warn | wave1 | — |
+| redis.warn.snapshotting | snapshotting — backup running | warn | wave1 | — |
+| redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 | — |
+| redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 | — |
+| redis.encryption-at-rest-off | encryption at rest off | warn | wave1 | — |
+| redis.encryption-in-transit-off | encryption in transit off | warn | wave1 | — |
+| redis.no-auth | no authentication token | broken | wave1 | — |
+| redis.no-backup | automatic backups off | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

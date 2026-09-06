@@ -131,10 +131,6 @@ One row per signal from §3:
 | `scanOnPush==false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `scan-on-push off` | `Vulnerability scanning is disabled for this repo — new images will push without a CVE scan.` |
 | latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `CRITICAL CVEs in latest` | `Latest image (pushed <date>) has N CRITICAL vulnerabilities — block deploys until patched.` |
 | latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S4, S5 | `HIGH CVEs in latest` | `Latest image (pushed <date>) has N HIGH vulnerabilities — review before next deploy.` |
-| Scan on push off | 1 | Warning | `~` | S2, S4, S5 | `scan on push off` | `Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives.` |
-| Tags are mutable | 1 | Warning | `~` | S2, S4, S5 | `tags are mutable` | `An existing tag... can be moved to different image content...` `IMMUTABLE_WITH_EXCLUSION` is not this signal. |
-| Repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S2, S4, S5 | `repository policy open to anyone` | `The repository policy grants a wildcard principal...` Rows name the principal and the actions. A policy scoped by a condition is not this signal. |
-| No lifecycle policy | 2 | Warning | `~` | S2, S4, S5 | `no lifecycle policy` | `No lifecycle policy is set, so every image ever pushed is kept forever...` The NotFound answer is the signal, not a failed read. |
 
 Rules applied:
 
@@ -195,13 +191,13 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 |
-| ecr.public-policy | repository policy open to anyone | broken | wave2 |
-| ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 |
-| ecr.scan-on-push-off | scan on push off | warn | wave1 |
-| ecr.mutable-tags | tags are mutable | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 | — |
+| ecr.public-policy | repository policy open to anyone | broken | wave2 | — |
+| ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | — |
+| ecr.scan-on-push-off | scan on push off | warn | wave1 | — |
+| ecr.mutable-tags | tags are mutable | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

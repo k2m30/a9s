@@ -147,8 +147,6 @@ One row per signal from §3:
 | `VolumeStatus.Status == impaired` | 2 | Broken | n/a | S2, S4, S5 | `impaired: I/O failing` | `AWS reports impaired volume status — I/O is failing; detach and restore from snapshot.` |
 | `VolumeStatus.Status == warning` | 2 | Warning | n/a | S2, S4, S5 | `degraded: I/O warning` | `AWS reports degraded performance — investigate recent workload and snapshot before action.` |
 | `Events[] non-empty` (row in-use) | 2 | Warning | `~` | S3, S4, S5 | `event: <EventType>` | `<Event.Description> — window <NotBefore> to <NotAfter>.` |
-| No backup plan selection matches the volume ARN or its tags | 2 | Warning | `~` | S2, S4, S5 | `not covered by a backup plan` | `No backup plan selects this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by ARN, or give it a tag one of your plans already selects on.` |
-| In-use volume with no snapshot in the loaded snapshot list | 2 | Warning | `~` | S2, S4, S5 | `no snapshot exists` | `This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will.` |
 
 Notes on rows omitted:
 
@@ -197,15 +195,15 @@ ebs — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ebs.state.creating | creating | warn | wave1 |
-| ebs.state.error | error | broken | wave1 |
-| ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 |
-| ebs.encryption.disabled | unencrypted | warn | wave1 |
-| ebs.volume-io-degraded | volume I/O degraded | broken | wave2 |
-| ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 |
-| ebs.no-snapshot | no snapshot exists | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ebs.state.creating | creating | warn | wave1 | — |
+| ebs.state.error | error | broken | wave1 | — |
+| ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 | — |
+| ebs.encryption.disabled | unencrypted | warn | wave1 | — |
+| ebs.volume-io-degraded | volume I/O degraded | broken | wave2 | — |
+| ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
+| ebs.no-snapshot | no snapshot exists | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

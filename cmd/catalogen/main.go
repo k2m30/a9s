@@ -165,12 +165,12 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	// Findings section content.
 	var findingsContent strings.Builder
 	if len(rt.Findings) > 0 {
-		findingsContent.WriteString("| Code | Phrase | Severity | Source |\n")
-		findingsContent.WriteString("| --- | --- | --- | --- |\n")
+		findingsContent.WriteString("| Code | Phrase | Severity | Source | Detail |\n")
+		findingsContent.WriteString("| --- | --- | --- | --- | --- |\n")
 		for _, f := range rt.Findings {
-			fmt.Fprintf(&findingsContent, "| %s | %s | %s | %s |\n",
+			fmt.Fprintf(&findingsContent, "| %s | %s | %s | %s | %s |\n",
 				escapeMarkdownCell(string(f.Code)), escapeMarkdownCell(f.Phrase),
-				severityLabel(f.Severity), escapeMarkdownCell(f.Source))
+				severityLabel(f.Severity), escapeMarkdownCell(f.Source), detailCell(f))
 		}
 	}
 
@@ -286,6 +286,15 @@ func escapeMarkdownCell(s string) string {
 		"`", "\\`",
 	)
 	return replacer.Replace(s)
+}
+
+// detailCell is the Detail column of a findings table: the declared S5
+// sentence, or an em dash for a finding that renders none.
+func detailCell(f catalog.FindingDef) string {
+	if f.Detail == "" {
+		return "—"
+	}
+	return escapeMarkdownCell(f.Detail)
 }
 
 // severityLabel returns the human-readable label for a domain.Severity value.

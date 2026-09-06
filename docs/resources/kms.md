@@ -174,14 +174,14 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| kms.state.pending\_deletion | pending deletion | broken | wave1 |
-| kms.state.disabled | disabled | warn | wave1 |
-| kms.state.unavailable | <key state> | broken | wave1 |
-| kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 |
-| kms.rotation-disabled | key rotation disabled | warn | wave2 |
-| kms.public-policy | key policy open to anyone | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| kms.state.pending\_deletion | pending deletion | broken | wave1 | — |
+| kms.state.disabled | disabled | warn | wave1 | — |
+| kms.state.unavailable | <key state> | broken | wave1 | — |
+| kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | — |
+| kms.rotation-disabled | key rotation disabled | warn | wave2 | — |
+| kms.public-policy | key policy open to anyone | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

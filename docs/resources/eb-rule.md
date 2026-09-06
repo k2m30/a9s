@@ -186,10 +186,10 @@ eb-rule — MESSAGING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| eb-rule.state.disabled | disabled | dim | wave1 |
-| eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| eb-rule.state.disabled | disabled | dim | wave1 | — |
+| eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

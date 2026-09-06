@@ -298,22 +298,22 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ec2.state.pending | pending | warn | wave1 |
-| ec2.state.shutting-down | shutting down | warn | wave1 |
-| ec2.state.stopping | stopping | warn | wave1 |
-| ec2.state.stopped | stopped | warn | wave1 |
-| ec2.state.stopped.server | stopped | broken | wave1 |
-| ec2.state.terminated | terminated | dim | wave1 |
-| ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 |
-| ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 |
-| ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 |
-| ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 |
-| ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 |
-| ec2.public-ip | public address | warn | wave1 |
-| ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 |
-| ec2.user-data-secret | credential in user data | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ec2.state.pending | pending | warn | wave1 | — |
+| ec2.state.shutting-down | shutting down | warn | wave1 | — |
+| ec2.state.stopping | stopping | warn | wave1 | — |
+| ec2.state.stopped | stopped | warn | wave1 | — |
+| ec2.state.stopped.server | stopped | broken | wave1 | — |
+| ec2.state.terminated | terminated | dim | wave1 | — |
+| ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | — |
+| ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | — |
+| ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 | — |
+| ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 | — |
+| ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | — |
+| ec2.public-ip | public address | warn | wave1 | — |
+| ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 | — |
+| ec2.user-data-secret | credential in user data | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

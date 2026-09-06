@@ -275,14 +275,14 @@ ecs-svc — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ecs-svc.state.inactive | inactive | broken | wave1 |
-| ecs-svc.state.draining | draining | warn | wave1 |
-| ecs-svc.tasks.none-running | no tasks running | broken | wave1 |
-| ecs-svc.tasks.below-desired | running below desired count | warn | wave1 |
-| ecs-svc.deployment-failed | deployment failed | broken | wave2 |
-| ecs-svc.public-ip | tasks get public IPs | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ecs-svc.state.inactive | inactive | broken | wave1 | — |
+| ecs-svc.state.draining | draining | warn | wave1 | — |
+| ecs-svc.tasks.none-running | no tasks running | broken | wave1 | — |
+| ecs-svc.tasks.below-desired | running below desired count | warn | wave1 | — |
+| ecs-svc.deployment-failed | deployment failed | broken | wave2 | — |
+| ecs-svc.public-ip | tasks get public IPs | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

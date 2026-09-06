@@ -176,12 +176,12 @@ sg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 |
-| sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 |
-| sg.default-with-rules | default group allows traffic | warn | wave1 |
-| sg.unused | not attached to anything | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 | — |
+| sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 | — |
+| sg.default-with-rules | default group allows traffic | warn | wave1 | — |
+| sg.unused | not attached to anything | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

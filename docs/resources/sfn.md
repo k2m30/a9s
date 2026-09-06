@@ -176,9 +176,9 @@ sfn — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

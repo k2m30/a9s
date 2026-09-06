@@ -141,11 +141,11 @@ igw — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| igw.state.attaching | attaching | warn | wave1 |
-| igw.state.detaching | detaching | warn | wave1 |
-| igw.no-attachments | no VPC attachments | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| igw.state.attaching | attaching | warn | wave1 | — |
+| igw.state.detaching | detaching | warn | wave1 | — |
+| igw.no-attachments | no VPC attachments | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

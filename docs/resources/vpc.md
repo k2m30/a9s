@@ -196,10 +196,10 @@ vpc — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| vpc.state.pending | pending | warn | wave1 |
-| vpc.no-flow-logs | no active VPC flow logs | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| vpc.state.pending | pending | warn | wave1 | — |
+| vpc.no-flow-logs | no active VPC flow logs | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

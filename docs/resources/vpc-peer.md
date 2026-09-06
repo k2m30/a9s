@@ -139,19 +139,19 @@ vpc-peer — NETWORKING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| vpc-peer.warn.provisioning | provisioning | warn | wave1 |
-| vpc-peer.warn.initiating | initiating | warn | wave1 |
-| vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 |
-| vpc-peer.warn.expired | expired: never accepted | warn | wave1 |
-| vpc-peer.broken.rejected | rejected | broken | wave1 |
-| vpc-peer.broken.failed | failed | broken | wave1 |
-| vpc-peer.warn.deleting | deleting | warn | wave1 |
-| vpc-peer.dim.deleted | deleted | dim | wave1 |
-| vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 |
-| vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 |
-| vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| vpc-peer.warn.provisioning | provisioning | warn | wave1 | — |
+| vpc-peer.warn.initiating | initiating | warn | wave1 | — |
+| vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 | — |
+| vpc-peer.warn.expired | expired: never accepted | warn | wave1 | — |
+| vpc-peer.broken.rejected | rejected | broken | wave1 | — |
+| vpc-peer.broken.failed | failed | broken | wave1 | — |
+| vpc-peer.warn.deleting | deleting | warn | wave1 | — |
+| vpc-peer.dim.deleted | deleted | dim | wave1 | — |
+| vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 | — |
+| vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 | — |
+| vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

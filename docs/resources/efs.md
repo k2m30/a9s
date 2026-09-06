@@ -221,17 +221,17 @@ efs — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| efs.broken.error | error | broken | wave1 |
-| efs.broken.no\_mount\_targets | no mount targets | broken | wave1 |
-| efs.warn.creating | creating | warn | wave1 |
-| efs.warn.updating | updating | warn | wave1 |
-| efs.warn.deleting | deleting | warn | wave1 |
-| efs.mount-target-down | mount target down | broken | wave2 |
-| efs.unencrypted | not encrypted | warn | wave1 |
-| efs.public-policy | file system policy open to anyone | broken | wave2 |
-| efs.no-backup-policy | automatic backups off | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| efs.broken.error | error | broken | wave1 | — |
+| efs.broken.no\_mount\_targets | no mount targets | broken | wave1 | — |
+| efs.warn.creating | creating | warn | wave1 | — |
+| efs.warn.updating | updating | warn | wave1 | — |
+| efs.warn.deleting | deleting | warn | wave1 | — |
+| efs.mount-target-down | mount target down | broken | wave2 | — |
+| efs.unencrypted | not encrypted | warn | wave1 | — |
+| efs.public-policy | file system policy open to anyone | broken | wave2 | — |
+| efs.no-backup-policy | automatic backups off | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

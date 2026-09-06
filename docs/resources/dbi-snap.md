@@ -199,16 +199,16 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| dbi-snap.broken.failed | failed | broken | wave1 |
-| dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
-| dbi-snap.warn.creating | creating: <pct>% | warn | wave1 |
-| dbi-snap.warn.transitional | <status> | warn | wave1 |
-| dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
-| dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |
-| dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 |
-| dbi-snap.public | shared with all AWS accounts | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| dbi-snap.broken.failed | failed | broken | wave1 | — |
+| dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 | — |
+| dbi-snap.warn.creating | creating: <pct>% | warn | wave1 | — |
+| dbi-snap.warn.transitional | <status> | warn | wave1 | — |
+| dbi-snap.warn.unencrypted | unencrypted | warn | wave1 | — |
+| dbi-snap.orphan | orphan: source DB deleted | broken | wave2 | — |
+| dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 | — |
+| dbi-snap.public | shared with all AWS accounts | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

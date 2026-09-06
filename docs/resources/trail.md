@@ -169,12 +169,12 @@ trail — MONITORING. Lifecycle key: none (the list API returns no lifecycle fie
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| trail.log-file-validation.disabled | log file validation disabled | warn | wave1 |
-| trail.not-logging | not logging | broken | wave2 |
-| trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 |
-| trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| trail.log-file-validation.disabled | log file validation disabled | warn | wave1 | — |
+| trail.not-logging | not logging | broken | wave2 | — |
+| trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 | — |
+| trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

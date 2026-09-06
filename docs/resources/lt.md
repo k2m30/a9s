@@ -169,14 +169,14 @@ lt — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 |
-| lt.warn.unencrypted | EBS encryption disabled | warn | wave1 |
-| lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 |
-| lt.user-data-secret | credential in user data | broken | wave2 |
-| lt.warn.details\_denied | details denied | warn | wave1 |
-| lt.warn.details\_unavailable | details unavailable | warn | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 | — |
+| lt.warn.unencrypted | EBS encryption disabled | warn | wave1 | — |
+| lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 | — |
+| lt.user-data-secret | credential in user data | broken | wave2 | — |
+| lt.warn.details\_denied | details denied | warn | wave1 | — |
+| lt.warn.details\_unavailable | details unavailable | warn | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

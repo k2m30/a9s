@@ -221,30 +221,30 @@ redshift — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| redshift.broken.incompatible\_hsm | incompatible-hsm | broken | wave1 |
-| redshift.broken.incompatible\_network | incompatible-network | broken | wave1 |
-| redshift.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 |
-| redshift.broken.incompatible\_restore | incompatible-restore | broken | wave1 |
-| redshift.broken.hardware\_failure | hardware-failure | broken | wave1 |
-| redshift.broken.storage\_full | storage-full | broken | wave1 |
-| redshift.broken.unavailable | unavailable | broken | wave1 |
-| redshift.broken.failed | failed | broken | wave1 |
-| redshift.warn.creating | creating | warn | wave1 |
-| redshift.warn.modifying | modifying | warn | wave1 |
-| redshift.warn.resizing | resizing | warn | wave1 |
-| redshift.warn.rebooting | rebooting | warn | wave1 |
-| redshift.warn.renaming | renaming | warn | wave1 |
-| redshift.warn.deleting | deleting | warn | wave1 |
-| redshift.warn.maintenance | maintenance | warn | wave1 |
-| redshift.warn.availability\_modifying | modifying | warn | wave1 |
-| redshift.warn.pending\_change | pending change queued | warn | wave1 |
-| redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 |
-| redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 |
-| redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 |
-| redshift.audit-logging-off | audit logging off | warn | wave2 |
-| redshift.require-ssl-off | SSL not required | warn | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| redshift.broken.incompatible\_hsm | incompatible-hsm | broken | wave1 | — |
+| redshift.broken.incompatible\_network | incompatible-network | broken | wave1 | — |
+| redshift.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 | — |
+| redshift.broken.incompatible\_restore | incompatible-restore | broken | wave1 | — |
+| redshift.broken.hardware\_failure | hardware-failure | broken | wave1 | — |
+| redshift.broken.storage\_full | storage-full | broken | wave1 | — |
+| redshift.broken.unavailable | unavailable | broken | wave1 | — |
+| redshift.broken.failed | failed | broken | wave1 | — |
+| redshift.warn.creating | creating | warn | wave1 | — |
+| redshift.warn.modifying | modifying | warn | wave1 | — |
+| redshift.warn.resizing | resizing | warn | wave1 | — |
+| redshift.warn.rebooting | rebooting | warn | wave1 | — |
+| redshift.warn.renaming | renaming | warn | wave1 | — |
+| redshift.warn.deleting | deleting | warn | wave1 | — |
+| redshift.warn.maintenance | maintenance | warn | wave1 | — |
+| redshift.warn.availability\_modifying | modifying | warn | wave1 | — |
+| redshift.warn.pending\_change | pending change queued | warn | wave1 | — |
+| redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 | — |
+| redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
+| redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 | — |
+| redshift.audit-logging-off | audit logging off | warn | wave2 | — |
+| redshift.require-ssl-off | SSL not required | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

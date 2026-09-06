@@ -168,13 +168,13 @@ ami — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ami.state.pending | pending | warn | wave1 |
-| ami.state.failed | failed | broken | wave1 |
-| ami.state.dim | deregistered | dim | wave1 |
-| ami.deprecated | deprecated | warn | wave1 |
-| ami.public | shared with all AWS accounts | broken | wave1 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ami.state.pending | pending | warn | wave1 | — |
+| ami.state.failed | failed | broken | wave1 | — |
+| ami.state.dim | deregistered | dim | wave1 | — |
+| ami.deprecated | deprecated | warn | wave1 | — |
+| ami.public | shared with all AWS accounts | broken | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

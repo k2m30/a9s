@@ -175,14 +175,14 @@ ebs-snap — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| ebs-snap.state.pending | pending | warn | wave1 |
-| ebs-snap.state.error | error | broken | wave1 |
-| ebs-snap.encryption.disabled | unencrypted | warn | wave1 |
-| ebs-snap.aged-automated | automated, <N>d old | warn | wave1 |
-| ebs-snap.orphan | orphan: source volume deleted | warn | wave2 |
-| ebs-snap.public | shared with all AWS accounts | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| ebs-snap.state.pending | pending | warn | wave1 | — |
+| ebs-snap.state.error | error | broken | wave1 | — |
+| ebs-snap.encryption.disabled | unencrypted | warn | wave1 | — |
+| ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | — |
+| ebs-snap.orphan | orphan: source volume deleted | warn | wave2 | — |
+| ebs-snap.public | shared with all AWS accounts | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

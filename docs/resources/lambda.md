@@ -345,17 +345,17 @@ lambda — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source |
-| --- | --- | --- | --- |
-| lambda.last-update.failed | last update failed to apply | broken | wave1 |
-| lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 |
-| lambda.state.pending | pending | warn | wave1 |
-| lambda.state.failed | failed | broken | wave1 |
-| lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 |
-| lambda.dlq.missing | no dead-letter queue configured | warn | wave1 |
-| lambda.env-secret | credential in environment variables | broken | wave1 |
-| lambda.public-policy | invokable by anyone | broken | wave2 |
-| lambda.function-url-public | function endpoint open without authentication | broken | wave2 |
+| Code | Phrase | Severity | Source | Detail |
+| --- | --- | --- | --- | --- |
+| lambda.last-update.failed | last update failed to apply | broken | wave1 | — |
+| lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 | — |
+| lambda.state.pending | pending | warn | wave1 | — |
+| lambda.state.failed | failed | broken | wave1 | — |
+| lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 | — |
+| lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | — |
+| lambda.env-secret | credential in environment variables | broken | wave1 | — |
+| lambda.public-policy | invokable by anyone | broken | wave2 | — |
+| lambda.function-url-public | function endpoint open without authentication | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
