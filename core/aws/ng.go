@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
@@ -152,10 +151,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 // RawStruct, they survive the disk cache: without them a warm row makes
 // ng→eks, ng→ec2 and ng→ebs answer a confident zero instead of "not read".
 func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource {
-	r := DegradedDetails("ng", ngName, &ekstypes.Nodegroup{
-		ClusterName:   aws.String(clusterName),
-		NodegroupName: aws.String(ngName),
-	}, err)
+	r := DegradedDetails("ng", ngName, err)
 	r.Fields["cluster_name"] = clusterName
 	r.Fields["nodegroup_name"] = ngName
 	return r

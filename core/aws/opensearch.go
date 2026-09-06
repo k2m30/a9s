@@ -291,7 +291,7 @@ func FetchOpenSearchDomainsAt(
 			reason = describeErr.Error()
 		}
 		failures = append(failures, fmt.Sprintf("%s: %s", name, reason))
-		resources = append(resources, DegradedDetails("opensearch", name, opensearchtypes.DomainStatus{DomainName: &name}, describeErr))
+		resources = append(resources, DegradedDetails("opensearch", name, describeErr))
 	}
 
 	return resources, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))

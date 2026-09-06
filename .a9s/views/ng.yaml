@@ -4,6 +4,7 @@ list:
     width: 28
   Cluster:
     path: ClusterName
+    key: cluster_name
     width: 24
   Status:
     path: Status

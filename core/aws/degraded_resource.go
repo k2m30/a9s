@@ -141,12 +141,17 @@ func degradedDetailsFinding(shortName string, err error) domain.Finding {
 }
 
 // DegradedDetails builds the name-only row an N+1 fetcher emits when the
-// per-item describe for id failed or came back empty. raw is a minimal
-// typed SDK value carrying the identifier (so detail/YAML views render
-// something honest); pass the zero struct with the name set. err is the
-// describe call's error (nil for an absent-from-response row); it decides
-// whether the row renders "details denied" or "details unavailable".
-func DegradedDetails(shortName, id string, raw any, err error) resource.Resource {
+// per-item describe for id failed or came back empty. err is the describe
+// call's error (nil for an absent-from-response row); it decides whether the
+// row renders "details denied" or "details unavailable".
+//
+// RawStruct stays nil on purpose. A synthetic struct carrying only the name
+// is assertable, so every pivot that reads a field off the struct would find
+// it empty and answer a confident zero — "this node group has no IAM role" —
+// about a resource nobody was allowed to describe. Nil makes those pivots
+// answer Unknown instead. Identity a pivot can legitimately use goes in
+// Fields, which the disk cache preserves and RawStruct does not.
+func DegradedDetails(shortName, id string, err error) resource.Resource {
 	finding := degradedDetailsFinding(shortName, err)
 	return resource.Resource{
 		ID:   id,
@@ -155,7 +160,6 @@ func DegradedDetails(shortName, id string, raw any, err error) resource.Resource
 			"name":   id,
 			"status": finding.Phrase,
 		},
-		RawStruct: raw,
-		Findings:  []domain.Finding{finding},
+		Findings: []domain.Finding{finding},
 	}
 }

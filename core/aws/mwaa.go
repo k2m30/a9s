@@ -198,8 +198,7 @@ func buildMWAADegradedResource(name string, err error) resource.Resource {
 			"name":   name,
 			"status": finding.Phrase,
 		},
-		RawStruct: &mwaatypes.Environment{Name: aws.String(name)},
-		Findings:  []domain.Finding{finding},
+		Findings: []domain.Finding{finding},
 	}
 }
 

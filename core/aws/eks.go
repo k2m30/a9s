@@ -52,12 +52,12 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 		})
 		if descErr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %s", name, descErr.Error()))
-			resources = append(resources, DegradedDetails("eks", name, &ekstypes.Cluster{Name: aws.String(name)}, descErr))
+			resources = append(resources, DegradedDetails("eks", name, descErr))
 			continue
 		}
 		if descOutput.Cluster == nil {
 			failures = append(failures, fmt.Sprintf("%s: nil cluster in response", name))
-			resources = append(resources, DegradedDetails("eks", name, &ekstypes.Cluster{Name: aws.String(name)}, nil))
+			resources = append(resources, DegradedDetails("eks", name, nil))
 			continue
 		}
 		resources = append(resources, buildEKSResource(name, descOutput.Cluster, versions))
