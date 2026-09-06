@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // generateAndReadDoc runs generateResourceDoc against a temp repo root and
@@ -25,6 +26,74 @@ func generateAndReadDoc(t *testing.T, rt catalog.ResourceTypeDef) string {
 		t.Fatalf("read generated doc: %v", err)
 	}
 	return string(raw)
+}
+
+// TestDetailCell_DeclaredSentenceOrEmDash pins task w27 row 2 directly
+// through the generator's own function, not by writing and re-reading a
+// page: a finding with a declared Detail renders its escaped sentence, and
+// one with none renders the em dash.
+func TestDetailCell_DeclaredSentenceOrEmDash(t *testing.T) {
+	cases := []struct {
+		name string
+		def  catalog.FindingDef
+		want string
+	}{
+		{
+			name: "no Detail declared",
+			def:  catalog.FindingDef{Code: "sg.ingress.wide-open", Phrase: "all ports open to 0.0.0.0/0"},
+			want: "—",
+		},
+		{
+			name: "a declared sentence",
+			def: catalog.FindingDef{
+				Code:   "sg.ingress.dangerous-ports",
+				Detail: "An administrative or database port on this group accepts connections from any address on the internet.",
+			},
+			want: "An administrative or database port on this group accepts connections from any address on the internet.",
+		},
+		{
+			name: "a declared sentence needing markdown-cell escaping",
+			def: catalog.FindingDef{
+				Code:   "test.escape",
+				Detail: "Uses `backticks`, pipes | and _underscores_.",
+			},
+			want: "Uses \\`backticks\\`, pipes \\| and \\_underscores\\_.",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := detailCell(tc.def)
+			if got != tc.want {
+				t.Errorf("detailCell() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDetailCell_ThroughGenerateResourceDoc pins the same contract one layer
+// up: the §4 findings table's Detail column, as generateResourceDoc actually
+// writes it, carries the declared sentence or the em dash — the acceptance
+// column's "298 cells are regenerated, not edited" requires this join to
+// hold end to end, not just at detailCell in isolation.
+func TestDetailCell_ThroughGenerateResourceDoc(t *testing.T) {
+	rt := catalog.ResourceTypeDef{
+		Name:      "Security Groups",
+		ShortName: "sg",
+		Category:  "NETWORKING",
+		FieldKeys: []string{"name", "state"},
+		Findings: []catalog.FindingDef{
+			{Code: "sg.ingress.dangerous-ports", Phrase: "ports 22 open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1",
+				Detail: "An administrative or database port on this group accepts connections from any address on the internet."},
+			{Code: "sg.ingress.wide-open", Phrase: "all ports open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1"},
+		},
+	}
+	doc := generateAndReadDoc(t, rt)
+	if !strings.Contains(doc, "An administrative or database port on this group accepts connections from any address on the internet.") {
+		t.Errorf("generated doc is missing the declared Detail sentence:\n%s", doc)
+	}
+	if !strings.Contains(doc, "| all ports open to 0.0.0.0/0 | broken | wave1 | — |") {
+		t.Errorf("generated doc's Detail-less row does not render the em dash:\n%s", doc)
+	}
 }
 
 func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
