@@ -41,6 +41,12 @@ var (
 	// Blanking ARNs before the keyword pass is what lets isRealValue see the
 	// reference rather than its last segment.
 	arnRe = regexp.MustCompile(`arn:aws[a-z-]*:[^\s"',;]+`)
+	// envRefRe matches a bare environment reference and nothing else: a
+	// dollar followed by an identifier, all the way to the end. Every hash
+	// format whose own syntax opens with a dollar — bcrypt's $2y$, crypt's
+	// $6$, $argon2id$ — fails it on the first character or the first
+	// separator, and those are the credential itself, not a name for one.
+	envRefRe = regexp.MustCompile(`^\$[A-Za-z_]\w*$`)
 	// userinfoRe: scheme://user:password@host — the password is group 1.
 	userinfoRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s/:@]+:([^\s/@]+)@`)
 	kvKeyRe    = regexp.MustCompile(`(?i)(secret|passw(or)?d|passwd|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret|credential|auth[_-]?token|db[_-]?pass)`)
@@ -139,10 +145,10 @@ func isRealValue(v string) bool {
 		return false
 	}
 	lower := strings.ToLower(v)
-	// "$" covers both "${var.x}" and a bare "$ACME_API_KEY": an environment
-	// indirection names where the secret lives, which is the practice this
-	// scanner exists to encourage.
-	for _, p := range []string{"arn:", "$", "{{", "/", "ssm:", "secretsmanager:"} {
+	if envRefRe.MatchString(v) {
+		return false
+	}
+	for _, p := range []string{"arn:", "${", "{{", "/", "ssm:", "secretsmanager:"} {
 		if strings.HasPrefix(lower, p) {
 			return false
 		}

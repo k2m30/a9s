@@ -321,7 +321,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The secret scanner no longer reports a value that names where the secret
   lives rather than carrying one: an environment variable reference such as
   `$ACME_API_KEY`, and a Secrets Manager ARN, whose own `secret:` segment
-  used to be read as a credential followed by its value.
+  used to be read as a credential followed by its value. A hash whose own
+  syntax opens with a dollar, such as bcrypt or crypt, is the credential
+  itself and is still reported.
 - A sentence mentioning a credential word in quotes, such as `The "password":
   rotate it every ninety days`, is no longer reported as a leak. A quoted key
   now counts only when its value is quoted too, which is the JSON shape.
