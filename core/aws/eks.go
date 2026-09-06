@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -119,6 +120,8 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 		subnetIDs = strings.Join(cluster.ResourcesVpcConfig.SubnetIds, ",")
 	}
 
+	posture := eksPostureOf(cluster, versions)
+
 	r := resource.Resource{
 		ID:   name,
 		Name: clusterName,
@@ -133,51 +136,22 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 			"health_issues_count": strconv.Itoa(healthIssuesCount),
 			"health_issues":       strings.Join(issueCodes, ", "),
 			"subnet_ids":          subnetIDs,
+			// The four posture verdicts as words. colorEKSCluster's fallback
+			// runs eksClusterFindings over Fields, so a row stripped of its
+			// findings has to be able to recover them; the config they are
+			// derived from is on the DescribeCluster struct and nowhere else.
+			"public_endpoint":       posture.PublicEndpoint,
+			"control_plane_logging": posture.ControlPlaneLogging,
+			"secrets_encryption":    posture.SecretsEncryption,
+			"version_support":       posture.VersionSupport,
 		},
 		RawStruct: cluster,
 	}
 
-	// emit canonical Findings for non-healthy lifecycle states, mirroring
-	// colorEKSCluster's own precedence (catalog_containers.go): FAILED wins
-	// outright (SevBroken, folding in Health.Issues detail if present),
-	// then CREATING/UPDATING (SevWarn), then a bare Health.Issues[] on an
-	// otherwise-healthy cluster (SevWarn — health is tracked independently
-	// of lifecycle state, docs/resources/eks.md §3.2).
-	switch {
-	case cluster.Status == ekstypes.ClusterStatusFailed:
-		f, rows := healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)
-		r.Findings = []domain.Finding{f}
-		addWave1Rows(&r, CodeEKSStateFailed, rows...)
-	case cluster.Status == ekstypes.ClusterStatusCreating:
-		r.Findings = []domain.Finding{{
-			Code: CodeEKSStateCreating, Phrase: "creating",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
-	case cluster.Status == ekstypes.ClusterStatusUpdating:
-		r.Findings = []domain.Finding{{
-			Code: CodeEKSStateUpdating, Phrase: "updating",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
-	case cluster.Status == ekstypes.ClusterStatusDeleting:
-		r.Findings = []domain.Finding{{
-			Code: CodeEKSStateDeleting, Phrase: "deleting",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
-	case cluster.Status == ekstypes.ClusterStatusPending:
-		r.Findings = []domain.Finding{{
-			Code: CodeEKSStatePending, Phrase: "pending",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
-	case healthIssuesCount > 0:
-		// SevWarn, not SevBroken: a Health.Issues[] signal on an otherwise
-		// healthy lifecycle state ranks below FAILED/CREATING/UPDATING
-		// (docs/resources/eks.md §3.2).
-		f, rows := healthIssueFindingSev(CodeEKSHealthIssue, "health issue", issueCodes, domain.SevWarn)
-		r.Findings = []domain.Finding{f}
-		addWave1Rows(&r, CodeEKSHealthIssue, rows...)
-	}
-
-	addEKSPostureFindings(&r, cluster, versions)
+	var issueRows []domain.DetailRow
+	r.Findings, issueRows = eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
+	addWave1Rows(&r, eksIssueRowCode(status), issueRows...)
+	addEKSPostureRows(&r, cluster, versions)
 	return r
 }
 
@@ -228,33 +202,59 @@ func eksSupportWords(status ekstypes.VersionStatus) string {
 // addEKSPostureFindings evaluates the four w6b posture signals against the
 // DescribeCluster response the fetcher already holds, plus the version
 // catalogue read once for the page.
-func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) {
-	if cluster.Status == ekstypes.ClusterStatusDeleting {
-		return
-	}
+// eksPosture is the four config verdicts, each a word the fetcher derives from
+// the DescribeCluster struct and writes into Fields so the classifier can read
+// back what the fetcher decided instead of deciding again.
+type eksPosture struct {
+	PublicEndpoint      string // open | restricted | no
+	ControlPlaneLogging string // complete | incomplete
+	SecretsEncryption   string // kms | none
+	VersionSupport      string // standard | the words eksSupportWords derives
+}
+
+func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) eksPosture {
+	p := eksPosture{PublicEndpoint: "no", ControlPlaneLogging: "complete", SecretsEncryption: "none", VersionSupport: "standard"}
 
 	if vpc := cluster.ResourcesVpcConfig; vpc != nil && vpc.EndpointPublicAccess {
 		// AWS defaults PublicAccessCidrs to 0.0.0.0/0 and omits it when it was
 		// never narrowed, so an empty list on a public endpoint is the open
 		// case rather than the unknown one.
-		open := len(vpc.PublicAccessCidrs) == 0 || slices.Contains(vpc.PublicAccessCidrs, "0.0.0.0/0")
-		severity := domain.SevWarn
-		if open {
-			severity = domain.SevBroken
+		p.PublicEndpoint = "restricted"
+		if len(vpc.PublicAccessCidrs) == 0 || slices.Contains(vpc.PublicAccessCidrs, "0.0.0.0/0") {
+			p.PublicEndpoint = "open"
 		}
-		addWave1Finding(r, CodeEKSPublicEndpoint, "cluster endpoint reachable from the internet", severity)
-		ranges := "0.0.0.0/0"
-		if len(vpc.PublicAccessCidrs) > 0 {
-			ranges = strings.Join(vpc.PublicAccessCidrs, ", ")
-		}
-		addWave1Rows(r, CodeEKSPublicEndpoint, domain.DetailRow{
-			Label: "Reachable from", Value: ranges, Tier: "!",
-		})
 	}
 
-	// A LogSetup entry that lists a type with Enabled=false does not enable
-	// it, and the five may arrive spread across several enabled entries, so
-	// this is the union of the enabled ones.
+	if len(eksMissingLogTypes(cluster)) > 0 {
+		p.ControlPlaneLogging = "incomplete"
+	}
+
+	for _, ec := range cluster.EncryptionConfig {
+		// Resources is the only field that says WHICH resources a key covers,
+		// and "covers secrets specifically" is the condition being reported.
+		// The SDK marks it deprecated because EKS now encrypts API data by
+		// default, but it is still what DescribeCluster returns and still what
+		// distinguishes a cluster with its own key from one without.
+		//nolint:staticcheck // SA1019: no replacement field carries this fact
+		if slices.Contains(ec.Resources, "secrets") {
+			p.SecretsEncryption = "kms"
+		}
+	}
+
+	// A version absent from the catalogue, or a catalogue that could not be
+	// read at all, is unknown — not old.
+	if info, known := versions[aws.ToString(cluster.Version)]; known &&
+		info.VersionStatus != ekstypes.VersionStatusStandardSupport && info.VersionStatus != "" {
+		p.VersionSupport = eksSupportWords(info.VersionStatus)
+	}
+	return p
+}
+
+// eksMissingLogTypes returns the control-plane log types not being sent. A
+// LogSetup entry that lists a type with Enabled=false does not enable it, and
+// the five may arrive spread across several enabled entries, so this is the
+// complement of the union of the enabled ones.
+func eksMissingLogTypes(cluster *ekstypes.Cluster) []string {
 	enabled := make(map[ekstypes.LogType]bool, len(eksControlPlaneLogTypes))
 	if cluster.Logging != nil {
 		for _, setup := range cluster.Logging.ClusterLogging {
@@ -272,46 +272,113 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 			missing = append(missing, string(lt))
 		}
 	}
-	if len(missing) > 0 {
-		addWave1Finding(r, CodeEKSControlPlaneLoggingOff, "control plane logging incomplete", domain.SevWarn)
-		addWave1Rows(r, CodeEKSControlPlaneLoggingOff, domain.DetailRow{
-			Label: "Not being sent", Value: strings.Join(missing, ", "), Tier: "~",
+	return missing
+}
+
+// eksPostureFindings decides the four posture findings from the words alone. A
+// cluster on its way out reports none of them: nothing an operator does to a
+// deleting cluster matters. An absent word is unknown rather than bad — the
+// fetcher always writes all four, so a missing one means a row built outside
+// it.
+func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
+	if status == string(ekstypes.ClusterStatusDeleting) {
+		return nil
+	}
+	var findings []domain.Finding
+	if p.PublicEndpoint != "no" && p.PublicEndpoint != "" {
+		severity := domain.SevWarn
+		if p.PublicEndpoint == "open" {
+			severity = domain.SevBroken
+		}
+		findings = append(findings, domain.Finding{
+			Code: CodeEKSPublicEndpoint, Phrase: "cluster endpoint reachable from the internet",
+			Detail: catalog.Detail(CodeEKSPublicEndpoint), Severity: severity, Source: "wave1",
 		})
 	}
+	if p.ControlPlaneLogging == "incomplete" {
+		findings = append(findings, domain.Finding{
+			Code: CodeEKSControlPlaneLoggingOff, Phrase: "control plane logging incomplete",
+			Detail: catalog.Detail(CodeEKSControlPlaneLoggingOff), Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+	if p.SecretsEncryption == "none" {
+		findings = append(findings, domain.Finding{
+			Code: CodeEKSSecretsNotKMS, Phrase: "secrets not encrypted with KMS",
+			Detail: catalog.Detail(CodeEKSSecretsNotKMS), Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+	if p.VersionSupport != "standard" && p.VersionSupport != "" {
+		findings = append(findings, domain.Finding{
+			Code: CodeEKSVersionUnsupported, Phrase: "Kubernetes " + version + " is out of standard support",
+			Detail: catalog.Detail(CodeEKSVersionUnsupported), Severity: domain.SevBroken, Source: "wave1",
+		})
+	}
+	return findings
+}
 
-	// An encryption configuration covering something other than secrets does
-	// not cover secrets, so a non-empty slice is not the question.
-	secretsEncrypted := false
-	for _, ec := range cluster.EncryptionConfig {
-		// Resources is the only field that says WHICH resources a key covers,
-		// and "covers secrets specifically" is the condition being reported.
-		// The SDK marks it deprecated because EKS now encrypts API data by
-		// default, but it is still what DescribeCluster returns and still what
-		// distinguishes a cluster with its own key from one without.
-		//nolint:staticcheck // SA1019: no replacement field carries this fact
-		for _, res := range ec.Resources {
-			if res == "secrets" {
-				secretsEncrypted = true
-			}
+// addEKSPostureRows attaches the supporting rows for whichever posture
+// findings fired. They name the CIDR list, the missing log types and the
+// support dates, none of which Fields carries — a detail row is the fetcher's
+// alone, and only the colour has to survive a stripped row.
+func addEKSPostureRows(r *resource.Resource, cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) {
+	if hasFinding(r.Findings, CodeEKSPublicEndpoint) {
+		ranges := "0.0.0.0/0"
+		if vpc := cluster.ResourcesVpcConfig; vpc != nil && len(vpc.PublicAccessCidrs) > 0 {
+			ranges = strings.Join(vpc.PublicAccessCidrs, ", ")
 		}
+		addWave1Rows(r, CodeEKSPublicEndpoint, domain.DetailRow{Label: "Reachable from", Value: ranges, Tier: "!"})
 	}
-	if !secretsEncrypted {
-		addWave1Finding(r, CodeEKSSecretsNotKMS, "secrets not encrypted with KMS", domain.SevWarn)
+	if hasFinding(r.Findings, CodeEKSControlPlaneLoggingOff) {
+		addWave1Rows(r, CodeEKSControlPlaneLoggingOff, domain.DetailRow{
+			Label: "Not being sent", Value: strings.Join(eksMissingLogTypes(cluster), ", "), Tier: "~",
+		})
 	}
-
-	// A version absent from the catalogue, or a catalogue that could not be
-	// read at all, is unknown — not old.
-	version := aws.ToString(cluster.Version)
-	info, known := versions[version]
-	if !known || info.VersionStatus == ekstypes.VersionStatusStandardSupport || info.VersionStatus == "" {
+	if !hasFinding(r.Findings, CodeEKSVersionUnsupported) {
 		return
 	}
-	addWave1Finding(r, CodeEKSVersionUnsupported, "Kubernetes "+version+" is out of standard support", domain.SevBroken)
+	info := versions[aws.ToString(cluster.Version)]
 	support := eksSupportWords(info.VersionStatus)
 	if info.EndOfStandardSupportDate != nil {
 		support += ", standard support ended " + info.EndOfStandardSupportDate.Format("2006-01-02")
 	}
-	addWave1Rows(r, CodeEKSVersionUnsupported, domain.DetailRow{
-		Label: "Support", Value: support, Tier: "!",
-	})
+	addWave1Rows(r, CodeEKSVersionUnsupported, domain.DetailRow{Label: "Support", Value: support, Tier: "!"})
+}
+
+// eksClusterFindings is the one predicate for a cluster: the lifecycle state,
+// then the posture verdicts. colorEKSCluster runs it over Fields for rows built
+// outside the fetcher, which have the issue count but not the codes; the phrase
+// is then the fallback wording and the severity, which is what decides the
+// colour, is the same either way.
+func eksClusterFindings(status string, healthIssuesCount int, issueCodes []string, version string, p eksPosture) ([]domain.Finding, []domain.DetailRow) {
+	var findings []domain.Finding
+	var rows []domain.DetailRow
+	switch status {
+	case string(ekstypes.ClusterStatusFailed):
+		f, r := healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)
+		findings, rows = []domain.Finding{f}, r
+	case string(ekstypes.ClusterStatusCreating):
+		findings = []domain.Finding{{Code: CodeEKSStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeEKSStateCreating), Severity: domain.SevWarn, Source: "wave1"}}
+	case string(ekstypes.ClusterStatusUpdating):
+		findings = []domain.Finding{{Code: CodeEKSStateUpdating, Phrase: "updating", Detail: catalog.Detail(CodeEKSStateUpdating), Severity: domain.SevWarn, Source: "wave1"}}
+	case string(ekstypes.ClusterStatusDeleting):
+		findings = []domain.Finding{{Code: CodeEKSStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeEKSStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
+	case string(ekstypes.ClusterStatusPending):
+		findings = []domain.Finding{{Code: CodeEKSStatePending, Phrase: "pending", Detail: catalog.Detail(CodeEKSStatePending), Severity: domain.SevWarn, Source: "wave1"}}
+	default:
+		if healthIssuesCount > 0 {
+			f, r := healthIssueFindingSev(CodeEKSHealthIssue, "health issue", issueCodes, domain.SevWarn)
+			findings, rows = []domain.Finding{f}, r
+		}
+	}
+	return append(findings, eksPostureFindings(status, version, p)...), rows
+}
+
+// eksIssueRowCode names the finding the Health.Issues[] rows belong to: the
+// failed state folds them in, any other state leaves them on the health-issue
+// finding.
+func eksIssueRowCode(status string) domain.FindingCode {
+	if status == string(ekstypes.ClusterStatusFailed) {
+		return CodeEKSStateFailed
+	}
+	return CodeEKSHealthIssue
 }

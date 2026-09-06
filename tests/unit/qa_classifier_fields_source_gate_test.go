@@ -29,10 +29,9 @@ import (
 // with the reason "not yet on the shared fallback". Task w29 empties it and
 // deletes this gate.
 var classifiersOffTheSharedFallback = map[string]string{ //nolint:gochecknoglobals // test-only burn-down list
-	"colorEKSCluster": "not yet on the shared fallback",
-	"colorCF":         "not yet on the shared fallback",
-	"colorLogs":       "not yet on the shared fallback",
-	"colorCFN":        "not yet on the shared fallback: parses a phrase through cfnStackColor",
+	"colorCF":   "not yet on the shared fallback",
+	"colorLogs": "not yet on the shared fallback",
+	"colorCFN":  "not yet on the shared fallback: parses a phrase through cfnStackColor",
 	// These two live in catalog_color_helpers.go rather than a catalog_<cat>.go
 	// data file, which is why a sweep of the category files did not see them.
 }

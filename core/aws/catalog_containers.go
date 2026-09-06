@@ -18,34 +18,19 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// colorEKSCluster is the last classifier in this file still deciding for
-// itself: w6b's posture findings read cluster config (endpoint access,
-// control-plane logging, secrets encryption, version support) that the fetcher
-// never writes into Fields, so a predicate over Fields cannot yet recover them.
 func colorEKSCluster(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	if r.Fields["status"] == "FAILED" {
-		return domain.ColorBroken
-	}
-	hasIssues := false
-	if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
-		hasIssues = true
-	}
-	switch r.Fields["status"] {
-	case "ACTIVE":
-		if hasIssues {
-			return domain.ColorWarning
-		}
-		return domain.ColorHealthy
-	case "CREATING", "UPDATING", "DELETING", "PENDING":
-		return domain.ColorWarning
-	}
-	if hasIssues {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	issues, _ := strconv.Atoi(r.Fields["health_issues_count"])
+	findings, _ := eksClusterFindings(
+		r.Fields["status"], issues, nil, r.Fields["version"], eksPosture{
+			PublicEndpoint:      r.Fields["public_endpoint"],
+			ControlPlaneLogging: r.Fields["control_plane_logging"],
+			SecretsEncryption:   r.Fields["secrets_encryption"],
+			VersionSupport:      r.Fields["version_support"],
+		})
+	return colorFromFindings(findings)
 }
 
 func colorEKSNodeGroup(r domain.Resource) domain.Color {
