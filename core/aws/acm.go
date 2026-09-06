@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,7 +37,34 @@ const (
 	// acmCodeStatusInactive — Status==INACTIVE. An imported certificate no
 	// longer attached to any resource for TLS termination.
 	acmCodeStatusInactive domain.FindingCode = "acm.status.inactive"
+
+	// CodeACMWeakKey — KeyAlgorithm is RSA below 2048 bits. Elliptic-curve
+	// keys and RSA 2048+ are fine.
+	CodeACMWeakKey domain.FindingCode = "acm.weak-key"
 )
+
+// acmWeakKeyDetail is the S5 sentence for CodeACMWeakKey.
+const acmWeakKeyDetail = "The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a 2048-bit or longer RSA key, or an elliptic-curve key."
+
+// acmRSAMinimumBits is the shortest RSA key still considered sound.
+const acmRSAMinimumBits = 2048
+
+// acmKeyIsWeak reports whether the key algorithm is RSA below
+// acmRSAMinimumBits. An empty algorithm is unresolved, not weak, and any
+// elliptic-curve key AWS issues is sound.
+func acmKeyIsWeak(alg string) bool {
+	bits, ok := strings.CutPrefix(alg, "RSA_")
+	if !ok {
+		return false
+	}
+	n, err := strconv.Atoi(bits)
+	return err == nil && n < acmRSAMinimumBits
+}
+
+// acmKeyAlgorithmWords renders the SDK enum as the words the console shows.
+func acmKeyAlgorithmWords(alg string) string {
+	return strings.ReplaceAll(alg, "_", " ")
+}
 
 // FetchACMCertificatesPage fetches a single page of ACM certificates.
 func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, continuationToken string) (resource.FetchResult, error) {
@@ -121,6 +149,18 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			// (acmStatusFindings), mirroring acmColor's own precedence.
 			Findings:  acmFindings(status, cert.NotAfter, cert.InUse != nil && *cert.InUse, now),
 			RawStruct: cert,
+		}
+
+		// Independent of status and expiry: a certificate can be issued, in
+		// use, valid for a year, and still built on a key worth attacking.
+		if alg := string(cert.KeyAlgorithm); acmKeyIsWeak(alg) {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code: CodeACMWeakKey, Phrase: "weak key algorithm",
+				Detail: acmWeakKeyDetail, Severity: domain.SevWarn, Source: "wave1",
+			})
+			addWave1Rows(&r, CodeACMWeakKey, domain.DetailRow{
+				Label: "Key algorithm", Value: acmKeyAlgorithmWords(alg), Tier: "~",
+			})
 		}
 
 		resources = append(resources, r)

@@ -92,6 +92,34 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 func buildCTTrails() []cloudtrailtypes.Trail {
 	return []cloudtrailtypes.Trail{
 		{
+			// TrailLogBucketPublic: delivers to the bucket the s3 enricher
+			// reports as public, which is what trail.log-bucket-public joins on.
+			Name:                       aws.String(TrailLogBucketPublic),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/" + TrailLogBucketPublic),
+			S3BucketName:               aws.String(S3BucketPublic),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(true),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(true),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+		},
+		{
+			// TrailLogBucketNoLogging: delivers to the bucket the s3 enricher
+			// reports as having no access logging.
+			Name:                       aws.String(TrailLogBucketNoLogging),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/" + TrailLogBucketNoLogging),
+			S3BucketName:               aws.String(S3BucketAccessLoggingOff),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(true),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(true),
+			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+		},
+		{
 			Name:                       aws.String("acme-management-trail"),
 			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail"),
 			S3BucketName:               aws.String("cloudtrail-audit-logs"),

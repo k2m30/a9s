@@ -10,7 +10,11 @@ package aws
 import (
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cttypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // trailDeliveryStaleAfter is the delivery-staleness threshold (docs/resources/trail.md §3.2):
@@ -56,6 +60,68 @@ const (
 	// carries the s3.access-logging-off finding. Severity: SevWarn.
 	CodeTrailLogBucketNoAccessLogging domain.FindingCode = "trail.log-bucket-no-access-logging"
 )
+
+// S5 detail sentences: what is wrong, what it exposes, what fixing it takes.
+const (
+	trailSingleRegionDetail = "The account has no multi-region trail, so API activity in every other region goes unrecorded. Recreate this trail with multi-region delivery enabled, or add one trail that covers all regions."
+
+	trailNoCloudWatchLogsDetail = "Events are delivered to S3 only, so no metric filter or alarm can watch them and nobody is paged on suspicious API activity. Attach a CloudWatch Logs log group to this trail."
+
+	trailNoKMSDetail = "Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control."
+
+	trailLogBucketPublicDetail = "The bucket holding this trail's log files is publicly accessible, so the account's audit history can be read by anyone. Remove the public grant from that bucket's policy and access control list."
+
+	trailLogBucketNoAccessLoggingDetail = "The bucket holding this trail's log files records no access logging, so reads of the audit history leave no trace. Enable server access logging on that bucket."
+)
+
+// trailPostureFindings returns the posture findings readable from the
+// DescribeTrails payload alone, and attaches each one's supporting rows.
+//
+// accountHasMultiRegion is the account-wide half of the single-region rule:
+// Prowler's check is satisfied by one multi-region trail anywhere, so a
+// single-region trail beside a multi-region one is not a gap. DescribeTrails
+// omits IsMultiRegionTrail only for trails that are not multi-region, so
+// absent is off here rather than unknown.
+func trailPostureFindings(r *resource.Resource, trail cttypes.Trail, accountHasMultiRegion bool) {
+	if !accountHasMultiRegion {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeTrailSingleRegion, Phrase: "single-region trail",
+			Severity: domain.SevWarn, Source: "wave1", Detail: trailSingleRegionDetail,
+		})
+		addWave1Rows(r, CodeTrailSingleRegion, domain.DetailRow{
+			Label: "Multi-region", Value: "no", Tier: "~",
+		})
+	}
+	if aws.ToString(trail.CloudWatchLogsLogGroupArn) == "" {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeTrailNoCloudWatchLogs, Phrase: "not delivering to CloudWatch Logs",
+			Severity: domain.SevWarn, Source: "wave1", Detail: trailNoCloudWatchLogsDetail,
+		})
+		addWave1Rows(r, CodeTrailNoCloudWatchLogs, domain.DetailRow{
+			Label: "Log group", Value: "none", Tier: "~",
+		})
+	}
+	if aws.ToString(trail.KmsKeyId) == "" {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeTrailNoKMS, Phrase: "log files not KMS-encrypted",
+			Severity: domain.SevWarn, Source: "wave1", Detail: trailNoKMSDetail,
+		})
+		addWave1Rows(r, CodeTrailNoKMS, domain.DetailRow{
+			Label: "KMS key", Value: "none", Tier: "~",
+		})
+	}
+}
+
+// trailListHasMultiRegion reports whether any trail in the account's list is
+// multi-region.
+func trailListHasMultiRegion(trails []cttypes.Trail) bool {
+	for _, t := range trails {
+		if aws.ToBool(t.IsMultiRegionTrail) {
+			return true
+		}
+	}
+	return false
+}
 
 // trailDeliveryIsStale reports whether latestDeliveryTime (RFC3339) is older
 // than trailDeliveryStaleAfter, given the trail is currently logging. Both

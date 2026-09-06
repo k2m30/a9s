@@ -87,6 +87,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Findings: []catalog.FindingDef{
 			{Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: r53CodeOrphanPrivateZone, Phrase: "private zone with no VPC associations (orphan)", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeR53QueryLoggingOff, Phrase: "query logging off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeR53DanglingRecord, Phrase: "record points at a released address", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -132,6 +134,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		// checkCf* related checkers at runtime. WebACLId is on GetDistributionConfig, not the summary.
 		Findings: []catalog.FindingDef{
 			{Code: cfCodeInsecureProtocol, Phrase: "no HTTPS redirect (insecure); origin without TLS", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFOriginBucketMissing, Phrase: "S3 origin bucket does not exist", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeCFDeprecatedTLS, Phrase: "minimum TLS below 1.2", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFLoggingOff, Phrase: "access logging off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFNoDefaultRootObject, Phrase: "no default root object", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFS3OriginNoOAC, Phrase: "S3 origin without origin access control", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFDefaultCertificate, Phrase: "uses the default CloudFront certificate", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeCFNoGeoRestriction, Phrase: "no geo restriction", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -172,6 +181,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Code: acmCodeExpiresCritical, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: acmCodeExpiresSoon, Phrase: "expires in <N> days", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeACMWeakKey, Phrase: "weak key algorithm", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -214,6 +224,11 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Findings: []catalog.FindingDef{
 			{Code: apigwCodeNoDeployedStages, Phrase: "no deployed stages", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: apigwCodeStageConfigIssues, Phrase: "no throttling configured (DoS risk); access logs disabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeAPIGWNoAccessLogs, Phrase: "no access logs", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeAPIGWTracingOff, Phrase: "X-Ray tracing off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeAPIGWStageVariableSecret, Phrase: "credential in stage variables", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 }

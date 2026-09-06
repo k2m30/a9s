@@ -25,6 +25,13 @@ const logsCodeRetentionNeverExpire domain.FindingCode = "logs.retention-never-ex
 // orphaned log group no application still writes to.
 const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 
+// CodeLogsNoKMS is the canonical FindingCode for a log group with no customer
+// managed KMS key (KmsKeyId empty). docs/resources/logs.md §4.
+const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
+
+// logsNoKMSDetail is the S5 sentence for CodeLogsNoKMS.
+const logsNoKMSDetail = "Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group."
+
 // logsStaleEmptyAge is the age threshold colorLogs uses to flag an empty log
 // group as stale.
 const logsStaleEmptyAge = 90 * 24 * time.Hour
@@ -104,6 +111,21 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			}}
+		}
+
+		// Independent of the retention/stale pair above: a log group can be
+		// both unencrypted and never-expiring, and fixing one leaves the other.
+		if kmsKeyID == "" {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code:     CodeLogsNoKMS,
+				Phrase:   "not encrypted with KMS",
+				Detail:   logsNoKMSDetail,
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			})
+			addWave1Rows(&r, CodeLogsNoKMS, domain.DetailRow{
+				Label: "KMS key", Value: "none", Tier: "~",
+			})
 		}
 
 		resources = append(resources, r)

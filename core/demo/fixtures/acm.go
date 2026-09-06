@@ -38,6 +38,23 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 	return &ACMFixtures{
 		Certificates: []acmtypes.CertificateSummary{
 			{
+				// ACMWeakKey: the one certificate on an RSA key below 2048
+				// bits. Every other certificate here is RSA 2048 so nothing
+				// else trips acm.weak-key.
+				DomainName:                      aws.String(ACMWeakKey),
+				CertificateArn:                  aws.String("arn:aws:acm:us-east-1:123456789012:certificate/c3d4e5f6-7890-12ab-cdef-333333333333"),
+				Status:                          acmtypes.CertificateStatusIssued,
+				Type:                            acmtypes.CertificateTypeImported,
+				NotAfter:                        aws.Time(mustParseACMTime("2027-09-30T23:59:59+00:00")),
+				NotBefore:                       aws.Time(mustParseACMTime("2025-09-30T00:00:00+00:00")),
+				IssuedAt:                        aws.Time(time.Date(2025, 9, 30, 10, 0, 0, 0, time.UTC)),
+				InUse:                           aws.Bool(true),
+				CreatedAt:                       aws.Time(time.Date(2025, 9, 30, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:                    acmtypes.KeyAlgorithmRsa1024,
+				SubjectAlternativeNameSummaries: []string{ACMWeakKey},
+				RenewalEligibility:              acmtypes.RenewalEligibilityIneligible,
+			},
+			{
 				DomainName:     aws.String("acme-corp.com"),
 				CertificateArn: aws.String(ProdACMCertARN1),
 				Status:         acmtypes.CertificateStatusIssued,

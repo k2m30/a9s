@@ -70,6 +70,25 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 			RawStruct: alarm,
 		}
 
+		// Independent of the state/no-actions pair: an alarm can have actions
+		// wired and still have execution switched off, and it reads as healthy
+		// in the console. Nil means DescribeAlarms did not resolve the switch,
+		// which is not evidence that it is off.
+		if alarm.ActionsEnabled != nil && !*alarm.ActionsEnabled {
+			r.Findings = append(r.Findings, domain.Finding{
+				Code:     CodeAlarmActionsDisabled,
+				Phrase:   "actions disabled",
+				Detail:   alarmActionsDisabledDetail,
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			})
+			// The phrase already says the actions are off; the row says how
+			// much is wired behind the switch.
+			addWave1Rows(&r, CodeAlarmActionsDisabled, domain.DetailRow{
+				Label: "Configured actions", Value: strconv.Itoa(actionsCount), Tier: "~",
+			})
+		}
+
 		resources = append(resources, r)
 	}
 

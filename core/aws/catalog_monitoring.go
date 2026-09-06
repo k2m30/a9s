@@ -6,7 +6,6 @@ import (
 	"context"
 	"net/url"
 	"strconv"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -23,21 +22,13 @@ func colorAlarm(r domain.Resource) domain.Color {
 	return colorFromFindings(alarmStateFindings(r.Fields["state"], actionsCount))
 }
 
+// colorLogs derives the row colour from the log group's findings alone. The
+// fetcher emits one for every condition this classifier used to read out of
+// Fields a second time — never-expiring retention, an old empty group, and a
+// group with no KMS key — so a fetched row that is off-healthy always carries
+// a Finding saying why, and a row with none is healthy.
 func colorLogs(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	if r.Fields["retention_days"] == "" {
-		return domain.ColorWarning
-	}
-	if r.Fields["stored_bytes"] == "0 B" {
-		ct := r.Fields["creation_time"]
-		t, err := time.Parse("2006-01-02 15:04", ct)
-		if err == nil && time.Since(t) > 90*24*time.Hour {
-			return domain.ColorWarning
-		}
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }
 
 func colorTrail(r domain.Resource) domain.Color {
@@ -109,6 +100,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeAlarmActionsDisabled, Phrase: "actions disabled", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -156,6 +148,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1", Detail: "No retention policy set — events kept forever, billed indefinitely."},
 			{Code: logsCodeStaleEmpty, Phrase: "empty, created over 90 days ago", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeLogsNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -220,6 +213,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeTrailNotLogging, Phrase: "not logging", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: CodeTrailDeliveryError, Phrase: "delivery error: <LatestDeliveryError>", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: CodeTrailDeliveryStale, Phrase: "delivery stale since <LatestDeliveryTime>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeTrailSingleRegion, Phrase: "single-region trail", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTrailNoCloudWatchLogs, Phrase: "not delivering to CloudWatch Logs", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTrailNoKMS, Phrase: "log files not KMS-encrypted", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTrailLogBucketPublic, Phrase: "log bucket is publicly accessible", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeTrailLogBucketNoAccessLogging, Phrase: "log bucket has no access logging", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

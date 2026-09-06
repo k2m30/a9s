@@ -24,6 +24,7 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 	}
 
 	var resources []resource.Resource
+	accountHasMultiRegion := trailListHasMultiRegion(output.TrailList)
 
 	for _, trail := range output.TrailList {
 		trailName := ""
@@ -104,6 +105,7 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 			Findings:  trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logValidation),
 			RawStruct: trail,
 		}
+		trailPostureFindings(&r, trail, accountHasMultiRegion)
 
 		resources = append(resources, r)
 	}

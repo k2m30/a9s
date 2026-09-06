@@ -14,3 +14,6 @@ const (
 	// can have actions configured and still have them switched off.
 	CodeAlarmActionsDisabled domain.FindingCode = "alarm.actions-disabled"
 )
+
+// alarmActionsDisabledDetail is the S5 sentence for CodeAlarmActionsDisabled.
+const alarmActionsDisabledDetail = "The alarm still changes state but runs none of its actions, so nobody is notified when it triggers. Switch actions back on for this alarm."
