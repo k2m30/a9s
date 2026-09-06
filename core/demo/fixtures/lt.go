@@ -58,6 +58,9 @@ const (
 	WarnLTMultiID = "lt-0warnmulti111111a"
 	// WarnLTDeniedID is listed but its DescribeLaunchTemplateVersions call is denied.
 	WarnLTDeniedID = "lt-0warndenied11111a"
+	// WarnLTUnavailableID is listed but DescribeLaunchTemplateVersions returns
+	// no $Default version for it (absent from DefaultVersions, not denied).
+	WarnLTUnavailableID = "lt-0warnunavail1111a"
 	// WarnLTDeprecatedAMIID references the existing deprecated ami fixture
 	// (ec2.go's ami-0deprecated0ubuntu1, DeprecationTime in the past).
 	WarnLTDeprecatedAMIID = "lt-0warndeprecated1a"
@@ -164,6 +167,7 @@ func buildLaunchTemplates() []ec2types.LaunchTemplate {
 		entry(WarnLTUnencryptedID, "warn-lt-unencrypted", 1, 1, "2025-05-03T08:00:00Z", "staging"),
 		entry(WarnLTMultiID, "warn-lt-multi", 1, 1, "2025-05-04T08:00:00Z", "staging"),
 		entry(WarnLTDeniedID, "warn-lt-denied", 2, 2, "2025-05-05T08:00:00Z", "staging"),
+		entry(WarnLTUnavailableID, "warn-lt-unavailable", 1, 1, "2025-05-05T09:00:00Z", "staging"),
 		entry(WarnLTDeprecatedAMIID, "warn-lt-deprecated-ami", 1, 1, "2025-05-06T08:00:00Z", "staging"),
 		entry(LTUserDataSecret, "warn-lt-user-data-secret", 1, 1, "2025-05-07T08:00:00Z", "staging"),
 	}

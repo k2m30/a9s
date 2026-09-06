@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -26,15 +27,23 @@ func NewEKS() *EKSFake {
 }
 
 func (f *EKSFake) ListClusters(_ context.Context, _ *eks.ListClustersInput, _ ...func(*eks.Options)) (*eks.ListClustersOutput, error) {
-	names := make([]string, 0, len(f.fix.Clusters))
+	names := make([]string, 0, len(f.fix.Clusters)+len(f.fix.DeniedClusters)+len(f.fix.UnavailableClusters))
 	for _, c := range f.fix.Clusters {
 		names = append(names, aws.ToString(c.Name))
 	}
+	names = append(names, f.fix.DeniedClusters...)
+	names = append(names, f.fix.UnavailableClusters...)
 	return &eks.ListClustersOutput{Clusters: names}, nil
 }
 
 func (f *EKSFake) DescribeCluster(_ context.Context, input *eks.DescribeClusterInput, _ ...func(*eks.Options)) (*eks.DescribeClusterOutput, error) {
 	name := aws.ToString(input.Name)
+	if slices.Contains(f.fix.DeniedClusters, name) {
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: "User is not authorized to perform: eks:DescribeCluster on resource: " + name,
+		}
+	}
 	for _, c := range f.fix.Clusters {
 		if aws.ToString(c.Name) == name {
 			return &eks.DescribeClusterOutput{Cluster: c}, nil
@@ -66,7 +75,7 @@ func (f *EKSFake) ngsForCluster(clusterName string) []ekstypes.Nodegroup {
 
 func (f *EKSFake) ListNodegroups(_ context.Context, input *eks.ListNodegroupsInput, _ ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error) {
 	clusterName := aws.ToString(input.ClusterName)
-	found := false
+	found := slices.Contains(f.fix.DeniedClusters, clusterName) || slices.Contains(f.fix.UnavailableClusters, clusterName)
 	for _, c := range f.fix.Clusters {
 		if aws.ToString(c.Name) == clusterName {
 			found = true
@@ -84,12 +93,20 @@ func (f *EKSFake) ListNodegroups(_ context.Context, input *eks.ListNodegroupsInp
 	for _, ng := range ngs {
 		names = append(names, aws.ToString(ng.NodegroupName))
 	}
+	names = append(names, f.fix.DeniedNodegroups[clusterName]...)
+	names = append(names, f.fix.UnavailableNodegroups[clusterName]...)
 	return &eks.ListNodegroupsOutput{Nodegroups: names}, nil
 }
 
 func (f *EKSFake) DescribeNodegroup(_ context.Context, input *eks.DescribeNodegroupInput, _ ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error) {
 	clusterName := aws.ToString(input.ClusterName)
 	ngName := aws.ToString(input.NodegroupName)
+	if slices.Contains(f.fix.DeniedNodegroups[clusterName], ngName) {
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: "User is not authorized to perform: eks:DescribeNodegroup on resource: " + ngName,
+		}
+	}
 	ngs := f.ngsForCluster(clusterName)
 	for i := range ngs {
 		if aws.ToString(ngs[i].NodegroupName) == ngName {

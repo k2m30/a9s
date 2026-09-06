@@ -30,11 +30,12 @@ func NewDynamoDB() *DynamoDBFake {
 }
 
 func (f *DynamoDBFake) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
-	names := make([]string, 0, len(f.fix.Tables)+len(f.fix.DeniedNames))
+	names := make([]string, 0, len(f.fix.Tables)+len(f.fix.DeniedNames)+len(f.fix.UnavailableNames))
 	for _, t := range f.fix.Tables {
 		names = append(names, aws.ToString(t.TableName))
 	}
 	names = append(names, f.fix.DeniedNames...)
+	names = append(names, f.fix.UnavailableNames...)
 	sort.Strings(names)
 	return &dynamodb.ListTablesOutput{TableNames: names}, nil
 }

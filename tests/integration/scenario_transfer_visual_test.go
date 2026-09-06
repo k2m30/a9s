@@ -56,7 +56,7 @@ func TestScenario_TransferVisual(t *testing.T) {
 	// S1 menu badge — issue-COLORED rows: offline, starting, stopping,
 	// stop-failed, legacy-policy, no-logging, multi, details-denied (8
 	// Warning) + start-failed (1 Broken) = 9.
-	scenario.ExpectMenuIssueCount("transfer", 9)
+	scenario.ExpectMenuIssueCount("transfer", 10)
 
 	scenario.OpenList("transfer")
 

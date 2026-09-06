@@ -49,7 +49,7 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"ebs":          len(ec2.Volumes),
 		"ebs-snap":     len(ec2.Snapshots),
 		"ami":          len(ec2.Images),
-		"eks":          len(eks.Clusters),
+		"eks":          len(eks.Clusters) + len(eks.DeniedClusters) + len(eks.UnavailableClusters),
 		"ng":           countEKSNodegroups(eks),
 		"lt":           len(NewLTFixtures().LaunchTemplates),
 		"elb":          len(elb.LoadBalancers),
@@ -69,7 +69,7 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"s3":           len(s3.Buckets),
 		"redis":        countRedisEngineReplicationGroups(NewRedisFixtures()),
 		"dbc":          len(docdb.DBClusters) + len(rds.DBClusters),
-		"ddb":          len(ddb.Tables) + len(ddb.DeniedNames),
+		"ddb":          len(ddb.Tables) + len(ddb.DeniedNames) + len(ddb.UnavailableNames),
 		"opensearch":   len(openSearch.Domains) + len(openSearch.UnavailableNames),
 		"redshift":     len(NewRedshiftFixtures().Clusters),
 		"efs":          len(NewEFSFixtures().FileSystems),
@@ -105,7 +105,7 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"codeartifact": len(NewCodeArtifactFixtures().Repositories),
 		"glue":         len(NewGlueFixtures().Jobs),
 		"athena":       len(NewAthenaFixtures().WorkGroups),
-		"mwaa":         len(mwaaFix.Environments) + len(mwaaFix.DeniedNames),
+		"mwaa":         len(mwaaFix.Environments) + len(mwaaFix.DeniedNames) + len(mwaaFix.UnavailableNames),
 		"transfer":     len(transferFix.ListedServers),
 		"backup":       len(NewBackupFixtures().Plans),
 		"ses":          len(NewSESFixtures().Identities),
@@ -124,6 +124,12 @@ func countEKSNodegroups(f *EKSFixtures) int {
 	total := 0
 	for _, nodegroups := range f.Nodegroups {
 		total += len(nodegroups)
+	}
+	for _, names := range f.DeniedNodegroups {
+		total += len(names)
+	}
+	for _, names := range f.UnavailableNodegroups {
+		total += len(names)
 	}
 	return total
 }

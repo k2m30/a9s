@@ -227,7 +227,7 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.public | reachable outside a VPC | broken | wave1 | The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals. |
 | opensearch.https-not-enforced | HTTPS not enforced | warn | wave1 | The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options. |
 | opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave1 | Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive. |
-| opensearch.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
+| opensearch.warn.details\_denied | details denied | warn | wave1 | — |
 | opensearch.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 

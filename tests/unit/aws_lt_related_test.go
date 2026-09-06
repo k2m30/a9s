@@ -75,7 +75,7 @@ func ltSiblingCache(t *testing.T) resource.ResourceCache {
 	eksFake := fakes.NewEKS()
 	pf := resource.GetPaginatedFetcher("ng")
 	ngResult, err := pf(ctx, &awsclient.ServiceClients{EKS: eksFake, EC2: fakes.NewEC2()}, "")
-	if err != nil {
+	if err != nil && len(ngResult.Resources) == 0 {
 		t.Fatalf("ng paginated fetcher: %v", err)
 	}
 	ngResources := ngResult.Resources

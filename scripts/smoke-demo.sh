@@ -143,6 +143,8 @@ expect ng.txt "create failed" "ng failed pool status is humanized"
 forbid ng.txt "CREATE_FAILED" "ng shows no raw CREATE_FAILED enum"
 forbid ng.txt "ACTIVE" "ng healthy status is lowercased"
 expect ng.txt "insufficient free addresses" "ng degraded pool names its cause"
+expect ng.txt "details denied" "ng keeps the node group whose describe was denied"
+expect ng.txt "details unavailable" "ng keeps the node group whose describe found nothing"
 
 # Lambda: the issue-colored rows explain themselves in the State column.
 expect lambda.txt "lambda(36) !" "lambda title carries the issue count"

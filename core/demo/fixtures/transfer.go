@@ -60,6 +60,9 @@ const (
 	WarnTransferNoLoggingID     = "warn-transfer-no-logging"
 	WarnTransferMultiID         = "warn-transfer-multi"
 	WarnTransferDetailsDeniedID = "warn-transfer-details-denied"
+	// WarnTransferDetailsUnavailableID is listed but DescribeServer cannot
+	// find it — the neutral degraded row (transfer.warn.details_unavailable).
+	WarnTransferDetailsUnavailableID = "warn-transfer-details-unavailable"
 )
 
 // ProdAS2GatewayVpcEndpointID is the auto-created VPC endpoint backing the
@@ -265,6 +268,11 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	// deliberately never added to the Servers map.
 	denied := transferBaseServer(WarnTransferDetailsDeniedID, transfertypes.StateOnline, "SHA256:0d1e2f3a4b4c4d5e6f708091a2b3c4d5e6f7a8b9c0d1e")
 	listedServers = append(listedServers, transferListedFromDescribed(denied))
+
+	// Listed but absent from DescribeServer — the neutral failure, kept as a
+	// rich degraded row from the list fields; never added to the Servers map.
+	unavailable := transferBaseServer(WarnTransferDetailsUnavailableID, transfertypes.StateOnline, "SHA256:1e2f3a4b5c5d5e6f70819203a4b5c6d7e8f9a0b1c2d3e4f")
+	listedServers = append(listedServers, transferListedFromDescribed(unavailable))
 
 	// Agreements — server-scoped, both hang off the graph root.
 	agreements := map[string]transfertypes.DescribedAgreement{

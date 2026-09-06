@@ -28,11 +28,12 @@ func NewMWAA() *MWAAFake {
 // deterministic demo/test output. MWAA's real ListEnvironments returns
 // names only — every other field comes from GetEnvironment.
 func (f *MWAAFake) ListEnvironments(_ context.Context, _ *mwaa.ListEnvironmentsInput, _ ...func(*mwaa.Options)) (*mwaa.ListEnvironmentsOutput, error) {
-	names := make([]string, 0, len(f.fix.Environments)+len(f.fix.DeniedNames))
+	names := make([]string, 0, len(f.fix.Environments)+len(f.fix.DeniedNames)+len(f.fix.UnavailableNames))
 	for name := range f.fix.Environments {
 		names = append(names, name)
 	}
 	names = append(names, f.fix.DeniedNames...)
+	names = append(names, f.fix.UnavailableNames...)
 	sort.Strings(names)
 	return &mwaa.ListEnvironmentsOutput{Environments: names}, nil
 }

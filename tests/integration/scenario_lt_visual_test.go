@@ -64,7 +64,7 @@ func TestScenario_LTVisual(t *testing.T) {
 	//                    whose deprecated-AMI check is Wave-2 `~` and
 	//                    deliberately never bumps the badge
 	// 5 + 1 = 6.
-	scenario.ExpectMenuIssueCount("lt", 6)
+	scenario.ExpectMenuIssueCount("lt", 7)
 
 	scenario.OpenList("lt")
 

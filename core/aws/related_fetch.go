@@ -45,10 +45,13 @@ func FetchRelatedTarget(ctx context.Context, clients any, cache resource.Resourc
 		return nil, false, nil
 	}
 	result, err := pf(ctx, clients, "")
-	if err != nil {
+	if err != nil && len(result.Resources) == 0 {
 		return nil, false, err
 	}
-	isTruncated := result.Pagination != nil && result.Pagination.IsTruncated
+	// Rows returned beside an error are a per-item partial failure (the
+	// fetcher already kept the degraded rows): a proven subset, answered as
+	// truncated rather than thrown away.
+	isTruncated := err != nil || (result.Pagination != nil && result.Pagination.IsTruncated)
 	resources := result.Resources
 	if resources == nil {
 		resources = []resource.Resource{}

@@ -26,6 +26,11 @@ type DDBFixtures struct {
 	// them — the fetcher keeps a name-only `details denied` row (finding
 	// ddb.warn.details_denied).
 	DeniedNames []string
+	// UnavailableNames are listed by ListTables but DescribeTable answers
+	// ResourceNotFoundException for them — the neutral failure, so the
+	// fetcher keeps a name-only `details unavailable` row (finding
+	// ddb.warn.details_unavailable).
+	UnavailableNames []string
 	// ResourcePolicies maps table name → resource-policy JSON for the
 	// GetResourcePolicy fake. Tables absent from this map have no policy at
 	// all — the healthy default.
@@ -34,6 +39,9 @@ type DDBFixtures struct {
 
 // WarnDDBDetailsDeniedID is the listed-but-denied coverage-gate witness.
 const WarnDDBDetailsDeniedID = "warn-ddb-details-denied"
+
+// WarnDDBDetailsUnavailableID is the listed-but-not-describable coverage-gate witness.
+const WarnDDBDetailsUnavailableID = "warn-ddb-details-unavailable"
 
 // One witness per new ddb finding. Every other table keeps deletion
 // protection on and has no resource policy.
@@ -111,6 +119,7 @@ var sharedDDBFixtures = sync.OnceValue(func() *DDBFixtures {
 		ContinuousBackups:   buildDDBContinuousBackups(),
 		KinesisDestinations: buildDDBKinesisDestinations(),
 		DeniedNames:         []string{WarnDDBDetailsDeniedID},
+		UnavailableNames:    []string{WarnDDBDetailsUnavailableID},
 		ResourcePolicies:    buildDDBResourcePolicies(),
 	}
 })

@@ -158,11 +158,12 @@ func buildAllTargetCache(t *testing.T, clients any) resource.ResourceCache {
 		token := ""
 		for page := 0; page < 20; page++ {
 			out, err := fetcher(ctx, clients, token)
+			all = append(all, out.Resources...)
 			if err != nil {
-				// Demo mode may not implement every AWS service — ignore and move on.
+				// Demo mode may not implement every AWS service — ignore and
+				// move on; a partial-failure page still carried its rows.
 				break
 			}
-			all = append(all, out.Resources...)
 			if out.Pagination == nil || !out.Pagination.IsTruncated {
 				break
 			}

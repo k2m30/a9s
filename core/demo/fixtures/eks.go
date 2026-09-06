@@ -19,15 +19,37 @@ type EKSFixtures struct {
 	// Nodegroups maps cluster name → []Nodegroup.
 	// RawStructs are ekstypes.Nodegroup (values, matching production fetcher).
 	Nodegroups map[string][]ekstypes.Nodegroup
+	// DeniedClusters are listed by ListClusters but DescribeCluster answers
+	// AccessDeniedException; UnavailableClusters are listed but not found —
+	// the two degraded rows (eks.warn.details_denied / details_unavailable).
+	DeniedClusters      []string
+	UnavailableClusters []string
+	// DeniedNodegroups / UnavailableNodegroups map cluster name → node group
+	// names that ListNodegroups returns but DescribeNodegroup denies / cannot
+	// find (ng.warn.details_denied / details_unavailable).
+	DeniedNodegroups      map[string][]string
+	UnavailableNodegroups map[string][]string
 }
+
+// Degraded-row witnesses. The node groups hang off the graph-root cluster.
+const (
+	WarnEKSDetailsDeniedID      = "warn-eks-details-denied"
+	WarnEKSDetailsUnavailableID = "warn-eks-details-unavailable"
+	WarnNGDetailsDeniedID       = "warn-ng-details-denied"
+	WarnNGDetailsUnavailableID  = "warn-ng-details-unavailable"
+)
 
 // NewEKSFixtures builds and returns a fully-populated EKSFixtures struct.
 var sharedEKSFixtures = sync.OnceValue(func() *EKSFixtures {
 	clusters := buildEKSClusters()
 	ngs := buildEKSNodegroups()
 	return &EKSFixtures{
-		Clusters:   clusters,
-		Nodegroups: ngs,
+		Clusters:              clusters,
+		Nodegroups:            ngs,
+		DeniedClusters:        []string{WarnEKSDetailsDeniedID},
+		UnavailableClusters:   []string{WarnEKSDetailsUnavailableID},
+		DeniedNodegroups:      map[string][]string{"acme-prod": {WarnNGDetailsDeniedID}},
+		UnavailableNodegroups: map[string][]string{"acme-prod": {WarnNGDetailsUnavailableID}},
 	}
 })
 

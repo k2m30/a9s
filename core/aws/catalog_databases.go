@@ -501,7 +501,10 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: opensearchCodePublic, Phrase: "reachable outside a VPC", Severity: domain.SevBroken, Source: "wave1", Detail: "The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals."},
 			{Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced", Severity: domain.SevWarn, Source: "wave1", Detail: "The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options."},
 			{Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off", Severity: domain.SevWarn, Source: "wave1", Detail: "Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive."},
-			DetailsDeniedFindingDef("opensearch", ""),
+			// DescribeDomains is one batched call, so a denial degrades every
+			// listed domain at once and no demo fixture can witness this row
+			// beside healthy domains; the row renders its phrase alone.
+			{Code: DetailsDeniedCode("opensearch"), Phrase: "details denied", Severity: domain.SevWarn, Source: "wave1"},
 			DetailsUnavailableFindingDef("opensearch"),
 		},
 	},

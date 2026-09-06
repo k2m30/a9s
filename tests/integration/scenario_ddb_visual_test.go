@@ -85,7 +85,7 @@ func TestScenario_DDBVisual(t *testing.T) {
 	//                    which never bumps the badge
 	// 2 + 6 + 1 = 9. Was 7 before those two rows.
 	// ---------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("ddb", 9)
+	scenario.ExpectMenuIssueCount("ddb", 10)
 
 	scenario.OpenList("ddb")
 
