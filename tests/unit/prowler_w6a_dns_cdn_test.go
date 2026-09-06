@@ -50,8 +50,15 @@ const (
 type w6aR53Fake struct {
 	awsclient.Route53API
 
-	private     bool
-	logConfigs  int
+	private    bool
+	logConfigs int
+	// logPages > 1 makes ListQueryLoggingConfigs paginate; logCalls counts
+	// them so a walk that reads past its answer is visible.
+	logPages int
+	logCalls int
+	// recordPages makes ListResourceRecordSets paginate forever, so the walk
+	// runs into PerParentPageCap instead of ending.
+	recordPages bool
 	records     []r53types.ResourceRecordSet
 	zoneErr     error
 	recordsErr  error
@@ -76,7 +83,11 @@ func (f *w6aR53Fake) GetHostedZone(_ context.Context, in *route53.GetHostedZoneI
 }
 
 func (f *w6aR53Fake) ListQueryLoggingConfigs(_ context.Context, _ *route53.ListQueryLoggingConfigsInput, _ ...func(*route53.Options)) (*route53.ListQueryLoggingConfigsOutput, error) {
+	f.logCalls++
 	out := &route53.ListQueryLoggingConfigsOutput{}
+	if f.logCalls < f.logPages {
+		out.NextToken = aws.String("next")
+	}
 	for i := 0; i < f.logConfigs; i++ {
 		out.QueryLoggingConfigs = append(out.QueryLoggingConfigs, r53types.QueryLoggingConfig{
 			Id:                        aws.String("qlc-0000000000000000"),
@@ -92,7 +103,13 @@ func (f *w6aR53Fake) ListResourceRecordSets(_ context.Context, _ *route53.ListRe
 	if f.recordsErr != nil {
 		return nil, f.recordsErr
 	}
-	return &route53.ListResourceRecordSetsOutput{ResourceRecordSets: f.records}, nil
+	out := &route53.ListResourceRecordSetsOutput{ResourceRecordSets: f.records}
+	if f.recordPages {
+		out.IsTruncated = true
+		out.NextRecordName = aws.String("next.acme-corp.com.")
+		out.NextRecordType = r53types.RRTypeA
+	}
+	return out, nil
 }
 
 // w6aARecord builds a realistic A record pointing at one address.
@@ -676,4 +693,57 @@ func TestW6ACF_CatalogDefs(t *testing.T) {
 	} {
 		w2AssertFindingDef(t, "cf", c.code, c.phrase, c.sev, "wave2")
 	}
+}
+
+// TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo pins the paging the enricher
+// gained when it stopped taking a skip-list entry: the walk stops at
+// PerParentPageCap rather than running a zone of any size, and a zone it could
+// not finish is marked truncated so the count reads as a lower bound.
+//
+// A dangling record seen in the prefix is still reported. More pages may hold
+// more of them, which is what truncation says; none of that makes the one
+// already found untrue, and staying silent would hide a live takeover because
+// the zone is large.
+func TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo(t *testing.T) {
+	fake := &w6aR53Fake{
+		logConfigs:  1,
+		recordPages: true,
+		records: []r53types.ResourceRecordSet{
+			w6aARecord("dangling.acme-corp.com.", "203.0.113.201"),
+		},
+	}
+	res := w6aEnrichR53(t, fake, w6aAddressCache(false, []string{"203.0.113.10"}, nil, nil),
+		w6aZoneRes("Z0LONGZONE0000000000", "acme-corp.com."))
+
+	if fake.recordCalls != awsclient.PerParentPageCap {
+		t.Errorf("ListResourceRecordSets called %d times, want PerParentPageCap (%d)",
+			fake.recordCalls, awsclient.PerParentPageCap)
+	}
+	if !res.TruncatedIDs["Z0LONGZONE0000000000"] {
+		t.Error("a zone longer than the page cap was not marked truncated")
+	}
+	w2AssertFinding(t, res.Findings["Z0LONGZONE0000000000"], w6aR53Dangling,
+		"record points at a released address", domain.SevBroken, "wave2:r53")
+}
+
+// TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig pins the other half: the
+// row asks whether a zone has any config, so one on the first page answers it
+// and every further page is a call nobody needed.
+func TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig(t *testing.T) {
+	found := &w6aR53Fake{logConfigs: 1, logPages: 5}
+	res := w6aEnrichR53(t, found, nil, w6aZoneRes("Z0FIRSTHIT0000000000", "logged.acme-corp.com."))
+	if found.logCalls != 1 {
+		t.Errorf("ListQueryLoggingConfigs called %d times after the first hit, want 1", found.logCalls)
+	}
+	w2AssertNoCode(t, res.Findings["Z0FIRSTHIT0000000000"], w6aR53QueryLoggingOff)
+
+	// A zone with no config anywhere has to be walked to the last page before
+	// the finding is honest.
+	empty := &w6aR53Fake{logConfigs: 0, logPages: 3}
+	res = w6aEnrichR53(t, empty, nil, w6aZoneRes("Z0NOCONFIG0000000000", "unlogged.acme-corp.com."))
+	if empty.logCalls != 3 {
+		t.Errorf("ListQueryLoggingConfigs called %d times over 3 pages, want 3", empty.logCalls)
+	}
+	w2AssertFinding(t, res.Findings["Z0NOCONFIG0000000000"], w6aR53QueryLoggingOff,
+		"query logging off", domain.SevWarn, "wave2:r53")
 }

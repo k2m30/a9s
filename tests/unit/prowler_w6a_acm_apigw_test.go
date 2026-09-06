@@ -149,10 +149,19 @@ type w6aAPIGWV2Fake struct {
 
 	authorizers []apigwv2types.Authorizer
 	stages      []apigwv2types.Stage
+	// authPages > 1 makes GetAuthorizers paginate; authCalls counts them so a
+	// walk that reads past its answer is visible.
+	authPages int
+	authCalls int
 }
 
 func (f *w6aAPIGWV2Fake) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
-	return &apigatewayv2.GetAuthorizersOutput{Items: f.authorizers}, nil
+	f.authCalls++
+	out := &apigatewayv2.GetAuthorizersOutput{Items: f.authorizers}
+	if f.authCalls < f.authPages {
+		out.NextToken = aws.String("next")
+	}
+	return out, nil
 }
 
 func (f *w6aAPIGWV2Fake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
@@ -531,4 +540,30 @@ func w6aAssertNoSecretLeak(t *testing.T, parts ...string) {
 			t.Errorf("secret value rendered on an operator surface: %q", p)
 		}
 	}
+}
+
+// TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer pins the paging
+// the v2 lane gained when it stopped taking a skip-list entry. The row asks
+// whether an API has any authorizer, so one on the first page answers it and
+// every further page is a call nobody needed; an API with none has to be
+// walked to the last page before the finding is honest.
+func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
+	guarded := &w6aAPIGWV2Fake{
+		authPages:   5,
+		authorizers: []apigwv2types.Authorizer{{AuthorizerId: aws.String("auth02"), Name: aws.String("acme-jwt")}},
+		stages:      []apigwv2types.Stage{w6aV2HealthyStage("$default")},
+	}
+	res := w6aEnrichAPIGW(t, nil, guarded, w6aHTTPRes("htp005authed", "acme-guarded-http"))
+	if guarded.authCalls != 1 {
+		t.Errorf("GetAuthorizers called %d times after the first hit, want 1", guarded.authCalls)
+	}
+	w2AssertNoCode(t, res.Findings["htp005authed"], w6aAPIGWNoAuth)
+
+	open := &w6aAPIGWV2Fake{authPages: 3, stages: []apigwv2types.Stage{w6aV2HealthyStage("$default")}}
+	res = w6aEnrichAPIGW(t, nil, open, w6aHTTPRes("htp006noauth", "acme-open-http"))
+	if open.authCalls != 3 {
+		t.Errorf("GetAuthorizers called %d times over 3 pages, want 3", open.authCalls)
+	}
+	w2AssertFinding(t, res.Findings["htp006noauth"], w6aAPIGWNoAuth,
+		"no authorizer", domain.SevWarn, "wave2:apigw")
 }
