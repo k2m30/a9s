@@ -208,24 +208,17 @@ func ctIDAlternatives(v string) []string {
 	return ctStripTypeWord(v, "/")
 }
 
-// ctStripTypeWord returns res and the forms inside it, most specific first:
+// ctStripTypeWord returns res and the form inside it, most specific first:
 // res as written, then without its leading "<type><sep>"
-// ("instance/i-abc" → "i-abc", "secret:prod/api/key" → "prod/api/key"), then
-// that remainder's own last segment. Whole forms lead, so a name that
-// genuinely contains slashes resolves entire and only falls back to a
-// fragment when nothing holds the whole.
+// ("instance/i-abc" → "i-abc", "secret:prod/api/key" → "prod/api/key").
+// Nothing shorter: a fragment of a name belongs to a different resource.
 func ctStripTypeWord(res, seps string) []string {
 	out := []string{res}
 	i := strings.IndexAny(res, seps)
 	if i < 0 || i >= len(res)-1 {
 		return out
 	}
-	rest := res[i+1:]
-	out = append(out, rest)
-	if j := strings.LastIndex(rest, "/"); j >= 0 && j < len(rest)-1 {
-		out = append(out, rest[j+1:])
-	}
-	return out
+	return append(out, res[i+1:])
 }
 
 // ctLambdaAlternatives is ctIDAlternatives plus the Lambda-only rule: a
