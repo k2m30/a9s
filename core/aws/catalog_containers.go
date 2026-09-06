@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
-	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -346,12 +345,12 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			})
 			if descErr != nil {
 				failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
-				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, descErr))
+				resources = append(resources, degradedNodeGroup(cluster, ngName, descErr))
 				continue
 			}
 			if descOutput.Nodegroup == nil {
 				failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
-				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, nil))
+				resources = append(resources, degradedNodeGroup(cluster, ngName, nil))
 				continue
 			}
 			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
