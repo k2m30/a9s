@@ -114,7 +114,20 @@ func resourceRefToRow(ref ResourceRef, recipientAccountID string) Row {
 	if idx := strings.IndexAny(val, "/:"); idx >= 0 {
 		navID = val[idx+1:]
 	}
+	if target == "role" {
+		navID = roleNavID(navID)
+	}
 	return Row{Key: key, Value: val, IsNavigable: isNav, TargetType: target, NavID: navID}
+}
+
+// roleNavID reduces a role reference to the name the role list answers by. An
+// IAM role name is unique account-wide and the path filed in front of it is not
+// part of it, so a path-filed role reaches the list only by its last segment.
+func roleNavID(val string) string {
+	if idx := strings.LastIndex(val, "/"); idx >= 0 {
+		return val[idx+1:]
+	}
+	return val
 }
 
 // labelFromType derives the Row.Key label from an AWS resource type string.
@@ -235,7 +248,7 @@ func extractByEventName(eventName string, params map[string]any, cleanedParams m
 		if arn, _ := params["roleArn"].(string); arn != "" {
 			val := FormatCTTarget(arn, "")
 			isNav, target := navFromLabel("Role")
-			return []Row{{Key: "Role", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "roleArn")
+			return []Row{{Key: "Role", Value: val, IsNavigable: isNav, TargetType: target, NavID: roleNavID(val)}}, removeKeys(cleanedParams, "roleArn")
 		}
 
 	case "BatchGetImage":

@@ -296,6 +296,13 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 						continue
 					}
 
+					// demofixtures.CtEventDeletedRole names a role the account no
+					// longer holds — the row-12 witness. Same known surface as the
+					// deleted bucket above: the left column offers the value anyway.
+					if res.ID == demofixtures.CtEventDeletedRole {
+						continue
+					}
+
 					// Check by ID or by Name (role names are IDs in demo).
 					found = fixtureIDs[navID]
 					if !found {

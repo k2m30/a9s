@@ -21,6 +21,14 @@ const CtEventDeletedBucket = "evt-0a1b2c3d4e5f60009"
 // ("prod/api/stripe-key"); its Secrets pivot must resolve.
 const CtEventPathNamedSecret = "evt-0a1b2c3d4e5f60010"
 
+// CtEventPathNamedRole names a role by an ARN carrying its IAM path; the role
+// exists, so its pivot resolves once the role list confirms it.
+const CtEventPathNamedRole = "evt-0a1b2c3d4e5f60011"
+
+// CtEventDeletedRole names a role no demo IAM fixture carries; its pivot stays
+// at zero rather than answering with a role that merely shares a name segment.
+const CtEventDeletedRole = "evt-0a1b2c3d4e5f60012"
+
 // CloudTrailFixtures holds all CloudTrail domain objects served by the fake.
 type CloudTrailFixtures struct {
 	Trails      []cloudtrailtypes.Trail
@@ -300,6 +308,24 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("acme-retired-archive")},
 			},
+		},
+		{
+			EventId:         aws.String(CtEventPathNamedRole),
+			EventName:       aws.String("AssumeRole"),
+			EventTime:       aws.Time(t2),
+			EventSource:     aws.String("sts.amazonaws.com"),
+			Username:        aws.String("alice.johnson"),
+			ReadOnly:        aws.String("true"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:45:00Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme/platform/` + RolePathNamed + `","roleSessionName":"audit-run"},"responseElements":null,"requestID":"req-sts-assume-011","eventID":"` + CtEventPathNamedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[]}`),
+		},
+		{
+			EventId:         aws.String(CtEventDeletedRole),
+			EventName:       aws.String("AssumeRole"),
+			EventTime:       aws.Time(t2),
+			EventSource:     aws.String("sts.amazonaws.com"),
+			Username:        aws.String("alice.johnson"),
+			ReadOnly:        aws.String("true"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:40:00Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme/retired/acme-legacy-sync","roleSessionName":"stale-run"},"responseElements":null,"requestID":"req-sts-assume-012","eventID":"` + CtEventDeletedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[]}`),
 		},
 		{
 			EventId:         aws.String("evt-0a1b2c3d4e5f60002"),

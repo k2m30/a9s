@@ -251,8 +251,9 @@ func TestCTEventTargetRow_NavIDNamesTheResource(t *testing.T) {
 
 // TestCTEventTargetRows_DemoNavIDsAreResolvable is the class check for the left
 // column: every navigable TARGET row the demo events produce must point at a
-// resource the demo account holds. CtEventDeletedBucket is the one exception —
-// its bucket is gone by design, which is the row-6 witness.
+// resource the demo account holds. CtEventDeletedBucket and CtEventDeletedRole
+// are the exceptions — the resource each names is gone by design, which is what
+// makes them the row-6 and row-12 witnesses.
 func TestCTEventTargetRows_DemoNavIDsAreResolvable(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	events := byType["ct-events"]
@@ -261,7 +262,7 @@ func TestCTEventTargetRows_DemoNavIDsAreResolvable(t *testing.T) {
 	}
 
 	for _, e := range events {
-		if e.ID == demofixtures.CtEventDeletedBucket {
+		if e.ID == demofixtures.CtEventDeletedBucket || e.ID == demofixtures.CtEventDeletedRole {
 			continue
 		}
 		ev, ok := e.RawStruct.(cloudtrailtypes.Event)

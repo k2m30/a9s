@@ -241,6 +241,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The role a CloudTrail event names is now reported only once the role list
+  confirms it still exists. An event body records what was there at the time,
+  so an event naming a since-deleted role used to answer with a count that
+  went nowhere on Enter. With no role list read yet, the row now reads as
+  unknown rather than guessing, and a role filed under a path is matched by
+  its whole name instead of a trailing fragment that could belong to a
+  different role.
+
 - A load balancer with several listeners in the clear, or several on a weak
   TLS policy, now names every affected port rather than the first one, and its
   listeners are read to the end instead of one page deep, so a listener no

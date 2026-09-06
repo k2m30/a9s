@@ -198,8 +198,10 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 // for AssumedRole events.
 //
 // AssumedRole events are identified by a non-empty role_name field.
-// Bug E: same short-circuit as checkCtEventsUser — nil-client fetcher error causes
-// ctEventsRelatedResources to return nil, making checkCtEventsRole return Count=-1.
+// INVERTED (was: "Bug E", which read Unknown on an empty cache as the defect and
+// demanded a definitive 0). A role id in an event body is a claim about the past;
+// with no list to confirm it against, Unknown is the only honest answer, and a
+// confident 0 would deny a role that exists.
 func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
 	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -230,8 +232,7 @@ func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *te
 			if r.TargetType() != "role" {
 				continue
 			}
-			// Bug E: nil clients + empty cache → short-circuit → State: RelatedUnknown.
-			if r.State() == domain.RelatedUnknown && len(r.FetchFilter()) == 0 && r.Err() == nil {
+			if r.State() != domain.RelatedUnknown && len(r.FetchFilter()) == 0 && r.Err() == nil {
 				bugECases = append(bugECases, bugECase{
 					fixtureID: fixture.ID,
 					count:     r.Count(),
@@ -246,11 +247,10 @@ func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *te
 
 	for _, bc := range bugECases {
 		t.Run(bc.fixtureID, func(t *testing.T) {
-			t.Errorf("Bug E: event=%s: checkCtEventsRole returned Count=-1 with nil clients"+
-				" and empty cache — short-circuit in ctEventsRelatedResources ignores the nil"+
-				" error from the failed paginated fetcher. Expected Count=0 (definitive no-match),"+
-				" not Count=-1 (unknown).",
-				bc.fixtureID)
+			t.Errorf("event=%s: checkCtEventsRole answered Count=%d with nil clients and an"+
+				" empty cache. With no list to confirm the named role against, the row must be"+
+				" Unknown, not a count.",
+				bc.fixtureID, bc.count)
 		})
 	}
 }

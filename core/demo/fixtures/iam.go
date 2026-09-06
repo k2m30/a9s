@@ -76,6 +76,10 @@ const (
 
 	// RoleConfusedDeputy trusts lambda.amazonaws.com with no aws:SourceAccount
 	// or aws:SourceArn condition — role.trust.confused-deputy.
+	// RolePathNamed is filed under an IAM path, so a CloudTrail event names it by
+	// an ARN whose resource part carries that path. The role list answers by name.
+	RolePathNamed = "acme-service-audit"
+
 	RoleConfusedDeputy = "acme-invoker-callback-role"
 	// RoleScopedWildcardTrust is the healthy counterpart of
 	// role.trust.wildcard-principal: it trusts any AWS principal, but only one
@@ -269,6 +273,14 @@ func buildIAMRoles() []iamtypes.Role {
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2025, 4, 5, 16, 45, 0, 0, time.UTC)),
 			Description: aws.String("Enhanced monitoring role for RDS instances"),
+		},
+		{
+			RoleName:    aws.String(RolePathNamed),
+			RoleId:      aws.String("AROAEXAMPLE777777771"),
+			Arn:         aws.String("arn:aws:iam::123456789012:role/acme/platform/" + RolePathNamed),
+			Path:        aws.String("/acme/platform/"),
+			CreateDate:  aws.Time(time.Date(2025, 4, 20, 9, 0, 0, 0, time.UTC)),
+			Description: aws.String("Audit role filed under an IAM path prefix"),
 		},
 		{
 			RoleName:    aws.String("deploy-bot"),

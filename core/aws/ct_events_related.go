@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
@@ -47,31 +48,11 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 // Resources slice (AWS::IAM::Role) and matches against the role cache.
 // Pattern C — cache lookup by name extracted from ARN.
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	roleName := ctEventsExtractRoleName(res)
-	if roleName == "" {
+	candidates := ctEventsRoleCandidates(res)
+	if len(candidates) == 0 {
 		return resource.KnownRelated("role", nil, false)
 	}
-
-	roleList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "role")
-	if err != nil {
-		return resource.ErrorRelated("role", err)
-	}
-
-	var ids []string
-	for _, roleRes := range roleList {
-		if roleRes.Name == roleName || roleRes.ID == roleName {
-			ids = append(ids, roleRes.ID)
-		}
-	}
-	// The event names this exact role. When the cache can't disprove it — a
-	// truncated page or a cold/nil cache — resolve by identity so the row is a
-	// navigable (1), never a scoreless Unknown that renders actionable but
-	// dead-ends on Enter. A complete (non-nil, non-truncated) cache with no
-	// match stays (0): the role genuinely isn't one of ours.
-	if len(ids) == 0 && (truncated || roleList == nil) {
-		ids = []string{roleName}
-	}
-	return relatedResult("role", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "role", [][]string{candidates})
 }
 
 // ctEventsExtractRoleName attempts to find a role name from the CloudTrail event.
@@ -79,7 +60,7 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 // extracts the name from the ResourceName ARN (last segment after "/"). If no
 // role resource is found, it falls back to the Username field — some role-based
 // events encode the role as "AWSServiceRole/RoleName".
-func ctEventsExtractRoleName(res resource.Resource) string {
+func ctEventsRoleCandidates(res resource.Resource) []string {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
 	// TARGET role being assumed. Prefer it over Resources[]/sessionIssuer, which
@@ -89,7 +70,7 @@ func ctEventsExtractRoleName(res resource.Resource) string {
 		if parsed := parseCTEventJSON(event.CloudTrailEvent); parsed != nil {
 			if req, _ := parsed["requestParameters"].(map[string]any); req != nil {
 				if arn, _ := req["roleArn"].(string); arn != "" {
-					return roleNameFromARN(arn)
+					return ctRoleAlternatives(arn)
 				}
 			}
 		}
@@ -98,26 +79,36 @@ func ctEventsExtractRoleName(res resource.Resource) string {
 		for _, r := range event.Resources {
 			if r.ResourceType != nil && strings.Contains(*r.ResourceType, "Role") {
 				if r.ResourceName != nil && *r.ResourceName != "" {
-					return roleNameFromARN(*r.ResourceName)
+					return ctRoleAlternatives(*r.ResourceName)
 				}
 			}
 		}
 	}
 
-	// Fallback: check if Username encodes a service role path (e.g. "AWSServiceRole/RoleName").
-	username := res.Fields["user"]
-	if strings.Contains(username, "/") {
-		return username[strings.LastIndex(username, "/")+1:]
+	// Fallback: Username may encode a service role path ("AWSServiceRole/RoleName").
+	if username := res.Fields["user"]; strings.Contains(username, "/") {
+		return ctRoleAlternatives(username)
 	}
 
 	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON string.
 	if ok {
 		if name := extractRoleNameFromCTEventJSON(event.CloudTrailEvent); name != "" {
-			return name
+			return ctRoleAlternatives(name)
 		}
 	}
 
-	return ""
+	return nil
+}
+
+// ctRoleAlternatives is ctIDAlternatives plus the STS form: an assumed-role
+// ARN ends "assumed-role/<role>/<session>", so the role is the segment before
+// the session and no general rule can see that.
+func ctRoleAlternatives(v string) []string {
+	out := ctIDAlternatives(v)
+	if name := roleNameFromARN(v); name != "" && !slices.Contains(out, name) {
+		out = append(out, name)
+	}
+	return out
 }
 
 // ctEventsRelatedResources reads the target list from the session cache ONLY —
@@ -244,12 +235,13 @@ func ctLambdaAlternatives(group []string) []string {
 
 // extractCTResourceIDs scans the event's Resources slice for entries matching
 // awsResourceType (e.g. "AWS::EC2::Instance") and returns one candidate group
-// per entry: the ResourceName as written, then its last slash segment. Which
-// form is the id varies per target type — an ARN's is the last segment, a
-// Secrets Manager name keeps its slashes — so both are offered and the target
-// list picks. They are ALTERNATIVES: one event resource is one resource, so
-// ctEventsMatchTarget takes at most one match per group, preferring the name
-// as written.
+// per entry, built by ctIDAlternatives: the value as written first, then the
+// same value with its leading type word removed, then that remainder's last
+// slash segment. Which form is the id varies per target type — an ARN's may be
+// the tail, a Secrets Manager name keeps its slashes — so each is offered and
+// the target list picks. They are ALTERNATIVES: one event resource is one
+// resource, so ctEventsMatchTarget takes at most one match per group,
+// preferring the value as written.
 func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [][]string {
 	var groups [][]string
 	for _, r := range event.Resources {

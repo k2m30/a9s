@@ -252,13 +252,14 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	// Event-derived: the event names the target role in its body, so an
-	// empty/cold cache resolves by identity to a navigable (1) — zero fetch.
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (event names the role; resolved by identity, zero-fetch)", result.Count())
+	// INVERTED (was: cold cache resolves by identity to (1)). An id in an event
+	// body is a claim about the past; a cold cache cannot confirm the role still
+	// exists, so the row is Unknown rather than a navigable count that dead-ends.
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want Unknown (cold cache cannot confirm the named role)", result.State())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs())
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
@@ -606,14 +607,12 @@ func TestRelated_CtEvents_Role_AssumedRoleNoMatch(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Identity resolution: a CloudTrail event names an EXACT, finite set of
-// resources, so a forward ct-event->target checker must NEVER report a
-// truncated (N+). When the named target is absent from a truncated cache page,
-// resolve by identity (the event-extracted ID IS the resource ID) to a
-// navigable (N) instead of a scoreless (0+) dead-end.
+// A CloudTrail event names an EXACT, finite set of resources, so once every
+// named resource is confirmed against the list the count is exact and never
+// (N+). A named resource the list has NOT confirmed is Unknown, not a count.
 // ---------------------------------------------------------------------------
 
-func TestRelated_CtEvents_Role_TruncatedCacheResolvesByIdentity(t *testing.T) {
+func TestRelated_CtEvents_Role_TruncatedCacheWithoutTheRoleIsUnknown(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
@@ -636,21 +635,18 @@ func TestRelated_CtEvents_Role_TruncatedCacheResolvesByIdentity(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (named role resolved by identity)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs())
-	}
-	if result.Truncated() {
-		t.Error("Truncated = true, want false (a named role is exact, never (N+))")
+	// INVERTED (was: resolved by identity to (1)). The page is truncated and does
+	// not carry my-role, so the checker cannot tell a deleted role from one on a
+	// page it never read. Unknown is the honest answer.
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want Unknown (truncated page cannot confirm my-role)", result.State())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
-func TestRelated_CtEvents_Role_MatchInTruncatedCacheIsExactlyOne(t *testing.T) {
+func TestRelated_CtEvents_Role_MatchInTruncatedCacheCounts(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -679,8 +675,11 @@ func TestRelated_CtEvents_Role_MatchInTruncatedCacheIsExactlyOne(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if result.Truncated() {
-		t.Error("Truncated = true, want false (matched exact role is (1), not (1+))")
+	// INVERTED (was: Truncated false). The role is confirmed, so it counts, but a
+	// page the checker never read may carry another role of the same name, and the
+	// role pivot is not special-cased against the rule every other pivot follows.
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true (a later page was never read)")
 	}
 }
 
@@ -881,12 +880,15 @@ func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
 func TestRelated_CtEvents_Role_ExtractsTargetFromRequestRoleArn(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
-			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
-			IsTruncated: true,
+			Resources: []resource.Resource{
+				{ID: "target-role", Name: "target-role"},
+				{ID: "some-session-name", Name: "some-session-name"},
+			},
 		},
 	}
 	// AssumeRole event: requestParameters.roleArn is the TARGET role; the
-	// roleSessionName must NOT leak through as the resolved id.
+	// roleSessionName must NOT leak through as the resolved id, even when a role
+	// by that name exists.
 	cte := `{"eventName":"AssumeRole","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/target-role","roleSessionName":"some-session-name"}}`
 	res := resource.Resource{
 		ID:        "evt-assume-role-arn-001",
@@ -905,12 +907,15 @@ func TestRelated_CtEvents_Role_ExtractsTargetFromRequestRoleArn(t *testing.T) {
 func TestRelated_CtEvents_Role_AssumedRoleARNResolvesRoleNotSession(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
-			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
-			IsTruncated: true,
+			Resources: []resource.Resource{
+				{ID: "my-role", Name: "my-role"},
+				{ID: "session-abc123", Name: "session-abc123"},
+			},
 		},
 	}
 	// No requestParameters; the role identity is an STS assumed-role ARN in
-	// Resources[]. The role name is the middle segment, NOT the trailing session.
+	// Resources[]. The role name is the middle segment, NOT the trailing session,
+	// even when a role by the session name exists.
 	res := resource.Resource{
 		ID:     "evt-assumed-role-arn-002",
 		Fields: map[string]string{},
