@@ -152,7 +152,7 @@ func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceC
 //   - truncated list: still only the confirmed ids, because an unread page
 //     cannot confirm anything; Unknown when it confirmed none, since a zero
 //     off a partial list is a guess either way.
-func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, ids []string) resource.RelatedCheckResult {
+func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, groups [][]string) resource.RelatedCheckResult {
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, target)
 	if err != nil {
 		return resource.ErrorRelated(target, err)
@@ -161,16 +161,28 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 		return resource.UnknownRelated(target)
 	}
 
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
+	byID := make(map[string]string, len(resourceList)*2)
+	for _, r := range resourceList {
+		byID[r.ID] = r.ID
+		if r.Name != "" {
+			if _, taken := byID[r.Name]; !taken {
+				byID[r.Name] = r.ID
+			}
+		}
 	}
 	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
+	seen := make(map[string]struct{}, len(groups))
+	for _, group := range groups {
+		for _, candidate := range group {
+			id, ok := byID[candidate]
+			if !ok {
+				continue
+			}
+			if _, dup := seen[id]; !dup {
+				seen[id] = struct{}{}
+				matched = append(matched, id)
+			}
+			break
 		}
 	}
 	if truncated && len(matched) == 0 {
@@ -180,10 +192,15 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 }
 
 // extractCTResourceIDs scans the event's Resources slice for entries matching
-// awsResourceType (e.g. "AWS::EC2::Instance") and returns the bare identifiers
-// (ResourceName with any "/" prefix trimmed to the last segment).
-func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) []string {
-	var ids []string
+// awsResourceType (e.g. "AWS::EC2::Instance") and returns one candidate group
+// per entry: the ResourceName as written, then its last slash segment. Which
+// form is the id varies per target type — an ARN's is the last segment, a
+// Secrets Manager name keeps its slashes — so both are offered and the target
+// list picks. They are ALTERNATIVES: one event resource is one resource, so
+// ctEventsMatchTarget takes at most one match per group, preferring the name
+// as written.
+func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [][]string {
+	var groups [][]string
 	for _, r := range event.Resources {
 		if r.ResourceType == nil || !strings.EqualFold(*r.ResourceType, awsResourceType) {
 			continue
@@ -191,17 +208,14 @@ func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [
 		if r.ResourceName == nil || *r.ResourceName == "" {
 			continue
 		}
-		// Which form is the id varies per target type — an ARN's is the last
-		// segment, a Secrets Manager name keeps its slashes — so both go in
-		// and the list picks. Safe because ctEventsMatchTarget counts only
-		// ids the list confirms.
 		name := *r.ResourceName
-		ids = append(ids, name)
+		group := []string{name}
 		if idx := strings.LastIndex(name, "/"); idx >= 0 && idx < len(name)-1 {
-			ids = append(ids, name[idx+1:])
+			group = append(group, name[idx+1:])
 		}
+		groups = append(groups, group)
 	}
-	return ids
+	return groups
 }
 
 // cfnStackNameFromResourceName extracts the stack NAME from a CloudTrail
@@ -281,9 +295,12 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 		parsed := parseCTEventJSON(event.CloudTrailEvent)
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
-			ids = append(ids, ctJSONStringSlice(req, "instanceId", "instancesSet", "items")...)
 			resp, _ := parsed["responseElements"].(map[string]any)
-			ids = append(ids, ctJSONStringSlice(resp, "instanceId", "instancesSet", "items")...)
+			fromBody := append(ctJSONStringSlice(req, "instanceId", "instancesSet", "items"),
+				ctJSONStringSlice(resp, "instanceId", "instancesSet", "items")...)
+			for _, id := range fromBody {
+				ids = append(ids, []string{id})
+			}
 		}
 	}
 
@@ -308,7 +325,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if b := ctJSONString(req, "bucketName"); b != "" {
-				ids = append(ids, b)
+				ids = append(ids, []string{b})
 			}
 		}
 	}
@@ -338,7 +355,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 				if idx := strings.LastIndex(fn, ":"); idx >= 0 && idx < len(fn)-1 {
 					fn = fn[idx+1:]
 				}
-				ids = append(ids, fn)
+				ids = append(ids, []string{fn})
 			}
 		}
 	}
@@ -361,31 +378,17 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.KnownRelated("dbi", nil, false)
 	}
 
-	var ids []string
-	// Resources slice: DB INSTANCES only. AWS::RDS::DBCluster / DBSnapshot /
-	// DBClusterSnapshot identifiers are NOT dbi ids — emitting them here would
-	// fake an RDS Instance relation that can never resolve (clusters are a
-	// separate pivot).
-	for _, r := range event.Resources {
-		if r.ResourceType == nil || *r.ResourceType != "AWS::RDS::DBInstance" {
-			continue
-		}
-		if r.ResourceName == nil || *r.ResourceName == "" {
-			continue
-		}
-		name := *r.ResourceName
-		if idx := strings.LastIndex(name, "/"); idx >= 0 && idx < len(name)-1 {
-			name = name[idx+1:]
-		}
-		ids = append(ids, name)
-	}
+	// DB INSTANCES only. AWS::RDS::DBCluster / DBSnapshot / DBClusterSnapshot
+	// identifiers are NOT dbi ids — emitting them here would fake an RDS
+	// Instance relation that can never resolve (clusters are a separate pivot).
+	ids := extractCTResourceIDs(event, "AWS::RDS::DBInstance")
 
 	if len(ids) == 0 {
 		parsed := parseCTEventJSON(event.CloudTrailEvent)
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "dBInstanceIdentifier"); id != "" {
-				ids = append(ids, id)
+				ids = append(ids, []string{id})
 			}
 		}
 	}
@@ -411,11 +414,11 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "keyId"); id != "" {
-				ids = append(ids, stripKMSKeyID(id))
+				ids = append(ids, []string{stripKMSKeyID(id)})
 			}
 			svcDetails, _ := parsed["serviceEventDetails"].(map[string]any)
 			if id := ctJSONString(svcDetails, "keyId"); id != "" {
-				ids = append(ids, stripKMSKeyID(id))
+				ids = append(ids, []string{stripKMSKeyID(id)})
 			}
 		}
 	}
@@ -450,7 +453,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "secretId"); id != "" {
-				ids = append(ids, id)
+				ids = append(ids, []string{id})
 			}
 		}
 	}
@@ -469,11 +472,11 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		return resource.KnownRelated("vpce", nil, false)
 	}
 
-	var ids []string
+	var ids [][]string
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 	if parsed != nil {
 		if id := ctJSONString(parsed, "vpcEndpointId"); id != "" {
-			ids = append(ids, id)
+			ids = append(ids, []string{id})
 		}
 	}
 
@@ -498,7 +501,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "groupId"); id != "" {
-				ids = append(ids, id)
+				ids = append(ids, []string{id})
 			}
 		}
 	}
@@ -524,7 +527,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "tableName"); name != "" {
-				ids = append(ids, name)
+				ids = append(ids, []string{name})
 			}
 		}
 	}
@@ -637,7 +640,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 					if idx := strings.LastIndex(v, "/"); idx >= 0 && idx < len(v)-1 {
 						name = v[idx+1:]
 					}
-					ids = append(ids, name)
+					ids = append(ids, []string{name})
 				}
 			}
 		}
@@ -657,15 +660,12 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.KnownRelated("cfn", nil, false)
 	}
 
-	var ids []string
-	for _, r := range event.Resources {
-		if r.ResourceType == nil || !strings.EqualFold(*r.ResourceType, "AWS::CloudFormation::Stack") {
-			continue
-		}
-		if r.ResourceName == nil || *r.ResourceName == "" {
-			continue
-		}
-		ids = append(ids, cfnStackNameFromResourceName(*r.ResourceName))
+	// cfn resources are keyed by stack name, and a stack ARN is
+	// ".../stack/<name>/<uuid>" — the extractor's last-segment candidate would
+	// be the uuid, so the name is derived first and offered on its own.
+	var ids [][]string
+	for _, group := range extractCTResourceIDs(event, "AWS::CloudFormation::Stack") {
+		ids = append(ids, []string{cfnStackNameFromResourceName(group[0])})
 	}
 
 	if len(ids) == 0 {
@@ -673,7 +673,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "stackName"); name != "" {
-				ids = append(ids, name)
+				ids = append(ids, []string{name})
 			}
 		}
 	}
