@@ -134,12 +134,6 @@ func TestRel2UnknownSecretARNResolvesZero(t *testing.T) {
 // evt-iam-assume-002.
 const rel2SecondPathNamedRole = "acme-partner-integration-role"
 
-// Named here so dev has the two constants row 5 asks for; both land in
-// core/demo/fixtures/cloudtrail.go beside CtEventPathNamedRole.
-//
-//	const CtEventSecondPathNamedRole = "evt-0a1b2c3d4e5f60012"
-const rel2SecondPathNamedRoleEvent = "evt-0a1b2c3d4e5f60012"
-
 // TestRel2PathNamedRoleResolvesFromItsEvent pins the shape both witnesses must
 // render. An event names a role by an ARN whose resource part carries a path,
 // and the id the panel navigates by is the bare role name the roles list
@@ -164,7 +158,7 @@ func TestRel2PathNamedRoleResolvesFromItsEvent(t *testing.T) {
 // witness dev adds. Two witnesses are what keeps the fragment rule honest: one
 // fixture can be satisfied by a coincidence of that fixture's spelling.
 func TestRel2SecondPathNamedRoleResolvesFromItsEvent(t *testing.T) {
-	event := rel2CTFixtureByID(t, rel2SecondPathNamedRoleEvent)
+	event := rel2CTFixtureByID(t, fixtures.CtEventSecondPathNamedRole)
 	roles := rel2DemoList(t, "role")
 
 	found := false

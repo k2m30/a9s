@@ -17,8 +17,11 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // rel2RedisGroup builds a replication group with the given member cluster
@@ -218,5 +221,142 @@ func TestRel2MemberlessRedisGroupResolvesZeroEverywhere(t *testing.T) {
 				t.Errorf("Count = %d, want 0", result.Count())
 			}
 		})
+	}
+}
+
+// --- the fourth answer: a row that was never enriched ------------------------
+
+// TestRel2WarmCacheRowIsUnknownNotAnError pins the state a row restored from
+// the on-disk cache must produce. That cache deliberately carries no RawStruct
+// (core/cache/cache.go), and the detail workload hands the row to the related
+// checkers as it stands, before enrichment lands. Nothing failed on that path
+// and nothing was read, so the panel owes the user a "?", not a red error
+// claiming the details "are not loaded" — which is a description of Unknown,
+// not of a failure.
+func TestRel2WarmCacheRowIsUnknownNotAnError(t *testing.T) {
+	redisClients := &awsclient.ServiceClients{ElastiCache: &mockElastiCacheFullAPI{}}
+	dbcClients := &awsclient.ServiceClients{RDS: &rel2RDSFake{}}
+
+	cases := []struct {
+		name    string
+		checker func(*testing.T, string) resource.RelatedChecker
+		clients any
+		typ     string
+		targets []string
+	}{
+		{"redis", redisCheckerByTarget, redisClients, "redis", []string{"sg", "sns", "subnet", "vpc"}},
+		{"dbc", dbcCheckerByTarget, dbcClients, "dbc", []string{"subnet", "vpc"}},
+	}
+
+	for _, tc := range cases {
+		for _, target := range tc.targets {
+			t.Run(tc.name+"/"+target, func(t *testing.T) {
+				// A warm-cache replay row: identity and Fields only.
+				row := resource.Resource{
+					ID:     "acme-warm-cache-row",
+					Name:   "acme-warm-cache-row",
+					Type:   tc.typ,
+					Fields: map[string]string{"status": "available"},
+				}
+				result := tc.checker(t, target)(context.Background(), tc.clients, row, rel2RedisSubnetCache())
+				if result.State() != domain.RelatedUnknown {
+					t.Errorf("State = %v (err %q), want RelatedUnknown: the row was never enriched, so nothing was read and nothing failed",
+						result.State(), result.Err())
+				}
+			})
+		}
+	}
+}
+
+// --- row 2 on the rendered panel --------------------------------------------
+
+// TestRel2MemberlessDemoGroupRendersFourZeros pins row 2 where the operator
+// reads it: the panel. "dev-feature-redis" is a demo replication group AWS
+// reports with no member clusters, and the four pivots that hang off the
+// member must each render a count of zero. A row with no count at all tells
+// the operator neither that there is none nor that we could not tell, which is
+// the ambiguity this row exists to remove.
+func TestRel2MemberlessDemoGroupRendersFourZeros(t *testing.T) {
+	rel2AssertRenderedRedisZeros(t, "dev-feature-redis", "sg", "sns", "subnet", "vpc")
+}
+
+// TestRel2NoSubnetGroupDemoGroupRendersZeros pins row 1's demo witness on the
+// panel: "legacy-redis-classic" has a member cluster that names no subnet
+// group, so the subnet and vpc pivots have nothing to reach. That is a fact
+// about the group, and the panel must state it as a zero rather than the "?"
+// that used to also mean "the call failed".
+func TestRel2NoSubnetGroupDemoGroupRendersZeros(t *testing.T) {
+	rel2AssertRenderedRedisZeros(t, fixtures.RedisNoSubnetGroupID, "subnet", "vpc")
+}
+
+// rel2AssertRenderedRedisZeros drives every registered redis checker against a
+// demo replication group and asserts the named pivots render a resolved zero
+// in the right column the Controller builds.
+func rel2AssertRenderedRedisZeros(t *testing.T, groupID string, targets ...string) {
+	t.Helper()
+	rows := rel2DemoList(t, "redis")
+	var group resource.Resource
+	for _, r := range rows {
+		if r.ID == groupID {
+			group = r
+		}
+	}
+	if group.ID == "" {
+		t.Fatalf("%s is not in the demo redis list; the row has no witness", groupID)
+	}
+
+	clients := demo.NewServiceClients()
+	cache := resource.ResourceCache{}
+	for _, target := range []string{"sg", "sns", "subnet", "vpc"} {
+		cache[target] = resource.ResourceCacheEntry{Resources: rel2DemoList(t, target)}
+	}
+
+	c := newTestController(t)
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenDetail,
+		Context: runtime.ScreenContext{ResourceType: "redis", ResourceID: group.ID},
+	}})
+	c.EnsureDetailState(group, "redis")
+	c.InitDetailRelatedRows("redis")
+
+	want := make(map[string]bool, len(targets))
+	for _, target := range targets {
+		want[target] = true
+	}
+	for _, def := range resource.GetRelated("redis") {
+		if def.Checker == nil {
+			continue
+		}
+		result := def.Checker(context.Background(), clients, group, cache)
+		errMsg := ""
+		if result.Err() != nil {
+			errMsg = result.Err().Error()
+		}
+		c.ApplyDetailRelatedResultForResource("redis", group.ID, def.DisplayName, def.TargetType,
+			result.EffectiveState(), result.Count(), false, errMsg, result.Truncated(),
+			result.ResourceIDs(), result.FetchFilter())
+	}
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	seen := map[string]bool{}
+	for _, block := range body.Related {
+		if !want[block.TargetType] {
+			continue
+		}
+		seen[block.TargetType] = true
+		if block.State != domain.RelatedResolved {
+			t.Errorf("%s (%s): State = %v, want Resolved", block.Name, block.TargetType, block.State)
+		}
+		if block.Count != 0 {
+			t.Errorf("%s (%s): Count = %d, want 0", block.Name, block.TargetType, block.Count)
+		}
+	}
+	for target := range want {
+		if !seen[target] {
+			t.Errorf("no rendered related row for %s on %s", target, groupID)
+		}
 	}
 }
