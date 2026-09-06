@@ -124,7 +124,7 @@ while IFS= read -r fragment; do
     '## '*) continue ;;
     esac
     printf '%s' "$line" | grep -q '[^[:space:]]' || continue
-    if ! grep -qF -- "$line" "$tmp/CHANGELOG.md"; then
+    if ! grep -qxF -- "$line" "$tmp/CHANGELOG.md"; then
       echo "FAIL: ${fragment#"$repo_root"/} would lose a line the assembly does not place:" >&2
       echo "  $line" >&2
       echo "CHANGELOG.md and every fragment are unchanged. Move the line under one of: $SECTION_ORDER." >&2

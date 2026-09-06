@@ -172,3 +172,17 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestPhraseCell_BacktickPhraseIsFencedNotEmphasised(t *testing.T) {
+	cases := map[string]string{
+		"weak_policy":     "`weak_policy`",
+		"uses `*` action": "``uses `*` action``",
+		"`env_ref`":       "`` `env_ref` ``",
+		"plain phrase":    "plain phrase",
+	}
+	for in, want := range cases {
+		if got := phraseCell(in); got != want {
+			t.Errorf("phraseCell(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
