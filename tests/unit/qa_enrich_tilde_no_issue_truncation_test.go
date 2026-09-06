@@ -48,10 +48,10 @@ type tildeOnlyEnricherCase struct {
 // findings (an open resource policy, a deprecated engine version), so a capped
 // walk really can hide an issue and Truncated is the correct answer for them.
 //
-// cf and apigw joined them in batch w6a: cf.origin-bucket-missing,
-// apigw.no-authorizer-public and apigw.stage-variable-secret are all "!", so
-// both are covered by TestCapBoundedEnrichers_OverEnrichmentCap_TruncatedTrue
-// below instead.
+// cf, apigw and r53 joined them in batch w6a: cf.origin-bucket-missing,
+// apigw.no-authorizer-public, apigw.stage-variable-secret and
+// r53.dangling-record are all "!", so all three are covered by
+// TestCapBoundedEnrichers_OverEnrichmentCap_TruncatedTrue below instead.
 func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
 		{"athena", awsclient.EnrichAthenaWorkGroup},
@@ -70,7 +70,6 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 		// open topic policy on sns, an open queue policy on sqs — so a capped
 		// walk really can hide an issue and Truncated is the correct answer
 		// for them. See TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated.
-		{"r53", awsclient.EnrichRoute53Zone},
 		{"vpc", awsclient.EnrichVPCFlowLogs},
 		{"waf", awsclient.EnrichWAFLogging},
 	}
@@ -130,6 +129,7 @@ func brokenEmittingEnricherCases() []tildeOnlyEnricherCase {
 		{"msk", awsclient.EnrichMSKCluster},
 		{"sns", awsclient.EnrichSNSSubscriptions},
 		{"sqs", awsclient.EnrichSQSAttributes},
+		{"r53", awsclient.EnrichRoute53Zone},
 	}
 }
 
