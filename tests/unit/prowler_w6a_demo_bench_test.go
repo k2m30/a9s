@@ -10,9 +10,11 @@ package unit_test
 // field once real fixture data reaches it.
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -127,5 +129,89 @@ func TestW6ADetailAttentionNeverRepeatsItself(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// w6aWitness maps every code the batch emits to the fixture constant naming
+// the one demo resource that must show it. Contract rule 8: the constant's
+// value is the witness, so this table is the batch's bench contract.
+var w6aWitness = map[string]struct {
+	short   string
+	witness string
+}{ //nolint:gochecknoglobals // test-only table
+	"trail.no-cloudwatch-logs":           {"trail", fixtures.TrailNoCWLogs},
+	"trail.no-kms":                       {"trail", fixtures.TrailNoKMS},
+	"trail.log-bucket-public":            {"trail", fixtures.TrailLogBucketPublic},
+	"trail.log-bucket-no-access-logging": {"trail", fixtures.TrailLogBucketNoLogging},
+	"logs.no-kms":                        {"logs", fixtures.LogGroupNoKMS},
+	"alarm.actions-disabled":             {"alarm", fixtures.AlarmActionsDisabled},
+	"r53.query-logging-off":              {"r53", fixtures.R53QueryLoggingOff},
+	"r53.dangling-record":                {"r53", fixtures.R53DanglingA},
+	"cf.origin-bucket-missing":           {"cf", fixtures.CFOriginBucketMissing},
+	"cf.deprecated-tls":                  {"cf", fixtures.CFDeprecatedTLS},
+	"cf.logging-off":                     {"cf", fixtures.CFLoggingOff},
+	"cf.no-default-root-object":          {"cf", fixtures.CFNoRootObject},
+	"cf.s3-origin-no-oac":                {"cf", fixtures.CFS3OriginNoOAC},
+	"cf.default-certificate":             {"cf", fixtures.CFDefaultCert},
+	"cf.no-geo-restriction":              {"cf", fixtures.CFNoGeoRestriction},
+	"acm.weak-key":                       {"acm", fixtures.ACMWeakKey},
+	"apigw.no-authorizer-public":         {"apigw", fixtures.APIGWRESTNoAuthorizer},
+	"apigw.no-authorizer":                {"apigw", fixtures.APIGWHTTPNoAuthorizer},
+	"apigw.no-access-logs":               {"apigw", fixtures.APIGWRESTNoAccessLogs},
+	"apigw.tracing-off":                  {"apigw", fixtures.APIGWRESTTracingOff},
+	"apigw.stage-variable-secret":        {"apigw", fixtures.APIGWRESTStageSecret},
+}
+
+// TestW6AEveryFindingFiresOnItsNamedWitnessOnly is the batch's bench gate,
+// keyed by witness name rather than by code.
+//
+// The code-fires-somewhere gate it replaces asks only whether a finding
+// appears on any demo row, which four of this batch's constants passed while
+// naming a resource no fixture built: the finding rode on a pre-existing row
+// and the constant pointed at nothing. It is also silent when a row fires on a
+// third of a list — a bench where 35 of 40 log groups carry the same warning
+// cannot show an operator which row the signal was built for.
+//
+// So this asserts both halves of contract rule 8 at once: exactly one demo row
+// carries the code, and that row is the one the constant names.
+func TestW6AEveryFindingFiresOnItsNamedWitnessOnly(t *testing.T) {
+	clients := demo.NewServiceClients()
+	byType, cache := buildVisibilityTypeCache(t)
+
+	for code, want := range w6aWitness {
+		t.Run(code, func(t *testing.T) {
+			td := resource.FindResourceType(want.short)
+			if td == nil {
+				t.Fatalf("%s not registered", want.short)
+			}
+			var carriers []string
+			for _, res := range mergeWave2Findings(t, *td, byType[want.short], cache, clients) {
+				for _, f := range res.Findings {
+					if string(f.Code) != code {
+						continue
+					}
+					// The witness usually names the row itself. r53's dangling
+					// record is the exception the acceptance round accepted: the
+					// finding lands on the zone that holds the record, which is
+					// the only shape a per-zone row allows, so the record name
+					// is matched where it actually renders — the finding's own
+					// supporting rows.
+					named := res.ID + " / " + res.Name
+					for _, row := range res.AttentionDetails[f.Code].Rows {
+						named += " / " + row.Value
+					}
+					carriers = append(carriers, named)
+				}
+			}
+			switch {
+			case len(carriers) == 0:
+				t.Errorf("no demo row carries %q; its witness %q builds no row", code, want.witness)
+			case len(carriers) > 1:
+				t.Errorf("%d demo rows carry %q, want exactly the witness %q: %v",
+					len(carriers), code, want.witness, carriers)
+			case !strings.Contains(carriers[0], want.witness):
+				t.Errorf("%q fires on %q, want the named witness %q", code, carriers[0], want.witness)
+			}
+		})
 	}
 }

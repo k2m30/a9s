@@ -88,6 +88,25 @@ var knownUnwitnessedFindings = map[string]bool{
 	"opensearch:opensearch.warn.details_denied": true,
 }
 
+// w6aCodesUnderTheNameKeyedGate are batch w6a's codes, which this gate hands
+// to TestW6AEveryFindingFiresOnItsNamedWitnessOnly. That gate asserts the
+// stronger property — exactly one demo row carries the code and it is the row
+// the witness constant names — so checking "fires somewhere" here as well
+// would only weaken what a green run means.
+var w6aCodesUnderTheNameKeyedGate = map[string]bool{ //nolint:gochecknoglobals // test-only lookup
+	"trail.no-cloudwatch-logs": true, "trail.no-kms": true,
+	"trail.log-bucket-public": true, "trail.log-bucket-no-access-logging": true,
+	"logs.no-kms": true, "alarm.actions-disabled": true,
+	"r53.query-logging-off": true, "r53.dangling-record": true,
+	"cf.origin-bucket-missing": true, "cf.deprecated-tls": true,
+	"cf.logging-off": true, "cf.no-default-root-object": true,
+	"cf.s3-origin-no-oac": true, "cf.default-certificate": true,
+	"cf.no-geo-restriction": true, "acm.weak-key": true,
+	"apigw.no-authorizer-public": true, "apigw.no-authorizer": true,
+	"apigw.no-access-logs": true, "apigw.tracing-off": true,
+	"apigw.stage-variable-secret": true,
+}
+
 // TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures is the
 // DYNAMIC witness gate: for every registered type and every catalog.FindingDef
 // in td.Findings, at least one demo fixture resource must actually PRODUCE a
@@ -126,6 +145,16 @@ func TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures(t *testing
 			allowlisted := knownUnwitnessedFindings[key]
 
 			t.Run(testName, func(t *testing.T) {
+				if w6aCodesUnderTheNameKeyedGate[string(fd.Code)] {
+					// Batch w6a is covered by
+					// TestW6AEveryFindingFiresOnItsNamedWitnessOnly instead.
+					// This gate asks only whether a code fires somewhere, which
+					// four of that batch's codes passed while their witness
+					// constant named a resource no fixture built: the finding
+					// rode on a pre-existing row. A census of codes is not a
+					// census of rows.
+					t.Skip("covered by the name-keyed bench gate for batch w6a")
+				}
 				if len(fixtures) == 0 {
 					if allowlisted {
 						stillUnwitnessed = append(stillUnwitnessed, key)

@@ -11,6 +11,14 @@ package unit
 //
 // Assertions are on literal code and phrase strings, never on the production
 // constants, so a silent rename is caught rather than followed.
+//
+// The resource names here are deliberately NOT the fixture witness constants.
+// These drive the real fetcher over hand-built SDK input to pin the predicate;
+// they say nothing about whether a demo row exists. Naming them after the
+// witnesses is what let four constants point at rows no fixture built while
+// these tests stayed green. The bench half is
+// TestW6AEveryFindingFiresOnItsNamedWitnessOnly, which reads the fixture
+// store.
 
 import (
 	"context"
@@ -97,32 +105,32 @@ func w6aFetchTrails(t *testing.T, trails ...cttypes.Trail) map[string]resource.R
 // TestW6ATrailNoCloudWatchLogs pins row 2. A trail that writes only to S3 has
 // no live stream to alarm on, so the delivery target is the evidence.
 func TestW6ATrailNoCloudWatchLogs(t *testing.T) {
-	silent := w6aTrail("acme-s3-only-trail")
+	silent := w6aTrail("unit-no-cwlogs-trail")
 	silent.CloudWatchLogsLogGroupArn = nil
 	empty := w6aTrail("acme-empty-arn-trail")
 	empty.CloudWatchLogsLogGroupArn = aws.String("")
 
 	got := w6aFetchTrails(t, silent, empty, w6aTrail("acme-healthy-trail"))
 
-	for _, id := range []string{"acme-s3-only-trail", "acme-empty-arn-trail"} {
+	for _, id := range []string{"unit-no-cwlogs-trail", "acme-empty-arn-trail"} {
 		w2AssertFinding(t, got[id].Findings, w6aTrailNoCWLogs,
 			"not delivering to CloudWatch Logs", domain.SevWarn, "wave1")
 	}
 	w2AssertNoCode(t, got["acme-healthy-trail"].Findings, w6aTrailNoCWLogs)
-	w6aAssertRow(t, got["acme-s3-only-trail"], w6aTrailNoCWLogs, "Log group", "none")
+	w6aAssertRow(t, got["unit-no-cwlogs-trail"], w6aTrailNoCWLogs, "Log group", "none")
 }
 
 // TestW6ATrailNoKMS pins row 3.
 func TestW6ATrailNoKMS(t *testing.T) {
-	plain := w6aTrail("acme-unencrypted-trail")
+	plain := w6aTrail("unit-no-kms-trail")
 	plain.KmsKeyId = nil
 
 	got := w6aFetchTrails(t, plain, w6aTrail("acme-healthy-trail"))
 
-	w2AssertFinding(t, got["acme-unencrypted-trail"].Findings, w6aTrailNoKMS,
+	w2AssertFinding(t, got["unit-no-kms-trail"].Findings, w6aTrailNoKMS,
 		"log files not KMS-encrypted", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-healthy-trail"].Findings, w6aTrailNoKMS)
-	w6aAssertRow(t, got["acme-unencrypted-trail"], w6aTrailNoKMS, "KMS key", "none")
+	w6aAssertRow(t, got["unit-no-kms-trail"], w6aTrailNoKMS, "KMS key", "none")
 }
 
 // TestW6ATrail_ConditionsAreIndependent pins contract rule 4 on trail: three
@@ -358,19 +366,19 @@ func w6aFetchLogGroups(t *testing.T, groups ...cwltypes.LogGroup) map[string]res
 // TestW6ALogsNoKMS pins row 6. A log group with no customer key is readable
 // by anyone holding logs:GetLogEvents, with no second control in the way.
 func TestW6ALogsNoKMS(t *testing.T) {
-	plain := w6aLogGroup("/app/acme-unencrypted-audit")
+	plain := w6aLogGroup("/unit/no-kms-group")
 	plain.KmsKeyId = nil
 	empty := w6aLogGroup("/app/acme-empty-key")
 	empty.KmsKeyId = aws.String("")
 
 	got := w6aFetchLogGroups(t, plain, empty, w6aLogGroup("/app/acme-encrypted"))
 
-	for _, id := range []string{"/app/acme-unencrypted-audit", "/app/acme-empty-key"} {
+	for _, id := range []string{"/unit/no-kms-group", "/app/acme-empty-key"} {
 		w2AssertFinding(t, got[id].Findings, w6aLogsNoKMS,
 			"not encrypted with KMS", domain.SevWarn, "wave1")
 	}
 	w2AssertNoCode(t, got["/app/acme-encrypted"].Findings, w6aLogsNoKMS)
-	w6aAssertRow(t, got["/app/acme-unencrypted-audit"], w6aLogsNoKMS, "KMS key", "none")
+	w6aAssertRow(t, got["/unit/no-kms-group"], w6aLogsNoKMS, "KMS key", "none")
 	w2AssertFindingDef(t, "logs", w6aLogsNoKMS, "not encrypted with KMS", domain.SevWarn, "wave1")
 }
 
@@ -424,17 +432,17 @@ func w6aFetchAlarms(t *testing.T, alarms ...cwtypes.MetricAlarm) map[string]reso
 // TestW6AAlarmActionsDisabled pins row 7. An alarm with actions configured
 // but execution switched off looks wired up in the console and pages nobody.
 func TestW6AAlarmActionsDisabled(t *testing.T) {
-	off := w6aAlarm("acme-actions-disabled-alarm")
+	off := w6aAlarm("unit-actions-disabled-alarm")
 	off.ActionsEnabled = aws.Bool(false)
 
 	got := w6aFetchAlarms(t, off, w6aAlarm("acme-healthy-alarm"))
 
-	w2AssertFinding(t, got["acme-actions-disabled-alarm"].Findings, w6aAlarmActionsOff,
+	w2AssertFinding(t, got["unit-actions-disabled-alarm"].Findings, w6aAlarmActionsOff,
 		"actions disabled", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-healthy-alarm"].Findings, w6aAlarmActionsOff)
 	// The phrase already says the actions are off; the row's job is to say
 	// how much is wired behind the switch (U11).
-	w6aAssertRow(t, got["acme-actions-disabled-alarm"], w6aAlarmActionsOff, "Configured actions", "2")
+	w6aAssertRow(t, got["unit-actions-disabled-alarm"], w6aAlarmActionsOff, "Configured actions", "2")
 	w2AssertFindingDef(t, "alarm", w6aAlarmActionsOff, "actions disabled", domain.SevWarn, "wave1")
 }
 

@@ -129,6 +129,11 @@ type w6aAPIGWV1Fake struct {
 	authorizers []apigwtypes.Authorizer
 	stages      []apigwtypes.Stage
 	stagesErr   error
+	restApis    []apigwtypes.RestApi
+}
+
+func (f *w6aAPIGWV1Fake) GetRestApis(_ context.Context, _ *apigateway.GetRestApisInput, _ ...func(*apigateway.Options)) (*apigateway.GetRestApisOutput, error) {
+	return &apigateway.GetRestApisOutput{Items: f.restApis}, nil
 }
 
 func (f *w6aAPIGWV1Fake) GetAuthorizers(_ context.Context, _ *apigateway.GetAuthorizersInput, _ ...func(*apigateway.Options)) (*apigateway.GetAuthorizersOutput, error) {
@@ -162,6 +167,13 @@ func (f *w6aAPIGWV2Fake) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAu
 		out.NextToken = aws.String("next")
 	}
 	return out, nil
+}
+
+// GetApis answers empty rather than leaving the call to the embedded nil
+// interface: the merged fetcher walks both lanes, and a nil embedded field
+// dereferences into a SIGSEGV that takes the package down.
+func (f *w6aAPIGWV2Fake) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error) {
+	return &apigatewayv2.GetApisOutput{}, nil
 }
 
 func (f *w6aAPIGWV2Fake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
@@ -566,4 +578,90 @@ func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
 	}
 	w2AssertFinding(t, res.Findings["htp006noauth"], w6aAPIGWNoAuth,
 		"no authorizer", domain.SevWarn, "wave2:apigw")
+}
+
+// TestW6AAPIGWRESTEndpointType pins row 22, one case per branch.
+//
+// The endpoint type decides row 18's severity, and the v1 fetcher used to
+// hard-code the field empty: every value including "unknown" fell through to
+// the broken branch, so a genuinely private REST API rendered red and the
+// supporting row that exists to name the endpoint named nothing. The value is
+// on the RestApi the fetcher already keeps, and unknown is not misconfigured.
+func TestW6AAPIGWRESTEndpointType(t *testing.T) {
+	for _, tc := range []struct {
+		endpoint string
+		word     string
+		code     string
+		phrase   string
+		sev      domain.Severity
+	}{
+		{"PRIVATE", "private", w6aAPIGWNoAuth, "no authorizer", domain.SevWarn},
+		{"REGIONAL", "regional", w6aAPIGWNoAuthPublic, "internet-facing with no authorizer", domain.SevBroken},
+		{"EDGE", "edge", w6aAPIGWNoAuthPublic, "internet-facing with no authorizer", domain.SevBroken},
+	} {
+		t.Run(tc.word, func(t *testing.T) {
+			id := "rst0" + tc.word
+			res := w6aEnrichAPIGW(t,
+				&w6aAPIGWV1Fake{stages: []apigwtypes.Stage{w6aV1Stage("prod")}},
+				&w6aAPIGWV2Fake{},
+				w6aRESTRes(id, "acme-"+tc.word+"-rest", tc.endpoint, ""),
+			)
+			w2AssertFinding(t, res.Findings[id], tc.code, tc.phrase, tc.sev, "wave2:apigw")
+			w2AssertRow(t, w2Rows(t, res, id, tc.code), "Endpoint", tc.word)
+		})
+	}
+
+	// No endpoint configuration at all is unknown, and the common contract's
+	// nil rule says unknown is not misconfigured: neither code may fire, or
+	// the batch escalates a missing field to a red row.
+	t.Run("unknown", func(t *testing.T) {
+		res := w6aEnrichAPIGW(t,
+			&w6aAPIGWV1Fake{stages: []apigwtypes.Stage{w6aV1Stage("prod")}},
+			&w6aAPIGWV2Fake{},
+			w6aRESTRes("rst0unknown", "acme-unknown-rest", "", ""),
+		)
+		w2AssertNoCode(t, res.Findings["rst0unknown"], w6aAPIGWNoAuthPublic)
+		w2AssertNoCode(t, res.Findings["rst0unknown"], w6aAPIGWNoAuth)
+	})
+}
+
+// TestW6AAPIGWRESTFetcherKeepsTheEndpointType pins the other half of row 22:
+// the word has to reach Fields from the RestApi the fetcher already holds.
+// The enricher branches above read Fields, so they pass against a hand-built
+// row whatever the fetcher does — this is the pin that fails when the fetcher
+// hard-codes the field empty and sends every REST API down the broken branch.
+func TestW6AAPIGWRESTFetcherKeepsTheEndpointType(t *testing.T) {
+	mk := func(id string, types ...apigwtypes.EndpointType) apigwtypes.RestApi {
+		api := apigwtypes.RestApi{Id: aws.String(id), Name: aws.String("acme-" + id)}
+		if len(types) > 0 {
+			api.EndpointConfiguration = &apigwtypes.EndpointConfiguration{Types: types}
+		}
+		return api
+	}
+	v1 := &w6aAPIGWV1Fake{restApis: []apigwtypes.RestApi{
+		mk("rstprivate", apigwtypes.EndpointTypePrivate),
+		mk("rstregional", apigwtypes.EndpointTypeRegional),
+		mk("rstedge", apigwtypes.EndpointTypeEdge),
+		mk("rstnone"),
+	}}
+
+	out, err := awsclient.FetchAPIGatewaysPageMerged(context.Background(),
+		&awsclient.ServiceClients{APIGatewayV1: v1, APIGatewayV2: &w6aAPIGWV2Fake{}}, "")
+	if err != nil {
+		t.Fatalf("FetchAPIGatewaysPageMerged: %v", err)
+	}
+	got := map[string]string{}
+	for _, r := range out.Resources {
+		got[r.ID] = r.Fields["endpoint"]
+	}
+	for id, want := range map[string]string{
+		"rstprivate":  "private",
+		"rstregional": "regional",
+		"rstedge":     "edge",
+		"rstnone":     "",
+	} {
+		if got[id] != want {
+			t.Errorf("%s: Fields[endpoint] = %q, want %q", id, got[id], want)
+		}
+	}
 }

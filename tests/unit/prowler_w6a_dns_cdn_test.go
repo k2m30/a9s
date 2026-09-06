@@ -457,14 +457,17 @@ func TestW6ACFOriginBucketMissing_IncompleteS3CacheEmitsNothing(t *testing.T) {
 // TestW6ACFDeprecatedTLS pins row 11 across every protocol version AWS still
 // accepts but no longer considers safe, and the two that are fine.
 func TestW6ACFDeprecatedTLS(t *testing.T) {
+	// Row 23: the value is the mapped word, never string(<SDK enum>). Two
+	// enums share TLS 1.0, so those carry the policy year to stay distinct;
+	// the acronym map already allows TLS.
 	weak := map[cftypes.MinimumProtocolVersion]string{
-		cftypes.MinimumProtocolVersionSSLv3:      "SSLv3",
-		cftypes.MinimumProtocolVersionTLSv1:      "TLSv1",
-		cftypes.MinimumProtocolVersionTLSv12016:  "TLSv1_2016",
-		cftypes.MinimumProtocolVersionTLSv112016: "TLSv1.1_2016",
+		cftypes.MinimumProtocolVersionSSLv3:      "SSL 3.0",
+		cftypes.MinimumProtocolVersionTLSv1:      "TLS 1.0",
+		cftypes.MinimumProtocolVersionTLSv12016:  "TLS 1.0 (2016)",
+		cftypes.MinimumProtocolVersionTLSv112016: "TLS 1.1 (2016)",
 	}
 	for version, want := range weak {
-		t.Run(want, func(t *testing.T) {
+		t.Run(string(version), func(t *testing.T) {
 			cfg := w6aCFConfig("shop.acme-corp.com", "acme-live-origin.s3.us-east-1.amazonaws.com")
 			cfg.ViewerCertificate.MinimumProtocolVersion = version
 			res := w6aCFOne(t, "E7G8H9I0J1K2L3", cfg, w6aS3NameCache(false, "acme-live-origin"))
