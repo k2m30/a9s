@@ -705,7 +705,7 @@ One-call budget: `DescribeLaunchTemplates` carries no `LaunchTemplateData` at al
 - **`ami`** — `LaunchTemplateData.ImageId` when it matches `ami-` (a `resolve:ssm:` reference is a display fact, not a pivot).
 - **`asg`** — loaded-cache cross-ref: `AutoScalingGroup.LaunchTemplate.LaunchTemplateId`, `MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification`, and per-`Overrides[]` specifications — "which fleets launch from this template".
 - **`ct-events`** — audit trail: who bumped the default version.
-- **`ec2`** — loaded-cache cross-ref by the auto-tag `aws:ec2launchtemplate:id` (catches direct, ASG, and NG launches); degrades to unknown when the ec2 cache is truncated — never a fake 0.
+- **`ec2`** — loaded-cache cross-ref by the auto-tag `aws:ec2launchtemplate:id` (catches direct, ASG, and NG launches); degrades to unknown when the ec2 cache has not been loaded at all — never a fake 0. A cache that WAS loaded but is truncated gives a real count so far, rendered `(N+)`.
 - **`kms`** — `BlockDeviceMappings[].Ebs.KmsKeyId` in key-id/ARN form only (alias forms are detail-only; zero counts expected on most templates).
 - **`ng`** — loaded-cache cross-ref: `Nodegroup.LaunchTemplate.Id`/`Name`.
 - **`sg`** — union of `LaunchTemplateData.SecurityGroupIds` ∪ `NetworkInterfaces[].Groups` (mutually exclusive by API design); `SecurityGroups` (names, EC2-Classic legacy) are detail-only.

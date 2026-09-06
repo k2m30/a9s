@@ -208,10 +208,12 @@ func TestR53Related_NoCacheNoFetcher_Unknown(t *testing.T) {
 	}
 }
 
-// TestR53Related_TruncatedTargetPageNoMatch_Unknown pins the contract stated at
-// related_fetch.go:25-27: a first page that matched nothing does not prove the
-// rest of the account matched nothing either.
-func TestR53Related_TruncatedTargetPageNoMatch_Unknown(t *testing.T) {
+// TestR53Related_TruncatedTargetPageNoMatch_Truncated is INVERTED (was: the
+// same case asserted Unknown). Row 16 settled it the other way: a list that WAS
+// read is evidence, so nothing matching in it is a real zero so far, and the
+// truncation flag is what says a later page may add to it. Unknown is reserved
+// for a list that was never read at all, which the test above covers.
+func TestR53Related_TruncatedTargetPageNoMatch_Truncated(t *testing.T) {
 	for _, tc := range nilCacheCases() {
 		t.Run(tc.target, func(t *testing.T) {
 			cache := resource.ResourceCache{tc.target: resource.ResourceCacheEntry{
@@ -225,9 +227,11 @@ func TestR53Related_TruncatedTargetPageNoMatch_Unknown(t *testing.T) {
 			if len(result.ResourceIDs()) > 0 {
 				return // a match on the first page is authoritative; nothing to prove here
 			}
-			if got := result.EffectiveState(); got != domain.RelatedUnknown {
-				t.Errorf("state = %v after a truncated first page matched nothing, want RelatedUnknown — "+
-					"a zero from a partial list is a guess, not a count", got)
+			if got := result.EffectiveState(); got != domain.RelatedResolved {
+				t.Errorf("state = %v after a truncated first page matched nothing, want RelatedResolved", got)
+			}
+			if !result.Truncated() {
+				t.Error("Truncated = false, want true — a later page may still match")
 			}
 		})
 	}

@@ -61,19 +61,10 @@ func canonicalDNS(s string) string {
 	return strings.TrimSuffix(s, ".")
 }
 
-// r53RelatedResult applies the rule stated at FetchRelatedTarget's doc
-// comment: a first page of the TARGET list that matched nothing does not prove
-// the rest of the account matched nothing either, so an empty result off a
-// truncated target list is Unknown rather than a resolved zero.
-//
-// recordsTruncated is the zone's own record scan and is deliberately NOT part
-// of that test: a truncated record scan with no match renders "(0+)", which
-// already says "more records may match" without claiming ignorance of the
-// target type.
+// r53RelatedResult folds the zone's own record scan and the target list's
+// pagination into the one truncation flag the row renders. Either being cut
+// short means "what you see is what was read", which is what "(N+)" says.
 func r53RelatedResult(target string, ids []string, recordsTruncated, targetTruncated bool) resource.RelatedCheckResult {
-	if len(ids) == 0 && targetTruncated {
-		return resource.UnknownRelated(target)
-	}
 	return relatedResultTrunc(target, ids, recordsTruncated || targetTruncated)
 }
 

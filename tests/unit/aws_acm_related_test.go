@@ -263,10 +263,11 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 // confirming the early-exit path is hit only when ID and Name are both empty.
 // --- checkACMCF: truncated cache → TruncatedResult ---
 
-// TestRelated_ACM_CF_TruncatedCacheNoMatch is INVERTED (was: a truncated result
-// with Count 0 and Truncated true). A truncated page that matched nothing has
-// not earned a zero — the distribution carrying this certificate may sit on a
-// page the scan never read — so the row reads as unknown.
+// TestRelated_ACM_CF_TruncatedCacheNoMatch: a truncated page that matched
+// nothing is a resolved zero carrying the truncation flag, rendered "(0+)".
+// Row 16 settled this against the Unknown reading I briefly pinned here: the
+// page WAS read, so zero-so-far is a fact, and the "+" is what says a later
+// page may add to it.
 func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{
@@ -294,8 +295,11 @@ func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("State = %v, want Unknown (truncated page, nothing matched)", result.State())
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("State = %v, want Resolved (the page was read)", result.State())
+	}
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

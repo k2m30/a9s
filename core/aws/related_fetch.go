@@ -24,8 +24,11 @@ const DefaultPageSize = resource.DefaultPageSize
 //   - cache miss + registered fetcher: fetches first page only, returns IsTruncated from pagination.
 //   - cache miss + no fetcher: returns nil, false, nil (graceful no-op).
 //
-// Callers MUST return an UnknownRelated result when isTruncated==true and 0
-// matches are found locally — never report a partial count as definitive.
+// A nil list means nothing was read: callers MUST answer UnknownRelated, since
+// a count from a list that was never fetched is a guess. A list that WAS read
+// but came back truncated is a different answer — whatever matched in it is
+// real, and zero matches is a real zero so far, so callers carry isTruncated
+// through and the row renders "(N+)".
 func FetchRelatedTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	if entry, ok := cache[target]; ok {
 		// A present entry is a complete answer even when it holds nothing:
