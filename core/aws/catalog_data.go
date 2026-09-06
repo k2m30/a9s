@@ -33,13 +33,7 @@ func colorAthena(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "ENABLED":
-		return domain.ColorHealthy
-	case "DISABLED":
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(athenaStateFindings(r.Fields["state"]))
 }
 
 var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var

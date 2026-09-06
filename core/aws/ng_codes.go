@@ -28,6 +28,10 @@ const (
 	// Severity: SevBroken.
 	CodeNGStateDeleteFailed domain.FindingCode = "ng.state.delete-failed"
 
+	// CodeNGHealthIssue — node group reports a Health.Issues[] entry while its
+	// lifecycle state says nothing is wrong. Severity: SevWarn.
+	CodeNGHealthIssue domain.FindingCode = "ng.health-issue"
+
 	// CodeNGStateDegraded — node group is degraded.
 	// Severity: SevBroken.
 	CodeNGStateDegraded domain.FindingCode = "ng.state.degraded"

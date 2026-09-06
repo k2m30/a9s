@@ -19,11 +19,8 @@ func colorSecrets(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	findings := secretStateFindings(r.Fields["status"])
-	if len(findings) == 0 {
-		findings = secretStructuralFindings(r.Fields["rotation_enabled"], r.Fields["last_changed"])
-	}
-	return colorFromFindings(findings)
+	return colorFromFindings(secretFindings(
+		r.Fields["status"], r.Fields["rotation_enabled"], r.Fields["last_changed"]))
 }
 
 func colorSSM(r domain.Resource) domain.Color {

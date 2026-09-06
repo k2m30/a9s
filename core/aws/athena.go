@@ -85,17 +85,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 			RawStruct: wg,
 		}
 
-		// state is admin-controlled and blocks all query execution while
-		// DISABLED — emit a wave1 Finding so colorAthena's DISABLED branch
-		// has a Finding to derive its Warning color from.
-		if state == "DISABLED" {
-			r.Findings = []domain.Finding{{
-				Code:     athenaCodeWorkgroupDisabled,
-				Phrase:   "disabled",
-				Detail:   catalog.Detail(athenaCodeWorkgroupDisabled),
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		}
+		r.Findings = athenaStateFindings(state)
 
 		resources = append(resources, r)
 	}
@@ -121,4 +111,19 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// athenaStateFindings is the one predicate for a workgroup's state, which is
+// admin-controlled and blocks all query execution while DISABLED. colorAthena
+// runs it over Fields for rows built outside the fetcher.
+func athenaStateFindings(state string) []domain.Finding {
+	if state == "DISABLED" {
+		return []domain.Finding{{
+			Code:     athenaCodeWorkgroupDisabled,
+			Phrase:   "disabled",
+			Detail:   catalog.Detail(athenaCodeWorkgroupDisabled),
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
 }

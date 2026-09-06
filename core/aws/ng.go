@@ -104,27 +104,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		}
 	}
 
-	// emit wave1 Findings for non-healthy lifecycle states.
-	// ACTIVE → no Finding (healthy). Fields["status"] is still populated
-	// so the existing structural Color path works for the wave2 fallback.
-	var findings []domain.Finding
-	var issueRows []domain.DetailRow
-	switch status {
-	case "CREATING":
-		findings = []domain.Finding{{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
-	case "UPDATING":
-		findings = []domain.Finding{{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
-	case "DELETING":
-		findings = []domain.Finding{{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
-	case "CREATE_FAILED":
-		findings = []domain.Finding{{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"}}
-	case "DELETE_FAILED":
-		findings = []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"}}
-	case "DEGRADED":
-		f, rows := healthIssueFinding(CodeNGStateDegraded, "degraded", issueCodes)
-		findings = []domain.Finding{f}
-		issueRows = rows
-	}
+	findings, issueRows := ngFindings(status, healthIssuesCount, issueCodes)
 
 	r := resource.Resource{
 		ID:   nodegroupName,
@@ -155,4 +135,32 @@ func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource 
 	r.Fields["cluster_name"] = clusterName
 	r.Fields["nodegroup_name"] = ngName
 	return r
+}
+
+// ngFindings is the one predicate for a node group: its lifecycle state, then
+// a bare Health.Issues[] on a node group whose state says nothing — health is
+// tracked independently of the state, the same way it is for the cluster.
+// colorEKSNodeGroup runs it over Fields for rows built outside the fetcher,
+// which have the issue count but not the codes.
+func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]domain.Finding, []domain.DetailRow) {
+	switch status {
+	case "CREATING":
+		return []domain.Finding{{Code: CodeNGStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeNGStateCreating), Severity: domain.SevWarn, Source: "wave1"}}, nil
+	case "UPDATING":
+		return []domain.Finding{{Code: CodeNGStateUpdating, Phrase: "updating", Detail: catalog.Detail(CodeNGStateUpdating), Severity: domain.SevWarn, Source: "wave1"}}, nil
+	case "DELETING":
+		return []domain.Finding{{Code: CodeNGStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeNGStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}, nil
+	case "CREATE_FAILED":
+		return []domain.Finding{{Code: CodeNGStateCreateFailed, Phrase: "create failed", Detail: catalog.Detail(CodeNGStateCreateFailed), Severity: domain.SevBroken, Source: "wave1"}}, nil
+	case "DELETE_FAILED":
+		return []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Detail: catalog.Detail(CodeNGStateDeleteFailed), Severity: domain.SevBroken, Source: "wave1"}}, nil
+	case "DEGRADED":
+		f, rows := healthIssueFinding(CodeNGStateDegraded, "degraded", issueCodes)
+		return []domain.Finding{f}, rows
+	}
+	if healthIssuesCount > 0 {
+		f, rows := healthIssueFindingSev(CodeNGHealthIssue, "health issue", issueCodes, domain.SevWarn)
+		return []domain.Finding{f}, rows
+	}
+	return nil, nil
 }

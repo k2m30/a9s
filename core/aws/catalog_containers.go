@@ -18,10 +18,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// colorEKSCluster classifies an EKS cluster from its worst Finding
-// (populated by buildEKSResource, eks.go); the raw-field checks below are the
-// identical-precedence fallback for callers that construct a Resource with
-// only Fields set (e.g. qa_eks_color_test.go).
+// colorEKSCluster is the last classifier in this file still deciding for
+// itself: w6b's posture findings read cluster config (endpoint access,
+// control-plane logging, secrets encryption, version support) that the fetcher
+// never writes into Fields, so a predicate over Fields cannot yet recover them.
 func colorEKSCluster(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
@@ -52,25 +52,9 @@ func colorEKSNodeGroup(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	hasIssues := false
-	if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
-		hasIssues = true
-	}
-	switch r.Fields["status"] {
-	case "ACTIVE":
-		if hasIssues {
-			return domain.ColorWarning
-		}
-		return domain.ColorHealthy
-	case "CREATING", "UPDATING", "DELETING":
-		return domain.ColorWarning
-	case "CREATE_FAILED", "DELETE_FAILED", "DEGRADED":
-		return domain.ColorBroken
-	}
-	if hasIssues {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	issues, _ := strconv.Atoi(r.Fields["health_issues_count"])
+	findings, _ := ngFindings(r.Fields["status"], issues, nil)
+	return colorFromFindings(findings)
 }
 
 var containersTypes = []catalog.ResourceTypeDef{
@@ -196,6 +180,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group is degraded, so some nodes are failing or not joining; when AWS reports health issues, the first is the phrase and any others follow as rows. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile."},
+			{Code: CodeNGHealthIssue, Phrase: "issue: <health issue code>", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group reports a health issue while its state says nothing is wrong; the first code is the phrase and any others follow as rows. Nodes may be failing to join or to stay healthy until it clears."},
 			DetailsDeniedFindingDef("ng", ""),
 			DetailsUnavailableFindingDef("ng"),
 		},

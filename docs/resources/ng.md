@@ -109,6 +109,11 @@ One bullet per distinct signal. Each signal is derived from the `DescribeNodegro
   - **API call**: `DescribeNodegroup` — one call per node group.
   - **Cost shape**: per-resource.
 
+- **Signal**: `health.issues[]` is non-empty on a node group whose `status` is not itself a finding (`ACTIVE`) → Warning. Health is tracked independently of the lifecycle state, the same way it is for the cluster.
+  - **State bucket**: Warning.
+  - **API call**: `DescribeNodegroup` — same call as above; no additional request.
+  - **Cost shape**: per-resource.
+
 - **Signal**: `health.issues[]` contains a code in the broken set — `InsufficientFreeAddresses`, `Ec2LaunchTemplateVersionMismatch`, `AutoScalingGroupInvalidConfiguration`, `AccessDenied`, `Ec2SecurityGroupDeletionFailure`, `Ec2SecurityGroupNotFound`, `IamInstanceProfileNotFound`, `IamNodeRoleNotFound`, `InstanceLimitExceeded`, `NodeCreationFailure`, `ClusterUnreachable`, `Ec2LaunchTemplateNotFound`, `AsgInstanceLaunchFailures`, `AutoScalingGroupNotFound`, `Ec2SubnetInvalidConfiguration`, `Ec2InstanceTypeDoesNotExist`, `InternalFailure`.
   - **State bucket**: Broken.
   - **API call**: `DescribeNodegroup` — same call as above; no additional request.

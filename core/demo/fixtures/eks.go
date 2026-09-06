@@ -156,7 +156,9 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA},
 			},
-			CreatedAt: aws.Time(mustTime("2026-04-02T09:00:00Z")),
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2026-04-02T09:00:00Z")),
 			Tags: map[string]string{
 				"Environment": "sandbox",
 			},
@@ -172,7 +174,9 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA},
 			},
-			CreatedAt: aws.Time(mustTime("2026-02-11T09:00:00Z")),
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2026-02-11T09:00:00Z")),
 			Tags: map[string]string{
 				"Environment": "sandbox",
 			},
@@ -318,6 +322,39 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					DesiredSize: aws.Int32(2),
 				},
 				CreatedAt:      aws.Time(mustTime("2025-06-20T10:00:00Z")),
+				ReleaseVersion: aws.String("1.29.3-20240322"),
+				Version:        aws.String("1.29"),
+				Tags: map[string]string{
+					"Environment": "staging",
+				},
+			},
+			// Witness for ng.health-issue: ACTIVE, so no state finding, but
+			// Health.Issues[] is non-empty — health is tracked independently
+			// of the lifecycle state.
+			{
+				NodegroupName: aws.String("staging-degraded-net-pool"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-staging/staging-degraded-net-pool/ccc33333"),
+				ClusterName:   aws.String("acme-staging"),
+				Status:        ekstypes.NodegroupStatusActive,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(30),
+				InstanceTypes: []string{"t3.medium"},
+				Subnets:       []string{eksSubnetA, eksSubnetB},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(1),
+					MaxSize:     aws.Int32(4),
+					DesiredSize: aws.Int32(2),
+				},
+				Health: &ekstypes.NodegroupHealth{
+					Issues: []ekstypes.Issue{
+						{
+							Code:    ekstypes.NodegroupIssueCodeInsufficientFreeAddresses,
+							Message: aws.String("Subnet has run out of addresses"),
+						},
+					},
+				},
+				CreatedAt:      aws.Time(mustTime("2025-07-02T10:00:00Z")),
 				ReleaseVersion: aws.String("1.29.3-20240322"),
 				Version:        aws.String("1.29"),
 				Tags: map[string]string{
