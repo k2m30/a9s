@@ -524,3 +524,28 @@ func TestW6BEKS_FindingDefsRegistered(t *testing.T) {
 	w2AssertFindingDef(t, "eks", string(w6bEKSCodeSecretsNotKMS), w6bEKSPhraseSecretsNotKMS, domain.SevWarn, "wave1")
 	w2AssertFindingDef(t, "eks", string(w6bEKSCodeVersionOld), "Kubernetes <version> is out of standard support", domain.SevBroken, "wave1")
 }
+
+// eksSupportWords derives the words from the enum rather than switching on the
+// three values AWS publishes today, so a status AWS adds later still renders.
+// The switch it replaced returned "" for anything unlisted, which put a row on
+// screen reading ", standard support ended 2025-11-26" with nothing in front
+// of the comma. Pinned because only a status outside the three shows the
+// difference, and every other test uses one of the three.
+func TestW6BEKS_UnknownSupportStatus_RendersAsWordsNotEmpty(t *testing.T) {
+	const name = "acme-future-status"
+	fake := &w6bEKSFake{
+		order:    []string{name},
+		clusters: map[string]*ekstypes.Cluster{name: w6bEKSCluster(name, "1.30")},
+		versions: map[string]w6bEKSVersionInfo{
+			"1.30": {status: ekstypes.VersionStatus("DEPRECATED_SUPPORT"), endOfStandardSupport: aws.Time(w6bEKSEndOfStandardSupport)},
+		},
+	}
+	rs := w6bFetchEKS(t, fake)
+	r := pw1ResourceByID(t, rs, name)
+
+	f := pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld,
+		w6bEKSVersionPhrase("1.30"), domain.SevBroken, "wave1")
+	rows := w6bWave1Rows(r, w6bEKSCodeVersionOld)
+	w6bRequireRowValueContains(t, rows, "deprecated support")
+	w6bRequireNoRawEnum(t, f, rows)
+}
