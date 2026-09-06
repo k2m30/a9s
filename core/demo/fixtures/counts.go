@@ -92,7 +92,8 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"r53":          len(NewR53Fixtures().HostedZones),
 		"cf":           len(NewCloudFrontFixtures().Distributions),
 		"acm":          len(NewACMFixtures().Certificates),
-		"apigw":        len(NewAPIGWFixtures().APIs),
+		// The a9s apigw list merges both lanes: v2 HTTP APIs and v1 REST APIs.
+		"apigw":        len(NewAPIGWFixtures().APIs) + len(NewAPIGWV1Fixtures().RestApis),
 		"role":         len(iam.Roles),
 		"policy":       countTopLevelIAMPolicies(iam),
 		"iam-user":     len(iam.Users),

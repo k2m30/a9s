@@ -5,82 +5,85 @@ package aws
 
 import (
 	"context"
+	"sync"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// trailBucketSignals maps an s3 wave-2 finding code to the trail finding it
-// raises on whichever trail delivers to that bucket.
-var trailBucketSignals = []struct { //nolint:gochecknoglobals // static table: intentional package-level var
-	s3Code   domain.FindingCode
-	code     domain.FindingCode
-	phrase   string
-	severity domain.Severity
-	tier     string
-	detail   string
-}{
-	{s3CodePublic, CodeTrailLogBucketPublic, "log bucket is publicly accessible", domain.SevBroken, "!", trailLogBucketPublicDetail},
-	{s3CodeAccessLoggingOff, CodeTrailLogBucketNoAccessLogging, "log bucket has no access logging", domain.SevWarn, "~", trailLogBucketNoAccessLoggingDetail},
+// trailLogBucketAPI is the pair of read-only S3 calls the log-bucket rows
+// need. Asserted off clients.S3 rather than folded into the aggregate, so a
+// client or fake that predates these rows still satisfies it.
+type trailLogBucketAPI interface {
+	S3GetBucketPolicyStatusAPI
+	S3GetBucketLoggingAPI
 }
 
-// EnrichTrailLogBucket reports what the s3 cache already knows about the
-// bucket each trail delivers to: a publicly readable log bucket, and one that
-// records no access logging.
+// EnrichTrailLogBucket reports on the bucket each trail delivers to: one that
+// AWS evaluates as public, and one that records no access logging.
 //
-// Cache-only — it makes no AWS call. The s3 rows carry their own wave-2
-// findings, so this reads them by code string rather than importing the s3
-// enricher's symbols. Registered at Priority 200 so s3 (100) runs first.
+// It asks S3 directly for the trail's own bucket rather than joining the s3
+// resource cache. A join only answers once the operator has opened the bucket
+// list, so in production it is silent exactly when nobody has looked — which
+// is when the audit trail sitting in a public bucket matters most.
 //
-// Three states mean "not known" and emit nothing rather than a false
-// negative: no s3 cache, a truncated one (the bucket may be on a page nobody
-// loaded), and one whose rows carry no wave-2 finding at all, which means the
-// s3 wave-2 pass has not run yet. Cache order across types is not guaranteed.
-func EnrichTrailLogBucket(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
+// One or two calls per trail, capped by EnrichmentCap. A bucket that cannot be
+// read marks its trail truncated rather than reporting it clean.
+func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
-	entry, ok := cache["s3"]
-	if !ok || entry.IsTruncated || !anyWave2Finding(entry.Resources) {
+	api, ok := clients.S3.(trailLogBucketAPI)
+	if !ok || clients.S3 == nil {
 		return result, nil
 	}
 
-	codesByBucket := make(map[string]map[domain.FindingCode]bool, len(entry.Resources))
-	for _, b := range entry.Resources {
-		codes := make(map[domain.FindingCode]bool, len(b.Findings))
-		for _, f := range b.Findings {
-			codes[f.Code] = true
-		}
-		codesByBucket[b.ID] = codes
-	}
-
-	for _, r := range resources {
+	var mu sync.Mutex
+	n := min(len(resources), EnrichmentCap)
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		bucket := r.Fields["s3_bucket"]
-		codes, known := codesByBucket[bucket]
-		if bucket == "" || !known {
-			continue
+		if bucket == "" {
+			return
 		}
-		for _, sig := range trailBucketSignals {
-			if !codes[sig.s3Code] {
-				continue
-			}
-			setWave2Finding(&result, r.ID, sig.code, sig.phrase, sig.tier, "trail",
-				[]domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: sig.tier}})
-		}
-	}
-	return result, nil
-}
 
-// anyWave2Finding reports whether any cached row carries a finding the wave-2
-// pass produced. An all-wave1 cache means that pass has not run yet.
-func anyWave2Finding(rs []domain.Resource) bool {
-	for _, r := range rs {
-		for _, f := range r.Findings {
-			if len(f.Source) >= 6 && f.Source[:6] == "wave2:" {
-				return true
-			}
+		status, statusErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyStatusOutput, error) {
+			return api.GetBucketPolicyStatus(ctx, &s3.GetBucketPolicyStatusInput{Bucket: aws.String(bucket)})
+		})
+		logging, loggingErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
+			return api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
+		})
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		// A bucket with no policy cannot be public by policy; anything else
+		// that fails leaves the trail's posture unknown, not clean.
+		public := statusErr == nil && status.PolicyStatus != nil && aws.ToBool(status.PolicyStatus.IsPublic)
+		if statusErr != nil && !isS3APIErrCode(statusErr, "NoSuchBucketPolicy") {
+			result.TruncatedIDs[r.ID] = true
 		}
-	}
-	return false
+		if public {
+			setWave2Finding(&result, r.ID, CodeTrailLogBucketPublic,
+				"log bucket is publicly accessible", "!", "trail",
+				[]domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "!"}})
+		}
+
+		switch {
+		case loggingErr != nil:
+			result.TruncatedIDs[r.ID] = true
+		case logging.LoggingEnabled == nil:
+			setWave2Finding(&result, r.ID, CodeTrailLogBucketNoAccessLogging,
+				"log bucket has no access logging", "~", "trail",
+				[]domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "~"}})
+		}
+	})
+	// CodeTrailLogBucketPublic is "!", so the cap bounds the issue count and a
+	// capped pass must say so rather than under-report the badge.
+	result.Truncated = len(resources) > EnrichmentCap
+	return result, nil
 }

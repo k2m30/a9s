@@ -89,6 +89,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `elasticbeanstalk_environment_managed_updates_enabled`,
   `elasticbeanstalk_environment_enhanced_health_reporting` and
   `elasticbeanstalk_environment_cloudwatch_logging_enabled`.
+- CloudTrail trails now say when the trail itself is under-configured: one
+  delivering to the bucket only rather than to a log group, and one whose log
+  files carry no KMS key of your own. The trail's log bucket is checked too,
+  so a bucket AWS reports as public, or one recording no access logging, now
+  colours the trail that writes its audit history there.
+- CloudWatch log groups with no KMS key of your own now read as a warning.
+- A CloudWatch alarm with its actions switched off now says so. It used to
+  read the same as an alarm with no actions at all, so an alarm that was wired
+  up and muted looked identical to one nobody had finished.
+- Route 53 public zones now say when nothing records who resolves their names,
+  and when a record still answers with an address the account has released,
+  which is how a subdomain gets taken over.
+- CloudFront distributions now say when an origin names a bucket the account
+  does not hold, when viewers may still negotiate a protocol below TLS 1.2,
+  and when logging, a default root object, an origin access control, a
+  matching certificate or a geographic restriction is missing.
+- ACM certificates on an RSA key below 2048 bits now read as a warning.
+- API Gateways now say when nothing checks the caller's identity, which reads
+  as broken for a REST API reachable from the internet and as a warning
+  otherwise. REST stages also say when they record no access logs, when
+  tracing is off, and when a stage variable holds what looks like a credential.
 
 - A database instance being deleted now reads as a warning instead of green.
 - A snapshot in a state neither ready nor failed, such as one still copying,
@@ -292,6 +313,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A credential written as a JSON object key, which is how one reaches a state
   machine definition or a task definition, is now found by the secret
   scanner. Only unquoted `KEY=value` and `KEY: value` forms matched before.
+- CloudFront, ACM and CloudWatch log group rows take their colour from their
+  findings alone. Each used to re-derive a colour from raw fields as well, so a
+  row could be coloured for a reason the detail view never named.
+- A single-region CloudTrail trail is no longer flagged. The check is
+  satisfied by one multi-region trail anywhere in the account, so it is a
+  property of the account rather than of any one trail: flagging it per row
+  means either flagging every trail or none, and neither reads as the truth.
+  It moves to the backlog as an account-level signal.
+
 - Row colour and the Status column now come from one selection for every
   resource type, EventBridge rules, Kinesis streams and MSK clusters
   included. A row that carries several findings shows the worst one and

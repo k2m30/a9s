@@ -40,10 +40,6 @@ const (
 	// Severity: SevBroken.
 	CodeTrailDeliveryStale domain.FindingCode = "trail.delivery-stale"
 
-	// CodeTrailSingleRegion — this trail is single-region and no trail in the
-	// account is multi-region. Severity: SevWarn.
-	CodeTrailSingleRegion domain.FindingCode = "trail.single-region"
-
 	// CodeTrailNoCloudWatchLogs — CloudWatchLogsLogGroupArn empty. Events land
 	// in S3 only, so no metric filter or alarm can watch them. Severity: SevWarn.
 	CodeTrailNoCloudWatchLogs domain.FindingCode = "trail.no-cloudwatch-logs"
@@ -63,8 +59,6 @@ const (
 
 // S5 detail sentences: what is wrong, what it exposes, what fixing it takes.
 const (
-	trailSingleRegionDetail = "The account has no multi-region trail, so API activity in every other region goes unrecorded. Recreate this trail with multi-region delivery enabled, or add one trail that covers all regions."
-
 	trailNoCloudWatchLogsDetail = "Events are delivered to the bucket only, so no metric filter or alarm can watch them and nobody is paged on suspicious account activity. Attach a log group to this trail."
 
 	trailNoKMSDetail = "Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control."
@@ -76,22 +70,7 @@ const (
 
 // trailPostureFindings returns the posture findings readable from the
 // DescribeTrails payload alone, and attaches each one's supporting rows.
-//
-// accountHasMultiRegion is the account-wide half of the single-region rule:
-// Prowler's check is satisfied by one multi-region trail anywhere, so a
-// single-region trail beside a multi-region one is not a gap. DescribeTrails
-// omits IsMultiRegionTrail only for trails that are not multi-region, so
-// absent is off here rather than unknown.
-func trailPostureFindings(r *resource.Resource, trail cttypes.Trail, accountHasMultiRegion bool) {
-	if !accountHasMultiRegion {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeTrailSingleRegion, Phrase: "single-region trail",
-			Severity: domain.SevWarn, Source: "wave1", Detail: trailSingleRegionDetail,
-		})
-		addWave1Rows(r, CodeTrailSingleRegion, domain.DetailRow{
-			Label: "Multi-region", Value: "no", Tier: "~",
-		})
-	}
+func trailPostureFindings(r *resource.Resource, trail cttypes.Trail) {
 	if aws.ToString(trail.CloudWatchLogsLogGroupArn) == "" {
 		r.Findings = append(r.Findings, domain.Finding{
 			Code: CodeTrailNoCloudWatchLogs, Phrase: "not delivering to CloudWatch Logs",
@@ -110,17 +89,6 @@ func trailPostureFindings(r *resource.Resource, trail cttypes.Trail, accountHasM
 			Label: "KMS key", Value: "none", Tier: "~",
 		})
 	}
-}
-
-// trailListHasMultiRegion reports whether any trail in the account's list is
-// multi-region.
-func trailListHasMultiRegion(trails []cttypes.Trail) bool {
-	for _, t := range trails {
-		if aws.ToBool(t.IsMultiRegionTrail) {
-			return true
-		}
-	}
-	return false
 }
 
 // trailDeliveryIsStale reports whether latestDeliveryTime (RFC3339) is older

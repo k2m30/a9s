@@ -213,7 +213,6 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeTrailNotLogging, Phrase: "not logging", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: CodeTrailDeliveryError, Phrase: "delivery error: <LatestDeliveryError>", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: CodeTrailDeliveryStale, Phrase: "delivery stale since <LatestDeliveryTime>", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: CodeTrailSingleRegion, Phrase: "single-region trail", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeTrailNoCloudWatchLogs, Phrase: "not delivering to CloudWatch Logs", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeTrailNoKMS, Phrase: "log files not KMS-encrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeTrailLogBucketPublic, Phrase: "log bucket is publicly accessible", Severity: domain.SevBroken, Source: "wave2"},

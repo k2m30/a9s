@@ -992,10 +992,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 // that carries its finding; every other trail is set to the healthy value for
 // that condition.
 const (
-	// TrailSingleRegion is the trail that is single-region while no trail in
-	// the account is multi-region.
-	TrailSingleRegion = "acme-region-local-trail"
-
 	// TrailNoCWLogs is the trail delivering to S3 only.
 	TrailNoCWLogs = "acme-s3-only-trail"
 
