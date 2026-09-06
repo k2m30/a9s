@@ -94,7 +94,7 @@ Transcribed from `docs/attention-signals.md`.
 - **Signal**: `Enabled == false`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `DistributionSummary.Enabled` field on the list response.
-- **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+- **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`.
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.ViewerCertificate.MinimumProtocolVersion` field on the list response.
 - **Signal**: `WebACLId == ""` (no WAF attached). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
@@ -108,7 +108,7 @@ Transcribed from `docs/attention-signals.md`.
   - **API call**: `GetDistributionConfig` — one call per distribution.
   - **Cost shape**: per-resource.
 
-- **Signal**: `LoggingConfig.Enabled == false` on the full distribution config. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+- **Signal**: `LoggingConfig.Enabled == false` on the full distribution config.
   - **State bucket**: Warning.
   - **API call**: `GetDistributionConfig` — one call per distribution.
   - **Cost shape**: per-resource.
@@ -148,10 +148,10 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `Status == InProgress` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deploying: config propagating` |
 | `Enabled == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
-| Weak TLS policy on aliased distribution — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `weak TLS: MinimumProtocolVersion=<v>` |
+| Weak TLS policy on aliased distribution | 1 | Warning | n/a | S2, S4 | `minimum TLS below 1.2` |
 | `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` |
 | viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `no HTTPS redirect (insecure); origin without TLS` |
-| `LoggingConfig.Enabled == false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logs off` |
+| `LoggingConfig.Enabled == false` | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logging off` |
 
 ## 4.1 UX review (two sentences)
 
