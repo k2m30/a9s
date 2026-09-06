@@ -68,27 +68,15 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			availableIPs = fmt.Sprintf("%d", *subnet.AvailableIpAddressCount)
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "pending":
-			findings = []domain.Finding{{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
-		case "unavailable":
-			findings = []domain.Finding{{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"}}
-		case "failed":
-			findings = []domain.Finding{{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
-		case "failed-insufficient-capacity":
-			findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"}}
+		autoPublicIP := "no"
+		if subnet.MapPublicIpOnLaunch != nil && *subnet.MapPublicIpOnLaunch {
+			autoPublicIP = "yes"
 		}
 
+		findings := subnetFindings(state, autoPublicIP)
+
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
-		if subnet.MapPublicIpOnLaunch != nil && *subnet.MapPublicIpOnLaunch {
-			findings = append(findings, domain.Finding{
-				Code:     CodeSubnetAutoPublicIP,
-				Phrase:   SubnetAutoPublicIPPhrase,
-				Detail:   catalog.Detail(CodeSubnetAutoPublicIP),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+		if autoPublicIP == "yes" {
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				CodeSubnetAutoPublicIP: {Rows: []domain.DetailRow{
 					{Label: "Public address on launch", Value: "enabled", Tier: "~"},
@@ -107,6 +95,10 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 				"availability_zone": az,
 				"state":             state,
 				"available_ips":     availableIPs,
+				// The flag as a word, not the raw bool: colorSubnet's fallback
+				// runs subnetFindings over Fields, so a row stripped of its
+				// findings has to be able to recover this one.
+				"auto_public_ip": autoPublicIP,
 			},
 			Findings:         findings,
 			AttentionDetails: attentionDetails,
@@ -137,4 +129,32 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// subnetFindings is the one predicate for a subnet: its state, then whether it
+// hands every instance a public address on launch. colorSubnet runs it over
+// Fields for rows built outside the fetcher, which is why it takes the
+// auto-assign flag as the yes/no word the fetcher writes rather than the bool.
+func subnetFindings(state, autoPublicIP string) []domain.Finding {
+	var findings []domain.Finding
+	switch state {
+	case "pending":
+		findings = []domain.Finding{{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	case "unavailable":
+		findings = []domain.Finding{{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"}}
+	case "failed":
+		findings = []domain.Finding{{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "failed-insufficient-capacity":
+		findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if autoPublicIP == "yes" {
+		findings = append(findings, domain.Finding{
+			Code:     CodeSubnetAutoPublicIP,
+			Phrase:   SubnetAutoPublicIPPhrase,
+			Detail:   catalog.Detail(CodeSubnetAutoPublicIP),
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		})
+	}
+	return findings
 }

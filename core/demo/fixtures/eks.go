@@ -145,6 +145,22 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "dev",
 			},
 		},
+		// Witness for eks.state.pending.
+		{
+			Name:    aws.String("acme-sandbox-pending"),
+			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-sandbox-pending"),
+			Version: aws.String("1.30"),
+			Status:  ekstypes.ClusterStatusPending,
+			RoleArn: aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:     aws.String(eksVPCID),
+				SubnetIds: []string{eksSubnetA},
+			},
+			CreatedAt: aws.Time(mustTime("2026-04-02T09:00:00Z")),
+			Tags: map[string]string{
+				"Environment": "sandbox",
+			},
+		},
 		// Witness for eks.state.deleting.
 		{
 			Name:    aws.String("acme-sandbox-retiring"),

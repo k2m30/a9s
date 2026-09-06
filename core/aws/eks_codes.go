@@ -16,6 +16,10 @@ const (
 	// Severity: SevWarn.
 	CodeEKSStateDeleting domain.FindingCode = "eks.state.deleting"
 
+	// CodeEKSStatePending — cluster is in the "PENDING" lifecycle state.
+	// Severity: SevWarn.
+	CodeEKSStatePending domain.FindingCode = "eks.state.pending"
+
 	// CodeEKSStateUpdating — cluster is in the "UPDATING" lifecycle state.
 	// Severity: SevWarn (transitional).
 	CodeEKSStateUpdating domain.FindingCode = "eks.state.updating"

@@ -6,7 +6,6 @@ import (
 	"context"
 	"net/url"
 	"strconv"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -72,15 +71,8 @@ func colorECSTask(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["last_status"] {
-	case "RUNNING":
-		return domain.ColorHealthy
-	case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
-		return domain.ColorWarning
-	case "STOPPED":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(ecsTaskStructuralFindings(
+		r.Fields["last_status"], r.Fields["stop_code"], r.Fields["health_status"]))
 }
 
 func colorLambda(r domain.Resource) domain.Color {
@@ -109,69 +101,15 @@ func colorEB(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	var healthColor domain.Color
-	healthSet := true
-	switch r.Fields["health"] {
-	case "Red":
-		healthColor = domain.ColorBroken
-	case "Yellow":
-		healthColor = domain.ColorWarning
-	case "Grey":
-		healthColor = domain.ColorWarning
-	case "Green":
-		healthColor = domain.ColorHealthy
-	default:
-		healthSet = false
-		healthColor = domain.ColorHealthy
-	}
-	if r.Fields["status"] == "Terminated" && healthColor != domain.ColorBroken {
-		return domain.ColorDim
-	}
-	if healthSet {
-		return healthColor
-	}
-	switch r.Fields["status"] {
-	case "Ready":
-		return domain.ColorHealthy
-	case "Launching", "Updating":
-		return domain.ColorWarning
-	case "Terminating":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(ebEnvironmentFindings(r.Fields["status"], r.Fields["health"]))
 }
 
 func colorEBS(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	var base domain.Color
-	switch r.Fields["state"] {
-	case "in-use":
-		base = domain.ColorHealthy
-	case "available":
-		base = domain.ColorHealthy
-		if r.Fields["attached_to"] == "" {
-			if t, err := time.Parse("2006-01-02 15:04", r.Fields["created"]); err == nil {
-				if time.Since(t) > 7*24*time.Hour {
-					base = domain.ColorWarning
-				}
-			}
-		}
-	case "creating", "deleting":
-		base = domain.ColorWarning
-	case "error":
-		base = domain.ColorBroken
-	default:
-		base = domain.ColorHealthy
-	}
-	if base == domain.ColorBroken {
-		return domain.ColorBroken
-	}
-	if r.Fields["encrypted"] == "false" && base == domain.ColorHealthy {
-		base = domain.ColorWarning
-	}
-	return base
+	return colorFromFindings(ebsFindings(
+		r.Fields["state"], r.Fields["attached_to"], r.Fields["created"], r.Fields["encrypted"]))
 }
 
 func colorEBSSnap(r domain.Resource) domain.Color {

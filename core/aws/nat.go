@@ -65,17 +65,7 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 			}
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "pending":
-			findings = []domain.Finding{{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
-		case "deleting":
-			findings = []domain.Finding{{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
-		case "failed":
-			findings = []domain.Finding{{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
-		case "deleted":
-			findings = []domain.Finding{{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
-		}
+		findings := natStateFindings(state)
 
 		r := resource.Resource{
 			ID:   natID,
@@ -116,4 +106,21 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// natStateFindings is the one predicate for a NAT gateway's state. available
+// reports nothing. colorNAT runs it over Fields for rows built outside the
+// fetcher.
+func natStateFindings(state string) []domain.Finding {
+	switch state {
+	case "pending":
+		return []domain.Finding{{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	case "deleting":
+		return []domain.Finding{{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case "failed":
+		return []domain.Finding{{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "deleted":
+		return []domain.Finding{{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	return nil
 }

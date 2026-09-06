@@ -62,11 +62,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 			isDefault = "true"
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "pending":
-			findings = []domain.Finding{{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
-		}
+		findings := vpcStateFindings(state)
 
 		r := resource.Resource{
 			ID:   vpcID,
@@ -106,4 +102,13 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// vpcStateFindings is the one predicate for a VPC's state. available reports
+// nothing. colorVPC runs it over Fields for rows built outside the fetcher.
+func vpcStateFindings(state string) []domain.Finding {
+	if state == "pending" {
+		return []domain.Finding{{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }

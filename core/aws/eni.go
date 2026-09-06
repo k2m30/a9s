@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -112,29 +111,7 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 		// in-use → healthy (no Finding). available → SevWarn (potential cost waste,
 		// except for requester-managed which are managed by AWS services).
 		// attaching / detaching → SevWarn (transitional).
-		switch eni.Status {
-		case ec2types.NetworkInterfaceStatusAvailable:
-			// Requester-managed interfaces (e.g. VPC endpoints, ELB NICs) that are
-			// "available" are controlled by AWS — do not flag as wasteful.
-			// Use the RequesterManaged bool field — InterfaceType alone is insufficient
-			// since EFS mount targets and other AWS-managed ENIs use InterfaceType="interface".
-			if eni.RequesterManaged == nil || !aws.ToBool(eni.RequesterManaged) {
-				r.Findings = []domain.Finding{{
-					Code: CodeENIStateAvailable, Phrase: "available",
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
-			}
-		case ec2types.NetworkInterfaceStatusAttaching:
-			r.Findings = []domain.Finding{{
-				Code: CodeENIStateAttaching, Phrase: "attaching",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		case ec2types.NetworkInterfaceStatusDetaching:
-			r.Findings = []domain.Finding{{
-				Code: CodeENIStateDetaching, Phrase: "detaching",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		}
+		r.Findings = eniFindings(status, requesterManaged)
 
 		resources = append(resources, r)
 	}
@@ -160,4 +137,23 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// eniFindings is the one predicate for a network interface. An unattached
+// interface is wasted spend unless AWS itself owns it: requester-managed
+// interfaces (VPC endpoints, ELB NICs, EFS mount targets) are "available" by
+// design, and InterfaceType alone cannot tell them apart. colorENI runs this
+// over Fields for rows built outside the fetcher.
+func eniFindings(status, requesterManaged string) []domain.Finding {
+	switch status {
+	case "available":
+		if requesterManaged != "true" {
+			return []domain.Finding{{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1"}}
+		}
+	case "attaching":
+		return []domain.Finding{{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"}}
+	case "detaching":
+		return []domain.Finding{{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }

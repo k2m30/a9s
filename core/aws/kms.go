@@ -284,6 +284,11 @@ func kmsAccessDeniedResource(keyID string) resource.Resource {
 // without re-parsing the raw status string.
 func kmsStateFindings(state kmstypes.KeyState, stateStr string) []domain.Finding {
 	switch state {
+	case "":
+		// A row with no state at all is one built outside the fetcher; there
+		// is nothing to report, and the default arm below would call it
+		// unavailable.
+		return nil
 	case kmstypes.KeyStateEnabled:
 		return nil
 	case kmstypes.KeyStatePendingDeletion:

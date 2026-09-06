@@ -55,16 +55,7 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 			state = string(igw.Attachments[0].State)
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "attaching":
-			findings = []domain.Finding{{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"}}
-		case "detaching":
-			findings = []domain.Finding{{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"}}
-		}
-		if len(findings) == 0 && len(igw.Attachments) == 0 {
-			findings = []domain.Finding{{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1"}}
-		}
+		findings := igwFindings(state, len(igw.Attachments))
 
 		r := resource.Resource{
 			ID:   igwID,
@@ -104,4 +95,20 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// igwFindings is the one predicate for an internet gateway: its attachment
+// state, then whether it is attached to anything at all. colorIGW runs it over
+// Fields for rows built outside the fetcher.
+func igwFindings(state string, attachmentsCount int) []domain.Finding {
+	switch state {
+	case "attaching":
+		return []domain.Finding{{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"}}
+	case "detaching":
+		return []domain.Finding{{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	if attachmentsCount == 0 {
+		return []domain.Finding{{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }

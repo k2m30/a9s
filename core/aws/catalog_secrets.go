@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"net/url"
 	"strings"
 	"time"
@@ -18,24 +19,11 @@ func colorSecrets(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	if r.Fields["rotation_enabled"] == "No" {
-		return domain.ColorWarning
+	findings := secretStateFindings(r.Fields["status"])
+	if len(findings) == 0 {
+		findings = secretStructuralFindings(r.Fields["rotation_enabled"], r.Fields["last_changed"])
 	}
-	if la := r.Fields["last_accessed"]; la != "" {
-		if t, err := time.Parse("2006-01-02", la); err == nil {
-			if time.Since(t) > 180*24*time.Hour {
-				return domain.ColorWarning
-			}
-		}
-	}
-	if lc := r.Fields["last_changed"]; lc != "" {
-		if t, err := time.Parse("2006-01-02", lc); err == nil {
-			if time.Since(t) > 365*24*time.Hour {
-				return domain.ColorWarning
-			}
-		}
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(findings)
 }
 
 func colorSSM(r domain.Resource) domain.Color {
@@ -53,17 +41,8 @@ func colorKMS(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["status"] {
-	case "Enabled":
-		return domain.ColorHealthy
-	case "Disabled":
-		return domain.ColorWarning
-	case "PendingDeletion", "PendingImport", "PendingReplicaDeletion":
-		return domain.ColorBroken
-	case "Unavailable":
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(kmsStateFindings(
+		kmstypes.KeyState(r.Fields["status"]), r.Fields["status"]))
 }
 
 var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var

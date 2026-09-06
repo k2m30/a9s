@@ -60,33 +60,15 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			description = *tgw.Description
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "pending":
-			findings = []domain.Finding{{Code: CodeTGWStatePending, Phrase: "pending", Detail: catalog.Detail(CodeTGWStatePending), Severity: domain.SevWarn, Source: "wave1"}}
-		case "modifying":
-			findings = []domain.Finding{{Code: CodeTGWStateModifying, Phrase: "modifying", Detail: catalog.Detail(CodeTGWStateModifying), Severity: domain.SevWarn, Source: "wave1"}}
-		case "deleting":
-			findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeTGWStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
-		case "failed":
-			findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeTGWStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
-		case "deleted":
-			findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Detail: catalog.Detail(CodeTGWStateDeleted), Severity: domain.SevDim, Source: "wave1"}}
+		autoAccept := "no"
+		if tgw.Options != nil && tgw.Options.AutoAcceptSharedAttachments == ec2types.AutoAcceptSharedAttachmentsValueEnable {
+			autoAccept = "yes"
 		}
 
-		// A gateway on its way out cannot accept anything; a posture finding
-		// on it is noise an operator can do nothing about.
-		lifecycleEnded := state == "deleting" || state == "deleted"
+		findings := tgwFindings(state, autoAccept)
 
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
-		if !lifecycleEnded && tgw.Options != nil && tgw.Options.AutoAcceptSharedAttachments == ec2types.AutoAcceptSharedAttachmentsValueEnable {
-			findings = append(findings, domain.Finding{
-				Code:     CodeTGWAutoAccept,
-				Phrase:   TGWAutoAcceptPhrase,
-				Detail:   catalog.Detail(CodeTGWAutoAccept),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+		if hasFinding(findings, CodeTGWAutoAccept) {
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				CodeTGWAutoAccept: {Rows: []domain.DetailRow{
 					{Label: "Auto-accept shared attachments", Value: "enabled", Tier: "~"},
@@ -98,10 +80,14 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			ID:   tgwID,
 			Name: name,
 			Fields: map[string]string{
-				"tgw_id":      tgwID,
-				"name":        name,
-				"state":       state,
-				"owner_id":    ownerID,
+				"tgw_id":   tgwID,
+				"name":     name,
+				"state":    state,
+				"owner_id": ownerID,
+				// The option as a word: colorTGW's fallback runs tgwFindings
+				// over Fields, so a row stripped of its findings has to be able
+				// to recover this one. Same reason as subnet's auto_public_ip.
+				"auto_accept": autoAccept,
 				"description": description,
 			},
 			Findings:         findings,
@@ -133,4 +119,34 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// tgwFindings is the one predicate for a transit gateway: its state, then
+// whether it accepts shared attachments without review. A gateway on its way
+// out cannot accept anything, so the posture finding is suppressed there.
+// colorTGW runs this over Fields for rows built outside the fetcher.
+func tgwFindings(state, autoAccept string) []domain.Finding {
+	var findings []domain.Finding
+	switch state {
+	case "pending":
+		findings = []domain.Finding{{Code: CodeTGWStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	case "modifying":
+		findings = []domain.Finding{{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"}}
+	case "deleting":
+		findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case "failed":
+		findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "deleted":
+		findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	if autoAccept == "yes" && state != "deleting" && state != "deleted" {
+		findings = append(findings, domain.Finding{
+			Code:     CodeTGWAutoAccept,
+			Phrase:   TGWAutoAcceptPhrase,
+			Detail:   catalog.Detail(CodeTGWAutoAccept),
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		})
+	}
+	return findings
 }

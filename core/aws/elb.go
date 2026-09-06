@@ -59,15 +59,7 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 			lbArn = *lb.LoadBalancerArn
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "provisioning":
-			findings = []domain.Finding{{Code: CodeELBStateProvisioning, Phrase: "provisioning", Detail: catalog.Detail(CodeELBStateProvisioning), Severity: domain.SevWarn, Source: "wave1"}}
-		case "active_impaired":
-			findings = []domain.Finding{{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Detail: catalog.Detail(CodeELBStateActiveImpaired), Severity: domain.SevWarn, Source: "wave1"}}
-		case "failed":
-			findings = []domain.Finding{{Code: CodeELBStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeELBStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
-		}
+		findings := elbStateFindings(state)
 
 		r := resource.Resource{
 			ID:   lbName,
@@ -109,4 +101,19 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// elbStateFindings is the one predicate for a load balancer's state. active
+// reports nothing. colorELB runs it over Fields for rows built outside the
+// fetcher.
+func elbStateFindings(state string) []domain.Finding {
+	switch state {
+	case "provisioning":
+		return []domain.Finding{{Code: CodeELBStateProvisioning, Phrase: "provisioning", Detail: catalog.Detail(CodeELBStateProvisioning), Severity: domain.SevWarn, Source: "wave1"}}
+	case "active_impaired":
+		return []domain.Finding{{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Detail: catalog.Detail(CodeELBStateActiveImpaired), Severity: domain.SevWarn, Source: "wave1"}}
+	case "failed":
+		return []domain.Finding{{Code: CodeELBStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeELBStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	return nil
 }

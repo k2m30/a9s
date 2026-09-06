@@ -90,39 +90,16 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 			vpcID = *vpce.VpcId
 		}
 
-		var findings []domain.Finding
-		switch state {
-		case "PendingAcceptance":
-			findings = []domain.Finding{{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1"}}
-		case "Pending":
-			findings = []domain.Finding{{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
-		case "Deleting":
-			findings = []domain.Finding{{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
-		case "Failed":
-			findings = []domain.Finding{{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
-		case "Rejected":
-			findings = []domain.Finding{{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"}}
-		case "Expired":
-			findings = []domain.Finding{{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
-		case "Partial":
-			findings = []domain.Finding{{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"}}
-		case "Deleted":
-			findings = []domain.Finding{{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+		rows, open := vpcePolicyExposure(aws.ToString(vpce.PolicyDocument))
+		policyExposure := "scoped"
+		if open {
+			policyExposure = "open"
 		}
 
-		// An endpoint being torn down carries no live exposure; a posture
-		// finding on it is noise an operator can do nothing about.
-		lifecycleEnded := state == "Deleting" || state == "Deleted"
+		findings := vpceFindings(state, policyExposure)
 
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
-		if rows, open := vpcePolicyExposure(aws.ToString(vpce.PolicyDocument)); open && !lifecycleEnded {
-			findings = append(findings, domain.Finding{
-				Code:     CodeVPCEPolicyOpen,
-				Phrase:   VPCEPolicyOpenPhrase,
-				Detail:   catalog.Detail(CodeVPCEPolicyOpen),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+		if hasFinding(findings, CodeVPCEPolicyOpen) {
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				CodeVPCEPolicyOpen: {Rows: rows},
 			}
@@ -137,6 +114,10 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 				"type":         endpointType,
 				"state":        state,
 				"vpc_id":       vpcID,
+				// The evaluation's verdict as a word, never the document:
+				// colorVPCE's fallback runs vpceFindings over Fields, so a row
+				// stripped of its findings has to be able to recover this one.
+				"policy_exposure": policyExposure,
 			},
 			Findings:         findings,
 			AttentionDetails: attentionDetails,
@@ -167,4 +148,41 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// vpceFindings is the one predicate for an endpoint: its state, then whether
+// its policy lets anyone in. An endpoint being torn down carries no live
+// exposure, so the posture finding is suppressed there. colorVPCE runs this
+// over Fields for rows built outside the fetcher, which is why it takes the
+// exposure verdict as the word the fetcher writes rather than the document.
+func vpceFindings(state, policyExposure string) []domain.Finding {
+	var findings []domain.Finding
+	switch state {
+	case "PendingAcceptance":
+		findings = []domain.Finding{{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1"}}
+	case "Pending":
+		findings = []domain.Finding{{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	case "Deleting":
+		findings = []domain.Finding{{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case "Failed":
+		findings = []domain.Finding{{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "Rejected":
+		findings = []domain.Finding{{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"}}
+	case "Expired":
+		findings = []domain.Finding{{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
+	case "Partial":
+		findings = []domain.Finding{{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"}}
+	case "Deleted":
+		findings = []domain.Finding{{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	if policyExposure == "open" && state != "Deleting" && state != "Deleted" {
+		findings = append(findings, domain.Finding{
+			Code:     CodeVPCEPolicyOpen,
+			Phrase:   VPCEPolicyOpenPhrase,
+			Detail:   catalog.Detail(CodeVPCEPolicyOpen),
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		})
+	}
+	return findings
 }

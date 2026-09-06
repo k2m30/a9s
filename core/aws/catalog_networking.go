@@ -16,15 +16,7 @@ func colorELB(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "active", "":
-		return domain.ColorHealthy
-	case "provisioning", "active_impaired":
-		return domain.ColorWarning
-	case "failed":
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(elbStateFindings(r.Fields["state"]))
 }
 
 func colorTG(r domain.Resource) domain.Color {
@@ -38,28 +30,14 @@ func colorVPC(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "available", "":
-		return domain.ColorHealthy
-	case "pending":
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(vpcStateFindings(r.Fields["state"]))
 }
 
 func colorSubnet(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "available", "":
-		return domain.ColorHealthy
-	case "pending":
-		return domain.ColorWarning
-	case "unavailable", "failed", "failed-insufficient-capacity":
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(subnetFindings(r.Fields["state"], r.Fields["auto_public_ip"]))
 }
 
 func colorRTB(r domain.Resource) domain.Color {
@@ -75,84 +53,36 @@ func colorNAT(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "available", "":
-		return domain.ColorHealthy
-	case "pending", "deleting":
-		return domain.ColorWarning
-	case "failed":
-		return domain.ColorBroken
-	case "deleted":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(natStateFindings(r.Fields["state"]))
 }
 
 func colorIGW(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "attaching", "detaching":
-		return domain.ColorWarning
-	}
 	attachments, _ := strconv.Atoi(r.Fields["attachments_count"])
-	if attachments == 0 {
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(igwFindings(r.Fields["state"], attachments))
 }
 
 func colorVPCE(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "Available", "":
-		return domain.ColorHealthy
-	case "PendingAcceptance", "Pending", "Deleting":
-		return domain.ColorWarning
-	case "Failed", "Rejected", "Expired", "Partial":
-		return domain.ColorBroken
-	case "Deleted":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(vpceFindings(r.Fields["state"], r.Fields["policy_exposure"]))
 }
 
 func colorTGW(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["state"] {
-	case "available", "":
-		return domain.ColorHealthy
-	case "pending", "modifying", "deleting":
-		return domain.ColorWarning
-	case "failed":
-		return domain.ColorBroken
-	case "deleted":
-		return domain.ColorDim
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(tgwFindings(r.Fields["state"], r.Fields["auto_accept"]))
 }
 
 func colorENI(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["status"] {
-	case "in-use":
-		return domain.ColorHealthy
-	case "available":
-		if r.Fields["requester_managed"] == "true" {
-			return domain.ColorHealthy
-		}
-		return domain.ColorWarning
-	case "attaching", "detaching":
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
+	return colorFromFindings(eniFindings(r.Fields["status"], r.Fields["requester_managed"]))
 }
 
 var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var

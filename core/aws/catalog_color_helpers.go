@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -42,6 +43,13 @@ func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
 		return domain.ColorHealthy, false
 	}
 	return colorFromSeverity(top.Severity), true
+}
+
+// hasFinding reports whether findings carries code. A fetcher attaching the
+// supporting rows for a posture finding asks its own predicate's answer rather
+// than re-evaluating the condition the predicate just decided.
+func hasFinding(findings []domain.Finding, code domain.FindingCode) bool {
+	return slices.ContainsFunc(findings, func(f domain.Finding) bool { return f.Code == code })
 }
 
 // colorFromFindings is the bare-Fields path every classifier ends with: a

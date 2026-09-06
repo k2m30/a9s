@@ -163,6 +163,11 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 			Code: CodeEKSStateDeleting, Phrase: "deleting",
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
+	case cluster.Status == ekstypes.ClusterStatusPending:
+		r.Findings = []domain.Finding{{
+			Code: CodeEKSStatePending, Phrase: "pending",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
 	case healthIssuesCount > 0:
 		// SevWarn, not SevBroken: a Health.Issues[] signal on an otherwise
 		// healthy lifecycle state ranks below FAILED/CREATING/UPDATING

@@ -108,30 +108,7 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			RawStruct: vol,
 		}
 
-		// emit canonical Findings for non-healthy volume states.
-		// in-use and available are healthy (no Finding).
-		// creating and deleting → SevWarn. error → SevBroken.
-		switch vol.State {
-		case ec2types.VolumeStateCreating:
-			r.Findings = []domain.Finding{{
-				Code: CodeEBSStateCreating, Phrase: "creating",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		case ec2types.VolumeStateDeleting:
-			r.Findings = []domain.Finding{{
-				Code: CodeEBSStateDeleting, Phrase: "deleting",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		case ec2types.VolumeStateError:
-			r.Findings = []domain.Finding{{
-				Code: CodeEBSStateError, Phrase: "error",
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
-		}
-
-		if len(r.Findings) == 0 {
-			r.Findings = ebsStructuralFindings(vol, attachedTo)
-		}
+		r.Findings = ebsFindings(state, attachedTo, created, encrypted)
 
 		resources = append(resources, r)
 	}
@@ -384,30 +361,35 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	return nil
 }
 
-// ebsStructuralFindings mirrors colorEBS's own precedence (orphan check,
-// then unencrypted check) for the branches that carry no state-derived
-// Finding, so the list Status cell / detail Attention block always explain
-// the Warning color. Only called when len(r.Findings)==0 (state is
-// "in-use"/"available"/"deleting", none of which write a Finding above).
-//
-// The orphan check reads vol.CreateTime directly (the typed value) rather
-// than round-tripping through the formatted Fields["created"] string —
-// colorEBS still parses Fields["created"] for its own Warning coloring, but
-// the Finding emission does not need to repeat that string round-trip when
-// the typed *time.Time is already in hand here.
-func ebsStructuralFindings(vol ec2types.Volume, attachedTo string) []domain.Finding {
-	if vol.State == ec2types.VolumeStateAvailable && attachedTo == "" && vol.CreateTime != nil {
-		if age := time.Since(*vol.CreateTime); age > ebsOrphanAge {
-			days := int(age.Hours() / 24)
-			return []domain.Finding{{
-				Code:     CodeEBSOrphanUnattached,
-				Phrase:   "orphan: unattached " + strconv.Itoa(days) + "d",
-				Detail:   catalog.Detail(CodeEBSOrphanUnattached),
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
+// ebsFindings is the one predicate for a volume: its lifecycle state first,
+// then, only when the state says nothing, the orphan and encryption checks in
+// colorEBS's own precedence. colorEBS runs it over Fields for rows built
+// outside the fetcher, so it takes the same formatted strings the fetcher
+// writes there rather than the SDK struct.
+func ebsFindings(state, attachedTo, created, encrypted string) []domain.Finding {
+	switch state {
+	case "creating":
+		return []domain.Finding{{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case "deleting":
+		return []domain.Finding{{Code: CodeEBSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case "error":
+		return []domain.Finding{{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if state == "available" && attachedTo == "" {
+		if t, err := time.Parse("2006-01-02 15:04", created); err == nil {
+			if age := time.Since(t); age > ebsOrphanAge {
+				days := int(age.Hours() / 24)
+				return []domain.Finding{{
+					Code:   CodeEBSOrphanUnattached,
+					Phrase: "orphan: unattached " + strconv.Itoa(days) + "d",
+					Detail: "Unattached since creation " + strconv.Itoa(days) +
+						" days ago — billed hourly for no workload.",
+					Severity: domain.SevWarn, Source: "wave1",
+				}}
+			}
 		}
 	}
-	if vol.Encrypted == nil || !*vol.Encrypted {
+	if encrypted == "false" {
 		return []domain.Finding{{
 			Code: CodeEBSUnencrypted, Phrase: "unencrypted",
 			Detail:   catalog.Detail(CodeEBSUnencrypted),
