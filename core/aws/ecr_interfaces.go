@@ -13,8 +13,17 @@ type ECRDescribeRepositoriesAPI interface {
 	DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
 }
 
-// ECRGetRepositoryPolicyAPI defines the interface for the ECR GetRepositoryPolicy operation.
-// Used by checkECRRole to extract IAM roles from the repository's resource-based policy.
+// ECRGetRepositoryPolicyAPI defines the interface for the ECR
+// GetRepositoryPolicy operation. Used by checkECRRole to extract IAM roles
+// from the repository's resource-based policy, and by EnrichECRRepository to
+// evaluate whether that policy is open to anyone.
+//
+// Standalone rather than part of the aggregate, for the same reason as
+// ECRGetLifecyclePolicyAPI: a partial client that embeds ECRAPI without
+// implementing this method inherits a nil method through the embedded
+// interface, so a caller reaching it through the aggregate panics instead of
+// degrading. Keeping it out means the type assertion actually answers, and
+// both callers already make one.
 type ECRGetRepositoryPolicyAPI interface {
 	GetRepositoryPolicy(ctx context.Context, params *ecr.GetRepositoryPolicyInput, optFns ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error)
 }
@@ -64,6 +73,5 @@ type ECRAPI interface {
 	ECRDescribeRepositoriesAPI
 	ECRDescribeImagesAPI
 	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
-	ECRGetRepositoryPolicyAPI       // related-panel: ecr→role, Wave 2 public-policy
 	ECRListTagsForResourceAPI       // related-panel: ecr→cfn
 }

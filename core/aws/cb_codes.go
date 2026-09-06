@@ -27,3 +27,16 @@ const (
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	CodeCBEnvSecret domain.FindingCode = "cb.env-secret"
 )
+
+// S5 operator sentences.
+const (
+	cbPublicBuildsDetail = "Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed."
+
+	cbBuildspecFromSourceDetail = "The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches."
+
+	//nolint:gosec // G101 false positive: operator prose about a credential, not one
+	cbSourceURLCredentialDetail = "The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked."
+
+	//nolint:gosec // G101 false positive: operator prose about a credential, not one
+	cbEnvSecretDetail = "A plaintext environment variable on this project holds what looks like a credential; every build log and anyone who can read the project definition sees its value. Move it to Secrets Manager or Parameter Store, reference it by type, and rotate the exposed value."
+)

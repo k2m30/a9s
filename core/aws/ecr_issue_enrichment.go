@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -71,6 +73,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	if !ok {
 		return result, nil
 	}
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -98,13 +101,37 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 				MaxResults:     aws.Int32(int32(ECRImagesPerRepo)),
 			})
 		})
-		mu.Lock()
-		defer mu.Unlock()
 		if err != nil {
+			mu.Lock()
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
+			mu.Unlock()
 			return
+		}
+
+		// The two policy reads are issued before the lock is taken: holding it
+		// across a network call would serialise the whole page behind one
+		// repository and undo ForEachParallel.
+		exposure, policyUnreadable := ecrRepositoryExposure(ctx, clients.ECR, repoName, ownAccount)
+		noLifecyclePolicy := ecrLifecyclePolicyMissing(ctx, clients.ECR, repoName)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		switch {
+		case policyUnreadable:
+			// Unknown, not clean: the row renders "?" rather than claiming a
+			// repository nobody could read is private.
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+		case exposure.Public:
+			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "repository policy open to anyone", "!", "ecr",
+				publicPolicyRows(exposure), ecrPublicPolicyDetail)
+		}
+		if noLifecyclePolicy {
+			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "no lifecycle policy", "~", "ecr",
+				nil, ecrNoLifecyclePolicyDetail)
 		}
 
 		scannedCount := 0
@@ -164,3 +191,58 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	result.Truncated = truncated
 	return result, AggregateFailures("ecr-enrich: DescribeImages", failures, total)
 }
+
+// ecrRepositoryExposure evaluates a repository's resource policy through the
+// shared policy engine. A repository with no policy at all is a definite
+// answer — the default, and the safe one — so it reports no exposure and no
+// failure. Anything else that stops the read leaves the repository unknown.
+func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount string) (iampolicy.Exposure, bool) {
+	policyAPI, ok := api.(ECRGetRepositoryPolicyAPI)
+	if !ok {
+		return iampolicy.Exposure{}, false
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetRepositoryPolicyOutput, error) {
+		return policyAPI.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
+	})
+	if err != nil {
+		if _, notFound := errors.AsType[*ecrtypes.RepositoryPolicyNotFoundException](err); notFound {
+			return iampolicy.Exposure{}, false
+		}
+		return iampolicy.Exposure{}, true
+	}
+	if out.PolicyText == nil {
+		return iampolicy.Exposure{}, false
+	}
+	doc, perr := iampolicy.Parse(*out.PolicyText)
+	if perr != nil {
+		return iampolicy.Exposure{}, true
+	}
+	return iampolicy.Evaluate(doc, ownAccount), false
+}
+
+// ecrLifecyclePolicyMissing reports whether the repository keeps images
+// forever. Here the NotFound answer IS the finding, which is why it is read
+// through its own standalone interface rather than the aggregate: a client
+// that predates the call degrades to "nothing to say" instead of reporting
+// every repository as unpolicied.
+func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string) bool {
+	lifecycleAPI, ok := api.(ECRGetLifecyclePolicyAPI)
+	if !ok {
+		return false
+	}
+	_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetLifecyclePolicyOutput, error) {
+		return lifecycleAPI.GetLifecyclePolicy(ctx, &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)})
+	})
+	if err == nil {
+		return false
+	}
+	_, notFound := errors.AsType[*ecrtypes.LifecyclePolicyNotFoundException](err)
+	return notFound
+}
+
+// S5 operator sentences for the two policy findings.
+const (
+	ecrPublicPolicyDetail = "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or scope the grant with a condition."
+
+	ecrNoLifecyclePolicyDetail = "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."
+)

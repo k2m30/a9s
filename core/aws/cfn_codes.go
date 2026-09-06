@@ -23,3 +23,11 @@ const (
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	CodeCFNOutputSecret domain.FindingCode = "cfn.output-secret"
 )
+
+// S5 operator sentences: what is wrong, what it exposes, what fixing it takes.
+const (
+	cfnTerminationProtectionOffDetail = "A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted."
+
+	//nolint:gosec // G101 false positive: operator prose about a credential, not one
+	cfnOutputSecretDetail = "A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential."
+)

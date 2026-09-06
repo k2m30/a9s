@@ -102,3 +102,23 @@ func (f *EKSFake) DescribeNodegroup(_ context.Context, input *eks.DescribeNodegr
 		Message: "No nodegroup found for name: " + ngName,
 	}
 }
+
+// DescribeClusterVersions reports the support state of every Kubernetes minor
+// the fixtures use. Only the minor named by fixtures.EKSVersionUnsupported's
+// cluster is out of standard support, so exactly one demo row carries the
+// version finding and no cluster's Version column had to be changed for it.
+func (f *EKSFake) DescribeClusterVersions(_ context.Context, _ *eks.DescribeClusterVersionsInput, _ ...func(*eks.Options)) (*eks.DescribeClusterVersionsOutput, error) {
+	out := &eks.DescribeClusterVersionsOutput{}
+	for version, status := range fixtures.EKSVersionSupport {
+		info := ekstypes.ClusterVersionInformation{
+			ClusterVersion: aws.String(version),
+			ClusterType:    aws.String("eks"),
+			VersionStatus:  status,
+		}
+		if status != ekstypes.VersionStatusStandardSupport {
+			info.EndOfStandardSupportDate = aws.Time(fixtures.EKSEndOfStandardSupport)
+		}
+		out.ClusterVersions = append(out.ClusterVersions, info)
+	}
+	return out, nil
+}

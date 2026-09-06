@@ -19,6 +19,16 @@ type CodeBuildFixtures struct {
 
 const prodCBRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
 
+// inlineCBBuildspec is the healthy buildspec shape: the commands live in the
+// project definition, so changing them needs CodeBuild permissions rather than
+// a pull request. Every project but CBBuildspecFromSource uses it.
+const inlineCBBuildspec = `version: 0.2
+phases:
+  build:
+    commands:
+      - make ci
+`
+
 func mustParseCBTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return t
@@ -34,7 +44,9 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			ServiceRole:          aws.String(prodCBRoleARN),
 			ConcurrentBuildLimit: aws.Int32(10),
 			Source: &cbtypes.ProjectSource{
-				Type: cbtypes.SourceTypeGithub,
+				Type:      cbtypes.SourceTypeGithub,
+				Location:  aws.String("https://github.com/acme/api-service.git"),
+				Buildspec: aws.String(inlineCBBuildspec),
 			},
 			// Artifacts.Location — required for the cb:s3 related-panel pivot
 			// witness (checkCbS3). a9s-demo-healthy is a real s3.go bucket.
@@ -87,8 +99,13 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-frontend-build"),
 			Description: aws.String("Build project for React frontend"),
 			ServiceRole: aws.String(prodCBRoleARN),
+			// CBBuildspecFromSource witness: the build commands come from a
+			// file in the repository, so a pull request can rewrite what runs
+			// inside the build role.
 			Source: &cbtypes.ProjectSource{
-				Type: cbtypes.SourceTypeCodecommit,
+				Type:      cbtypes.SourceTypeCodecommit,
+				Location:  aws.String("https://git-codecommit.us-east-1.amazonaws.com/v1/repos/acme-frontend"),
+				Buildspec: aws.String("ci/buildspec.yml"),
 			},
 			LastModified: aws.Time(mustParseCBTime("2026-03-17T15:20:00+00:00")),
 			Created:      aws.Time(mustParseCBTime("2025-07-15T11:00:00+00:00")),
@@ -116,10 +133,54 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Description: aws.String("Integration test suite runner"),
 			ServiceRole: aws.String(prodCBRoleARN),
 			Source: &cbtypes.ProjectSource{
-				Type: cbtypes.SourceTypeGithub,
+				Type:      cbtypes.SourceTypeGithub,
+				Location:  aws.String("https://github.com/acme/integration-tests.git"),
+				Buildspec: aws.String(inlineCBBuildspec),
+			},
+			// CBEnvSecret witness: the test database password is pasted into a
+			// plaintext environment variable, so every build log prints it.
+			Environment: &cbtypes.ProjectEnvironment{
+				Type:        cbtypes.EnvironmentTypeLinuxContainer,
+				Image:       aws.String("aws/codebuild/standard:7.0"),
+				ComputeType: cbtypes.ComputeTypeBuildGeneral1Small,
+				EnvironmentVariables: []cbtypes.EnvironmentVariable{
+					{Name: aws.String("AWS_REGION"), Type: cbtypes.EnvironmentVariableTypePlaintext, Value: aws.String("us-east-1")},
+					{Name: aws.String("TEST_DB_PASSWORD"), Type: cbtypes.EnvironmentVariableTypePlaintext, Value: aws.String("Tr0ub4dor&3xample")},
+				},
 			},
 			LastModified: aws.Time(mustParseCBTime("2026-04-17T22:10:00+00:00")),
 			Created:      aws.Time(mustParseCBTime("2025-08-05T10:00:00+00:00")),
+		},
+		// CBPublicBuilds witness: build logs and artifacts are readable by
+		// anyone on the internet without an AWS account.
+		{
+			Name:              aws.String(CBPublicBuilds),
+			Arn:               aws.String("arn:aws:codebuild:us-east-1:123456789012:project/" + CBPublicBuilds),
+			Description:       aws.String("Publishes the public documentation site"),
+			ServiceRole:       aws.String(prodCBRoleARN),
+			ProjectVisibility: cbtypes.ProjectVisibilityTypePublicRead,
+			Source: &cbtypes.ProjectSource{
+				Type:      cbtypes.SourceTypeGithub,
+				Location:  aws.String("https://github.com/acme/docs-site.git"),
+				Buildspec: aws.String(inlineCBBuildspec),
+			},
+			LastModified: aws.Time(mustParseCBTime("2026-04-02T09:15:00+00:00")),
+			Created:      aws.Time(mustParseCBTime("2025-09-12T13:00:00+00:00")),
+		},
+		// CBSourceURLCredential witness: a personal access token is embedded in
+		// the clone address, stored in the project and echoed into build logs.
+		{
+			Name:        aws.String(CBSourceURLCredential),
+			Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/" + CBSourceURLCredential),
+			Description: aws.String("Mirrors the legacy vendor repository nightly"),
+			ServiceRole: aws.String(prodCBRoleARN),
+			Source: &cbtypes.ProjectSource{
+				Type:      cbtypes.SourceTypeBitbucket,
+				Location:  aws.String("https://acmebot:Tr0ub4dor3xample@bitbucket.org/acme/legacy-mirror.git"),
+				Buildspec: aws.String(inlineCBBuildspec),
+			},
+			LastModified: aws.Time(mustParseCBTime("2026-02-11T04:00:00+00:00")),
+			Created:      aws.Time(mustParseCBTime("2024-11-30T08:45:00+00:00")),
 		},
 	}
 

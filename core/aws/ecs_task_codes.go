@@ -5,7 +5,13 @@
 // ecs-task Color func reads them (any Finding, wave1 or wave2) to color rows.
 package aws
 
-import "github.com/k2m30/a9s/v3/core/domain"
+import (
+	"strings"
+
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+)
 
 const (
 	// CodeECSTaskStateProvisioning — task is in the "PROVISIONING" lifecycle state.
@@ -77,8 +83,23 @@ func ecsTaskWave1Findings(status string) []domain.Finding {
 // a STOPPED task with a non-UserInitiated stop code is broken; any other
 // STOPPED task is a normal, dim lifecycle stop; everything else falls
 // through to the shared transitional-state findings.
+// ecsTaskHealthWords renders a container health status as the word an operator
+// says. HEALTHY is the SDK's spelling of the enum; a task AWS reports no
+// health for at all stays empty, which is not the same as reporting unknown.
+//
+// Both task fetchers route through here and so does the predicate below, so
+// the column and the finding can never disagree about what the string is.
+func ecsTaskHealthWords(status ecstypes.HealthStatus) string {
+	return strings.ToLower(string(status))
+}
+
 func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.Finding {
-	if healthStatus == "UNHEALTHY" {
+	// Compared case-insensitively because this predicate also runs over rows
+	// rebuilt from the on-disk type cache, and a row cached before the health
+	// column moved to words still holds the SDK's uppercase spelling. Reading
+	// it strictly would retire the finding on exactly those rows: the cell
+	// would say the task is unhealthy while the row coloured green.
+	if strings.EqualFold(healthStatus, string(ecstypes.HealthStatusUnhealthy)) {
 		return []domain.Finding{{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 	// Not ecsTaskGone: that predicate answers "has teardown started", which

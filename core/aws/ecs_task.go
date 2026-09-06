@@ -105,7 +105,7 @@ func fetchECSTasksPageWithJoin(
 			}
 
 			stopCode := string(task.StopCode)
-			healthStatus := string(task.HealthStatus)
+			healthStatus := ecsTaskHealthWords(task.HealthStatus)
 
 			var images []string
 			for _, container := range task.Containers {

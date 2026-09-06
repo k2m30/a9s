@@ -130,6 +130,9 @@ One row per signal from §3:
 | latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run timed out at <Timeout>m` | `Most recent run hit the configured timeout of <Timeout> minutes on <StartedOn>.` |
 | latest run `ERROR` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run errored: <ErrorMessage head>` | `Most recent run ended in ERROR on <StartedOn>: <ErrorMessage>.` |
 | latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run expired (queued too long)` | `Most recent run EXPIRED on <StartedOn> — job was queued past its TTL and never started.` |
+| No security configuration | 1 | Warning | `~` | S2, S4, S5 | `no security configuration` | `This job names no security configuration, so its S3 output, its CloudWatch log stream and its job bookmarks are all written without encryption at rest.` One signal covers all three encryption checks. |
+| Continuous logging off | 1 | Warning | `~` | S2, S4, S5 | `continuous logging off` | `Continuous logging is off, so driver and executor output only appears after the run ends...` Row names the argument to add. |
+| Credential in default arguments | 1 | Broken | `!` | S1, S2, S4, S5 | `credential in job arguments` | `A default argument on this job holds what looks like a credential...` The leading `--` is stripped before scanning. |
 
 Notes on the S4 text:
 

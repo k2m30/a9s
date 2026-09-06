@@ -6,11 +6,15 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchGlueJobsPage fetches a single page of Glue jobs.
@@ -86,6 +90,7 @@ func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToke
 			RawStruct: job,
 		}
 
+		addGluePostureFindings(&r, job)
 		resources = append(resources, r)
 	}
 
@@ -110,4 +115,50 @@ func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToke
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// glueContinuousLogArgument is the default-argument flag that sends driver and
+// executor output to CloudWatch as the run happens.
+const glueContinuousLogArgument = "--enable-continuous-cloudwatch-log"
+
+// addGluePostureFindings evaluates the three w6b posture signals against the
+// GetJobs response the fetcher already holds.
+func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
+	// One finding for three Prowler checks: S3, CloudWatch-logs and job
+	// bookmark encryption all live on the security configuration a job either
+	// names or does not, so a job naming none fails all three at once.
+	if aws.ToString(job.SecurityConfiguration) == "" {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeGlueNoSecurityConfiguration, Phrase: "no security configuration",
+			Detail: glueNoSecurityConfigDetail, Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+
+	// The flag is a string, so "false" is off exactly as surely as absent.
+	if job.DefaultArguments[glueContinuousLogArgument] != "true" {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeGlueContinuousLoggingOff, Phrase: "continuous logging off",
+			Detail: glueContinuousLoggingOffDetail, Severity: domain.SevWarn, Source: "wave1",
+		})
+		addWave1Rows(r, CodeGlueContinuousLoggingOff, domain.DetailRow{
+			Label: "Argument to add", Value: glueContinuousLogArgument, Tier: "~",
+		})
+	}
+
+	// The leading "--" is Glue's argument syntax rather than part of the name,
+	// and leaving it on makes the scanner's key pattern miss "--db-password"
+	// entirely.
+	args := make(map[string]string, len(job.DefaultArguments))
+	for k, v := range job.DefaultArguments {
+		args[strings.TrimPrefix(k, "--")] = v
+	}
+	if hits := secretscan.ScanKV(args); len(hits) > 0 {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeGlueArgumentSecret, Phrase: "credential in job arguments",
+			Detail: glueArgumentSecretDetail, Severity: domain.SevBroken, Source: "wave1",
+		})
+		for _, h := range hits {
+			addWave1Rows(r, CodeGlueArgumentSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+		}
+	}
 }

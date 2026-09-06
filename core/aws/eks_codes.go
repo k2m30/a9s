@@ -49,3 +49,15 @@ const (
 	// than eksOldestStandardSupport (eks.go).
 	CodeEKSVersionUnsupported domain.FindingCode = "eks.version-unsupported"
 )
+
+// S5 operator sentences.
+const (
+	eksPublicEndpointDetail = "The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges."
+
+	eksControlPlaneLoggingOffDetail = "Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster."
+
+	//nolint:gosec // G101 false positive: operator prose about secrets, not a credential
+	eksSecretsNotKMSDetail = "Kubernetes secrets in this cluster are stored in etcd with only the AWS-managed default protection and no envelope encryption of their own. Attach a KMS key to the cluster's secrets encryption configuration so a copy of etcd is useless without that key."
+
+	eksVersionUnsupportedDetail = "This Kubernetes minor is past standard support, so it no longer receives the full patch stream and AWS will upgrade it on its own schedule if you do not. Plan an upgrade to a version in standard support before the automatic one lands during business hours."
+)

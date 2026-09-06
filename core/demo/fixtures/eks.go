@@ -5,6 +5,7 @@ package fixtures
 
 import (
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -57,30 +58,17 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:                 aws.String(eksVPCID),
 				SubnetIds:             []string{eksSubnetA, eksSubnetB, eksSubnetC},
 				SecurityGroupIds:      []string{"sg-0eks111111111111e"},
-				EndpointPublicAccess:  true,
+				EndpointPublicAccess:  false,
 				EndpointPrivateAccess: true,
-				PublicAccessCidrs:     []string{"0.0.0.0/0"},
 			},
 			KubernetesNetworkConfig: &ekstypes.KubernetesNetworkConfigResponse{
 				ServiceIpv4Cidr: aws.String("172.20.0.0/16"),
 				IpFamily:        ekstypes.IpFamilyIpv4,
 			},
-			Logging: &ekstypes.Logging{
-				ClusterLogging: []ekstypes.LogSetup{
-					{
-						Types:   []ekstypes.LogType{ekstypes.LogTypeApi, ekstypes.LogTypeAudit},
-						Enabled: aws.Bool(true),
-					},
-				},
-			},
-			EncryptionConfig: []ekstypes.EncryptionConfig{
-				{
-					Resources: []string{"secrets"},
-					Provider:  &ekstypes.Provider{KeyArn: aws.String(eksKMSKeyARN)},
-				},
-			},
-			CreatedAt:       aws.Time(mustTime("2025-03-01T10:00:00Z")),
-			PlatformVersion: aws.String("eks.5"),
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2025-03-01T10:00:00Z")),
+			PlatformVersion:  aws.String("eks.5"),
 			// aws:cloudformation:stack-name tag — required for eks→cfn
 			// related-panel pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: map[string]string{
@@ -99,10 +87,11 @@ func buildEKSClusters() []*ekstypes.Cluster {
 			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
 				VpcId:                 aws.String(eksVPCID),
 				SubnetIds:             []string{eksSubnetA, eksSubnetB},
-				EndpointPublicAccess:  true,
-				EndpointPrivateAccess: false,
-				PublicAccessCidrs:     []string{"0.0.0.0/0"},
+				EndpointPublicAccess:  false,
+				EndpointPrivateAccess: true,
 			},
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
 			KubernetesNetworkConfig: &ekstypes.KubernetesNetworkConfigResponse{
 				ServiceIpv4Cidr: aws.String("172.20.0.0/16"),
 				IpFamily:        ekstypes.IpFamilyIpv4,
@@ -119,11 +108,17 @@ func buildEKSClusters() []*ekstypes.Cluster {
 			Version: aws.String("1.30"),
 			Status:  ekstypes.ClusterStatusCreating,
 			RoleArn: aws.String(eksClusterRoleARN),
+			// EKSPublicEndpoint witness: the Kubernetes endpoint answers from
+			// anywhere on the internet.
 			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
-				VpcId:     aws.String(eksVPCID),
-				SubnetIds: []string{eksSubnetA},
+				VpcId:                aws.String(eksVPCID),
+				SubnetIds:            []string{eksSubnetA},
+				EndpointPublicAccess: true,
+				PublicAccessCidrs:    []string{"0.0.0.0/0"},
 			},
-			CreatedAt: aws.Time(mustTime("2026-03-21T09:00:00Z")),
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2026-03-21T09:00:00Z")),
 			Tags: map[string]string{
 				"Environment": "dev",
 			},
@@ -139,7 +134,18 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB},
 			},
-			CreatedAt: aws.Time(mustTime("2026-04-01T11:00:00Z")),
+			// EKSLoggingIncomplete witness: audit and scheduler output never
+			// reaches CloudWatch.
+			Logging: &ekstypes.Logging{ClusterLogging: []ekstypes.LogSetup{
+				{Enabled: aws.Bool(true), Types: []ekstypes.LogType{
+					ekstypes.LogTypeApi, ekstypes.LogTypeAuthenticator, ekstypes.LogTypeControllerManager,
+				}},
+				{Enabled: aws.Bool(false), Types: []ekstypes.LogType{
+					ekstypes.LogTypeAudit, ekstypes.LogTypeScheduler,
+				}},
+			}},
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2026-04-01T11:00:00Z")),
 			Tags: map[string]string{
 				"Environment": "staging",
 			},
@@ -155,6 +161,10 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB, eksSubnetC},
 			},
+			// EKSVersionUnsupported witness: 1.28 is the one demo minor the
+			// registry reports as out of standard support.
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
 			Health: &ekstypes.ClusterHealth{
 				Issues: []ekstypes.ClusterIssue{
 					{
@@ -184,6 +194,8 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB},
 			},
+			// EKSSecretsNoKMS witness: EncryptionConfig is deliberately absent.
+			Logging:   eksFullControlPlaneLogging(),
 			CreatedAt: aws.Time(mustTime("2025-08-01T10:00:00Z")),
 			Tags: map[string]string{
 				"Environment": "prod",
@@ -426,16 +438,56 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 // Witness clusters for the eks posture findings. Each names the ONE demo
 // cluster that carries its finding; every other cluster is set to the
 // healthy value for that condition.
+// The scoped-CIDR variant of the public endpoint has no witness of its own:
+// the demo bench requires exactly one row per finding code, and both the open
+// and the scoped case carry eks.public-endpoint. The severity split is pinned
+// by the unit tests instead.
 const (
 	// EKSPublicEndpoint — the Kubernetes endpoint is open to 0.0.0.0/0.
 	EKSPublicEndpoint = "acme-dev"
-	// EKSPublicEndpointScoped — public endpoint restricted to one /24, the
-	// warn-severity counterpart of EKSPublicEndpoint.
-	EKSPublicEndpointScoped = "acme-staging"
 	// EKSLoggingIncomplete — not all control-plane log types are enabled.
-	EKSLoggingIncomplete = "acme-degraded-prod"
+	EKSLoggingIncomplete = "acme-staging-failed"
 	// EKSSecretsNoKMS — no encryption configuration covers secrets.
 	EKSSecretsNoKMS = "acme-prod-updating"
-	// EKSVersionUnsupported — Kubernetes minor past standard support.
-	EKSVersionUnsupported = "acme-staging-failed"
+	// EKSVersionUnsupported — Kubernetes minor past standard support. This is
+	// the 1.28 cluster: it is the only demo minor that is not also worn by
+	// another cluster, and the ruling is that no cluster's Version changes to
+	// make room for this witness.
+	EKSVersionUnsupported = "acme-degraded-prod"
 )
+
+// eksFullControlPlaneLogging is the healthy control-plane logging setup: all
+// five types AWS emits, enabled. Every cluster but EKSLoggingIncomplete uses
+// it so exactly one demo row trips the incomplete-logging finding.
+func eksFullControlPlaneLogging() *ekstypes.Logging {
+	return &ekstypes.Logging{ClusterLogging: []ekstypes.LogSetup{{
+		Enabled: aws.Bool(true),
+		Types: []ekstypes.LogType{
+			ekstypes.LogTypeApi, ekstypes.LogTypeAudit, ekstypes.LogTypeAuthenticator,
+			ekstypes.LogTypeControllerManager, ekstypes.LogTypeScheduler,
+		},
+	}}}
+}
+
+// eksSecretsEncryption is the healthy secrets-encryption setup. Every cluster
+// but EKSSecretsNoKMS uses it.
+func eksSecretsEncryption() []ekstypes.EncryptionConfig {
+	return []ekstypes.EncryptionConfig{{
+		Resources: []string{"secrets"},
+		Provider:  &ekstypes.Provider{KeyArn: aws.String(eksKMSKeyARN)},
+	}}
+}
+
+// EKSVersionSupport is what the demo registry reports for each Kubernetes
+// minor the fixtures use, backing DescribeClusterVersions. Only 1.28 is out of
+// standard support, which is what makes acme-degraded-prod the sole witness
+// without any cluster's Version being changed to suit the test.
+var EKSVersionSupport = map[string]ekstypes.VersionStatus{ //nolint:gochecknoglobals // static demo data
+	"1.28": ekstypes.VersionStatusExtendedSupport,
+	"1.29": ekstypes.VersionStatusStandardSupport,
+	"1.30": ekstypes.VersionStatusStandardSupport,
+}
+
+// EKSEndOfStandardSupport is the date the demo registry reports for the one
+// minor that has left standard support.
+var EKSEndOfStandardSupport = time.Date(2025, 11, 26, 0, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // static demo data

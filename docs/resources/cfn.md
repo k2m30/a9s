@@ -130,6 +130,8 @@ One row per signal from §3:
 | `*_IN_PROGRESS` > 1h | 1 | Broken | n/a | S2, S4 | `stuck: in progress 2h` (actual age) | `Stack has been <StackStatus> for <age> — likely stuck, check stack events.` |
 | `DriftInformation.StackDriftStatus == DRIFTED` | 1 | Warning | n/a | S2, S4 | `drifted since <LastCheckTimestamp>` | `Stack configuration differs from template; last drift check <LastCheckTimestamp>.` |
 | Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | n/a | S2 (row already red), S4 (deduped), S5 | `failed: <LogicalResourceId>` | `Recent event: <LogicalResourceId> <ResourceStatus> — <ResourceStatusReason>.` |
+| Termination protection off (top-level stack) | 1 | Warning | `~` | S2, S4, S5 | `termination protection off` | `A single delete call removes this stack and every resource it owns...` |
+| Credential in `Outputs[]` | 1 | Broken | `!` | S1, S2, S4, S5 | `credential in stack outputs` | `A stack output holds what looks like a credential...` Rows name the output key and the kind of match, never the value. |
 
 Rules for filling list and detail text:
 
@@ -187,10 +189,10 @@ cfn — CI/CD. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
-| cfn.stack.failed | <status, lowercased> | broken | wave1 |
-| cfn.stack.rollback | <status, lowercased> | broken | wave1 |
-| cfn.stack.in\_progress | <status, lowercased> | warn | wave1 |
-| cfn.stack.deleted | delete\_complete | dim | wave1 |
+| cfn.stack.failed | <status, in words> | broken | wave1 |
+| cfn.stack.rollback | <status, in words> | broken | wave1 |
+| cfn.stack.in\_progress | <status, in words> | warn | wave1 |
+| cfn.stack.deleted | delete complete | dim | wave1 |
 | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 |
 | cfn.stack-drifted | stack drifted from template | warn | wave2 |
 | cfn.termination-protection-off | termination protection off | warn | wave1 |

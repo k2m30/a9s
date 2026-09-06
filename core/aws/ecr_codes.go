@@ -16,3 +16,10 @@ const (
 	// CodeECRMutableTags — ImageTagMutability is MUTABLE.
 	CodeECRMutableTags domain.FindingCode = "ecr.mutable-tags"
 )
+
+// S5 operator sentences.
+const (
+	ecrScanOnPushOffDetail = "Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives."
+
+	ecrMutableTagsDetail = "An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from."
+)

@@ -188,6 +188,10 @@ One row per signal from §3. All EKS signals are Wave 2 because `ListClusters` i
 | `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending` | `Cluster create or update is queued; EKS has not started the operation.` |
 | `Status == FAILED` | 2 | Broken | n/a | S2, S4 | `failed: see Health.Issues` | `Cluster is in FAILED state; see Health.Issues for the AWS-reported cause.` |
 | `Health.Issues[]` non-empty | 2 | Broken | n/a | S2, S4, S5 | `issue: <Issue.Code>` | `<Issue.Code>: <Issue.Message>` (first issue; detail lists all). |
+| Public endpoint reachable | 1 | Broken when open to `0.0.0.0/0`, Warning when scoped | `!` / `~` | S1, S2, S4, S5 | `cluster endpoint reachable from the internet` | `The cluster's Kubernetes endpoint answers from the public internet...` Row names the ranges. An empty range list on a public endpoint is the open case. |
+| Control-plane logging incomplete | 1 | Warning | `~` | S2, S4, S5 | `control plane logging incomplete` | `Some control-plane log types are not being sent to CloudWatch...` Row names the missing types. A listed-but-disabled entry does not count as enabled. |
+| Secrets not encrypted with a KMS key | 1 | Warning | `~` | S2, S4, S5 | `secrets not encrypted with KMS` | `Kubernetes secrets in this cluster are stored in etcd with only the AWS-managed default protection...` A configuration covering other resources does not cover secrets. |
+| Kubernetes version out of standard support | 1 | Broken | `!` | S1, S2, S4, S5 | `Kubernetes <version> is out of standard support` | `This Kubernetes minor is past standard support...` The support state comes from `DescribeClusterVersions`, read once per page, never from a version constant. A version absent from the registry is unknown, not old. |
 
 Notes:
 

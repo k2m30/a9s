@@ -36,3 +36,15 @@ type EKSAPI interface {
 	EKSListNodegroupsAPI
 	EKSDescribeNodegroupAPI
 }
+
+// EKSDescribeClusterVersionsAPI defines the interface for the EKS
+// DescribeClusterVersions operation, which reports the support state of every
+// Kubernetes minor.
+//
+// Deliberately NOT part of the aggregate EKSAPI, for the same reason as
+// ECRGetLifecyclePolicyAPI: the fetcher type-asserts for it, so a client
+// without the call degrades to "the version is unknown" rather than failing to
+// construct. *eks.Client satisfies it.
+type EKSDescribeClusterVersionsAPI interface {
+	DescribeClusterVersions(ctx context.Context, params *eks.DescribeClusterVersionsInput, optFns ...func(*eks.Options)) (*eks.DescribeClusterVersionsOutput, error)
+}

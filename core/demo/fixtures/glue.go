@@ -22,6 +22,11 @@ type GlueFixtures struct {
 	TagsByResourceARN map[string]map[string]string
 }
 
+// glueSecurityConfigName is the demo security configuration every job but
+// GlueNoSecurityConfig attaches. It is a real entry in SecurityConfigurations
+// below, which the glue:kms related-panel pivot resolves.
+const glueSecurityConfigName = "acme-glue-security-config"
+
 func mustParseGlueTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return t
@@ -50,13 +55,14 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				},
 				// SecurityConfiguration — required for the glue:kms related-panel
 				// pivot (checkGlueKMS → glue:GetSecurityConfiguration).
-				SecurityConfiguration: aws.String("acme-glue-security-config"),
+				SecurityConfiguration: aws.String(glueSecurityConfigName),
 				// DefaultArguments — required for the glue:secrets related-panel
 				// pivot (checkGlueSecrets scans for arn:aws:secretsmanager: values).
 				// References the prod/database/primary secret (secrets.go).
 				DefaultArguments: map[string]string{
-					"--enable-metrics": "true",
-					"--db-secret-arn":  "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
+					"--enable-continuous-cloudwatch-log": "true",
+					"--enable-metrics":                   "true",
+					"--db-secret-arn":                    "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
 				},
 			},
 			{
@@ -71,6 +77,12 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("gluestreaming"),
 				},
+				// GlueLoggingOff witness: the continuous-logging argument is
+				// deliberately absent, so a killed run leaves no diagnostics.
+				SecurityConfiguration: aws.String(glueSecurityConfigName),
+				DefaultArguments: map[string]string{
+					"--job-language": "python",
+				},
 			},
 			{
 				Name:            aws.String("acme-data-catalog-crawler"),
@@ -83,6 +95,13 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-01-20T16:00:00+00:00")),
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("pythonshell"),
+				},
+				// GlueNoSecurityConfig witness: SecurityConfiguration is
+				// deliberately absent, so output, logs and bookmarks are all
+				// written unencrypted.
+				DefaultArguments: map[string]string{
+					"--enable-continuous-cloudwatch-log": "true",
+					"--job-language":                     "python",
 				},
 			},
 			// S3 healthy-bucket ETL job (checkS3Glue pivot).
@@ -103,6 +122,11 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 					PythonVersion:  aws.String("3"),
 				},
 				Description: aws.String("ETL job reading from and writing to a9s-demo-healthy S3 bucket"),
+				DefaultArguments: map[string]string{
+					"--enable-continuous-cloudwatch-log": "true",
+					"--job-language":                     "python",
+				},
+				SecurityConfiguration: aws.String(glueSecurityConfigName),
 			},
 			// Issue: latest JobRun=ERROR → Broken (job script threw an unhandled exception)
 			{
@@ -116,6 +140,13 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-04-01T10:00:00+00:00")),
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("glueetl"),
+				},
+				SecurityConfiguration: aws.String(glueSecurityConfigName),
+				// GlueArgumentSecret witness: the warehouse password is passed
+				// as a default argument instead of a Secrets Manager reference.
+				DefaultArguments: map[string]string{
+					"--enable-continuous-cloudwatch-log": "true",
+					"--db-password":                      "Tr0ub4dor&3xample",
 				},
 			},
 		},

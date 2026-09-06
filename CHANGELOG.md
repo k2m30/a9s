@@ -25,8 +25,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Listing backup plans without a Backup client configured returns an empty page
   instead of crashing.
-
-### Added
+- CloudFormation stacks now flag termination protection being off, and a
+  credential pasted into a stack output. Stack status also reads in words
+  (`update rollback complete`) instead of the raw status keyword.
+- CodeBuild projects now flag build results being publicly visible, a buildspec
+  taken from the source repository, a credential embedded in the source
+  repository address, and a credential in a plaintext environment variable.
+  Closes Prowler codebuild_project_not_publicly_accessible,
+  codebuild_project_user_controlled_buildspec,
+  codebuild_project_source_repo_url_no_sensitive_credentials and
+  codebuild_project_no_secrets_in_variables.
+- ECR repositories now flag scan-on-push being off, mutable tags, a repository
+  policy open to anyone, and the absence of a lifecycle policy. Closes Prowler
+  ecr_repositories_scan_images_on_push_enabled,
+  ecr_repositories_tag_immutability,
+  ecr_repositories_not_publicly_accessible and
+  ecr_repositories_lifecycle_policy_enabled.
+- Glue jobs now flag having no security configuration, continuous logging being
+  off, and a credential in the job arguments. Closes Prowler
+  glue_etl_jobs_amazon_s3_encryption_enabled,
+  glue_etl_jobs_cloudwatch_logs_encryption_enabled,
+  glue_etl_jobs_job_bookmark_encryption_enabled, glue_etl_jobs_logging_enabled
+  and glue_etl_jobs_no_secrets_in_arguments.
+- EKS clusters now flag an endpoint reachable from the internet, incomplete
+  control-plane logging, secrets without their own KMS key, and a Kubernetes
+  version out of standard support. The support state is read from AWS rather
+  than a version constant compiled into the binary, so it stays correct when
+  the calendar moves. Closes Prowler eks_cluster_not_publicly_accessible,
+  eks_cluster_private_nodes_enabled,
+  eks_control_plane_logging_all_types_enabled,
+  eks_cluster_kms_cmk_encryption_in_secrets_enabled and
+  eks_cluster_uses_a_supported_version.
+- The Health column on an ECS service's task list now reads `healthy` /
+  `unhealthy` / `unknown` instead of the API's uppercase spelling.
 
 - A database instance being deleted now reads as a warning instead of green.
 - A snapshot in a state neither ready nor failed, such as one still copying,

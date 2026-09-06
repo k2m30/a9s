@@ -35,6 +35,11 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 		return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
 	}
 
+	// The support state is a property of a Kubernetes minor, not of a cluster,
+	// so the catalogue is read once for the whole page and every cluster is
+	// classified from the same answer.
+	versions := eksVersionCatalogue(ctx, c.EKS)
+
 	total := len(listOutput.Clusters)
 	var resources []resource.Resource
 	var failures []string
@@ -54,7 +59,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 			resources = append(resources, DegradedDetails("eks", name, &ekstypes.Cluster{Name: aws.String(name)}, nil))
 			continue
 		}
-		resources = append(resources, buildEKSResource(name, descOutput.Cluster))
+		resources = append(resources, buildEKSResource(name, descOutput.Cluster, versions))
 	}
 
 	isTruncated := listOutput.NextToken != nil
@@ -75,7 +80,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 }
 
 // buildEKSResource constructs a Resource from a cluster name and EKS Cluster struct.
-func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource {
+func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) resource.Resource {
 	clusterName := ""
 	if cluster.Name != nil {
 		clusterName = *cluster.Name
@@ -154,5 +159,166 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		r.Findings = []domain.Finding{healthIssueWarnFinding(CodeEKSHealthIssue, issueCodes)}
 	}
 
+	addEKSPostureFindings(&r, cluster, versions)
 	return r
+}
+
+// eksControlPlaneLogTypes is the full set AWS emits. "Complete" means all
+// five; anything less leaves a gap in the record of an incident.
+var eksControlPlaneLogTypes = []ekstypes.LogType{ //nolint:gochecknoglobals // static SDK enum set
+	ekstypes.LogTypeApi, ekstypes.LogTypeAudit, ekstypes.LogTypeAuthenticator,
+	ekstypes.LogTypeControllerManager, ekstypes.LogTypeScheduler,
+}
+
+// eksVersionCatalogue reads what AWS says about every Kubernetes minor, keyed
+// by version. It returns nil when the catalogue cannot be read, which is the
+// answer "unknown" rather than "old" — this row exists precisely so a9s never
+// asserts a support state it did not get from AWS.
+//
+// One call for the whole page: the support state belongs to the version, not
+// to the cluster, so a per-cluster lookup would ask the same question N times.
+func eksVersionCatalogue(ctx context.Context, api EKSAPI) map[string]ekstypes.ClusterVersionInformation {
+	versionsAPI, ok := api.(EKSDescribeClusterVersionsAPI)
+	if !ok {
+		return nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeClusterVersionsOutput, error) {
+		return versionsAPI.DescribeClusterVersions(ctx, &eks.DescribeClusterVersionsInput{
+			IncludeAll: aws.Bool(true),
+		})
+	})
+	if err != nil {
+		return nil
+	}
+	catalogue := make(map[string]ekstypes.ClusterVersionInformation, len(out.ClusterVersions))
+	for _, v := range out.ClusterVersions {
+		if key := aws.ToString(v.ClusterVersion); key != "" {
+			catalogue[key] = v
+		}
+	}
+	return catalogue
+}
+
+// eksSupportWords renders a version status as the words AWS uses in its own
+// console. VersionStatus is the current field; the deprecated lowercase Status
+// is never read, because a reader that consults it sees "" for every version
+// and silently stops flagging anything.
+func eksSupportWords(status ekstypes.VersionStatus) string {
+	switch status {
+	case ekstypes.VersionStatusExtendedSupport:
+		return "extended support"
+	case ekstypes.VersionStatusUnsupported:
+		return "unsupported"
+	case ekstypes.VersionStatusStandardSupport:
+		return "standard support"
+	}
+	return ""
+}
+
+// addEKSPostureFindings evaluates the four w6b posture signals against the
+// DescribeCluster response the fetcher already holds, plus the version
+// catalogue read once for the page.
+func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) {
+	if cluster.Status == ekstypes.ClusterStatusDeleting {
+		return
+	}
+
+	if vpc := cluster.ResourcesVpcConfig; vpc != nil && vpc.EndpointPublicAccess {
+		// AWS defaults PublicAccessCidrs to 0.0.0.0/0 and omits it when it was
+		// never narrowed, so an empty list on a public endpoint is the open
+		// case rather than the unknown one.
+		open := len(vpc.PublicAccessCidrs) == 0
+		for _, cidr := range vpc.PublicAccessCidrs {
+			if cidr == "0.0.0.0/0" {
+				open = true
+			}
+		}
+		severity := domain.SevWarn
+		if open {
+			severity = domain.SevBroken
+		}
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeEKSPublicEndpoint, Phrase: "cluster endpoint reachable from the internet",
+			Detail: eksPublicEndpointDetail, Severity: severity, Source: "wave1",
+		})
+		ranges := "0.0.0.0/0"
+		if len(vpc.PublicAccessCidrs) > 0 {
+			ranges = strings.Join(vpc.PublicAccessCidrs, ", ")
+		}
+		addWave1Rows(r, CodeEKSPublicEndpoint, domain.DetailRow{
+			Label: "Reachable from", Value: ranges, Tier: "!",
+		})
+	}
+
+	// A LogSetup entry that lists a type with Enabled=false does not enable
+	// it, and the five may arrive spread across several enabled entries, so
+	// this is the union of the enabled ones.
+	enabled := make(map[ekstypes.LogType]bool, len(eksControlPlaneLogTypes))
+	if cluster.Logging != nil {
+		for _, setup := range cluster.Logging.ClusterLogging {
+			if !aws.ToBool(setup.Enabled) {
+				continue
+			}
+			for _, lt := range setup.Types {
+				enabled[lt] = true
+			}
+		}
+	}
+	var missing []string
+	for _, lt := range eksControlPlaneLogTypes {
+		if !enabled[lt] {
+			missing = append(missing, string(lt))
+		}
+	}
+	if len(missing) > 0 {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeEKSControlPlaneLoggingOff, Phrase: "control plane logging incomplete",
+			Detail: eksControlPlaneLoggingOffDetail, Severity: domain.SevWarn, Source: "wave1",
+		})
+		addWave1Rows(r, CodeEKSControlPlaneLoggingOff, domain.DetailRow{
+			Label: "Not being sent", Value: strings.Join(missing, ", "), Tier: "~",
+		})
+	}
+
+	// An encryption configuration covering something other than secrets does
+	// not cover secrets, so a non-empty slice is not the question.
+	secretsEncrypted := false
+	for _, ec := range cluster.EncryptionConfig {
+		// Resources is the only field that says WHICH resources a key covers,
+		// and "covers secrets specifically" is the condition being reported.
+		// The SDK marks it deprecated because EKS now encrypts API data by
+		// default, but it is still what DescribeCluster returns and still what
+		// distinguishes a cluster with its own key from one without.
+		//nolint:staticcheck // SA1019: no replacement field carries this fact
+		for _, res := range ec.Resources {
+			if res == "secrets" {
+				secretsEncrypted = true
+			}
+		}
+	}
+	if !secretsEncrypted {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code: CodeEKSSecretsNotKMS, Phrase: "secrets not encrypted with KMS",
+			Detail: eksSecretsNotKMSDetail, Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+
+	// A version absent from the catalogue, or a catalogue that could not be
+	// read at all, is unknown — not old.
+	version := aws.ToString(cluster.Version)
+	info, known := versions[version]
+	if !known || info.VersionStatus == ekstypes.VersionStatusStandardSupport || info.VersionStatus == "" {
+		return
+	}
+	r.Findings = append(r.Findings, domain.Finding{
+		Code: CodeEKSVersionUnsupported, Phrase: "Kubernetes " + version + " is out of standard support",
+		Detail: eksVersionUnsupportedDetail, Severity: domain.SevBroken, Source: "wave1",
+	})
+	support := eksSupportWords(info.VersionStatus)
+	if info.EndOfStandardSupportDate != nil {
+		support += ", standard support ended " + info.EndOfStandardSupportDate.Format("2006-01-02")
+	}
+	addWave1Rows(r, CodeEKSVersionUnsupported, domain.DetailRow{
+		Label: "Support", Value: support, Tier: "!",
+	})
 }

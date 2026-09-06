@@ -169,10 +169,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 		status = *task.LastStatus
 	}
 
-	health := ""
-	if task.HealthStatus != "" {
-		health = strings.ToUpper(string(task.HealthStatus))
-	}
+	health := ecsTaskHealthWords(task.HealthStatus)
 
 	taskDefShort := ""
 	if task.TaskDefinitionArn != nil {

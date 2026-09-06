@@ -116,21 +116,38 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 			},
 		},
 		{
-			StackName:       aws.String("acme-eks-cluster"),
-			StackStatus:     cfntypes.StackStatusUpdateComplete,
-			CreationTime:    aws.Time(mustParseCFNTime("2025-01-10T11:00:00+00:00")),
-			LastUpdatedTime: aws.Time(mustParseCFNTime("2026-03-15T08:45:00+00:00")),
-			Description:     aws.String("EKS cluster and managed node groups"),
-			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-eks-cluster/22222222-2222-2222-2222-222222222222"),
-			RoleARN:         aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("acme-eks-cluster"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusUpdateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-01-10T11:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-03-15T08:45:00+00:00")),
+			Description:                 aws.String("EKS cluster and managed node groups"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-eks-cluster/22222222-2222-2222-2222-222222222222"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
 		{
-			StackName:    aws.String("acme-rds-aurora"),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-03-05T16:20:00+00:00")),
-			Description:  aws.String("Aurora PostgreSQL cluster for API backend"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-rds-aurora/33333333-3333-3333-3333-333333333333"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("acme-rds-aurora"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-03-05T16:20:00+00:00")),
+			Description:                 aws.String("Aurora PostgreSQL cluster for API backend"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-rds-aurora/33333333-3333-3333-3333-333333333333"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
+			// CFNOutputSecret witness: the master password was exported as a
+			// plain stack output, readable by anyone who can describe the
+			// stack. The endpoint output beside it is the healthy shape.
+			Outputs: []cfntypes.Output{
+				{
+					OutputKey:   aws.String("ClusterEndpoint"),
+					OutputValue: aws.String("acme-aurora.cluster-abc123.us-east-1.rds.amazonaws.com"),
+					Description: aws.String("Writer endpoint for the Aurora cluster"),
+				},
+				{
+					OutputKey:   aws.String("db-master-password"),
+					OutputValue: aws.String("Tr0ub4dor&3xample"),
+					Description: aws.String("Database master password"),
+				},
+			},
 		},
 		{
 			StackName:       aws.String("acme-monitoring"),
@@ -168,13 +185,14 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		},
 		// Drifted stack → Warning (drift detection triggered 2 days ago)
 		{
-			StackName:       aws.String("stack-drifted-prod"),
-			StackStatus:     cfntypes.StackStatusUpdateComplete,
-			CreationTime:    aws.Time(mustParseCFNTime("2025-05-01T09:00:00+00:00")),
-			LastUpdatedTime: aws.Time(mustParseCFNTime("2026-04-10T12:00:00+00:00")),
-			Description:     aws.String("Production services stack — detected drift from expected configuration"),
-			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/stack-drifted-prod/66666666-6666-6666-6666-666666666666"),
-			RoleARN:         aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("stack-drifted-prod"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusUpdateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-05-01T09:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-10T12:00:00+00:00")),
+			Description:                 aws.String("Production services stack — detected drift from expected configuration"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/stack-drifted-prod/66666666-6666-6666-6666-666666666666"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			DriftInformation: &cfntypes.StackDriftInformation{
 				StackDriftStatus:   cfntypes.StackDriftStatusDrifted,
 				LastCheckTimestamp: aws.Time(time.Now().AddDate(0, 0, -2)),
@@ -186,13 +204,14 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		},
 		// Stuck UPDATE_IN_PROGRESS (started >2h ago) → Broken
 		{
-			StackName:       aws.String("stack-stuck-update"),
-			StackStatus:     cfntypes.StackStatusUpdateInProgress,
-			CreationTime:    aws.Time(mustParseCFNTime("2025-08-15T14:00:00+00:00")),
-			LastUpdatedTime: aws.Time(time.Now().Add(-3 * time.Hour)),
-			Description:     aws.String("Database migration stack — update stalled on RDS parameter group change"),
-			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/stack-stuck-update/77777777-7777-7777-7777-777777777777"),
-			RoleARN:         aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("stack-stuck-update"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusUpdateInProgress,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-08-15T14:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(time.Now().Add(-3 * time.Hour)),
+			Description:                 aws.String("Database migration stack — update stalled on RDS parameter group change"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/stack-stuck-update/77777777-7777-7777-7777-777777777777"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			DriftInformation: &cfntypes.StackDriftInformation{
 				StackDriftStatus: cfntypes.StackDriftStatusInSync,
 			},
@@ -204,12 +223,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// S3 healthy-bucket CFN stack (checkS3CFN pivot).
 		// The healthy bucket carries the aws:cloudformation:stack-name tag pointing here.
 		{
-			StackName:    aws.String(S3CFNStackName),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-01-10T10:00:00+00:00")),
-			Description:  aws.String("S3 demo bucket stack managed by CloudFormation"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + S3CFNStackName + "/88888888-8888-8888-8888-888888888888"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String(S3CFNStackName),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-01-10T10:00:00+00:00")),
+			Description:                 aws.String("S3 demo bucket stack managed by CloudFormation"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + S3CFNStackName + "/88888888-8888-8888-8888-888888888888"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 			},
@@ -217,12 +237,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// OpenSearch graph-root CFN stack — required for opensearch→cfn related-panel pivot.
 		// The acme-logs domain's ListTags fake returns aws:cloudformation:stack-name=acme-search-stack.
 		{
-			StackName:    aws.String(OpenSearchCFNStackName),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-09-01T10:00:00+00:00")),
-			Description:  aws.String("OpenSearch cluster for acme-logs (full-text search + audit logging)"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + OpenSearchCFNStackName + "/99999999-9999-9999-9999-999999999999"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String(OpenSearchCFNStackName),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-09-01T10:00:00+00:00")),
+			Description:                 aws.String("OpenSearch cluster for acme-logs (full-text search + audit logging)"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + OpenSearchCFNStackName + "/99999999-9999-9999-9999-999999999999"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 				{Key: aws.String("Service"), Value: aws.String("search")},
@@ -232,12 +253,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// The acme-warehouse cluster carries the aws:cloudformation:stack-name tag
 		// pointing to "acme-warehouse-stack" so checkRedshiftCFN resolves a non-zero count.
 		{
-			StackName:    aws.String("acme-warehouse-stack"),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-03-10T09:00:00+00:00")),
-			Description:  aws.String("Redshift analytics cluster stack for Acme Corp warehouse"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-warehouse-stack/aaaa1111-bbbb-2222-cccc-333333333333"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("acme-warehouse-stack"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-03-10T09:00:00+00:00")),
+			Description:                 aws.String("Redshift analytics cluster stack for Acme Corp warehouse"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-warehouse-stack/aaaa1111-bbbb-2222-cccc-333333333333"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 				{Key: aws.String("Service"), Value: aws.String("analytics")},
@@ -245,12 +267,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		},
 		// Redshift acme-reporting CFN stack — required for redshift→cfn related-panel pivot (second graph-root).
 		{
-			StackName:    aws.String("acme-reporting-stack"),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-07-22T14:30:00+00:00")),
-			Description:  aws.String("Redshift reporting cluster stack for Acme Corp reporting"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-reporting-stack/dddd4444-eeee-5555-ffff-666666666666"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("acme-reporting-stack"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-07-22T14:30:00+00:00")),
+			Description:                 aws.String("Redshift reporting cluster stack for Acme Corp reporting"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-reporting-stack/dddd4444-eeee-5555-ffff-666666666666"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 				{Key: aws.String("Service"), Value: aws.String("reporting")},
@@ -260,12 +283,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// The prod-redis-sessions RG carries the aws:cloudformation:stack-name tag
 		// pointing to ProdRedisCFNStack so checkRedisCFN resolves a non-zero count.
 		{
-			StackName:    aws.String(ProdRedisCFNStack),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-03-15T08:00:00+00:00")),
-			Description:  aws.String("ElastiCache Redis cluster for production session storage"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + ProdRedisCFNStack + "/aaaabbbb-cccc-dddd-eeee-ffffffffffff"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String(ProdRedisCFNStack),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-03-15T08:00:00+00:00")),
+			Description:                 aws.String("ElastiCache Redis cluster for production session storage"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + ProdRedisCFNStack + "/aaaabbbb-cccc-dddd-eeee-ffffffffffff"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 				{Key: aws.String("Service"), Value: aws.String("sessions")},
@@ -275,12 +299,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// The prod-efs-app-data filesystem carries the aws:cloudformation:stack-name tag
 		// pointing to ProdEFSCFNStackName so checkEFSCFN resolves a non-zero count.
 		{
-			StackName:    aws.String(ProdEFSCFNStackName),
-			StackStatus:  cfntypes.StackStatusCreateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-02-01T10:00:00+00:00")),
-			Description:  aws.String("EFS filesystem for production app data shared storage"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + ProdEFSCFNStackName + "/bbbbcccc-dddd-eeee-ffff-000000000001"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String(ProdEFSCFNStackName),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-02-01T10:00:00+00:00")),
+			Description:                 aws.String("EFS filesystem for production app data shared storage"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + ProdEFSCFNStackName + "/bbbbcccc-dddd-eeee-ffff-000000000001"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 				{Key: aws.String("Service"), Value: aws.String("storage")},
@@ -291,35 +316,38 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// the "awseb-{envID}" prefix; e-acmeprodapi is acme-prod-api's
 		// EnvironmentId (eb.go).
 		{
-			StackName:    aws.String("awseb-e-acmeprodapi-stack"),
-			StackStatus:  cfntypes.StackStatusUpdateComplete,
-			CreationTime: aws.Time(mustParseCFNTime("2025-01-10T09:00:00+00:00")),
-			Description:  aws.String("Elastic Beanstalk-managed stack for acme-prod-api"),
-			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/cccc5555-dddd-6666-eeee-777777777777"),
-			RoleARN:      aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("awseb-e-acmeprodapi-stack"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusUpdateComplete,
+			CreationTime:                aws.Time(mustParseCFNTime("2025-01-10T09:00:00+00:00")),
+			Description:                 aws.String("Elastic Beanstalk-managed stack for acme-prod-api"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/cccc5555-dddd-6666-eeee-777777777777"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
 		// DELETE_COMPLETE → Dim (cfnStackColor). DescribeStacks still reports a
 		// recently torn-down stack for a retention window after deletion.
 		{
-			StackName:         aws.String("acme-decommissioned-poc"),
-			StackStatus:       cfntypes.StackStatusDeleteComplete,
-			StackStatusReason: aws.String("User Initiated"),
-			CreationTime:      aws.Time(mustParseCFNTime("2025-08-01T10:00:00+00:00")),
-			LastUpdatedTime:   aws.Time(mustParseCFNTime("2026-04-01T09:00:00+00:00")),
-			Description:       aws.String("Decommissioned proof-of-concept environment"),
-			StackId:           aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-decommissioned-poc/dddd6666-eeee-7777-ffff-888888888888"),
-			RoleARN:           aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("acme-decommissioned-poc"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusDeleteComplete,
+			StackStatusReason:           aws.String("User Initiated"),
+			CreationTime:                aws.Time(mustParseCFNTime("2025-08-01T10:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-01T09:00:00+00:00")),
+			Description:                 aws.String("Decommissioned proof-of-concept environment"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-decommissioned-poc/dddd6666-eeee-7777-ffff-888888888888"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
 		// StackStatus=CREATE_FAILED → wave1 finding (CodeCFNStackFailed, SevBroken) → Broken.
 		{
-			StackName:         aws.String("acme-experimental-queue"),
-			StackStatus:       cfntypes.StackStatusCreateFailed,
-			StackStatusReason: aws.String("The following resource(s) failed to create: [QueuePolicy]. Insufficient permissions."),
-			CreationTime:      aws.Time(mustParseCFNTime("2026-04-26T09:00:00+00:00")),
-			LastUpdatedTime:   aws.Time(mustParseCFNTime("2026-04-26T09:12:00+00:00")),
-			Description:       aws.String("Experimental SQS queue stack — initial create failed"),
-			StackId:           aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-experimental-queue/eeee7777-ffff-8888-9999-aaaaaaaaaaaa"),
-			RoleARN:           aws.String(prodCIDeployRoleARN),
+			StackName:                   aws.String("acme-experimental-queue"),
+			EnableTerminationProtection: aws.Bool(true),
+			StackStatus:                 cfntypes.StackStatusCreateFailed,
+			StackStatusReason:           aws.String("The following resource(s) failed to create: [QueuePolicy]. Insufficient permissions."),
+			CreationTime:                aws.Time(mustParseCFNTime("2026-04-26T09:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-26T09:12:00+00:00")),
+			Description:                 aws.String("Experimental SQS queue stack — initial create failed"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-experimental-queue/eeee7777-ffff-8888-9999-aaaaaaaaaaaa"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
