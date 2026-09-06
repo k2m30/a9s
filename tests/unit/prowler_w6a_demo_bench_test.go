@@ -20,15 +20,28 @@ import (
 // w6aBatchTypes are the seven resource types this batch touches.
 var w6aBatchTypes = []string{"trail", "logs", "alarm", "r53", "cf", "acm", "apigw"} //nolint:gochecknoglobals // test-only list
 
+// w6aOffTheSharedFallback are the batch's types whose classifier still picks a
+// colour of its own after the findings lookup, per
+// qa_classifier_fields_source_gate_test.go's burn-down list. The other three
+// hand their raw fields to the type's own findings predicate, which is the
+// sanctioned shared fallback and not a second opinion.
+var w6aOffTheSharedFallback = map[string]bool{ //nolint:gochecknoglobals // test-only lookup
+	"logs": true, // colorLogs
+	"cf":   true, // colorCF
+	"acm":  true, // acmColor
+	"r53":  true, // r53Color
+}
+
 // TestW6AColorDerivesFromFindings pins the classifier ruling for the batch:
 // a type's colour is whatever its findings say, and nothing else.
 //
 // Two probes, because they fail on different defects. The warn-then-broken
 // pair catches a classifier that stops at the first finding rather than the
-// worst. The findings-free probe catches the one this ruling is actually
-// about: a classifier that interprets a raw field itself and returns a colour
-// no finding backs, so the row is coloured for a reason the detail view never
-// names and the issue badge never counts.
+// worst, and applies to every type. The findings-free probe catches a
+// classifier that interprets a raw field itself and returns a colour no
+// finding backs, so the row is coloured for a reason the detail view never
+// names and the issue badge never counts; it applies only to the classifiers
+// still off the shared fallback.
 func TestW6AColorDerivesFromFindings(t *testing.T) {
 	// Values the raw-field branches read as unhealthy: an unset retention, a
 	// zero size on an old group, a trail that is not logging. A classifier
@@ -63,6 +76,9 @@ func TestW6AColorDerivesFromFindings(t *testing.T) {
 				t.Errorf("ResolveColor with a warn and a broken finding = %v, want ColorBroken", got)
 			}
 
+			if !w6aOffTheSharedFallback[short] {
+				return
+			}
 			bare := resource.Resource{ID: short + "-bare", Fields: unhealthyLookingFields}
 			if got := td.ResolveColor(bare); got != resource.ColorHealthy {
 				t.Errorf("ResolveColor with no findings = %v, want ColorHealthy: the classifier still reads a raw field", got)
