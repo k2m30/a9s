@@ -44,7 +44,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	// Backup coverage is a cache-only join, so it runs before the client guard
 	// below: a type whose own API client is missing is still either selected by
 	// a plan or not.
-	addBackupCoverage(cache, "ddb", resources, &result)
+	addBackupCoverage(cache, "ddb", resources, backupARNFromField, &result)
 
 	if clients.DynamoDB == nil {
 		return result, nil

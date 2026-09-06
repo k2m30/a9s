@@ -43,8 +43,8 @@ const (
 
 	// DBCNotInBackupPlan is the only demo cluster no backup plan selects;
 	// every other cluster is covered by acme-daily-backup.
-	DBCNotInBackupPlan    = "acme-aurora-unplanned"
-	DBCNotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:cluster:acme-aurora-unplanned"
+	DBCNotInBackupPlan    = "healthy-dbc-maint-overdue"
+	DBCNotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:cluster:healthy-dbc-maint-overdue"
 
 	// WarnDbcNoBkpMaintID / WarnDbcNoBkpMaintARN — Wave-1 warn + overdue maintenance.
 	WarnDbcNoBkpMaintID  = "warn-dbc-no-bkp-plus-maint"

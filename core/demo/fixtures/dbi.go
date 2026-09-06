@@ -51,8 +51,8 @@ const (
 
 	// DBINotInBackupPlan is the only demo instance no backup plan selects;
 	// every other instance is covered by acme-daily-backup.
-	DBINotInBackupPlan    = "warn-dbi-unplanned"
-	DBINotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-unplanned"
+	DBINotInBackupPlan    = "sandbox-db-02"
+	DBINotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:db:sandbox-db-02"
 
 	// warn-dbi-public — Warning (CIS RDS.2)
 	WarnDbiPublicID  = "warn-dbi-public"

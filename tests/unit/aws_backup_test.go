@@ -177,8 +177,11 @@ func TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchBackupPlans returned error: %v", err)
 	}
-	if len(resources) != 8 {
-		t.Fatalf("expected 8 fixture plans (impl-plan §2); update this count if fixtures change: got %d", len(resources))
+	// 9 since w7 added plan-fleet-wide, the blanket selection that makes every
+	// demo row explicitly covered by a backup plan except the four that
+	// witness "not covered by a backup plan".
+	if len(resources) != 9 {
+		t.Fatalf("expected 9 fixture plans (impl-plan §2 plus plan-fleet-wide); update this count if fixtures change: got %d", len(resources))
 	}
 
 	for _, r := range resources {

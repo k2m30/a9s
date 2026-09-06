@@ -15,6 +15,12 @@ import (
 
 // FetchBackupPlansPage fetches a single page of Backup plans.
 func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, continuationToken string) (resource.FetchResult, error) {
+	// A session that never wired Backup is an empty page, not a crash. Every
+	// sibling fetcher guards the same way, and the coverage join then sees no
+	// cache entry, which it reads as "cannot tell".
+	if api == nil {
+		return resource.FetchResult{}, nil
+	}
 	input := &backup.ListBackupPlansInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}

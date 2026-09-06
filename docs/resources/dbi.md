@@ -193,6 +193,7 @@ One row per signal from §3:
 | `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
 | `CertificateDetails.ValidTill` within 90d | 1 | Warning (Broken within 30d) | n/a | S2, S4, S5 | `server certificate expires in <N> days` | `The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window.` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S4, S5 | `engine version deprecated` | `AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing.` |
+| No backup plan selection matches the DB instance ARN | 2 | Warning | `~` | S2, S4, S5 | `not covered by a backup plan` | `No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on.` |
 
 Notes on the table:
 
@@ -200,6 +201,8 @@ Notes on the table:
 - **Per-failure S5 sentences**: each failure status has its own remedy sentence. Rationale: §4 groups them for brevity but operators need the specific remedy at 3am; user decision (2026-04-21).
 - **Broken precedence**: when `DBInstanceStatus` is itself broken (`failed`, `storage-full`, `incompatible-*`, `restore-error`, `inaccessible-encryption-credentials`), the status-based S4/S5 takes precedence over configuration warnings (no-backups, publicly-accessible, unencrypted, deletion-protection-off). The row renders red, not yellow, and does not stack a second S4 string.
 - **Warning precedence when available**: when `DBInstanceStatus == "available"` but one or more configuration warnings apply, S4 = the first one in this order: `no automated backups` > `publicly accessible` > `unencrypted storage` > `deletion protection off`. Rationale: operators want the highest-severity policy miss surfaced; only one line fits S4.
+
+- **Backup coverage reads selection ARNs only on this type.** A backup plan can also choose resources by tag, and this list does not carry this type's tags, so a tag-based selection is not evaluated here. When one exists, the signal's detail says so, and the resource may in fact be covered.
 
 Rules for filling list and detail text:
 
@@ -269,6 +272,7 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
 | dbi.single-az | single-AZ | warn | wave1 |
 | dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 |
+| dbi.not-in-backup-plan | not covered by a backup plan | warn | wave2 |
 | dbi.iam-auth-off | IAM database authentication off | warn | wave1 |
 | dbi.default-master-user | default master username | warn | wave1 |
 | dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 |

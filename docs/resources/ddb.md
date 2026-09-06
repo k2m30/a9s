@@ -147,6 +147,9 @@ One row per signal from §3:
 | `DeletionProtectionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `deletion protection off` | `A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step.` |
 | Resource policy names a foreign account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` | `The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest.` |
 | Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `resource policy open to anyone` | `The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access.` |
+| No backup plan selection matches the table ARN | 2 | Warning | `~` | S2, S4, S5 | `not covered by a backup plan` | `No backup plan selects this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by ARN, or give it a tag one of your plans already selects on.` |
+
+- **Backup coverage reads selection ARNs only on this type.** A backup plan can also choose resources by tag, and this list does not carry this type's tags, so a tag-based selection is not evaluated here. When one exists, the signal's detail says so, and the resource may in fact be covered.
 
 Rules for filling list and detail text:
 
@@ -206,6 +209,7 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 | ddb.deletion-protection-off | deletion protection off | warn | wave1 |
 | ddb.cross-account-policy | resource policy grants another account | warn | wave2 |
 | ddb.public-policy | resource policy open to anyone | broken | wave2 |
+| ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 |
 | ddb.warn.details\_denied | details denied | warn | wave1 |
 | ddb.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->

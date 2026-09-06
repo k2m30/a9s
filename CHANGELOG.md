@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Volumes, databases, clusters and tables that no backup plan selects now say
+  so. The check joins each resource's ARN against the backup plans already
+  loaded, and it only answers from a plan list read to the end: a list nobody
+  fetched, or one cut short, reports nothing rather than calling a resource
+  unprotected on the strength of a page nobody read. Volumes are also matched
+  by the tags a plan selects on; databases, clusters and tables carry no tags
+  in this list, so a tag-based plan is not evaluated for them and the
+  explanation says so. An attached volume with no snapshot behind it is flagged
+  too. Closes Prowler `ec2_ebs_volume_protected_by_backup_plan`,
+  `ec2_ebs_volume_snapshots_exists`, `rds_instance_protected_by_backup_plan`,
+  `rds_cluster_protected_by_backup_plan` and
+  `dynamodb_table_protected_by_backup_plan`.
+
+- Listing backup plans without a Backup client configured returns an empty page
+  instead of crashing.
+
+### Added
+
 - A database instance being deleted now reads as a warning instead of green.
 - A snapshot in a state neither ready nor failed, such as one still copying,
   now reads as a warning instead of green, on both RDS and DocumentDB

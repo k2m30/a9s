@@ -43,7 +43,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	// Backup coverage is a cache-only join, so it runs before the client guard
 	// below: a type whose own API client is missing is still either selected by
 	// a plan or not.
-	addBackupCoverage(cache, "dbc", resources, &result)
+	addBackupCoverage(cache, "dbc", resources, backupARNFromField, &result)
 
 	if clients == nil || clients.DocDB == nil {
 		return result, nil

@@ -44,6 +44,12 @@ const (
 	DevSporadicPlanID  = "88888888-8888-8888-8888-888888888888"
 	DevSporadicPlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:88888888-8888-8888-8888-888888888888"
 
+	// plan-fleet-wide selects every volume, database, cluster and table by
+	// wildcard and names the coverage witnesses in its exclusions, so
+	// "not covered by a backup plan" has exactly one carrier per type.
+	FleetWidePlanID  = "99999999-9999-9999-9999-999999999999"
+	FleetWidePlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:99999999-9999-9999-9999-999999999999"
+
 	// Vault names
 	BackupDefaultVaultName = "acme-default-vault"
 	BackupProdVaultName    = "acme-prod-vault"
@@ -460,6 +466,29 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			},
 		},
 
+		// plan-fleet-wide: one wildcard selection per service the coverage
+		// join reads, minus the four resources that witness the finding. It is
+		// what makes every other demo row explicitly covered rather than
+		// accidentally so.
+		FleetWidePlanID: {
+			{
+				SelectionName: aws.String("acme-fleet-wide-selection"),
+				IamRoleArn:    aws.String("arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole"),
+				Resources: []string{
+					"arn:aws:ec2:*:*:volume/*",
+					"arn:aws:rds:*:*:db:*",
+					"arn:aws:rds:*:*:cluster:*",
+					"arn:aws:dynamodb:*:*:table/*",
+				},
+				NotResources: []string{
+					EBSNotInBackupPlanARN,
+					DBINotInBackupPlanARN,
+					DBCNotInBackupPlanARN,
+					DDBNotInBackupPlanARN,
+				},
+			},
+		},
+
 		// plan-broken-aborted: uses default service role.
 		StagingHourlyPlanID: {
 			{
@@ -515,6 +544,15 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 		VaultEncryptionKeys: buildBackupVaultEncryptionKeys(),
 		VaultSNSTopics:      buildBackupVaultSNSTopics(),
 		Plans: []backuptypes.BackupPlansListMember{
+			// plan-fleet-wide: the blanket selection behind the coverage join.
+			{
+				BackupPlanName:   aws.String("acme-fleet-wide"),
+				BackupPlanId:     aws.String(FleetWidePlanID),
+				BackupPlanArn:    aws.String(FleetWidePlanARN),
+				CreationDate:     aws.Time(mustParseBackupTime("2025-01-15T09:00:00Z")),
+				VersionId:        aws.String("v1"),
+				CreatorRequestId: aws.String("acme-fleet-wide-init"),
+			},
 			// plan-healthy-daily: no jobs in 24h window → Healthy silence.
 			{
 				BackupPlanName:    aws.String("acme-daily-backup"),

@@ -96,12 +96,13 @@ const (
 	// EBSSnapPublic is the only demo snapshot restorable by every AWS
 	// account; every other snapshot is private to this account.
 	EBSSnapPublic = "snap-0a1b2c3d4e5f60002"
-	// EBSNotInBackupPlan is the only demo volume no backup plan selects,
-	// by ARN or by tag; every other volume is covered by acme-daily-backup.
-	EBSNotInBackupPlan = "vol-0a1b2c3d4e5f60009"
-	// EBSNoSnapshot is the only attached demo volume with no snapshot behind
-	// it; every other in-use volume has at least one.
-	EBSNoSnapshot = "vol-0a1b2c3d4e5f60010"
+	// EBSNotInBackupPlan is the only demo volume no backup plan selects: the
+	// fleet-wide plan excludes it by name and no other selection reaches it.
+	EBSNotInBackupPlan    = "vol-0a1b2c3d4e5f60004"
+	EBSNotInBackupPlanARN = "arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f60004"
+	// EBSNoSnapshot is the only attached demo volume the snapshot list holds
+	// no snapshot of. It is covered by a plan, so it carries that one finding.
+	EBSNoSnapshot = "vol-0unenc00000000c3"
 	// AMIPublic is the only demo image whose launch permission includes every
 	// AWS account; every other image sets Public=false.
 	AMIPublic = "ami-0public00000000001"

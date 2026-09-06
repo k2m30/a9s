@@ -58,6 +58,4 @@ const ebsNotInBackupPlanDetail = "No backup plan selects this volume, so nothing
 const CodeEBSNoSnapshot domain.FindingCode = "ebs.no-snapshot"
 
 // ebsNoSnapshotDetail is the S5 operator sentence for it.
-//
-//nolint:unused // wired with the check itself in the implementation round.
 const ebsNoSnapshotDetail = "This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will."
