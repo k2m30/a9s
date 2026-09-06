@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -105,8 +106,11 @@ func w5ConditionedPublicPolicy(resourceARN string) string {
 // the request never asks for it is silently dead.
 type w5SQSFake struct {
 	awsclient.SQSAPI
-	attrs     map[string]map[string]string
-	errByURL  map[string]error
+	attrs    map[string]map[string]string
+	errByURL map[string]error
+	// mu guards requested: the enricher fans its per-queue calls out through
+	// ForEachParallel, so every recording write here is concurrent.
+	mu        sync.Mutex
 	requested map[string][]sqstypes.QueueAttributeName
 }
 
@@ -124,7 +128,9 @@ func (f *w5SQSFake) GetQueueAttributes(_ context.Context, in *sqssvc.GetQueueAtt
 		url = *in.QueueUrl
 	}
 	if in != nil {
+		f.mu.Lock()
 		f.requested[url] = in.AttributeNames
+		f.mu.Unlock()
 	}
 	if err, ok := f.errByURL[url]; ok {
 		return nil, err
@@ -212,7 +218,9 @@ func TestW5_SQSEnricherRequestsThePolicyAttribute(t *testing.T) {
 		t.Fatalf("enricher returned error: %v", err)
 	}
 
+	f.mu.Lock()
 	asked, ok := f.requested[w5QueueURL(name)]
+	f.mu.Unlock()
 	if !ok {
 		t.Fatalf("GetQueueAttributes was never called for %s", name)
 	}

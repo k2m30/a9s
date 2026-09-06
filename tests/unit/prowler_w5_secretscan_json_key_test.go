@@ -160,3 +160,82 @@ func TestW5SecretScan_SecretsManagerARNIsNotALeak(t *testing.T) {
 		t.Errorf("reported %+v; an ARN naming where the secret lives is the fix, not the leak — the match lands inside the ARN, so the reference guard never sees it", hits)
 	}
 }
+
+// A value beginning with "$" is now treated as an environment reference and
+// never reported. That is right for $ACME_API_KEY and wrong for every hash
+// format whose own syntax starts with "$": bcrypt writes $2y$, $2a$, $2b$,
+// and crypt writes $6$ and $argon2id$. Those are credentials, not
+// references, and the plain KEY=value form they arrive in is the shape the
+// scanner's own doc comment names as its primary case.
+//
+// This is a regression, not a gap. All three lines below were reported by
+// the pattern that predates this batch entirely, verified by running the
+// original, the widened and the current pattern side by side with each
+// version's own reference list. A scanner that stops reporting a leak is
+// worse than one that reports a reference: the false positive is argued
+// with, the false negative is never seen.
+func TestW5SecretScan_DollarLeadingValuesAreStillLeaks(t *testing.T) {
+	cases := map[string]string{
+		"bcrypt hash in an environment variable":  `DB_PASSWORD=$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy`,
+		"crypt sha-512 hash":                      `password=$6$rounds=656000$YQ8kEpHkQ1nT2mBv$abcdefghijklmnopqrstuvwx`,
+		"literal value that starts with a dollar": `api_key=$LITERAL-SECRET-9f8e7d6c5b`,
+	}
+
+	for name, text := range cases {
+		t.Run(name, func(t *testing.T) {
+			if hits := secretscan.ScanText(text); !w5HasKeywordHit(hits) {
+				t.Errorf("no keyword hit for %q; a leading dollar makes this a reference only when what follows is an identifier — a hash whose own syntax starts with $ is the credential itself", text)
+			}
+		})
+	}
+}
+
+// The counterpart that must keep working, so the fix above cannot be made by
+// simply reverting the reference rule.
+func TestW5SecretScan_EnvironmentReferencesStayQuiet(t *testing.T) {
+	cases := map[string]string{
+		"bare environment reference":   `{"API_KEY": "$ACME_API_KEY"}`,
+		"braced reference":             `{"api_key": "${var.acme_api_key}"}`,
+		"shell-style braced reference": `API_KEY=${ACME_API_KEY}`,
+	}
+	for name, text := range cases {
+		t.Run(name, func(t *testing.T) {
+			if hits := secretscan.ScanText(text); w5HasKeywordHit(hits) {
+				t.Errorf("reported %+v; this names where the secret lives", hits)
+			}
+		})
+	}
+}
+
+// The ARN blanking must not swallow a real credential that shares a line
+// with an ARN. Blanking runs before the keyword pass, so anything the ARN
+// pattern over-matches is invisible to the scan that follows.
+func TestW5SecretScan_ARNAdjacentCredentialIsStillFound(t *testing.T) {
+	cases := map[string]string{
+		"reference and inline secret on one line": `{"SecretId": "arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/db-AbCdEf", "DB_PASSWORD": "hunter2-correct-horse-battery"}`,
+		"secret before the arn":                   `{"DB_PASSWORD": "hunter2-correct-horse-battery", "role": "arn:aws:iam::123456789012:role/acme-task"}`,
+	}
+	for name, text := range cases {
+		t.Run(name, func(t *testing.T) {
+			if hits := secretscan.ScanText(text); !w5HasKeywordHit(hits) {
+				t.Errorf("no keyword hit; the inline credential shares a line with an ARN, and blanking the ARN must not reach past it. got %+v", hits)
+			}
+		})
+	}
+}
+
+// An AWS access key sharing a line with an ARN is matched by its own
+// structural pattern, which runs over the untouched line. Pinned because the
+// blanking is one edit away from being applied to every pattern.
+func TestW5SecretScan_ARNAdjacentAccessKeyIsStillFound(t *testing.T) {
+	const line = `{"role": "arn:aws:iam::123456789012:role/acme-task", "key": "AKIAIOSFODNN7EXAMPLE"}`
+	var found bool
+	for _, h := range secretscan.ScanText(line) {
+		if h.Kind == "aws-access-key" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no aws-access-key hit; the structural patterns run over the line before any ARN is blanked. got %+v", secretscan.ScanText(line))
+	}
+}

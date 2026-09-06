@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -610,7 +611,10 @@ type w5EBFake struct {
 	options   map[string][]ebtypes.ConfigurationOptionSetting
 	optionErr map[string]error
 	causes    map[string][]string
-	requests  []ebsvc.DescribeConfigurationSettingsInput
+	// mu guards requests: the enricher fans its per-environment calls out
+	// through ForEachParallel, so every recording write here is concurrent.
+	mu       sync.Mutex
+	requests []ebsvc.DescribeConfigurationSettingsInput
 }
 
 func newW5EBFake() *w5EBFake {
@@ -624,7 +628,9 @@ func newW5EBFake() *w5EBFake {
 func (f *w5EBFake) DescribeConfigurationSettings(_ context.Context, in *ebsvc.DescribeConfigurationSettingsInput, _ ...func(*ebsvc.Options)) (*ebsvc.DescribeConfigurationSettingsOutput, error) {
 	env := ""
 	if in != nil {
+		f.mu.Lock()
 		f.requests = append(f.requests, *in)
+		f.mu.Unlock()
 		if in.EnvironmentName != nil {
 			env = *in.EnvironmentName
 		}
@@ -727,8 +733,11 @@ func TestW5_EBReadsAllThreeSettingsFromOneCall(t *testing.T) {
 			t.Errorf("no finding %q; got %v", code, w2Codes(res.Findings[id]))
 		}
 	}
-	if len(f.requests) != 1 {
-		t.Errorf("DescribeConfigurationSettings called %d times for one environment; the response carries all three options, so once is enough", len(f.requests))
+	f.mu.Lock()
+	calls := len(f.requests)
+	f.mu.Unlock()
+	if calls != 1 {
+		t.Errorf("DescribeConfigurationSettings called %d times for one environment; the response carries all three options, so once is enough", calls)
 	}
 }
 
