@@ -40,8 +40,9 @@ import (
 // (EnrichmentParallelism goroutines).
 type strictSFNFake struct {
 	awsclient.SFNAPI
-	mu             sync.Mutex
-	listCalledWith string
+	mu                 sync.Mutex
+	listCalledWith     string
+	describeCalledWith string
 }
 
 func (f *strictSFNFake) ListExecutions(
@@ -60,6 +61,35 @@ func (f *strictSFNFake) ListExecutions(
 		}
 	}
 	return &sfn.ListExecutionsOutput{}, nil
+}
+
+// DescribeStateMachine rejects a bare name exactly as ListExecutions does.
+// This fake exists to catch the enricher handing AWS r.ID instead of the ARN
+// in Fields["arn"]; the enricher now makes a second ARN-taking call, and a
+// permissive stub would leave that one uncovered.
+func (f *strictSFNFake) DescribeStateMachine(
+	_ context.Context,
+	input *sfn.DescribeStateMachineInput,
+	_ ...func(*sfn.Options),
+) (*sfn.DescribeStateMachineOutput, error) {
+	got := aws.ToString(input.StateMachineArn)
+	f.mu.Lock()
+	f.describeCalledWith = got
+	f.mu.Unlock()
+	if !strings.HasPrefix(got, "arn:aws:") {
+		return nil, &smithy.GenericAPIError{
+			Code:    "InvalidArn",
+			Message: "Invalid Arn: 'Invalid ARN prefix: " + got + "'",
+		}
+	}
+	return &sfn.DescribeStateMachineOutput{StateMachineArn: input.StateMachineArn}, nil
+}
+
+// describeCalledWithSafe returns describeCalledWith, safe for concurrent use.
+func (f *strictSFNFake) describeCalledWithSafe() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.describeCalledWith
 }
 
 // listCalledWithSafe returns listCalledWith, safe for concurrent use with
@@ -92,6 +122,10 @@ func TestEnrichStepFunctions_UsesARNFromFields(t *testing.T) {
 	}
 	if got := fake.listCalledWithSafe(); got != smARN {
 		t.Errorf("ListExecutions was called with %q, want %q (the ARN from Fields[\"arn\"])",
+			got, smARN)
+	}
+	if got := fake.describeCalledWithSafe(); got != smARN {
+		t.Errorf("DescribeStateMachine was called with %q, want %q (the ARN from Fields[\"arn\"])",
 			got, smARN)
 	}
 }

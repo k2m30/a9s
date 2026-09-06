@@ -713,3 +713,13 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 		})
 	}
 }
+
+// GetEmailIdentity is the stub half of a partial test double: this fake embeds
+// SESv2API as a nil interface and implements only the calls the enricher
+// under test made when it was written. The enricher now also calls
+// GetEmailIdentity, and the promoted nil method panics rather than returning
+// anything. An empty output keeps this fake's own scenario unchanged —
+// no DKIM posture is asserted here.
+func (f *sesEnrichmentFake) GetEmailIdentity(_ context.Context, _ *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
+	return &sesv2.GetEmailIdentityOutput{}, nil
+}

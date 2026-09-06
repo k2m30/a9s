@@ -521,3 +521,28 @@ func bareFindingCount(result awsclient.IssueEnricherResult) int {
 	}
 	return n
 }
+
+// DescribeStateMachine is the stub half of a partial test double: this fake
+// embeds SFNAPI as a nil interface and implements only ListExecutions, which
+// was the enricher's only call when it was written. The enricher now also
+// reads logging, encryption and definition posture.
+//
+// The body returned is a HEALTHY one, not an empty one. An empty
+// DescribeStateMachineOutput is not neutral — nil LoggingConfiguration means
+// logging is off and nil EncryptionConfiguration means the AWS-owned key, so
+// an empty stub would add two findings to every scenario in this file and
+// change what its assertions are measuring.
+func (f *invSFNFake) DescribeStateMachine(_ context.Context, in *sfnsvc.DescribeStateMachineInput, _ ...func(*sfnsvc.Options)) (*sfnsvc.DescribeStateMachineOutput, error) {
+	return invSFNHealthyDescribe(in.StateMachineArn), nil
+}
+
+// invSFNHealthyDescribe is the configuration a state machine has when none of the
+// posture checks fire.
+func invSFNHealthyDescribe(arn *string) *sfnsvc.DescribeStateMachineOutput {
+	return &sfnsvc.DescribeStateMachineOutput{
+		StateMachineArn:         arn,
+		Definition:              aws.String(`{"StartAt":"Done","States":{"Done":{"Type":"Succeed"}}}`),
+		LoggingConfiguration:    &sfntypes.LoggingConfiguration{Level: sfntypes.LogLevelAll},
+		EncryptionConfiguration: &sfntypes.EncryptionConfiguration{Type: sfntypes.EncryptionTypeCustomerManagedKmsKey},
+	}
+}

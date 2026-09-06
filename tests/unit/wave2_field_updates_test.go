@@ -1319,3 +1319,49 @@ func TestFetchAMI_WritesDeprecated(t *testing.T) {
 		t.Errorf("deprecated field is empty — coder must compute deprecated field in FetchAMIsPage when DeprecationTime is set")
 	}
 }
+
+// DescribeStateMachine is the stub half of a partial test double: this fake
+// embeds SFNAPI as a nil interface and implements only ListExecutions, which
+// was the enricher's only call when it was written. The enricher now also
+// reads logging, encryption and definition posture.
+//
+// The body returned is a HEALTHY one, not an empty one. An empty
+// DescribeStateMachineOutput is not neutral — nil LoggingConfiguration means
+// logging is off and nil EncryptionConfiguration means the AWS-owned key, so
+// an empty stub would add two findings to every scenario in this file and
+// change what its assertions are measuring.
+func (f *sfnFakeW) DescribeStateMachine(_ context.Context, in *sfn.DescribeStateMachineInput, _ ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
+	return sfnFakeWHealthyDescribe(in.StateMachineArn), nil
+}
+
+// sfnFakeWHealthyDescribe is the configuration a state machine has when none of the
+// posture checks fire.
+func sfnFakeWHealthyDescribe(arn *string) *sfn.DescribeStateMachineOutput {
+	return &sfn.DescribeStateMachineOutput{
+		StateMachineArn:         arn,
+		Definition:              aws.String(`{"StartAt":"Done","States":{"Done":{"Type":"Succeed"}}}`),
+		LoggingConfiguration:    &sfntypes.LoggingConfiguration{Level: sfntypes.LogLevelAll},
+		EncryptionConfiguration: &sfntypes.EncryptionConfiguration{Type: sfntypes.EncryptionTypeCustomerManagedKmsKey},
+	}
+}
+
+// GetTopicAttributes is the stub half of a partial test double: this fake
+// embeds SNSAPI as a nil interface and implements only the subscription
+// listing, which was the enricher's only call when it was written.
+//
+// The attributes returned are a HEALTHY set, not an empty one. An empty
+// attribute map is not neutral — a missing KmsMasterKeyId means the topic is
+// unencrypted and a missing Policy is read as unknown — so an empty stub
+// would add an encryption finding to every scenario in this file and change
+// what its assertions are measuring.
+func (f *snsFakeW) GetTopicAttributes(_ context.Context, in *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+	arn := ""
+	if in != nil && in.TopicArn != nil {
+		arn = *in.TopicArn
+	}
+	return &sns.GetTopicAttributesOutput{Attributes: map[string]string{
+		"TopicArn":       arn,
+		"KmsMasterKeyId": "alias/aws/sns",
+		"Policy":         `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"SNS:Publish","Resource":"` + arn + `"}]}`,
+	}}, nil
+}

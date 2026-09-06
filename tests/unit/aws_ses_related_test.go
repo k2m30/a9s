@@ -60,7 +60,7 @@ func sesFixtureSrcIdentity(identityName string) resource.Resource {
 		Name: identityName,
 		Fields: map[string]string{
 			"identity_name": identityName,
-			"identity_type": "DOMAIN",
+			"identity_type": "domain",
 		},
 		RawStruct: sesv2types.IdentityInfo{
 			IdentityName: aws.String(identityName),
@@ -581,7 +581,7 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 			name: "support@acme.com → global + support-router only",
 			resource: resource.Resource{
 				ID:     "support@acme.com",
-				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+				Fields: map[string]string{"identity_type": "email address"},
 			},
 			wantNames:    []string{"global-router", "support-router"},
 			unwantedName: "sales-router",
@@ -590,7 +590,7 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 			name: "billing@acme.com → global only (no specific rule matches)",
 			resource: resource.Resource{
 				ID:     "billing@acme.com",
-				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+				Fields: map[string]string{"identity_type": "email address"},
 			},
 			wantNames:    []string{"global-router"},
 			unwantedName: "support-router",
@@ -601,7 +601,7 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 			name: "acme.com (DOMAIN) → global + support + sales (domain owns all subdomains/addresses)",
 			resource: resource.Resource{
 				ID:     "acme.com",
-				Fields: map[string]string{"identity_type": "DOMAIN"},
+				Fields: map[string]string{"identity_type": "domain"},
 			},
 			wantNames:    []string{"global-router", "support-router", "sales-router"},
 			unwantedName: "",
@@ -610,7 +610,7 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 			name: "sales.acme.com (DOMAIN subdomain) → global + sales-router only",
 			resource: resource.Resource{
 				ID:     "sales.acme.com",
-				Fields: map[string]string{"identity_type": "DOMAIN"},
+				Fields: map[string]string{"identity_type": "domain"},
 			},
 			wantNames:    []string{"global-router", "sales-router"},
 			unwantedName: "support-router",
@@ -687,7 +687,7 @@ func TestCheckSESLambda_ExtractsFunctionNameFromARN(t *testing.T) {
 	})
 	src := resource.Resource{
 		ID:     "billing@example.com",
-		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+		Fields: map[string]string{"identity_type": "email address"},
 	}
 
 	checker := sesCheckerByTarget(t, "lambda")
@@ -730,7 +730,7 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 			name: "support@acme.com → global + support bucket only",
 			resource: resource.Resource{
 				ID:     "support@acme.com",
-				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+				Fields: map[string]string{"identity_type": "email address"},
 			},
 			wantBuckets:    []string{sesBucketName("global"), sesBucketName("support")},
 			unwantedBucket: sesBucketName("sales"),
@@ -739,7 +739,7 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 			name: "billing@acme.com → global bucket only",
 			resource: resource.Resource{
 				ID:     "billing@acme.com",
-				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+				Fields: map[string]string{"identity_type": "email address"},
 			},
 			wantBuckets:    []string{sesBucketName("global")},
 			unwantedBucket: sesBucketName("support"),
@@ -748,7 +748,7 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 			name: "acme.com (DOMAIN) → all buckets",
 			resource: resource.Resource{
 				ID:     "acme.com",
-				Fields: map[string]string{"identity_type": "DOMAIN"},
+				Fields: map[string]string{"identity_type": "domain"},
 			},
 			wantBuckets:    []string{sesBucketName("global"), sesBucketName("support"), sesBucketName("sales")},
 			unwantedBucket: "",
@@ -757,7 +757,7 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 			name: "sales.acme.com (DOMAIN) → global + sales bucket only",
 			resource: resource.Resource{
 				ID:     "sales.acme.com",
-				Fields: map[string]string{"identity_type": "DOMAIN"},
+				Fields: map[string]string{"identity_type": "domain"},
 			},
 			wantBuckets:    []string{sesBucketName("global"), sesBucketName("sales")},
 			unwantedBucket: sesBucketName("support"),
@@ -838,7 +838,7 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 
 	src := resource.Resource{
 		ID:     "support@acme.com",
-		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+		Fields: map[string]string{"identity_type": "email address"},
 	}
 
 	checker := sesCheckerByTarget(t, "lambda")
@@ -892,7 +892,7 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 		ID:   "acme-corp.com",
 		Name: "acme-corp.com",
 		Fields: map[string]string{
-			"identity_type": "DOMAIN",
+			"identity_type": "domain",
 		},
 	}
 	zoneRes := resource.Resource{
@@ -935,7 +935,7 @@ func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T
 		ID:   "acme-corp.com",
 		Name: "acme-corp.com",
 		Fields: map[string]string{
-			"identity_type": "DOMAIN",
+			"identity_type": "domain",
 		},
 	}
 	nonMatchingZone := resource.Resource{

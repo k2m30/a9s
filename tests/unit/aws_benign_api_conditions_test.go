@@ -52,6 +52,30 @@ type sfnTypeAwareFake struct {
 	executions       map[string]sfntypes.ExecutionStatus
 	notSupportedARNs map[string]bool
 	calledARNs       map[string]bool
+	// unloggedARNs names the machines whose DescribeStateMachine body comes
+	// back with logging off and no customer key. Everything else answers
+	// healthy: an empty DescribeStateMachineOutput is NOT neutral — nil
+	// logging means off and nil encryption means the AWS-owned key — so a
+	// blanket empty stub would add two findings to every scenario in this
+	// file.
+	unloggedARNs map[string]bool
+}
+
+func (f *sfnTypeAwareFake) DescribeStateMachine(
+	_ context.Context,
+	params *sfn.DescribeStateMachineInput,
+	_ ...func(*sfn.Options),
+) (*sfn.DescribeStateMachineOutput, error) {
+	arn := aws.ToString(params.StateMachineArn)
+	out := &sfn.DescribeStateMachineOutput{
+		StateMachineArn: params.StateMachineArn,
+		Definition:      aws.String(`{"StartAt":"Done","States":{"Done":{"Type":"Succeed"}}}`),
+	}
+	if !f.unloggedARNs[arn] {
+		out.LoggingConfiguration = &sfntypes.LoggingConfiguration{Level: sfntypes.LogLevelAll}
+		out.EncryptionConfiguration = &sfntypes.EncryptionConfiguration{Type: sfntypes.EncryptionTypeCustomerManagedKmsKey}
+	}
+	return out, nil
 }
 
 func (f *sfnTypeAwareFake) ListExecutions(
@@ -87,7 +111,9 @@ func (f *sfnTypeAwareFake) ListExecutions(
 // StateMachineTypeNotSupported, so the enricher must recognize the type ahead
 // of the call rather than reacting to the error. A sibling STANDARD machine in
 // the same batch is enriched normally (finding produced when its latest
-// execution is FAILED).
+// execution is FAILED). The EXPRESS machine still gets the configuration
+// findings, which are derived from DescribeStateMachine and apply to every
+// state machine type — see the inverted assertion below.
 func TestEnrichStepFunctionsStatus_ExpressMachineSkipsListExecutions(t *testing.T) {
 	standardName := "standard-sm"
 	standardARN := "arn:aws:states:us-east-1:111111111111:stateMachine:standard-sm"
@@ -99,6 +125,9 @@ func TestEnrichStepFunctionsStatus_ExpressMachineSkipsListExecutions(t *testing.
 			standardARN: sfntypes.ExecutionStatusFailed,
 		},
 		notSupportedARNs: map[string]bool{
+			expressARN: true,
+		},
+		unloggedARNs: map[string]bool{
 			expressARN: true,
 		},
 	}
@@ -120,8 +149,27 @@ func TestEnrichStepFunctionsStatus_ExpressMachineSkipsListExecutions(t *testing.
 		t.Errorf("ListExecutions must still be called for the STANDARD state machine (arn=%s)", standardARN)
 	}
 
-	if _, ok := result.Findings[expressName]; ok {
-		t.Errorf("EXPRESS state machine %q must produce no finding from this enricher", expressName)
+	// Inverted deliberately. This used to assert the EXPRESS machine carried
+	// no finding at all, which conflated two different facts: it has no
+	// EXECUTION finding, because ListExecutions is never called for it, but
+	// its logging, encryption and definition are all readable and all three
+	// checks apply to it. The old assertion made exempting every EXPRESS
+	// workflow in an account look like the intended behaviour.
+	for _, f := range result.Findings[expressName] {
+		if f.Code == "sfn.latest-execution-failed" {
+			t.Errorf("EXPRESS state machine %q carries %q; ListExecutions is never called for it, so there is nothing to derive that from", expressName, f.Code)
+		}
+	}
+	// The express machine's DescribeStateMachine body has logging off and no
+	// customer key, so the configuration checks must still reach it.
+	expressCodes := map[string]bool{}
+	for _, f := range result.Findings[expressName] {
+		expressCodes[string(f.Code)] = true
+	}
+	for _, want := range []string{"sfn.logging-off", "sfn.no-cmk"} {
+		if !expressCodes[want] {
+			t.Errorf("EXPRESS state machine %q is missing %q; skipping the execution listing must not skip the whole item", expressName, want)
+		}
 	}
 	if _, ok := result.Findings[standardName]; !ok {
 		t.Errorf("expected a finding for the STANDARD state machine %q (latest execution FAILED)", standardName)

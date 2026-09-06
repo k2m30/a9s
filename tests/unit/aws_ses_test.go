@@ -74,8 +74,10 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	if r.Fields["identity_name"] != "acme-corp.com" {
 		t.Errorf("Fields[identity_name] = %q, want %q", r.Fields["identity_name"], "acme-corp.com")
 	}
-	if r.Fields["identity_type"] != "DOMAIN" {
-		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "DOMAIN")
+	// Inverted with the two below it: the Type column renders this field
+	// verbatim and an operator reads a column, not an SDK enum constant.
+	if r.Fields["identity_type"] != "domain" {
+		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "domain")
 	}
 	if r.Fields["sending_enabled"] != "true" {
 		t.Errorf("Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "true")
@@ -471,8 +473,8 @@ func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 		if r.Fields["status"] != "" {
 			t.Errorf("graph-root Fields[status] = %q, want empty (healthy)", r.Fields["status"])
 		}
-		if r.Fields["identity_type"] != "DOMAIN" {
-			t.Errorf("graph-root Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "DOMAIN")
+		if r.Fields["identity_type"] != "domain" {
+			t.Errorf("graph-root Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "domain")
 		}
 		if r.Fields["sending_enabled"] != "true" {
 			t.Errorf("graph-root Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "true")

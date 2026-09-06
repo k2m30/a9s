@@ -61,10 +61,13 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 		// open key policy, an issue-severity finding, so its cap genuinely
 		// lower-bounds the issue count and Truncated must be allowed to rise.
 		{"logs", awsclient.EnrichLogsMetricFilters},
-		{"msk", awsclient.EnrichMSKCluster},
+		// msk, sns and sqs are deliberately absent, for the same reason ddb,
+		// dbi and kms are: each now also emits a "!" finding — brokers
+		// reachable from the internet and unauthenticated access on msk, an
+		// open topic policy on sns, an open queue policy on sqs — so a capped
+		// walk really can hide an issue and Truncated is the correct answer
+		// for them. See TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated.
 		{"r53", awsclient.EnrichRoute53Zone},
-		{"sns", awsclient.EnrichSNSSubscriptions},
-		{"sqs", awsclient.EnrichSQSAttributes},
 		{"vpc", awsclient.EnrichVPCFlowLogs},
 		{"waf", awsclient.EnrichWAFLogging},
 	}
@@ -104,6 +107,45 @@ func TestTildeOnlyEnrichers_OverEnrichmentCap_TruncatedFalse(t *testing.T) {
 			result, _ := tc.fn(context.Background(), clients, resources, nil)
 			if result.Truncated {
 				t.Errorf("%s: Truncated = true for %d resources (cap=%d); want false — \"~\"-only enrichers must never let EnrichmentCap lower-bound the issue count",
+					tc.name, len(resources), awsclient.EnrichmentCap)
+			}
+		})
+	}
+}
+
+// brokenEmittingEnricherCases names the enrichers this batch moved OFF the
+// list above: each emits at least one "!" finding now, so its per-resource
+// cap does bound the issue count and the aggregate flag must say so.
+//
+// Removing them from the list above only stops asserting the old answer. It
+// does not assert the new one, and an enricher that still hard-codes
+// Truncated = false would sail through the gap. That is what this pins.
+func brokenEmittingEnricherCases() []tildeOnlyEnricherCase {
+	return []tildeOnlyEnricherCase{
+		{"msk", awsclient.EnrichMSKCluster},
+		{"sns", awsclient.EnrichSNSSubscriptions},
+		{"sqs", awsclient.EnrichSQSAttributes},
+	}
+}
+
+// TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated is the mirror of
+// the test above. An enricher that can emit a "!" finding and inspects only
+// the first EnrichmentCap resources has genuinely not seen the rest, so the
+// badge must render its count as a lower bound rather than as a total. A
+// hard-coded Truncated = false there under-reports the issue badge, and the
+// operator reads "no issues" for a queue nobody looked at.
+func TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated(t *testing.T) {
+	clients := demo.NewServiceClients()
+	resources := tildeOnlyOverCapResources()
+	if len(resources) <= awsclient.EnrichmentCap {
+		t.Fatalf("test setup: len(resources) = %d, want > EnrichmentCap (%d)", len(resources), awsclient.EnrichmentCap)
+	}
+
+	for _, tc := range brokenEmittingEnricherCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			result, _ := tc.fn(context.Background(), clients, resources, nil)
+			if !result.Truncated {
+				t.Errorf("%s: Truncated = false for %d resources (cap=%d); want true — this enricher emits a \"!\" finding, so everything past the cap is unexamined and the badge count is a lower bound",
 					tc.name, len(resources), awsclient.EnrichmentCap)
 			}
 		})

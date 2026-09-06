@@ -1282,3 +1282,13 @@ func TestEnrichCFNCombined_NilClient_ReturnsEmpty(t *testing.T) {
 		t.Errorf("expected no findings for nil client; got %v", result.Findings)
 	}
 }
+
+// DescribeConfigurationSettings is the stub half of a partial test double: this fake embeds
+// ElasticBeanstalkAPI as a nil interface and implements only the calls the enricher
+// under test made when it was written. The enricher now also calls
+// DescribeConfigurationSettings, and the promoted nil method panics rather than returning
+// anything. An empty output keeps this fake's own scenario unchanged —
+// no managed-updates, health-reporting or log-streaming posture is asserted here.
+func (f *fakeEBHealthEnricher) DescribeConfigurationSettings(_ context.Context, _ *elasticbeanstalk.DescribeConfigurationSettingsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
+	return &elasticbeanstalk.DescribeConfigurationSettingsOutput{}, nil
+}

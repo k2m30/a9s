@@ -152,3 +152,24 @@ func TestSNS_SubsCount_FollowsAllPages(t *testing.T) {
 		t.Errorf("ListSubscriptionsByTopic called %d times; want >=2 (pagination)", fake.calls)
 	}
 }
+
+// GetTopicAttributes is the stub half of a partial test double: this fake
+// embeds SNSAPI as a nil interface and implements only the subscription
+// listing, which was the enricher's only call when it was written.
+//
+// The attributes returned are a HEALTHY set, not an empty one. An empty
+// attribute map is not neutral — a missing KmsMasterKeyId means the topic is
+// unencrypted and a missing Policy is read as unknown — so an empty stub
+// would add an encryption finding to every scenario in this file and change
+// what its assertions are measuring.
+func (f *snsPagedFake) GetTopicAttributes(_ context.Context, in *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+	arn := ""
+	if in != nil && in.TopicArn != nil {
+		arn = *in.TopicArn
+	}
+	return &sns.GetTopicAttributesOutput{Attributes: map[string]string{
+		"TopicArn":       arn,
+		"KmsMasterKeyId": "alias/aws/sns",
+		"Policy":         `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"SNS:Publish","Resource":"` + arn + `"}]}`,
+	}}, nil
+}

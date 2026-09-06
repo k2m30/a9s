@@ -86,7 +86,7 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 
 	src := resource.Resource{
 		ID:     "any@example.com",
-		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+		Fields: map[string]string{"identity_type": "email address"},
 	}
 
 	checker := sesCheckerByTarget(t, "lambda")
@@ -182,7 +182,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	src := resource.Resource{
 		ID:     "any@example.com",
-		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+		Fields: map[string]string{"identity_type": "email address"},
 	}
 
 	checker := sesCheckerByTarget(t, "lambda")
@@ -215,7 +215,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	sesRes := resource.Resource{
 		ID:     "any@example.com",
 		Name:   "any@example.com",
-		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+		Fields: map[string]string{"identity_type": "email address"},
 	}
 
 	m := tui.New("demo", "us-east-1",
@@ -316,7 +316,7 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 
 	src := resource.Resource{
 		ID:     "any@example.com",
-		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+		Fields: map[string]string{"identity_type": "email address"},
 	}
 	checker := sesCheckerByTarget(t, "lambda")
 
