@@ -455,10 +455,6 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 			return relatedResult("role", []string{profileName})
 		}
 	}
-	if roleList == nil && truncated {
-		return relatedResultTrunc("role", nil, true)
-	}
-
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.IAM == nil {
 		if truncated {
