@@ -77,13 +77,16 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// knownStateCoverageGaps pins the exact inventory of missing demo-fixture
-// states captured at ratchet-conversion time, in two key shapes:
+// knownStateCoverageGaps is the burn-down allowlist, read from the per-type
+// Pin registrations in core/demo/fixtures: a type's gaps are declared in the
+// fixture file whose fixtures would close them, so burning one down edits
+// that one file instead of a list every type shares. Two key shapes:
 //
 //	"type:bucket"       e.g. "ec2:warning" — a domain.Color bucket
 //	                    (healthy|warning|broken|dim) with zero fixture
@@ -100,113 +103,7 @@ import (
 //   - present + now covered           -> FAIL ("remove from allowlist").
 //   - a gap NOT present here          -> FAIL unconditionally, a new
 //     regression the allowlist was never told about.
-var knownStateCoverageGaps = map[string]bool{
-	// Reason class: "the API cannot witness it beside healthy rows" —
-	// DescribeDomains is one batched call, so a denial degrades every listed
-	// domain at once; the demo witnesses the absent-from-response case
-	// (details_unavailable) and the AUTH path is unit-tested by the
-	// batch-denial stub.
-	"opensearch:opensearch.warn.details_denied": true,
-
-	// --- bucket gaps: type never resolves to this domain.Color via td.ResolveColor ---
-	//
-
-	// Reason class: "dim unreachable: AWS stops listing the resource once
-	// deleted" — the Dim bucket models a genuine AWS terminal "deleted"
-	// lifecycle state, but the type's own List/Describe API drops the
-	// resource from its output once torn down, so no fixture — demo or
-	// real — can ever witness it without misrepresenting live AWS
-	// behavior.
-	"redis:dim": true, // colorRedis (core/aws/catalog_databases.go) has no Dim branch — deleted as dead code per AWS API behavior (a torn-down ElastiCache ReplicationGroup simply stops appearing in DescribeReplicationGroups rather than reporting a "deleted" status; see docs/resources/redis.md §3.1/§3.2/§5 and the Bug 4 pin in aws_classifier_fivepack_test.go).
-
-	// Reason class: "color never modeled by the classifier or any
-	// FindingDef" — verified per entry against BOTH the type's Color func
-	// (core/aws/catalog_*.go — no switch case or FieldUpdates-driven
-	// branch returns this domain.Color) AND its registered
-	// catalog.FindingDef table (core/aws/catalog_*.go Findings: [] —
-	// no entry carries the matching Severity). With neither a structural
-	// path nor a registered Finding of that severity, no fixture of any
-	// shape could ever witness this bucket — it is not a fixture gap.
-	"alarm:dim":     true,
-	"apigw:dim":     true,
-	"asg:dim":       true,
-	"athena:broken": true, "athena:dim": true,
-	"backup:dim":       true,
-	"cb:dim":           true,
-	"codeartifact:dim": true,
-	"dbc:dim":          true,
-	"dbc-snap:dim":     true,
-	"dbi:dim":          true, "dbi-snap:dim": true,
-	"ddb:dim": true,
-	"ebs:dim": true, "ebs-snap:dim": true,
-	"ecr:dim": true,
-	"ecs:dim": true, "ecs-svc:dim": true,
-	"efs:dim":    true,
-	"eip:broken": true, "eip:dim": true,
-	"eks:dim":    true,
-	"elb:dim":    true,
-	"eni:broken": true, "eni:dim": true,
-	"glue:dim":         true,
-	"iam-group:broken": true, "iam-group:dim": true,
-	"iam-user:dim": true,
-	"igw:broken":   true, "igw:dim": true,
-	"kinesis:broken": true, "kinesis:dim": true,
-	"kms:dim":     true, // colorKMS (core/aws/catalog_secrets.go) has exactly three branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim return; docs/resources/kms.md §3.1/§3.2 document no Dim-producing signal for this type.
-	"logs:broken": true, "logs:dim": true,
-	"lt:dim":       true, // colorLT (core/aws/catalog_compute.go) is colorFromAnyFinding-only and no registered lt.* FindingDef is SevDim, so no fixture can resolve to the dim bucket; docs/resources/lt.md §4 documents no Dim-producing signal for this type.
-	"msk:dim":      true,
-	"ng:dim":       true,
-	"pipeline:dim": true, "pipeline:warning": true,
-	"policy:dim":     true,
-	"r53:dim":        true,
-	"redshift:dim":   true,
-	"role:dim":       true,
-	"rtb:dim":        true,
-	"s3:dim":         true,
-	"secrets:dim":    true,
-	"ses:dim":        true,
-	"sfn:dim":        true,
-	"sg:dim":         true,
-	"sns:dim":        true,
-	"sns-sub:broken": true,
-	"sqs:dim":        true,
-	"ssm:dim":        true,
-	"subnet:dim":     true,
-	"tg:dim":         true,
-	"trail:dim":      true,
-	"transfer:dim":   true, // colorTransfer (core/aws/catalog_networking.go) is colorFromAnyFinding-only, and no registered FindingDef carries SevDim — structurally, AWS Transfer Family's DescribeServer State enum (OFFLINE|ONLINE|STARTING|STOPPING|START_FAILED|STOP_FAILED per docs.aws.amazon.com/transfer/latest/APIReference/API_DescribeServer.html) has no deleted/terminal value at all, so no fixture of any shape could ever witness a Dim row for this type.
-	"vpc:broken":     true, "vpc:dim": true,
-	"waf:broken": true, "waf:dim": true,
-
-	// ct-events:healthy — colorCTEvents (core/aws/catalog_monitoring.go)
-	// has exactly two colored branches (ct-danger -> Broken, ct-attention ->
-	// Warning) and defaults every other status straight to Dim; Healthy is
-	// not a reachable return value from this classifier by design, not a
-	// fixture gap.
-	"ct-events:healthy": true,
-
-	// --- finding gaps: seeded 2026-07-06 from the machine findings registry
-	// (249 FindingDefs across all types). The 52 original entries from that
-	// census (apigw, asg, cfn, dbi, ebs, ecs, ecs-task, eks, eni, igw,
-	// kinesis, logs, msk, ng, redshift, secrets, sns, subnet, tgw, vpce)
-	// have since been burned down — each now has a demo fixture producing
-	// the finding. s3 is deliberately absent and MUST stay absent: its
-	// per-resource Wave-1/Wave-2 "public access block incomplete" signal
-	// (EnrichS3Posture / GetPublicAccessBlockOutput fixtures)
-	// already flows into TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture
-	// in qa_demo_pivot_coverage_test.go, which is unaffected by this ratchet.
-	//
-	// Only the three ses codes remain: SES exposes exactly one
-	// GetAccount-shaped Wave-2 signal per account (no per-resource dimension
-	// to vary), and the canonical demo account is intentionally modeled
-	// healthy so the rest of the demo fleet has a non-degraded sending
-	// identity to reference. The distress shapes for account-shutdown /
-	// account-probation / quota-high are constructed inline in QA tests
-	// instead (see core/demo/fixtures/ses.go's own doc comment).
-	"ses:ses.account-shutdown":  true,
-	"ses:ses.account-probation": true,
-	"ses:ses.quota-high":        true,
-}
+var knownStateCoverageGaps = fixtures.CoverageGaps()
 
 // bucketName maps a domain.Color to the lowercase token used in
 // knownStateCoverageGaps keys and log output.

@@ -3,12 +3,15 @@
 package integration
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -167,69 +170,108 @@ func TestFourRules_Demo_R4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	scenario.ExpectViewContains("EC2 Instances")
 }
 
-// TestFourRules_Demo_R1_SpecificTypesShowIssueCounts is a strict regression pin
-// that verifies exact per-type issue counts after Wave 1. It complements the
-// broad smoke-test TestFourRules_Demo_R1_IssueCountsOnMenuAfterWave1: a
-// regression that silently drops issue counts for a specific type will pass the
-// smoke-test but fail here.
-func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
-	scenario := fullIntegrationNewDemoScenarioWithWave1(t)
-	view := scenario.currentView()
+// renderedMenuCounts parses the Wave-1 main menu into the numbers it shows per
+// type — "EC2 Instances (40) issues:15" — keyed by shortName. A truncated
+// count's "+" is dropped: a fixtures.Pin carries numbers, not truncation. A
+// type the menu shows without a count is absent from the result.
+func renderedMenuCounts(t *testing.T, view string) map[string]menuCounts {
+	t.Helper()
+	out := make(map[string]menuCounts)
+	for _, rt := range resource.AllResourceTypes() {
+		prefix := rt.Name + " ("
+		idx := strings.Index(view, prefix)
+		if idx == -1 {
+			continue
+		}
+		rest := view[idx+len(prefix):]
+		if nl := strings.IndexByte(rest, '\n'); nl != -1 {
+			rest = rest[:nl]
+		}
+		end := strings.IndexByte(rest, ')')
+		if end == -1 {
+			t.Fatalf("malformed menu count for %q in line %q", rt.Name, rest)
+		}
+		var counts menuCounts
+		if _, err := parseInt2(strings.TrimSuffix(rest[:end], "+"), &counts.rows); err != nil {
+			t.Fatalf("could not parse row count %q for %q", rest[:end], rt.Name)
+		}
+		if badge, ok := strings.CutPrefix(rest[end+1:], " issues:"); ok {
+			if cut := strings.IndexFunc(badge, func(r rune) bool { return r < '0' || r > '9' }); cut != -1 {
+				badge = badge[:cut]
+			}
+			if _, err := parseInt2(badge, &counts.issues); err != nil {
+				t.Fatalf("could not parse issue badge %q for %q", badge, rt.Name)
+			}
+		}
+		out[rt.ShortName] = counts
+	}
+	return out
+}
 
-	// Each entry is the exact substring that must appear in the ANSI-stripped
-	// main menu after Wave 1 completes. Counts are pinned against the demo
-	// fixture data that ships with the binary.
-	//
-	// These badges are measured at the WAVE-1 stage, so they are lower than
-	// the settled badges the scenario tests pin — a Healthy row carrying only
-	// a Wave-2 `!` has not been counted yet. Two live examples: DB Clusters
-	// reads 14 here and 15 in scenario_dbc_visual_test.go (healthy-dbc-maint-
-	// overdue is Wave-2 only), and EFS File Systems reads 8 here and 10 in
-	// scenario_efs_visual_test.go (fs-0healthymtdown001 and
-	// fs-0publicpolicy0001 are Wave-2 only). A mismatch between the two is
-	// expected; a mismatch in the same direction on a type with no Wave-2
-	// enricher, like redis, is not.
-	//
-	// Seven moved when the compute, databases and security batches landed —
-	// both the row count, because each batch added witness fixtures, and the
-	// badge, because those fixtures carry findings. The per-row derivations
-	// live next to the scenario pins for each type.
-	//
-	// ECS Services moved again for the same reason: acme-svc-stalled is the
-	// witness for a service that wants tasks and is running none, so it adds
-	// one row and one Broken badge.
-	pins := []string{
-		"EC2 Instances (40) issues:15",
-		"ECS Services (26) issues:7",
-		// d4 row 1: 42 -> 28. Sixteen rows carried
-		// dbi.warn.deletion_protection_off because the bulk pool left
-		// DeletionProtection unset; the pool now sets it and only
-		// warn-dbi-unprotected keeps the finding. Fourteen of the fifteen rows
-		// that lost it had no other issue, so the badge falls by exactly
-		// fourteen. Do not restore 42 — TestD4_DeletionProtectionHasOneWitness
-		// fails on it.
-		"DB Instances (50) issues:28",
-		"EBS Volumes (8) issues:5",
-		"Elastic Beanstalk (10) issues:4",
-		"EBS Snapshots (9) issues:5",
-		"EKS Clusters (8) issues:6",
-		"ElastiCache Redis (17) issues:13",
-		"DB Clusters (17) issues:14",
-		"EFS File Systems (12) issues:8",
-		"NAT Gateways (6) issues:3",
-		"AMIs (9) issues:4",
-		"Load Balancers (24) issues:3",
+type menuCounts struct{ rows, issues int }
+
+// TestFourRules_Demo_R1_SpecificTypesShowIssueCounts is a strict regression pin
+// that verifies exact per-type row counts and Wave-1 issue badges. It
+// complements the broad smoke-test
+// TestFourRules_Demo_R1_IssueCountsOnMenuAfterWave1: a regression that
+// silently drops issue counts for a specific type will pass the smoke-test but
+// fail here.
+//
+// The expected numbers come from each type's own fixtures.Pin, declared beside
+// the fixtures that produce them, and are compared against numbers re-parsed
+// from the rendered menu. Both halves are Wave-1 badges: a Healthy row
+// carrying only a Wave-2 `!` is not counted yet, so a type's Pin is lower than
+// the settled badge its scenario test pins (dbc reads 14 here and 15 in
+// scenario_dbc_visual_test.go). That gap is expected on a type with a Wave-2
+// enricher and a defect on a type without one.
+func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
+	pins := fixtures.Pins()
+	if len(pins) == 0 {
+		t.Fatal("no type registered a fixtures.Pin — this test has no expected counts to check")
 	}
 
-	var missing []string
-	for _, pin := range pins {
-		if !strings.Contains(view, pin) {
-			missing = append(missing, pin)
+	scenario := fullIntegrationNewDemoScenarioWithWave1(t)
+	rendered := renderedMenuCounts(t, scenario.currentView())
+
+	for _, p := range pins {
+		got, ok := rendered[p.ShortName]
+		if !ok {
+			t.Errorf("%s: pinned Rows=%d Issues=%d but the demo menu shows no count for this type",
+				p.ShortName, p.Rows, p.Issues)
+			continue
+		}
+		if got.rows != p.Rows || got.issues != p.Issues {
+			t.Errorf("%s: menu shows (%d) issues:%d, Pin says Rows=%d Issues=%d — "+
+				"move the number in that type's fixture file",
+				p.ShortName, got.rows, got.issues, p.Rows, p.Issues)
 		}
 	}
+}
+
+// TestFourRules_Demo_R1_EveryDemoMenuTypeIsPinned is the other direction: a
+// type whose count the demo menu shows and whose fixture file registers no
+// Pin has no regression pin at all. The literal table this test replaced
+// covered thirteen types out of the whole menu, so a fixture change to any
+// other type moved its counts silently.
+func TestFourRules_Demo_R1_EveryDemoMenuTypeIsPinned(t *testing.T) {
+	pinned := make(map[string]bool)
+	for _, p := range fixtures.Pins() {
+		pinned[p.ShortName] = true
+	}
+
+	scenario := fullIntegrationNewDemoScenarioWithWave1(t)
+	rendered := renderedMenuCounts(t, scenario.currentView())
+
+	var missing []string
+	for shortName, counts := range rendered {
+		if !pinned[shortName] {
+			missing = append(missing, fmt.Sprintf("%s (%d) issues:%d", shortName, counts.rows, counts.issues))
+		}
+	}
+	sort.Strings(missing)
 	if len(missing) > 0 {
-		t.Errorf("R1 regression: %d pin(s) missing from main menu view:\n  - %s\nfull view:\n%s",
-			len(missing), strings.Join(missing, "\n  - "), view)
+		t.Errorf("%d demo menu type(s) register no fixtures.Pin — add one in each type's fixture file:\n  %s",
+			len(missing), strings.Join(missing, "\n  "))
 	}
 }
 
