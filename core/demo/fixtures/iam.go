@@ -84,7 +84,10 @@ const (
 	// RoleScopedWildcardTrust is the healthy counterpart of
 	// role.trust.wildcard-principal: it trusts any AWS principal, but only one
 	// holding the agreed external ID, which is the documented cross-account
-	// pattern. It must render with no finding.
+	// pattern. It must render with no finding. It is also filed under an IAM
+	// path, so it is the second witness for the rule that reads a role name
+	// out of a path-carrying ARN — one witness can be satisfied by a
+	// coincidence of its own spelling, two cannot.
 	RoleScopedWildcardTrust = "acme-partner-integration-role"
 	// RoleAdminAttached carries the AWS-managed AdministratorAccess policy —
 	// role.admin-attached.
@@ -351,8 +354,8 @@ func buildIAMRoles() []iamtypes.Role {
 		iamtypes.Role{
 			RoleName:                 aws.String(RoleScopedWildcardTrust),
 			RoleId:                   aws.String("AROAEXAMPLESCOPEDWC1"),
-			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RoleScopedWildcardTrust),
-			Path:                     aws.String("/"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/acme/partners/" + RoleScopedWildcardTrust),
+			Path:                     aws.String("/acme/partners/"),
 			CreateDate:               aws.Time(time.Date(2025, 4, 8, 10, 0, 0, 0, time.UTC)),
 			Description:              aws.String("Cross-account role a partner assumes with the agreed external ID"),
 			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"acme-partner-9f3c2"}}}]}`),

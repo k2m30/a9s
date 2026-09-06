@@ -149,12 +149,21 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 		return resource.UnknownRelated(target)
 	}
 
-	byID := make(map[string]string, len(resourceList)*2)
+	byID := make(map[string]string, len(resourceList)*3)
 	for _, r := range resourceList {
 		byID[r.ID] = r.ID
 		if r.Name != "" {
 			if _, taken := byID[r.Name]; !taken {
 				byID[r.Name] = r.ID
+			}
+		}
+		// A secret's id is its name while its ARN carries the six random
+		// characters AWS appends, so an event that named the ARN can only be
+		// confirmed here. Exact equality against the row's own ARN, so no id
+		// is guessed and the suffix is never stripped.
+		if arn := r.Fields["arn"]; arn != "" {
+			if _, taken := byID[arn]; !taken {
+				byID[arn] = r.ID
 			}
 		}
 	}
@@ -178,13 +187,19 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 
 // ctIDAlternatives returns the candidate ids for one value an event named,
 // derived from what the event wrote and never from the ARN's fixed grammar.
-// An ARN contributes only the id inside its resource part — everything after
-// the type word, as one string — so no segment of the grammar and no type word
-// can answer for a resource. Anything else contributes itself. A fragment of a
-// name is not a form of it.
+// An ARN contributes the id inside its resource part — everything after the
+// type word, as one string — and then itself, so no segment of the grammar and
+// no type word can answer for a resource. Anything else contributes itself. A
+// fragment of a name is not a form of it.
 func ctIDAlternatives(v string) []string {
 	if parts := strings.SplitN(v, ":", 6); strings.HasPrefix(v, "arn:") && len(parts) == 6 {
-		return ctStripTypeWord(parts[5], "/:")
+		// The whole ARN is offered last, behind the resource-part forms: a
+		// list that carries its rows' own ARNs can answer it exactly, which
+		// is the only way to confirm an id whose ARN carries a suffix the
+		// name does not. Last because the callers that read a group
+		// positionally (cfnStackNameFromResourceName, ctLambdaAlternatives)
+		// read the resource part at [0] and its stripped form at [1].
+		return append(ctStripTypeWord(parts[5], "/:"), v)
 	}
 	// Not an ARN: the value IS the id. An event may still write the resource
 	// part alone ("instance/i-abc"), so the type-word strip is offered behind

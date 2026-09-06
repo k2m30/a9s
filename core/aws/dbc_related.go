@@ -4,6 +4,8 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -14,6 +16,11 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// errDbcNoClusterDetail is the answer when the row carries no DB-cluster struct
+// to read a subnet-group name from, so the pivot has neither a fact nor a
+// failed call to report.
+var errDbcNoClusterDetail = errors.New("cluster details are not loaded")
 
 // dbcSubnetGroupInfo is a minimal, engine-agnostic view of a DBSubnetGroup that
 // the dbc → subnet and dbc → vpc pivots need. Both dbcDocDBSubnetGroup and
@@ -239,9 +246,12 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 // to c.RDS; for docdb_types.DBCluster shapes it goes to c.DocDB.
 // See docs/resources/dbc.md §1 Coverage.
 func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	sng := dbcSubnetGroup(ctx, clients, res)
+	sng, err := dbcSubnetGroup(ctx, clients, res)
+	if err != nil {
+		return resource.ErrorRelated("subnet", err)
+	}
 	if sng == nil {
-		return resource.UnknownRelated("subnet")
+		return resource.KnownRelated("subnet", nil, false)
 	}
 	var ids []string
 	for _, s := range sng.Subnets {
@@ -256,9 +266,12 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 // single DescribeDBSubnetGroups call (Pattern C). Engine dispatch mirrors
 // checkDbcSubnet — Aurora rows use c.RDS, DocDB rows use c.DocDB.
 func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	sng := dbcSubnetGroup(ctx, clients, res)
+	sng, err := dbcSubnetGroup(ctx, clients, res)
+	if err != nil {
+		return resource.ErrorRelated("vpc", err)
+	}
 	if sng == nil {
-		return resource.UnknownRelated("vpc")
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
 		return resource.KnownRelated("vpc", nil, false)
@@ -271,71 +284,78 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 //   - rdstypes.DBCluster  → dbcRDSSubnetGroup  (Aurora / Multi-AZ; RDS API)
 //   - docdb_types.DBCluster → dbcDocDBSubnetGroup (DocumentDB; DocDB API)
 //
-// Returns nil if the shape is unrecognised, the clients pointer is nil, or the
-// API call returns no groups.
-func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *dbcSubnetGroupInfo {
+// A nil group with a nil error means the cluster names no subnet group, or the
+// named group no longer exists; an error means the describe could not be made
+// or failed.
+func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) (*dbcSubnetGroupInfo, error) {
 	if _, ok := assertStruct[rdstypes.DBCluster](res.RawStruct); ok {
 		return dbcRDSSubnetGroup(ctx, clients, res)
 	}
 	if _, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok {
 		return dbcDocDBSubnetGroup(ctx, clients, res)
 	}
-	return nil
+	return nil, errDbcNoClusterDetail
 }
 
 // dbcRDSSubnetGroup resolves the subnet group for an Aurora / Multi-AZ DB
 // cluster (rdstypes.DBCluster shape) by calling c.RDS.DescribeDBSubnetGroups.
 // Aurora subnet groups belong to the RDS API, not the DocDB API.
-func dbcRDSSubnetGroup(ctx context.Context, clients any, res resource.Resource) *dbcSubnetGroupInfo {
+func dbcRDSSubnetGroup(ctx context.Context, clients any, res resource.Resource) (*dbcSubnetGroupInfo, error) {
 	name := dbcClusterSubnetGroupName(res.RawStruct)
 	if name == "" {
-		return nil
+		return nil, nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.RDS == nil {
-		return nil
+		return nil, errDbcNoClusterDetail
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBSubnetGroupsOutput, error) {
 		return c.RDS.DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{
 			DBSubnetGroupName: &name,
 		})
 	})
-	if err != nil || out == nil || len(out.DBSubnetGroups) == 0 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
+	}
+	if out == nil || len(out.DBSubnetGroups) == 0 {
+		return nil, nil
 	}
 	sg := out.DBSubnetGroups[0]
 	info := &dbcSubnetGroupInfo{VpcId: sg.VpcId}
 	for _, s := range sg.Subnets {
 		info.Subnets = append(info.Subnets, dbcSubnetIdentifier{SubnetIdentifier: s.SubnetIdentifier})
 	}
-	return info
+	return info, nil
 }
 
 // dbcDocDBSubnetGroup resolves the subnet group for a DocumentDB cluster
 // (docdb_types.DBCluster shape) by calling c.DocDB.DescribeDBSubnetGroups.
-func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource) *dbcSubnetGroupInfo {
+func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource) (*dbcSubnetGroupInfo, error) {
 	name := dbcClusterSubnetGroupName(res.RawStruct)
 	if name == "" {
-		return nil
+		return nil, nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.DocDB == nil {
-		return nil
+		return nil, errDbcNoClusterDetail
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBSubnetGroupsOutput, error) {
 		return c.DocDB.DescribeDBSubnetGroups(ctx, &docdb.DescribeDBSubnetGroupsInput{
 			DBSubnetGroupName: &name,
 		})
 	})
-	if err != nil || out == nil || len(out.DBSubnetGroups) == 0 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
+	}
+	if out == nil || len(out.DBSubnetGroups) == 0 {
+		return nil, nil
 	}
 	sg := out.DBSubnetGroups[0]
 	info := &dbcSubnetGroupInfo{VpcId: sg.VpcId}
 	for _, s := range sg.Subnets {
 		info.Subnets = append(info.Subnets, dbcSubnetIdentifier{SubnetIdentifier: s.SubnetIdentifier})
 	}
-	return info
+	return info, nil
 }
 
 // checkDbcSecrets resolves the Secrets Manager secret managed for this cluster's

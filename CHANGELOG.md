@@ -291,6 +291,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A Redis replication group or database cluster whose subnets cannot be reached
+  now says which it is. The panel showed a bare `?` for three different
+  answers: the group has no member cluster to read, the member is not in a
+  subnet group at all, or the call to look failed. The first two now read as a
+  proven zero and the third reads as the error, on the Subnets and VPC rows of
+  both types. A group with no members reads zero on its Security Groups and SNS
+  Topics rows too, which used to render a label with no count beside it.
+- A CloudTrail event that names a secret by its full ARN now finds it. Secrets
+  Manager appends six random characters to the ARN that the secret's name does
+  not carry, so the event could never be matched against the secrets list and
+  the row read zero. The panel now matches an event's ARN against the list's
+  own ARN, which is exact rather than guessed.
 - A hosted zone no longer reports load balancers, CloudFront distributions or
   other targets that do not exist. Its alias records name a DNS target, and the
   panel used to turn that name straight into a count, so a zone whose alias

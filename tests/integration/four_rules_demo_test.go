@@ -213,7 +213,7 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 		"Elastic Beanstalk (7) issues:4",
 		"EBS Snapshots (9) issues:5",
 		"EKS Clusters (6) issues:4",
-		"ElastiCache Redis (16) issues:13",
+		"ElastiCache Redis (17) issues:13",
 		"DB Clusters (17) issues:14",
 		"EFS File Systems (12) issues:8",
 		"NAT Gateways (6) issues:3",

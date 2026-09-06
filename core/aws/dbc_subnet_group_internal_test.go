@@ -117,7 +117,7 @@ func TestDbcSubnetGroup_DocDBShape(t *testing.T) {
 		},
 	}
 
-	info := dbcSubnetGroup(context.Background(), clients, res)
+	info, _ := dbcSubnetGroup(context.Background(), clients, res)
 	if info == nil {
 		t.Fatal("dbcSubnetGroup returned nil for docdb shape with valid client")
 	}
@@ -162,7 +162,7 @@ func TestDbcSubnetGroup_RDSShape(t *testing.T) {
 		},
 	}
 
-	info := dbcSubnetGroup(context.Background(), clients, res)
+	info, _ := dbcSubnetGroup(context.Background(), clients, res)
 	if info == nil {
 		t.Fatal("dbcSubnetGroup returned nil for rds shape with valid client")
 	}
@@ -188,7 +188,7 @@ func TestDbcSubnetGroup_NilClient_DocDB(t *testing.T) {
 		},
 	}
 	// Pass nil clients — dbcDocDBSubnetGroup must short-circuit.
-	info := dbcSubnetGroup(context.Background(), nil, res)
+	info, _ := dbcSubnetGroup(context.Background(), nil, res)
 	if info != nil {
 		t.Errorf("dbcSubnetGroup = %+v, want nil when clients is nil", info)
 	}
@@ -205,7 +205,7 @@ func TestDbcSubnetGroup_NilClient_RDS(t *testing.T) {
 		},
 	}
 	// Pass nil clients — dbcRDSSubnetGroup must short-circuit.
-	info := dbcSubnetGroup(context.Background(), nil, res)
+	info, _ := dbcSubnetGroup(context.Background(), nil, res)
 	if info != nil {
 		t.Errorf("dbcSubnetGroup = %+v, want nil when clients is nil", info)
 	}
@@ -218,7 +218,7 @@ func TestDbcSubnetGroup_UnrecognisedShape(t *testing.T) {
 		ID:        "unknown",
 		RawStruct: "not-a-cluster",
 	}
-	info := dbcSubnetGroup(context.Background(), nil, res)
+	info, _ := dbcSubnetGroup(context.Background(), nil, res)
 	if info != nil {
 		t.Errorf("dbcSubnetGroup = %+v, want nil for unrecognised shape", info)
 	}
@@ -233,7 +233,7 @@ func TestDbcSubnetGroup_NoSubnetGroupName_DocDB(t *testing.T) {
 		ID:        "prod-docdb-no-sng",
 		RawStruct: docdbtypes.DBCluster{DBClusterIdentifier: aws.String("prod-docdb-no-sng"), DBSubnetGroup: nil},
 	}
-	info := dbcSubnetGroup(context.Background(), clients, res)
+	info, _ := dbcSubnetGroup(context.Background(), clients, res)
 	if info != nil {
 		t.Errorf("dbcSubnetGroup = %+v, want nil when DBSubnetGroup name is absent", info)
 	}

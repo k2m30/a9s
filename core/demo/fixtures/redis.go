@@ -21,6 +21,16 @@ const (
 	// ProdRedisARN is the ARN of the graph-root replication group.
 	ProdRedisARN = "arn:aws:elasticache:us-east-1:123456789012:replicationgroup:prod-redis-sessions"
 
+	// RedisNoSubnetGroupID is the replication group whose member cluster names
+	// no subnet group, so the subnet and vpc pivots have nothing to reach and
+	// resolve a proven zero rather than answering "we could not tell".
+	RedisNoSubnetGroupID = "legacy-redis-classic"
+
+	// RedisNoSubnetGroupMemberID is that group's member cluster. It is
+	// hand-written rather than derived, because withRedisMemberClusters gives
+	// every derived member the shared subnet group.
+	RedisNoSubnetGroupMemberID = "legacy-redis-classic-001"
+
 	// ProdRedisMemberClusterID is the primary member CacheCluster of the graph-root RG.
 	// Related checkers that need SG / SNS / subnet data call DescribeCacheClusters on this ID.
 	ProdRedisMemberClusterID = "prod-redis-sessions-001"
@@ -298,6 +308,25 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 			TransitEncryptionEnabled: aws.Bool(true),
 			AuthTokenEnabled:         aws.Bool(false),
 			SnapshotRetentionLimit:   aws.Int32(0),
+		},
+
+		// Healthy, and the witness for the subnet/vpc pivots' proven zero: its
+		// member cluster names no subnet group, so there is none to resolve.
+		{
+			ReplicationGroupId:       aws.String(RedisNoSubnetGroupID),
+			Description:              aws.String("Legacy Redis outside a VPC"),
+			ARN:                      aws.String("arn:aws:elasticache:us-east-1:123456789012:replicationgroup:" + RedisNoSubnetGroupID),
+			Status:                   aws.String("available"),
+			Engine:                   aws.String("redis"),
+			MultiAZ:                  elasticachetypes.MultiAZStatusDisabled,
+			AutomaticFailover:        elasticachetypes.AutomaticFailoverStatusDisabled,
+			CacheNodeType:            aws.String("cache.t3.small"),
+			MemberClusters:           []string{RedisNoSubnetGroupMemberID},
+			AtRestEncryptionEnabled:  aws.Bool(true),
+			TransitEncryptionEnabled: aws.Bool(true),
+			AuthTokenEnabled:         aws.Bool(true),
+			SnapshotRetentionLimit:   aws.Int32(1),
+			SnapshotWindow:           aws.String("05:00-06:00"),
 		},
 
 		// Warning: Status=modifying — config change in progress.
@@ -734,6 +763,21 @@ func withRedisMemberClusters(clusters []elasticachetypes.CacheCluster, groups []
 // group's first member is derived by withRedisMemberClusters.
 func buildRedisCacheClusters() []elasticachetypes.CacheCluster {
 	return []elasticachetypes.CacheCluster{
+		// The member cluster that names no subnet group. Written out here so
+		// withRedisMemberClusters leaves it alone; everything the subnet and
+		// vpc pivots read is absent by design.
+		{
+			CacheClusterId:            aws.String(RedisNoSubnetGroupMemberID),
+			ReplicationGroupId:        aws.String(RedisNoSubnetGroupID),
+			ARN:                       aws.String("arn:aws:elasticache:us-east-1:123456789012:cluster:" + RedisNoSubnetGroupMemberID),
+			CacheClusterStatus:        aws.String("available"),
+			CacheNodeType:             aws.String("cache.t3.small"),
+			Engine:                    aws.String("redis"),
+			EngineVersion:             aws.String("7.1"),
+			NumCacheNodes:             aws.Int32(1),
+			PreferredAvailabilityZone: aws.String("us-east-1a"),
+		},
+
 		// Graph-root primary member cluster — carries all related-panel pivot fields.
 		{
 			CacheClusterId:            aws.String(ProdRedisMemberClusterID),

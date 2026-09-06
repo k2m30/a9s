@@ -8,6 +8,8 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,6 +22,11 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// errRedisNoGroupDetail is the answer when the row carries no replication-group
+// struct to read a member from, so the pivot has neither a fact nor a failed
+// call to report.
+var errRedisNoGroupDetail = errors.New("replication group details are not loaded")
 
 // checkRedisAlarms checks the alarm cache for CloudWatch alarms with a
 // CacheClusterId dimension matching any member cluster of this replication group.
@@ -336,13 +343,12 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 // DescribeCacheClusters on MemberClusters[0] and reading SecurityGroups[].
 // All members share the same SG set, so one call is sufficient.
 func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	cc := redisMemberCluster(ctx, clients, res)
+	cc, err := redisMemberCluster(ctx, clients, res)
+	if err != nil {
+		return resource.ErrorRelated("sg", err)
+	}
 	if cc == nil {
-		// redisMemberCluster collapses "no members", "wrong client type", and
-		// "DescribeCacheClusters failed" into nil — we cannot tell which, so
-		// this is unresolved, not a proven zero (mirrors dbc_related.go's
-		// checkDbcSubnet/checkDbcVPC for the same two-hop shape).
-		return resource.UnknownRelated("sg")
+		return resource.KnownRelated("sg", nil, false)
 	}
 	sgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
@@ -382,10 +388,12 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 // NotificationConfiguration.TopicArn and matches it against the sns cache.
 // Uses the same DescribeCacheClusters call as checkRedisSG.
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	cc := redisMemberCluster(ctx, clients, res)
+	cc, err := redisMemberCluster(ctx, clients, res)
+	if err != nil {
+		return resource.ErrorRelated("sns", err)
+	}
 	if cc == nil {
-		// See checkRedisSG: redisMemberCluster's nil is unresolved, not proven.
-		return resource.UnknownRelated("sns")
+		return resource.KnownRelated("sns", nil, false)
 	}
 	if cc.NotificationConfiguration == nil || cc.NotificationConfiguration.TopicArn == nil || *cc.NotificationConfiguration.TopicArn == "" {
 		return resource.KnownRelated("sns", nil, false)
@@ -426,13 +434,12 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 // DescribeCacheClusters on MemberClusters[0] to get CacheSubnetGroupName, then
 // calling DescribeCacheSubnetGroups to read the individual subnet IDs.
 func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	sng := redisSubnetGroup(ctx, clients, res)
+	sng, err := redisSubnetGroup(ctx, clients, res)
+	if err != nil {
+		return resource.ErrorRelated("subnet", err)
+	}
 	if sng == nil {
-		// redisSubnetGroup collapses "no member cluster", "no subnet group
-		// name", and "DescribeCacheSubnetGroups failed" into nil — we cannot
-		// tell which, so this is unresolved, not a proven zero (mirrors
-		// dbc_related.go's checkDbcSubnet for the same two-hop shape).
-		return resource.UnknownRelated("subnet")
+		return resource.KnownRelated("subnet", nil, false)
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
@@ -472,10 +479,12 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 // checkRedisVPC resolves the VPC for the replication group via the same
 // DescribeCacheSubnetGroups call used by checkRedisSubnet.
 func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	sng := redisSubnetGroup(ctx, clients, res)
+	sng, err := redisSubnetGroup(ctx, clients, res)
+	if err != nil {
+		return resource.ErrorRelated("vpc", err)
+	}
 	if sng == nil {
-		// See checkRedisSubnet: redisSubnetGroup's nil is unresolved, not proven.
-		return resource.UnknownRelated("vpc")
+		return resource.KnownRelated("vpc", nil, false)
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
 		return resource.KnownRelated("vpc", nil, false)
@@ -484,16 +493,21 @@ func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ re
 }
 
 // redisMemberCluster calls DescribeCacheClusters on MemberClusters[0] of the
-// replication group. Returns nil when the RG has no members or the call fails.
-// SG, SNS, and SubnetGroup data all live on the member cluster struct.
-func redisMemberCluster(ctx context.Context, clients any, res resource.Resource) *elasticachetypes.CacheCluster {
+// replication group. SG, SNS, and SubnetGroup data all live on the member
+// cluster struct. The three outcomes are distinct: a cluster, a nil cluster
+// with a nil error (the group has no member to read — a fact about the group),
+// or an error (we could not look).
+func redisMemberCluster(ctx context.Context, clients any, res resource.Resource) (*elasticachetypes.CacheCluster, error) {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
-	if !ok || len(rg.MemberClusters) == 0 {
-		return nil
+	if !ok {
+		return nil, errRedisNoGroupDetail
+	}
+	if len(rg.MemberClusters) == 0 {
+		return nil, nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
-		return nil
+		return nil, errRedisNoGroupDetail
 	}
 	memberID := rg.MemberClusters[0]
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeCacheClustersOutput, error) {
@@ -501,24 +515,33 @@ func redisMemberCluster(ctx context.Context, clients any, res resource.Resource)
 			CacheClusterId: &memberID,
 		})
 	})
-	if err != nil || out == nil || len(out.CacheClusters) == 0 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("describing member cluster %s: %w", memberID, err)
+	}
+	if out == nil || len(out.CacheClusters) == 0 {
+		return nil, nil
 	}
 	cc := out.CacheClusters[0]
-	return &cc
+	return &cc, nil
 }
 
 // redisSubnetGroup performs the two-step resolution:
 // 1. DescribeCacheClusters(MemberClusters[0]) → CacheSubnetGroupName
 // 2. DescribeCacheSubnetGroups(name) → CacheSubnetGroup
-func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *elasticachetypes.CacheSubnetGroup {
-	cc := redisMemberCluster(ctx, clients, res)
+//
+// A nil group with a nil error means there is none to reach: no member cluster,
+// or a member that names no subnet group (a cluster outside a VPC).
+func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (*elasticachetypes.CacheSubnetGroup, error) {
+	cc, err := redisMemberCluster(ctx, clients, res)
+	if err != nil {
+		return nil, err
+	}
 	if cc == nil || cc.CacheSubnetGroupName == nil || *cc.CacheSubnetGroupName == "" {
-		return nil
+		return nil, nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
-		return nil
+		return nil, errRedisNoGroupDetail
 	}
 	name := *cc.CacheSubnetGroupName
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeCacheSubnetGroupsOutput, error) {
@@ -526,11 +549,14 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *
 			CacheSubnetGroupName: &name,
 		})
 	})
-	if err != nil || out == nil || len(out.CacheSubnetGroups) == 0 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
+	}
+	if out == nil || len(out.CacheSubnetGroups) == 0 {
+		return nil, nil
 	}
 	sng := out.CacheSubnetGroups[0]
-	return &sng
+	return &sng, nil
 }
 
 // truncatedResultRedis returns a RelatedCheckResult with Truncated=true when the
