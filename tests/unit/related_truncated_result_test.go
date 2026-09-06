@@ -31,10 +31,20 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws" // ensure all related registrations run
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -354,11 +364,23 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				"architecture": "x86_64",
 			},
 		},
+		// Row 7: the parents below carry the RawStruct their fetcher
+		// produces, because a checker handed a row with none never read it and
+		// answers "?" — which is a different rule from the lower bound this
+		// test pins. Giving the struct keeps each subtest on the truncated-scan
+		// path it exists to cover.
 		"ng": {
 			ID:   "nodegroup-00000001",
 			Name: "test-ng",
 			Fields: map[string]string{
 				"cluster_name": "test-cluster",
+			},
+			RawStruct: ekstypes.Nodegroup{
+				NodegroupName: aws.String("test-ng"),
+				ClusterName:   aws.String("test-cluster"),
+				Resources: &ekstypes.NodegroupResources{
+					AutoScalingGroups: []ekstypes.AutoScalingGroup{{Name: aws.String("test-asg")}},
+				},
 			},
 		},
 		"eks": {
@@ -383,6 +405,12 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				"vpc_id": "vpc-00000001",
 				"status": "available",
 			},
+			RawStruct: rdstypes.DBInstance{
+				DBInstanceIdentifier: aws.String("test-db-instance"),
+				MasterUserSecret: &rdstypes.MasterUserSecret{
+					SecretArn: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-test-AbCdEf"),
+				},
+			},
 		},
 		"lambda": {
 			ID:   "arn:aws:lambda:us-east-1:123456789012:function:test-fn",
@@ -390,12 +418,31 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Fields: map[string]string{
 				"vpc_id": "vpc-00000001",
 			},
+			RawStruct: lambdatypes.FunctionConfiguration{
+				FunctionName: aws.String("test-fn"),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:test-fn"),
+				Environment: &lambdatypes.EnvironmentResponse{Variables: map[string]string{
+					"DB_SECRET": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db-AbCdEf",
+					"API_PARAM": "/acme/prod/api-key",
+				}},
+			},
 		},
 		"ecs-svc": {
 			ID:   "arn:aws:ecs:us-east-1:123456789012:service/test-cluster/test-svc",
 			Name: "test-svc",
 			Fields: map[string]string{
 				"cluster_arn": "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster",
+			},
+			RawStruct: ecstypes.Service{
+				ServiceName:    aws.String("test-svc"),
+				ClusterArn:     aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster"),
+				TaskDefinition: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/test-svc:5"),
+				LoadBalancers: []ecstypes.LoadBalancer{{
+					TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/0000000000000001"),
+				}},
+				NetworkConfiguration: &ecstypes.NetworkConfiguration{
+					AwsvpcConfiguration: &ecstypes.AwsVpcConfiguration{Subnets: []string{"subnet-00000001"}},
+				},
 			},
 		},
 		"asg": {
@@ -464,6 +511,13 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				"state":             "available",
 				"availability_zone": "us-east-1a",
 			},
+			RawStruct: ec2types.Volume{
+				VolumeId: aws.String("vol-00000001"),
+				Tags: []ec2types.Tag{{
+					Key:   aws.String("aws:cloudformation:stack-name"),
+					Value: aws.String("test-stack"),
+				}},
+			},
 		},
 		"kms": {
 			ID:   "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000001",
@@ -476,6 +530,12 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			ID:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret-abcdef",
 			Name:   "test-secret",
 			Fields: map[string]string{},
+			RawStruct: smtypes.SecretListEntry{
+				Name:              aws.String("test-secret"),
+				ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret-abcdef"),
+				KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000001"),
+				RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:test-fn"),
+			},
 		},
 		"s3": {
 			ID:   "test-bucket",
@@ -489,6 +549,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Name: "test-stack",
 			Fields: map[string]string{
 				"status": "CREATE_COMPLETE",
+			},
+			RawStruct: cfntypes.Stack{
+				StackName: aws.String("test-stack"),
+				StackId:   aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/test-stack/00000000-0000-0000-0000-000000000001"),
 			},
 		},
 		"eb": {
@@ -550,6 +614,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Fields: map[string]string{
 				"lifecycle_state": "available",
 			},
+			RawStruct: efstypes.FileSystemDescription{
+				FileSystemId:  aws.String("fs-00000001"),
+				FileSystemArn: aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-00000001"),
+			},
 		},
 		"ses": {
 			ID:     "test@example.com",
@@ -561,6 +629,11 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Name: "/test/param",
 			Fields: map[string]string{
 				"type": "String",
+			},
+			RawStruct: ssmtypes.ParameterMetadata{
+				Name:  aws.String("/test/param"),
+				Type:  ssmtypes.ParameterTypeSecureString,
+				KeyId: aws.String("arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000001"),
 			},
 		},
 		"pipeline": {
@@ -589,6 +662,14 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			ID:     "arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm",
 			Name:   "test-alarm",
 			Fields: map[string]string{},
+			RawStruct: cwtypes.MetricAlarm{
+				AlarmName: aws.String("test-alarm"),
+				AlarmArn:  aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm"),
+				Dimensions: []cwtypes.Dimension{{
+					Name:  aws.String("AutoScalingGroupName"),
+					Value: aws.String("test-asg"),
+				}},
+			},
 		},
 		"backup": {
 			ID:     "arn:aws:backup:us-east-1:123456789012:backup-plan:test-plan",
@@ -720,10 +801,10 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				// provided a real cache entry (not nil). A non-Resolved State
 				// combined with IsTruncated=true is the anti-pattern that drops the
 				// honest lower bound.
-				if reason, joins := reverseScanNeedsJoinList[key]; joins {
-					// Row 18: this checker reads a JOIN list the harness leaves out
-					// of the cache, so the target list is never fetched and there
-					// are no pages for a zero to be a lower bound over.
+				if reason, expected := reverseScanExpectsUnknown[key]; expected {
+					// Row 18: this checker never reaches a scan of the target
+					// list under this harness, so there are no pages for a zero
+					// to be a lower bound over.
 					if result.State() != domain.RelatedUnknown {
 						t.Errorf("checker %s: state = %s, want Unknown — %s",
 							key, result.State(), reason)
@@ -759,25 +840,33 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 	// exemption nobody wrote for it. A wrong entry already fails loudly above,
 	// because it demands Unknown; only an unreached one can rot quietly.
 	var unreached []string
-	for key := range reverseScanNeedsJoinList {
+	for key := range reverseScanExpectsUnknown {
 		if !tested[key] {
 			unreached = append(unreached, key)
 		}
 	}
 	if len(unreached) > 0 {
 		sort.Strings(unreached)
-		t.Errorf("%d reverseScanNeedsJoinList entr(ies) name a checker this harness no longer runs. "+
+		t.Errorf("%d reverseScanExpectsUnknown entr(ies) name a checker this harness no longer runs. "+
 			"Re-derive the key or delete the entry:\n  %s", len(unreached), strings.Join(unreached, "\n  "))
 	}
 }
 
-// reverseScanNeedsJoinList names the checkers whose answer comes from a list
-// OTHER than their target type. The harness above seeds only the target entry,
-// so for these the join list is absent, the target list is never fetched, and
-// row 18 makes that Unknown rather than a zero nobody counted.
-var reverseScanNeedsJoinList = map[string]string{
-	"ec2→kms":    "reads the ebs list to find the volumes whose keys answer",
-	"eks→asg":    "reads the ng list to find the node groups whose scaling groups answer",
-	"lambda→sns": "reads the sns-subscription list to find the topics that answer",
-	"efs→vpc":    "reads the eni list to find the mount targets whose VPC answers",
+// reverseScanExpectsUnknown names the checkers this harness cannot put on the
+// truncated-scan path, with the reason for each. Most read a list OTHER than
+// their target type, and the harness seeds only the target entry — so the join
+// list is absent, the target list is never fetched, and row 18 makes that
+// Unknown rather than a zero nobody counted. Two need a live client to read the
+// rows they were handed, and the harness has none. Either way there are no
+// pages for a lower bound to be over, so Unknown is the honest answer and the
+// truncation rule has nothing to apply to.
+var reverseScanExpectsUnknown = map[string]string{
+	"ec2→kms":          "reads the ebs list to find the volumes whose keys answer",
+	"eks→asg":          "reads the ng list to find the node groups whose scaling groups answer",
+	"lambda→sns":       "reads the sns-subscription list to find the topics that answer",
+	"efs→vpc":          "reads the eni list to find the mount targets whose VPC answers",
+	"ecs-svc→elb":      "reads the tg list to find the load balancers the service's target groups belong to",
+	"ecs-svc→vpc":      "reads the subnet list to find the VPC the service's awsvpc subnets sit in",
+	"secrets→eb":       "describes each environment's config through a live client to see which resolves this secret",
+	"secrets→ecs-task": "describes each task definition through a live client to see which reads this secret",
 }
