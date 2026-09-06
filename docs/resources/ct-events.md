@@ -124,6 +124,8 @@ ct-events is the **universal pivot** referenced by every other registered type (
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html)
+
 Transcribed from `docs/attention-signals.md` row `ct-events`.
 
 ### 3.1 Wave 1 — zero extra API calls

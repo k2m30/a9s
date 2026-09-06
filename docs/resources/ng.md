@@ -82,6 +82,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `asg
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeNodegroup](https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeNodegroup.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

@@ -81,6 +81,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetRole](https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetRole.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -154,7 +156,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name, Source API, Wave 1/Wave 2/Wave 3 cells — `docs/attention-signals.md` § `role` row (Security & IAM table).
+- Display name, Source API, Wave 1/Wave 2/Wave 3 cells — `docs/attention-signals.md § Signals § SECURITY & IAM` row `role`.
 - AWS API URL and expected related targets — `docs/related-resources.md` § Per-type contract → `role` row.
 - Per-target reasoning (ct-events / ec2 / eks / glue / iam-group / iam-user / lambda / ng / policy) — `docs/related-resources.md` § `role` section.
 - `AssumeRolePolicyDocument` is URL-encoded JSON on the list response — `AWS SDK Go v2 — iam/types.Role § AssumeRolePolicyDocument` (string field on the `Role` struct returned by `ListRoles`).
@@ -176,7 +178,7 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "\*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition. |
+| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition. |
 | role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition to the trust statement. |
 | role.inline-privilege-escalation | inline policy allows privilege escalation: <combo> | broken | wave1 | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |

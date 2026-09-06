@@ -89,6 +89,8 @@ Explicitly excluded (per `docs/related-resources.md` §`transfer`): `sg` (`Endpo
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeServer](https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribeServer.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

@@ -99,6 +99,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeSubnets](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSubnets.html)
+
 Transcribed from `docs/attention-signals.md` §Networking — `subnet` row.
 
 ### 3.1 Wave 1 — zero extra API calls

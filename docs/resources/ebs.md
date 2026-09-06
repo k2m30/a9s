@@ -69,6 +69,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeVolumeStatus](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumeStatus.html)
+
 Transcribed from `docs/attention-signals.md` §Compute row `ebs`.
 
 ### 3.1 Wave 1 — zero extra API calls

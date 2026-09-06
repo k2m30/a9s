@@ -51,6 +51,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `sns`, `lam
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [ListSubscriptions](https://docs.aws.amazon.com/sns/latest/api/API_ListSubscriptions.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

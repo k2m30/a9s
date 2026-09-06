@@ -99,6 +99,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ec2
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeVpcs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcs.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

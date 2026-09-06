@@ -81,6 +81,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeImages](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImages.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

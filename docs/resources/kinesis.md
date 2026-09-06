@@ -64,6 +64,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeStreamSummary](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_DescribeStreamSummary.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

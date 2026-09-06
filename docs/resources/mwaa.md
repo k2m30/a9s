@@ -77,6 +77,8 @@ Explicitly excluded (per `docs/related-resources.md` §`mwaa`): `vpc` (no direct
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetEnvironment](https://docs.aws.amazon.com/mwaa/latest/API/API_GetEnvironment.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

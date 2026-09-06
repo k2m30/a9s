@@ -177,6 +177,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetFunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_GetFunctionConfiguration.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -358,7 +360,7 @@ lambda — COMPUTE. Lifecycle key: `state`.
 | lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 | — |
 | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | — |
 | lambda.env-secret | credential in environment variables | broken | wave1 | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
-| lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the \`\*\` principal with the specific account, service, or ARN that should be allowed to call it. |
+| lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it. |
 | lambda.function-url-public | function endpoint open without authentication | broken | wave2 | The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it. |
 <!-- END GENERATED: findings -->
 

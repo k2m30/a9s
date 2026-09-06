@@ -107,6 +107,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `d
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeDBClusters](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

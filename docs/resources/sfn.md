@@ -71,6 +71,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `e
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [ListExecutions](https://docs.aws.amazon.com/step-functions/latest/apireference/API_ListExecutions.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

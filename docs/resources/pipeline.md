@@ -105,6 +105,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetPipelineState](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_GetPipelineState.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

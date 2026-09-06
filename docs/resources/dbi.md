@@ -99,6 +99,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `d
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeDBInstances](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBInstances.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

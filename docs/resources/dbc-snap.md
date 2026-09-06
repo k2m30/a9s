@@ -79,6 +79,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeDBClusterSnapshots](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusterSnapshots.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -192,8 +194,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 
 - a9s golden doc — related-panel contract for `dbc-snap` — `docs/related-resources.md § dbc-snap` (targets `backup`, `ct-events`, `dbc`, `kms`, `vpc`; per-type contract table row).
-- a9s golden doc — Wave 1 signals (`Status` buckets, manual-age cost rule, automated cross-ref with `dbc` retention) — `docs/attention-signals.md § Databases & Storage § dbc-snap`.
-- a9s golden doc — Wave 3 exclusion (`DescribeDBClusterSnapshotAttributes`) — `docs/attention-signals.md § Databases & Storage § dbc-snap` Wave 3 cell.
+- a9s golden doc — Wave 1 signals (`Status` buckets, manual-age cost rule, automated cross-ref with `dbc` retention) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap`.
+- a9s golden doc — Wave 3 exclusion (`DescribeDBClusterSnapshotAttributes`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap` Wave 3 cell.
 - a9s golden doc — read-only invariant — `docs/architecture.md § What is a9s?`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md § Policy`.
 - AWS Go SDK v2 — `DBClusterIdentifier`, `KmsKeyId`, `VpcId`, `Status`, `SnapshotType`, `SnapshotCreateTime`, `StorageEncrypted` fields — `AWS SDK Go v2 — docdb/types.DBClusterSnapshot`.
@@ -218,7 +220,7 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbc-snap.warn.unencrypted | unencrypted | warn | wave1 | — |
 | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 | — |
 | dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 | — |
-| dbc-snap.public | shared with all AWS accounts | broken | wave2 | The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove \`all\` from the snapshot's restore attribute. |
+| dbc-snap.public | shared with all AWS accounts | broken | wave2 | The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove `all` from the snapshot's restore attribute. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -75,6 +75,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeSecurityGroups](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSecurityGroups.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

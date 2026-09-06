@@ -69,6 +69,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeImages](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeImages.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -178,7 +180,7 @@ ami — COMPUTE. Lifecycle key: `state`.
 | ami.state.failed | failed | broken | wave1 | — |
 | ami.state.dim | deregistered | dim | wave1 | — |
 | ami.deprecated | deprecated | warn | wave1 | The deprecation date has passed — AWS no longer recommends this AMI for new launches. |
-| ami.public | shared with all AWS accounts | broken | wave1 | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the \`all\` group from the image's launch permission. |
+| ami.public | shared with all AWS accounts | broken | wave1 | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -99,6 +99,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [ListSecrets](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_ListSecrets.html)
+
 Transcribed from `docs/attention-signals.md` § Secrets & Config.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -222,7 +224,7 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 | secrets.state.dormant | dormant | warn | wave1 | — |
 | secrets.rotation.disabled | rotation not enabled | warn | wave1 | — |
 | secrets.value.stale | value unchanged in over 365 days | warn | wave1 | — |
-| secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "\*" principal from the resource policy, or scope it with a condition naming the accounts that need it. |
+| secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "*" principal from the resource policy, or scope it with a condition naming the accounts that need it. |
 | secrets.cross-account-policy | resource policy grants another account | warn | wave2 | The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise. |
 <!-- END GENERATED: findings -->
 

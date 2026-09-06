@@ -63,6 +63,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetWebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_GetWebACL.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

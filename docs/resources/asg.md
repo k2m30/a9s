@@ -100,6 +100,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeAutoScalingGroups](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_DescribeAutoScalingGroups.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

@@ -57,6 +57,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetTopicAttributes](https://docs.aws.amazon.com/sns/latest/api/API_GetTopicAttributes.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -151,12 +153,12 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - §2 `sns-sub` why related — `docs/related-resources.md` § `sns` (line 923) and § `sns-sub` (line 931).
 - §2 `sns-sub` how discovered — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListSubscriptionsByTopic(TopicArn)` is the dedicated SNS API; no cheaper path — `ListSubscriptions` is account-wide and paginated with no topic filter.
 - §2 `sns-sub` count shown — a9s-devops (2026-04-20): possible=yes, worth=yes. Fanout-width is a primary decision signal for an SNS operator.
-- §3.1 no Wave 1 signals — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 1 cell: "None — `ListTopics` returns ARN only").
-- §3.2 orphan-topic signal — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 2 cell). Mechanism amended to match the implementation: `ListSubscriptionsByTopic` with pagination and per-subscription `PendingConfirmation` detection (`core/aws/sns_issue_enrichment.go:22-99`), not `GetTopicAttributes` subscription counts; same signal semantics.
+- §3.1 no Wave 1 signals — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 1 cell: "None — `ListTopics` returns ARN only").
+- §3.2 orphan-topic signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 2 cell). Mechanism amended to match the implementation: `ListSubscriptionsByTopic` with pagination and per-subscription `PendingConfirmation` detection (`core/aws/sns_issue_enrichment.go:22-99`), not `GetTopicAttributes` subscription counts; same signal semantics.
 - §3.2 all-pending-confirmation signal — companion finding from the same `ListSubscriptionsByTopic` call (`core/aws/sns_issue_enrichment.go:22-99`): fires when every returned `SubscriptionArn == "PendingConfirmation"`.
-- §3.2 missing-KMS signal — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 2 cell). Trigger definition for "sensitive topic" not specified.
+- §3.2 missing-KMS signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 2 cell). Trigger definition for "sensitive topic" not specified.
 - §3.2 `SubscriptionsConfirmed`/`SubscriptionsPending`/`KmsMasterKeyId` field names — `AWS SDK Go v2 — sns.GetTopicAttributesOutput § Attributes` doc comment.
-- §3.3 Wave 3 CloudWatch metric — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 3 cell).
+- §3.3 Wave 3 CloudWatch metric — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 3 cell).
 - §4 orphan-topic S4/S5 wording — a9s-devops (2026-04-20): possible=yes, worth=yes. `no subscribers` on the row lets an operator triage without drilling in; S5 spells out the consequence (messages discarded) for the detail view.
 - §5 missing-KMS deferral — a9s-devops (2026-04-20): possible=yes-via-tags-or-regex, worth=no as a universal default. Without an explicit "sensitive" trigger the rule fires on every unencrypted topic, producing noise. Defer until `attention-signals.md` defines the trigger.
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?" (line 15).

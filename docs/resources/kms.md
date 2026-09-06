@@ -65,6 +65,8 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeKey](https://docs.aws.amazon.com/kms/latest/APIReference/API_DescribeKey.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -185,7 +187,7 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 | kms.state.unavailable | <key state> | broken | wave1 | — |
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | — |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 | This customer-managed key never rotates its backing material, so every ciphertext ever written under it depends on one key that has been in use since creation. Enable automatic key rotation on the key. |
-| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "\*" principal with the specific accounts or roles that need the key, or add a condition scoping the grant. |
+| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "*" principal with the specific accounts or roles that need the key, or add a condition scoping the grant. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -82,6 +82,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetJobRuns](https://docs.aws.amazon.com/glue/latest/webapi/API_GetJobRuns.html)
+
 Transcribed from `docs/attention-signals.md` §Data & Analytics.
 
 ### 3.1 Wave 1 — zero extra API calls

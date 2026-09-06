@@ -93,6 +93,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeClusters](https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeClusters.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -248,7 +250,7 @@ redshift — DATABASES & STORAGE. Lifecycle key: `status`.
 | redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
 | redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 | — |
 | redshift.audit-logging-off | audit logging off | warn | wave2 | Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group. |
-| redshift.require-ssl-off | SSL not required | warn | wave2 | The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require\_ssl) to true and reboot. |
+| redshift.require-ssl-off | SSL not required | warn | wave2 | The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require_ssl) to true and reboot. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

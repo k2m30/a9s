@@ -81,6 +81,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeDomains](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomains.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

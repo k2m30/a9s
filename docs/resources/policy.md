@@ -53,6 +53,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetPolicyVersion](https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetPolicyVersion.html)
+
 Transcribed from `docs/attention-signals.md` §Security & IAM row `policy`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -148,7 +150,7 @@ policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycl
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 | — |
-| iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "\*" action and resource with the specific ones its holders need. |
+| iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "*" action and resource with the specific ones its holders need. |
 | policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions. |
 <!-- END GENERATED: findings -->
 

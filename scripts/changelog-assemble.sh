@@ -114,6 +114,25 @@ awk -v tmpdir="$tmp" -v order="$SECTION_ORDER" '
   END { if (inside) emit() }
 ' "$changelog" > "$tmp/CHANGELOG.md"
 
+# A fragment is the only copy of its lines, so nothing is deleted until every
+# one of them is in the rewritten file. A heading the assembler does not place
+# (a section outside the six, a fragment with no heading at all, a changelog
+# with no Unreleased block) would otherwise take its bullets down with it.
+while IFS= read -r fragment; do
+  while IFS= read -r line; do
+    case "$line" in
+    '## '*) continue ;;
+    esac
+    printf '%s' "$line" | grep -q '[^[:space:]]' || continue
+    if ! grep -qF -- "$line" "$tmp/CHANGELOG.md"; then
+      echo "FAIL: ${fragment#"$repo_root"/} would lose a line the assembly does not place:" >&2
+      echo "  $line" >&2
+      echo "CHANGELOG.md and every fragment are unchanged. Move the line under one of: $SECTION_ORDER." >&2
+      exit 1
+    fi
+  done < "$fragment"
+done < "$tmp/fragments"
+
 mv "$tmp/CHANGELOG.md" "$changelog"
 
 while IFS= read -r fragment; do

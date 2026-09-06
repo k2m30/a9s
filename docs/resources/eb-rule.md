@@ -76,6 +76,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `kinesis`, 
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [ListTargetsByRule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListTargetsByRule.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

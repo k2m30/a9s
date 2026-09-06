@@ -58,6 +58,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `apigw`, `c
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [ListCertificates](https://docs.aws.amazon.com/acm/latest/APIReference/API_ListCertificates.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

@@ -105,6 +105,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeTasks.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -250,7 +252,7 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |
 | ecs-task.writable-root | writable root filesystem | warn | wave2 | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |
 | ecs-task.no-logging | container without log driver | warn | wave2 | A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping. Give the container a log driver pointing at awslogs or your log router. |
-| ecs-task.env-secret | credential in container environment | broken | wave2 | A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's \`secrets\` block. |
+| ecs-task.env-secret | credential in container environment | broken | wave2 | A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

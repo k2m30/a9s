@@ -77,6 +77,8 @@ Explicitly excluded (per `docs/related-resources.md` §`lt`): `role` (`IamInstan
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeLaunchTemplateVersions](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeLaunchTemplateVersions.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

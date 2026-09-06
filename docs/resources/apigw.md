@@ -113,6 +113,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetStages](https://docs.aws.amazon.com/apigateway/latest/api/API_GetStages.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

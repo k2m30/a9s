@@ -123,6 +123,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeServices](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeServices.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

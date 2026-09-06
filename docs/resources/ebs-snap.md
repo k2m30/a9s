@@ -63,6 +63,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `bac
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeSnapshots](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSnapshots.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
@@ -186,7 +188,7 @@ ebs-snap — COMPUTE. Lifecycle key: `state`.
 | ebs-snap.encryption.disabled | unencrypted | warn | wave1 | Snapshot is not encrypted at rest — re-create from an encrypted volume. |
 | ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it. |
 | ebs-snap.orphan | orphan: source volume deleted | warn | wave2 | — |
-| ebs-snap.public | shared with all AWS accounts | broken | wave2 | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the \`all\` group. |
+| ebs-snap.public | shared with all AWS accounts | broken | wave2 | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the `all` group. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

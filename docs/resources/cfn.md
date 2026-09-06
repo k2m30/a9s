@@ -63,6 +63,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeStacks](https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_DescribeStacks.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

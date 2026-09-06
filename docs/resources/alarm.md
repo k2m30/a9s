@@ -120,6 +120,8 @@ All non-action pivots (everything except `sns`, `asg`, and `ct-events`) are disc
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeAlarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_DescribeAlarms.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

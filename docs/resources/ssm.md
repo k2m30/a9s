@@ -39,6 +39,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeParameters](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_DescribeParameters.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

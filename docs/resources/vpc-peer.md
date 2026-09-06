@@ -47,6 +47,8 @@ Explicitly excluded (per `docs/related-resources.md` §`vpc-peer`): `sg` (no dec
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeVpcPeeringConnections](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcPeeringConnections.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 Load-bearing SDK fact (doc comment on `Requester/AccepterVpcInfo`): "CIDR block information is only returned when describing an active VPC peering connection" — `CidrBlock`/`CidrBlockSet` are nil for every non-active state. Nil-safe rendering mandatory; the overlap check is active-only.

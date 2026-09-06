@@ -63,6 +63,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetAccount (SESv2)](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_GetAccount.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

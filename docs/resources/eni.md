@@ -87,6 +87,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ec2`, `eip
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeNetworkInterfaces](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNetworkInterfaces.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

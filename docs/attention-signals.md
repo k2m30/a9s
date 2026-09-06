@@ -62,7 +62,7 @@ lines under "Not yet implemented".
 
 <!-- BEGIN GENERATED: signals -->
 
-### Compute
+### COMPUTE
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -105,7 +105,7 @@ lines under "Not yet implemented".
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.host-namespace` | shares the host network or process namespace | warn | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.writable-root` | writable root filesystem | warn | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.no-logging` | container without log driver | warn | A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping. Give the container a log driver pointing at awslogs or your log router. |
-| `ecs-task` | ECS Tasks | wave2 | `ecs-task.env-secret` | credential in container environment | broken | A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's \`secrets\` block. |
+| `ecs-task` | ECS Tasks | wave2 | `ecs-task.env-secret` | credential in container environment | broken | A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block. |
 | `lambda` | Lambda Functions | wave1 | `lambda.last-update.failed` | last update failed to apply | broken | — |
 | `lambda` | Lambda Functions | wave1 | `lambda.runtime.deprecated` | runtime is end-of-life | broken | — |
 | `lambda` | Lambda Functions | wave1 | `lambda.state.pending` | pending | warn | — |
@@ -113,7 +113,7 @@ lines under "Not yet implemented".
 | `lambda` | Lambda Functions | wave1 | `lambda.state.inactive` | inactive, evicted after extended idle time | dim | — |
 | `lambda` | Lambda Functions | wave1 | `lambda.dlq.missing` | no dead-letter queue configured | warn | — |
 | `lambda` | Lambda Functions | wave1 | `lambda.env-secret` | credential in environment variables | broken | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
-| `lambda` | Lambda Functions | wave2 | `lambda.public-policy` | invokable by anyone | broken | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the \`\*\` principal with the specific account, service, or ARN that should be allowed to call it. |
+| `lambda` | Lambda Functions | wave2 | `lambda.public-policy` | invokable by anyone | broken | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it. |
 | `lambda` | Lambda Functions | wave2 | `lambda.function-url-public` | function endpoint open without authentication | broken | The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it. |
 | `asg` | Auto Scaling Groups | wave1 | `asg.state.deleting` | delete in progress | warn | — |
 | `asg` | Auto Scaling Groups | wave1 | `asg.instances.underprovisioned` | <N> of <M> instances in service | broken | — |
@@ -138,12 +138,12 @@ lines under "Not yet implemented".
 | `ebs-snap` | EBS Snapshots | wave1 | `ebs-snap.encryption.disabled` | unencrypted | warn | Snapshot is not encrypted at rest — re-create from an encrypted volume. |
 | `ebs-snap` | EBS Snapshots | wave1 | `ebs-snap.aged-automated` | automated, <N>d old | warn | This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it. |
 | `ebs-snap` | EBS Snapshots | wave2 | `ebs-snap.orphan` | orphan: source volume deleted | warn | — |
-| `ebs-snap` | EBS Snapshots | wave2 | `ebs-snap.public` | shared with all AWS accounts | broken | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the \`all\` group. |
+| `ebs-snap` | EBS Snapshots | wave2 | `ebs-snap.public` | shared with all AWS accounts | broken | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the `all` group. |
 | `ami` | AMIs | wave1 | `ami.state.pending` | pending | warn | — |
 | `ami` | AMIs | wave1 | `ami.state.failed` | failed | broken | — |
 | `ami` | AMIs | wave1 | `ami.state.dim` | deregistered | dim | — |
 | `ami` | AMIs | wave1 | `ami.deprecated` | deprecated | warn | The deprecation date has passed — AWS no longer recommends this AMI for new launches. |
-| `ami` | AMIs | wave1 | `ami.public` | shared with all AWS accounts | broken | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the \`all\` group from the image's launch permission. |
+| `ami` | AMIs | wave1 | `ami.public` | shared with all AWS accounts | broken | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
 | `lt` | Launch Templates | wave1 | `lt.warn.imdsv1` | IMDSv1 allowed | warn | Instance metadata does not require session tokens; IMDSv1 credentials are exposed to SSRF. |
 | `lt` | Launch Templates | wave1 | `lt.warn.unencrypted` | EBS encryption disabled | warn | A block device explicitly sets Encrypted=false; launched instances get unencrypted volumes. |
 | `lt` | Launch Templates | wave2 | `lt.warn.deprecated_ami` | deprecated AMI | warn | The default version references an AMI past its deprecation time. |
@@ -151,7 +151,7 @@ lines under "Not yet implemented".
 | `lt` | Launch Templates | wave1 | `lt.warn.details_denied` | details denied | warn | Access to the default version was denied; only the listed fields are visible. |
 | `lt` | Launch Templates | wave1 | `lt.warn.details_unavailable` | details unavailable | warn | Details could not be retrieved; only the name is visible. |
 
-### Containers
+### CONTAINERS
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -174,7 +174,7 @@ lines under "Not yet implemented".
 | `ng` | EKS Node Groups | wave1 | `ng.warn.details_denied` | details denied | warn | Access to resource details was denied; only the name is visible. |
 | `ng` | EKS Node Groups | wave1 | `ng.warn.details_unavailable` | details unavailable | warn | Details could not be retrieved; only the name is visible. |
 
-### Networking
+### NETWORKING
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -249,7 +249,7 @@ lines under "Not yet implemented".
 | `vpc-peer` | VPC Peering | wave2 | `vpc-peer.warn.no_local_route` | no local route to peer | warn | No loaded route table routes to this peering connection. |
 | `vpc-peer` | VPC Peering | wave2 | `vpc-peer.warn.route_blackholed` | route to peer blackholed | warn | A route references this connection but its state is blackhole. |
 
-### Databases & storage
+### DATABASES & STORAGE
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -351,7 +351,7 @@ lines under "Not yet implemented".
 | `redshift` | Redshift Clusters | wave1 | `redshift.warn.publicly_accessible` | publicly accessible | warn | — |
 | `redshift` | Redshift Clusters | wave1 | `redshift.warn.unencrypted_at_rest` | unencrypted at rest | warn | — |
 | `redshift` | Redshift Clusters | wave2 | `redshift.audit-logging-off` | audit logging off | warn | Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group. |
-| `redshift` | Redshift Clusters | wave2 | `redshift.require-ssl-off` | SSL not required | warn | The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require\_ssl) to true and reboot. |
+| `redshift` | Redshift Clusters | wave2 | `redshift.require-ssl-off` | SSL not required | warn | The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require_ssl) to true and reboot. |
 | `efs` | EFS File Systems | wave1 | `efs.broken.error` | error | broken | — |
 | `efs` | EFS File Systems | wave1 | `efs.broken.no_mount_targets` | no mount targets | broken | — |
 | `efs` | EFS File Systems | wave1 | `efs.warn.creating` | creating | warn | — |
@@ -368,7 +368,7 @@ lines under "Not yet implemented".
 | `dbi-snap` | DB Instance Snapshots | wave1 | `dbi-snap.warn.unencrypted` | unencrypted | warn | — |
 | `dbi-snap` | DB Instance Snapshots | wave2 | `dbi-snap.orphan` | orphan: source DB deleted | broken | — |
 | `dbi-snap` | DB Instance Snapshots | wave2 | `dbi-snap.past-retention` | automated, <N>d past retention | broken | — |
-| `dbi-snap` | DB Instance Snapshots | wave2 | `dbi-snap.public` | shared with all AWS accounts | broken | The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove \`all\` from the snapshot's restore attribute. |
+| `dbi-snap` | DB Instance Snapshots | wave2 | `dbi-snap.public` | shared with all AWS accounts | broken | The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove `all` from the snapshot's restore attribute. |
 | `dbc-snap` | DB Cluster Snapshots | wave1 | `dbc-snap.broken.failed` | failed | broken | — |
 | `dbc-snap` | DB Cluster Snapshots | wave1 | `dbc-snap.broken.incompatible` | `<incompatible-* status>` | broken | — |
 | `dbc-snap` | DB Cluster Snapshots | wave1 | `dbc-snap.warn.creating` | creating | warn | — |
@@ -377,9 +377,9 @@ lines under "Not yet implemented".
 | `dbc-snap` | DB Cluster Snapshots | wave1 | `dbc-snap.warn.unencrypted` | unencrypted | warn | — |
 | `dbc-snap` | DB Cluster Snapshots | wave2 | `dbc-snap.orphan` | orphan: source cluster deleted | broken | — |
 | `dbc-snap` | DB Cluster Snapshots | wave2 | `dbc-snap.past-retention` | automated, <N>d past retention | broken | — |
-| `dbc-snap` | DB Cluster Snapshots | wave2 | `dbc-snap.public` | shared with all AWS accounts | broken | The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove \`all\` from the snapshot's restore attribute. |
+| `dbc-snap` | DB Cluster Snapshots | wave2 | `dbc-snap.public` | shared with all AWS accounts | broken | The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove `all` from the snapshot's restore attribute. |
 
-### Monitoring
+### MONITORING
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -403,7 +403,7 @@ lines under "Not yet implemented".
 | `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.attention` | root account activity | warn | CloudTrail recorded a call worth a look: a modifying call, root-account activity, cross-account access, or a read of sensitive data. The status names which; verify the caller was expected. |
 | `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.info` | routine event | dim | — |
 
-### Messaging
+### MESSAGING
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -459,7 +459,7 @@ lines under "Not yet implemented".
 | `ses` | SES Identities | wave2 | `ses.quota-high` | quota 80%+ used | warn | — |
 | `ses` | SES Identities | wave2 | `ses.dkim-off` | DKIM not enabled | warn | Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you. |
 
-### Secrets & config
+### SECRETS & CONFIG
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -468,7 +468,7 @@ lines under "Not yet implemented".
 | `secrets` | Secrets Manager | wave1 | `secrets.state.dormant` | dormant | warn | — |
 | `secrets` | Secrets Manager | wave1 | `secrets.rotation.disabled` | rotation not enabled | warn | — |
 | `secrets` | Secrets Manager | wave1 | `secrets.value.stale` | value unchanged in over 365 days | warn | — |
-| `secrets` | Secrets Manager | wave2 | `secrets.public-policy` | resource policy open to anyone | broken | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "\*" principal from the resource policy, or scope it with a condition naming the accounts that need it. |
+| `secrets` | Secrets Manager | wave2 | `secrets.public-policy` | resource policy open to anyone | broken | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "*" principal from the resource policy, or scope it with a condition naming the accounts that need it. |
 | `secrets` | Secrets Manager | wave2 | `secrets.cross-account-policy` | resource policy grants another account | warn | The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise. |
 | `ssm` | SSM Parameters | wave1 | `ssm.value.plaintext-sensitive` | plaintext value looks like a credential | broken | — |
 | `ssm` | SSM Parameters | wave1 | `ssm.value.stale` | not modified in over 365 days | warn | — |
@@ -477,9 +477,9 @@ lines under "Not yet implemented".
 | `kms` | KMS Keys | wave1 | `kms.state.unavailable` | <key state> | broken | — |
 | `kms` | KMS Keys | wave1 | `kms.access-denied` | access denied (kms:DescribeKey) | broken | — |
 | `kms` | KMS Keys | wave2 | `kms.rotation-disabled` | key rotation disabled | warn | This customer-managed key never rotates its backing material, so every ciphertext ever written under it depends on one key that has been in use since creation. Enable automatic key rotation on the key. |
-| `kms` | KMS Keys | wave2 | `kms.public-policy` | key policy open to anyone | broken | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "\*" principal with the specific accounts or roles that need the key, or add a condition scoping the grant. |
+| `kms` | KMS Keys | wave2 | `kms.public-policy` | key policy open to anyone | broken | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "*" principal with the specific accounts or roles that need the key, or add a condition scoping the grant. |
 
-### Dns & cdn
+### DNS & CDN
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -507,17 +507,17 @@ lines under "Not yet implemented".
 | `apigw` | API Gateways | wave2 | `apigw.tracing-off` | X-Ray tracing off | warn | Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage. |
 | `apigw` | API Gateways | wave2 | `apigw.stage-variable-secret` | credential in stage variables | broken | A stage variable holds what looks like a credential, and stage variables are readable by anyone who can read the gateway's configuration. Move the value into Secrets Manager and reference it from the integration. |
 
-### Security & iam
+### SECURITY & IAM
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
-| `role` | IAM Roles | wave1 | `role.trust.wildcard-principal` | anyone can assume this role | broken | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "\*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition. |
+| `role` | IAM Roles | wave1 | `role.trust.wildcard-principal` | anyone can assume this role | broken | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition. |
 | `role` | IAM Roles | wave1 | `role.trust.confused-deputy` | service can assume without source scoping | warn | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition to the trust statement. |
 | `role` | IAM Roles | wave1 | `role.inline-privilege-escalation` | inline policy allows privilege escalation: <combo> | broken | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
 | `role` | IAM Roles | wave2 | `iam-role.dormant` | dormant role (>90d) | warn | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |
 | `role` | IAM Roles | wave2 | `role.admin-attached` | has an administrator policy | warn | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 | `policy` | IAM Policies | wave1 | `iam-policy.orphan-unattached` | unattached, no roles/users/groups use it | warn | — |
-| `policy` | IAM Policies | wave2 | `iam-policy.admin-star` | `admin star (allows * on *)` | broken | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "\*" action and resource with the specific ones its holders need. |
+| `policy` | IAM Policies | wave2 | `iam-policy.admin-star` | `admin star (allows * on *)` | broken | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "*" action and resource with the specific ones its holders need. |
 | `policy` | IAM Policies | wave2 | `policy.privilege-escalation` | allows privilege escalation: <combo> | broken | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions. |
 | `iam-user` | IAM Users | wave2 | `iam-user.no-mfa` | console user without MFA | broken | This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access. |
 | `iam-user` | IAM Users | wave2 | `iam-user.old-key` | key <keyID> >90d (rotation) | warn | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
@@ -531,7 +531,7 @@ lines under "Not yet implemented".
 | `waf` | WAF Web ACLs | wave2 | `waf.no-logging` | no logging configuration | warn | This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group. |
 | `waf` | WAF Web ACLs | wave2 | `waf.no-rules` | web ACL has no rules | warn | This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
 
-### Ci/cd
+### CI/CD
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -555,9 +555,9 @@ lines under "Not yet implemented".
 | `ecr` | ECR Repositories | wave1 | `ecr.scan-on-push-off` | scan on push off | warn | Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives. |
 | `ecr` | ECR Repositories | wave1 | `ecr.mutable-tags` | tags are mutable | warn | An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from. |
 | `codeartifact` | CodeArtifact Repos | wave2 | `codeartifact.no-permissions-policy` | no permissions policy | warn | — |
-| `codeartifact` | CodeArtifact Repos | wave2 | `codeartifact.public-access-policy` | public access policy | broken | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "\*" principal with the accounts or roles that need the repository, or scope the grant with a condition. |
+| `codeartifact` | CodeArtifact Repos | wave2 | `codeartifact.public-access-policy` | public access policy | broken | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "*" principal with the accounts or roles that need the repository, or scope the grant with a condition. |
 
-### Data & analytics
+### DATA & ANALYTICS
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -584,7 +584,7 @@ lines under "Not yet implemented".
 | `mwaa` | Managed Airflow | wave1 | `mwaa.warn.details_denied` | details denied | warn | Access to environment details was denied; only the name is visible. |
 | `mwaa` | Managed Airflow | wave1 | `mwaa.warn.details_unavailable` | details unavailable | warn | Details could not be retrieved; only the name is visible. |
 
-### Backup
+### BACKUP
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -595,67 +595,67 @@ lines under "Not yet implemented".
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
-| `alarm\_history` | Alarm History | wave1 | `alarm-history.broken.alarm` | alarm | broken | — |
-| `alarm\_history` | Alarm History | wave1 | `alarm-history.warn.insufficient_data` | insufficient data | warn | — |
-| `asg\_activities` | Scaling Activities | wave1 | `asg-activity.broken.failed` | failed | broken | — |
-| `asg\_activities` | Scaling Activities | wave1 | `asg-activity.warn.cancelled` | cancelled | warn | — |
-| `cb\_builds` | CodeBuild Builds | wave1 | `cb-build.broken.failed` | failed | broken | — |
-| `cb\_builds` | CodeBuild Builds | wave1 | `cb-build.broken.fault` | fault | broken | — |
-| `cb\_builds` | CodeBuild Builds | wave1 | `cb-build.broken.timed_out` | timed out | broken | — |
-| `cb\_builds` | CodeBuild Builds | wave1 | `cb-build.warn.in_progress` | in progress | warn | — |
-| `cb\_builds` | CodeBuild Builds | wave1 | `cb-build.dim.stopped` | stopped | dim | — |
-| `cfn\_events` | Stack Events | wave1 | `cfn-event.broken.failed` | <status, lowercased> | broken | — |
-| `cfn\_events` | Stack Events | wave1 | `cfn-event.warn.in_progress` | <status, lowercased> | warn | — |
-| `cfn\_events` | Stack Events | wave1 | `cfn-event.dim.deleted` | deleted | dim | — |
-| `cfn\_resources` | Stack Resources | wave1 | `cfn-resource.broken.failed` | <status, lowercased> | broken | — |
-| `cfn\_resources` | Stack Resources | wave1 | `cfn-resource.warn.in_progress` | <status, lowercased> | warn | — |
-| `cfn\_resources` | Stack Resources | wave1 | `cfn-resource.dim.deleted` | deleted | dim | — |
-| `dbi\_events` | RDS Events | wave1 | `dbi_events.broken.failure` | failure | broken | — |
-| `dbi\_events` | RDS Events | wave1 | `dbi_events.broken.low_storage` | low storage | broken | — |
-| `dbi\_events` | RDS Events | wave1 | `dbi_events.warn.failover` | failover | warn | — |
-| `dbi\_events` | RDS Events | wave1 | `dbi_events.warn.recovery` | recovery | warn | — |
-| `eb\_rule\_targets` | EB Rule Targets | wave1 | `eb_rule_targets.warn.no_dlq` | no DLQ configured | warn | — |
-| `ecr\_images` | ECR Images | wave1 | `ecr_images.broken.scan_failed` | scan failed | broken | — |
-| `ecr\_images` | ECR Images | wave1 | `ecr_images.broken.critical` | <N> critical vulnerabilities | broken | — |
-| `ecr\_images` | ECR Images | wave1 | `ecr_images.warn.high` | <N> high vulnerabilities | warn | — |
-| `ecr\_images` | ECR Images | wave1 | `ecr_images.dim.untagged` | untagged | dim | — |
-| `ecs\_svc\_logs` | Service Logs | wave1 | `log-event.broken.error` | error | broken | — |
-| `ecs\_svc\_logs` | Service Logs | wave1 | `log-event.warn.warning` | warning | warn | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.health.unhealthy` | unhealthy | broken | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <stop code> | broken | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.stopped` | stopped | dim | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.provisioning` | provisioning | warn | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.pending` | pending | warn | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.activating` | activating | warn | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.deactivating` | deactivating | warn | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.stopping` | stopping | warn | — |
-| `ecs\_tasks` | Service Tasks | wave1 | `ecs-task.state.deprovisioning` | deprovisioning | warn | — |
-| `elb\_listeners` | ELB Listeners | wave1 | `elb_listeners.broken.no_certificate` | no certificate configured | broken | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.broken.failed` | failed | broken | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.broken.timeout` | timeout | broken | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.broken.error` | error | broken | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.broken.expired` | expired | broken | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.warn.running` | running | warn | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.warn.starting` | starting | warn | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.warn.stopping` | stopping | warn | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.warn.waiting` | waiting | warn | — |
-| `glue\_runs` | Job Runs | wave1 | `glue-run.dim.stopped` | stopped | dim | — |
-| `lambda\_invocations` | Lambda Invocations | wave1 | `lambda-invocation.broken.timeout` | timed out | broken | — |
-| `log\_events` | Log Events | wave1 | `log-event.broken.error` | error | broken | — |
-| `log\_events` | Log Events | wave1 | `log-event.warn.warning` | warning | warn | — |
-| `pipeline\_stages` | Pipeline Stages | wave1 | `pipeline-stage.broken.failed` | failed | broken | — |
-| `role\_policies` | Role Policies | wave1 | `role-policy.broken.over_privileged` | over-privileged | broken | — |
-| `role\_policies` | Role Policies | wave1 | `role-policy.dim.inline` | inline | dim | — |
-| `sfn\_execution\_history` | SFN Execution History | wave1 | `sfn-execution-history.broken.event_failed` | task failed | broken | — |
-| `sfn\_executions` | SFN Executions | wave1 | `sfn-execution.broken.failed` | failed | broken | — |
-| `sfn\_executions` | SFN Executions | wave1 | `sfn-execution.broken.timed_out` | timed out | broken | — |
-| `sfn\_executions` | SFN Executions | wave1 | `sfn-execution.broken.aborted` | aborted | broken | — |
-| `sns\_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.state.pending-confirmation` | endpoint has not confirmed the subscription | warn | — |
-| `sns\_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.state.deleted` | endpoint deleted | dim | — |
-| `sns\_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.plain-http` | delivers over plain HTTP | warn | The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint. |
-| `transfer\_agreements` | Agreements | wave1 | `transfer.warn.agreement_inactive` | inactive: partner traffic rejected | warn | Agreement is inactive; partner traffic is rejected. |
-| `transfer\_agreements` | Agreements | wave1 | `transfer.broken.cert_expired` | expired | broken | The certificate has expired, so partner connections that present or verify it now fail. Import a renewed certificate and point the profile at it. |
-| `transfer\_agreements` | Agreements | wave1 | `transfer.warn.cert_expiring` | expires in <N>d | warn | The certificate expires soon; once it does, partner connections that present or verify it will fail. Import a renewed certificate before the inactive date. |
+| `alarm_history` | Alarm History | wave1 | `alarm-history.broken.alarm` | alarm | broken | — |
+| `alarm_history` | Alarm History | wave1 | `alarm-history.warn.insufficient_data` | insufficient data | warn | — |
+| `asg_activities` | Scaling Activities | wave1 | `asg-activity.broken.failed` | failed | broken | — |
+| `asg_activities` | Scaling Activities | wave1 | `asg-activity.warn.cancelled` | cancelled | warn | — |
+| `cb_builds` | CodeBuild Builds | wave1 | `cb-build.broken.failed` | failed | broken | — |
+| `cb_builds` | CodeBuild Builds | wave1 | `cb-build.broken.fault` | fault | broken | — |
+| `cb_builds` | CodeBuild Builds | wave1 | `cb-build.broken.timed_out` | timed out | broken | — |
+| `cb_builds` | CodeBuild Builds | wave1 | `cb-build.warn.in_progress` | in progress | warn | — |
+| `cb_builds` | CodeBuild Builds | wave1 | `cb-build.dim.stopped` | stopped | dim | — |
+| `cfn_events` | Stack Events | wave1 | `cfn-event.broken.failed` | <status, lowercased> | broken | — |
+| `cfn_events` | Stack Events | wave1 | `cfn-event.warn.in_progress` | <status, lowercased> | warn | — |
+| `cfn_events` | Stack Events | wave1 | `cfn-event.dim.deleted` | deleted | dim | — |
+| `cfn_resources` | Stack Resources | wave1 | `cfn-resource.broken.failed` | <status, lowercased> | broken | — |
+| `cfn_resources` | Stack Resources | wave1 | `cfn-resource.warn.in_progress` | <status, lowercased> | warn | — |
+| `cfn_resources` | Stack Resources | wave1 | `cfn-resource.dim.deleted` | deleted | dim | — |
+| `dbi_events` | RDS Events | wave1 | `dbi_events.broken.failure` | failure | broken | — |
+| `dbi_events` | RDS Events | wave1 | `dbi_events.broken.low_storage` | low storage | broken | — |
+| `dbi_events` | RDS Events | wave1 | `dbi_events.warn.failover` | failover | warn | — |
+| `dbi_events` | RDS Events | wave1 | `dbi_events.warn.recovery` | recovery | warn | — |
+| `eb_rule_targets` | EB Rule Targets | wave1 | `eb_rule_targets.warn.no_dlq` | no DLQ configured | warn | — |
+| `ecr_images` | ECR Images | wave1 | `ecr_images.broken.scan_failed` | scan failed | broken | — |
+| `ecr_images` | ECR Images | wave1 | `ecr_images.broken.critical` | <N> critical vulnerabilities | broken | — |
+| `ecr_images` | ECR Images | wave1 | `ecr_images.warn.high` | <N> high vulnerabilities | warn | — |
+| `ecr_images` | ECR Images | wave1 | `ecr_images.dim.untagged` | untagged | dim | — |
+| `ecs_svc_logs` | Service Logs | wave1 | `log-event.broken.error` | error | broken | — |
+| `ecs_svc_logs` | Service Logs | wave1 | `log-event.warn.warning` | warning | warn | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.health.unhealthy` | unhealthy | broken | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <stop code> | broken | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.stopped` | stopped | dim | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.provisioning` | provisioning | warn | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.pending` | pending | warn | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.activating` | activating | warn | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.deactivating` | deactivating | warn | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.stopping` | stopping | warn | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.deprovisioning` | deprovisioning | warn | — |
+| `elb_listeners` | ELB Listeners | wave1 | `elb_listeners.broken.no_certificate` | no certificate configured | broken | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.broken.failed` | failed | broken | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.broken.timeout` | timeout | broken | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.broken.error` | error | broken | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.broken.expired` | expired | broken | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.warn.running` | running | warn | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.warn.starting` | starting | warn | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.warn.stopping` | stopping | warn | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.warn.waiting` | waiting | warn | — |
+| `glue_runs` | Job Runs | wave1 | `glue-run.dim.stopped` | stopped | dim | — |
+| `lambda_invocations` | Lambda Invocations | wave1 | `lambda-invocation.broken.timeout` | timed out | broken | — |
+| `log_events` | Log Events | wave1 | `log-event.broken.error` | error | broken | — |
+| `log_events` | Log Events | wave1 | `log-event.warn.warning` | warning | warn | — |
+| `pipeline_stages` | Pipeline Stages | wave1 | `pipeline-stage.broken.failed` | failed | broken | — |
+| `role_policies` | Role Policies | wave1 | `role-policy.broken.over_privileged` | over-privileged | broken | — |
+| `role_policies` | Role Policies | wave1 | `role-policy.dim.inline` | inline | dim | — |
+| `sfn_execution_history` | SFN Execution History | wave1 | `sfn-execution-history.broken.event_failed` | task failed | broken | — |
+| `sfn_executions` | SFN Executions | wave1 | `sfn-execution.broken.failed` | failed | broken | — |
+| `sfn_executions` | SFN Executions | wave1 | `sfn-execution.broken.timed_out` | timed out | broken | — |
+| `sfn_executions` | SFN Executions | wave1 | `sfn-execution.broken.aborted` | aborted | broken | — |
+| `sns_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.state.pending-confirmation` | endpoint has not confirmed the subscription | warn | — |
+| `sns_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.state.deleted` | endpoint deleted | dim | — |
+| `sns_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.plain-http` | delivers over plain HTTP | warn | The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint. |
+| `transfer_agreements` | Agreements | wave1 | `transfer.warn.agreement_inactive` | inactive: partner traffic rejected | warn | Agreement is inactive; partner traffic is rejected. |
+| `transfer_agreements` | Agreements | wave1 | `transfer.broken.cert_expired` | expired | broken | The certificate has expired, so partner connections that present or verify it now fail. Import a renewed certificate and point the profile at it. |
+| `transfer_agreements` | Agreements | wave1 | `transfer.warn.cert_expiring` | expires in <N>d | warn | The certificate expires soon; once it does, partner connections that present or verify it will fail. Import a renewed certificate before the inactive date. |
 
 <!-- END GENERATED: signals -->
 

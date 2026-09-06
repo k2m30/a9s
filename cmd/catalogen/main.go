@@ -298,12 +298,14 @@ func escapeMarkdownCell(s string) string {
 }
 
 // detailCell is the Detail column of a findings table: the declared S5
-// sentence, or an em dash for a finding that renders none.
+// sentence, or an em dash for a finding that renders none. The sentence is
+// authored prose — its backticks are code spans it means to render — so only
+// the pipe, which would end the cell, is escaped.
 func detailCell(f catalog.FindingDef) string {
 	if f.Detail == "" {
 		return "—"
 	}
-	return escapeMarkdownCell(f.Detail)
+	return strings.ReplaceAll(f.Detail, `|`, `\|`)
 }
 
 // severityLabel returns the human-readable label for a domain.Severity value.
@@ -365,7 +367,11 @@ func generateSignalTables(repoRoot string, types []catalog.ResourceTypeDef) erro
 
 	var b strings.Builder
 	for _, category := range categories {
-		fmt.Fprintf(&b, "\n### %s\n\n", categoryLabel(category))
+		heading := category
+		if heading == "" {
+			heading = "Other"
+		}
+		fmt.Fprintf(&b, "\n### %s\n\n", heading)
 		b.WriteString("| shortName | Name | Wave | Code | Phrase | Severity | Detail |\n")
 		b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
 		for _, rt := range types {
@@ -374,7 +380,7 @@ func generateSignalTables(repoRoot string, types []catalog.ResourceTypeDef) erro
 			}
 			for _, f := range rt.Findings {
 				fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | %s | %s | %s |\n",
-					escapeMarkdownCell(rt.ShortName), escapeMarkdownCell(rt.Name),
+					rt.ShortName, escapeMarkdownCell(rt.Name),
 					escapeMarkdownCell(f.Source), f.Code,
 					phraseCell(f.Phrase), severityLabel(f.Severity), detailCell(f))
 			}
@@ -385,24 +391,24 @@ func generateSignalTables(repoRoot string, types []catalog.ResourceTypeDef) erro
 	return updateGeneratedSection(path, "signals", b.String())
 }
 
-// categoryLabel title-cases a catalog category ("COMPUTE" -> "Compute") for
-// the heading the hand-written signal tables already use.
-func categoryLabel(category string) string {
-	if category == "" {
-		return "Other"
-	}
-	lower := strings.ToLower(category)
-	return strings.ToUpper(lower[:1]) + lower[1:]
-}
-
 // phraseCell renders a finding's operator-facing phrase verbatim, so a reader
 // can search the page for the words the row shows. Only the pipe is escaped,
 // which would otherwise end the cell; a phrase carrying an asterisk or an
 // underscore goes in a code span, where markdown reads neither as emphasis.
 func phraseCell(phrase string) string {
 	cell := strings.ReplaceAll(phrase, `|`, `\|`)
-	if strings.ContainsAny(phrase, "*_") && !strings.Contains(phrase, "`") {
-		return "`" + cell + "`"
+	if !strings.ContainsAny(phrase, "*_") {
+		return cell
 	}
-	return cell
+	// The fence must be longer than any backtick run the phrase carries, and
+	// a phrase that begins or ends with one needs a space to sit off it.
+	fence := "`"
+	for strings.Contains(cell, fence) {
+		fence += "`"
+	}
+	pad := ""
+	if strings.HasPrefix(cell, "`") || strings.HasSuffix(cell, "`") {
+		pad = " "
+	}
+	return fence + pad + cell + pad + fence
 }

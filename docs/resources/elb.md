@@ -105,6 +105,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [DescribeLoadBalancers](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

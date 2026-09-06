@@ -75,6 +75,8 @@ Expected targets from `docs/related-resources.md` Per-type contract (line 102): 
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetQueueAttributes](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html)
+
 Transcribed from `docs/attention-signals.md` § Messaging § `sqs` row (line 82).
 
 ### 3.1 Wave 1 — zero extra API calls

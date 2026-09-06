@@ -64,6 +64,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `glue`, `km
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [GetWorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_GetWorkGroup.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls

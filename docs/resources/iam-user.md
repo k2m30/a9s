@@ -46,6 +46,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `iam-group`
 
 ## 3. Attention / Issues Algorithm
 
+**Source API**: [ListUsers](https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListUsers.html)
+
 Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
