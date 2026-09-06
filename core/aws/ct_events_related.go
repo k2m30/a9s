@@ -47,9 +47,9 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	candidates := ctEventsRoleCandidates(res)
 	if len(candidates) == 0 {
-		return resource.KnownRelated("role", nil, false)
+		return unreadZero(res, resource.KnownRelated("role", nil, false))
 	}
-	return ctEventsMatchTarget(ctx, clients, cache, "role", [][]string{candidates})
+	return unreadZero(res, ctEventsMatchTarget(ctx, clients, cache, "role", [][]string{candidates}))
 }
 
 // ctEventsRoleCandidates returns the candidate ids for the role a CloudTrail

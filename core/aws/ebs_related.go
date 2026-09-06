@@ -121,7 +121,7 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
-		return resource.KnownRelated("backup", nil, false)
+		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 	tags := map[string]string{}
 	if vol, ok := assertStruct[ec2types.Volume](res.RawStruct); ok {
@@ -146,5 +146,5 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, planRes.ID)
 		}
 	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return unreadZeroScanned(res, len(backupList), relatedResultTrunc("backup", ids, truncated))
 }

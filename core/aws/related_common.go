@@ -13,6 +13,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -23,6 +24,33 @@ import (
 // enrichment refills it. Nothing was read and nothing failed, so the panel owes
 // a "?".
 var errRawStructMissing = errors.New("resource details have not been read yet")
+
+// unreadZero is what a checker owes when it found nothing and could not read
+// its source row. A disk-cache replay carries no RawStruct, so a zero there is
+// a claim about a row nobody looked at — the checker had no filter to scan
+// with, and "none" and "we have not looked" are not the same answer.
+//
+// Everything else passes through untouched: anything the checker did find, an
+// error, an already-unknown, and a truncated zero — a truncated result means a
+// real list was read with whatever filter the row's Fields could supply, and
+// that lower bound is honest whether or not the RawStruct was there.
+func unreadZero(res resource.Resource, r resource.RelatedCheckResult) resource.RelatedCheckResult {
+	if res.RawStruct != nil || r.State() != domain.RelatedResolved || r.Count() != 0 || r.Truncated() {
+		return r
+	}
+	return resource.UnknownRelated(r.TargetType())
+}
+
+// unreadZeroScanned is unreadZero for a checker that did read the target list.
+// A zero over a population of none is proven whatever the source row could or
+// could not say — no row existed for it to match — so only a zero over rows
+// that were really there is a claim the source row has to back.
+func unreadZeroScanned(res resource.Resource, scanned int, r resource.RelatedCheckResult) resource.RelatedCheckResult {
+	if scanned == 0 {
+		return r
+	}
+	return unreadZero(res, r)
+}
 
 // relatedFromErr turns the error a two-hop helper returned into the result the
 // panel owes. It is the single place that knows "we have not read this row yet"

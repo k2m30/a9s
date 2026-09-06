@@ -114,9 +114,6 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 // empty because recovery points are a different resource class and the
 // backup list is keyed by plan id.
 func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// Missing RawStruct → we can't derive the source ARN. That's an early-exit
-	// (Count=0), not an unknown result. Returning unknown here when the caller
-	// handed us a valid truncated cache would drop the honest lower bound.
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
 		if res.RawStruct == nil {

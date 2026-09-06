@@ -368,14 +368,14 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 // NeedsTargetCache: true.
 func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("sfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
 	}
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("sfn")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.KnownRelated("sfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
 	}
 
 	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
@@ -385,7 +385,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		taskDefFamily = taskDefFamily[:idx]
 	}
 	if taskDefFamily == "" {
-		return resource.KnownRelated("sfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
 	}
 
 	entry, ok := cache["sfn"]
@@ -422,7 +422,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 	// Some DescribeStateMachine calls may have failed: ids is a proven subset,
 	// not necessarily exhaustive. Truncated (not Errored) keeps the row
 	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("sfn", ids, entry.IsTruncated || len(failures) > 0)
+	return unreadZero(res, relatedResultTrunc("sfn", ids, entry.IsTruncated || len(failures) > 0))
 }
 
 // sfnASLHasECSFamily walks an ASL definition JSON and returns true if any Task state

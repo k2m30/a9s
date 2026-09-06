@@ -76,7 +76,7 @@ func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _
 func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
 	if res.RawStruct == nil {
-		return resource.KnownRelated("eb", nil, false)
+		return unreadZero(res, resource.KnownRelated("eb", nil, false))
 	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
 		return resource.UnknownRelated("eb")
@@ -84,7 +84,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.KnownRelated("eb", nil, false)
+		return unreadZero(res, resource.KnownRelated("eb", nil, false))
 	}
 
 	entry, ok := cache["eb"]
@@ -150,7 +150,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	// Some DescribeConfigurationSettings calls may have failed: ids is a proven
 	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
 	// row actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("eb", ids, entry.IsTruncated || len(failures) > 0)
+	return unreadZero(res, relatedResultTrunc("eb", ids, entry.IsTruncated || len(failures) > 0))
 }
 
 // checkSecretsECSTask is a reverse-scan checker for the secrets→ecs-task relationship.
@@ -161,7 +161,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
 	if res.RawStruct == nil {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
 	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
 		return resource.UnknownRelated("ecs-task")
@@ -169,7 +169,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
 	}
 
 	entry, ok := cache["ecs-task"]
@@ -241,7 +241,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 			return resource.ErrorRelated("ecs-task", aggErr)
 		}
 	}
-	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0)
+	return unreadZero(res, relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0))
 }
 
 // secretsECSTaskRefsSecret returns true if the TaskDefinition references the given
@@ -327,7 +327,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 		secretID = secretName
 	}
 	if secretID == "" {
-		return resource.KnownRelated("role", nil, false)
+		return unreadZero(res, resource.KnownRelated("role", nil, false))
 	}
 
 	c, cok := clients.(*ServiceClients)
@@ -388,7 +388,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 		// confirmed, so this is unresolved, not a proven zero or a lower bound.
 		return resource.UnknownRelated("role")
 	}
-	return relatedResultTrunc("role", finalIDs, partial)
+	return unreadZero(res, relatedResultTrunc("role", finalIDs, partial))
 }
 
 // secretsPolicyRoleARNs parses a Secrets Manager resource policy JSON and returns

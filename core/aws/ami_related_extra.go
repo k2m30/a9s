@@ -25,7 +25,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 	cfnList, truncated, err := amiRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -40,7 +40,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // checkAMIKMS extracts KMS key IDs from the AMI's block device mappings

@@ -50,7 +50,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if rgID == "" && len(memberSet) == 0 {
-		return resource.KnownRelated("alarm", nil, false)
+		return unreadZero(res, resource.KnownRelated("alarm", nil, false))
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -84,12 +84,12 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("alarm", nil, true)
+		return unreadZeroScanned(res, len(alarmList), relatedResultTrunc("alarm", nil, true))
 	}
 	if truncated {
-		return truncatedResultRedis("alarm", ids)
+		return unreadZeroScanned(res, len(alarmList), truncatedResultRedis("alarm", ids))
 	}
-	return relatedResult("alarm", ids)
+	return unreadZeroScanned(res, len(alarmList), relatedResult("alarm", ids))
 }
 
 // checkRedisCFN resolves CloudFormation stack ownership via a single

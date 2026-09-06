@@ -372,7 +372,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		// Parent has no MasterUserSecret — true regardless of whether the
 		// RawStruct shape was a recognised cluster. Returning Count=0 is
 		// definitive: there is no cluster-managed master secret to associate.
-		return resource.KnownRelated("secrets", nil, false)
+		return unreadZero(res, resource.KnownRelated("secrets", nil, false))
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -394,7 +394,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, secretRes.ID)
 		}
 	}
-	return relatedResultTrunc("secrets", ids, truncated)
+	return unreadZeroScanned(res, len(secretList), relatedResultTrunc("secrets", ids, truncated))
 }
 
 // checkDbcKMS extracts the KMS key from the DBCluster's KmsKeyId field.
@@ -404,10 +404,10 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := dbcClusterKmsKeyID(res.RawStruct)
 	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return unreadZero(res, resource.KnownRelated("kms", nil, false))
 	}
 	keyID = kmsKeyIDFromField(keyID, res.Type)
-	return relatedResult("kms", []string{keyID})
+	return unreadZero(res, relatedResult("kms", []string{keyID}))
 }
 
 // checkDbcCTEvents looks up cached CloudTrail events for the cluster's

@@ -113,7 +113,7 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		// No RawStruct, or no Backup signature in Description/Tags — the
 		// parent's own fields definitively rule out coverage; not a
 		// truncated-cache situation.
-		return resource.KnownRelated("backup", nil, false)
+		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 	if sourceARN == "" {
 		// Backup-created signature confirmed via Description alone, but no
@@ -139,5 +139,5 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 			}
 		}
 	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return unreadZeroScanned(res, len(backupList), relatedResultTrunc("backup", ids, truncated))
 }

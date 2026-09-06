@@ -196,7 +196,7 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 	for id := range idSet {
 		ids = append(ids, id)
 	}
-	return relatedResultTrunc("sqs", ids, truncated)
+	return unreadZeroScanned(res, len(sqsList), relatedResultTrunc("sqs", ids, truncated))
 }
 
 // checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
@@ -253,7 +253,7 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 		queueARN = raw.Attributes["QueueArn"]
 	}
 	if queueARN == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return unreadZero(res, resource.KnownRelated("eb-rule", nil, false))
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
@@ -269,5 +269,5 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	if err != nil {
 		return resource.ErrorRelated("eb-rule", err)
 	}
-	return relatedResult("eb-rule", out.RuleNames)
+	return unreadZero(res, relatedResult("eb-rule", out.RuleNames))
 }

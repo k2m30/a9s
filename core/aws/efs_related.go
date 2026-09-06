@@ -53,7 +53,7 @@ func checkEFSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := efsCFNStackName(res)
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -75,7 +75,7 @@ func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // efsCFNStackName extracts the aws:cloudformation:stack-name tag value from the

@@ -91,7 +91,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("cfn", err)
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -113,7 +113,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // ecrCFNStackName extracts the aws:cloudformation:stack-name tag value from the

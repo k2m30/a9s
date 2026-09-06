@@ -59,7 +59,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		stackName = raw.Tags["aws:cloudformation:stack-name"]
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -81,7 +81,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // checkEKSLogs searches the logs cache for the EKS control-plane log group.

@@ -122,7 +122,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 		fnARN = *fn.FunctionArn
 	}
 	if fnARN == "" {
-		return resource.KnownRelated("cf", nil, false)
+		return unreadZero(res, resource.KnownRelated("cf", nil, false))
 	}
 	cfList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "cf")
 	if err != nil {
@@ -145,7 +145,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	return relatedResultTrunc("cf", ids, truncated)
+	return unreadZeroScanned(res, len(cfList), relatedResultTrunc("cf", ids, truncated))
 }
 
 // checkLambdaDDB scans this Lambda's event source mappings for DynamoDB

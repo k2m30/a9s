@@ -69,7 +69,7 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -91,7 +91,7 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // checkECSKMS extracts the KMS key from the ECS Cluster's

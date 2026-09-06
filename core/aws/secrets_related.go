@@ -103,7 +103,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := secretsCFNStackName(res)
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -125,7 +125,7 @@ func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // secretsCFNStackName extracts the aws:cloudformation:stack-name tag value from

@@ -245,7 +245,7 @@ func eipMatchingECSTask(ctx context.Context, clients any, cache resource.Resourc
 func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eniID := eipENIID(res)
 	if eniID == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
 	}
 	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
 	if err != nil {
@@ -253,11 +253,11 @@ func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	if taskRes.ID == "" {
 		if truncated {
-			return relatedResultTrunc("ecs-task", nil, true)
+			return unreadZero(res, relatedResultTrunc("ecs-task", nil, true))
 		}
-		return resource.KnownRelated("ecs-task", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
 	}
-	return relatedResult("ecs-task", []string{taskRes.ID})
+	return unreadZero(res, relatedResult("ecs-task", []string{taskRes.ID}))
 }
 
 // checkEIPECSSvc reports the ECS service whose task currently holds this EIP,
@@ -266,7 +266,7 @@ func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, ca
 func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eniID := eipENIID(res)
 	if eniID == "" {
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
 	}
 	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
 	if err != nil {
@@ -274,19 +274,19 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if taskRes.ID == "" {
 		if truncated {
-			return relatedResultTrunc("ecs-svc", nil, true)
+			return unreadZero(res, relatedResultTrunc("ecs-svc", nil, true))
 		}
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
 	}
 	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
 	if !ok || task.Group == nil || !strings.HasPrefix(*task.Group, "service:") {
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
 	}
 	svcName := strings.TrimPrefix(*task.Group, "service:")
 	if svcName == "" {
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
 	}
-	return relatedResult("ecs-svc", []string{svcName})
+	return unreadZero(res, relatedResult("ecs-svc", []string{svcName}))
 }
 
 // checkEIPECS reports the ECS cluster whose task currently holds this EIP,
@@ -295,7 +295,7 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eniID := eipENIID(res)
 	if eniID == "" {
-		return resource.KnownRelated("ecs", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
 	}
 	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
 	if err != nil {
@@ -303,17 +303,17 @@ func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	if taskRes.ID == "" {
 		if truncated {
-			return relatedResultTrunc("ecs", nil, true)
+			return unreadZero(res, relatedResultTrunc("ecs", nil, true))
 		}
-		return resource.KnownRelated("ecs", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
 	}
 	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
 	if !ok || task.ClusterArn == nil || *task.ClusterArn == "" {
-		return resource.KnownRelated("ecs", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
 	}
 	clusterName := arnLastSegment(*task.ClusterArn)
 	if clusterName == "" {
-		return resource.KnownRelated("ecs", nil, false)
+		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
 	}
-	return relatedResult("ecs", []string{clusterName})
+	return unreadZero(res, relatedResult("ecs", []string{clusterName}))
 }

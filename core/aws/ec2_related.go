@@ -25,11 +25,11 @@ import (
 // checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
 func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("tg", nil, false)
+		return unreadZero(res, resource.KnownRelated("tg", nil, false))
 	}
 	instanceID, vpcID, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.KnownRelated("tg", nil, false)
+		return unreadZero(res, resource.KnownRelated("tg", nil, false))
 	}
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
@@ -58,17 +58,17 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 			ids = append(ids, tgRes.ID)
 		}
 	}
-	return relatedResultTrunc("tg", ids, truncated)
+	return unreadZeroScanned(res, len(tgList), relatedResultTrunc("tg", ids, truncated))
 }
 
 // checkEC2ASG checks the cache for ASGs containing this EC2 instance.
 func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("asg", nil, false)
+		return unreadZero(res, resource.KnownRelated("asg", nil, false))
 	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return unreadZero(res, resource.KnownRelated("asg", nil, false))
 	}
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
@@ -90,26 +90,26 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	return relatedResultTrunc("asg", ids, truncated)
+	return unreadZeroScanned(res, len(asgList), relatedResultTrunc("asg", ids, truncated))
 }
 
 // checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
 func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("alarm", nil, false)
+		return unreadZero(res, resource.KnownRelated("alarm", nil, false))
 	}
 	instanceID, _, _ := ec2Identity(res)
-	return alarmIDsByDimension(ctx, clients, cache, "", "InstanceId", instanceID)
+	return unreadZero(res, alarmIDsByDimension(ctx, clients, cache, "", "InstanceId", instanceID))
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
 func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 	_, _, stackName := ec2Identity(res)
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -129,17 +129,17 @@ func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	return relatedResultTrunc("cfn", ids, truncated)
+	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
 // checkEC2EIP checks the cache for Elastic IPs associated with this EC2 instance.
 func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("eip", nil, false)
+		return unreadZero(res, resource.KnownRelated("eip", nil, false))
 	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.KnownRelated("eip", nil, false)
+		return unreadZero(res, resource.KnownRelated("eip", nil, false))
 	}
 	eipList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eip")
 	if err != nil {
@@ -159,20 +159,20 @@ func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, eipRes.ID)
 		}
 	}
-	return relatedResultTrunc("eip", ids, truncated)
+	return unreadZeroScanned(res, len(eipList), relatedResultTrunc("eip", ids, truncated))
 }
 
 func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids := ec2VolumeIDs(res)
 	if len(ids) == 0 {
-		return resource.KnownRelated("ebs", nil, false)
+		return unreadZero(res, resource.KnownRelated("ebs", nil, false))
 	}
 	ordered := make([]string, 0, len(ids))
 	for id := range ids {
 		ordered = append(ordered, id)
 	}
 	sort.Strings(ordered)
-	return relatedResult("ebs", ordered)
+	return unreadZero(res, relatedResult("ebs", ordered))
 }
 
 // checkEC2NodeGroups checks for EKS node groups associated with this EC2 instance.
@@ -180,17 +180,17 @@ func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // in the partial list.
 func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return resource.KnownRelated("ng", nil, false)
+		return unreadZero(res, resource.KnownRelated("ng", nil, false))
 	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.KnownRelated("ng", nil, false)
+		return unreadZero(res, resource.KnownRelated("ng", nil, false))
 	}
 	tags := ec2Tags(res)
 	clusterName := tags["eks:cluster-name"]
 	nodegroupName := tags["eks:nodegroup-name"]
 	if clusterName == "" && nodegroupName == "" {
-		return resource.KnownRelated("ng", nil, false)
+		return unreadZero(res, resource.KnownRelated("ng", nil, false))
 	}
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
@@ -222,7 +222,7 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, ngRes.ID)
 		}
 	}
-	return relatedResultTrunc("ng", ids, truncated)
+	return unreadZeroScanned(res, len(ngList), relatedResultTrunc("ng", ids, truncated))
 }
 
 // checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
@@ -266,7 +266,7 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Res
 func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volumeIDs := ec2VolumeIDs(res)
 	if len(volumeIDs) == 0 {
-		return resource.KnownRelated("ebs-snap", nil, false)
+		return unreadZero(res, resource.KnownRelated("ebs-snap", nil, false))
 	}
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
 	if err != nil {
@@ -286,7 +286,7 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, snapRes.ID)
 		}
 	}
-	return relatedResultTrunc("ebs-snap", ids, truncated)
+	return unreadZeroScanned(res, len(snapList), relatedResultTrunc("ebs-snap", ids, truncated))
 }
 
 // checkEC2SG extracts security group IDs from the EC2 Instance's SecurityGroups slice.

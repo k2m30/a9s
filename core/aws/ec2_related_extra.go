@@ -141,7 +141,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.KnownRelated("backup", nil, false)
+		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 
 	tags := map[string]string{}
@@ -170,5 +170,5 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, planRes.ID)
 		}
 	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return unreadZeroScanned(res, len(backupList), relatedResultTrunc("backup", ids, truncated))
 }

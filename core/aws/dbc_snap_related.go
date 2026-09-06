@@ -79,17 +79,17 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.VpcId == nil || *snap.VpcId == "" {
-			return resource.KnownRelated("vpc", nil, false)
+			return unreadZero(res, resource.KnownRelated("vpc", nil, false))
 		}
-		return relatedResult("vpc", []string{*snap.VpcId})
+		return unreadZero(res, relatedResult("vpc", []string{*snap.VpcId}))
 	}
 	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.VpcId == nil || *snap.VpcId == "" {
-			return resource.KnownRelated("vpc", nil, false)
+			return unreadZero(res, resource.KnownRelated("vpc", nil, false))
 		}
-		return relatedResult("vpc", []string{*snap.VpcId})
+		return unreadZero(res, relatedResult("vpc", []string{*snap.VpcId}))
 	}
-	return resource.KnownRelated("vpc", nil, false)
+	return unreadZero(res, resource.KnownRelated("vpc", nil, false))
 }
 
 // checkDbcSnapBackup resolves AWS Backup PLANS that cover this DocumentDB or
@@ -114,7 +114,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	parentName, parentARN := dbcSnapParentRefs(res.RawStruct)
 	if parentName == "" {
 		// No parent reference — can't pivot.
-		return resource.KnownRelated("backup", nil, false)
+		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 
 	// If the snapshot's RawStruct already exposes the parent cluster ARN we
@@ -142,7 +142,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 				return resource.UnknownRelated("backup")
 			}
 			// Cache is complete — parent is genuinely absent (orphan or no ARN field).
-			return resource.KnownRelated("backup", nil, false)
+			return unreadZeroScanned(res, len(dbcList), resource.KnownRelated("backup", nil, false))
 		}
 	}
 
@@ -160,7 +160,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, planRes.ID)
 		}
 	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return unreadZeroScanned(res, len(planList), relatedResultTrunc("backup", ids, truncated))
 }
 
 // dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from a
