@@ -25,7 +25,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return relatedResultTrunc("logs", nil, true)
+		return resource.UnknownRelated("logs")
 	}
 	prefix := "/aws/dynamodb/tables/" + name + "/"
 	var ids []string
@@ -49,7 +49,7 @@ func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("vpce", err)
 	}
 	if vpceList == nil {
-		return relatedResultTrunc("vpce", nil, true)
+		return resource.UnknownRelated("vpce")
 	}
 	var ids []string
 	for _, vpceRes := range vpceList {

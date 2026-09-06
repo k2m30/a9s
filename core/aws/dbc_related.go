@@ -144,7 +144,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return relatedResultTrunc("logs", nil, true)
+		return resource.UnknownRelated("logs")
 	}
 
 	// dbc covers both DocumentDB (/aws/docdb/<cluster>/*) and Aurora

@@ -241,6 +241,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A related row no longer reads as a confident zero when the list behind it was
+  cut short. Document DB and Aurora cluster log groups, RDS instance snapshots
+  and log groups, DynamoDB table log groups and gateway endpoints, and the
+  CloudFront distributions and hosted zones behind a certificate now read as
+  unknown when nothing was read or nothing matched on a page that had more to
+  come.
+
 - The role a CloudTrail event names is now reported only once the role list
   confirms it still exists. An event body records what was there at the time,
   so an event naming a since-deleted role used to answer with a count that

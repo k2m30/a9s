@@ -54,6 +54,11 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfRes.ID)
 		}
 	}
+	// A truncated list that matched nothing has not earned a zero: the match may
+	// sit on a page never read.
+	if truncated && len(ids) == 0 {
+		return resource.UnknownRelated("cf")
+	}
 	return relatedResultTrunc("cf", ids, truncated)
 }
 
@@ -211,6 +216,11 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 			seen[bestZoneID] = true
 			ids = append(ids, bestZoneID)
 		}
+	}
+	// A truncated list that matched nothing has not earned a zero: the match may
+	// sit on a page never read.
+	if truncated && len(ids) == 0 {
+		return resource.UnknownRelated("r53")
 	}
 	return relatedResultTrunc("r53", ids, truncated)
 }

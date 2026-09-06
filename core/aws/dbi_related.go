@@ -94,7 +94,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("dbi-snap", err)
 	}
 	if snapList == nil {
-		return relatedResultTrunc("dbi-snap", nil, true)
+		return resource.UnknownRelated("dbi-snap")
 	}
 
 	var ids []string
@@ -125,7 +125,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return relatedResultTrunc("logs", nil, true)
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
