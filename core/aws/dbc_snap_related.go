@@ -47,11 +47,7 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, dbcRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		// Cache is truncated — parent may be in a later page; answer is unknown.
-		return resource.UnknownRelated("dbc")
-	}
-	return relatedResult("dbc", ids)
+	return relatedResultTrunc("dbc", ids, truncated)
 }
 
 // checkDbcSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.

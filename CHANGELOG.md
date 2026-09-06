@@ -247,7 +247,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now read as unknown when their list was never fetched, instead of a zero with
   a "more to come" marker that implied a list had been seen. A list that was
   fetched but came back partial still reports what it found, marked as a lower
-  bound.
+  bound, which is now also how a cluster snapshot answers for a parent cluster
+  that was not on the page it read.
 
 - The role a CloudTrail event names is now reported only once the role list
   confirms it still exists. An event body records what was there at the time,

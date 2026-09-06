@@ -303,12 +303,13 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_RDS(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB verifies that when the dbc cache
-// is truncated (IsTruncated=true) and the parent cluster is not in the visible
-// window, the checker returns UnknownRelated (Count=-1) — the parent may be in
-// a later page, so absence is non-definitive.
-//
-// FAILS today: checkDbcSnapDBC returns Count=1 regardless.
+// TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB is INVERTED under row 16. The
+// original defect it caught stands: the checker used to answer 1 from the
+// snapshot's own cluster id without scanning the list at all. What it must
+// answer instead changed. The dbc list IS the target list here, so a truncated
+// page that did not carry the parent is a resolved zero carrying the truncation
+// flag, rendered "(0+)", not Unknown. Unknown is reserved for a list that was
+// never read.
 func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 	const ghostCluster = "ghost-cluster-trunc"
 	res := dbcSnapDBC_SnapshotWithDocDBRaw(ghostCluster)
@@ -317,22 +318,11 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	// After fix: truncated cache + parent not found → UnknownRelated (Count=-1).
-	// FAILS today: Count=1 (no cache scan).
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf(
-			"checkDbcSnapDBC (docdb RawStruct): ghost cluster %q with truncated cache: "+
-				"Count = %d, want -1 (UnknownRelated) — DBC-SNAP-NO-CACHE-CHECK BUG: "+
-				"parent may be in later page; answer must be unknown, not positive",
-			ghostCluster, result.Count(),
-		)
-	}
+	assertDbcSnapTruncatedZero(t, "docdb RawStruct", ghostCluster, result)
 }
 
-// TestRelated_DbcSnap_DBC_OrphanTruncated_RDS verifies the same scenario for
-// rdstypes.DBClusterSnapshot RawStruct.
-//
-// FAILS today: Count=1 regardless.
+// TestRelated_DbcSnap_DBC_OrphanTruncated_RDS is the same case for the
+// rdstypes.DBClusterSnapshot shape, inverted for the same reason.
 func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	const ghostCluster = "ghost-rds-cluster-trunc"
 	res := dbcSnapDBC_SnapshotWithRDSRaw(ghostCluster)
@@ -341,13 +331,7 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf(
-			"checkDbcSnapDBC (rds RawStruct): ghost cluster %q with truncated cache: "+
-				"Count = %d, want -1 (UnknownRelated) — DBC-SNAP-NO-CACHE-CHECK BUG (RDS branch)",
-			ghostCluster, result.Count(),
-		)
-	}
+	assertDbcSnapTruncatedZero(t, "rds RawStruct", ghostCluster, result)
 }
 
 // TestRelated_DbcSnap_DBC_PresentInCache_DocDB verifies that when the parent
@@ -388,5 +372,24 @@ func TestRelated_DbcSnap_DBC_PresentInCache_RDS(t *testing.T) {
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != clusterID {
 		t.Errorf("checkDbcSnapDBC (rds RawStruct): ResourceIDs = %v, want [%s]", result.ResourceIDs(), clusterID)
+	}
+}
+
+// assertDbcSnapTruncatedZero holds the row 16 reading for a ghost parent on a
+// truncated page: the list was read, so the zero is real so far, and the
+// truncation flag is what says a later page may still carry the cluster. The
+// snapshot's own cluster id must never become the count.
+func assertDbcSnapTruncatedZero(t *testing.T, shape, ghostCluster string, result domain.RelatedCheckResult) {
+	t.Helper()
+	if result.State() != domain.RelatedResolved {
+		t.Errorf("checkDbcSnapDBC (%s): ghost cluster %q on a truncated page: state = %v, want Resolved",
+			shape, ghostCluster, result.State())
+	}
+	if result.Count() != 0 {
+		t.Errorf("checkDbcSnapDBC (%s): ghost cluster %q: Count = %d, want 0 — the id came from the snapshot, not the list",
+			shape, ghostCluster, result.Count())
+	}
+	if !result.Truncated() {
+		t.Errorf("checkDbcSnapDBC (%s): Truncated = false, want true — a later page may carry the cluster", shape)
 	}
 }
