@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The menu count for a resource type now follows a full list downward. A list
+  that reached the end of the type and found five is the answer for that type,
+  so a badge left at 200 by an earlier partial count is replaced instead of
+  kept. The stale number could also reach the on-disk count for the type, where
+  it outlived the session that produced it.
+
 ### Added
 
 - Volumes, databases, clusters and tables that no backup plan selects now say

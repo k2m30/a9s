@@ -74,34 +74,10 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 
 		case runtime.PatchMenuAvailability:
 			if ms := c.rootMenuState(); ms != nil {
-				if ms.Availability == nil {
-					ms.Availability = make(map[string]int)
-				}
-				if ms.Truncated == nil {
-					ms.Truncated = make(map[string]bool)
-				}
 				// Store under the key as emitted by the runtime (may be an alias
 				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
 				// active key per item using menuActiveKey().
-				//
-				// Per cache contract C5: a truncated probe result must never downgrade an
-				// already-exact stored total — mirrors the guard
-				// SaveResourceListCache/SaveAvailabilityCache already apply on the
-				// disk-persist path (core/runtime/probes.go). Exactness only
-				// ever advances: an untruncated observation always wins; a
-				// truncated one only wins when the current entry is itself unknown
-				// or already truncated, or reports a count that is not SMALLER than
-				// the one already stored (equal or larger) — a same-count update
-				// that only flips Truncated (e.g. toggling the lower-bound marker
-				// on an unchanged count) is not the "downgrade" C5 forbids; only a
-				// truncated result reporting FEWER items than the stored exact
-				// total is.
-				curCount, known := ms.Availability[v.ResourceType]
-				curTruncated := ms.Truncated[v.ResourceType]
-				if !v.Truncated || !known || curTruncated || v.Count >= curCount {
-					ms.Availability[v.ResourceType] = v.Count
-					ms.Truncated[v.ResourceType] = v.Truncated
-				}
+				applyAvailabilityObservation(ms, v.ResourceType, v.Count, v.Truncated)
 				// Per cache contract C3: track cache-seeded vs live-verified origin
 				// independently of the exactness guard above — a truncated
 				// sweep result that loses the count/truncated race still

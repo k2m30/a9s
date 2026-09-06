@@ -515,6 +515,7 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 2. Counts flow to `MainMenuModel` via `SetIssues()`, rendered as `issues:N` badges
 3. Wave 2 enrichment folds findings onto the cached rows, then `unifiedIssueCount` (`core/runtime/handlers_availability.go`) recomputes the badge from the folded rows and emits `PatchMenu` — a recount, not an only-increase merge, so a healed issue clears
 4. The old `popView()` sync-back is gone: the list-count → menu-badge sync runs at the controller level (`core/app/handle.go`, `handleResourcesLoadedEvent`/`syncExactTotalToMenu`) on every `ResourcesLoaded` for a top-level list, so both the TUI and web renderers get it as soon as a fetch or load-more result lands
+5. The availability count itself has one rule and one writer function, `applyAvailabilityObservation` (`core/app/menu.go`), called by both the list-open lane and the probe lane (`PatchMenuAvailability`): an untruncated observation always wins and clears the lower-bound marker; a truncated one wins only when nothing is known, when the stored count is itself truncated, or when it reports at least as many. Two lanes with two rules is what let a canonical list of 5 rows sit under a badge of 200 and queue that 200 to the availability cache writer
 
 **`ExcludeFromIssueBadge`**: When set on a `ResourceTypeDef`, rows are still colored and ctrl+z is honored, but the type is excluded from the main-menu badge count. Used by ct-events where severity is event-level, not resource-health.
 

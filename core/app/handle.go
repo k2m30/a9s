@@ -330,25 +330,8 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 // a non-nil ParentContext) — those show a filtered subset, not the global
 // population.
 //
-// The availability guard applies three rules, in order of priority:
-//  1. Unknown type: always seed it.
-//  2. The currently-known count is itself a truncated lower bound (e.g.
-//     "10+" from an availability probe) and the new result is exact
-//     (untruncated): the exact result always wins, even if numerically
-//     smaller than the lower-bound placeholder — an exact 3 is more useful
-//     than an unconfirmed "10+".
-//  3. Otherwise (both exact, or the new result is itself still truncated):
-//     pure directional "never shrink a known count" — update only when
-//     newCount is strictly larger than curCount.
-//
-// This differs from the TUI's original popRS guard
-// (`!newTrunc || !known || newCount > curCount`), which would also let ANY
-// untruncated result overwrite a larger already-EXACT count. The exact-total
-// sync-back pins
-// the stricter rule 3 explicitly (a smaller exact result must not regress a
-// larger already-exact one, e.g. a concurrent fuller probe already landed a
-// bigger number) while still requiring rule 2 (an exact result must replace
-// a truncated lower-bound placeholder regardless of magnitude).
+// The availability write goes through applyAvailabilityObservation (menu.go),
+// the one rule this lane shares with the probe lane.
 func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	ls := screen.State.List
 	if ls == nil || ls.EscPops || ls.ParentContext != nil {
@@ -367,18 +350,7 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	if ms == nil {
 		return
 	}
-	if ms.Availability == nil {
-		ms.Availability = make(map[string]int)
-	}
-	if ms.Truncated == nil {
-		ms.Truncated = make(map[string]bool)
-	}
-	curCount, known := ms.Availability[canon]
-	curTrunc := ms.Truncated[canon]
-	if !known || (curTrunc && !newTrunc) || newCount > curCount {
-		ms.Availability[canon] = newCount
-		ms.Truncated[canon] = newTrunc
-	}
+	applyAvailabilityObservation(ms, canon, newCount, newTrunc)
 
 	// authoritative=false: newIssues here is derived from bare list rows, not
 	// a confirmed Wave-2 enrichment result, so a zero must not be treated as

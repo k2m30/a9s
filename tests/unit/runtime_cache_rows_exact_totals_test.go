@@ -156,15 +156,20 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 	}
 }
 
-// TestLoadMoreExhausted_OnlyIncreaseGuard mirrors the only-increase guard
-// ported from internal/tui/app_stack.go:57 — a load-more result must never
-// SHRINK a menu count that was already known to be at least as large
-// (e.g. a stale/short load-more page racing a larger already-recorded
-// count), while a load-more that DOES exceed the known count must still win.
-// Both sub-cases are asserted together so this test cannot pass merely
-// because the exact-total sync-back is entirely unimplemented (an unimplemented sync-back
-// would leave availability untouched in BOTH sub-cases, which the "wins"
-// sub-case catches).
+// TestLoadMoreExhausted_OnlyIncreaseGuard pins what the only-increase guard
+// still covers now that both writers of the availability map follow one rule:
+// a TRUNCATED result never shrinks a known count, and a result that exceeds
+// the known count still wins. Both sub-cases are asserted together so this
+// test cannot pass merely because the exact-total sync-back is entirely
+// unimplemented (an unimplemented sync-back would leave availability untouched
+// in BOTH sub-cases, which the "wins" sub-case catches).
+//
+// INVERTED: the first sub-case used to assert that an EXACT load-more result
+// of 2 leaves a stored exact 500 alone. That was the list-open lane's private
+// rule, and it is the reason a canonical list of 5 rows could sit under a
+// badge of 200 and queue that 200 to the disk writer. The rule both lanes now
+// share is the probe lane's: an untruncated observation always wins. Do not
+// "restore" the old expectation.
 func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 	newCtrl := func(seedCount int, seedTruncated bool) (*runtime.Core, *app.Controller) {
 		s := session.New()
@@ -178,10 +183,33 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 		return core, c
 	}
 
-	t.Run("smaller_load_more_does_not_regress", func(t *testing.T) {
+	t.Run("smaller_truncated_load_more_does_not_regress", func(t *testing.T) {
 		// Menu already knows about MORE resources than this load-more result
 		// will report (simulates a concurrent fuller probe having already
-		// landed).
+		// landed), and this result is itself a truncated lower bound, so it
+		// carries no authority to shrink the stored count.
+		_, c := newCtrl(500, false)
+
+		c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+		c.ApplyResourcesLoaded("ec2", []resource.Resource{{ID: "i-only1", Type: "ec2"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-z"}, false)
+
+		c.Handle(messages.ResourcesLoaded{
+			ResourceType: "ec2",
+			Resources:    []resource.Resource{{ID: "i-only2", Type: "ec2"}},
+			Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-y"},
+			Append:       true,
+			Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
+		})
+
+		avail := c.GetMenuAvailability()
+		if got := avail["ec2"]; got != 500 {
+			t.Errorf("menu availability[ec2] = %d, want unchanged 500 — a truncated load-more total must not regress an already-known larger exact count", got)
+		}
+	})
+
+	t.Run("smaller_exact_load_more_replaces_the_stored_count", func(t *testing.T) {
+		// The other half of the one rule: this result enumerated the type to
+		// the end, so its 2 is the answer even though a probe once said 500.
 		_, c := newCtrl(500, false)
 
 		c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -195,9 +223,11 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 			Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 		})
 
-		avail := c.GetMenuAvailability()
-		if got := avail["ec2"]; got != 500 {
-			t.Errorf("menu availability[ec2] = %d, want unchanged 500 — a smaller load-more total must not regress an already-known larger exact count", got)
+		if got := c.GetMenuAvailability()["ec2"]; got != 2 {
+			t.Errorf("menu availability[ec2] = %d, want 2 — an untruncated result is the answer for its type", got)
+		}
+		if c.GetMenuTruncated()["ec2"] {
+			t.Error("menu truncated[ec2] = true, want false — an exact result clears the lower-bound marker")
 		}
 	})
 

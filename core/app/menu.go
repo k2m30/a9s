@@ -316,6 +316,35 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 	}
 }
 
+// applyAvailabilityObservation records one observation of how many resources
+// of a type exist, under the single rule every writer of the availability map
+// follows: an untruncated observation always wins, and a truncated one wins
+// only when nothing is known, when the stored count is itself a truncated
+// lower bound, or when it reports at least as many as the stored one.
+//
+// Both lanes call it — the list-open lane in syncExactTotalToMenu
+// (handle.go) and the probe lane on PatchMenuAvailability (intents.go) — so a
+// list of 5 and a badge of 200 cannot describe the same type. It decides
+// Truncated with the same rule, so an exact result that shrinks the count also
+// clears the lower-bound marker.
+//
+// Cache contract C5 forbids a truncated probe DOWNGRADING an exact total; a
+// same-count update that only flips the marker is not that downgrade, which is
+// why the truncated branch compares with >= rather than >.
+func applyAvailabilityObservation(ms *MenuState, key string, count int, truncated bool) {
+	if ms.Availability == nil {
+		ms.Availability = make(map[string]int)
+	}
+	if ms.Truncated == nil {
+		ms.Truncated = make(map[string]bool)
+	}
+	cur, known := ms.Availability[key]
+	if !truncated || !known || ms.Truncated[key] || count >= cur {
+		ms.Availability[key] = count
+		ms.Truncated[key] = truncated
+	}
+}
+
 // persistMenuAvailabilityCache best-effort persists ms's availability/issue
 // state to disk (the exact-total menu sync-back's restart half: the badge
 // must survive a restart). No-op when
