@@ -74,6 +74,10 @@ func run() error {
 		return fmt.Errorf("attention-signals.md: %w", err)
 	}
 
+	if err := generateSignalTables(repoRoot, types); err != nil {
+		return fmt.Errorf("attention-signals.md signals: %w", err)
+	}
+
 	if err := generateRelatedResources(repoRoot, types); err != nil {
 		return fmt.Errorf("related-resources.md: %w", err)
 	}
@@ -358,4 +362,49 @@ func lifecycleFragment(rt catalog.ResourceTypeDef) string {
 		return "Lifecycle key: none (the list API returns no lifecycle field)."
 	}
 	return fmt.Sprintf("Lifecycle key: `%s`.", key)
+}
+
+// generateSignalTables writes the per-category signal tables of
+// docs/attention-signals.md from the registered FindingDefs. The section is
+// optional: a page without the markers is left untouched.
+func generateSignalTables(repoRoot string, types []catalog.ResourceTypeDef) error {
+	path := filepath.Join(repoRoot, "docs", "attention-signals.md")
+
+	var categories []string
+	for _, rt := range types {
+		if len(rt.Findings) > 0 && !slices.Contains(categories, rt.Category) {
+			categories = append(categories, rt.Category)
+		}
+	}
+
+	var b strings.Builder
+	for _, category := range categories {
+		fmt.Fprintf(&b, "\n### %s\n\n", categoryLabel(category))
+		b.WriteString("| shortName | Name | Wave | Code | Phrase | Severity | Detail |\n")
+		b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
+		for _, rt := range types {
+			if rt.Category != category {
+				continue
+			}
+			for _, f := range rt.Findings {
+				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s | %s | %s |\n",
+					escapeMarkdownCell(rt.ShortName), escapeMarkdownCell(rt.Name),
+					escapeMarkdownCell(f.Source), escapeMarkdownCell(string(f.Code)),
+					escapeMarkdownCell(f.Phrase), severityLabel(f.Severity), detailCell(f))
+			}
+		}
+	}
+	b.WriteString("\n")
+
+	return updateOptionalSection(path, "signals", b.String())
+}
+
+// categoryLabel title-cases a catalog category ("COMPUTE" -> "Compute") for
+// the heading the hand-written signal tables already use.
+func categoryLabel(category string) string {
+	if category == "" {
+		return "Other"
+	}
+	lower := strings.ToLower(category)
+	return strings.ToUpper(lower[:1]) + lower[1:]
 }
