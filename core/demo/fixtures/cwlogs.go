@@ -363,14 +363,6 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		})
 	}
 
-	// Row 6's witness is the only demo group without a customer key. Every
-	// other group is encrypted here rather than in forty literals, so a group
-	// added later cannot quietly become a second carrier of logs.no-kms.
-	for i := range logGroups {
-		if logGroups[i].KmsKeyId == nil {
-			logGroups[i].KmsKeyId = aws.String(demoLogsKMSKeyARN)
-		}
-	}
 	logGroups = append(logGroups, cwlogstypes.LogGroup{
 		LogGroupName:    aws.String(LogGroupNoKMS),
 		Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupNoKMS + ":*"),
