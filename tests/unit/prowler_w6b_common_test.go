@@ -66,6 +66,33 @@ func w6bWave1Rows(r resource.Resource, code domain.FindingCode) []domain.DetailR
 	return r.AttentionDetails[code].Rows
 }
 
+// w6bRequireNoRawEnum fails when an SDK enum spelling reaches a surface a9s
+// draws. AWS writes its states in SCREAMING_SNAKE (EXTENDED_SUPPORT,
+// PUBLIC_READ, MUTABLE); those reach a phrase, a detail sentence or a row only
+// by handing string(<SDK enum>) straight through, and an operator does not
+// speak them.
+func w6bRequireNoRawEnum(t *testing.T, f domain.Finding, rows []domain.DetailRow) {
+	t.Helper()
+	surfaces := []struct{ where, text string }{{"Phrase", f.Phrase}, {"Detail", f.Detail}}
+	for _, r := range rows {
+		surfaces = append(surfaces,
+			struct{ where, text string }{"row label", r.Label},
+			struct{ where, text string }{"row " + r.Label, r.Value})
+	}
+	for _, s := range surfaces {
+		where, text := s.where, s.text
+		for _, word := range strings.Fields(text) {
+			word = strings.Trim(word, ".,;:()\"'")
+			if !strings.ContainsRune(word, '_') {
+				continue
+			}
+			if word == strings.ToUpper(word) && word != strings.ToLower(word) {
+				t.Errorf("%s carries the SDK enum spelling %q: %q", where, word, text)
+			}
+		}
+	}
+}
+
 // w6bRequireNoSecretLeak fails when a credential value reaches any rendered
 // surface of a finding. Rule 7 of the batch contract: rows carry Where and
 // Kind, never the value.

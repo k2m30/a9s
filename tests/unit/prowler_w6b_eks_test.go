@@ -56,10 +56,10 @@ type w6bEKSFake struct {
 	awsclient.EKSAPI
 	clusters map[string]*ekstypes.Cluster
 	order    []string
-	// versions maps a Kubernetes minor to the support state AWS reports for
-	// it. A version absent from this map is absent from the catalogue, which
-	// is what AWS does for a minor it no longer publishes at all.
-	versions map[string]ekstypes.VersionStatus
+	// versions maps a Kubernetes minor to what AWS reports about it. A version
+	// absent from this map is absent from the catalogue, which is what AWS
+	// does for a minor it no longer publishes at all.
+	versions map[string]w6bEKSVersionInfo
 	// versionsErr fails the catalogue lookup.
 	versionsErr error
 	// versionCalls counts catalogue lookups so a per-cluster fan-out is
@@ -81,14 +81,25 @@ func (f *w6bEKSFake) DescribeClusterVersions(_ context.Context, _ *eks.DescribeC
 		return nil, f.versionsErr
 	}
 	out := &eks.DescribeClusterVersionsOutput{}
-	for v, status := range f.versions {
+	for v, info := range f.versions {
+		// Status (the deprecated lowercase field) is deliberately left unset.
+		// AWS's own docs say it is replaced by VersionStatus, and a reader
+		// that still consults it sees "" for every version — which means no
+		// cluster is ever flagged and the row silently stops working.
 		out.ClusterVersions = append(out.ClusterVersions, ekstypes.ClusterVersionInformation{
-			ClusterVersion: aws.String(v),
-			ClusterType:    aws.String("eks"),
-			VersionStatus:  status,
+			ClusterVersion:           aws.String(v),
+			ClusterType:              aws.String("eks"),
+			VersionStatus:            info.status,
+			EndOfStandardSupportDate: info.endOfStandardSupport,
 		})
 	}
 	return out, nil
+}
+
+// w6bEKSVersionInfo is what the catalogue reports for one Kubernetes minor.
+type w6bEKSVersionInfo struct {
+	status               ekstypes.VersionStatus
+	endOfStandardSupport *time.Time
 }
 
 // w6bEKSCluster builds a healthy active cluster: private endpoint, all five
@@ -123,15 +134,20 @@ func w6bEKSCluster(name, version string) *ekstypes.Cluster {
 	}
 }
 
+// w6bEKSEndOfStandardSupport is the date the catalogue reports for 1.28. It is
+// referenced by the row assertions rather than repeated, so the expected
+// rendering and the fake cannot drift apart.
+var w6bEKSEndOfStandardSupport = time.Date(2025, 11, 26, 0, 0, 0, 0, time.UTC)
+
 // w6bEKSSupportedVersions is the catalogue every test that is not about the
 // version row uses, so those clusters never trip row 18 by accident.
-func w6bEKSSupportedVersions() map[string]ekstypes.VersionStatus {
-	return map[string]ekstypes.VersionStatus{
-		"1.33": ekstypes.VersionStatusStandardSupport,
-		"1.32": ekstypes.VersionStatusStandardSupport,
-		"1.31": ekstypes.VersionStatusStandardSupport,
-		"1.28": ekstypes.VersionStatusExtendedSupport,
-		"1.26": ekstypes.VersionStatusUnsupported,
+func w6bEKSSupportedVersions() map[string]w6bEKSVersionInfo {
+	return map[string]w6bEKSVersionInfo{
+		"1.33": {status: ekstypes.VersionStatusStandardSupport},
+		"1.32": {status: ekstypes.VersionStatusStandardSupport},
+		"1.31": {status: ekstypes.VersionStatusStandardSupport},
+		"1.28": {status: ekstypes.VersionStatusExtendedSupport, endOfStandardSupport: aws.Time(w6bEKSEndOfStandardSupport)},
+		"1.26": {status: ekstypes.VersionStatusUnsupported, endOfStandardSupport: aws.Time(time.Date(2024, 6, 11, 0, 0, 0, 0, time.UTC))},
 	}
 }
 
@@ -338,13 +354,66 @@ func TestW6BEKS_VersionUnsupported_ExtendedSupportIsFlagged(t *testing.T) {
 
 	f := pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld,
 		w6bEKSVersionPhrase("1.28"), domain.SevBroken, "wave1")
-	// The row carries the support state AWS reported, which is the fact the
-	// phrase leaves out: "out of standard support" does not say whether the
-	// cluster is still receiving patches at all.
-	w6bRequireRowValueContains(t, w6bWave1Rows(r, w6bEKSCodeVersionOld), "extended support")
+	rows := w6bWave1Rows(r, w6bEKSCodeVersionOld)
+	// Two facts the phrase leaves out. "Out of standard support" does not say
+	// whether the cluster still receives patches at all, and it does not say
+	// when the clock ran out — which is what tells an operator whether this is
+	// a plan-it-this-quarter or a fix-it-now.
+	w6bRequireRowValueContains(t, rows, "extended support")
+	w6bRequireRowValueContains(t, rows, w6bEKSEndOfStandardSupport.Format("2006-01-02"))
+	w6bRequireNoRawEnum(t, f, rows)
 	if strings.Contains(f.Detail, "1.31") {
 		t.Errorf("Detail names a hardcoded floor version: %q", f.Detail)
 	}
+}
+
+// The support word is the row's whole point, so it has to be a word. AWS
+// spells the state EXTENDED_SUPPORT; handing string(VersionStatus) to the row
+// puts the SDK's enum on a surface an operator reads.
+func TestW6BEKS_VersionUnsupported_UnsupportedRowIsWordsAndDate(t *testing.T) {
+	r := w6bEKSFetchOne(t, w6bEKSCluster("acme-ancient", "1.26"))
+
+	f := pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld,
+		w6bEKSVersionPhrase("1.26"), domain.SevBroken, "wave1")
+	rows := w6bWave1Rows(r, w6bEKSCodeVersionOld)
+	w6bRequireRowValueContains(t, rows, "unsupported")
+	w6bRequireRowValueContains(t, rows, "2024-06-11")
+	w6bRequireNoRawEnum(t, f, rows)
+}
+
+// The catalogue answers through VersionStatus. AWS deprecated the lowercase
+// Status field in favour of it, and this fake leaves Status unset on every
+// entry, so a reader still consulting the deprecated field sees "" for every
+// version and flags nothing. Without this test that regression looks exactly
+// like a clean run: no findings, no errors, no clue.
+func TestW6BEKS_VersionCatalogue_ReadFromVersionStatusNotDeprecatedStatus(t *testing.T) {
+	const name = "acme-deprecated-field-probe"
+	fake := &w6bEKSFake{
+		order:    []string{name},
+		clusters: map[string]*ekstypes.Cluster{name: w6bEKSCluster(name, "1.28")},
+		versions: w6bEKSSupportedVersions(),
+	}
+	rs := w6bFetchEKS(t, fake)
+
+	for _, entry := range w6bCatalogueEntries(t, fake) {
+		if entry.Status != "" {
+			t.Fatalf("the fake must leave the deprecated Status field unset for %s; this test proves nothing otherwise",
+				aws.ToString(entry.ClusterVersion))
+		}
+	}
+	pw1RequireFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bEKSCodeVersionOld,
+		w6bEKSVersionPhrase("1.28"), domain.SevBroken, "wave1")
+}
+
+// w6bCatalogueEntries returns what the fake would answer, so the guard above
+// checks the fixture it actually served rather than a second copy of it.
+func w6bCatalogueEntries(t *testing.T, fake *w6bEKSFake) []ekstypes.ClusterVersionInformation {
+	t.Helper()
+	out, err := fake.DescribeClusterVersions(context.Background(), &eks.DescribeClusterVersionsInput{})
+	if err != nil {
+		t.Fatalf("fake catalogue: %v", err)
+	}
+	return out.ClusterVersions
 }
 
 // A minor AWS has dropped entirely receives no patches at all.
