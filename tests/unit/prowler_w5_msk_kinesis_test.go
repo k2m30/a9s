@@ -656,3 +656,96 @@ func TestW5_KinesisCatalogDefs(t *testing.T) {
 	w2AssertFindingDef(t, "kinesis", "kinesis.min-retention",
 		"24h retention", domain.SevWarn, "wave2")
 }
+
+// Rule 4: a cluster being torn down, or already failed, carries no
+// reachability finding. No demo cluster in either state supplies the
+// connectivity or client-authentication blocks these rows read, so the
+// cluster below is hand-built to trip BOTH at once — otherwise the guard
+// would look proven by a fixture that never reached the code it guards.
+func TestW5_MSKLifecycleEndedEmitsNoReachabilityFinding(t *testing.T) {
+	for _, state := range []string{"DELETING", "FAILED"} {
+		t.Run(state, func(t *testing.T) {
+			name := "acme-events-going-away"
+			f := newW5MSKFake()
+			c := w5ProvisionedCluster(name)
+			c.Provisioned.BrokerNodeGroupInfo.ConnectivityInfo.PublicAccess.Type = aws.String("SERVICE_PROVIDED_EIPS")
+			c.Provisioned.ClientAuthentication.Unauthenticated.Enabled = aws.Bool(true)
+			f.clusters[w5ClusterARN(name)] = c
+
+			r := w5MSKRes(name)
+			r.Fields["state"] = state
+
+			res := w5EnrichMSK(t, f, r)
+			w2AssertNoCode(t, res.Findings[name], "msk.public-access")
+			w2AssertNoCode(t, res.Findings[name], "msk.unauthenticated")
+		})
+	}
+}
+
+// The guard sits BELOW the broker-version and encryption-in-transit checks
+// on purpose: those describe the software the cluster is running, which
+// stays true while it drains, and they predate this batch. A guard hoisted
+// to the top of the loop would silence them too, and nothing else would say
+// so — the demo fixtures do not put a draining cluster on old brokers.
+func TestW5_MSKLifecycleEndedStillReportsSoftwareFindings(t *testing.T) {
+	name := "acme-events-draining"
+	f := newW5MSKFake()
+	c := w5ProvisionedCluster(name)
+	c.Provisioned.CurrentBrokerSoftwareInfo.KafkaVersion = aws.String("2.6.1")
+	c.Provisioned.EncryptionInfo.EncryptionInTransit.ClientBroker = kafkatypes.ClientBrokerTlsPlaintext
+	f.clusters[w5ClusterARN(name)] = c
+
+	r := w5MSKRes(name)
+	r.Fields["state"] = "DELETING"
+
+	res := w5EnrichMSK(t, f, r)
+
+	// Asserted by code and phrase rather than through w2AssertFinding: these
+	// two codes predate this batch and carry no Detail sentence, and the
+	// shared helper enforces one because that is this batch's contract for
+	// its own fifteen rows. What this test is about is that the guard did
+	// not reach up and silence them.
+	for _, want := range []struct{ code, phrase string }{
+		{"msk.broker-outdated", "broker software outdated"},
+		{"msk.encryption-not-tls", "encryption in transit not enforced"},
+	} {
+		got, ok := w2Find(res.Findings[name], want.code)
+		if !ok {
+			t.Errorf("no finding %q on a draining cluster; the guard sits below the software checks and must not silence them. got %v",
+				want.code, w2Codes(res.Findings[name]))
+			continue
+		}
+		if got.Phrase != want.phrase {
+			t.Errorf("%s: Phrase = %q, want %q", want.code, got.Phrase, want.phrase)
+		}
+		if got.Severity != domain.SevWarn {
+			t.Errorf("%s: Severity = %v, want %v", want.code, got.Severity, domain.SevWarn)
+		}
+	}
+}
+
+// The twin that keeps the guard narrow. A cluster mid-maintenance or
+// rebooting is still serving traffic, so public brokers and unauthenticated
+// access are exactly what an operator wants reported. Widening the guard to
+// "not ACTIVE" would pass the test above and fail here.
+func TestW5_MSKDegradedClusterStillReportsReachability(t *testing.T) {
+	for _, state := range []string{"ACTIVE", "MAINTENANCE", "REBOOTING_BROKER", "HEALING", "UPDATING"} {
+		t.Run(state, func(t *testing.T) {
+			name := "acme-events-busy"
+			f := newW5MSKFake()
+			c := w5ProvisionedCluster(name)
+			c.Provisioned.BrokerNodeGroupInfo.ConnectivityInfo.PublicAccess.Type = aws.String("SERVICE_PROVIDED_EIPS")
+			c.Provisioned.ClientAuthentication.Unauthenticated.Enabled = aws.Bool(true)
+			f.clusters[w5ClusterARN(name)] = c
+
+			r := w5MSKRes(name)
+			r.Fields["state"] = state
+
+			res := w5EnrichMSK(t, f, r)
+			w2AssertFinding(t, res.Findings[name], "msk.public-access",
+				"brokers reachable from the internet", domain.SevBroken, "wave2:msk")
+			w2AssertFinding(t, res.Findings[name], "msk.unauthenticated",
+				"unauthenticated access allowed", domain.SevBroken, "wave2:msk")
+		})
+	}
+}
