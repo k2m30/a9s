@@ -74,3 +74,6 @@ website/resources/
 # graphify knowledge-graph working files (generated locally, regenerable via
 # `graphify update .`; graph.json alone is ~27MB).
 graphify-out/
+
+# per-dispatch agent context written by the orchestrator into each worktree; never shared
+.claude/task-context.md
