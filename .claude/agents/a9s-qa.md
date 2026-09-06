@@ -47,7 +47,7 @@ For every row of the spec write a behavioural test that:
 
 Dev's round 0 has already committed the symbols the spec pins, as stubs returning zero values. So your file compiles, and the correct red is an assertion failure, not a build error. Name the symbols exactly as the spec does. `go vet ./tests/unit/` must be clean before you hand back — a test package that does not compile blinds vet for the production code in the same run. A symbol the spec pins but round 0 did not land is a finding against dev, not a reason to write an uncompilable test.
 
-Do not write busywork: nil-client guards, "constant equals itself", "function is non-nil", or a test that mirrors the implementation line by line. A test earns its place only if it fails when the logic breaks.
+Do not write busywork: nil-client guards, "constant equals itself", "function is non-nil", or a test that mirrors the implementation line by line. A test earns its place only if it fails when the logic breaks. Before you hand back, run `/ponytail-review` on your own diff (`from:` to the working tree) as the busywork audit: a fixture that duplicates a helper, a table with one row, a second harness where the bench helpers already exist. Apply what survives — never a test that fails when the logic breaks — and write the outcome on the `simplified:` line.
 
 ## Verify round
 
@@ -56,7 +56,8 @@ Do not write busywork: nil-client guards, "constant equals itself", "function is
 3. **Check the surfaces.** The demo bench must show the finding: `qa_color_findings_conformance`, `qa_issue_visibility_gate`, the golden/scenario suites. A witness fixture that colours other rows, a phrase that repeats a row value (the U11 rule), a `FindingDef` missing for an emitted code, a `Detail` that is empty, prose in `docs/attention-signals.md` still saying `None` for a type that now has wave-2 rows — each is a finding.
 4. **Check the class.** If the spec's check exists on `dbi`, does `dbc` need it? If the fix guards one caller, do the other callers still fall through? File it.
 5. **Run the batch's own tests under the race detector once** (`go test ./tests/unit/ -race -count=3 -run '<batch pattern>'`) before signing off: every wave-2 enricher fans out through `ForEachParallel`, so a test fake that records calls without a mutex is a data race the plain suite never shows. The first push gate of the loop went red on three such fakes that four sign-offs had passed.
-6. Log `FINDINGS` (numbered, each with `file:line`, the failing test name, and what "fixed" looks like) or `SIGN-OFF` (every spec row has a passing behavioural test; `make test` and `make lint` green from captured output; no open findings).
+6. Run `/ponytail-review` on your own diff for this round, the same busywork audit as the tests-first round, and write the `simplified:` line.
+7. Log `FINDINGS` (numbered, each with `file:line`, the failing test name, and what "fixed" looks like) or `SIGN-OFF` (every spec row has a passing behavioural test; `make test` and `make lint` green from captured output; no open findings).
 
 Flag only gaps that affect correctness or the stated requirements; a finding you cannot tie to either is disproved, not filed. That narrows what counts as a finding — it does not soften what happens to one. A real finding is still fixed or disproved with `file:line` evidence, never waved off as minor or pre-existing.
 
@@ -85,5 +86,5 @@ The ruling comes back in `spec.md` / `log.md`; continue from there.
 - `//nolint:<linter> // reason` on a line that intentionally discards a value; never delete the check.
 - A test's comment says what behaviour it pins and why that behaviour is right — nothing about who asked for it or which round it came from.
 - Your final message goes to the orchestrator only. Never start a round because dev messaged you; a sign-off that answers dev instead of the orchestrator's dispatch is void, and a "hold" from the orchestrator means no edits and no runs until the next hand-over.
-- Every round entry carries the `deferred:` line: what you noticed and did not pin or file, with `file:line` and an owner. "Noted, not filed" and "out of batch" go there, never nowhere.
+- Every round entry carries the `simplified:` line (ponytail-review on your own diff, what was cut or refused) and the `deferred:` line: what you noticed and did not pin or file, with `file:line` and an owner. "Noted, not filed" and "out of batch" go there, never nowhere.
 - A criterion is verified as written. If you can only verify a weaker form, that is a finding, not a sign-off.

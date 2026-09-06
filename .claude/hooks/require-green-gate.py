@@ -22,9 +22,10 @@ When the first team was asked what it had left open it produced 65 items, a
 dozen of them never written anywhere and most of the rest parked under
 "pre-existing" or "out of batch". So a dev or QA entry that ends a round
 (DONE, FINDINGS, SIGN-OFF) must carry a `deferred:` line -- `none`, or one
-item per line with file:line and an owner -- and an acceptance verdict
-(ACCEPT, REJECT) must carry an `observed, out of scope:` line. The orchestrator
-routes those lines; the hook only makes sure they exist.
+item per line with file:line and an owner -- and a `simplified:` line naming
+the ponytail-review pass on the round's own diff and its outcome, and an
+acceptance verdict (ACCEPT, REJECT) must carry an `observed, out of scope:`
+line. The orchestrator routes those lines; the hook only makes sure they exist.
 
 The hook never blocks when it has no reliable information — no parseable
 payload, no round-ending status. A DONE it cannot locate is refused, because an
@@ -46,10 +47,10 @@ ROUND_END = {
     "a9s-qa": ("DONE", "FINDINGS", "SIGN-OFF"),
     "a9s-acceptance": ("ACCEPT", "REJECT"),
 }
-REQUIRED_LINE = {
-    "a9s-dev": "deferred:",
-    "a9s-qa": "deferred:",
-    "a9s-acceptance": "observed, out of scope:",
+REQUIRED_LINES = {
+    "a9s-dev": ("deferred:", "simplified:"),
+    "a9s-qa": ("deferred:", "simplified:"),
+    "a9s-acceptance": ("observed, out of scope:",),
 }
 
 # A gate older than this is from an earlier round no matter what else is true.
@@ -217,14 +218,23 @@ def main():
     if not any(status in message for status in ROUND_END[agent]):
         return
 
-    required = REQUIRED_LINE[agent]
-    if not has_line(message, required):
-        sys.stderr.write(
-            "Round entry ends a round but carries no `%s` line. Add it: `none`, "
-            "or one item per line as file:line — what — why left — owner. "
-            "Anything noticed and not written there is a defect of the round.\n"
-            % required
-        )
+    for required in REQUIRED_LINES[agent]:
+        if has_line(message, required):
+            continue
+        if required == "simplified:":
+            sys.stderr.write(
+                "Round entry ends a round but carries no `simplified:` line. Run "
+                "/ponytail-review on the round's own diff, apply what survives the "
+                "deletion rule, and write the range reviewed and what was cut or "
+                "refused. A round nobody simplified is not finished.\n"
+            )
+        else:
+            sys.stderr.write(
+                "Round entry ends a round but carries no `%s` line. Add it: `none`, "
+                "or one item per line as file:line — what — why left — owner. "
+                "Anything noticed and not written there is a defect of the round.\n"
+                % required
+            )
         sys.exit(2)
 
     if agent != AGENT or "DONE" not in message:

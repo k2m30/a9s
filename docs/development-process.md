@@ -113,7 +113,7 @@ Lenses, used as tools:
 - `a9s-consistency-checker` — cross-file drift (code ↔ docs ↔ website ↔ config).
 - Direct review for Bubble Tea v2 / Lipgloss v2 correctness (see the `a9s-bt-v2` skill), security (read-only AWS invariant, no secrets), and test-coverage gaps.
 - `arch-review` skill — architecture checklist for size ≥ `M`.
-- `/ponytail-review` on the integrated diff — over-engineering only; it does not hunt correctness.
+- `/ponytail-review` on the integrated diff — over-engineering only; it does not hunt correctness. Inside the team loop every dev and QA round already ran it on its own diff and recorded the outcome on the round entry's `simplified:` line (the stop hook refuses a round without it), so the integrated pass is the second look, not the first.
 
 External passes, batched — one per phase boundary or pre-tag, never per fix:
 

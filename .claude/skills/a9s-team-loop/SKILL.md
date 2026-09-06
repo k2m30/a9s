@@ -49,11 +49,14 @@ Append one entry per round, never edit earlier entries:
 - changed: core/aws/sqs_issue_enrichment.go:41-88 (policy verdict via iampolicy.Evaluate), core/demo/fixtures/sqs.go:120 (PublicQueueName witness)
 - gates: go build OK · go vet OK · go test ./tests/unit -run 'SQS' OK (14 tests) · make lint OK
 - deferred: core/aws/sqs.go:77 — Deleting queues still reach the posture pass — not this batch's row — owner: spec w5 gone-resource ruling
+- simplified: ponytail-review on 4f1a9c2..HEAD — dropped the per-queue result struct (one map suffices), kept the cap guard (it is the read-only bound, not ceremony)
 ```
 
 The `from:` line names the commit the round started from — the other role's last commit. It is how the next agent knows the tree it inherits. The `TASKDIR=` and `WORKTREE=` lines are what the stop hook reads to find `gate.txt`; without them the hook refuses the round.
 
 The `deferred:` line is mandatory: `none`, or one item per line as `file:line — what — why left — owner`. Anything you noticed and did not fix goes here — a duplicated fact, a raw value, a gate that cannot see a surface, a fixture that lies — whether or not it is "this batch's". An item you noticed and did not write is a defect of the round. "Pre-existing", "out of batch" and "add when" are routings for the orchestrator, never dispositions: every deferred line is moved to the spec of the batch that owns the type, or to the backlog with an owner, before the next dispatch into the worktree.
+
+The `simplified:` line is mandatory on every dev and QA round entry. Before the round's gates, run `/ponytail-review` on the round's own diff (`from:` to the working tree, never the whole tree) and apply what survives the rules below; the line names the range reviewed and what was cut, or what the review proposed and why it was refused. `none` is not an answer: a review that proposes nothing says "nothing proposed" with the range. Ponytail hunts over-engineering only; its proposals go through the same rules as any other change — a deletion is a hypothesis proven by grepping callers and running the gates, and no test, guard or `//nolint` is removed to look simpler. If the skill cannot be loaded in your session, apply its ladder by hand and say so on the line.
 
 Status values, exactly one per entry:
 
@@ -80,6 +83,7 @@ Read the whole log before starting a round. Rounds are numbered per role; round 
 - **A criterion is met as written or logged as OFF.** Verifying a weaker check ("is a prefix of" for "equals") and signing off is a finding against the verifier, not a verification.
 - **A deletion is a hypothesis.** "Dead", "unreachable", "nothing calls it" is proven by grepping the symbol across every caller and running the gates on the deletion, not by reasoning from the path you were editing.
 - **Deferral is written, never carried in your head.** See the `deferred:` line above.
+- **Every round is simplified before it is handed on.** See the `simplified:` line above: ponytail-review on the round's diff, its proposals judged by the deletion rule, the result written down.
 - **No confidence filter.** Every finding is fixed or disproved with `file:line` evidence in the log. "Pre-existing", "minor", "probably fine" are not dispositions.
 - **Nothing real.** No real AWS account IDs, profile names, bucket/secret/DNS names, or e-mails anywhere — synthetic `123456789012`, `example-readonly`, `acme-*`. `scripts/check-no-real-data.sh` is the gate.
 - **Comments earn their place.** No comment that restates the code, narrates a change, or argues with a reviewer. Rationale, constraints, gotchas, external context only.
