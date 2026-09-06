@@ -112,3 +112,88 @@ func TestRel2IDAnswerableCheckersDoNotDiscardTheirCount(t *testing.T) {
 		})
 	}
 }
+
+// TestRel2AnswerableCheckersProveTheirZero is the other half of the pair above.
+// Dropping the nil guard is only right if the zero it used to hide is itself
+// honest, so each of the six is handed a warm row and a target list that was
+// read and holds nothing. The filter came from the row's own ID or Fields, the
+// list was read, nothing matched — that is a zero the row backs, and turning it
+// into "?" would be the same information loss one return lower down.
+func TestRel2AnswerableCheckersProveTheirZero(t *testing.T) {
+	clients := demo.NewServiceClients()
+	pairs := []struct{ source, target, rowID string }{
+		{"ec2", "tg", "i-0a1b2c3d4e5f60001"},
+		{"ec2", "asg", "i-0a1b2c3d4e5f60001"},
+		{"ec2", "alarm", "i-0a1b2c3d4e5f60001"},
+		{"ec2", "eip", "i-0a1b2c3d4e5f60001"},
+		{"secrets", "eb", "prod/database/primary"},
+		{"secrets", "ecs-task", "prod/database/primary"},
+	}
+
+	for _, tc := range pairs {
+		t.Run(tc.source+"→"+tc.target, func(t *testing.T) {
+			var row resource.Resource
+			for _, r := range rel2DemoList(t, tc.source) {
+				if r.ID == tc.rowID {
+					row = r
+				}
+			}
+			if row.ID == "" {
+				t.Fatalf("%s row %q is not in the demo list", tc.source, tc.rowID)
+			}
+			row.RawStruct = nil
+
+			// Present and read, holding nothing: the population is empty, not absent.
+			cache := resource.ResourceCache{
+				tc.target: resource.ResourceCacheEntry{Resources: []resource.Resource{}},
+			}
+			result := rel2CheckerFor(t, tc.source, tc.target)(context.Background(), clients, row, cache)
+
+			if result.State() != domain.RelatedResolved || result.Count() != 0 {
+				t.Errorf("State = %v, Count = %d; want Resolved 0: the list was read and was empty, "+
+					"and the filter came from the row itself", result.State(), result.Count())
+			}
+		})
+	}
+}
+
+// TestRel2StructDependentCheckersStayUnknown pins the three guards that stay.
+// Each filter lives only in the struct — an instance's CloudFormation tag, its
+// EKS tags, a service's task definition — so a warm row cannot produce it, and
+// the count these checkers reach with the struct is exactly what they must not
+// claim to have ruled out without it.
+func TestRel2StructDependentCheckersStayUnknown(t *testing.T) {
+	clients := demo.NewServiceClients()
+	cache := rel2DemoCacheFor(t, "ec2", "cfn", "ng", "ecs-svc", "sfn")
+
+	pairs := []struct{ source, target string }{
+		{"ec2", "cfn"},
+		{"ec2", "ng"},
+		{"ecs-svc", "sfn"},
+	}
+
+	for _, tc := range pairs {
+		t.Run(tc.source+"→"+tc.target, func(t *testing.T) {
+			checker := rel2CheckerFor(t, tc.source, tc.target)
+			var matched resource.Resource
+			for _, r := range rel2DemoList(t, tc.source) {
+				if checker(context.Background(), clients, r, cache).Count() > 0 {
+					matched = r
+					break
+				}
+			}
+			if matched.ID == "" {
+				t.Fatalf("no demo %s row resolves a %s count; the pair proves nothing",
+					tc.source, tc.target)
+			}
+
+			warm := matched
+			warm.RawStruct = nil
+			result := checker(context.Background(), clients, warm, cache)
+			if result.State() != domain.RelatedUnknown {
+				t.Errorf("row %s: State = %v, Count = %d; want Unknown — the filter lives only in "+
+					"the struct, so a warm row has ruled nothing out", matched.ID, result.State(), result.Count())
+			}
+		})
+	}
+}
