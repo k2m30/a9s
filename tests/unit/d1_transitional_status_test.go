@@ -383,10 +383,12 @@ func TestD1_DbcSnapCopyingWitnessCarriesTheTransitionalFindingAlone(t *testing.T
 	}
 }
 
-// The witness has to survive wave 2 to be worth anything: a row that picks up a
+// A witness has to survive wave 2 to be worth anything: a row that picks up a
 // Broken cross-ref finding renders that phrase in the status column instead, so
-// the state the fixture exists to demonstrate is never shown.
-func TestD1_DbiSnapCopyingWitnessSurvivesWave2(t *testing.T) {
+// the state the fixture exists to demonstrate is never shown. Both lifecycle
+// witnesses are checked, because the parent lookup is the same for each and a
+// parent that only exists in the legacy pool is easy to miss.
+func TestD1_DbiSnapLifecycleWitnessesSurviveWave2(t *testing.T) {
 	enricher := dbiSnapEnricher(t)
 	fix := fixtures.NewDBISnapFixtures()
 
@@ -403,8 +405,13 @@ func TestD1_DbiSnapCopyingWitnessSurvivesWave2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enricher: %v", err)
 	}
-	if got, has := result.Findings[fixtures.WarnDBISnapCopyingID]; has {
-		t.Errorf("the copying witness picked up wave-2 findings %+v; its status column will show one of those, not \"copying\"", got)
+	for id, phrase := range map[string]string{
+		fixtures.WarnDBISnapCopyingID:  "copying",
+		fixtures.WarnDBISnapCreatingID: "creating",
+	} {
+		if got, has := result.Findings[id]; has {
+			t.Errorf("the %s witness picked up wave-2 findings %+v; its status column will show one of those, not %q", phrase, got, phrase)
+		}
 	}
 }
 

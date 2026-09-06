@@ -37,10 +37,9 @@ const (
 	ProdDBISnapID  = "rds:prod-dbi-1-2026-04-15"
 	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
-	// WarnDBISnapCopyingID is the witness for dbi-snap.warn.transitional: a
-	// state the predicate does not enumerate and cannot restore from yet.
-	// Its parent is ProdDbiID and it is manual, so neither wave-2 cross-ref
-	// fires and the row's Status column stays "copying".
+	// WarnDBISnapCopyingID is the witness for dbi-snap.warn.transitional. Its
+	// parent must stay a canonical dbi fixture and the snapshot manual, or a
+	// wave-2 cross-ref outranks the state it exists to show.
 	WarnDBISnapCopyingID  = "cross-region-copy-snap"
 	WarnDBISnapCopyingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:cross-region-copy-snap"
 
