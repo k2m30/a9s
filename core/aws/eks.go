@@ -159,7 +159,10 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
 	case healthIssuesCount > 0:
-		f, rows := healthIssueWarnFinding(CodeEKSHealthIssue, issueCodes)
+		// SevWarn, not SevBroken: a Health.Issues[] signal on an otherwise
+		// healthy lifecycle state ranks below FAILED/CREATING/UPDATING
+		// (docs/resources/eks.md §3.2).
+		f, rows := healthIssueFindingSev(CodeEKSHealthIssue, "health issue", issueCodes, domain.SevWarn)
 		r.Findings = []domain.Finding{f}
 		addWave1Rows(&r, CodeEKSHealthIssue, rows...)
 	}

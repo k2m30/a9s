@@ -46,22 +46,11 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 // an operator scanning the Status column needs the cause, not just the
 // state name. issueCodes is the already-humanized list from
 // Health.Issues; when empty (AWS reported the state without an issues[]
-// entry, which happens transiently) fallbackPhrase is used instead. A
-// second and later issue is folded into Detail as "+N more" rather than
-// widening the Phrase, keeping the Status cell short.
+// entry, which happens transiently) fallbackPhrase is used instead. A second
+// and later issue becomes an Attention row rather than widening the Phrase,
+// keeping the Status cell short.
 func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCodes []string) (domain.Finding, []domain.DetailRow) {
 	return healthIssueFindingSev(code, fallbackPhrase, issueCodes, domain.SevBroken)
-}
-
-// healthIssueWarnFinding is healthIssueFinding at SevWarn instead of
-// SevBroken — for a Health.Issues[] signal that fires on an otherwise-healthy
-// lifecycle state (docs/resources/eks.md §3.2: Health is tracked
-// independently of lifecycle; colorEKSCluster's own precedence puts a bare
-// health issue below FAILED/CREATING/UPDATING). issueCodes is always non-empty
-// here (callers only invoke this when health_issues_count > 0), so there is
-// no fallbackPhrase parameter.
-func healthIssueWarnFinding(code domain.FindingCode, issueCodes []string) (domain.Finding, []domain.DetailRow) {
-	return healthIssueFindingSev(code, "health issue", issueCodes, domain.SevWarn)
 }
 
 // healthIssueFindingSev returns the finding plus one Attention row per
@@ -76,8 +65,10 @@ func healthIssueFindingSev(code domain.FindingCode, fallbackPhrase string, issue
 	if sev == domain.SevBroken {
 		tier = "!"
 	}
-	rows := make([]domain.DetailRow, 0, len(issueCodes))
-	for _, c := range issueCodes {
+	// From the second issue on: the first is already the phrase, and a row
+	// repeating it prints the same words one line below itself.
+	rows := make([]domain.DetailRow, 0, len(issueCodes)-1)
+	for _, c := range issueCodes[1:] {
 		rows = append(rows, domain.DetailRow{Label: "Issue", Value: c, Tier: tier})
 	}
 	return f, rows
