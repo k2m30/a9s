@@ -3,7 +3,6 @@
 package aws
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -107,15 +106,11 @@ func acmColor(r domain.Resource) domain.Color {
 // "wave2:r53") color from their own Finding; the raw-field check below is the
 // identical-precedence fallback for callers that construct a Resource with
 // only Fields set (e.g. qa_r53_color_test.go).
+// r53Color derives the row colour from the zone's findings alone. The fetcher
+// emits r53CodeUnusedZone for a zone down to its default NS+SOA records and
+// the wave-2 enricher covers the rest, so the record-count branch this
+// classifier used to read was a second opinion on a fact a Finding already
+// carries.
 func r53Color(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	s := r.Fields["record_count"]
-	if s != "" {
-		if n, err := strconv.ParseInt(s, 10, 64); err == nil && n <= 2 {
-			return domain.ColorWarning
-		}
-	}
-	return domain.ColorHealthy
+	return colorAnyFindingOrHealthy(r)
 }

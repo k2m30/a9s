@@ -84,8 +84,7 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 			RawStruct: zone,
 		}
 
-		// mirrors r53Color: two or fewer records means only the default
-		// NS+SOA remain — likely an unused zone.
+		// Two or fewer records means only the default NS+SOA remain.
 		if zone.ResourceRecordSetCount != nil && *zone.ResourceRecordSetCount <= 2 {
 			r.Findings = []domain.Finding{{
 				Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain",
