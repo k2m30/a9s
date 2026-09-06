@@ -11,6 +11,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -77,9 +78,21 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 	if r0.Name != "cluster-a" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "cluster-a", r0.Name)
 	}
-	// Post-fold contract: ACTIVE state is healthy → no Status, no Finding.
-	if len(r0.Findings) != 0 {
-		t.Errorf("resource[0].Findings: expected 0 for ACTIVE cluster, got %d", len(r0.Findings))
+	// Post-fold contract: ACTIVE state is healthy → no lifecycle Finding.
+	//
+	// Inverted deliberately: this counted Findings and expected 0. It cannot,
+	// now that posture signals share the slice — this fixture declares no
+	// control-plane logging and no encryption configuration, so it legitimately
+	// carries those two findings. Counting the whole slice makes every future
+	// posture row look like a regression here, so the assertion names the
+	// lifecycle codes it is actually about.
+	for _, code := range []domain.FindingCode{
+		awsclient.CodeEKSStateCreating, awsclient.CodeEKSStateUpdating,
+		awsclient.CodeEKSStateFailed, awsclient.CodeEKSHealthIssue,
+	} {
+		if _, found := pw1FindFinding(r0.Findings, code); found {
+			t.Errorf("resource[0].Findings: ACTIVE cluster carries lifecycle finding %q (all: %+v)", code, r0.Findings)
+		}
 	}
 	if r0.Fields["cluster_name"] != "cluster-a" {
 		t.Errorf("resource[0].Fields[\"cluster_name\"]: expected %q, got %q", "cluster-a", r0.Fields["cluster_name"])

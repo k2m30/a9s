@@ -217,8 +217,16 @@ func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if len(r.Findings) != 0 {
-		t.Errorf("Findings: got %d, want 0 for ACTIVE cluster", len(r.Findings))
+	// Inverted deliberately: this counted Findings and expected 0. Posture
+	// signals now share the slice, and this fixture declares no control-plane
+	// logging and no encryption configuration, so it legitimately carries those
+	// two. The lifecycle contract this test is about is that an ACTIVE cluster
+	// gets no state finding, which is what it now asserts.
+	for _, f := range r.Findings {
+		if f.Code == awsclient.CodeEKSStateCreating || f.Code == awsclient.CodeEKSStateUpdating ||
+			f.Code == awsclient.CodeEKSStateFailed {
+			t.Errorf("Findings: ACTIVE cluster carries lifecycle finding %q (all: %+v)", f.Code, r.Findings)
+		}
 	}
 }
 
@@ -246,12 +254,21 @@ func TestPR03b_EKSFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if len(r.Findings) != 1 {
-		t.Fatalf("Findings: got %d, want 1 for FAILED cluster", len(r.Findings))
+	// Inverted deliberately: this took Findings[0] after asserting a length of
+	// 1. Posture signals now share the slice and this fixture declares neither
+	// logging nor encryption, so the lifecycle finding is no longer alone or
+	// necessarily first. The contract is that it is present and Broken, which
+	// is what this now looks up by code.
+	var f domain.Finding
+	var found bool
+	for _, candidate := range r.Findings {
+		if candidate.Code == awsclient.CodeEKSStateFailed {
+			f, found = candidate, true
+			break
+		}
 	}
-	f := r.Findings[0]
-	if f.Code != awsclient.CodeEKSStateFailed {
-		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, awsclient.CodeEKSStateFailed)
+	if !found {
+		t.Fatalf("Findings: FAILED cluster carries no %q (all: %+v)", awsclient.CodeEKSStateFailed, r.Findings)
 	}
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken", f.Severity)

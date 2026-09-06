@@ -247,3 +247,34 @@ func TestW6BDemoFindingsAllCarryADetailSentence(t *testing.T) {
 		}
 	}
 }
+
+// Dev moved two witness constants so no demo cluster's Version had to change.
+// The half of that bargain a bench cannot see is that every demo cluster still
+// reports a version the registry publishes: a cluster on a minor the registry
+// has never heard of is classified "unknown" and silently drops out of row 18
+// altogether, which looks exactly like a healthy cluster.
+func TestW6BEKSDemoClusterVersionsAreAllInTheRegistry(t *testing.T) {
+	rows := w6bMergedDemoRows(t)["eks"]
+	if len(rows) == 0 {
+		t.Fatal("no demo rows for eks")
+	}
+
+	flagged := 0
+	for _, r := range rows {
+		if r.Fields["version"] == "" {
+			t.Errorf("%s reports no version; row 18 cannot classify it", r.ID)
+		}
+		for _, f := range r.Findings {
+			if string(f.Code) == "eks.version-unsupported" {
+				flagged++
+				if !strings.Contains(f.Phrase, r.Fields["version"]) {
+					t.Errorf("%s is flagged for version %q but its phrase reads %q",
+						r.ID, r.Fields["version"], f.Phrase)
+				}
+			}
+		}
+	}
+	if flagged != 1 {
+		t.Errorf("%d demo clusters are out of standard support; the bench expects exactly the one witness", flagged)
+	}
+}

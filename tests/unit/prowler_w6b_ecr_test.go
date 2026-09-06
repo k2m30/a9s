@@ -296,7 +296,7 @@ func TestW6BECR_NoLifecyclePolicy_NotFoundIsTheFinding(t *testing.T) {
 
 	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeNoLifecycle),
 		w6bECRPhraseNoLifecycle, domain.SevWarn, w6bECRSource)
-	w6bRequireNoRows(t, w2Rows(t, res, name, string(w6bECRCodeNoLifecycle)))
+	w2AssertNoRows(t, res, name, string(w6bECRCodeNoLifecycle))
 	if res.TruncatedIDs[name] {
 		t.Error("LifecyclePolicyNotFound marked the repository unknown; the absence is the answer, not a failed read")
 	}
@@ -339,18 +339,25 @@ func TestW6BECR_PolicyReadError_MarksOnlyThatRepoUnknown(t *testing.T) {
 // pass, but the repository it happened to is still unknown.
 func TestW6BECR_ImagesReadError_DoesNotSinkTheOtherRepos(t *testing.T) {
 	const broken = "acme/cross-region"
-	const healthy = "acme/frontend"
+	const neighbour = "acme/frontend"
+	// The neighbour is given no lifecycle policy on purpose. It is the one
+	// still-readable repository in the batch, so the finding it carries is the
+	// proof that the failed read next to it did not sink the whole pass — an
+	// earlier draft handed it a policy and then asserted the no-lifecycle
+	// finding on it, which no repository with a policy can carry.
 	fake := &w6bECRFake{
-		lifecycles: map[string]string{healthy: w6bECRLifecycleDoc},
-		imagesErr:  map[string]error{broken: errors.New("RepositoryNotFoundException: does not exist in the registry")},
+		imagesErr: map[string]error{broken: errors.New("RepositoryNotFoundException: does not exist in the registry")},
 	}
-	res, _ := w6bECREnrich(t, fake, broken, healthy)
+	res, _ := w6bECREnrich(t, fake, broken, neighbour)
 
 	if !res.TruncatedIDs[broken] {
 		t.Errorf("the repository whose read failed must be marked unknown, got %v", res.TruncatedIDs)
 	}
-	w2AssertFinding(t, res.Findings[healthy], string(w6bECRCodeNoLifecycle),
+	w2AssertFinding(t, res.Findings[neighbour], string(w6bECRCodeNoLifecycle),
 		w6bECRPhraseNoLifecycle, domain.SevWarn, w6bECRSource)
+	if res.TruncatedIDs[neighbour] {
+		t.Error("one repository's failed read marked its neighbour unknown")
+	}
 }
 
 // Past the cap the pass reports itself truncated rather than silently
