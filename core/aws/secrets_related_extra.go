@@ -74,17 +74,18 @@ func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _
 // for {{resolve:secretsmanager:<parent ARN> pattern.
 // NeedsTargetCache: true; sets Truncated and FetchFilter.
 func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// Validate source RawStruct — must be a SecretListEntry.
-	if res.RawStruct == nil {
-		return unreadZero(res, resource.KnownRelated("eb", nil, false))
-	}
-	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
-		return resource.UnknownRelated("eb")
+	// A struct, when the row carries one, must be a SecretListEntry. A row
+	// carrying none is not the wrong shape — secretIdentifiers still reads
+	// the ARN and the name off Fields, which survive the disk cache.
+	if res.RawStruct != nil {
+		if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
+			return resource.UnknownRelated("eb")
+		}
 	}
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return unreadZero(res, resource.KnownRelated("eb", nil, false))
+		return resource.KnownRelated("eb", nil, false)
 	}
 
 	entry, ok := cache["eb"]
@@ -150,7 +151,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	// Some DescribeConfigurationSettings calls may have failed: ids is a proven
 	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
 	// row actionable rather than discarding confirmed matches as a dead end.
-	return unreadZero(res, relatedResultTrunc("eb", ids, entry.IsTruncated || len(failures) > 0))
+	return relatedResultTrunc("eb", ids, entry.IsTruncated || len(failures) > 0)
 }
 
 // checkSecretsECSTask is a reverse-scan checker for the secrets→ecs-task relationship.
@@ -159,17 +160,18 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 // RepositoryCredentials.CredentialsParameter == parent ARN.
 // NeedsTargetCache: true; sets Truncated.
 func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// Validate source RawStruct — must be a SecretListEntry.
-	if res.RawStruct == nil {
-		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
-	}
-	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
-		return resource.UnknownRelated("ecs-task")
+	// A struct, when the row carries one, must be a SecretListEntry. A row
+	// carrying none is not the wrong shape — secretIdentifiers still reads
+	// the ARN and the name off Fields, which survive the disk cache.
+	if res.RawStruct != nil {
+		if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
+			return resource.UnknownRelated("ecs-task")
+		}
 	}
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
+		return resource.KnownRelated("ecs-task", nil, false)
 	}
 
 	entry, ok := cache["ecs-task"]
@@ -241,7 +243,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 			return resource.ErrorRelated("ecs-task", aggErr)
 		}
 	}
-	return unreadZero(res, relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0))
+	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0)
 }
 
 // secretsECSTaskRefsSecret returns true if the TaskDefinition references the given

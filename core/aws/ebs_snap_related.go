@@ -110,9 +110,8 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 	isBackupCreated := strings.HasPrefix(description, "Created by AWS Backup") || sourceARN != ""
 	if !isBackupCreated {
-		// No RawStruct, or no Backup signature in Description/Tags — the
-		// parent's own fields definitively rule out coverage; not a
-		// truncated-cache situation.
+		// No Backup signature in Description/Tags — the parent's own fields
+		// rule out coverage; not a truncated-cache situation.
 		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 	if sourceARN == "" {
