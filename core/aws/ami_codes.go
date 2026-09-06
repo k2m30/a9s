@@ -28,6 +28,3 @@ const (
 	// account. Severity: SevBroken.
 	CodeAMIPublic domain.FindingCode = "ami.public"
 )
-
-// amiPublicDetail is the S5 operator sentence for CodeAMIPublic.
-const amiPublicDetail = "This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission."

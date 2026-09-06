@@ -92,19 +92,19 @@ No API-calling Wave 2 exists (no per-connection describe). Two derived zero-API 
 
 Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing — the fleet color invariant ("color derives from findings", the conformance-gate owner rule) applies to the two cache-scan route checks too: their rows render Warning-colored like any other finding. Their `~` class affects only the S1 aggregation (no badge bump) and S5 ordering.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| provisioning | 1 | Warning | n/a | S2, S4 | `provisioning` | `Peering connection is being provisioned.` |
-| initiating-request | 1 | Warning | n/a | S2, S4 | `initiating` | `Peering request is being initiated.` |
-| pending-acceptance | 1 | Warning | n/a | S2, S4, S5 | `pending acceptance: expires in <N>d` | `The peer has not accepted; AWS expires the request on <date>.` |
-| expired | 1 | Warning | n/a | S2, S4 | `expired: never accepted` | `The peering request expired unaccepted; recreate it if still needed.` |
-| rejected | 1 | Broken | n/a | S2, S4, S5 | `rejected` | `Status.Message verbatim.` |
-| failed | 1 | Broken | n/a | S2, S4, S5 | `failed` | `Status.Message verbatim.` |
-| deleting | 1 | Warning | n/a | S2, S4 | `deleting` | `Peering connection is being deleted.` |
-| deleted | 1 | Dim | n/a | S2, S4 | `deleted` | `AWS keeps deleted connections listed for a window.` |
-| CIDR overlap (active) | 1 | Warning | n/a | S2, S4, S5 | `CIDR overlap with peer` | `Requester and accepter CIDR ranges overlap: <ranges>; overlapping subsets blackhole.` |
-| no local route (active) | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `no local route to peer` | `No loaded route table routes to this peering connection.` |
-| route blackholed | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `route to peer blackholed` | `A route references this connection but its state is blackhole.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| provisioning | 1 | Warning | n/a | S2, S4 | `provisioning` |
+| initiating-request | 1 | Warning | n/a | S2, S4 | `initiating` |
+| pending-acceptance | 1 | Warning | n/a | S2, S4, S5 | `pending acceptance: expires in <N>d` |
+| expired | 1 | Warning | n/a | S2, S4 | `expired: never accepted` |
+| rejected | 1 | Broken | n/a | S2, S4, S5 | `rejected` |
+| failed | 1 | Broken | n/a | S2, S4, S5 | `failed` |
+| deleting | 1 | Warning | n/a | S2, S4 | `deleting` |
+| deleted | 1 | Dim | n/a | S2, S4 | `deleted` |
+| CIDR overlap (active) | 1 | Warning | n/a | S2, S4, S5 | `CIDR overlap with peer` |
+| no local route (active) | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `no local route to peer` |
+| route blackholed | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `route to peer blackholed` |
 
 Notes:
 
@@ -141,17 +141,17 @@ vpc-peer — NETWORKING. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| vpc-peer.warn.provisioning | provisioning | warn | wave1 | — |
-| vpc-peer.warn.initiating | initiating | warn | wave1 | — |
-| vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 | — |
-| vpc-peer.warn.expired | expired: never accepted | warn | wave1 | — |
-| vpc-peer.broken.rejected | rejected | broken | wave1 | — |
-| vpc-peer.broken.failed | failed | broken | wave1 | — |
-| vpc-peer.warn.deleting | deleting | warn | wave1 | — |
-| vpc-peer.dim.deleted | deleted | dim | wave1 | — |
-| vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 | — |
-| vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 | — |
-| vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 | — |
+| vpc-peer.warn.provisioning | provisioning | warn | wave1 | Peering connection is being provisioned. |
+| vpc-peer.warn.initiating | initiating | warn | wave1 | Peering request is being initiated. |
+| vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 | The peer has not accepted this request yet, and AWS expires it a week after creation; the countdown is in the status and the date is listed below. Ask the accepter to approve it. |
+| vpc-peer.warn.expired | expired: never accepted | warn | wave1 | The peering request expired unaccepted; recreate it if still needed. |
+| vpc-peer.broken.rejected | rejected | broken | wave1 | The accepter rejected this peering request, so nothing will ever route across it; AWS keeps the record listed for a while. Delete it and request again once the other side agrees. |
+| vpc-peer.broken.failed | failed | broken | wave1 | The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one. |
+| vpc-peer.warn.deleting | deleting | warn | wave1 | Peering connection is being deleted. |
+| vpc-peer.dim.deleted | deleted | dim | wave1 | AWS keeps deleted connections listed for a window. |
+| vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 | The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap. |
+| vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 | No loaded route table routes to this peering connection. |
+| vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 | A route references this connection but its state is blackhole. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

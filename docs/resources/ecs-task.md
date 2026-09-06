@@ -151,11 +151,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ecs-task`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -167,22 +171,22 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `lastStatus` transitional (`PROVISIONING`/`PENDING`/`ACTIVATING`/`STOPPING`/`DEPROVISIONING`) | 1 | Warning | n/a | S2, S4 | `starting` or `stopping` (match phase) | `Task is transitioning — last status PENDING, started 00:00:14 ago.` |
-| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | n/a | S2, S4 | `stopped: essential container exited` | `Essential container exited with code N — see logs for the last lines before exit.` |
-| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | n/a | S2, S4 | `stopped: failed to start` | `Task never reached RUNNING — check image pull, secrets, and IAM permissions.` |
-| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | n/a | S2, S4 | `stopped: spot reclaimed` | `Spot capacity was reclaimed by AWS — task will be rescheduled if managed by a service.` |
-| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | n/a | S2, S4 | `stopped: scheduler replaced` | `Service scheduler stopped this task as part of a deployment or scaling action.` |
-| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | n/a | S2, S4 | `stopped: termination notice` | `Host received a termination notice — task was drained before shutdown.` |
-| `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped: user initiated` | `Task was stopped intentionally — no action needed.` |
-| `healthStatus==UNHEALTHY` | 1 | Broken | n/a | S2, S4 | `running but unhealthy` | `Task is RUNNING but an essential container failed its health check.` |
-| Wave 2: `ExitCode!=0` on essential container (on an already-Broken row) | 2 | Broken | `!` (counted) | S1, S4 (dedup), S5 | `stopped: exit N` (merged with existing cause) | `Essential container <name> exited with code <N> — reason: "<Container.Reason or StoppedReason>".` |
-| any container `privileged` (task definition) | 2 | Broken | `!` | S1, S3, S4, S5 | `privileged container` | `A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise.` |
-| `networkMode == host` or `pidMode == host` | 2 | Warning | `~` | S2, S3, S4, S5 | `shares the host network or process namespace` | `This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance.` |
-| any container without `readonlyRootFilesystem` | 2 | Warning | `~` | S2, S3, S4, S5 | `writable root filesystem` | `A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task.` |
-| any container without `logConfiguration` | 2 | Warning | `~` | S2, S3, S4, S5 | `container without log driver` | `A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping.` |
-| credential in a container `environment[]` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in container environment` | `A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `lastStatus` transitional (`PROVISIONING`/`PENDING`/`ACTIVATING`/`STOPPING`/`DEPROVISIONING`) | 1 | Warning | n/a | S2, S4 | `starting` or `stopping` (match phase) |
+| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | n/a | S2, S4 | `stopped: essential container exited` |
+| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | n/a | S2, S4 | `stopped: failed to start` |
+| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | n/a | S2, S4 | `stopped: spot reclaimed` |
+| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | n/a | S2, S4 | `stopped: scheduler replaced` |
+| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | n/a | S2, S4 | `stopped: termination notice` |
+| `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped: user initiated` |
+| `healthStatus==UNHEALTHY` | 1 | Broken | n/a | S2, S4 | `running but unhealthy` |
+| Wave 2: `ExitCode!=0` on essential container (on an already-Broken row) | 2 | Broken | `!` (counted) | S1, S4 (dedup), S5 | `stopped: exit N` (merged with existing cause) |
+| any container `privileged` (task definition) | 2 | Broken | `!` | S1, S3, S4, S5 | `privileged container` |
+| `networkMode == host` or `pidMode == host` | 2 | Warning | `~` | S2, S3, S4, S5 | `shares the host network or process namespace` |
+| any container without `readonlyRootFilesystem` | 2 | Warning | `~` | S2, S3, S4, S5 | `writable root filesystem` |
+| any container without `logConfiguration` | 2 | Warning | `~` | S2, S3, S4, S5 | `container without log driver` |
+| credential in a container `environment[]` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in container environment` |
 
 Rules for filling list and detail text:
 
@@ -242,11 +246,11 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 | — |
 | ecs-task.health.unhealthy | unhealthy | broken | wave1 | — |
 | ecs-task.task-failed | <stop code or container> failed | broken | wave2 | — |
-| ecs-task.privileged | privileged container | broken | wave2 | — |
-| ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | — |
-| ecs-task.writable-root | writable root filesystem | warn | wave2 | — |
-| ecs-task.no-logging | container without log driver | warn | wave2 | — |
-| ecs-task.env-secret | credential in container environment | broken | wave2 | — |
+| ecs-task.privileged | privileged container | broken | wave2 | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |
+| ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |
+| ecs-task.writable-root | writable root filesystem | warn | wave2 | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |
+| ecs-task.no-logging | container without log driver | warn | wave2 | A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping. Give the container a log driver pointing at awslogs or your log router. |
+| ecs-task.env-secret | credential in container environment | broken | wave2 | A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's \`secrets\` block. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -23,13 +23,6 @@ const (
 	ecsSvcCodePublicIP         domain.FindingCode = "ecs-svc.public-ip"
 )
 
-// ecsSvcDeploymentFailedDetail is the S5 operator sentence for
-// ecsSvcCodeDeploymentFailed.
-const ecsSvcDeploymentFailedDetail = "This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them."
-
-// ecsSvcPublicIPDetail is the S5 operator sentence for ecsSvcCodePublicIP.
-const ecsSvcPublicIPDetail = "Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway."
-
 // ecsServiceScheduling reports a service that still launches tasks. An
 // inactive or draining service schedules nothing, so its network settings
 // hand out nothing. The single lifecycle guard for every ecs-svc posture
@@ -170,8 +163,8 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					nc != nil && nc.AwsvpcConfiguration != nil &&
 					nc.AwsvpcConfiguration.AssignPublicIp == ecstypes.AssignPublicIpEnabled {
 					setWave2Finding(&result, svcName, ecsSvcCodePublicIP, "tasks get public IPs", "~", "ecs-svc",
-						[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}},
-						ecsSvcPublicIPDetail)
+						[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}})
+
 				}
 
 				if len(deploymentIssues) == 0 && !serviceStuck && len(eventIssues) == 0 {
@@ -200,7 +193,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					summary = eventIssues[0]
 				}
 
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows, ecsSvcDeploymentFailedDetail)
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows)
 			}
 		}
 	}

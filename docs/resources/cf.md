@@ -124,11 +124,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `cf`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -140,14 +144,14 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == InProgress` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deploying: config propagating` | `Distribution config change is still propagating to edge locations.` |
-| `Enabled == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` | `Distribution is administratively disabled — not serving traffic.` |
-| Weak TLS policy on aliased distribution — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `weak TLS: MinimumProtocolVersion=<v>` | `Viewer TLS policy allows deprecated protocols (SSLv3 / TLSv1 / TLSv1_2016 / TLSv1.1_2016).` |
-| `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` | `Distribution has no Web ACL in front of it — public surface without rate limiting.` |
-| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `no HTTPS redirect (insecure); origin without TLS` | `Viewer protocol policy allows plain HTTP, or an origin accepts HTTP only — traffic can travel unencrypted.` |
-| `LoggingConfig.Enabled == false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logs off` | `Standard access logs are disabled — no S3 log trail for this distribution.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == InProgress` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deploying: config propagating` |
+| `Enabled == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
+| Weak TLS policy on aliased distribution — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `weak TLS: MinimumProtocolVersion=<v>` |
+| `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` |
+| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `no HTTPS redirect (insecure); origin without TLS` |
+| `LoggingConfig.Enabled == false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logs off` |
 
 ## 4.1 UX review (two sentences)
 

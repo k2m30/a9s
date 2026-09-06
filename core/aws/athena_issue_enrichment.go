@@ -23,16 +23,6 @@ const (
 	athenaCodeResultsUnencrypted  domain.FindingCode = "athena.results-unencrypted"
 )
 
-// S5 operator sentences for the athena Wave 2 findings.
-const (
-	athenaSettingsNotEnforcedDetail = "Every query submitted to this workgroup may override the settings it " +
-		"defines, so the result location and encryption configured here are advisory rather than binding. Turn on " +
-		"the workgroup's configuration enforcement so its settings apply to every query."
-	athenaResultsUnencryptedDetail = "Query results are written to S3 with no encryption configured, so whatever " +
-		"a query returns is readable by anyone who can read the results bucket. Set an encryption option on the " +
-		"workgroup's result configuration."
-)
-
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
 // surface governance and security findings.
 //
@@ -86,7 +76,8 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		// and U11 forbids restating it underneath.
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
 			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced,
-				"settings can be overridden per query", "~", "athena", nil, athenaSettingsNotEnforcedDetail)
+				"settings can be overridden per query", "~", "athena", nil)
+
 		}
 		// Missing encryption on result configuration is a security concern.
 		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
@@ -95,7 +86,8 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 				rows = append(rows, domain.DetailRow{Label: "Results written to", Value: loc, Tier: "~"})
 			}
 			setWave2Finding(&result, key, athenaCodeResultsUnencrypted,
-				"query results stored unencrypted", "~", "athena", rows, athenaResultsUnencryptedDetail)
+				"query results stored unencrypted", "~", "athena", rows)
+
 		}
 	})
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

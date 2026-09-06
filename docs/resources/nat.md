@@ -107,11 +107,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `available`. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `nat`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -123,11 +127,11 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: being created` | `NAT gateway is being created and cannot yet process traffic.` |
-| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting: winding down` | `NAT gateway is terminating; may still process traffic briefly.` |
-| `State==failed` + `FailureCode` | 1 | Broken | n/a | S2, S4 | `failed: <FailureCode>` | `NAT gateway creation failed: <FailureMessage>.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: being created` |
+| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting: winding down` |
+| `State==failed` + `FailureCode` | 1 | Broken | n/a | S2, S4 | `failed: <FailureCode>` |
 
 Notes on filling list and detail text:
 

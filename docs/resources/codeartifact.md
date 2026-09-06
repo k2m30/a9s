@@ -80,11 +80,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, unused registry. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `empty, created 47d ago`). **Healthy rows render blank** — no `OK`, no `available`. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `codeartifact`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -96,11 +100,11 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| empty repo, age >30d (unused registry) | 2 | Warning | `~` | S3, S4, S5 | `empty, created 47d ago` | `No packages published since repository was created 47 days ago — consider removing if unused.` |
-| policy grants `"Principal":"*"` | 2 | Healthy | `!` | S1, S3, S4, S5 | `public access policy` | `Repository policy grants access to everyone (Principal *) — supply-chain exposure; restrict it.` |
-| no permissions policy | 2 | Healthy | `~` | S3, S4, S5 | `no permissions policy` | `Repository has no permissions policy — access is governed only by domain policy and IAM.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| empty repo, age >30d (unused registry) | 2 | Warning | `~` | S3, S4, S5 | `empty, created 47d ago` |
+| policy grants `"Principal":"*"` | 2 | Healthy | `!` | S1, S3, S4, S5 | `public access policy` |
+| no permissions policy | 2 | Healthy | `~` | S3, S4, S5 | `no permissions policy` |
 
 Rationale for severity: an empty-but-configured registry is a housekeeping concern, not an outage — nothing is broken, the operator may simply have provisioned it ahead of an upcoming workload. `~` (informational) matches the "worth knowing, no immediate action" rule and keeps it out of the menu `issues:N` count so the count stays focused on real breakage. Classified per the attention-signals.md "Warning (unused)" label combined with S3/S4/S5 mapping for Healthy-row informational findings. — a9s-devops: possible=yes, worth=yes; an unused private registry is the kind of thing ops notices on a quarterly clean-up pass, not at 3am — informational severity is correct.
 
@@ -150,7 +154,7 @@ codeartifact — CI/CD. Lifecycle key: none (the list API returns no lifecycle f
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 | — |
-| codeartifact.public-access-policy | public access policy | broken | wave2 | — |
+| codeartifact.public-access-policy | public access policy | broken | wave2 | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "\*" principal with the accounts or roles that need the repository, or scope the grant with a condition. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

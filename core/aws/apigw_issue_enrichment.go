@@ -139,7 +139,8 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				Label: "Issue",
 				Value: "no deployed stages",
 				Tier:  "~",
-			}}, "")
+			}})
+
 			return
 		}
 		if len(summaries) == 0 {
@@ -154,7 +155,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				uniqueSummaries = append(uniqueSummaries, s)
 			}
 		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows, "")
+		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows)
 	})
 	// All API Gateway findings are severity "~" (informational).
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

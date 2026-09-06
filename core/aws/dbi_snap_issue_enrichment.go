@@ -37,10 +37,6 @@ const (
 	dbiSnapPublicCode        domain.FindingCode = "dbi-snap.public"
 )
 
-// dbiSnapPublicDetail is the S5 operator sentence for a snapshot shared with
-// the "all" group.
-const dbiSnapPublicDetail = "The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove `all` from the snapshot's restore attribute."
-
 // enrichDBISnapCrossRef is the IssueEnricherFunc registered for dbi-snap.
 // It is the SnapshotCrossRef helper instantiated with rds.DBSnapshot /
 // rds.DBInstance extractors.
@@ -85,7 +81,6 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	PublicAttr:        dbiSnapShareAttributes,
 	PublicCode:        dbiSnapPublicCode,
 	PublicPhrase:      "shared with all AWS accounts",
-	PublicDetail:      dbiSnapPublicDetail,
 })
 
 // dbiSnapShareAttributes reads one DB snapshot's share attributes.

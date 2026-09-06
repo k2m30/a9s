@@ -72,7 +72,8 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 			rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
 		}
 		setWave2Finding(&result, res.ID, ltCodeUserDataSecret, "credential in user data", "!", "lt",
-			rows, ltUserDataSecretDetail)
+			rows)
+
 	}
 
 	amiEntry, amiLoaded := cache["ami"]
@@ -108,8 +109,8 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 			continue
 		}
 		setWave2Finding(&result, res.ID, ltCodeDeprecatedAMI, "deprecated AMI", "~", "lt",
-			[]domain.DetailRow{{Label: "AMI", Value: imageID, Tier: "~"}},
-			"The default version references an AMI past its deprecation time.")
+			[]domain.DetailRow{{Label: "AMI", Value: imageID, Tier: "~"}})
+
 	}
 
 	return result, nil

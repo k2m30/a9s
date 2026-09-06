@@ -145,7 +145,9 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 	// of lifecycle state, docs/resources/eks.md §3.2).
 	switch {
 	case cluster.Status == ekstypes.ClusterStatusFailed:
-		r.Findings = []domain.Finding{healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)}
+		f, rows := healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)
+		r.Findings = []domain.Finding{f}
+		addWave1Rows(&r, CodeEKSStateFailed, rows...)
 	case cluster.Status == ekstypes.ClusterStatusCreating:
 		r.Findings = []domain.Finding{{
 			Code: CodeEKSStateCreating, Phrase: "creating",
@@ -157,7 +159,9 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
 	case healthIssuesCount > 0:
-		r.Findings = []domain.Finding{healthIssueWarnFinding(CodeEKSHealthIssue, issueCodes)}
+		f, rows := healthIssueWarnFinding(CodeEKSHealthIssue, issueCodes)
+		r.Findings = []domain.Finding{f}
+		addWave1Rows(&r, CodeEKSHealthIssue, rows...)
 	}
 
 	addEKSPostureFindings(&r, cluster, versions)
@@ -225,7 +229,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 		if open {
 			severity = domain.SevBroken
 		}
-		addWave1Finding(r, CodeEKSPublicEndpoint, "cluster endpoint reachable from the internet", eksPublicEndpointDetail, severity)
+		addWave1Finding(r, CodeEKSPublicEndpoint, "cluster endpoint reachable from the internet", severity)
 		ranges := "0.0.0.0/0"
 		if len(vpc.PublicAccessCidrs) > 0 {
 			ranges = strings.Join(vpc.PublicAccessCidrs, ", ")
@@ -256,7 +260,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 		}
 	}
 	if len(missing) > 0 {
-		addWave1Finding(r, CodeEKSControlPlaneLoggingOff, "control plane logging incomplete", eksControlPlaneLoggingOffDetail, domain.SevWarn)
+		addWave1Finding(r, CodeEKSControlPlaneLoggingOff, "control plane logging incomplete", domain.SevWarn)
 		addWave1Rows(r, CodeEKSControlPlaneLoggingOff, domain.DetailRow{
 			Label: "Not being sent", Value: strings.Join(missing, ", "), Tier: "~",
 		})
@@ -279,7 +283,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 		}
 	}
 	if !secretsEncrypted {
-		addWave1Finding(r, CodeEKSSecretsNotKMS, "secrets not encrypted with KMS", eksSecretsNotKMSDetail, domain.SevWarn)
+		addWave1Finding(r, CodeEKSSecretsNotKMS, "secrets not encrypted with KMS", domain.SevWarn)
 	}
 
 	// A version absent from the catalogue, or a catalogue that could not be
@@ -289,7 +293,7 @@ func addEKSPostureFindings(r *resource.Resource, cluster *ekstypes.Cluster, vers
 	if !known || info.VersionStatus == ekstypes.VersionStatusStandardSupport || info.VersionStatus == "" {
 		return
 	}
-	addWave1Finding(r, CodeEKSVersionUnsupported, "Kubernetes "+version+" is out of standard support", eksVersionUnsupportedDetail, domain.SevBroken)
+	addWave1Finding(r, CodeEKSVersionUnsupported, "Kubernetes "+version+" is out of standard support", domain.SevBroken)
 	support := eksSupportWords(info.VersionStatus)
 	if info.EndOfStandardSupportDate != nil {
 		support += ", standard support ended " + info.EndOfStandardSupportDate.Format("2006-01-02")

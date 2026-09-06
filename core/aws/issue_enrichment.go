@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -137,12 +138,11 @@ func setWave2Finding(
 	severityGlyph string,
 	shortName string,
 	rows []domain.DetailRow,
-	detail string,
 ) {
 	f := domain.Finding{
 		Code:     code,
 		Phrase:   phrase,
-		Detail:   detail,
+		Detail:   catalog.Detail(code),
 		Severity: glyphToSeverity(severityGlyph),
 		Source:   "wave2:" + shortName,
 	}

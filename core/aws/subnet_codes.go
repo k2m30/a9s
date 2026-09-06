@@ -17,8 +17,3 @@ const (
 
 // SubnetAutoPublicIPPhrase is the S4 status phrase for CodeSubnetAutoPublicIP.
 const SubnetAutoPublicIPPhrase = "auto-assigns public IPs"
-
-// SubnetAutoPublicIPDetail is the S5 operator sentence for CodeSubnetAutoPublicIP.
-const SubnetAutoPublicIPDetail = "Every instance launched into this subnet is given a public address by default, " +
-	"so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign " +
-	"public address setting off and attach an elastic address to the instances that genuinely need one."

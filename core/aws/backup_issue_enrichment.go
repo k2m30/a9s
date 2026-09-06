@@ -149,7 +149,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 				})
 			}
 
-			setWave2Finding(&result, planID, backupCodeJobFailed, summary, "!", "backup", rows, "")
+			setWave2Finding(&result, planID, backupCodeJobFailed, summary, "!", "backup", rows)
 			if result.FieldUpdates[planID] == nil {
 				result.FieldUpdates[planID] = make(map[string]string)
 			}
@@ -160,7 +160,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 				{Label: "Partial jobs", Value: fmt.Sprintf("%d", partialCount), Tier: "~"},
 				{Label: "Total jobs", Value: fmt.Sprintf("%d", totalCount), Tier: "~"},
 			}
-			setWave2Finding(&result, planID, backupCodeJobPartial, summary, "~", "backup", rows, "")
+			setWave2Finding(&result, planID, backupCodeJobPartial, summary, "~", "backup", rows)
 			if result.FieldUpdates[planID] == nil {
 				result.FieldUpdates[planID] = make(map[string]string)
 			}

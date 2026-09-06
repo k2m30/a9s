@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -84,7 +85,7 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			findings = append(findings, domain.Finding{
 				Code:     CodeSubnetAutoPublicIP,
 				Phrase:   SubnetAutoPublicIPPhrase,
-				Detail:   SubnetAutoPublicIPDetail,
+				Detail:   catalog.Detail(CodeSubnetAutoPublicIP),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			})

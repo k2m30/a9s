@@ -93,6 +93,9 @@ var knownAcronymExemptions = map[string]bool{
 	// UTC is how a timestamp names its zone and IOPS is how a volume's
 	// throughput is measured. Both are what the operator would write.
 	"UTC": true, "IOPS": true,
+	// IP is how an operator names an address; EKS is the service the health
+	// sentence points the operator at.
+	"IP": true, "EKS": true,
 }
 
 // awsAccessKeyIDPattern matches an AWS IAM access key ID shape

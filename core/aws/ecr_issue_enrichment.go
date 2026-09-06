@@ -126,12 +126,10 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 		case exposure.Public:
-			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "repository policy open to anyone", "!", "ecr",
-				publicPolicyRows(exposure), ecrPublicPolicyDetail)
+			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "repository policy open to anyone", "!", "ecr", publicPolicyRows(exposure))
 		}
 		if noLifecyclePolicy {
-			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "no lifecycle policy", "~", "ecr",
-				nil, ecrNoLifecyclePolicyDetail)
+			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "no lifecycle policy", "~", "ecr", nil)
 		}
 
 		scannedCount := 0
@@ -184,7 +182,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			})
 		}
 		summary := strings.Join(parts, ", ") + " vulnerabilities"
-		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, summary, tier, "ecr", rows, "")
+		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, summary, tier, "ecr", rows)
 	})
 	sort.Strings(failures)
 
@@ -241,8 +239,3 @@ func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string)
 }
 
 // S5 operator sentences for the two policy findings.
-const (
-	ecrPublicPolicyDetail = "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or scope the grant with a condition."
-
-	ecrNoLifecyclePolicyDetail = "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."
-)

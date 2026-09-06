@@ -30,28 +30,6 @@ const (
 	elbCodeWeakTLSPolicy       domain.FindingCode = "elb.weak-tls-policy"
 )
 
-// S5 operator sentences for the elb Wave 2 findings.
-const (
-	elbDesyncMitigationOffDetail = "The load balancer forwards requests it knows are ambiguous instead of " +
-		"rejecting them, so a crafted request can be interpreted one way by the balancer and another by the " +
-		"target. Set the desync mitigation mode to defensive or strictest."
-	elbInvalidHeadersKeptDetail = "Headers that are not valid HTTP are passed through to the targets instead of " +
-		"being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid " +
-		"header fields."
-	elbPlainHTTPListenerDetail = "This listener carries traffic in the clear, so credentials and session cookies " +
-		"cross the network readable by anyone on the path. Terminate TLS on the listener, or redirect it to an " +
-		"HTTPS listener."
-	elbPlainHTTPListenersDetail = "These listeners carry traffic in the clear, so credentials and session cookies " +
-		"cross the network readable by anyone on the path. Terminate TLS on each listener, or redirect it to an " +
-		"HTTPS listener."
-	elbWeakTLSPolicyDetail = "The listener's security policy still negotiates older protocol versions or ciphers " +
-		"without forward secrecy, so a client can be steered onto a breakable connection. Move the listener to one " +
-		"of the modern security policies that require version 1.2 or later."
-	elbWeakTLSPoliciesDetail = "These listeners' security policies still negotiate older protocol versions or " +
-		"ciphers without forward secrecy, so a client can be steered onto a breakable connection. Move each " +
-		"listener to one of the modern security policies that require version 1.2 or later."
-)
-
 // elbDesyncMonitorMode is the desync mitigation mode that only observes.
 // AWS defaults to "defensive"; "strictest" is stricter still.
 const elbDesyncMonitorMode = "monitor"
@@ -200,19 +178,19 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			case "routing.http.desync_mitigation_mode":
 				if isALB && *attr.Value == elbDesyncMonitorMode {
 					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, "HTTP desync mitigation off", "~", "elb",
-						[]domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: "~"}},
-						elbDesyncMitigationOffDetail)
+						[]domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: "~"}})
+
 				}
 			case "routing.http.drop_invalid_header_fields.enabled":
 				if isALB && *attr.Value != "true" {
 					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, "invalid HTTP headers not dropped", "~", "elb",
-						[]domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: "~"}},
-						elbInvalidHeadersKeptDetail)
+						[]domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: "~"}})
+
 				}
 			}
 		}
 		if len(rows) > 0 {
-			setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], "~", "elb", rows, "")
+			setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], "~", "elb", rows)
 		}
 	})
 	// Listener posture needs a second read per load balancer, so it runs as
@@ -247,13 +225,13 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodePlainHTTPListener]); ports != "" {
 			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener,
-				elbCount(rows, "port ", "ports ")+ports+" in the clear", "~", "elb", rows,
-				elbCount(rows, elbPlainHTTPListenerDetail, elbPlainHTTPListenersDetail))
+				elbCount(rows, "port ", "ports ")+ports+" in the clear", "~", "elb", rows)
+
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodeWeakTLSPolicy]); ports != "" {
 			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy,
-				"weak TLS policy on "+elbCount(rows, "port ", "ports ")+ports, "~", "elb", rows,
-				elbCount(rows, elbWeakTLSPolicyDetail, elbWeakTLSPoliciesDetail))
+				"weak TLS policy on "+elbCount(rows, "port ", "ports ")+ports, "~", "elb", rows)
+
 		}
 	})
 	sort.Strings(failures)

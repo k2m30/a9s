@@ -123,11 +123,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `eni`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -139,12 +143,12 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == attaching` | 1 | Warning | n/a | S2 + S4 | `attaching` | n/a |
-| `Status == detaching` | 1 | Warning | n/a | S2 + S4 | `detaching` | n/a |
-| `Status == available` (orphan) | 1 | Warning | n/a | S2 + S4 | `unattached — billed while idle` | n/a |
-| Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` | n/a |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == attaching` | 1 | Warning | n/a | S2 + S4 | `attaching` |
+| `Status == detaching` | 1 | Warning | n/a | S2 + S4 | `detaching` |
+| `Status == available` (orphan) | 1 | Warning | n/a | S2 + S4 | `unattached — billed while idle` |
+| Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` |
 
 ## 4.1 UX review (two sentences)
 

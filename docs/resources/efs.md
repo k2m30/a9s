@@ -150,11 +150,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank**. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `efs`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -166,17 +170,17 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `LifeCycleState == creating` | 1 | Warning | n/a | S2, S4 | `creating` | `File system is provisioning; mount targets not yet usable.` |
-| `LifeCycleState == updating` | 1 | Warning | n/a | S2, S4 | `updating` | `File system configuration change in progress.` |
-| `LifeCycleState == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | `File system is being deleted; clients will lose access.` |
-| `LifeCycleState == error` | 1 | Broken | n/a | S2, S4 | `error` | `File system is in error state; AWS could not complete last operation.` |
-| `NumberOfMountTargets == 0` | 1 | Broken | n/a | S2, S4 | `no mount targets` | `No mount targets — file system is unreachable from any subnet.` |
-| any mount target `LifeCycleState != available` | 2 | Broken | n/a | S2, S4, S5 | `mount target down` | `N of M mount targets not available (creating/deleting/error); AZ-level access may be degraded.` |
-| `Encrypted` not true | 1 | Warning | n/a | S2, S4, S5 | `not encrypted` | `File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across.` |
-| File system policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `file system policy open to anyone` | `The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access.` |
-| AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S4, S5 | `automatic backups off` | `AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `LifeCycleState == creating` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `LifeCycleState == updating` | 1 | Warning | n/a | S2, S4 | `updating` |
+| `LifeCycleState == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `LifeCycleState == error` | 1 | Broken | n/a | S2, S4 | `error` |
+| `NumberOfMountTargets == 0` | 1 | Broken | n/a | S2, S4 | `no mount targets` |
+| any mount target `LifeCycleState != available` | 2 | Broken | n/a | S2, S4, S5 | `mount target down` |
+| `Encrypted` not true | 1 | Warning | n/a | S2, S4, S5 | `not encrypted` |
+| File system policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `file system policy open to anyone` |
+| AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S4, S5 | `automatic backups off` |
 
 Rules for filling list and detail text:
 
@@ -229,9 +233,9 @@ efs — DATABASES & STORAGE. Lifecycle key: `status`.
 | efs.warn.updating | updating | warn | wave1 | — |
 | efs.warn.deleting | deleting | warn | wave1 | — |
 | efs.mount-target-down | mount target down | broken | wave2 | — |
-| efs.unencrypted | not encrypted | warn | wave1 | — |
-| efs.public-policy | file system policy open to anyone | broken | wave2 | — |
-| efs.no-backup-policy | automatic backups off | warn | wave2 | — |
+| efs.unencrypted | not encrypted | warn | wave1 | File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across. |
+| efs.public-policy | file system policy open to anyone | broken | wave2 | The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access. |
+| efs.no-backup-policy | automatic backups off | warn | wave2 | AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -121,11 +121,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, PITR off. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `archived: kms key inaccessible 7d+`, `PITR off`). **Healthy rows render blank** — no `OK` / `ACTIVE`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ddb`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -137,16 +141,16 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `TableStatus == ACTIVE` (healthy) | 2 | Healthy | n/a | — (omitted) | *(blank)* | *(none)* |
-| `TableStatus` transitional (`CREATING`/`UPDATING`/`DELETING`/`ARCHIVING`) | 2 | Warning | n/a | S2 + S4 | `creating` / `updating` / `deleting` / `archiving` | `Table is <status>; wait for ACTIVE before routing traffic.` |
-| `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 2 | Broken | n/a | S2 + S4 + S5 | `kms key inaccessible` | `KMS key inaccessible — table archives in 7d if not restored.` |
-| `TableStatus == ARCHIVED` | 2 | Broken | n/a | S2 + S4 + S5 | `archived: kms key lost` | `Archived due to inaccessible KMS key; on-demand backup kept at ArchivalBackupArn.` |
-| PITR disabled | 2 | Healthy (with `~` background finding) | `~` | S3 + S4 + S5 | `PITR off` | `Point-in-time recovery is disabled — 35-day rollback window unavailable.` |
-| `DeletionProtectionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `deletion protection off` | `A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step.` |
-| Resource policy names a foreign account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` | `The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest.` |
-| Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `resource policy open to anyone` | `The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `TableStatus == ACTIVE` (healthy) | 2 | Healthy | n/a | — (omitted) | *(blank)* |
+| `TableStatus` transitional (`CREATING`/`UPDATING`/`DELETING`/`ARCHIVING`) | 2 | Warning | n/a | S2 + S4 | `creating` / `updating` / `deleting` / `archiving` |
+| `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 2 | Broken | n/a | S2 + S4 + S5 | `kms key inaccessible` |
+| `TableStatus == ARCHIVED` | 2 | Broken | n/a | S2 + S4 + S5 | `archived: kms key lost` |
+| PITR disabled | 2 | Healthy (with `~` background finding) | `~` | S3 + S4 + S5 | `PITR off` |
+| `DeletionProtectionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `deletion protection off` |
+| Resource policy names a foreign account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
+| Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `resource policy open to anyone` |
 
 Rules for filling list and detail text:
 
@@ -203,12 +207,12 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 | ddb.warn.deleting | deleting | warn | wave1 | — |
 | ddb.warn.archiving | archiving | warn | wave1 | — |
 | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 | — |
-| ddb.deletion-protection-off | deletion protection off | warn | wave1 | — |
-| ddb.cross-account-policy | resource policy grants another account | warn | wave2 | — |
-| ddb.public-policy | resource policy open to anyone | broken | wave2 | — |
-| ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
-| ddb.warn.details\_denied | details denied | warn | wave1 | — |
-| ddb.warn.details\_unavailable | details unavailable | warn | wave1 | — |
+| ddb.deletion-protection-off | deletion protection off | warn | wave1 | A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step. |
+| ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest. |
+| ddb.public-policy | resource policy open to anyone | broken | wave2 | The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access. |
+| ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
+| ddb.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
+| ddb.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

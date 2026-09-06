@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -89,10 +90,9 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		// has a Finding to derive its Warning color from.
 		if state == "DISABLED" {
 			r.Findings = []domain.Finding{{
-				Code:   athenaCodeWorkgroupDisabled,
-				Phrase: "disabled",
-				Detail: "Workgroup is administratively disabled — queries " +
-					"submitted against it are rejected until re-enabled.",
+				Code:     athenaCodeWorkgroupDisabled,
+				Phrase:   "disabled",
+				Detail:   catalog.Detail(athenaCodeWorkgroupDisabled),
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
 		}

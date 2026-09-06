@@ -27,12 +27,6 @@ const (
 	lambdaCodeFunctionURLPublic domain.FindingCode = "lambda.function-url-public"
 )
 
-// S5 operator sentences for the codes above.
-const (
-	lambdaPublicPolicyDetail = "The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it."
-	lambdaFunctionURLDetail  = "The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it."
-)
-
 // EnrichLambdaPosture asks, per function (capped at EnrichmentCap), who may
 // invoke it: GetPolicy for the resource policy and ListFunctionUrlConfigs for
 // unauthenticated function URLs. Both are read-only.
@@ -92,11 +86,13 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		}
 		if policyPublic {
 			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, "invokable by anyone", "!", "lambda",
-				policyRows, lambdaPublicPolicyDetail)
+				policyRows)
+
 		}
 		if urlPublic {
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, "function endpoint open without authentication", "!", "lambda",
-				urlRows, lambdaFunctionURLDetail)
+				urlRows)
+
 		}
 	})
 	sort.Strings(failures)

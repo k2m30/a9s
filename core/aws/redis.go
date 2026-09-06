@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -211,30 +212,30 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	var findings []domain.Finding
 	details := map[domain.FindingCode]domain.AttentionDetail{}
 
-	add := func(code domain.FindingCode, phrase, detail string, sev domain.Severity, rows []domain.DetailRow) {
+	add := func(code domain.FindingCode, phrase string, sev domain.Severity, rows []domain.DetailRow) {
 		findings = append(findings, domain.Finding{
-			Code: code, Phrase: phrase, Detail: detail, Severity: sev, Source: "wave1",
+			Code: code, Phrase: phrase, Detail: catalog.Detail(code), Severity: sev, Source: "wave1",
 		})
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
 	if !aws.ToBool(rg.AtRestEncryptionEnabled) {
-		add(CodeRedisAtRestOff, "encryption at rest off", redisAtRestOffDetail, domain.SevWarn, nil)
+		add(CodeRedisAtRestOff, "encryption at rest off", domain.SevWarn, nil)
 	}
 	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
 	if !transitOn {
-		add(CodeRedisTransitOff, "encryption in transit off", redisTransitOffDetail, domain.SevWarn, nil)
+		add(CodeRedisTransitOff, "encryption in transit off", domain.SevWarn, nil)
 	}
 	// AWS only accepts an AUTH token on a group that also encrypts in
 	// transit, so a group without in-transit encryption is already reported
 	// by the row above — reporting a missing AUTH token there too would name
 	// the same misconfiguration twice.
 	if transitOn && !aws.ToBool(rg.AuthTokenEnabled) {
-		add(CodeRedisNoAuth, "no authentication token", redisNoAuthDetail, domain.SevBroken,
+		add(CodeRedisNoAuth, "no authentication token", domain.SevBroken,
 			[]domain.DetailRow{{Label: "Authentication token", Value: "none", Tier: "!"}})
 	}
 	if rg.SnapshotRetentionLimit == nil || *rg.SnapshotRetentionLimit == 0 {
-		add(CodeRedisNoBackup, "automatic backups off", redisNoBackupDetail, domain.SevWarn,
+		add(CodeRedisNoBackup, "automatic backups off", domain.SevWarn,
 			[]domain.DetailRow{{Label: "Snapshot retention", Value: "0 days", Tier: "~"}})
 	}
 

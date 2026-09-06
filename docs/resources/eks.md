@@ -164,11 +164,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `eks`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -180,14 +184,14 @@ Wave → surface mapping:
 
 One row per signal from §3. All EKS signals are Wave 2 because `ListClusters` is opaque; the Describe pass sets the row color, so these behave like Wave 1 colors to the operator (yellow/red is the attention signal, S3 suppressed because the row is not green):
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` | `Cluster is being provisioned by EKS; control-plane not yet reachable.` |
-| `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` | `Cluster update in progress (version, endpoint access, or logging change).` |
-| `Status == DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` | `Cluster is being deleted; workloads are being torn down.` |
-| `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending` | `Cluster create or update is queued; EKS has not started the operation.` |
-| `Status == FAILED` | 2 | Broken | n/a | S2, S4 | `failed: see Health.Issues` | `Cluster is in FAILED state; see Health.Issues for the AWS-reported cause.` |
-| `Health.Issues[]` non-empty | 2 | Broken | n/a | S2, S4, S5 | `issue: <Issue.Code>` | `<Issue.Code>: <Issue.Message>` (first issue; detail lists all). |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` |
+| `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
+| `Status == DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` |
+| `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending` |
+| `Status == FAILED` | 2 | Broken | n/a | S2, S4 | `failed: see Health.Issues` |
+| `Health.Issues[]` non-empty | 2 | Broken | n/a | S2, S4, S5 | `issue: <Issue.Code>` |
 
 Notes:
 
@@ -235,14 +239,14 @@ eks — CONTAINERS. Lifecycle key: `status`.
 | --- | --- | --- | --- | --- |
 | eks.state.creating | creating | warn | wave1 | — |
 | eks.state.updating | updating | warn | wave1 | — |
-| eks.state.failed | failed | broken | wave1 | — |
-| eks.health-issue | issue: <Issue.Code> | warn | wave1 | — |
-| eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 | — |
-| eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 | — |
-| eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 | — |
-| eks.version-unsupported | Kubernetes <version> is out of standard support | broken | wave1 | — |
-| eks.warn.details\_denied | details denied | warn | wave1 | — |
-| eks.warn.details\_unavailable | details unavailable | warn | wave1 | — |
+| eks.state.failed | failed | broken | wave1 | The cluster is in a failed state and AWS reports the health issues listed below; it will not recover on its own. Open a support case or recreate the cluster. |
+| eks.health-issue | issue: <Issue.Code> | warn | wave1 | The control plane reports at least one health issue; the codes are listed below and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
+| eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |
+| eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 | Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster. |
+| eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 | Kubernetes secrets in this cluster are stored in etcd with only the AWS-managed default protection and no envelope encryption of their own. Attach a KMS key to the cluster's secrets encryption configuration so a copy of etcd is useless without that key. |
+| eks.version-unsupported | Kubernetes <version> is out of standard support | broken | wave1 | This Kubernetes minor is past standard support, so it no longer receives the full patch stream and AWS will upgrade it on its own schedule if you do not. Plan an upgrade to a version in standard support before the automatic one lands during business hours. |
+| eks.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
+| eks.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

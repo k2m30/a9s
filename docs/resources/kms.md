@@ -110,11 +110,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. rotation disabled, maintenance scheduled. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `disabled: admin off`, `pending deletion in 7d`). **Healthy rows render blank** — no `OK` / `Enabled`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `kms`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -126,17 +130,17 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `KeyState==Creating` | 2 | Warning | n/a | S2, S4 | `creating` | `Key is being created; not yet usable for cryptographic operations.` |
-| `KeyState==Updating` | 2 | Warning | n/a | S2, S4 | `updating` | `Key material is being updated; brief availability window.` |
-| `KeyState==Disabled` | 2 | Warning | n/a | S2, S4 | `disabled: admin off` | `Key is disabled by an administrator; cannot encrypt or decrypt until re-enabled.` |
-| `KeyState==PendingDeletion` | 2 | Broken | n/a | S2, S4 | `pending deletion` | `Key is scheduled for deletion; resources encrypted with it will become unrecoverable.` |
-| `KeyState==PendingImport` | 2 | Broken | n/a | S2, S4 | `awaiting key material` | `Key has no material imported yet; cannot encrypt or decrypt.` |
-| `KeyState==PendingReplicaDeletion` | 2 | Broken | n/a | S2, S4 | `pending replica deletion` | `Multi-Region replica is scheduled for deletion; primary still holds the material.` |
-| `KeyState==Unavailable` | 2 | Broken | n/a | S2, S4 | `unavailable: custom key store offline` | `Custom key store (CloudHSM or external) is disconnected; key cannot be used.` |
-| `KeyRotationEnabled==false` on CMK | 2 | Healthy + `!` | `!` | S1, S3, S4, S5 | `rotation off` | `Customer-managed key has automatic rotation disabled; enable annual rotation for compliance.` |
-| Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `key policy open to anyone` | `Any AWS account can use this key to decrypt data encrypted with it — scope the key policy.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `KeyState==Creating` | 2 | Warning | n/a | S2, S4 | `creating` |
+| `KeyState==Updating` | 2 | Warning | n/a | S2, S4 | `updating` |
+| `KeyState==Disabled` | 2 | Warning | n/a | S2, S4 | `disabled: admin off` |
+| `KeyState==PendingDeletion` | 2 | Broken | n/a | S2, S4 | `pending deletion` |
+| `KeyState==PendingImport` | 2 | Broken | n/a | S2, S4 | `awaiting key material` |
+| `KeyState==PendingReplicaDeletion` | 2 | Broken | n/a | S2, S4 | `pending replica deletion` |
+| `KeyState==Unavailable` | 2 | Broken | n/a | S2, S4 | `unavailable: custom key store offline` |
+| `KeyRotationEnabled==false` on CMK | 2 | Healthy + `!` | `!` | S1, S3, S4, S5 | `rotation off` |
+| Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `key policy open to anyone` |
 
 Rules for filling list and detail text:
 
@@ -180,8 +184,8 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 | kms.state.disabled | disabled | warn | wave1 | — |
 | kms.state.unavailable | <key state> | broken | wave1 | — |
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | — |
-| kms.rotation-disabled | key rotation disabled | warn | wave2 | — |
-| kms.public-policy | key policy open to anyone | broken | wave2 | — |
+| kms.rotation-disabled | key rotation disabled | warn | wave2 | This customer-managed key never rotates its backing material, so every ciphertext ever written under it depends on one key that has been in use since creation. Enable automatic key rotation on the key. |
+| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "\*" principal with the specific accounts or roles that need the key, or add a condition scoping the grant. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

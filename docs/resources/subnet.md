@@ -154,11 +154,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
 | S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `subnet`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -173,16 +177,16 @@ One row per signal from §3:
 Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
 sentence would restate it. Their S5 cell reads `—`.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` | — |
-| `State == unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` | — |
-| `State == failed` | 1 | Broken | n/a | S2, S4 | `failed: infrastructure` | — |
-| `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed: AZ out of capacity` | — |
-| IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` | — |
-| IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` | — |
-| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` | `Every instance launched into this subnet is given a public address by default, so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign public address setting off and attach an elastic address to the instances that genuinely need one.` |
-| Misconfigured public subnet (auto-assign public address, no IGW default route) — NOT IMPLEMENTED: the auto-assign half above ships, the route-table cross-reference does not | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` |
+| `State == unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` |
+| `State == failed` | 1 | Broken | n/a | S2, S4 | `failed: infrastructure` |
+| `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed: AZ out of capacity` |
+| IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` |
+| IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` |
+| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` |
+| Misconfigured public subnet (auto-assign public address, no IGW default route) — NOT IMPLEMENTED: the auto-assign half above ships, the route-table cross-reference does not | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` |
 
 Rules for filling list and detail text:
 
@@ -240,7 +244,7 @@ subnet — NETWORKING. Lifecycle key: `state`.
 | subnet.state.unavailable | unavailable | broken | wave1 | — |
 | subnet.state.failed | failed | broken | wave1 | — |
 | subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 | — |
-| subnet.auto-public-ip | auto-assigns public IPs | warn | wave1 | — |
+| subnet.auto-public-ip | auto-assigns public IPs | warn | wave1 | Every instance launched into this subnet is given a public address by default, so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign public address setting off and attach an elastic address to the instances that genuinely need one. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

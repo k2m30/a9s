@@ -19,10 +19,6 @@ import (
 const (
 	iamGroupCodeOrphanOrNoop  domain.FindingCode = "iam-group.orphan-or-noop"
 	iamGroupCodeAdminAttached domain.FindingCode = "iam-group.admin-attached"
-
-	iamGroupOrphanOrNoopDetail = "This group grants nothing to nobody: it either has no members or carries no " +
-		"policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was " +
-		"created for."
 )
 
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
@@ -204,13 +200,14 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 
 		if adminPolicy := adminAttachedPolicyName(allAttached); adminPolicy != "" {
 			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, adminAttachedPhrase, "~", "iam-group",
-				adminAttachedRows(adminPolicy), adminAttachedDetail)
+				adminAttachedRows(adminPolicy))
+
 		}
 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows, iamGroupOrphanOrNoopDetail)
+		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows)
 	})
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false

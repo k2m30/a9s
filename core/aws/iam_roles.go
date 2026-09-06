@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -28,16 +29,6 @@ const (
 	// roleCodeInlinePrivEsc — an inline policy grants an action set that adds
 	// up to full administrator.
 	roleCodeInlinePrivEsc domain.FindingCode = "role.inline-privilege-escalation"
-
-	roleWildcardTrustDetail = "Any AWS account can call sts:AssumeRole on this role and obtain its permissions. " +
-		"Replace the \"*\" principal in the trust policy with the specific account or role ARNs, or add an " +
-		"sts:ExternalId condition."
-	roleConfusedDeputyDetail = "An AWS service principal can assume this role on behalf of any caller, so another " +
-		"customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn " +
-		"condition to the trust statement."
-	roleInlinePrivEscDetail = "An inline policy on this role grants a combination of actions that lets its holder " +
-		"grant itself full administrator. Split or scope the inline policy so the escalation actions are not all " +
-		"available together."
 
 	// awsServiceRolePathPrefix marks an AWS service-linked role. AWS owns the
 	// trust policy and the attached permissions, so posture findings about
@@ -66,13 +57,13 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 		out.wildcard, out.summary = "true", "WILDCARD"
 		out.findings = append(out.findings, domain.Finding{
 			Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role",
-			Detail: roleWildcardTrustDetail, Severity: domain.SevBroken, Source: "wave1",
+			Detail: catalog.Detail(roleCodeWildcardTrust), Severity: domain.SevBroken, Source: "wave1",
 		})
 	}
 	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {
 		out.findings = append(out.findings, domain.Finding{
 			Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping",
-			Detail: roleConfusedDeputyDetail, Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(roleCodeConfusedDeputy), Severity: domain.SevWarn, Source: "wave1",
 		})
 		out.details = map[domain.FindingCode]domain.AttentionDetail{
 			roleCodeConfusedDeputy: {Rows: []domain.DetailRow{
@@ -383,7 +374,7 @@ func enumerateRoleInlinePolicies(
 			scan.finding = &domain.Finding{
 				Code:     roleCodeInlinePrivEsc,
 				Phrase:   "inline policy allows privilege escalation: " + combos[0],
-				Detail:   roleInlinePrivEscDetail,
+				Detail:   catalog.Detail(roleCodeInlinePrivEsc),
 				Severity: domain.SevBroken,
 				Source:   "wave1",
 			}

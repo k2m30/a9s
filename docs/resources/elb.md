@@ -142,11 +142,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `elb`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -161,15 +165,15 @@ One row per signal from §3:
 Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
 sentence would restate it. Their S5 cell reads `—`.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning: <State.Reason>` (fallback `provisioning: coming up`) | — |
-| `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `impaired: <State.Reason>` (fallback `impaired: scaling behind`) | — |
-| `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed: <State.Reason>` | — |
-| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` | `The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest.` |
-| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` | `Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields.` |
-| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `ports <ports> in the clear` | `This listener carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path. Terminate TLS on the listener, or redirect it to an HTTPS listener.` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on ports <ports>` | `The listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection. Move the listener to one of the modern security policies that require version 1.2 or later.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning: <State.Reason>` (fallback `provisioning: coming up`) |
+| `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `impaired: <State.Reason>` (fallback `impaired: scaling behind`) |
+| `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed: <State.Reason>` |
+| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` |
+| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` |
+| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `ports <ports> in the clear` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on ports <ports>` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 
@@ -209,14 +213,14 @@ elb — NETWORKING. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| elb.state.provisioning | provisioning | warn | wave1 | — |
-| elb.state.active\_impaired | active impaired | warn | wave1 | — |
-| elb.state.failed | failed | broken | wave1 | — |
+| elb.state.provisioning | provisioning | warn | wave1 | The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses. |
+| elb.state.active\_impaired | active impaired | warn | wave1 | The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses. |
+| elb.state.failed | failed | broken | wave1 | The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime. |
 | elb.misconfigured | deletion protection disabled | warn | wave2 | — |
-| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 | — |
-| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 | — |
-| elb.plain-http-listener | <ports> in the clear | warn | wave2 | — |
-| elb.weak-tls-policy | weak TLS policy on <ports> | warn | wave2 | — |
+| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 | The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest. |
+| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 | Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields. |
+| elb.plain-http-listener | <ports> in the clear | warn | wave2 | A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener. |
+| elb.weak-tls-policy | weak TLS policy on <ports> | warn | wave2 | A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -222,11 +222,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `lambda`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -238,17 +242,17 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State==Pending` | 1 | Warning | n/a | S2, S4 | `creating` | — |
-| `State==Inactive` | 1 | Dim | n/a | S2, S4 | `idle: not invoked recently` | — |
-| `State==Failed` | 1 | Broken | n/a | S2, S4 | `failed: <StateReasonCode>` | — |
-| `LastUpdateStatus==Failed` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `update failed: <LastUpdateStatusReasonCode>` | — |
-| `Runtime` deprecated — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `runtime deprecated: <Runtime>` | — |
-| `DeadLetterConfig==nil` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no DLQ — async failures dropped` | — |
-| credential in `Environment.Variables` | 1 | Broken | `!` | S2, S4, S5 | `credential in environment variables` | `A credential is stored as a plaintext environment variable on this function; move it to Secrets Manager and rotate it.` |
-| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S3, S4, S5 | `invokable by anyone` | `The function's resource policy allows a wildcard principal, so any AWS caller can invoke it.` |
-| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S3, S4, S5 | `function endpoint open without authentication` | `The function has a web endpoint that requires no authentication; anyone who learns the address can invoke it.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State==Pending` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `State==Inactive` | 1 | Dim | n/a | S2, S4 | `idle: not invoked recently` |
+| `State==Failed` | 1 | Broken | n/a | S2, S4 | `failed: <StateReasonCode>` |
+| `LastUpdateStatus==Failed` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `update failed: <LastUpdateStatusReasonCode>` |
+| `Runtime` deprecated — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `runtime deprecated: <Runtime>` |
+| `DeadLetterConfig==nil` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no DLQ — async failures dropped` |
+| credential in `Environment.Variables` | 1 | Broken | `!` | S2, S4, S5 | `credential in environment variables` |
+| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S3, S4, S5 | `invokable by anyone` |
+| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S3, S4, S5 | `function endpoint open without authentication` |
 
 Rules for filling list and detail text:
 
@@ -353,9 +357,9 @@ lambda — COMPUTE. Lifecycle key: `state`.
 | lambda.state.failed | failed | broken | wave1 | — |
 | lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 | — |
 | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | — |
-| lambda.env-secret | credential in environment variables | broken | wave1 | — |
-| lambda.public-policy | invokable by anyone | broken | wave2 | — |
-| lambda.function-url-public | function endpoint open without authentication | broken | wave2 | — |
+| lambda.env-secret | credential in environment variables | broken | wave1 | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
+| lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the \`\*\` principal with the specific account, service, or ARN that should be allowed to call it. |
+| lambda.function-url-public | function endpoint open without authentication | broken | wave2 | The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

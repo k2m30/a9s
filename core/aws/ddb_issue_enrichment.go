@@ -27,12 +27,6 @@ const (
 	ddbCodePublicPolicy       domain.FindingCode = "ddb.public-policy"
 )
 
-// S5 operator sentences for the resource-policy findings.
-const (
-	ddbCrossAccountPolicyDetail = "The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest."
-	ddbPublicPolicyDetail       = "The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access."
-)
-
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
 // Severity is "~" (informational); PITR-disabled findings do not bump the menu badge.
@@ -54,7 +48,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 	}
 	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsOfResource")
-	addBackupCoverage(cache, "ddb", CodeDDBNotInBackupPlan, ddbNotInBackupPlanDetail, resources, arnAndTags, &result)
+	addBackupCoverage(cache, "ddb", CodeDDBNotInBackupPlan, resources, arnAndTags, &result)
 
 	if clients.DynamoDB == nil {
 		return result, tagErr
@@ -93,7 +87,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			// phrase (e.g. "archived: kms key lost") is computed at render time
 			// by domain.StatusPhrase(r.Findings) — not by writing
 			// FieldUpdates["status"] here.
-			setWave2Finding(&result, r.ID, ddbCodePITROff, "point-in-time recovery disabled", "~", "ddb", nil, "")
+			setWave2Finding(&result, r.ID, ddbCodePITROff, "point-in-time recovery disabled", "~", "ddb", nil)
 		}
 	})
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
@@ -146,15 +140,16 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 				[]domain.DetailRow{
 					{Label: "Principal", Value: "*", Tier: "!"},
 					{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-				}, ddbPublicPolicyDetail)
+				})
+
 			return
 		}
 		// Without a resolved own-account ID every principal reads as foreign,
 		// which would report the account's own roles as an outside grant.
 		if ownAccount != "" && len(ex.CrossAccount) > 0 {
 			setWave2Finding(result, r.ID, ddbCodeCrossAccountPolicy, "resource policy grants another account", "~", "ddb",
-				[]domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: "~"}},
-				ddbCrossAccountPolicyDetail)
+				[]domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: "~"}})
+
 		}
 	})
 	return Finish(result, failures, n, "ddb-enrich: GetResourcePolicy")

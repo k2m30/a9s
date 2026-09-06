@@ -183,11 +183,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ecs-svc`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -199,18 +203,18 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `status == DRAINING` | 1 | Dim | n/a | S2, S4 | `draining` | `Service is draining; tasks shutting down ahead of delete.` |
-| `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive` | `Service is inactive — not scheduling tasks; safe to delete.` |
-| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S4, S5 | `no tasks running` | `The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes.` |
-| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S4, S5 | `running below desired count` | `Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks.` |
-| `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S2, S4, S5, S1 (via Broken color + finding count) | `deploy failed` | `Latest deployment failed to reach steady state; rollout halted.` |
-| `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S2, S4, S5, S1 | `running 2/4: no active deploy` | `Task shortfall without an active deployment — placement or health-check blocked.` |
-| `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `unable to place` | `Scheduler cannot place tasks — check subnet IPs, capacity providers, constraints.` |
-| `events[]` matches `ELB health checks failed` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `ELB health checks failed` | `Tasks killed by load balancer — target group health-check is failing.` |
-| deployment circuit-breaker triggered | 2 | Broken | `!` | S2, S4, S5, S1 | `circuit breaker` | `Circuit breaker halted the rollout after repeated task failures.` |
-| `awsvpcConfiguration.assignPublicIp == ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks get public IPs` | `Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `status == DRAINING` | 1 | Dim | n/a | S2, S4 | `draining` |
+| `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive` |
+| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S4, S5 | `no tasks running` |
+| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S4, S5 | `running below desired count` |
+| `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S2, S4, S5, S1 (via Broken color + finding count) | `deploy failed` |
+| `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S2, S4, S5, S1 | `running 2/4: no active deploy` |
+| `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `unable to place` |
+| `events[]` matches `ELB health checks failed` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `ELB health checks failed` |
+| deployment circuit-breaker triggered | 2 | Broken | `!` | S2, S4, S5, S1 | `circuit breaker` |
+| `awsvpcConfiguration.assignPublicIp == ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks get public IPs` |
 
 Rules for filling list and detail text:
 
@@ -279,10 +283,10 @@ ecs-svc — COMPUTE. Lifecycle key: `status`.
 | --- | --- | --- | --- | --- |
 | ecs-svc.state.inactive | inactive | broken | wave1 | — |
 | ecs-svc.state.draining | draining | warn | wave1 | — |
-| ecs-svc.tasks.none-running | no tasks running | broken | wave1 | — |
-| ecs-svc.tasks.below-desired | running below desired count | warn | wave1 | — |
-| ecs-svc.deployment-failed | deployment failed | broken | wave2 | — |
-| ecs-svc.public-ip | tasks get public IPs | warn | wave2 | — |
+| ecs-svc.tasks.none-running | no tasks running | broken | wave1 | The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes. |
+| ecs-svc.tasks.below-desired | running below desired count | warn | wave1 | Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks. |
+| ecs-svc.deployment-failed | deployment failed | broken | wave2 | This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them. |
+| ecs-svc.public-ip | tasks get public IPs | warn | wave2 | Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

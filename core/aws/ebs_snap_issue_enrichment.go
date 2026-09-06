@@ -32,9 +32,6 @@ import (
 // "all" group, so every AWS account can restore a volume from it.
 const ebsSnapCodePublic domain.FindingCode = "ebs-snap.public"
 
-// ebsSnapPublicDetail is the S5 operator sentence for ebsSnapCodePublic.
-const ebsSnapPublicDetail = "This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the `all` group."
-
 // enrichEBSSnapCrossRef is the IssueEnricherFunc registered for ebs-snap:
 // the cache-only orphan scan, plus the one account-wide DescribeSnapshots
 // call that names the snapshots restorable by every AWS account.
@@ -91,7 +88,8 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 				continue
 			}
 			setWave2Finding(result, id, ebsSnapCodePublic, "shared with all AWS accounts", "!", "ebs-snap",
-				[]domain.DetailRow{{Label: "Public", Value: "yes", Tier: "!"}}, ebsSnapPublicDetail)
+				[]domain.DetailRow{{Label: "Public", Value: "yes", Tier: "!"}})
+
 		}
 		if out.NextToken == nil || aws.ToString(out.NextToken) == "" {
 			return nil

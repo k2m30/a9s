@@ -127,11 +127,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ecs`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -143,14 +147,14 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `status == PROVISIONING` | 1 | Warning | n/a | S2, S4 | `provisioning: capacity coming up` | Cluster is being created — capacity providers still attaching. |
-| `status == DEPROVISIONING` | 1 | Warning | n/a | S2, S4 | `deprovisioning: being torn down` | Cluster is being deleted — wait for removal or recreate. |
-| `status == FAILED` | 1 | Broken | n/a | S2, S4 | `failed: cluster creation failed` | Cluster creation failed — delete and recreate with a working configuration. |
-| `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive: deleted (stale ref)` | Cluster was deleted — this is a grace-period tombstone, update any references that still point here. |
-| `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning (informational) | `~` | S3, S4, S5 | `tasks stuck pending: N` | N tasks cannot be placed — likely out of capacity, missing subnet/SG, or ENI attach failing. |
-| `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning (informational) | `~` | S3, S4, S5 | `idle: N instances, 0 tasks` | N container instances are registered but running no tasks — likely agent disconnect or a stopped service. |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `status == PROVISIONING` | 1 | Warning | n/a | S2, S4 | `provisioning: capacity coming up` |
+| `status == DEPROVISIONING` | 1 | Warning | n/a | S2, S4 | `deprovisioning: being torn down` |
+| `status == FAILED` | 1 | Broken | n/a | S2, S4 | `failed: cluster creation failed` |
+| `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive: deleted (stale ref)` |
+| `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning (informational) | `~` | S3, S4, S5 | `tasks stuck pending: N` |
+| `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning (informational) | `~` | S3, S4, S5 | `idle: N instances, 0 tasks` |
 
 Rules for filling list and detail text:
 

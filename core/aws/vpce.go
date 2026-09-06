@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -118,7 +119,7 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 			findings = append(findings, domain.Finding{
 				Code:     CodeVPCEPolicyOpen,
 				Phrase:   VPCEPolicyOpenPhrase,
-				Detail:   VPCEPolicyOpenDetail,
+				Detail:   catalog.Detail(CodeVPCEPolicyOpen),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			})

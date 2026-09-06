@@ -101,11 +101,11 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("role"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: roleCodeInlinePrivEsc, Phrase: "inline policy allows privilege escalation: <combo>", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: iamRoleCodeDormant, Phrase: "dormant role (>90d)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamRoleCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role", Severity: domain.SevBroken, Source: "wave1", Detail: "Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the \"*\" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition."},
+			{Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping", Severity: domain.SevWarn, Source: "wave1", Detail: "An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition to the trust statement."},
+			{Code: roleCodeInlinePrivEsc, Phrase: "inline policy allows privilege escalation: <combo>", Severity: domain.SevBroken, Source: "wave1", Detail: "An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together."},
+			{Code: iamRoleCodeDormant, Phrase: "dormant role (>90d)", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role."},
+			{Code: iamRoleCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2", Detail: "This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs."},
 		},
 	},
 	{
@@ -201,8 +201,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		DetailEnrich: enrichPolicy,
 		Findings: []catalog.FindingDef{
 			{Code: iamPolicyCodeOrphanUnattached, Phrase: "unattached, no roles/users/groups use it", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (allows * on *)", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: iamPolicyCodePrivEsc, Phrase: "allows privilege escalation: <combo>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (allows * on *)", Severity: domain.SevBroken, Source: "wave2", Detail: "This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the \"*\" action and resource with the specific ones its holders need."},
+			{Code: iamPolicyCodePrivEsc, Phrase: "allows privilege escalation: <combo>", Severity: domain.SevBroken, Source: "wave2", Detail: "This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions."},
 		},
 	},
 	{
@@ -239,13 +239,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: iamUserCodeOldKey, Phrase: "key <keyID> >90d (rotation)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamUserCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamUserCodeConsoleNeverUsed, Phrase: "console password never used", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamUserCodeKeyUnused, Phrase: "access key unused for <N> days", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamUserCodeTwoActiveKeys, Phrase: "two active access keys", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA", Severity: domain.SevBroken, Source: "wave2", Detail: "This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access."},
+			{Code: iamUserCodeOldKey, Phrase: "key <keyID> >90d (rotation)", Severity: domain.SevWarn, Source: "wave2", Detail: "This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one."},
+			{Code: iamUserCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2", Detail: "This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs."},
+			{Code: iamUserCodeConsoleNeverUsed, Phrase: "console password never used", Severity: domain.SevWarn, Source: "wave2", Detail: "This user has a console password that has never been used since the account was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave the user with programmatic access only."},
+			{Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days", Severity: domain.SevWarn, Source: "wave2", Detail: "Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not."},
+			{Code: iamUserCodeKeyUnused, Phrase: "access key unused for <N> days", Severity: domain.SevWarn, Source: "wave2", Detail: "This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it."},
+			{Code: iamUserCodeTwoActiveKeys, Phrase: "two active access keys", Severity: domain.SevWarn, Source: "wave2", Detail: "This user has both of its access-key slots active at once, which doubles the exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use."},
 		},
 	},
 	{
@@ -283,8 +283,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("iam-group"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: iamGroupCodeOrphanOrNoop, Phrase: "group has no members (orphan)", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: iamGroupCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: iamGroupCodeOrphanOrNoop, Phrase: "group has no members (orphan)", Severity: domain.SevWarn, Source: "wave2", Detail: "This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for."},
+			{Code: iamGroupCodeAdminAttached, Phrase: "has an administrator policy", Severity: domain.SevWarn, Source: "wave2", Detail: "This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs."},
 		},
 	},
 	{
@@ -327,8 +327,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
 		// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
 		Findings: []catalog.FindingDef{
-			{Code: wafCodeNoLogging, Phrase: "no logging configuration", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: wafCodeNoRules, Phrase: "web ACL has no rules", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: wafCodeNoLogging, Phrase: "no logging configuration", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group."},
+			{Code: wafCodeNoRules, Phrase: "web ACL has no rules", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing."},
 		},
 	},
 }

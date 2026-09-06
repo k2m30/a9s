@@ -22,13 +22,6 @@ const (
 	iamPolicyCodeAdminStar domain.FindingCode = "iam-policy.admin-star"
 	iamPolicyCodePrivEsc   domain.FindingCode = "policy.privilege-escalation"
 
-	iamPolicyOrphanDetail    = "This customer-managed policy can be attached but is attached to no user, group or role, so it grants nothing and nobody is reviewing it. Delete it, or attach it where it was meant to apply."
-	iamPolicyAdminStarDetail = "This policy allows every action on every resource, so anyone holding it is an " +
-		"account administrator. Replace the \"*\" action and resource with the specific ones its holders need."
-	iamPolicyPrivEscDetail = "This policy grants a combination of actions that lets its holder grant itself full " +
-		"administrator, even though no single action looks privileged. Split the combination across separate " +
-		"policies or remove the escalation actions."
-
 	// privEscComboRowCap bounds the Combo rows listed on one finding; the
 	// remainder is summarised in a trailing row.
 	privEscComboRowCap = 10
@@ -95,14 +88,16 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (allows * on *)", "!", "iam-policy", []domain.DetailRow{
 				{Label: "Allowed actions", Value: "all (*)", Tier: "!"},
 				{Label: "On resources", Value: "all (*)", Tier: "!"},
-			}, iamPolicyAdminStarDetail)
+			})
+
 		} else if combos := policyPrivEscCombos(doc); len(combos) > 0 {
 			// An admin policy matches nearly every combination; reporting it
 			// twice would say the same thing in two voices, so admin wins.
 			riskVal = riskPrivEsc
 			setWave2Finding(&result, r.ID, iamPolicyCodePrivEsc,
 				"allows privilege escalation: "+combos[0], "!", "iam-policy",
-				privEscComboRows(combos), iamPolicyPrivEscDetail)
+				privEscComboRows(combos))
+
 		}
 		result.FieldUpdates[r.ID] = map[string]string{
 			"risk": riskVal,

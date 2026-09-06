@@ -67,11 +67,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
 | S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ssm`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -81,11 +85,11 @@ Wave → surface mapping:
 - **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4, S5. No S1.
 - **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed, S4 deduplicates, S5 carries full sentence, S1 still counts if `!`.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `SecureString not rotated >365d` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `stale: not rotated in 365d+` | `SecureString parameter has not been modified in over a year — rotate or confirm still in use.` |
-| `String name looks like a secret` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `plaintext: name looks like a secret` | `Parameter is type String but name suggests a credential — switch to SecureString.` |
-| `Advanced tier aged >90d` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `advanced: aged 90d+ ($0.05/mo)` | `Advanced-tier parameter has not changed in 90d+ — downgrade to Standard if no Advanced features are used.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `SecureString not rotated >365d` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `stale: not rotated in 365d+` |
+| `String name looks like a secret` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `plaintext: name looks like a secret` |
+| `Advanced tier aged >90d` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `advanced: aged 90d+ ($0.05/mo)` |
 
 Rules for filling list and detail text:
 

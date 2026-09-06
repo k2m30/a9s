@@ -125,39 +125,43 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `ACTIVE`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
 
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ng`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
+
 One row per signal from §3 that reaches at least one surface. Healthy is omitted (silence is the UX).
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `status==CREATING` | 2 | Warning | n/a | S2, S4 | `creating` | `Node group is being created; nodes will register with the cluster once ready.` |
-| `status==UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` | `Node group is updating — version, scaling, or launch-template change in progress.` |
-| `status==DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` | `Node group is being deleted; worker nodes are draining and terminating.` |
-| `status==CREATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `create failed` | `Node group create failed — see health issues for root cause, then delete and retry.` |
-| `status==DELETE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `delete failed` | `Node group delete failed — backing ASG or ENIs may be stuck; inspect ASG for details.` |
-| `status==DEGRADED` | 2 | Broken | n/a | S2, S4, S5 | `degraded: <first issue code, human-readable>` | `Node group degraded: <first issue message from health.issues[0].Message>.` |
-| `health.issues[] InsufficientFreeAddresses` | 2 | Broken | n/a | S2, S4, S5 | `no free IPs in subnets` | `Subnets assigned to this node group have no free IP addresses; new nodes cannot launch.` |
-| `health.issues[] Ec2LaunchTemplateVersionMismatch` | 2 | Broken | n/a | S2, S4, S5 | `launch template version mismatch` | `EC2 launch template version differs from the one EKS expects; revert or update the node group.` |
-| `health.issues[] AutoScalingGroupInvalidConfiguration` | 2 | Broken | n/a | S2, S4, S5 | `ASG misconfigured` | `Backing Auto Scaling group has an invalid configuration; inspect the ASG for the exact setting.` |
-| `health.issues[] AccessDenied` | 2 | Broken | n/a | S2, S4, S5 | `access denied to cluster` | `Node group cannot authenticate with the Kubernetes API server — check node IAM role and aws-auth.` |
-| `health.issues[] Ec2SecurityGroupDeletionFailure` | 2 | Broken | n/a | S2, S4, S5 | `remote-access SG delete failed` | `Remote-access security group could not be deleted; remove dependencies from the SG to unblock.` |
-| `health.issues[] Ec2SecurityGroupNotFound` | 2 | Broken | n/a | S2, S4, S5 | `cluster SG missing` | `Cluster security group is gone; the cluster itself must be recreated.` |
-| `health.issues[] IamInstanceProfileNotFound` | 2 | Broken | n/a | S2, S4, S5 | `instance profile missing` | `IAM instance profile for worker nodes is missing; recreate it with the same settings.` |
-| `health.issues[] IamNodeRoleNotFound` | 2 | Broken | n/a | S2, S4, S5 | `node IAM role missing` | `Node IAM role is missing; recreate it and reattach worker-node policies.` |
-| `health.issues[] InstanceLimitExceeded` | 2 | Broken | n/a | S2, S4, S5 | `EC2 instance limit reached` | `Account cannot launch more of this instance type; request a limit increase or change type.` |
-| `health.issues[] NodeCreationFailure` | 2 | Broken | n/a | S2, S4, S5 | `nodes cannot register` | `Launched instances fail to join the cluster — check node IAM permissions and outbound internet.` |
-| `health.issues[] ClusterUnreachable` | 2 | Broken | n/a | S2, S4, S5 | `cluster unreachable` | `Nodes cannot reach the Kubernetes API server; check VPC routing, endpoint access, and SGs.` |
-| `health.issues[] Ec2LaunchTemplateNotFound` | 2 | Broken | n/a | S2, S4, S5 | `launch template missing` | `EC2 launch template for this node group is gone; recreate it with the original settings.` |
-| `health.issues[] AsgInstanceLaunchFailures` | 2 | Broken | n/a | S2, S4, S5 | `ASG launch failures` | `Backing Auto Scaling group is failing to launch instances; inspect scaling activities.` |
-| `health.issues[] AutoScalingGroupNotFound` | 2 | Broken | n/a | S2, S4, S5 | `backing ASG missing` | `Backing Auto Scaling group is gone; recreate an ASG with matching settings to recover.` |
-| `health.issues[] Ec2SubnetInvalidConfiguration` | 2 | Broken | n/a | S2, S4, S5 | `subnet public-IP setting wrong` | `One or more subnets do not auto-assign public IPs as required; toggle the subnet setting.` |
-| `health.issues[] Ec2InstanceTypeDoesNotExist` | 2 | Broken | n/a | S2, S4, S5 | `instance type unavailable` | `Requested instance type is not available in this region; pick a supported type.` |
-| `health.issues[] InternalFailure` | 2 | Broken | n/a | S2, S4, S5 | `EKS internal failure` | `Amazon EKS reported a server-side failure; retry the operation or open an AWS support case.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `status==CREATING` | 2 | Warning | n/a | S2, S4 | `creating` |
+| `status==UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
+| `status==DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` |
+| `status==CREATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `create failed` |
+| `status==DELETE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `delete failed` |
+| `status==DEGRADED` | 2 | Broken | n/a | S2, S4, S5 | `degraded: <first issue code, human-readable>` |
+| `health.issues[] InsufficientFreeAddresses` | 2 | Broken | n/a | S2, S4, S5 | `no free IPs in subnets` |
+| `health.issues[] Ec2LaunchTemplateVersionMismatch` | 2 | Broken | n/a | S2, S4, S5 | `launch template version mismatch` |
+| `health.issues[] AutoScalingGroupInvalidConfiguration` | 2 | Broken | n/a | S2, S4, S5 | `ASG misconfigured` |
+| `health.issues[] AccessDenied` | 2 | Broken | n/a | S2, S4, S5 | `access denied to cluster` |
+| `health.issues[] Ec2SecurityGroupDeletionFailure` | 2 | Broken | n/a | S2, S4, S5 | `remote-access SG delete failed` |
+| `health.issues[] Ec2SecurityGroupNotFound` | 2 | Broken | n/a | S2, S4, S5 | `cluster SG missing` |
+| `health.issues[] IamInstanceProfileNotFound` | 2 | Broken | n/a | S2, S4, S5 | `instance profile missing` |
+| `health.issues[] IamNodeRoleNotFound` | 2 | Broken | n/a | S2, S4, S5 | `node IAM role missing` |
+| `health.issues[] InstanceLimitExceeded` | 2 | Broken | n/a | S2, S4, S5 | `EC2 instance limit reached` |
+| `health.issues[] NodeCreationFailure` | 2 | Broken | n/a | S2, S4, S5 | `nodes cannot register` |
+| `health.issues[] ClusterUnreachable` | 2 | Broken | n/a | S2, S4, S5 | `cluster unreachable` |
+| `health.issues[] Ec2LaunchTemplateNotFound` | 2 | Broken | n/a | S2, S4, S5 | `launch template missing` |
+| `health.issues[] AsgInstanceLaunchFailures` | 2 | Broken | n/a | S2, S4, S5 | `ASG launch failures` |
+| `health.issues[] AutoScalingGroupNotFound` | 2 | Broken | n/a | S2, S4, S5 | `backing ASG missing` |
+| `health.issues[] Ec2SubnetInvalidConfiguration` | 2 | Broken | n/a | S2, S4, S5 | `subnet public-IP setting wrong` |
+| `health.issues[] Ec2InstanceTypeDoesNotExist` | 2 | Broken | n/a | S2, S4, S5 | `instance type unavailable` |
+| `health.issues[] InternalFailure` | 2 | Broken | n/a | S2, S4, S5 | `EKS internal failure` |
 
 All `health.issues[]` rows above are Wave 2 findings on an already-red row (because `DEGRADED` / `CREATE_FAILED` / `DELETE_FAILED` already bucketed Broken). Per §4 mapping rule — S3 glyph is suppressed on non-green rows; S4 surfaces the *cause*, not a redundant state keyword; S5 carries the full operator sentence. S1 still counts these as `!`-severity findings so the menu tally is accurate.
 
@@ -204,9 +208,9 @@ ng — CONTAINERS. Lifecycle key: `status`.
 | ng.state.deleting | deleting | warn | wave1 | — |
 | ng.state.create-failed | create failed | broken | wave1 | — |
 | ng.state.delete-failed | delete failed | broken | wave1 | — |
-| ng.state.degraded | degraded | broken | wave1 | — |
-| ng.warn.details\_denied | details denied | warn | wave1 | — |
-| ng.warn.details\_unavailable | details unavailable | warn | wave1 | — |
+| ng.state.degraded | degraded | broken | wave1 | The node group is degraded: AWS reports the health issues listed below, so some nodes are failing or not joining. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
+| ng.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
+| ng.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

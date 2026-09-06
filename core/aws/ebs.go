@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -352,8 +353,7 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	if snap.Encrypted == nil || !*snap.Encrypted {
 		return []domain.Finding{{
 			Code: CodeEBSSnapUnencrypted, Phrase: "unencrypted",
-			Detail: "Snapshot is not encrypted at rest — " +
-				"re-create from an encrypted volume.",
+			Detail:   catalog.Detail(CodeEBSSnapUnencrypted),
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
 	}
@@ -368,10 +368,9 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 			if isAutomated {
 				days := int(age.Hours() / 24)
 				return []domain.Finding{{
-					Code:   CodeEBSSnapAgedAutomated,
-					Phrase: "automated, " + strconv.Itoa(days) + "d old",
-					Detail: "Automated snapshot is " + strconv.Itoa(days) +
-						" days old with no retention policy pruning it — billed indefinitely.",
+					Code:     CodeEBSSnapAgedAutomated,
+					Phrase:   "automated, " + strconv.Itoa(days) + "d old",
+					Detail:   catalog.Detail(CodeEBSSnapAgedAutomated),
 					Severity: domain.SevWarn, Source: "wave1",
 				}}
 			}
@@ -396,10 +395,9 @@ func ebsStructuralFindings(vol ec2types.Volume, attachedTo string) []domain.Find
 		if age := time.Since(*vol.CreateTime); age > ebsOrphanAge {
 			days := int(age.Hours() / 24)
 			return []domain.Finding{{
-				Code:   CodeEBSOrphanUnattached,
-				Phrase: "orphan: unattached " + strconv.Itoa(days) + "d",
-				Detail: "Unattached since creation " + strconv.Itoa(days) +
-					" days ago — billed hourly for no workload.",
+				Code:     CodeEBSOrphanUnattached,
+				Phrase:   "orphan: unattached " + strconv.Itoa(days) + "d",
+				Detail:   catalog.Detail(CodeEBSOrphanUnattached),
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
 		}
@@ -407,8 +405,7 @@ func ebsStructuralFindings(vol ec2types.Volume, attachedTo string) []domain.Find
 	if vol.Encrypted == nil || !*vol.Encrypted {
 		return []domain.Finding{{
 			Code: CodeEBSUnencrypted, Phrase: "unencrypted",
-			Detail: "Volume is not encrypted at rest — " +
-				"re-create from encrypted snapshot.",
+			Detail:   catalog.Detail(CodeEBSUnencrypted),
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
 	}

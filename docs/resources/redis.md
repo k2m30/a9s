@@ -136,30 +136,34 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
 
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `redis`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
+
 Wave → surface mapping applied below. `Status == "available"` with `AutomaticFailover == "enabled"` (Healthy) does not produce a §4 row — the row is green and S4 blank, silence is the UX.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating — new group` | `Replication group is being created; nodes are not yet serving traffic.` |
-| `Status == modifying` (single-shard) | 1 | Warning | n/a | S2, S4 | `modifying — config change` | `Replication group is applying a configuration change; failover or latency spikes possible.` |
-| `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S2, S4 | `snapshotting — backup running` | `Replication group is taking a backup; performance may dip until it completes.` |
-| `Status == deleting` | 1 | Warning | n/a | S2, S4 | `deleting — teardown` | `Replication group is being deleted; endpoints will stop accepting connections.` |
-| `Status == create-failed` | 1 | Broken | n/a | S2, S4 | `create failed — see events` | `Replication group create failed; AWS did not surface a cause field — check CloudTrail events for the failure reason.` |
-| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: modifying` | `Shard <ng-id> is applying a change; primary currently in <primary-AZ>, replicas in <replica-AZs>. Failover or latency spikes possible on this shard only.` |
-| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: snapshotting` | `Shard <ng-id> is taking a backup; primary currently in <primary-AZ>.` |
-| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: creating` | `Shard <ng-id> is being added or re-sharded.` |
-| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: deleting` | `Shard <ng-id> is being removed.` |
-| `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S2, S4 | `multi-AZ without auto-failover` | `Replication group is deployed multi-AZ but automatic failover is not enabled; a primary-node loss will require manual intervention.` |
-| `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption at rest off` | `Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate.` |
-| `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption in transit off` | `Client traffic to this group crosses the network in cleartext, so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group.` |
-| `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | n/a | S1, S2, S4, S5 | `no authentication token` | `The group accepts any client that can reach it — encryption in transit is on but no authentication token is required. Set one, so a network-level reachability mistake is not immediately a data breach.` |
-| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | n/a | S2, S4, S5 | `automatic backups off` | `Automatic backups are off, so a failed replication group takes its data with it. Set a snapshot retention limit of at least one day.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating — new group` |
+| `Status == modifying` (single-shard) | 1 | Warning | n/a | S2, S4 | `modifying — config change` |
+| `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S2, S4 | `snapshotting — backup running` |
+| `Status == deleting` | 1 | Warning | n/a | S2, S4 | `deleting — teardown` |
+| `Status == create-failed` | 1 | Broken | n/a | S2, S4 | `create failed — see events` |
+| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: modifying` |
+| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: snapshotting` |
+| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: creating` |
+| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: deleting` |
+| `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S2, S4 | `multi-AZ without auto-failover` |
+| `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption at rest off` |
+| `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption in transit off` |
+| `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | n/a | S1, S2, S4, S5 | `no authentication token` |
+| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | n/a | S2, S4, S5 | `automatic backups off` |
 
 Notes for fillers:
 
@@ -234,10 +238,10 @@ redis — DATABASES & STORAGE. Lifecycle key: `status`.
 | redis.warn.snapshotting | snapshotting — backup running | warn | wave1 | — |
 | redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 | — |
 | redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 | — |
-| redis.encryption-at-rest-off | encryption at rest off | warn | wave1 | — |
-| redis.encryption-in-transit-off | encryption in transit off | warn | wave1 | — |
-| redis.no-auth | no authentication token | broken | wave1 | — |
-| redis.no-backup | automatic backups off | warn | wave1 | — |
+| redis.encryption-at-rest-off | encryption at rest off | warn | wave1 | Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate. |
+| redis.encryption-in-transit-off | encryption in transit off | warn | wave1 | Client traffic to this group crosses the network in cleartext, so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group. |
+| redis.no-auth | no authentication token | broken | wave1 | The group accepts any client that can reach it — encryption in transit is on but no authentication token is required. Set one, so a network-level reachability mistake is not immediately a data breach. |
+| redis.no-backup | automatic backups off | warn | wave1 | Automatic backups are off, so a failed replication group takes its data with it. Set a snapshot retention limit of at least one day. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

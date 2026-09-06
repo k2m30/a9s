@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
@@ -605,11 +606,9 @@ const (
 func ctEventFindings(status, cause, errorCode, eventName string) []domain.Finding {
 	switch status {
 	case "ct-danger":
-		phrase, detail := ctDangerPhrase(cause, errorCode, eventName)
-		return []domain.Finding{{Code: CodeCTEventDanger, Phrase: phrase, Detail: detail, Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeCTEventDanger, Phrase: ctDangerPhrase(cause, errorCode), Detail: catalog.Detail(CodeCTEventDanger), Severity: domain.SevBroken, Source: "wave1"}}
 	case "ct-attention":
-		phrase, detail := ctAttentionPhrase(cause, eventName)
-		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: phrase, Detail: detail, Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: ctAttentionPhrase(cause, eventName), Detail: catalog.Detail(CodeCTEventAttention), Severity: domain.SevWarn, Source: "wave1"}}
 	}
 	// ct-info (or any unrecognized tier) — colorCTEvents has no healthy
 	// bucket for events, so the routine/no-signal tier still needs a
@@ -620,32 +619,31 @@ func ctEventFindings(status, cause, errorCode, eventName string) []domain.Findin
 // ctDangerPhrase renders the ct-danger cause as a lowercase operator phrase
 // plus a one-sentence detail. Precedence matches computeCTStatus: error
 // before destructive verb.
-func ctDangerPhrase(cause, errorCode, eventName string) (phrase, detail string) {
+func ctDangerPhrase(cause, errorCode string) string {
 	switch cause {
 	case ctCauseError:
-		humanized := domain.HumanizeStatusPhrase(errorCode)
-		return "failed: " + humanized, fmt.Sprintf("CloudTrail recorded a failed call (%s) — it was refused with (%s).", eventName, errorCode)
+		return "failed: " + domain.HumanizeStatusPhrase(errorCode)
 	case ctCauseDestructive:
-		return "destructive call", fmt.Sprintf("CloudTrail recorded a destructive call (%s) — verify it was expected.", eventName)
+		return "destructive call"
 	}
-	return "danger", ""
+	return "danger"
 }
 
 // ctAttentionPhrase renders the ct-attention cause as a lowercase operator
-// phrase plus a one-sentence detail. Precedence matches computeCTStatus:
+// phrase. Precedence matches computeCTStatus:
 // write verb, then root, then cross-account, then sensitive read.
-func ctAttentionPhrase(cause, eventName string) (phrase, detail string) {
+func ctAttentionPhrase(cause, eventName string) string {
 	switch cause {
 	case ctCauseWrite:
-		return "modifying call", fmt.Sprintf("CloudTrail recorded a modifying call (%s) — verify the change was expected.", eventName)
+		return "modifying call"
 	case ctCauseRoot:
-		return "root account activity", fmt.Sprintf("CloudTrail recorded a call (%s) performed by the account root user.", eventName)
+		return "root account activity"
 	case ctCauseCrossAccount:
-		return "cross-account access", fmt.Sprintf("CloudTrail recorded a call (%s) from a different AWS account than the recipient.", eventName)
+		return "cross-account access"
 	case ctCauseSensitiveRead:
-		return "reads sensitive data (" + eventName + ")", fmt.Sprintf("CloudTrail recorded a read of sensitive data (%s) — verify the caller is expected.", eventName)
+		return "reads sensitive data (" + eventName + ")"
 	}
-	return "attention", ""
+	return "attention"
 }
 
 // computeCTStatus implements the §1.2 severity ladder, returning the tier

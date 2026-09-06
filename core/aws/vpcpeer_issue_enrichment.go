@@ -68,10 +68,12 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 		switch {
 		case blackholed[res.ID]:
 			setWave2Finding(&result, res.ID, vpcPeerCodeRouteBlackholed, "route to peer blackholed", "~", "vpc-peer",
-				nil, "A route references this connection but its state is blackhole.")
+				nil)
+
 		case !routed[res.ID]:
 			setWave2Finding(&result, res.ID, vpcPeerCodeNoLocalRoute, "no local route to peer", "~", "vpc-peer",
-				nil, "No loaded route table routes to this peering connection.")
+				nil)
+
 		}
 	}
 

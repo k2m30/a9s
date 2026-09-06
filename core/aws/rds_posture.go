@@ -4,7 +4,7 @@
 // (rds.go) and both cluster fetchers (dbc.go for DocumentDB, dbc_rds.go for
 // Aurora / Multi-AZ) evaluate. Instances and clusters expose the same four
 // settings under the same names, so one predicate set answers for all three
-// call sites; only the FindingCode/Detail pair differs per short name and is
+// call sites; only the FindingCode differs per short name and is
 // passed in via rdsPostureCodes.
 package aws
 
@@ -13,21 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
-// rdsPostureCodes carries the per-short-name FindingCode and S5 Detail
-// sentence for each posture predicate. dbiPostureCodes and dbcPostureCodes
-// are the two instantiations.
+// rdsPostureCodes carries the per-short-name FindingCode for each posture
+// predicate. dbiPostureCodes and dbcPostureCodes are the two instantiations.
 type rdsPostureCodes struct {
-	singleAZ                domain.FindingCode
-	singleAZDetail          string
-	minorUpgrade            domain.FindingCode
-	minorUpgradeDetail      string
-	iamAuth                 domain.FindingCode
-	iamAuthDetail           string
-	defaultMasterUser       domain.FindingCode
-	defaultMasterUserDetail string
+	singleAZ          domain.FindingCode
+	minorUpgrade      domain.FindingCode
+	iamAuth           domain.FindingCode
+	defaultMasterUser domain.FindingCode
 }
 
 // rdsPosture is the subset of an RDS instance or cluster the posture
@@ -88,27 +84,27 @@ func rdsPostureFindings(p rdsPosture, c rdsPostureCodes) ([]domain.Finding, map[
 	var findings []domain.Finding
 	details := map[domain.FindingCode]domain.AttentionDetail{}
 
-	add := func(code domain.FindingCode, phrase, detail string, rows []domain.DetailRow) {
+	add := func(code domain.FindingCode, phrase string, rows []domain.DetailRow) {
 		findings = append(findings, domain.Finding{
-			Code: code, Phrase: phrase, Detail: detail,
+			Code: code, Phrase: phrase, Detail: catalog.Detail(code),
 			Severity: domain.SevWarn, Source: "wave1",
 		})
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
 	if !p.SkipSingleAZ && !p.IsReadReplica && p.MultiAZ != nil && !*p.MultiAZ {
-		add(c.singleAZ, "single-AZ", c.singleAZDetail,
+		add(c.singleAZ, "single-AZ",
 			[]domain.DetailRow{{Label: "Multi-AZ", Value: "no", Tier: "~"}})
 	}
 	if p.AutoMinorVersionUpgrade != nil && !*p.AutoMinorVersionUpgrade {
-		add(c.minorUpgrade, "auto minor version upgrade off", c.minorUpgradeDetail, nil)
+		add(c.minorUpgrade, "auto minor version upgrade off", nil)
 	}
 	if engineSupportsIAMAuth(p.Engine) && p.IAMAuthEnabled != nil && !*p.IAMAuthEnabled {
-		add(c.iamAuth, "IAM database authentication off", c.iamAuthDetail,
+		add(c.iamAuth, "IAM database authentication off",
 			[]domain.DetailRow{{Label: "Database authentication", Value: "identity-based, off", Tier: "~"}})
 	}
 	if p.MasterUsername != nil && isDefaultMasterUsername(*p.MasterUsername) {
-		add(c.defaultMasterUser, "default master username", c.defaultMasterUserDetail,
+		add(c.defaultMasterUser, "default master username",
 			[]domain.DetailRow{{Label: "Master username", Value: *p.MasterUsername, Tier: "~"}})
 	}
 
@@ -129,7 +125,7 @@ const (
 // rdsCACertFinding returns the CA-certificate-expiry finding for validTill,
 // or nil when the certificate is absent or expires beyond the reporting
 // window. now is injected so tests can pin the boundary (the acm.go pattern).
-func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code domain.FindingCode, detail string) (*domain.Finding, []domain.DetailRow) {
+func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code domain.FindingCode) (*domain.Finding, []domain.DetailRow) {
 	if validTill == nil {
 		return nil, nil
 	}
@@ -151,7 +147,7 @@ func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code dom
 	f := &domain.Finding{
 		Code:     code,
 		Phrase:   "server certificate expires in " + strconv.Itoa(days) + " days",
-		Detail:   detail,
+		Detail:   catalog.Detail(code),
 		Severity: sev,
 		Source:   "wave1",
 	}

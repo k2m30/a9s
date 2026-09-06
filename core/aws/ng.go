@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -48,7 +49,7 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 // entry, which happens transiently) fallbackPhrase is used instead. A
 // second and later issue is folded into Detail as "+N more" rather than
 // widening the Phrase, keeping the Status cell short.
-func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCodes []string) domain.Finding {
+func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCodes []string) (domain.Finding, []domain.DetailRow) {
 	return healthIssueFindingSev(code, fallbackPhrase, issueCodes, domain.SevBroken)
 }
 
@@ -59,25 +60,27 @@ func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCod
 // health issue below FAILED/CREATING/UPDATING). issueCodes is always non-empty
 // here (callers only invoke this when health_issues_count > 0), so there is
 // no fallbackPhrase parameter.
-func healthIssueWarnFinding(code domain.FindingCode, issueCodes []string) domain.Finding {
+func healthIssueWarnFinding(code domain.FindingCode, issueCodes []string) (domain.Finding, []domain.DetailRow) {
 	return healthIssueFindingSev(code, "health issue", issueCodes, domain.SevWarn)
 }
 
-func healthIssueFindingSev(code domain.FindingCode, fallbackPhrase string, issueCodes []string, sev domain.Severity) domain.Finding {
+// healthIssueFindingSev returns the finding plus one Attention row per
+// reported issue code, so the phrase names the first and the rows the rest.
+func healthIssueFindingSev(code domain.FindingCode, fallbackPhrase string, issueCodes []string, sev domain.Severity) (domain.Finding, []domain.DetailRow) {
+	f := domain.Finding{Code: code, Phrase: fallbackPhrase, Detail: catalog.Detail(code), Severity: sev, Source: "wave1"}
 	if len(issueCodes) == 0 {
-		return domain.Finding{Code: code, Phrase: fallbackPhrase, Severity: sev, Source: "wave1"}
+		return f, nil
 	}
-	detail := ""
-	if len(issueCodes) > 1 {
-		detail = "+" + strconv.Itoa(len(issueCodes)-1) + " more: " + strings.Join(issueCodes[1:], ", ")
+	f.Phrase = issueCodes[0]
+	tier := "~"
+	if sev == domain.SevBroken {
+		tier = "!"
 	}
-	return domain.Finding{
-		Code:     code,
-		Phrase:   issueCodes[0],
-		Detail:   detail,
-		Severity: sev,
-		Source:   "wave1",
+	rows := make([]domain.DetailRow, 0, len(issueCodes))
+	for _, c := range issueCodes {
+		rows = append(rows, domain.DetailRow{Label: "Issue", Value: c, Tier: tier})
 	}
+	return f, rows
 }
 
 // buildNodeGroupResource constructs a Resource from cluster name, nodegroup name, and EKS Nodegroup struct.
@@ -114,6 +117,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 	// ACTIVE → no Finding (healthy). Fields["status"] is still populated
 	// so the existing structural Color path works for the wave2 fallback.
 	var findings []domain.Finding
+	var issueRows []domain.DetailRow
 	switch status {
 	case "CREATING":
 		findings = []domain.Finding{{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
@@ -126,10 +130,12 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 	case "DELETE_FAILED":
 		findings = []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"}}
 	case "DEGRADED":
-		findings = []domain.Finding{healthIssueFinding(CodeNGStateDegraded, "degraded", issueCodes)}
+		f, rows := healthIssueFinding(CodeNGStateDegraded, "degraded", issueCodes)
+		findings = []domain.Finding{f}
+		issueRows = rows
 	}
 
-	return resource.Resource{
+	r := resource.Resource{
 		ID:   nodegroupName,
 		Name: nodegroupName,
 		Fields: map[string]string{
@@ -144,4 +150,6 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		Findings:  findings,
 		RawStruct: ng,
 	}
+	addWave1Rows(&r, CodeNGStateDegraded, issueRows...)
+	return r
 }

@@ -199,11 +199,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ec2`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -215,21 +219,21 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `pending` / `shutting-down` / `stopping` | 1 | Warning | n/a | S2, S4 | `stopping` (or `pending` / `shutting-down`) | `Instance is <state> — transition in progress.` |
-| `stopped` (user-initiated, recent) | 1 | Warning | n/a | S2, S4 | `stopped: user-initiated` | `Instance stopped by user on <date-from-StateTransitionReason>.` |
-| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | n/a | S2, S4 | `stopped: Server.SpotInstanceShutdown` (or actual `StateReason.Code`) | `AWS stopped this instance: <StateReason.Message>.` |
-| `stopped` >30 days (long-stopped) | 1 | Warning | n/a | S2, S4 | `stopped 42d ago` | `Instance stopped >30 days ago — review whether it is still needed.` |
-| `terminated` | 1 | Dim | n/a | S2, S4 | `terminated` | `Instance terminated — no further action.` |
-| `SystemStatus.Status == impaired` (or `InstanceStatus.Status == impaired`) | 2 | Broken | `!` | S1, S3, S4, S5 (row stays green only if Wave 1 is Healthy; otherwise S3 suppressed and S4 deduplicates) | `impaired: system checks failing` | `AWS reports this instance is impaired — system or instance status checks are failing.` |
-| `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 | `initializing: checks in progress` | `Instance status checks have not yet passed since start.` |
-| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4, S5 | `status unknown: AWS insufficient-data` | `AWS cannot determine status — insufficient data from the hypervisor.` |
-| `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `!` | S1, S3, S4, S5 | `retires in 3d` (or `reboot in 5d`) | `AWS scheduled <instance-retirement|system-reboot> starting <NotBefore>.` |
-| instance metadata answers without a session token | 1 | Warning | `~` | S2, S4, S5 | `IMDSv1 allowed` | `Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata.` |
-| `PublicIpAddress` set | 1 | Warning | `~` | S2, S4, S5 | `public address` | `The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly.` |
-| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S3, S4, S5 | `port(s) 22 reachable from the internet` | `Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion.` |
-| credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` | `A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `pending` / `shutting-down` / `stopping` | 1 | Warning | n/a | S2, S4 | `stopping` (or `pending` / `shutting-down`) |
+| `stopped` (user-initiated, recent) | 1 | Warning | n/a | S2, S4 | `stopped: user-initiated` |
+| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | n/a | S2, S4 | `stopped: Server.SpotInstanceShutdown` (or actual `StateReason.Code`) |
+| `stopped` >30 days (long-stopped) | 1 | Warning | n/a | S2, S4 | `stopped 42d ago` |
+| `terminated` | 1 | Dim | n/a | S2, S4 | `terminated` |
+| `SystemStatus.Status == impaired` (or `InstanceStatus.Status == impaired`) | 2 | Broken | `!` | S1, S3, S4, S5 (row stays green only if Wave 1 is Healthy; otherwise S3 suppressed and S4 deduplicates) | `impaired: system checks failing` |
+| `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 | `initializing: checks in progress` |
+| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4, S5 | `status unknown: AWS insufficient-data` |
+| `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `!` | S1, S3, S4, S5 | `retires in 3d` (or `reboot in 5d`) |
+| instance metadata answers without a session token | 1 | Warning | `~` | S2, S4, S5 | `IMDSv1 allowed` |
+| `PublicIpAddress` set | 1 | Warning | `~` | S2, S4, S5 | `public address` |
+| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S3, S4, S5 | `port(s) 22 reachable from the internet` |
+| credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` |
 
 Notes on list-text construction:
 
@@ -306,14 +310,14 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 | ec2.state.stopped | stopped | warn | wave1 | — |
 | ec2.state.stopped.server | stopped | broken | wave1 | — |
 | ec2.state.terminated | terminated | dim | wave1 | — |
-| ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | — |
-| ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | — |
-| ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 | — |
+| ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | AWS reports this instance is impaired — system or instance status checks are failing. |
+| ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | Instance status checks have not yet passed since start. |
+| ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 | AWS cannot determine status — insufficient data from the hypervisor. |
 | ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 | — |
-| ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | — |
-| ec2.public-ip | public address | warn | wave1 | — |
-| ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 | — |
-| ec2.user-data-secret | credential in user data | broken | wave2 | — |
+| ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata. |
+| ec2.public-ip | public address | warn | wave1 | The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly. |
+| ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 | Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion. |
+| ec2.user-data-secret | credential in user data | broken | wave2 | A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

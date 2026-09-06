@@ -115,12 +115,11 @@ type SnapshotCrossRefConfig struct {
 	// attributes are normalized so a single parser answers for the rds and
 	// docdb SDKs alike.
 	PublicAttr func(ctx context.Context, clients *ServiceClients, snap resource.Resource) ([]snapshotAttribute, error)
-	// PublicCode / PublicPhrase / PublicDetail describe the finding emitted
-	// when PublicAttr reports a restore grant to the "all" group. Required
-	// when PublicAttr is non-nil.
+	// PublicCode / PublicPhrase describe the finding emitted when PublicAttr
+	// reports a restore grant to the "all" group. Required when PublicAttr is
+	// non-nil.
 	PublicCode   domain.FindingCode
 	PublicPhrase string
-	PublicDetail string
 }
 
 // snapshotAttribute is one snapshot share attribute, normalized away from the
@@ -257,7 +256,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			// and AttentionDetails (core/aws/issue_enrichment.go) — it
 			// drives the detail-view Attention section AND the S4 status
 			// column at render time via domain.StatusPhrase(r.Findings).
-			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows, "")
+			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows)
 		}
 
 		return result, publicErr
@@ -306,7 +305,8 @@ func enrichSnapshotPublicShare(
 			return
 		}
 		setWave2Finding(result, res.ID, cfg.PublicCode, cfg.PublicPhrase, "!", cfg.ShortName,
-			[]domain.DetailRow{{Label: "Restore", Value: "all", Tier: "!"}}, cfg.PublicDetail)
+			[]domain.DetailRow{{Label: "Restore", Value: "all", Tier: "!"}})
+
 	})
 	return Finish(result, failures, n, cfg.ShortName+"-enrich: snapshot share attributes")
 }

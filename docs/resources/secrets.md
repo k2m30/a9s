@@ -140,11 +140,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
 | S4 | Status / description column text | Short human-readable cause. Healthy rows render blank — no `OK`, no `available`. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `secrets`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping applied:
 
@@ -154,15 +158,15 @@ Wave → surface mapping applied:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `now > NextRotationDate` | 1 | Warning | n/a | S2, S4 | `rotation overdue: due Apr 10` | `Rotation overdue — next rotation was due 2026-04-10.` |
-| `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` | `Rotation schedule is 30d but last successful rotation was 92d ago.` |
-| `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant: not read in 210d` | `Secret has not been read in this region for 210 days — check if still in use.` |
-| `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deletion in 6d` | `Scheduled for deletion on 2026-04-26 — restore with RestoreSecret before window ends.` |
-| `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` | `Rotation started but never completed — an AWSPENDING version has been lingering.` |
-| Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `resource policy open to anyone` | `Any AWS account can read the credential this secret holds — remove the wildcard principal.` |
-| Resource policy names a principal in another account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` | `Another AWS account can read this secret — confirm the grant is intended and still needed.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `now > NextRotationDate` | 1 | Warning | n/a | S2, S4 | `rotation overdue: due Apr 10` |
+| `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |
+| `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant: not read in 210d` |
+| `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deletion in 6d` |
+| `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` |
+| Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `resource policy open to anyone` |
+| Resource policy names a principal in another account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
 
 Formatting notes applied:
 
@@ -218,8 +222,8 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 | secrets.state.dormant | dormant | warn | wave1 | — |
 | secrets.rotation.disabled | rotation not enabled | warn | wave1 | — |
 | secrets.value.stale | value unchanged in over 365 days | warn | wave1 | — |
-| secrets.public-policy | resource policy open to anyone | broken | wave2 | — |
-| secrets.cross-account-policy | resource policy grants another account | warn | wave2 | — |
+| secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "\*" principal from the resource policy, or scope it with a condition naming the accounts that need it. |
+| secrets.cross-account-policy | resource policy grants another account | warn | wave2 | The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

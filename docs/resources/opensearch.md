@@ -146,11 +146,15 @@ Every signal from §3.1 must land on one or more of these five existing surfaces
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `isolated: cluster quarantined by AWS`). **Healthy rows render blank** — no `OK` / `Active` / `available`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `opensearch`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping applied here:
 
@@ -160,16 +164,16 @@ Wave → surface mapping applied here:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Deleted==true` | 2 | Dim | n/a | S2, S4 | `deleting: removal in progress` | `Domain is being deleted — awaiting AWS to tear down ENIs and release the endpoint.` |
-| `Processing==true` or `UpgradeProcessing==true` | 2 | Warning | n/a | S2, S4 | `processing: config change in flight` | `AWS is applying a configuration or version change — writes continue, brief brownouts possible.` |
-| `DomainProcessingStatus=="Isolated"` | 2 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` | `AWS has quarantined the domain (billing, policy, or health) — no reads/writes until resolved.` |
-| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` | `Service-software update is available; AWS will apply it automatically any day — plan the window.` |
-| `EncryptionAtRestOptions.Enabled==false` | 2 | Healthy | `~` | S3, S4, S5 | `encryption at rest off` | `Indexes are stored unencrypted on disk — enable at-rest encryption for compliance.` |
-| No `VPCOptions` AND access policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `reachable outside a VPC` | `The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals.` |
-| `DomainEndpointOptions.EnforceHTTPS` not true | 2 | Warning | `~` | S2, S4, S5 | `HTTPS not enforced` | `The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options.` |
-| `NodeToNodeEncryptionOptions.Enabled` not true | 2 | Warning | `~` | S2, S4, S5 | `node-to-node encryption off` | `Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Deleted==true` | 2 | Dim | n/a | S2, S4 | `deleting: removal in progress` |
+| `Processing==true` or `UpgradeProcessing==true` | 2 | Warning | n/a | S2, S4 | `processing: config change in flight` |
+| `DomainProcessingStatus=="Isolated"` | 2 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` |
+| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` |
+| `EncryptionAtRestOptions.Enabled==false` | 2 | Healthy | `~` | S3, S4, S5 | `encryption at rest off` |
+| No `VPCOptions` AND access policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `reachable outside a VPC` |
+| `DomainEndpointOptions.EnforceHTTPS` not true | 2 | Warning | `~` | S2, S4, S5 | `HTTPS not enforced` |
+| `NodeToNodeEncryptionOptions.Enabled` not true | 2 | Warning | `~` | S2, S4, S5 | `node-to-node encryption off` |
 
 ## 4.1 UX review
 
@@ -218,13 +222,13 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 | — |
 | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 | — |
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 | — |
-| opensearch.update-forced | software update forced soon | warn | wave1 | — |
-| opensearch.encryption-off | encryption at rest off | warn | wave1 | — |
-| opensearch.public | reachable outside a VPC | broken | wave1 | — |
-| opensearch.https-not-enforced | HTTPS not enforced | warn | wave1 | — |
-| opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave1 | — |
-| opensearch.warn.details\_denied | details denied | warn | wave1 | — |
-| opensearch.warn.details\_unavailable | details unavailable | warn | wave1 | — |
+| opensearch.update-forced | software update forced soon | warn | wave1 | AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window. |
+| opensearch.encryption-off | encryption at rest off | warn | wave1 | Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place. |
+| opensearch.public | reachable outside a VPC | broken | wave1 | The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals. |
+| opensearch.https-not-enforced | HTTPS not enforced | warn | wave1 | The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options. |
+| opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave1 | Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive. |
+| opensearch.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
+| opensearch.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

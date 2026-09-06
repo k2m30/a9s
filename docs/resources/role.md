@@ -107,11 +107,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `role`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -123,13 +127,13 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S2, S4, S5 | `anyone can assume this role` | `Any AWS account can call sts:AssumeRole on this role and obtain its permissions.` |
-| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S2, S4, S5 | `service can assume without source scoping` | `A service can assume this role for any caller, so another customer's resource can trick it into using your role.` |
-| an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S2, S4, S5 | `inline policy allows privilege escalation` | `An inline policy grants a set of actions that lets its holder grant itself full administrator.` |
-| dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `unused >90d` | `No AssumeRole activity in the last 90 days (region-scoped — may miss usage in other regions).` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `has an administrator policy` | `The role carries an AWS-managed policy granting administrator-equivalent access.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S2, S4, S5 | `anyone can assume this role` |
+| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S2, S4, S5 | `service can assume without source scoping` |
+| an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S2, S4, S5 | `inline policy allows privilege escalation` |
+| dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `unused >90d` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `has an administrator policy` |
 
 Rules for filling list and detail text:
 
@@ -172,11 +176,11 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | — |
-| role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | — |
-| role.inline-privilege-escalation | inline policy allows privilege escalation: <combo> | broken | wave1 | — |
-| iam-role.dormant | dormant role (>90d) | warn | wave2 | — |
-| role.admin-attached | has an administrator policy | warn | wave2 | — |
+| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "\*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition. |
+| role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition to the trust statement. |
+| role.inline-privilege-escalation | inline policy allows privilege escalation: <combo> | broken | wave1 | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
+| iam-role.dormant | dormant role (>90d) | warn | wave2 | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |
+| role.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -107,11 +107,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. snapshot approaching cost-age threshold, unencrypted snapshot. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `error: KMS key disabled`, `orphan: source volume deleted`). **Healthy rows render blank** — no `OK` / `completed`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ebs-snap`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -125,16 +129,16 @@ Note: the Wave 1 signals `age > 365d` and `Encrypted == false` are background-ch
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S2, S4 | `creating (Progress%)` | `Snapshot still being created; progress reported by AWS.` |
-| `State == error` | 1 | Broken | n/a | S2, S4 | `error: <StateMessage>` | `Snapshot failed; AWS reason: <StateMessage>.` |
-| `State == recoverable` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recoverable: AWS degraded` | `Snapshot in recoverable state; contact AWS to restore.` |
-| `State == recovering` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recovering: being restored by AWS` | `AWS is recovering this snapshot after an earlier failure.` |
-| age > 365d AND automated description — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `age 420d: automated, review cost` | `Automated snapshot older than 365d; consider lifecycle policy.` |
-| `Encrypted == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unencrypted: CIS EC2.1` | `Snapshot is not encrypted at rest; CIS EC2.1 flags this.` |
-| orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: source volume deleted` | `Source EBS volume no longer exists in this account/region.` |
-| restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S3, S4, S5 | `shared with all AWS accounts` | `This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the all group.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State == pending` | 1 | Warning | n/a | S2, S4 | `creating (Progress%)` |
+| `State == error` | 1 | Broken | n/a | S2, S4 | `error: <StateMessage>` |
+| `State == recoverable` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recoverable: AWS degraded` |
+| `State == recovering` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recovering: being restored by AWS` |
+| age > 365d AND automated description — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `age 420d: automated, review cost` |
+| `Encrypted == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unencrypted: CIS EC2.1` |
+| orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: source volume deleted` |
+| restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S3, S4, S5 | `shared with all AWS accounts` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)
 
@@ -179,10 +183,10 @@ ebs-snap — COMPUTE. Lifecycle key: `state`.
 | --- | --- | --- | --- | --- |
 | ebs-snap.state.pending | pending | warn | wave1 | — |
 | ebs-snap.state.error | error | broken | wave1 | — |
-| ebs-snap.encryption.disabled | unencrypted | warn | wave1 | — |
-| ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | — |
+| ebs-snap.encryption.disabled | unencrypted | warn | wave1 | Snapshot is not encrypted at rest — re-create from an encrypted volume. |
+| ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it. |
 | ebs-snap.orphan | orphan: source volume deleted | warn | wave2 | — |
-| ebs-snap.public | shared with all AWS accounts | broken | wave2 | — |
+| ebs-snap.public | shared with all AWS accounts | broken | wave2 | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the \`all\` group. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

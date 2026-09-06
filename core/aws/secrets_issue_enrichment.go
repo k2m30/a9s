@@ -19,13 +19,6 @@ import (
 const (
 	secretsCodePublicPolicy       domain.FindingCode = "secrets.public-policy"
 	secretsCodeCrossAccountPolicy domain.FindingCode = "secrets.cross-account-policy"
-
-	secretsPublicPolicyDetail = "The secret's resource policy allows a wildcard principal, so any AWS account can " +
-		"read the credential this secret holds. Remove the \"*\" principal from the resource policy, or scope it " +
-		"with a condition naming the accounts that need it."
-	secretsCrossAccountPolicyDetail = "The secret's resource policy names a principal in another AWS account, so " +
-		"that account can read the credential. Confirm the grant is intended and still needed, and remove the " +
-		"account from the resource policy otherwise."
 )
 
 // EnrichSecretsPolicy calls GetResourcePolicy per secret (cap EnrichmentCap)
@@ -98,10 +91,12 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		switch {
 		case ex.Public:
 			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, "resource policy open to anyone", "!", "secrets",
-				publicPolicyRows(ex), secretsPublicPolicyDetail)
+				publicPolicyRows(ex))
+
 		case len(ex.CrossAccount) > 0:
 			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, "resource policy grants another account",
-				"~", "secrets", crossAccountPolicyRows(ex), secretsCrossAccountPolicyDetail)
+				"~", "secrets", crossAccountPolicyRows(ex))
+
 		}
 	})
 	result.Truncated = len(resources) > EnrichmentCap

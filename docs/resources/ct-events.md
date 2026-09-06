@@ -156,11 +156,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `AccessDenied: iam:DeleteUser`). **Healthy rows render blank** — no `OK` / `Success`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ct-events`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping applied here:
 
@@ -169,10 +173,10 @@ Wave → surface mapping applied here:
 - Wave 1 Warning (single `errorCode` on an event) → S2 (yellow) + S4 (cause text). No S1, S3, S5.
 - Wave 1 Broken (AccessDenied-write storm by principal > N/h) → S2 (red) + S4 (cause text). No S1, S3, S5 — consistent with the "Wave 1 Warning/Broken/Dim" rule.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `errorCode` present on event | 1 | Warning | n/a | S2 + S4 | `<errorCode>: <eventSource>:<eventName>` | — (Wave 1 Warning does not reach S5) |
-| AccessDenied-write storm by principal > N/h | 1 | Broken | n/a | S2 + S4 | `AccessDenied storm: <principal> Nx in 1h` | — (Wave 1 Broken does not reach S5) |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `errorCode` present on event | 1 | Warning | n/a | S2 + S4 | `<errorCode>: <eventSource>:<eventName>` |
+| AccessDenied-write storm by principal > N/h | 1 | Broken | n/a | S2 + S4 | `AccessDenied storm: <principal> Nx in 1h` |
 
 Rules for filling list and detail text:
 
@@ -216,8 +220,8 @@ ct-events — MONITORING. Lifecycle key: none (the list API returns no lifecycle
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ct\_event.severity.danger | destructive call | broken | wave1 | — |
-| ct\_event.severity.attention | root account activity | warn | wave1 | — |
+| ct\_event.severity.danger | destructive call | broken | wave1 | CloudTrail recorded a call that either failed or was destructive; the event name and error code in this row say which. Verify it was expected and, if not, find out who made it. |
+| ct\_event.severity.attention | root account activity | warn | wave1 | CloudTrail recorded a call worth a look: a modifying call, root-account activity, cross-account access, or a read of sensitive data. The status names which; verify the caller was expected. |
 | ct\_event.severity.info | routine event | dim | wave1 | — |
 <!-- END GENERATED: findings -->
 

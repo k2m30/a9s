@@ -101,8 +101,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: CodeCFNStackDeleted, Phrase: "delete complete", Severity: domain.SevDim, Source: "wave1"},
 			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure: <ResourceType/LogicalResourceId>", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted."},
+			{Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs", Severity: domain.SevBroken, Source: "wave1", Detail: "A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential."},
 		},
 	},
 	{
@@ -211,10 +211,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status> (<date>)", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: CodeCBPublicBuilds, Phrase: "build results publicly visible", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCBEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCBPublicBuilds, Phrase: "build results publicly visible", Severity: domain.SevBroken, Source: "wave1", Detail: "Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed."},
+			{Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository", Severity: domain.SevWarn, Source: "wave1", Detail: "The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches."},
+			{Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address", Severity: domain.SevBroken, Source: "wave1", Detail: "The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked."},
+			{Code: CodeCBEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1", Detail: "A plaintext environment variable on this project holds what looks like a credential; every build log and anyone who can read the project definition sees its value. Move it to Secrets Manager or Parameter Store, reference it by type, and rotate the exposed value."},
 		},
 	},
 	{
@@ -264,10 +264,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: CodeECRScanOnPushOff, Phrase: "scan on push off", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeECRMutableTags, Phrase: "tags are mutable", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or scope the grant with a condition."},
+			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2", Detail: "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."},
+			{Code: CodeECRScanOnPushOff, Phrase: "scan on push off", Severity: domain.SevWarn, Source: "wave1", Detail: "Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives."},
+			{Code: CodeECRMutableTags, Phrase: "tags are mutable", Severity: domain.SevWarn, Source: "wave1", Detail: "An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from."},
 		},
 	},
 	{
@@ -309,7 +309,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: codeartifactCodeNoPermissionsPolicy, Phrase: "no permissions policy", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or scope the grant with a condition."},
 		},
 	},
 }

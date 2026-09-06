@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/mwaa"
 	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -45,12 +46,6 @@ const (
 // the shared DefaultPageSize (50) exceeds it and AWS rejects the call with a
 // ValidationException ("Member must have value less than or equal to 25").
 const mwaaListPageSize = 25
-
-// mwaaDetailsDeniedDetail is mwaa's own §4 S5 sentence for the
-// details-denied finding — deliberately NOT the generic degraded_resource.go
-// text, matching transferDetailsDeniedDetail/ltDetailsDeniedDetail's
-// precedent.
-const mwaaDetailsDeniedDetail = "Access to environment details was denied; only the name is visible."
 
 // FetchMWAAEnvironmentsPage fetches a single page of MWAA environments.
 // ListEnvironments returns names only (docs/resources/mwaa.md §3.1 — no Wave
@@ -195,7 +190,7 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 // Environment body); it decides whether the row renders mwaa's own "details
 // denied" sentence or the neutral "details unavailable" one.
 func buildMWAADegradedResource(name string, err error) resource.Resource {
-	finding := degradedDetailsFinding("mwaa", err, mwaaDetailsDeniedDetail, detailsUnavailableDetail)
+	finding := degradedDetailsFinding("mwaa", err)
 	return resource.Resource{
 		ID:   name,
 		Name: name,
@@ -233,7 +228,7 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 		findings = append(findings, domain.Finding{
 			Code:     mwaaCodeLastUpdateFailed,
 			Phrase:   "last update failed",
-			Detail:   fmt.Sprintf("Last update failed: %s. Still on previous config.", errMessage),
+			Detail:   catalog.Detail(mwaaCodeLastUpdateFailed),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		})
@@ -250,13 +245,18 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 	switch env.WebserverAccessMode {
 	case mwaatypes.WebserverAccessModePublicOnly, mwaatypes.WebserverAccessModePublicAndPrivate:
 		findings = append(findings, domain.Finding{
-			Code:   mwaaCodeWebserverPublic,
-			Phrase: "webserver public",
-			Detail: fmt.Sprintf("Airflow webserver is reachable from the internet (access mode: %s).",
-				domain.HumanizeStatusPhrase(string(env.WebserverAccessMode))),
+			Code:     mwaaCodeWebserverPublic,
+			Phrase:   "webserver public",
+			Detail:   catalog.Detail(mwaaCodeWebserverPublic),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		})
+		if attentionDetails == nil {
+			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{}
+		}
+		attentionDetails[mwaaCodeWebserverPublic] = domain.AttentionDetail{Rows: []domain.DetailRow{
+			{Label: "Access mode", Value: domain.HumanizeStatusPhrase(string(env.WebserverAccessMode)), Tier: "~"},
+		}}
 	}
 
 	return findings, attentionDetails
@@ -267,57 +267,46 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.Finding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
 	mwaatypes.EnvironmentStatusCreating: {
 		Code: mwaaCodeCreating, Phrase: "creating",
-		Detail:   "Environment is being provisioned; Airflow is not yet reachable.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusCreatingSnapshot: {
 		Code: mwaaCodeCreatingSnapshot, Phrase: "creating snapshot",
-		Detail:   "The environment is snapshotting its metadata database before an update or upgrade.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusPending: {
 		Code: mwaaCodePending, Phrase: "pending: awaiting VPC endpoints",
-		Detail:   "Creation is paused until the required VPC endpoints exist in your VPC.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusUpdating: {
 		Code: mwaaCodeUpdating, Phrase: "updating",
-		Detail:   "Environment update in progress; workers may be replaced.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusRollingBack: {
 		Code: mwaaCodeRollingBack, Phrase: "rolling back: update failed",
-		Detail:   "Update or upgrade failed; the environment is restoring the latest metadata snapshot.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusMaintenance: {
 		Code: mwaaCodeMaintenance, Phrase: "maintenance in progress",
-		Detail:   "Scheduled maintenance is running; the environment may be briefly unavailable.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusCreateFailed: {
 		Code: mwaaCodeCreateFailed, Phrase: "create failed",
-		Detail:   "Environment creation failed and the environment was not created.",
 		Severity: domain.SevBroken, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusUpdateFailed: {
 		Code: mwaaCodeUpdateFailed, Phrase: "update failed: rolled back",
-		Detail:   "Update failed; environment was restored to its previous state and is usable.",
 		Severity: domain.SevBroken, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusUnavailable: {
 		Code: mwaaCodeUnavailable, Phrase: "unavailable: not stable",
-		Detail:   "Environment failed and did not return to a stable state; contact AWS support.",
 		Severity: domain.SevBroken, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusDeleting: {
 		Code: mwaaCodeDeleting, Phrase: "deleting",
-		Detail:   "Environment is being deleted.",
 		Severity: domain.SevDim, Source: "wave1",
 	},
 	mwaatypes.EnvironmentStatusDeleted: {
 		Code: mwaaCodeDeleted, Phrase: "deleted",
-		Detail:   "Environment has been deleted.",
 		Severity: domain.SevDim, Source: "wave1",
 	},
 }
@@ -326,6 +315,7 @@ var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.Finding{ //nolint
 // state-bucket Finding. ok is false for AVAILABLE (Healthy — no finding).
 func mwaaStateFinding(status mwaatypes.EnvironmentStatus) (domain.Finding, bool) {
 	f, ok := mwaaStateFindings[status]
+	f.Detail = catalog.Detail(f.Code)
 	return f, ok
 }
 

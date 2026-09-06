@@ -150,11 +150,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `redshift`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -166,22 +170,22 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `ClusterStatus` creating / modifying / resizing / rebooting / renaming / deleting | 1 | Warning | n/a | S2, S4 | `modifying` / `resizing` / `rebooting` / `renaming` / `creating` / `deleting` | `Cluster is <status>; queries may be intermittently unavailable.` |
-| `ClusterStatus` incompatible-hsm / incompatible-network / incompatible-parameters / incompatible-restore | 1 | Broken | n/a | S2, S4 | `broken: incompatible-<hsm\|network\|parameters\|restore>` | `Cluster cannot start: <ClusterStatus>. Inspect parameter group / HSM / VPC settings.` |
-| `ClusterStatus==hardware-failure` | 1 | Broken | n/a | S2, S4 | `broken: hardware-failure` | `Underlying hardware failed; AWS is recovering the cluster.` |
-| `ClusterStatus==storage-full` | 1 | Broken | n/a | S2, S4 | `broken: storage-full` | `Cluster storage is full; writes and queries failing. Resize or free space.` |
-| `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` | `Cluster is not available for queries (ClusterAvailabilityStatus=Unavailable).` |
-| `ClusterAvailabilityStatus==Failed` | 1 | Broken | n/a | S2, S4 | `failed` | `Cluster has failed (ClusterAvailabilityStatus=Failed).` |
-| `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | n/a | S2, S4 | `maintenance` | `Cluster intermittently unavailable due to maintenance.` |
-| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | n/a | S2, S4 | `modifying` | `Cluster intermittently unavailable while modifications apply.` |
-| `PendingModifiedValues` non-empty | 1 | Warning | n/a | S2, S4 | `pending change queued` | `Config change queued; will apply at next maintenance window.` |
-| `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S2, S4 | `maintenance deferred` | `Maintenance deferred; window active until <DeferMaintenanceEndTime>.` |
-| `PubliclyAccessible==true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` | `Cluster endpoint reachable from public internet; review SG and PubliclyAccessible flag.` |
-| `Encrypted==false` | 1 | Warning | n/a | S2, S4 | `unencrypted at rest` | `Storage encryption is off (Encrypted=false). Not CIS-compliant.` |
-| `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S4, S5 | `audit logging off` | `Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group.` |
-| Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S4, S5 | `SSL not required` | `The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require_ssl) to true and reboot.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `ClusterStatus` creating / modifying / resizing / rebooting / renaming / deleting | 1 | Warning | n/a | S2, S4 | `modifying` / `resizing` / `rebooting` / `renaming` / `creating` / `deleting` |
+| `ClusterStatus` incompatible-hsm / incompatible-network / incompatible-parameters / incompatible-restore | 1 | Broken | n/a | S2, S4 | `broken: incompatible-<hsm/network/parameters/restore>` |
+| `ClusterStatus==hardware-failure` | 1 | Broken | n/a | S2, S4 | `broken: hardware-failure` |
+| `ClusterStatus==storage-full` | 1 | Broken | n/a | S2, S4 | `broken: storage-full` |
+| `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` |
+| `ClusterAvailabilityStatus==Failed` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | n/a | S2, S4 | `maintenance` |
+| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | n/a | S2, S4 | `modifying` |
+| `PendingModifiedValues` non-empty | 1 | Warning | n/a | S2, S4 | `pending change queued` |
+| `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S2, S4 | `maintenance deferred` |
+| `PubliclyAccessible==true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` |
+| `Encrypted==false` | 1 | Warning | n/a | S2, S4 | `unencrypted at rest` |
+| `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S4, S5 | `audit logging off` |
+| Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S4, S5 | `SSL not required` |
 
 ## 4.1 UX review (two sentences)
 
@@ -243,8 +247,8 @@ redshift — DATABASES & STORAGE. Lifecycle key: `status`.
 | redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 | — |
 | redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
 | redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 | — |
-| redshift.audit-logging-off | audit logging off | warn | wave2 | — |
-| redshift.require-ssl-off | SSL not required | warn | wave2 | — |
+| redshift.audit-logging-off | audit logging off | warn | wave2 | Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group. |
+| redshift.require-ssl-off | SSL not required | warn | wave2 | The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require\_ssl) to true and reboot. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

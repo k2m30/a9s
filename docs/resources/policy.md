@@ -78,11 +78,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `policy`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -94,11 +98,11 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `AttachmentCount==0`, customer-managed — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: 0 attachments` | `Customer-managed policy attached to no users, groups, or roles.` |
-| Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `wildcard admin: Allow *:*` | `Default version grants Action=* on Resource=* — effective AdministratorAccess.` |
-| Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `allows privilege escalation` | `The policy grants a set of actions that lets its holder grant itself full administrator.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `AttachmentCount==0`, customer-managed — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: 0 attachments` |
+| Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `wildcard admin: Allow *:*` |
+| Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `allows privilege escalation` |
 
 Rules for filling list and detail text:
 
@@ -144,8 +148,8 @@ policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycl
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 | — |
-| iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 | — |
-| policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 | — |
+| iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "\*" action and resource with the specific ones its holders need. |
+| policy.privilege-escalation | allows privilege escalation: <combo> | broken | wave2 | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	autoscalingtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -125,7 +126,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 			r.Findings = append(r.Findings, domain.Finding{
 				Code: CodeASGLegacyLaunchConfig, Phrase: "uses a launch configuration",
-				Detail:   asgLegacyLaunchConfigDetail,
+				Detail:   catalog.Detail(CodeASGLegacyLaunchConfig),
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeASGLegacyLaunchConfig, domain.DetailRow{
@@ -135,7 +136,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		if len(asg.AvailabilityZones) < 2 {
 			r.Findings = append(r.Findings, domain.Finding{
 				Code: CodeASGSingleAZ, Phrase: "single availability zone",
-				Detail:   asgSingleAZDetail,
+				Detail:   catalog.Detail(CodeASGSingleAZ),
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeASGSingleAZ, domain.DetailRow{
@@ -146,7 +147,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			aws.ToString(asg.HealthCheckType) != "ELB" {
 			r.Findings = append(r.Findings, domain.Finding{
 				Code: CodeASGNoELBHealthCheck, Phrase: "no load balancer health check",
-				Detail:   asgNoELBHealthCheckDetail,
+				Detail:   catalog.Detail(CodeASGNoELBHealthCheck),
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			// The API spells the type "EC2"/"ELB"; the row says which check the

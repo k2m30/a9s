@@ -28,14 +28,6 @@ const (
 	asgCodeLaunchConfigSecret domain.FindingCode = "asg.launch-config.secret"
 )
 
-// S5 operator sentences for the launch-configuration posture codes above.
-const (
-	asgLaunchConfigIMDSv1Detail   = "Instances this group launches answer metadata requests without a session token, so an SSRF bug on any of them leaks the attached role's credentials. Launch configurations cannot be edited — copy this one to a launch template that requires session tokens and repoint the group."
-	asgLaunchConfigPublicIPDetail = "Every instance this group launches gets a routable public address, so each new instance is reachable from the internet on whatever its security groups leave open. Copy the launch configuration to a launch template with public address assignment off."
-	//nolint:gosec // G101 false positive: operator prose about a credential, not one
-	asgLaunchConfigSecretDetail = "A credential is pasted into the launch configuration's user data, so it is readable by anyone who can call autoscaling:DescribeLaunchConfigurations and lands on every instance the group starts. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it."
-)
-
 // EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
 // (cap EnrichmentCap) and returns a Finding when the latest activity StatusCode == Failed.
 // Severity is "!" (broken/degraded). Summary: "latest scaling activity failed: <statusMessage>".
@@ -102,7 +94,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if act.StartTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
 		}
-		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows, "")
+		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows)
 	})
 	sort.Strings(failures)
 	result.Truncated = truncated
@@ -220,11 +212,13 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 	}
 	if lc.MetadataOptions == nil || lc.MetadataOptions.HttpTokens != asgtypes.InstanceMetadataHttpTokensStateRequired {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigIMDSv1, "launch configuration allows IMDSv1", "~", "asg",
-			[]domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: "~"}}, asgLaunchConfigIMDSv1Detail)
+			[]domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: "~"}})
+
 	}
 	if lc.AssociatePublicIpAddress != nil && *lc.AssociatePublicIpAddress {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigPublicIP, "launch configuration assigns public IPs", "~", "asg",
-			[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}}, asgLaunchConfigPublicIPDetail)
+			[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}})
+
 	}
 	if userData := aws.ToString(lc.UserData); userData != "" {
 		if hits := secretscan.ScanText(decodeUserData(userData)); len(hits) > 0 {
@@ -233,7 +227,8 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 				rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
 			}
 			setWave2Finding(result, groupID, asgCodeLaunchConfigSecret, "credential in launch configuration user data", "!", "asg",
-				rows, asgLaunchConfigSecretDetail)
+				rows)
+
 		}
 	}
 }

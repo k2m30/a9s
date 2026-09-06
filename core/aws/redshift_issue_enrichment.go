@@ -25,12 +25,6 @@ const (
 	redshiftCodeRequireSSLOff   domain.FindingCode = "redshift.require-ssl-off"
 )
 
-// S5 operator sentences for the redshift posture findings.
-const (
-	redshiftAuditLoggingOffDetail = "Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group."
-	redshiftRequireSSLOffDetail   = "The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require_ssl) to true and reboot."
-)
-
 // EnrichRedshiftPosture reports the two cluster-security settings
 // DescribeClusters does not carry:
 //
@@ -85,7 +79,8 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			// No supporting row: "Audit logging: off" is the phrase split on a
 			// colon, and U11 forbids restating it under the finding it belongs to.
 			setWave2Finding(&result, r.ID, redshiftCodeAuditLoggingOff, "audit logging off", "~", "redshift",
-				nil, redshiftAuditLoggingOffDetail)
+				nil)
+
 		}
 
 		if sslKnown && !strings.EqualFold(sslValue, "true") {
@@ -99,7 +94,8 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			// identifier rides along as an aside beside the value.
 			shown += " (require_ssl)"
 			setWave2Finding(&result, r.ID, redshiftCodeRequireSSLOff, "SSL not required", "~", "redshift",
-				[]domain.DetailRow{{Label: "Requires encrypted connections", Value: shown, Tier: "~"}}, redshiftRequireSSLOffDetail)
+				[]domain.DetailRow{{Label: "Requires encrypted connections", Value: shown, Tier: "~"}})
+
 		}
 	})
 

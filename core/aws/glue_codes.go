@@ -24,11 +24,3 @@ const (
 )
 
 // S5 operator sentences.
-const (
-	glueNoSecurityConfigDetail = "This job names no security configuration, so its S3 output, its CloudWatch log stream and its job bookmarks are all written without encryption at rest. Create a security configuration with a KMS key and attach it to the job."
-
-	glueContinuousLoggingOffDetail = "Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments."
-
-	//nolint:gosec // G101 false positive: operator prose about a credential, not one
-	glueArgumentSecretDetail = "A default argument on this job holds what looks like a credential, and default arguments are readable by anyone who can describe the job and are echoed into run history. Move the value into Secrets Manager, pass its name instead, and rotate the exposed credential."
-)

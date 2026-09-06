@@ -97,12 +97,6 @@ func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 // which one is attached.
 const adminAttachedPhrase = "has an administrator policy"
 
-// adminAttachedDetail is the S5 sentence stamped on every admin-attached
-// finding, whatever principal carries it.
-const adminAttachedDetail = "This principal is attached to an AWS-managed policy that grants " +
-	"administrator-equivalent access, so anything it can be used for it can be used for everything. " +
-	"Replace the managed policy with a scoped policy covering only the actions this principal needs."
-
 // adminAttachedRows is the supporting Attention row shared by the role, user
 // and group admin-attached findings.
 func adminAttachedRows(policyName string) []domain.DetailRow {

@@ -160,11 +160,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `dbc`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -176,28 +180,28 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status` transitional | 1 | Warning | n/a | S2, S4 | `<status>: in progress` (e.g. `modifying: in progress`) | `Cluster is <status>; operations in flight — wait for it to settle.` |
-| `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed: cluster operation` | `Cluster reports Status=failed; inspect recent CloudTrail ModifyDBCluster events.` |
-| `Status == inaccessible-encryption-credentials` | 1 | Broken | n/a | S2, S4 | `encryption key unreachable` | `KMS key for this cluster is disabled or inaccessible — restore the key to recover the cluster.` |
-| `Status == incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `parameter group incompatible` | `Cluster parameter group has values the engine rejects — revert the last parameter change.` |
-| No writer in `DBClusterMembers[]` | 1 | Broken | n/a | S2, S4 | `no writer: reads only` | `No cluster member has IsClusterWriter=true — writes are refused until a primary is present.` |
-| `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `delete-protection off` | `DeletionProtection is disabled — an accidental DeleteDBCluster will destroy the cluster.` |
-| `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `not encrypted at rest` | `StorageEncrypted is false — cluster storage is not protected by KMS.` |
-| `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` | `BackupRetentionPeriod is 0 — automated snapshots are disabled; PITR will not work.` |
-| Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` | `AWS-mandated maintenance past its ForcedApplyDate — AWS will apply it in the next window.` |
-| `MultiAZ == false` | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` | `The cluster has no instance in a second Availability Zone, so an AZ failure takes it down until you restore it. Add a replica in another AZ.` |
-| `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` | `Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself.` |
-| `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` | `Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities.` |
-| `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status` transitional | 1 | Warning | n/a | S2, S4 | `<status>: in progress` (e.g. `modifying: in progress`) |
+| `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed: cluster operation` |
+| `Status == inaccessible-encryption-credentials` | 1 | Broken | n/a | S2, S4 | `encryption key unreachable` |
+| `Status == incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `parameter group incompatible` |
+| No writer in `DBClusterMembers[]` | 1 | Broken | n/a | S2, S4 | `no writer: reads only` |
+| `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `delete-protection off` |
+| `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `not encrypted at rest` |
+| `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` |
+| Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` |
+| `MultiAZ == false` | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` |
+| `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` |
+| `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` |
+| `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` |
 
 Rules for filling list and detail text:
 
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Tests will assert the cause is present.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), you may omit the row from this table entirely; §3 still describes it.
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 
 ## 4.1 UX review (two sentences)
 
@@ -248,11 +252,11 @@ dbc — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 | — |
 | dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 | — |
 | dbc.maintenance-overdue | maintenance overdue | broken | wave2 | — |
-| dbc.single-az | single-AZ | warn | wave1 | — |
-| dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | — |
-| dbc.iam-auth-off | IAM database authentication off | warn | wave1 | — |
-| dbc.default-master-user | default master username | warn | wave1 | — |
-| dbc.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
+| dbc.single-az | single-AZ | warn | wave1 | The cluster has no instance in a second Availability Zone, so an AZ failure takes it down until you restore it. Add a replica in another AZ. |
+| dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself. |
+| dbc.iam-auth-off | IAM database authentication off | warn | wave1 | Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities. |
+| dbc.default-master-user | default master username | warn | wave1 | The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one. |
+| dbc.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this cluster, so its retention is whatever the cluster's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

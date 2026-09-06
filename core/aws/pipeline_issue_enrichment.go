@@ -94,7 +94,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					break
 				}
 			}
-			setWave2Finding(&result, key, pipelineCodeStageFailed, fmt.Sprintf("stage %s failed", stageName), "!", "pipeline", rows, "")
+			setWave2Finding(&result, key, pipelineCodeStageFailed, fmt.Sprintf("stage %s failed", stageName), "!", "pipeline", rows)
 			break // first failed stage is sufficient
 		}
 		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}

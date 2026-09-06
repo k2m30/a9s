@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -199,7 +200,7 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional {
 			r.Findings = append(r.Findings, domain.Finding{
 				Code: CodeEC2IMDSv1Allowed, Phrase: "IMDSv1 allowed",
-				Detail:   ec2IMDSv1AllowedDetail,
+				Detail:   catalog.Detail(CodeEC2IMDSv1Allowed),
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
@@ -209,7 +210,7 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 		if publicIP != "" {
 			r.Findings = append(r.Findings, domain.Finding{
 				Code: CodeEC2PublicIP, Phrase: "public address",
-				Detail:   ec2PublicIPDetail,
+				Detail:   catalog.Detail(CodeEC2PublicIP),
 				Severity: domain.SevWarn, Source: "wave1",
 			})
 			addWave1Rows(&r, CodeEC2PublicIP, domain.DetailRow{

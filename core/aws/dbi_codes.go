@@ -36,31 +36,15 @@ const (
 	CodeDBICACertExpiring    domain.FindingCode = "dbi.ca-cert-expiring"
 )
 
-// S5 operator sentences for the dbi posture findings.
-const (
-	dbiSingleAZDetail          = "The instance runs in one Availability Zone, so an AZ failure takes the database down until you restore it. Enable Multi-AZ to keep a synchronous standby in a second AZ."
-	dbiMinorUpgradeDetail      = "Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself."
-	dbiIAMAuthDetail           = "Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities."
-	dbiDefaultMasterUserDetail = "The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one."
-	dbiCACertExpiringDetail    = "The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window."
-)
-
 // dbiPostureCodes binds the shared RDS posture predicates to the dbi codes.
 var dbiPostureCodes = rdsPostureCodes{
-	singleAZ:                CodeDBISingleAZ,
-	singleAZDetail:          dbiSingleAZDetail,
-	minorUpgrade:            CodeDBIMinorUpgradeOff,
-	minorUpgradeDetail:      dbiMinorUpgradeDetail,
-	iamAuth:                 CodeDBIIAMAuthOff,
-	iamAuthDetail:           dbiIAMAuthDetail,
-	defaultMasterUser:       CodeDBIDefaultMasterUser,
-	defaultMasterUserDetail: dbiDefaultMasterUserDetail,
+	singleAZ:          CodeDBISingleAZ,
+	minorUpgrade:      CodeDBIMinorUpgradeOff,
+	iamAuth:           CodeDBIIAMAuthOff,
+	defaultMasterUser: CodeDBIDefaultMasterUser,
 }
 
 // CodeDBINotInBackupPlan — no backup plan selection matches this instance.
 // Automated backups are a separate setting and do not satisfy it.
 // Severity: SevWarn.
 const CodeDBINotInBackupPlan domain.FindingCode = "dbi.not-in-backup-plan"
-
-// dbiNotInBackupPlanDetail is the S5 operator sentence for it.
-const dbiNotInBackupPlanDetail = "No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on."

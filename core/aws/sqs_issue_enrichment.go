@@ -93,7 +93,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows, "")
+		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows)
 	})
 	sort.Strings(failures)
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

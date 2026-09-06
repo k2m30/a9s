@@ -132,11 +132,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `failed: exit 1 in build phase`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `cb`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -148,9 +152,9 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S3, S4, S5 (green row stays green; `!` glyph + cause) | `last build failed: <CurrentPhase>` | `Most recent build ended <buildStatus> in phase <CurrentPhase> on <EndTime>.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S3, S4, S5 (green row stays green; `!` glyph + cause) | `last build failed: <CurrentPhase>` |
 
 Cause-field sources for S4 / S5: `Build.BuildStatus` (enum) plus `Build.CurrentPhase` and `Build.EndTime` from the batched `BatchGetBuilds` response (AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, CurrentPhase, EndTime`). When `BuildStatus==FAULT` the fault usually reflects a platform/infrastructure problem; `FAILED` reflects a user-code/script exit; `TIMED_OUT` reflects the project's `TimeoutInMinutes`. The S4 line uses the status keyword paired with the phase so the operator sees where it broke without opening detail.
 
@@ -159,7 +163,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`FAILED`, `FAULT`, `TIMED_OUT`) in the List text column is not acceptable. The spec pairs it with the build phase.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), the row is omitted entirely from this table; §3 still describes it.
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 
 ### 4.1 UX review (two sentences)
 
@@ -202,10 +206,10 @@ cb — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 | — |
-| cb.public-builds | build results publicly visible | broken | wave1 | — |
-| cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 | — |
-| cb.source-url-credential | credential in the source repository address | broken | wave1 | — |
-| cb.env-secret | credential in environment variables | broken | wave1 | — |
+| cb.public-builds | build results publicly visible | broken | wave1 | Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed. |
+| cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 | The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches. |
+| cb.source-url-credential | credential in the source repository address | broken | wave1 | The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked. |
+| cb.env-secret | credential in environment variables | broken | wave1 | A plaintext environment variable on this project holds what looks like a credential; every build log and anyone who can read the project definition sees its value. Move it to Secrets Manager or Parameter Store, reference it by type, and rotate the exposed value. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

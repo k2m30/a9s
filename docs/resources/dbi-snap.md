@@ -113,11 +113,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `dbi-snap`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -130,23 +134,23 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating: <pct>%` | — |
-| `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S2, S4 | `<status>` | — |
-| `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` | — |
-| `Status == incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (or current keyword) | — |
-| `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` | — |
-| orphan: source DB deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source DB deleted` | `orphan: source DB deleted` + Source DB row |
-| automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` | `automated, <N>d past retention` + Source DB / Retention / Created rows |
-| `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S4, S5 | `shared with all AWS accounts` | `The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove the all group from the snapshot's restore attribute.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating: <pct>%` |
+| `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S2, S4 | `<status>` |
+| `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `Status == incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (or current keyword) |
+| `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` |
+| orphan: source DB deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source DB deleted` |
+| automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` |
+| `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S4, S5 | `shared with all AWS accounts` |
 
 Rules for filling list and detail text:
 
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Tests will assert the cause is present.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), you may omit the row from this table entirely; §3 still describes it.
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 
 Notes on the table above:
 
@@ -208,7 +212,7 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 | — |
 | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 | — |
 | dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 | — |
-| dbi-snap.public | shared with all AWS accounts | broken | wave2 | — |
+| dbi-snap.public | shared with all AWS accounts | broken | wave2 | The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove \`all\` from the snapshot's restore attribute. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

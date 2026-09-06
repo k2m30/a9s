@@ -83,11 +83,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `2 jobs failed in last 24h`). **Healthy rows render blank**. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `backup`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -101,17 +105,17 @@ Because Wave 1 is silent, every signal below is a Wave 2 background finding that
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S3, S4, S5 | `2 jobs failed in last 24h` | `2 backup jobs failed in the last 24h — most recent failure at 2026-04-20 07:12 UTC` |
-| recent job `PARTIAL` | 2 | Warning | `~` | S3, S4, S5 | `partial: 1 of 3 resources skipped` | `Last run completed partially — 1 of 3 selected resources was not backed up` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S3, S4, S5 | `2 jobs failed in last 24h` |
+| recent job `PARTIAL` | 2 | Warning | `~` | S3, S4, S5 | `partial: 1 of 3 resources skipped` |
 
 Rules for filling list and detail text:
 
 - Banned words (never appear): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - S4 never carries a bare state keyword like `FAILED` or `PARTIAL` alone — it always includes the count and the time window so the operator knows the scope at a glance.
 - A plan with zero jobs in the 24h window is Healthy: S2 green, S4 blank, no glyph. (A plan that has *never* run is also Healthy by this rule — the out-of-scope Wave 3 signal is what would catch a stale plan, not Wave 2.)
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 
 ## 4.1 UX review (two sentences)
 

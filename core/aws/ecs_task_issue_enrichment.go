@@ -30,16 +30,6 @@ const (
 	ecsTaskCodeEnvSecret domain.FindingCode = "ecs-task.env-secret"
 )
 
-// S5 operator sentences for the task-definition posture codes above.
-const (
-	ecsTaskPrivilegedDetail    = "A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs."
-	ecsTaskHostNamespaceDetail = "This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset."
-	ecsTaskWritableRootDetail  = "A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes."
-	ecsTaskNoLoggingDetail     = "A container in this task has no log driver, so its stdout and stderr are discarded and nothing survives the task stopping. Give the container a log driver pointing at awslogs or your log router."
-	//nolint:gosec // G101 false positive: operator prose about a credential, not one
-	ecsTaskEnvSecretDetail = "A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block."
-)
-
 // ecsTaskGone reports a task that is stopped or on its way there. The row is
 // a task, not a definition, so once teardown starts its definition's posture
 // is no longer an open item — nobody is going to reconfigure a task that is
@@ -172,7 +162,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				}
 
 				summary := rows[0].Value
-				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, summary, "!", "ecs-task", rows, "")
+				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, summary, "!", "ecs-task", rows)
 			}
 		}
 	}
@@ -271,7 +261,8 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 
 	if len(privileged) > 0 {
 		setWave2Finding(result, taskID, ecsTaskCodePrivileged, "privileged container", "!", "ecs-task",
-			privileged, ecsTaskPrivilegedDetail)
+			privileged)
+
 	}
 	var nsRows []domain.DetailRow
 	if td.NetworkMode == ecstypes.NetworkModeHost {
@@ -282,18 +273,22 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 	}
 	if len(nsRows) > 0 {
 		setWave2Finding(result, taskID, ecsTaskCodeHostNamespace, "shares the host network or process namespace", "~", "ecs-task",
-			nsRows, ecsTaskHostNamespaceDetail)
+			nsRows)
+
 	}
 	if len(writableRoot) > 0 {
 		setWave2Finding(result, taskID, ecsTaskCodeWritableRoot, "writable root filesystem", "~", "ecs-task",
-			writableRoot, ecsTaskWritableRootDetail)
+			writableRoot)
+
 	}
 	if len(noLogging) > 0 {
 		setWave2Finding(result, taskID, ecsTaskCodeNoLogging, "container without log driver", "~", "ecs-task",
-			noLogging, ecsTaskNoLoggingDetail)
+			noLogging)
+
 	}
 	if len(secretRows) > 0 {
 		setWave2Finding(result, taskID, ecsTaskCodeEnvSecret, "credential in container environment", "!", "ecs-task",
-			secretRows, ecsTaskEnvSecretDetail)
+			secretRows)
+
 	}
 }

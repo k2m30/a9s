@@ -105,7 +105,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 				if exec.Name != nil && *exec.Name != "" {
 					rows = append(rows, domain.DetailRow{Label: "Execution Name", Value: *exec.Name})
 				}
-				setWave2Finding(&result, r.ID, sfnCodeLatestExecutionFailed, fmt.Sprintf("latest execution %s", statusPhrase), "!", "sfn", rows, "")
+				setWave2Finding(&result, r.ID, sfnCodeLatestExecutionFailed, fmt.Sprintf("latest execution %s", statusPhrase), "!", "sfn", rows)
 			}
 			result.FieldUpdates[r.ID] = map[string]string{
 				"last_run": lastRunVal,

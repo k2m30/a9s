@@ -202,7 +202,20 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	if err := updateGeneratedSection(path, "findings", findingsContent.String()); err != nil {
 		return err
 	}
+	if err := updateOptionalSection(path, "badge", badgeNote(rt)+"\n"); err != nil {
+		return err
+	}
 	return updateGeneratedSection(path, "related", relatedContent.String())
+}
+
+// badgeNote is the §4 S1 note saying which waves feed this type's issue
+// badge: only a type that registers a Wave 2 enricher can have Wave 2
+// findings counted.
+func badgeNote(rt catalog.ResourceTypeDef) string {
+	if _, ok := aws.Wave2EnricherFor(rt.ShortName); ok {
+		return "Badge aggregation for `" + rt.ShortName + "`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher."
+	}
+	return "Badge aggregation for `" + rt.ShortName + "`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count."
 }
 
 // buildStub returns the full content of a new per-resource markdown stub.
@@ -251,6 +264,20 @@ func updateGeneratedSection(path, section, content string) error {
 	after := existing[endIdx:]
 	updated := before + "\n" + content + after
 	return os.WriteFile(path, []byte(updated), 0o600) //nolint:gosec // path is derived from repoRoot+catalog short names, not user input
+}
+
+// updateOptionalSection is updateGeneratedSection for a section a page
+// opts into by carrying its markers; a page without them is left alone
+// rather than having the block appended.
+func updateOptionalSection(path, section, content string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(raw), fmt.Sprintf("<!-- BEGIN GENERATED: %s -->", section)) {
+		return nil
+	}
+	return updateGeneratedSection(path, section, content)
 }
 
 // findRepoRoot walks up from the current working directory to find the repo

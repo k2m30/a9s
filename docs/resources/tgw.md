@@ -92,11 +92,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `tgw`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -111,16 +115,16 @@ One row per signal from §3:
 Lifecycle findings render their phrase only — the state IS the whole fact, and a Detail
 sentence would restate it. Their S5 cell reads `—`.
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` | — |
-| `State==modifying` | 1 | Warning | n/a | S2, S4 | `modifying: config change` | — |
-| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | — |
-| `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` | — |
-| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` | — |
-| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment rejected` | — |
-| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment awaiting accept` | — |
-| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S2, S4, S5 | `auto-accepts shared attachments` | `Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` |
+| `State==modifying` | 1 | Warning | n/a | S2, S4 | `modifying: config change` |
+| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` |
+| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment rejected` |
+| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment awaiting accept` |
+| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S2, S4, S5 | `auto-accepts shared attachments` |
 
 ## 4.1 UX review (two sentences)
 
@@ -155,14 +159,14 @@ tgw — NETWORKING. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| tgw.state.pending | pending | warn | wave1 | — |
-| tgw.state.modifying | modifying | warn | wave1 | — |
-| tgw.state.deleting | deleting | warn | wave1 | — |
-| tgw.state.failed | failed | broken | wave1 | — |
-| tgw.state.deleted | deleted | dim | wave1 | — |
-| tgw.attachment-failed | attachment <id> failed | broken | wave2 | — |
-| tgw.attachment-transitional | attachment <id> <state> | warn | wave2 | — |
-| tgw.auto-accept-attachments | auto-accepts shared attachments | warn | wave1 | — |
+| tgw.state.pending | pending | warn | wave1 | The gateway is still being created and does not route yet. Attachments created now stay pending until it comes up. |
+| tgw.state.modifying | modifying | warn | wave1 | A configuration change is being applied. Routing across the gateway can be inconsistent until it settles. |
+| tgw.state.deleting | deleting | warn | wave1 | The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop. |
+| tgw.state.failed | failed | broken | wave1 | The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path. |
+| tgw.state.deleted | deleted | dim | wave1 | This gateway is gone. AWS keeps returning it for a while after deletion, so route tables that still point at it are dead references worth cleaning up. |
+| tgw.attachment-failed | attachment <id> failed | broken | wave2 | The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment. |
+| tgw.attachment-transitional | attachment <id> <state> | warn | wave2 | The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it. |
+| tgw.auto-accept-attachments | auto-accepts shared attachments | warn | wave1 | Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

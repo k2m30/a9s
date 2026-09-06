@@ -153,7 +153,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1", Detail: "No retention policy set — events kept forever, billed indefinitely."},
 			{Code: logsCodeStaleEmpty, Phrase: "empty, created over 90 days ago", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2"},
 		},
@@ -269,8 +269,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "role_name", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeCTEventDanger, Phrase: "destructive call", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCTEventAttention, Phrase: "root account activity", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCTEventDanger, Phrase: "destructive call", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudTrail recorded a call that either failed or was destructive; the event name and error code in this row say which. Verify it was expected and, if not, find out who made it."},
+			{Code: CodeCTEventAttention, Phrase: "root account activity", Severity: domain.SevWarn, Source: "wave1", Detail: "CloudTrail recorded a call worth a look: a modifying call, root-account activity, cross-account access, or a read of sensitive data. The status names which; verify the caller was expected."},
 			{Code: CodeCTEventInfo, Phrase: "routine event", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},

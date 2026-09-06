@@ -155,11 +155,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `dbi`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -171,28 +175,28 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S2, S4 | `<status>: <PendingModifiedValues first non-empty key>` when available, else bare `<status>` (e.g. `modifying: DBInstanceClass`, `rebooting`) | `Instance is <status> — pending changes in progress.` |
-| `failed` | 1 | Broken | n/a | S2, S4 | `failed` | `Instance is in a failed state — contact AWS support or restore from snapshot.` |
-| `storage-full` | 1 | Broken | n/a | S2, S4 | `storage-full` | `Instance storage full — scale up or free space to recover.` |
-| `incompatible-network` | 1 | Broken | n/a | S2, S4 | `incompatible-network` | `Network config incompatible — check DB subnet group AZ coverage.` |
-| `incompatible-option-group` | 1 | Broken | n/a | S2, S4 | `incompatible-option-group` | `Option group incompatible — remove or update options.` |
-| `incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `incompatible-parameters` | `Parameter group incompatible — review custom parameters.` |
-| `incompatible-restore` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` | `Restore failed — check snapshot compatibility and engine version.` |
-| `restore-error` | 1 | Broken | n/a | S2, S4 | `restore-error` | `Restore error — review source snapshot and target engine version.` |
-| `inaccessible-encryption-credentials` | 1 | Broken | n/a | S2, S4 | `encryption key unavailable` | `KMS key for storage is unavailable — check key state and grants.` |
-| `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` | `Automated backups disabled (BackupRetentionPeriod=0).` |
-| `PubliclyAccessible == true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` | `Instance is reachable from the public internet (CIS RDS.2).` |
-| `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted storage` | `Storage encryption at rest is disabled (CIS RDS.3).` |
-| `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `deletion protection off` | `Deletion protection is disabled — instance can be deleted in one API call.` |
-| Pending maintenance overdue | 2 | Warning on Healthy row | `~` | S3, S4, S5 | `maintenance scheduled` | `Pending maintenance action overdue: <ActionType> (<Description>).` |
-| `MultiAZ == false` on a non-Aurora primary | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` | `The instance runs in one Availability Zone, so an AZ failure takes the database down until you restore it. Enable Multi-AZ to keep a synchronous standby in a second AZ.` |
-| `AutoMinorVersionUpgrade == false` | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` | `Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself.` |
-| `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` | `Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities.` |
-| `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` | `The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one.` |
-| `CertificateDetails.ValidTill` within 90d | 1 | Warning (Broken within 30d) | n/a | S2, S4, S5 | `server certificate expires in <N> days` | `The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window.` |
-| Engine version no longer available | 2 | Broken | `!` | S1, S2, S4, S5 | `engine version deprecated` | `AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S2, S4 | `<status>: <PendingModifiedValues first non-empty key>` when available, else bare `<status>` (e.g. `modifying: DBInstanceClass`, `rebooting`) |
+| `failed` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `storage-full` | 1 | Broken | n/a | S2, S4 | `storage-full` |
+| `incompatible-network` | 1 | Broken | n/a | S2, S4 | `incompatible-network` |
+| `incompatible-option-group` | 1 | Broken | n/a | S2, S4 | `incompatible-option-group` |
+| `incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `incompatible-parameters` |
+| `incompatible-restore` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` |
+| `restore-error` | 1 | Broken | n/a | S2, S4 | `restore-error` |
+| `inaccessible-encryption-credentials` | 1 | Broken | n/a | S2, S4 | `encryption key unavailable` |
+| `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` |
+| `PubliclyAccessible == true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` |
+| `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted storage` |
+| `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `deletion protection off` |
+| Pending maintenance overdue | 2 | Warning on Healthy row | `~` | S3, S4, S5 | `maintenance scheduled` |
+| `MultiAZ == false` on a non-Aurora primary | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` |
+| `AutoMinorVersionUpgrade == false` | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` |
+| `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` |
+| `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` |
+| `CertificateDetails.ValidTill` within 90d | 1 | Warning (Broken within 30d) | n/a | S2, S4, S5 | `server certificate expires in <N> days` |
+| Engine version no longer available | 2 | Broken | `!` | S1, S2, S4, S5 | `engine version deprecated` |
 
 Notes on the table:
 
@@ -206,7 +210,7 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Tests will assert the cause is present.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), you may omit the row from this table entirely; §3 still describes it.
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 
 ## 4.1 UX review (two sentences)
 
@@ -266,14 +270,14 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
 | dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 | — |
 | dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 | — |
-| dbi.pending-maintenance | maintenance scheduled | warn | wave2 | — |
-| dbi.single-az | single-AZ | warn | wave1 | — |
-| dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | — |
-| dbi.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
-| dbi.iam-auth-off | IAM database authentication off | warn | wave1 | — |
-| dbi.default-master-user | default master username | warn | wave1 | — |
-| dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 | — |
-| dbi.engine-deprecated | engine version deprecated | broken | wave2 | — |
+| dbi.pending-maintenance | maintenance scheduled | warn | wave2 | AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you. |
+| dbi.single-az | single-AZ | warn | wave1 | The instance runs in one Availability Zone, so an AZ failure takes the database down until you restore it. Enable Multi-AZ to keep a synchronous standby in a second AZ. |
+| dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself. |
+| dbi.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
+| dbi.iam-auth-off | IAM database authentication off | warn | wave1 | Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities. |
+| dbi.default-master-user | default master username | warn | wave1 | The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one. |
+| dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 | The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window. |
+| dbi.engine-deprecated | engine version deprecated | broken | wave2 | AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

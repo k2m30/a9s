@@ -18,11 +18,6 @@ const sgCodeUnused domain.FindingCode = "sg.unused"
 // sgUnusedPhrase is the S4 status phrase for sgCodeUnused.
 const sgUnusedPhrase = "not attached to anything"
 
-// sgUnusedDetail is the S5 operator sentence for sgCodeUnused.
-const sgUnusedDetail = "No network interface in this account references this group, so its rules protect nothing " +
-	"and its name still gets picked from the console list. Delete it, or attach it to the workload it was " +
-	"written for."
-
 // EnrichSGUsage cross-references each security group against the already
 // loaded "eni" cache: a group no network interface references is dead
 // configuration. Zero AWS API calls — the ENI list is the only place that
@@ -61,8 +56,8 @@ func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Re
 			continue
 		}
 		setWave2Finding(&result, r.ID, sgCodeUnused, sgUnusedPhrase, "~", "sg",
-			[]domain.DetailRow{{Label: "Network interfaces referencing", Value: "0", Tier: "~"}},
-			sgUnusedDetail)
+			[]domain.DetailRow{{Label: "Network interfaces referencing", Value: "0", Tier: "~"}})
+
 	}
 
 	return result, nil

@@ -145,12 +145,12 @@ func addCFNPostureFindings(r *resource.Resource, stack cfntypes.Stack) {
 	// the setting on a child and deletes it with the root. Reporting it would
 	// name a setting the operator cannot change.
 	if stack.ParentId == nil && !aws.ToBool(stack.EnableTerminationProtection) {
-		addWave1Finding(r, CodeCFNTerminationProtectionOff, "termination protection off", cfnTerminationProtectionOffDetail, domain.SevWarn)
+		addWave1Finding(r, CodeCFNTerminationProtectionOff, "termination protection off", domain.SevWarn)
 	}
 
 	outputs := make(map[string]string, len(stack.Outputs))
 	for _, o := range stack.Outputs {
 		outputs[aws.ToString(o.OutputKey)] = aws.ToString(o.OutputValue)
 	}
-	addSecretScanFinding(r, CodeCFNOutputSecret, "credential in stack outputs", cfnOutputSecretDetail, outputs)
+	addSecretScanFinding(r, CodeCFNOutputSecret, "credential in stack outputs", outputs)
 }

@@ -106,11 +106,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ami`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -122,15 +126,15 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State == pending` or `transient` | 1 | Warning | n/a | S2, S4 | `pending: registering image` | AMI registration in progress; not yet launchable. |
-| `State == failed / error / invalid` | 1 | Broken | n/a | S2, S4 | `failed: <StateReason.Message>` | AMI registration failed: `<StateReason.Message>` — image is unusable. |
-| `State == deregistered` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `deregistered` | AMI has been deregistered; cannot launch new instances from it. |
-| `State == disabled` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled` | AMI is disabled in this account; launches are blocked until re-enabled. |
-| `DeprecationTime < now()` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deprecated <Nd> ago` | AWS marked this AMI deprecated on `<DeprecationTime>`; replace with current image. |
-| Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` | One or more EBS snapshots in `BlockDeviceMappings` are absent — AMI cannot be used to launch. |
-| `Public == true` | 1 | Broken | `!` | S2, S4, S5 | `shared with all AWS accounts` | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State == pending` or `transient` | 1 | Warning | n/a | S2, S4 | `pending: registering image` |
+| `State == failed / error / invalid` | 1 | Broken | n/a | S2, S4 | `failed: <StateReason.Message>` |
+| `State == deregistered` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `deregistered` |
+| `State == disabled` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled` |
+| `DeprecationTime < now()` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deprecated <Nd> ago` |
+| Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` |
+| `Public == true` | 1 | Broken | `!` | S2, S4, S5 | `shared with all AWS accounts` |
 
 ## 4.1 UX review (two sentences)
 
@@ -173,8 +177,8 @@ ami — COMPUTE. Lifecycle key: `state`.
 | ami.state.pending | pending | warn | wave1 | — |
 | ami.state.failed | failed | broken | wave1 | — |
 | ami.state.dim | deregistered | dim | wave1 | — |
-| ami.deprecated | deprecated | warn | wave1 | — |
-| ami.public | shared with all AWS accounts | broken | wave1 | — |
+| ami.deprecated | deprecated | warn | wave1 | The deprecation date has passed — AWS no longer recommends this AMI for new launches. |
+| ami.public | shared with all AWS accounts | broken | wave1 | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the \`all\` group from the image's launch permission. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

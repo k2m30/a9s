@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -61,11 +62,11 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 		var findings []domain.Finding
 		switch state {
 		case "provisioning":
-			findings = []domain.Finding{{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeELBStateProvisioning, Phrase: "provisioning", Detail: catalog.Detail(CodeELBStateProvisioning), Severity: domain.SevWarn, Source: "wave1"}}
 		case "active_impaired":
-			findings = []domain.Finding{{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Detail: catalog.Detail(CodeELBStateActiveImpaired), Severity: domain.SevWarn, Source: "wave1"}}
 		case "failed":
-			findings = []domain.Finding{{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeELBStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeELBStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
 		}
 
 		r := resource.Resource{

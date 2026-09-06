@@ -106,11 +106,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
 | S4 | Status / description column text | Short human-readable cause (e.g. `rollback_complete: Resource <X> failed`, `update_failed: permission denied on iam:PassRole`). **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `cfn`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -121,21 +125,21 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | n/a | S2, S4 | `update in progress` (or verb matching status) | `Stack operation <StackStatus> in progress since <LastUpdatedTime>.` |
-| `ROLLBACK_COMPLETE` | 1 | Warning | n/a | S2, S4 | `rollback: failed create, delete required` | `Stack creation failed and rolled back; delete the stack and recreate it.` |
-| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Warning | n/a | S2, S4 | `update rolled back: <reason>` | `Update failed and reverted: <StackStatusReason>.` |
-| `*_FAILED` | 1 | Broken | n/a | S2, S4 | `failed: <StackStatusReason short>` | `Stack <StackStatus>: <StackStatusReason>.` |
-| `*_IN_PROGRESS` > 1h | 1 | Broken | n/a | S2, S4 | `stuck: in progress 2h` (actual age) | `Stack has been <StackStatus> for <age> — likely stuck, check stack events.` |
-| `DriftInformation.StackDriftStatus == DRIFTED` | 1 | Warning | n/a | S2, S4 | `drifted since <LastCheckTimestamp>` | `Stack configuration differs from template; last drift check <LastCheckTimestamp>.` |
-| Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | n/a | S2 (row already red), S4 (deduped), S5 | `failed: <LogicalResourceId>` | `Recent event: <LogicalResourceId> <ResourceStatus> — <ResourceStatusReason>.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | n/a | S2, S4 | `update in progress` (or verb matching status) |
+| `ROLLBACK_COMPLETE` | 1 | Warning | n/a | S2, S4 | `rollback: failed create, delete required` |
+| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Warning | n/a | S2, S4 | `update rolled back: <reason>` |
+| `*_FAILED` | 1 | Broken | n/a | S2, S4 | `failed: <StackStatusReason short>` |
+| `*_IN_PROGRESS` > 1h | 1 | Broken | n/a | S2, S4 | `stuck: in progress 2h` (actual age) |
+| `DriftInformation.StackDriftStatus == DRIFTED` | 1 | Warning | n/a | S2, S4 | `drifted since <LastCheckTimestamp>` |
+| Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | n/a | S2 (row already red), S4 (deduped), S5 | `failed: <LogicalResourceId>` |
 
 Rules for filling list and detail text:
 
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword (`ROLLBACK_COMPLETE`, `UPDATE_FAILED`) in the List text column is not acceptable alone. Pair it with the cause from `StackStatusReason`.
-- List text ≤ 40 chars; the Detail column quotes the shipped sentence verbatim.
+- List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 
 ## 4.1 UX review (two sentences)
 
@@ -193,8 +197,8 @@ cfn — CI/CD. Lifecycle key: `status`.
 | cfn.stack.deleted | delete complete | dim | wave1 | — |
 | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 | — |
 | cfn.stack-drifted | stack drifted from template | warn | wave2 | — |
-| cfn.termination-protection-off | termination protection off | warn | wave1 | — |
-| cfn.output-secret | credential in stack outputs | broken | wave1 | — |
+| cfn.termination-protection-off | termination protection off | warn | wave1 | A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted. |
+| cfn.output-secret | credential in stack outputs | broken | wave1 | A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

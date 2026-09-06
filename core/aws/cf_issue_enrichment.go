@@ -107,7 +107,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			return
 		}
 		summary := strings.Join(summaries, "; ")
-		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows, "")
+		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows)
 	})
 	// All CloudFront findings are severity "~" (informational).
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

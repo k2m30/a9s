@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -222,7 +223,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 			if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
 				r.Findings = []domain.Finding{{
 					Code: CodeAMIDeprecated, Phrase: "deprecated",
-					Detail:   "The deprecation date has passed — AWS no longer recommends this AMI for new launches.",
+					Detail:   catalog.Detail(CodeAMIDeprecated),
 					Severity: domain.SevWarn, Source: "wave1",
 				}}
 			}
@@ -236,7 +237,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 	if amiLaunchable(img.State) && img.Public != nil && *img.Public {
 		r.Findings = append(r.Findings, domain.Finding{
 			Code: CodeAMIPublic, Phrase: "shared with all AWS accounts",
-			Detail:   amiPublicDetail,
+			Detail:   catalog.Detail(CodeAMIPublic),
 			Severity: domain.SevBroken, Source: "wave1",
 		})
 		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "yes", Tier: "!"})

@@ -107,11 +107,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `open: 22 to 0.0.0.0/0`). **Healthy rows render blank** — no `OK` / `in-use`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `sg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -123,12 +127,12 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S2 + S4 + S5 | `ports 22 open to 0.0.0.0/0` | `An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link.` |
-| an all-protocols (`-1`) rule open to `0.0.0.0/0` | 1 | Broken | `!` | S2 + S4 + S5 | `all ports open to 0.0.0.0/0` | `One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them.` |
-| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S2 + S4 + S5 | `default group allows traffic` | `The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group.` |
-| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` | `No network interface in this account references this group, so its rules protect nothing and its name still gets picked from the console list. Delete it, or attach it to the workload it was written for.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S2 + S4 + S5 | `ports 22 open to 0.0.0.0/0` |
+| an all-protocols (`-1`) rule open to `0.0.0.0/0` | 1 | Broken | `!` | S2 + S4 + S5 | `all ports open to 0.0.0.0/0` |
+| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S2 + S4 + S5 | `default group allows traffic` |
+| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` |
 
 Rules for filling list and detail text:
 
@@ -178,10 +182,10 @@ sg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 | — |
-| sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 | — |
-| sg.default-with-rules | default group allows traffic | warn | wave1 | — |
-| sg.unused | not attached to anything | warn | wave2 | — |
+| sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 | One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them. |
+| sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 | An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link. |
+| sg.default-with-rules | default group allows traffic | warn | wave1 | The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group. |
+| sg.unused | not attached to anything | warn | wave2 | No network interface in this account references this group, so its rules protect nothing and its name still gets picked from the console list. Delete it, or attach it to the workload it was written for. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

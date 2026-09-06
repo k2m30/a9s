@@ -123,7 +123,8 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "audit log group missing metric filters", "~", "logs", []domain.DetailRow{
 			{Label: "Log Group", Value: logGroupName, Tier: "~"},
 			{Label: "Metric Filters", Value: "none", Tier: "~"},
-		}, "")
+		})
+
 	})
 	sort.Strings(failures)
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

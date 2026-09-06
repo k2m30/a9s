@@ -32,7 +32,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 	// no EC2 client still knows whether a plan selects the volume and whether a
 	// snapshot of it exists.
 	account := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	addBackupCoverage(cache, "ebs", CodeEBSNotInBackupPlan, ebsNotInBackupPlanDetail, resources, func(r resource.Resource) (string, map[string]string, bool) {
+	addBackupCoverage(cache, "ebs", CodeEBSNotInBackupPlan, resources, func(r resource.Resource) (string, map[string]string, bool) {
 		return ebsVolumeARN(r, account), ebsVolumeTags(r), true
 	}, &result)
 	addEBSSnapshotCoverage(cache, resources, &result)
@@ -106,7 +106,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 				rows = append(rows, domain.DetailRow{Label: "Action Code", Value: *ac.Code})
 			}
 		}
-		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "volume I/O degraded", "!", "ebs", rows, "")
+		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "volume I/O degraded", "!", "ebs", rows)
 	}
 	result.Truncated = truncated
 	return result, nil
@@ -169,7 +169,6 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 		if volumeID == "" || r.Fields["state"] != string(ec2types.VolumeStateInUse) || snapshotted[volumeID] {
 			continue
 		}
-		setWave2Finding(result, r.ID, CodeEBSNoSnapshot, "no snapshot exists", "~", "ebs",
-			[]domain.DetailRow{{Label: "Snapshots", Value: "0"}}, ebsNoSnapshotDetail)
+		setWave2Finding(result, r.ID, CodeEBSNoSnapshot, "no snapshot exists", "~", "ebs", []domain.DetailRow{{Label: "Snapshots", Value: "0"}})
 	}
 }

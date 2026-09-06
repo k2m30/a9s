@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -92,7 +93,7 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			r.Findings = []domain.Finding{{
 				Code:     logsCodeRetentionNeverExpire,
 				Phrase:   "retention: never expire",
-				Detail:   "No retention policy set — events kept forever, billed indefinitely.",
+				Detail:   catalog.Detail(logsCodeRetentionNeverExpire),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			}}

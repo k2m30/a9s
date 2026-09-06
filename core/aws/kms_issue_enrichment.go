@@ -20,13 +20,6 @@ import (
 const (
 	kmsCodeRotationDisabled domain.FindingCode = "kms.rotation-disabled"
 	kmsCodePublicPolicy     domain.FindingCode = "kms.public-policy"
-
-	kmsRotationDisabledDetail = "This customer-managed key never rotates its backing material, so every ciphertext " +
-		"ever written under it depends on one key that has been in use since creation. Enable automatic key " +
-		"rotation on the key."
-	kmsPublicPolicyDetail = "The key policy allows a wildcard principal, so any AWS account can use this key to " +
-		"decrypt data encrypted with it. Replace the \"*\" principal with the specific accounts or roles that " +
-		"need the key, or add a condition scoping the grant."
 )
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -61,7 +54,8 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			result.TruncatedIDs[keyID] = true
 		case public:
 			setWave2Finding(&result, keyID, kmsCodePublicPolicy, "key policy open to anyone", "!", "kms",
-				publicPolicyRows(ex), kmsPublicPolicyDetail)
+				publicPolicyRows(ex))
+
 		}
 		mu.Unlock()
 		out, err := clients.KMS.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{
@@ -87,7 +81,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			"rotation_enabled": rotationVal,
 		}
 		if !out.KeyRotationEnabled {
-			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil, kmsRotationDisabledDetail)
+			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil)
 		}
 	})
 	result.Truncated = len(resources) > EnrichmentCap

@@ -31,7 +31,6 @@ func addBackupCoverage(
 	cache resource.ResourceCache,
 	shortName string,
 	code domain.FindingCode,
-	detail string,
 	resources []resource.Resource,
 	arnAndTags func(resource.Resource) (string, map[string]string, bool),
 	result *IssueEnricherResult,
@@ -50,8 +49,7 @@ func addBackupCoverage(
 		if arn == "" || !known || backupPlansCover(entry.Resources, arn, tags) {
 			continue
 		}
-		setWave2Finding(result, r.ID, code, "not covered by a backup plan", "~", shortName,
-			[]domain.DetailRow{{Label: "Backup plans", Value: "0"}}, detail)
+		setWave2Finding(result, r.ID, code, "not covered by a backup plan", "~", shortName, []domain.DetailRow{{Label: "Backup plans", Value: "0"}})
 	}
 }
 

@@ -20,9 +20,6 @@ import (
 const (
 	iamRoleCodeDormant       domain.FindingCode = "iam-role.dormant"
 	iamRoleCodeAdminAttached domain.FindingCode = "role.admin-attached"
-
-	iamRoleDormantDetail = "Nothing has assumed this role in over 90 days, so its trust policy and permissions " +
-		"are live but unexercised. Confirm the workload that used it is gone, then delete the role."
 )
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
@@ -73,7 +70,8 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		defer mu.Unlock()
 		if adminPolicy != "" {
 			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, adminAttachedPhrase, "~", "iam-role",
-				adminAttachedRows(adminPolicy), adminAttachedDetail)
+				adminAttachedRows(adminPolicy))
+
 		}
 		if err != nil {
 			result.TruncatedIDs[r.ID] = true
@@ -89,7 +87,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			isDormant = true
 		}
 		if isDormant {
-			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil, iamRoleDormantDetail)
+			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil)
 		}
 	})
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

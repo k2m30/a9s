@@ -128,11 +128,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `acm`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -144,19 +148,19 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == PENDING_VALIDATION` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `validating DNS` | `Certificate is waiting for DNS validation records to be published.` |
-| `Status == EXPIRED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `expired` | `Certificate is past its NotAfter date and no longer valid for TLS.` |
-| `Status == REVOKED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `revoked` | `Certificate was revoked by the CA; clients will reject it.` |
-| `Status == FAILED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `issuance failed` | `Certificate issuance failed; see FailureReason on the detail view.` |
-| `Status == VALIDATION_TIMED_OUT` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `validation timed out` | `DNS validation records were not added within 72 hours; re-request the cert.` |
-| `Status == INACTIVE` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `inactive` | `Certificate is inactive — not used for any live resources.` |
-| `NotAfter within 30 days` | 1 | Warning | n/a | S2, S4 | `expires in <N>d` | `Certificate expires in <N> days on <NotAfter>; renew or replace before then.` |
-| `NotAfter within 7 days` | 1 | Broken | n/a | S2, S4 | `expires in <N>d` | `Certificate expires in <N> days on <NotAfter>; renew immediately.` |
-| `InUse == false on non-expired cert` | 1 | Warning | n/a | S2, S4 | `not in use` | `Certificate is not attached to any resource; consider deleting if no longer needed.` |
-| `RenewalSummary.RenewalStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `auto-renewal failed` | `Automatic renewal failed — the cert will expire unless you re-validate or re-issue.` |
-| `DomainValidationOptions[].ValidationStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | n/a | S4, S5 | `validation failed: <domain>` | `Validation failed for domain <domain>; check the DNS record or request a new cert.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == PENDING_VALIDATION` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `validating DNS` |
+| `Status == EXPIRED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `expired` |
+| `Status == REVOKED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `revoked` |
+| `Status == FAILED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `issuance failed` |
+| `Status == VALIDATION_TIMED_OUT` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `validation timed out` |
+| `Status == INACTIVE` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `inactive` |
+| `NotAfter within 30 days` | 1 | Warning | n/a | S2, S4 | `expires in <N>d` |
+| `NotAfter within 7 days` | 1 | Broken | n/a | S2, S4 | `expires in <N>d` |
+| `InUse == false on non-expired cert` | 1 | Warning | n/a | S2, S4 | `not in use` |
+| `RenewalSummary.RenewalStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `auto-renewal failed` |
+| `DomainValidationOptions[].ValidationStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | n/a | S4, S5 | `validation failed: <domain>` |
 
 Notes:
 

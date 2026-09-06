@@ -258,7 +258,7 @@ func dbiPostureFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 		caFinding, caRows := rdsCACertFinding(
 			aws.ToString(db.CertificateDetails.CAIdentifier),
 			db.CertificateDetails.ValidTill, now,
-			CodeDBICACertExpiring, dbiCACertExpiringDetail,
+			CodeDBICACertExpiring,
 		)
 		if caFinding != nil {
 			findings = append(findings, *caFinding)

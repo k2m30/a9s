@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -49,18 +50,6 @@ const (
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	ltCodeUserDataSecret domain.FindingCode = "lt.user-data-secret"
 )
-
-// ltUserDataSecretDetail is the S5 operator sentence for ltCodeUserDataSecret.
-//
-//nolint:gosec // G101 false positive: operator prose about a credential, not one
-const ltUserDataSecretDetail = "A credential is pasted into the default version's user data, so it is readable by anyone who can call ec2:DescribeLaunchTemplateVersions and lands on every instance launched from this template. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it."
-
-// ltDetailsDeniedDetail is lt's own §4 S5 sentence for the details-denied
-// finding — deliberately NOT the generic degraded_resource.go text, matching
-// transferDetailsDeniedDetail's precedent (a rich degraded row keeps far
-// more than just the name, so the sentence names what's specifically
-// missing: the default version).
-const ltDetailsDeniedDetail = "Access to the default version was denied; only the listed fields are visible."
 
 // LTRaw is the composite RawStruct for Launch Templates: neither bare SDK
 // shape alone carries the whole detail story (docs/resources/lt-impl-plan.md
@@ -111,10 +100,10 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		switch {
 		case versionErr != nil:
 			failures = append(failures, fmt.Sprintf("%s: %s", id, versionErr.Error()))
-			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", versionErr, ltDetailsDeniedDetail, detailsUnavailableDetail)}))
+			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", versionErr)}))
 		case len(versionOutput.LaunchTemplateVersions) == 0:
 			failures = append(failures, fmt.Sprintf("%s: no $Default version in DescribeLaunchTemplateVersions response", id))
-			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", nil, ltDetailsDeniedDetail, detailsUnavailableDetail)}))
+			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", nil)}))
 		default:
 			ver := versionOutput.LaunchTemplateVersions[0]
 			resources = append(resources, ltResource(tpl, ver, computeLTFindings(ver)))
@@ -183,7 +172,7 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 		findings = append(findings, domain.Finding{
 			Code:     ltCodeIMDSv1,
 			Phrase:   "IMDSv1 allowed",
-			Detail:   "Instance metadata does not require session tokens; IMDSv1 credentials are exposed to SSRF.",
+			Detail:   catalog.Detail(ltCodeIMDSv1),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		})
@@ -196,7 +185,7 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 			findings = append(findings, domain.Finding{
 				Code:     ltCodeUnencrypted,
 				Phrase:   "EBS encryption disabled",
-				Detail:   "A block device explicitly sets Encrypted=false; launched instances get unencrypted volumes.",
+				Detail:   catalog.Detail(ltCodeUnencrypted),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			})

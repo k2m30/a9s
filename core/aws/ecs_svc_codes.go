@@ -26,7 +26,3 @@ const (
 )
 
 // S5 operator sentences for the task-count findings.
-const (
-	ecsSvcNoTasksRunningDetail    = "The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes."
-	ecsSvcTasksBelowDesiredDetail = "Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks."
-)

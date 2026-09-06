@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	domainpkg "github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -62,13 +63,13 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	if openSearchUpdateForcedSoon(d, now) {
 		findings = append(findings, domainpkg.Finding{
 			Code: opensearchCodeUpdateForced, Phrase: "software update forced soon",
-			Detail: opensearchUpdateForcedDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(opensearchCodeUpdateForced), Severity: domainpkg.SevWarn, Source: "wave1",
 		})
 	}
 	if d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled {
 		findings = append(findings, domainpkg.Finding{
 			Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off",
-			Detail: opensearchEncryptionOffDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(opensearchCodeEncryptionOff), Severity: domainpkg.SevWarn, Source: "wave1",
 		})
 	}
 	// Reachable outside a VPC only counts when the access policy also lets
@@ -77,19 +78,19 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	if d.VPCOptions == nil && openSearchPolicyIsPublic(d) {
 		findings = append(findings, domainpkg.Finding{
 			Code: opensearchCodePublic, Phrase: "reachable outside a VPC",
-			Detail: opensearchPublicDetail, Severity: domainpkg.SevBroken, Source: "wave1",
+			Detail: catalog.Detail(opensearchCodePublic), Severity: domainpkg.SevBroken, Source: "wave1",
 		})
 	}
 	if d.DomainEndpointOptions == nil || !aws.ToBool(d.DomainEndpointOptions.EnforceHTTPS) {
 		findings = append(findings, domainpkg.Finding{
 			Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced",
-			Detail: opensearchHTTPSNotForcedDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(opensearchCodeHTTPSNotForced), Severity: domainpkg.SevWarn, Source: "wave1",
 		})
 	}
 	if d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled) {
 		findings = append(findings, domainpkg.Finding{
 			Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off",
-			Detail: opensearchN2NOffDetail, Severity: domainpkg.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(opensearchCodeN2NOff), Severity: domainpkg.SevWarn, Source: "wave1",
 		})
 	}
 	return findings

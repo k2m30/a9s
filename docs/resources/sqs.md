@@ -118,11 +118,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
 | S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `sqs`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping applied to `sqs`:
 
@@ -133,13 +137,13 @@ Wave → surface mapping applied to `sqs`:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` | `Queue depth (<N> messages) exceeds the configured backlog threshold.` |
-| `ApproximateNumberOfMessages rising unbounded` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S2, S4, S5 | `backlog growing: <N> msgs` | `Queue depth is increasing across samples — consumer has stopped or can't keep up.` |
-| `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `oldest msg age: <D>` | `Oldest message age exceeds 5× visibility timeout — consumers are lagging.` |
-| `is-DLQ with messages` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `DLQ has <N> msgs` | `Dead-letter queue holds <N> un-redriven messages — investigate failed consumers.` |
-| `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S4, S5 | `no DLQ configured` | `Queue has no redrive policy — poison-pill messages will never be diverted.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` |
+| `ApproximateNumberOfMessages rising unbounded` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S2, S4, S5 | `backlog growing: <N> msgs` |
+| `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `oldest msg age: <D>` |
+| `is-DLQ with messages` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `DLQ has <N> msgs` |
+| `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S4, S5 | `no DLQ configured` |
 
 ## 4.1 UX review
 

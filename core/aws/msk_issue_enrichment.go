@@ -78,7 +78,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
-				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "broker software outdated", "~", "msk", nil, "")
+				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "broker software outdated", "~", "msk", nil)
 			}
 		}
 		// Check encryption in transit — independently evaluated from the broker
@@ -87,7 +87,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		if prov.EncryptionInfo != nil &&
 			prov.EncryptionInfo.EncryptionInTransit != nil &&
 			prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil, "")
+			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil)
 		}
 	})
 	sort.Strings(failures)

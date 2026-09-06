@@ -54,7 +54,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		}
 	}
 	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
-	addBackupCoverage(cache, "dbc", CodeDBCNotInBackupPlan, dbcNotInBackupPlanDetail, resources, arnAndTags, &result)
+	addBackupCoverage(cache, "dbc", CodeDBCNotInBackupPlan, resources, arnAndTags, &result)
 
 	if clients == nil || clients.DocDB == nil {
 		return result, tagErr
@@ -149,7 +149,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 				}
 			}
 
-			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows, "")
+			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows)
 		}
 
 		if out.Marker == nil || *out.Marker == "" {

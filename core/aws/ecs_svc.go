@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -152,12 +153,12 @@ func ecsSvcFindings(status string, desiredCount, runningCount int32) []domain.Fi
 	case runningCount == 0:
 		findings = append(findings, domain.Finding{
 			Code: CodeECSSvcNoTasksRunning, Phrase: "no tasks running",
-			Detail: ecsSvcNoTasksRunningDetail, Severity: domain.SevBroken, Source: "wave1",
+			Detail: catalog.Detail(CodeECSSvcNoTasksRunning), Severity: domain.SevBroken, Source: "wave1",
 		})
 	case runningCount < desiredCount:
 		findings = append(findings, domain.Finding{
 			Code: CodeECSSvcTasksBelowDesired, Phrase: "running below desired count",
-			Detail: ecsSvcTasksBelowDesiredDetail, Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(CodeECSSvcTasksBelowDesired), Severity: domain.SevWarn, Source: "wave1",
 		})
 	}
 	return findings

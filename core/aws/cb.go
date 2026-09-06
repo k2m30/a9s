@@ -181,16 +181,16 @@ func cbSourceLocationCredential(src *cbtypes.ProjectSource) (string, bool) {
 // findings.
 func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 	if project.ProjectVisibility == cbtypes.ProjectVisibilityTypePublicRead {
-		addWave1Finding(r, CodeCBPublicBuilds, "build results publicly visible", cbPublicBuildsDetail, domain.SevBroken)
+		addWave1Finding(r, CodeCBPublicBuilds, "build results publicly visible", domain.SevBroken)
 	}
 
 	if spec, ok := cbBuildspecFromSource(project.Source); ok {
-		addWave1Finding(r, CodeCBBuildspecFromSource, "buildspec taken from the source repository", cbBuildspecFromSourceDetail, domain.SevWarn)
+		addWave1Finding(r, CodeCBBuildspecFromSource, "buildspec taken from the source repository", domain.SevWarn)
 		addWave1Rows(r, CodeCBBuildspecFromSource, domain.DetailRow{Label: "Buildspec", Value: spec, Tier: "~"})
 	}
 
 	if redacted, ok := cbSourceLocationCredential(project.Source); ok {
-		addWave1Finding(r, CodeCBSourceURLCredential, "credential in the source repository address", cbSourceURLCredentialDetail, domain.SevBroken)
+		addWave1Finding(r, CodeCBSourceURLCredential, "credential in the source repository address", domain.SevBroken)
 		addWave1Rows(r, CodeCBSourceURLCredential, domain.DetailRow{Label: "Repository", Value: redacted, Tier: "!"})
 	}
 
@@ -206,5 +206,5 @@ func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 			plaintext[aws.ToString(ev.Name)] = aws.ToString(ev.Value)
 		}
 	}
-	addSecretScanFinding(r, CodeCBEnvSecret, "credential in environment variables", cbEnvSecretDetail, plaintext)
+	addSecretScanFinding(r, CodeCBEnvSecret, "credential in environment variables", plaintext)
 }

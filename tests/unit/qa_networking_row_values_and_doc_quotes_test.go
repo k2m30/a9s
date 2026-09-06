@@ -13,19 +13,14 @@ package unit_test
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -247,97 +242,6 @@ func netDocQuotes(t *testing.T, shortName string) []string {
 	return out
 }
 
-// detailConstants returns every operator Detail sentence the code can render:
-// the string constants named *Detail declared under core/aws. That is the
-// oracle a §4 cell is checked against, rather than the demo bench, because a
-// finding with no demo fixture still has its constant and a cell must not be
-// judged by whether someone remembered to plant a witness.
-func detailConstants(t *testing.T) map[string]bool {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller(0) failed")
-	}
-	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "core", "aws")
-	matches, err := filepath.Glob(filepath.Join(dir, "*.go"))
-	if err != nil {
-		t.Fatalf("glob core/aws: %v", err)
-	}
-
-	out := map[string]bool{}
-	fset := token.NewFileSet()
-	for _, path := range matches {
-		if strings.HasSuffix(path, "_test.go") {
-			continue
-		}
-		file, perr := parser.ParseFile(fset, path, nil, 0)
-		if perr != nil {
-			t.Fatalf("parse %s: %v", path, perr)
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			switch node := n.(type) {
-			case *ast.ValueSpec:
-				// const/var xxxDetail = "..."
-				for i, name := range node.Names {
-					if !strings.HasSuffix(name.Name, "Detail") || i >= len(node.Values) {
-						continue
-					}
-					if v, folded := foldStringExpr(node.Values[i]); folded && v != "" {
-						out[v] = true
-					}
-				}
-			case *ast.KeyValueExpr:
-				// Detail: "..." or Detail: fmt.Sprintf("...", …)
-				key, isIdent := node.Key.(*ast.Ident)
-				if !isIdent || key.Name != "Detail" {
-					return true
-				}
-				if v, folded := foldStringExpr(node.Value); folded && v != "" {
-					out[v] = true
-					return true
-				}
-				if call, isCall := node.Value.(*ast.CallExpr); isCall && len(call.Args) > 0 {
-					if v, folded := foldStringExpr(call.Args[0]); folded && v != "" {
-						out[v] = true
-					}
-				}
-			}
-			return true
-		})
-	}
-	if len(out) == 0 {
-		t.Fatal("no *Detail string constants found under core/aws; the oracle would pass everything")
-	}
-	return out
-}
-
-// foldStringExpr evaluates a string literal or a chain of them joined by +,
-// which is how the longer Detail sentences are wrapped in source.
-func foldStringExpr(e ast.Expr) (string, bool) {
-	switch v := e.(type) {
-	case *ast.BasicLit:
-		if v.Kind != token.STRING {
-			return "", false
-		}
-		s, err := strconv.Unquote(v.Value)
-		if err != nil {
-			return "", false
-		}
-		return s, true
-	case *ast.BinaryExpr:
-		if v.Op != token.ADD {
-			return "", false
-		}
-		l, lok := foldStringExpr(v.X)
-		r, rok := foldStringExpr(v.Y)
-		if !lok || !rok {
-			return "", false
-		}
-		return l + r, true
-	}
-	return "", false
-}
-
 // docPlaceholder matches the two ways a sentence names a value it fills in at
 // render time: a `<...>` placeholder in a doc cell, and a printf verb in the
 // format string a finding builds its Detail from.
@@ -354,119 +258,46 @@ func docQuoteMatches(quote, constant string) bool {
 		docPlaceholder.ReplaceAllString(constant, "\x00")
 }
 
-// docQuoteBurnDown is every type whose §4 cells still quote sentences the code
-// cannot say, with the exact number of such cells today.
-//
-// One reason covers all of them: the pages were written before the Detail
-// constants existed or drifted from them afterwards, so a cell describes what
-// someone expected the app to say. Two shapes hide in that: a type with Detail
-// constants whose cells no longer match them, and a type that emits no Detail
-// at all (acm, alarm, cf, r53 and their kind), where the cells cannot be fixed
-// by quoting — the sentence has to be written or the cell dropped. Task w27
-// settles both by putting Detail on FindingDef and letting catalogen write the
-// cells, and deletes this map.
-//
-// Exact counts, so the list can only shrink: a type that improves without its
-// number moving fails here too.
-var docQuoteBurnDown = map[string]int{
-	"acm":          11,
-	"alarm":        6,
-	"apigw":        1,
-	"asg":          11,
-	"athena":       1,
-	"backup":       2,
-	"cb":           1,
-	"cf":           6,
-	"cfn":          7,
-	"codeartifact": 3,
-	"dbc":          9,
-	"dbc-snap":     1,
-	"dbi":          14,
-	"dbi-snap":     1,
-	"ddb":          4,
-	"eb":           5,
-	"eb-rule":      4,
-	"ebs":          7,
-	"ebs-snap":     8,
-	"ec2":          9,
-	"ecr":          3,
-	"ecs-svc":      7,
-	"ecs-task":     14,
-	"efs":          6,
-	"eks":          5,
-	"glue":         4,
-	"iam-group":    2,
-	"iam-user":     5,
-	"kinesis":      3,
-	"kms":          9,
-	"lambda":       3,
-	"logs":         3,
-	"lt":           1,
-	"msk":          7,
-	"nat":          3,
-	"ng":           23,
-	"opensearch":   5,
-	"pipeline":     4,
-	"policy":       3,
-	"r53":          3,
-	"redis":        10,
-	"redshift":     12,
-	"role":         5,
-	"rtb":          2,
-	"secrets":      7,
-	"ses":          8,
-	"sfn":          2,
-	"sns":          3,
-	"sqs":          5,
-	"ssm":          3,
-	"tg":           3,
-	"trail":        4,
-	"vpc":          1,
-	"vpc-peer":     5,
-	"waf":          2,
+// declaredDetails is every Detail sentence the installed catalog declares —
+// the one owner of the S5 sentence since task w27, and therefore the oracle a
+// hand-written §4 quote is checked against.
+func declaredDetails() map[string]bool {
+	out := map[string]bool{}
+	for _, td := range catalog.All() {
+		for _, def := range td.Findings {
+			if def.Detail != "" {
+				out[def.Detail] = true
+			}
+		}
+	}
+	return out
 }
 
-// TestNetworkingDocQuotes_EqualADetailConstant checks every §4 Detail cell on
-// every resource page against the constants the code can actually render.
-//
-// A quote that matches nothing is either invented or has drifted from the
-// constant it once copied; either way the doc is telling an operator the app
-// says something it does not.
+// TestNetworkingDocQuotes_EqualADetailConstant checks every hand-written §4
+// Detail quote on every resource page against the sentences the catalog
+// declares. The generated Findings table carries the declared sentence by
+// construction; a hand-written quote that matches no declaration is either
+// invented or has drifted, and either way the doc is telling an operator the
+// app says something it does not.
 func TestNetworkingDocQuotes_EqualADetailConstant(t *testing.T) {
-	constants := detailConstants(t)
-	unmatched := map[string]int{}
-
+	declared := declaredDetails()
+	if len(declared) == 0 {
+		t.Fatal("no FindingDef declares a Detail; the oracle would fail every quote")
+	}
 	for _, short := range netTypes(t) {
 		for _, quote := range netDocQuotes(t, short) {
 			matched := false
-			for constant := range constants {
-				if docQuoteMatches(quote, constant) {
+			for sentence := range declared {
+				if docQuoteMatches(quote, sentence) {
 					matched = true
 					break
 				}
 			}
-			if matched {
-				continue
+			if !matched {
+				t.Errorf("docs/resources/%s.md §4 quotes a Detail sentence no finding declares:\n  %q\n"+
+					"declare it on the finding's FindingDef (a <placeholder> may stand for a value "+
+					"the finding fills in), or drop the quote", short, quote)
 			}
-			unmatched[short]++
-			if _, carried := docQuoteBurnDown[short]; !carried {
-				t.Errorf("docs/resources/%s.md §4 quotes a Detail sentence no finding renders:\n  %q\n"+
-					"quote the finding's Detail constant verbatim (a <placeholder> may stand for a value "+
-					"the finding fills in), or drop the cell if the finding has none", short, quote)
-			}
-		}
-	}
-
-	for short, want := range docQuoteBurnDown {
-		switch got := unmatched[short]; {
-		case got == 0:
-			t.Errorf("docs/resources/%s.md no longer quotes anything unrenderable — delete its docQuoteBurnDown entry", short)
-		case got > want:
-			t.Errorf("docs/resources/%s.md quotes %d unrenderable sentences, up from the %d carried; "+
-				"the burn-down only shrinks", short, got, want)
-		case got < want:
-			t.Errorf("docs/resources/%s.md is down to %d unrenderable sentences from %d — lower its "+
-				"docQuoteBurnDown entry to %d so the gate holds the ground you took", short, got, want, got)
 		}
 	}
 }

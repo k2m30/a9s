@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -49,7 +50,7 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 	return append(lifecycle, domain.Finding{
 		Code:     CodeDDBDeletionProtectionOff,
 		Phrase:   "deletion protection off",
-		Detail:   ddbDeletionProtectionOffDetail,
+		Detail:   catalog.Detail(CodeDDBDeletionProtectionOff),
 		Severity: domain.SevWarn,
 		Source:   "wave1",
 	}), nil

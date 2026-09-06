@@ -102,11 +102,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `athena`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -118,11 +122,11 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled: no new queries accepted` | `Workgroup is disabled — queries submitted here will be rejected until re-enabled.` |
-| `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S4, S5 | `settings can be overridden per query` | `Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query.` |
-| `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S4, S5 | `query results stored unencrypted` | `Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled: no new queries accepted` |
+| `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S4, S5 | `settings can be overridden per query` |
+| `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S4, S5 | `query results stored unencrypted` |
 
 Rules for filling list and detail text:
 
@@ -152,7 +156,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `ListWorkGroups` returns `WorkGroupSummary` with `Name`, `State`, `CreationTime`, `Description`, `EngineVersion` — `AWS SDK Go v2 — service/athena/types.WorkGroupSummary § State`.
 - AWS Go SDK v2 — `State` enum values `ENABLED`/`DISABLED` — `AWS SDK Go v2 — service/athena/types.WorkGroupState § WorkGroupStateEnabled`.
 - AWS Go SDK v2 — `GetWorkGroup` returns `WorkGroup.Configuration` (not on `WorkGroupSummary`) — `AWS SDK Go v2 — service/athena/types.WorkGroup § Configuration`.
-- AWS Go SDK v2 — `EnforceWorkGroupConfiguration`, `BytesScannedCutoffPerQuery`, `ResultConfiguration`, `ExecutionRole`, `CustomerContentEncryptionConfiguration`, `MonitoringConfiguration` all on `WorkGroupConfiguration` — `AWS SDK Go v2 — service/athena/types.WorkGroupConfiguration § EnforceWorkGroupConfiguration, § BytesScannedCutoffPerQuery, § ResultConfiguration, § ExecutionRole`.
+- AWS Go SDK v2 — `EnforceWorkGroupConfiguration`, `ResultConfiguration`, `ExecutionRole`, `CustomerContentEncryptionConfiguration`, `MonitoringConfiguration` all on `WorkGroupConfiguration` — `AWS SDK Go v2 — service/athena/types.WorkGroupConfiguration § EnforceWorkGroupConfiguration, § ResultConfiguration, § ExecutionRole`.
 - AWS Go SDK v2 — `OutputLocation` (S3 URI) and `EncryptionConfiguration` on `ResultConfiguration` — `AWS SDK Go v2 — service/athena/types.ResultConfiguration § OutputLocation, § EncryptionConfiguration`.
 - AWS Go SDK v2 — `KmsKey` on `EncryptionConfiguration` (populated when `EncryptionOption` is `SSE_KMS` or `CSE_KMS`) — `AWS SDK Go v2 — service/athena/types.EncryptionConfiguration § KmsKey`.
 - AWS Go SDK v2 — `CloudWatchLoggingConfiguration.LogGroup` — `AWS SDK Go v2 — service/athena/types.CloudWatchLoggingConfiguration § LogGroup`.
@@ -167,9 +171,9 @@ athena — DATA & ANALYTICS. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| athena.workgroup-disabled | disabled | warn | wave1 | — |
-| athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | — |
-| athena.results-unencrypted | query results stored unencrypted | warn | wave2 | — |
+| athena.workgroup-disabled | disabled | warn | wave1 | Workgroup is administratively disabled — queries submitted against it are rejected until re-enabled. |
+| athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query. |
+| athena.results-unencrypted | query results stored unencrypted | warn | wave2 | Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

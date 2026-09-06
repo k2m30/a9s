@@ -50,12 +50,6 @@ const (
 // nothing is scheduled to copy it. Severity: SevWarn.
 const CodeEBSNotInBackupPlan domain.FindingCode = "ebs.not-in-backup-plan"
 
-// ebsNotInBackupPlanDetail is the S5 operator sentence for it.
-const ebsNotInBackupPlanDetail = "No backup plan selects this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by ARN, or give it a tag one of your plans already selects on."
-
 // CodeEBSNoSnapshot — an attached volume with no snapshot behind it, so there
 // is nothing to restore from. Severity: SevWarn.
 const CodeEBSNoSnapshot domain.FindingCode = "ebs.no-snapshot"
-
-// ebsNoSnapshotDetail is the S5 operator sentence for it.
-const ebsNoSnapshotDetail = "This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will."

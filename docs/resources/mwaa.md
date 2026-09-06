@@ -132,11 +132,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `mwaa`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -148,22 +152,22 @@ Wave → surface mapping:
 
 One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironments` is opaque; the `GetEnvironment` pass sets the row color, so the state-bucket rows behave like Wave 1 colors to the operator (yellow/red is the attention signal, S3 suppressed because the row is not green):
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` | `Environment is being provisioned; Airflow is not yet reachable.` |
-| `Status == CREATING_SNAPSHOT` | 2 | Warning | n/a | S2, S4 | `creating snapshot` | `The environment is snapshotting its metadata database before an update or upgrade.` |
-| `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending: awaiting VPC endpoints` | `Creation is paused until the required VPC endpoints exist in your VPC.` |
-| `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` | `Environment update in progress; workers may be replaced.` |
-| `Status == ROLLING_BACK` | 2 | Warning | n/a | S2, S4 | `rolling back: update failed` | `Update or upgrade failed; the environment is restoring the latest metadata snapshot.` |
-| `Status == MAINTENANCE` | 2 | Warning | n/a | S2, S4 | `maintenance in progress` | `Scheduled maintenance is running; the environment may be briefly unavailable.` |
-| `Status == CREATE_FAILED` | 2 | Broken | n/a | S2, S4 | `create failed` | `Environment creation failed and the environment was not created.` |
-| `Status == UPDATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `update failed: rolled back` | `Update failed; environment was restored to its previous state and is usable.` |
-| `Status == UNAVAILABLE` | 2 | Broken | n/a | S2, S4 | `unavailable: not stable` | `Environment failed and did not return to a stable state; contact AWS support.` |
-| `Status == DELETING` | 2 | Dim | n/a | S2, S4 | `deleting` | `Environment is being deleted.` |
-| `Status == DELETED` | 2 | Dim | n/a | S2, S4 | `deleted` | `Environment has been deleted.` |
-| `LastUpdate.Status == FAILED` on `AVAILABLE` | 2 | Warning | n/a | S2, S4, S5 | `last update failed` | `Last update failed: <LastUpdate.Error.ErrorMessage>. Still on previous config.` |
-| `WebserverAccessMode` public | 2 | Warning | n/a | S2, S4, S5 | `webserver public` | `Airflow webserver is reachable from the internet (access mode: <humanized mode>).` |
-| `GetEnvironment` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` | `Access to environment details was denied; only the name is visible.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` |
+| `Status == CREATING_SNAPSHOT` | 2 | Warning | n/a | S2, S4 | `creating snapshot` |
+| `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending: awaiting VPC endpoints` |
+| `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
+| `Status == ROLLING_BACK` | 2 | Warning | n/a | S2, S4 | `rolling back: update failed` |
+| `Status == MAINTENANCE` | 2 | Warning | n/a | S2, S4 | `maintenance in progress` |
+| `Status == CREATE_FAILED` | 2 | Broken | n/a | S2, S4 | `create failed` |
+| `Status == UPDATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `update failed: rolled back` |
+| `Status == UNAVAILABLE` | 2 | Broken | n/a | S2, S4 | `unavailable: not stable` |
+| `Status == DELETING` | 2 | Dim | n/a | S2, S4 | `deleting` |
+| `Status == DELETED` | 2 | Dim | n/a | S2, S4 | `deleted` |
+| `LastUpdate.Status == FAILED` on `AVAILABLE` | 2 | Warning | n/a | S2, S4, S5 | `last update failed` |
+| `WebserverAccessMode` public | 2 | Warning | n/a | S2, S4, S5 | `webserver public` |
+| `GetEnvironment` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` |
 
 Notes:
 
@@ -209,21 +213,21 @@ mwaa — DATA & ANALYTICS. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| mwaa.warn.creating | creating | warn | wave1 | — |
-| mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 | — |
-| mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 | — |
-| mwaa.warn.updating | updating | warn | wave1 | — |
-| mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 | — |
-| mwaa.warn.maintenance | maintenance in progress | warn | wave1 | — |
-| mwaa.broken.create\_failed | create failed | broken | wave1 | — |
-| mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 | — |
-| mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | — |
-| mwaa.dim.deleting | deleting | dim | wave1 | — |
-| mwaa.dim.deleted | deleted | dim | wave1 | — |
-| mwaa.warn.last\_update\_failed | last update failed | warn | wave1 | — |
-| mwaa.warn.webserver\_public | webserver public | warn | wave1 | — |
-| mwaa.warn.details\_denied | details denied | warn | wave1 | — |
-| mwaa.warn.details\_unavailable | details unavailable | warn | wave1 | — |
+| mwaa.warn.creating | creating | warn | wave1 | Environment is being provisioned; Airflow is not yet reachable. |
+| mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 | The environment is snapshotting its metadata database before an update or upgrade. |
+| mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 | Creation is paused until the required VPC endpoints exist in your VPC. |
+| mwaa.warn.updating | updating | warn | wave1 | Environment update in progress; workers may be replaced. |
+| mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 | Update or upgrade failed; the environment is restoring the latest metadata snapshot. |
+| mwaa.warn.maintenance | maintenance in progress | warn | wave1 | Scheduled maintenance is running; the environment may be briefly unavailable. |
+| mwaa.broken.create\_failed | create failed | broken | wave1 | Environment creation failed and the environment was not created. |
+| mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 | Update failed; environment was restored to its previous state and is usable. |
+| mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | Environment failed and did not return to a stable state; contact AWS support. |
+| mwaa.dim.deleting | deleting | dim | wave1 | Environment is being deleted. |
+| mwaa.dim.deleted | deleted | dim | wave1 | Environment has been deleted. |
+| mwaa.warn.last\_update\_failed | last update failed | warn | wave1 | The last update to this environment failed, so it is still running its previous configuration; the error code and message are listed below. Fix the cause and update again. |
+| mwaa.warn.webserver\_public | webserver public | warn | wave1 | The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC. |
+| mwaa.warn.details\_denied | details denied | warn | wave1 | Access to environment details was denied; only the name is visible. |
+| mwaa.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

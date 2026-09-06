@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -50,12 +51,6 @@ var transferLegacySecurityPolicies = map[string]bool{ //nolint:gochecknoglobals 
 	"TransferSecurityPolicy-2018-11": true,
 	"TransferSecurityPolicy-2020-06": true,
 }
-
-// transferDetailsDeniedDetail is transfer's own §4 S5 sentence for the
-// details-denied finding — deliberately NOT the generic
-// degraded_resource.go text, because transfer's degraded row keeps the full
-// ListedServer, not just the name.
-const transferDetailsDeniedDetail = "Access to server details was denied; only the listed fields are visible."
 
 // FetchTransferServersPage fetches a single page of Transfer Family
 // servers. ListServers carries the Wave-1 State signal but none of the §2
@@ -160,7 +155,7 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 		findings = append(findings, domain.Finding{
 			Code:     transferCodeLegacyPolicy,
 			Phrase:   "legacy security policy",
-			Detail:   fmt.Sprintf("Security policy %s allows weak ciphers / old TLS; move to a current policy.", policy),
+			Detail:   catalog.Detail(transferCodeLegacyPolicy),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		})
@@ -170,7 +165,7 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 		findings = append(findings, domain.Finding{
 			Code:     transferCodeNoLogging,
 			Phrase:   "no activity logging",
-			Detail:   "Neither a logging role nor structured log destinations are configured.",
+			Detail:   catalog.Detail(transferCodeNoLogging),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		})
@@ -185,27 +180,22 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 var transferStateFindings = map[transfertypes.State]domain.Finding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
 	transfertypes.StateOffline: {
 		Code: transferCodeOffline, Phrase: "offline: not accepting transfers",
-		Detail:   "Server is offline; partners cannot connect until it is started.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	transfertypes.StateStarting: {
 		Code: transferCodeStarting, Phrase: "starting",
-		Detail:   "Server is starting; not yet fully able to respond.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	transfertypes.StateStopping: {
 		Code: transferCodeStopping, Phrase: "stopping",
-		Detail:   "Server is stopping; transfers are draining.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 	transfertypes.StateStartFailed: {
 		Code: transferCodeStartFailed, Phrase: "start failed",
-		Detail:   "Server failed to come online; partner transfers are down.",
 		Severity: domain.SevBroken, Source: "wave1",
 	},
 	transfertypes.StateStopFailed: {
 		Code: transferCodeStopFailed, Phrase: "stop failed",
-		Detail:   "Stop failed; the server may still be serving transfers.",
 		Severity: domain.SevWarn, Source: "wave1",
 	},
 }
@@ -216,6 +206,7 @@ var transferStateFindings = map[transfertypes.State]domain.Finding{ //nolint:goc
 // builders since State is present on both ListedServer and DescribedServer.
 func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
 	f, ok := transferStateFindings[state]
+	f.Detail = catalog.Detail(f.Code)
 	return f, ok
 }
 
@@ -237,7 +228,7 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer, err error)
 	if f, ok := transferStateFinding(listed.State); ok {
 		findings = append(findings, f)
 	}
-	findings = append(findings, degradedDetailsFinding("transfer", err, transferDetailsDeniedDetail, detailsUnavailableDetail))
+	findings = append(findings, degradedDetailsFinding("transfer", err))
 	statusPhrase := domain.StatusPhrase(findings)
 
 	raw := listed

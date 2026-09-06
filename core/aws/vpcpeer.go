@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -85,7 +86,7 @@ func FetchVpcPeeringConnectionsPage(ctx context.Context, api EC2DescribeVpcPeeri
 func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 	id := aws.ToString(pc.VpcPeeringConnectionId)
 	name := tagValue(pc.Tags, "Name")
-	findings := computeVpcPeerFindings(pc)
+	findings, attention := computeVpcPeerFindings(pc)
 
 	requesterVPC, requesterOwner := vpcPeerSide(pc.RequesterVpcInfo)
 	accepterVPC, accepterOwner := vpcPeerSide(pc.AccepterVpcInfo)
@@ -101,8 +102,9 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 			"accepter_owner":  accepterOwner,
 			"expires":         ltFormatTime(pc.ExpirationTime),
 		},
-		RawStruct: pc,
-		Findings:  findings,
+		RawStruct:        pc,
+		Findings:         findings,
+		AttentionDetails: attention,
 	}
 }
 
@@ -118,49 +120,59 @@ func vpcPeerSide(info *ec2types.VpcPeeringConnectionVpcInfo) (vpcID, ownerID str
 // connection: state first, then (active-only) CIDR overlap —
 // docs/resources/vpc-peer.md §4 precedence order. An active connection with
 // disjoint CIDRs returns nil (blank Status, Healthy).
-func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) []domain.Finding {
+func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	if pc.Status == nil {
-		return nil
+		return nil, nil
 	}
 	code := pc.Status.Code
 	message := aws.ToString(pc.Status.Message)
 
 	var findings []domain.Finding
+	attention := map[domain.FindingCode]domain.AttentionDetail{}
+	statusRow := func(fc domain.FindingCode) {
+		if message != "" {
+			attention[fc] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Status message", Value: message, Tier: "!"}}}
+		}
+	}
 	switch code {
 	case ec2types.VpcPeeringConnectionStateReasonCodeProvisioning:
 		findings = append(findings, domain.Finding{
 			Code: vpcPeerCodeProvisioning, Phrase: "provisioning",
-			Detail: "Peering connection is being provisioned.", Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(vpcPeerCodeProvisioning), Severity: domain.SevWarn, Source: "wave1",
 		})
 	case ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest:
 		findings = append(findings, domain.Finding{
 			Code: vpcPeerCodeInitiating, Phrase: "initiating",
-			Detail: "Peering request is being initiated.", Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(vpcPeerCodeInitiating), Severity: domain.SevWarn, Source: "wave1",
 		})
 	case ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance:
-		findings = append(findings, vpcPeerPendingAcceptanceFinding(pc.ExpirationTime))
+		f, rows := vpcPeerPendingAcceptanceFinding(pc.ExpirationTime)
+		findings = append(findings, f)
+		attention[vpcPeerCodePendingAcceptance] = domain.AttentionDetail{Rows: rows}
 	case ec2types.VpcPeeringConnectionStateReasonCodeExpired:
 		findings = append(findings, domain.Finding{
 			Code: vpcPeerCodeExpired, Phrase: "expired: never accepted",
-			Detail: "The peering request expired unaccepted; recreate it if still needed.", Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(vpcPeerCodeExpired), Severity: domain.SevWarn, Source: "wave1",
 		})
 	case ec2types.VpcPeeringConnectionStateReasonCodeRejected:
 		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeRejected, Phrase: "rejected", Detail: message, Severity: domain.SevBroken, Source: "wave1",
+			Code: vpcPeerCodeRejected, Phrase: "rejected", Detail: catalog.Detail(vpcPeerCodeRejected), Severity: domain.SevBroken, Source: "wave1",
 		})
+		statusRow(vpcPeerCodeRejected)
 	case ec2types.VpcPeeringConnectionStateReasonCodeFailed:
 		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeFailed, Phrase: "failed", Detail: message, Severity: domain.SevBroken, Source: "wave1",
+			Code: vpcPeerCodeFailed, Phrase: "failed", Detail: catalog.Detail(vpcPeerCodeFailed), Severity: domain.SevBroken, Source: "wave1",
 		})
+		statusRow(vpcPeerCodeFailed)
 	case ec2types.VpcPeeringConnectionStateReasonCodeDeleting:
 		findings = append(findings, domain.Finding{
 			Code: vpcPeerCodeDeleting, Phrase: "deleting",
-			Detail: "Peering connection is being deleted.", Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(vpcPeerCodeDeleting), Severity: domain.SevWarn, Source: "wave1",
 		})
 	case ec2types.VpcPeeringConnectionStateReasonCodeDeleted:
 		findings = append(findings, domain.Finding{
 			Code: vpcPeerCodeDeleted, Phrase: "deleted",
-			Detail: "AWS keeps deleted connections listed for a window.", Severity: domain.SevDim, Source: "wave1",
+			Detail: catalog.Detail(vpcPeerCodeDeleted), Severity: domain.SevDim, Source: "wave1",
 		})
 	}
 
@@ -168,39 +180,43 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) []domain.Finding 
 	// non-active connection (VpcPeeringConnectionVpcInfo doc comment) —
 	// docs/resources/vpc-peer.md §3.1.
 	if code == ec2types.VpcPeeringConnectionStateReasonCodeActive {
-		if detail, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
+		if ranges, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
 			findings = append(findings, domain.Finding{
 				Code: vpcPeerCodeCidrOverlap, Phrase: "CIDR overlap with peer",
-				Detail:   fmt.Sprintf("Requester and accepter CIDR ranges overlap: %s; overlapping subsets blackhole.", detail),
+				Detail:   catalog.Detail(vpcPeerCodeCidrOverlap),
 				Severity: domain.SevWarn, Source: "wave1",
 			})
+			attention[vpcPeerCodeCidrOverlap] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Overlapping range", Value: ranges, Tier: "~"}}}
 		}
 	}
-	return findings
+	if len(attention) == 0 {
+		return findings, nil
+	}
+	return findings, attention
 }
 
 // vpcPeerPendingAcceptanceFinding builds the pending-acceptance Finding: the
 // countdown to ExpirationTime IS the S4 phrase (docs/resources/vpc-peer.md
 // §4), rounded up to at least 1 day so a request expiring within hours never
-// reads as "0d".
-func vpcPeerPendingAcceptanceFinding(expiration *time.Time) domain.Finding {
+// reads as "0d". The expiration date itself is the Attention row.
+func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []domain.DetailRow) {
 	days := 1
-	detail := "The peer has not accepted; AWS expires the request."
+	var rows []domain.DetailRow
 	if expiration != nil {
 		if remaining := time.Until(*expiration); remaining > 0 {
 			if d := int(math.Ceil(remaining.Hours() / 24)); d > days {
 				days = d
 			}
 		}
-		detail = fmt.Sprintf("The peer has not accepted; AWS expires the request on %s.", expiration.Format("2006-01-02"))
+		rows = []domain.DetailRow{{Label: "Expires", Value: expiration.Format("2006-01-02"), Tier: "~"}}
 	}
 	return domain.Finding{
 		Code:     vpcPeerCodePendingAcceptance,
 		Phrase:   fmt.Sprintf("pending acceptance: expires in %dd", days),
-		Detail:   detail,
+		Detail:   catalog.Detail(vpcPeerCodePendingAcceptance),
 		Severity: domain.SevWarn,
 		Source:   "wave1",
-	}
+	}, rows
 }
 
 // vpcPeerCIDROverlapDetail reports whether any IPv4 prefix in requester's

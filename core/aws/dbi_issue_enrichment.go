@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,10 +21,6 @@ const (
 	dbiCodePendingMaintenance domain.FindingCode = "dbi.pending-maintenance"
 	dbiCodeEngineDeprecated   domain.FindingCode = "dbi.engine-deprecated"
 )
-
-// dbiEngineDeprecatedDetail is the S5 operator sentence for an instance
-// running an engine version AWS no longer supports.
-const dbiEngineDeprecatedDetail = "AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing."
 
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
 // and emits one Finding per dbi instance with pending maintenance. Severity "~"
@@ -52,7 +47,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		}
 	}
 	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
-	addBackupCoverage(cache, "dbi", CodeDBINotInBackupPlan, dbiNotInBackupPlanDetail, resources, arnAndTags, &result)
+	addBackupCoverage(cache, "dbi", CodeDBINotInBackupPlan, resources, arnAndTags, &result)
 
 	if clients == nil || clients.RDS == nil {
 		return result, tagErr
@@ -116,13 +111,9 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		// Description, Earliest Target, Apply Method) lives only in Rows so
 		// the Attention section does not render duplicated content.
 		var rows []domain.DetailRow
-		var firstAction, firstDescription string
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.Action != nil && *pa.Action != "" {
 				rows = append(rows, domain.DetailRow{Label: "Action", Value: *pa.Action, Tier: "~"})
-				if firstAction == "" {
-					firstAction = *pa.Action
-				}
 			}
 			if pa.OptInStatus != nil && *pa.OptInStatus != "" {
 				rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: *pa.OptInStatus})
@@ -134,19 +125,10 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 			if pa.Description != nil && *pa.Description != "" {
 				rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
-				if firstDescription == "" {
-					firstDescription = *pa.Description
-				}
 			}
 		}
 
-		// Detail (S5): docs/resources/dbi.md §4 row "Pending maintenance overdue".
-		detail := ""
-		if firstAction != "" && firstDescription != "" {
-			detail = fmt.Sprintf("Pending maintenance action overdue: %s (%s).", firstAction, firstDescription)
-		}
-
-		setWave2Finding(&result, key, dbiCodePendingMaintenance, "maintenance scheduled", "~", "dbi", rows, detail)
+		setWave2Finding(&result, key, dbiCodePendingMaintenance, "maintenance scheduled", "~", "dbi", rows)
 	}
 
 	enrichDBIEngineVersions(ctx, clients, resources, &result)
@@ -205,8 +187,8 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 			continue
 		}
 		setWave2Finding(result, r.ID, dbiCodeEngineDeprecated, "engine version deprecated", "!", "dbi",
-			[]domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: "!"}},
-			dbiEngineDeprecatedDetail)
+			[]domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: "!"}})
+
 	}
 
 	if len(failures) > 0 {

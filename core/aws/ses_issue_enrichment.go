@@ -60,7 +60,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 
 	// Replicate the finding onto every identity row.
 	for _, res := range resources {
-		setWave2Finding(&result, res.ID, code, phrase, severityGlyph, "ses", rows, "")
+		setWave2Finding(&result, res.ID, code, phrase, severityGlyph, "ses", rows)
 	}
 
 	result.Truncated = false

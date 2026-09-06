@@ -21,12 +21,6 @@ const (
 	glueCodeLatestRunFailed domain.FindingCode = "glue.latest-run-failed"
 )
 
-// glueLatestRunFailedDetail is the S5 operator sentence for a job whose most
-// recent run did not finish. Whatever the job feeds is stale from that run
-// onward, and Glue keeps no partial output, so the run has to be repeated
-// once the cause is fixed.
-const glueLatestRunFailedDetail = "The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job."
-
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
 // Returns a Finding for each job whose latest run is FAILED, ERROR, or TIMEOUT.
 // Severity is "!" (broken/degraded). Summary: "latest run <STATUS>".
@@ -75,7 +69,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				if run.ErrorMessage != nil && *run.ErrorMessage != "" {
 					rows = append(rows, domain.DetailRow{Label: "Error", Value: *run.ErrorMessage, Tier: "!"})
 				}
-				setWave2Finding(&result, key, glueCodeLatestRunFailed, fmt.Sprintf("latest run %s", statePhrase), "!", "glue", rows, glueLatestRunFailedDetail)
+				setWave2Finding(&result, key, glueCodeLatestRunFailed, fmt.Sprintf("latest run %s", statePhrase), "!", "glue", rows)
 				result.FieldUpdates[key] = map[string]string{"last_run": stateVal}
 			} else {
 				result.FieldUpdates[key] = map[string]string{"last_run": "OK"}

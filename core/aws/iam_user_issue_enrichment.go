@@ -15,6 +15,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	smithy "github.com/aws/smithy-go"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -28,21 +29,6 @@ const (
 	iamUserCodeKeyUnused        domain.FindingCode = "iam-user.access-key-unused"
 	iamUserCodeTwoActiveKeys    domain.FindingCode = "iam-user.two-active-keys"
 	iamUserCodeConsoleDormant   domain.FindingCode = "iam-user.console-dormant"
-
-	iamUserNoMFADetail = "This user signs in to the console with a password alone, so a leaked or guessed " +
-		"password is a full takeover. Register an MFA device for the user, or remove the console password if " +
-		"the user only needs programmatic access."
-	iamUserOldKeyDetail = "This access key has been valid for more than 90 days, so a copy taken at any point " +
-		"since it was created still works. Create a replacement key, move callers onto it, then deactivate and " +
-		"delete the old one."
-	iamUserConsoleDormantDetail   = "Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not."
-	iamUserConsoleNeverUsedDetail = "This user has a console password that has never been used since the account " +
-		"was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave " +
-		"the user with programmatic access only."
-	iamUserKeyUnusedDetail = "This access key is active but has not signed a request in over 90 days, so it is a " +
-		"live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it."
-	iamUserTwoActiveKeysDetail = "This user has both of its access-key slots active at once, which doubles the " +
-		"exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use."
 
 	// unusedCredentialAge is the age past which an untouched credential is
 	// reported. Matches the 90-day threshold used for key rotation.
@@ -163,7 +149,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if hasConsolePassword && !hasMFA {
 			riskLabel = riskNoMFA
 			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, "console user without MFA", "!", "iam-user",
-				[]domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: "!"}}, iamUserNoMFADetail)
+				[]domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: "!"}})
+
 		}
 
 		for _, f := range iamUserConsoleDormantFindings(consolePasswordVal, r.Fields["password_last_used"]) {
@@ -171,7 +158,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				riskLabel = riskConsoleDormant
 			}
 			setWave2Finding(&result, r.ID, f.Code, f.Phrase, "~", "iam-user",
-				[]domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: "~"}}, f.Detail)
+				[]domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: "~"}})
+
 		}
 
 		if hasConsolePassword && r.Fields["password_last_used"] == "Never" &&
@@ -180,7 +168,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				riskLabel = riskConsoleNeverUsed
 			}
 			setWave2Finding(&result, r.ID, iamUserCodeConsoleNeverUsed, "console password never used", "~", "iam-user",
-				[]domain.DetailRow{{Label: "Created", Value: r.Fields["create_date"], Tier: "~"}}, iamUserConsoleNeverUsedDetail)
+				[]domain.DetailRow{{Label: "Created", Value: r.Fields["create_date"], Tier: "~"}})
+
 		}
 
 		for _, key := range activeKeys {
@@ -192,7 +181,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			}
 			phrase := fmt.Sprintf("key %s >90d (rotation)", lastFourOfKeyID(aws.ToString(key.AccessKeyId)))
 			setWave2Finding(&result, r.ID, iamUserCodeOldKey, phrase, "~", "iam-user",
-				[]domain.DetailRow{{Label: "Access key", Value: lastFourOfKeyID(aws.ToString(key.AccessKeyId)), Tier: "~"}}, iamUserOldKeyDetail)
+				[]domain.DetailRow{{Label: "Access key", Value: lastFourOfKeyID(aws.ToString(key.AccessKeyId)), Tier: "~"}})
+
 			break
 		}
 
@@ -206,7 +196,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				[]domain.DetailRow{
 					{Label: "Key", Value: k.suffix, Tier: "~"},
 					{Label: "Last used", Value: k.lastUsed, Tier: "~"},
-				}, iamUserKeyUnusedDetail)
+				})
+
 		}
 
 		if len(activeKeys) >= 2 {
@@ -214,7 +205,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				riskLabel = riskTwoActiveKeys
 			}
 			setWave2Finding(&result, r.ID, iamUserCodeTwoActiveKeys, "two active access keys", "~", "iam-user",
-				[]domain.DetailRow{{Label: "Keys", Value: "2 active", Tier: "~"}}, iamUserTwoActiveKeysDetail)
+				[]domain.DetailRow{{Label: "Keys", Value: "2 active", Tier: "~"}})
+
 		}
 
 		if adminPolicy != "" {
@@ -222,7 +214,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				riskLabel = riskAdminPolicy
 			}
 			setWave2Finding(&result, r.ID, iamUserCodeAdminAttached, adminAttachedPhrase, "~", "iam-user",
-				adminAttachedRows(adminPolicy), adminAttachedDetail)
+				adminAttachedRows(adminPolicy))
+
 		}
 
 		result.FieldUpdates[r.ID] = map[string]string{
@@ -342,7 +335,7 @@ func iamUserConsoleDormantFindings(hasConsolePassword, passwordLastUsed string) 
 	}
 	return []domain.Finding{{
 		Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days",
-		Detail:   iamUserConsoleDormantDetail,
+		Detail:   catalog.Detail(iamUserCodeConsoleDormant),
 		Severity: domain.SevWarn, Source: "wave2:iam-user",
 	}}
 }

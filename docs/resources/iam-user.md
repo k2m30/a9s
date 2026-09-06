@@ -85,11 +85,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `iam-user`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -101,14 +105,14 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` | `Console password has never been used since the account was created — an unguarded sign-in path.` |
-| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` | `Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not.` |
-| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` | `Access key …4QJZ has not signed a request in 120 days — deactivate it, then delete it.` |
-| Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` | `Both access-key slots are active, which doubles exposure and blocks a clean rotation.` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` | `The user carries an AWS-managed policy granting administrator-equivalent access.` |
-| Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` | `User has console password but zero MFA devices — add MFA or remove password.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` |
+| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` |
+| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` |
+| Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
+| Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` |
 
 Rules applied:
 
@@ -151,13 +155,13 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| iam-user.no-mfa | console user without MFA | broken | wave2 | — |
-| iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 | — |
-| iam-user.admin-attached | has an administrator policy | warn | wave2 | — |
-| iam-user.console-never-used | console password never used | warn | wave2 | — |
-| iam-user.console-dormant | console sign-in unused for 90 days | warn | wave2 | — |
-| iam-user.access-key-unused | access key unused for <N> days | warn | wave2 | — |
-| iam-user.two-active-keys | two active access keys | warn | wave2 | — |
+| iam-user.no-mfa | console user without MFA | broken | wave2 | This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access. |
+| iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
+| iam-user.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
+| iam-user.console-never-used | console password never used | warn | wave2 | This user has a console password that has never been used since the account was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave the user with programmatic access only. |
+| iam-user.console-dormant | console sign-in unused for 90 days | warn | wave2 | Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not. |
+| iam-user.access-key-unused | access key unused for <N> days | warn | wave2 | This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it. |
+| iam-user.two-active-keys | two active access keys | warn | wave2 | This user has both of its access-key slots active at once, which doubles the exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

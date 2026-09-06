@@ -116,21 +116,25 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
 | S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
 
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ecr`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
+
 Note on baseline state: the ECR Repository object carries no runtime status field — a repo is always "available" once created. The list row starts green by default and is repainted by the signals below.
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `scanOnPush==false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `scan-on-push off` | `Vulnerability scanning is disabled for this repo — new images will push without a CVE scan.` |
-| latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `CRITICAL CVEs in latest` | `Latest image (pushed <date>) has N CRITICAL vulnerabilities — block deploys until patched.` |
-| latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S4, S5 | `HIGH CVEs in latest` | `Latest image (pushed <date>) has N HIGH vulnerabilities — review before next deploy.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `scanOnPush==false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `scan-on-push off` |
+| latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `CRITICAL CVEs in latest` |
+| latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S4, S5 | `HIGH CVEs in latest` |
 
 Rules applied:
 
@@ -194,10 +198,10 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 | — |
-| ecr.public-policy | repository policy open to anyone | broken | wave2 | — |
-| ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | — |
-| ecr.scan-on-push-off | scan on push off | warn | wave1 | — |
-| ecr.mutable-tags | tags are mutable | warn | wave1 | — |
+| ecr.public-policy | repository policy open to anyone | broken | wave2 | The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or scope the grant with a condition. |
+| ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained. |
+| ecr.scan-on-push-off | scan on push off | warn | wave1 | Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives. |
+| ecr.mutable-tags | tags are mutable | warn | wave1 | An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

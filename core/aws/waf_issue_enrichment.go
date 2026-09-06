@@ -22,13 +22,6 @@ import (
 const (
 	wafCodeNoLogging domain.FindingCode = "waf.no-logging"
 	wafCodeNoRules   domain.FindingCode = "waf.no-rules"
-
-	wafNoLoggingDetail = "This web ACL is not writing request logs anywhere, so a blocked or allowed request " +
-		"leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis " +
-		"Firehose stream, S3 bucket, or CloudWatch log group."
-	wafNoRulesDetail = "This web ACL contains no rules, so every request reaches the protected resource and the " +
-		"ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not " +
-		"read as coverage it is not providing."
 )
 
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
@@ -154,13 +147,14 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 
 		if noRules {
 			setWave2Finding(&result, r.ID, wafCodeNoRules, "web ACL has no rules", "~", "waf",
-				[]domain.DetailRow{{Label: "Rules", Value: "0", Tier: "~"}}, wafNoRulesDetail)
+				[]domain.DetailRow{{Label: "Rules", Value: "0", Tier: "~"}})
+
 		}
 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows, wafNoLoggingDetail)
+		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows)
 	})
 	sort.Strings(failures)
 	// All WAF logging findings are severity "~" (informational).

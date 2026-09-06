@@ -29,29 +29,14 @@ const (
 	CodeDBCDefaultMasterUser domain.FindingCode = "dbc.default-master-user"
 )
 
-// S5 operator sentences for the dbc posture findings.
-const (
-	dbcSingleAZDetail          = "The cluster has no instance in a second Availability Zone, so an AZ failure takes it down until you restore it. Add a replica in another AZ."
-	dbcMinorUpgradeDetail      = "Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself."
-	dbcIAMAuthDetail           = "Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities."
-	dbcDefaultMasterUserDetail = "The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one."
-)
-
 // dbcPostureCodes binds the shared RDS posture predicates to the dbc codes.
 var dbcPostureCodes = rdsPostureCodes{
-	singleAZ:                CodeDBCSingleAZ,
-	singleAZDetail:          dbcSingleAZDetail,
-	minorUpgrade:            CodeDBCMinorUpgradeOff,
-	minorUpgradeDetail:      dbcMinorUpgradeDetail,
-	iamAuth:                 CodeDBCIAMAuthOff,
-	iamAuthDetail:           dbcIAMAuthDetail,
-	defaultMasterUser:       CodeDBCDefaultMasterUser,
-	defaultMasterUserDetail: dbcDefaultMasterUserDetail,
+	singleAZ:          CodeDBCSingleAZ,
+	minorUpgrade:      CodeDBCMinorUpgradeOff,
+	iamAuth:           CodeDBCIAMAuthOff,
+	defaultMasterUser: CodeDBCDefaultMasterUser,
 }
 
 // CodeDBCNotInBackupPlan — no backup plan selection matches this cluster
 // (Aurora or DocumentDB). Severity: SevWarn.
 const CodeDBCNotInBackupPlan domain.FindingCode = "dbc.not-in-backup-plan"
-
-// dbcNotInBackupPlanDetail is the S5 operator sentence for it.
-const dbcNotInBackupPlanDetail = "No backup plan selects this cluster, so its retention is whatever the cluster's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on."

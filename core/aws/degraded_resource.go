@@ -50,22 +50,27 @@ func DetailsDeniedCode(shortName string) domain.FindingCode {
 // DetailsDeniedFindingDef returns the catalog declaration matching what
 // DegradedDetailsDenied emits. Every adopting type lists this in its
 // `Findings` slice so the coverage gates demand a demo witness for it.
-func DetailsDeniedFindingDef(shortName string) catalog.FindingDef {
+// detail is the type's own S5 sentence; "" takes the name-only default.
+func DetailsDeniedFindingDef(shortName, detail string) catalog.FindingDef {
+	if detail == "" {
+		detail = detailsDeniedDetail
+	}
 	return catalog.FindingDef{
 		Code:     DetailsDeniedCode(shortName),
 		Phrase:   detailsDeniedPhrase,
 		Severity: domain.SevWarn,
 		Source:   "wave1",
+		Detail:   detail,
 	}
 }
 
-// detailsDeniedFinding builds the shared details-denied Finding for
-// shortName, with detail as the per-type §4 S5 sentence.
-func detailsDeniedFinding(shortName, detail string) domain.Finding {
+// detailsDeniedFinding builds the shared details-denied Finding for shortName.
+func detailsDeniedFinding(shortName string) domain.Finding {
+	code := DetailsDeniedCode(shortName)
 	return domain.Finding{
-		Code:     DetailsDeniedCode(shortName),
+		Code:     code,
 		Phrase:   detailsDeniedPhrase,
-		Detail:   detail,
+		Detail:   catalog.Detail(code),
 		Severity: domain.SevWarn,
 		Source:   "wave1",
 	}
@@ -87,16 +92,18 @@ func DetailsUnavailableFindingDef(shortName string) catalog.FindingDef {
 		Phrase:   detailsUnavailablePhrase,
 		Severity: domain.SevWarn,
 		Source:   "wave1",
+		Detail:   detailsUnavailableDetail,
 	}
 }
 
 // detailsUnavailableFinding builds the shared details-unavailable Finding
-// for shortName, with detail as the per-type §4 S5 sentence.
-func detailsUnavailableFinding(shortName, detail string) domain.Finding {
+// for shortName.
+func detailsUnavailableFinding(shortName string) domain.Finding {
+	code := DetailsUnavailableCode(shortName)
 	return domain.Finding{
-		Code:     DetailsUnavailableCode(shortName),
+		Code:     code,
 		Phrase:   detailsUnavailablePhrase,
-		Detail:   detail,
+		Detail:   catalog.Detail(code),
 		Severity: domain.SevWarn,
 		Source:   "wave1",
 	}
@@ -126,11 +133,11 @@ func degradedAuthDenial(err error) bool {
 // "details unavailable" finding. "You can't see it" (denied) and "it didn't
 // come back" (unavailable) are different facts and must never share one
 // phrase.
-func degradedDetailsFinding(shortName string, err error, deniedDetail, unavailableDetail string) domain.Finding {
+func degradedDetailsFinding(shortName string, err error) domain.Finding {
 	if degradedAuthDenial(err) {
-		return detailsDeniedFinding(shortName, deniedDetail)
+		return detailsDeniedFinding(shortName)
 	}
-	return detailsUnavailableFinding(shortName, unavailableDetail)
+	return detailsUnavailableFinding(shortName)
 }
 
 // DegradedDetails builds the name-only row an N+1 fetcher emits when the
@@ -140,7 +147,7 @@ func degradedDetailsFinding(shortName string, err error, deniedDetail, unavailab
 // describe call's error (nil for an absent-from-response row); it decides
 // whether the row renders "details denied" or "details unavailable".
 func DegradedDetails(shortName, id string, raw any, err error) resource.Resource {
-	finding := degradedDetailsFinding(shortName, err, detailsDeniedDetail, detailsUnavailableDetail)
+	finding := degradedDetailsFinding(shortName, err)
 	return resource.Resource{
 		ID:   id,
 		Name: id,

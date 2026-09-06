@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -113,7 +114,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 		findings = append(findings, domain.Finding{
 			Code:     transferCodeAgreementInactive,
 			Phrase:   "inactive: partner traffic rejected",
-			Detail:   "Agreement is inactive; partner traffic is rejected.",
+			Detail:   catalog.Detail(transferCodeAgreementInactive),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		})
@@ -249,7 +250,7 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 		return domain.Finding{
 			Code:     transferCodeCertExpired,
 			Phrase:   "expired",
-			Detail:   fmt.Sprintf("Certificate %s has expired.", certID),
+			Detail:   catalog.Detail(transferCodeCertExpired),
 			Severity: domain.SevBroken,
 			Source:   "wave1",
 		}, true
@@ -262,7 +263,7 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 			return domain.Finding{
 				Code:     transferCodeCertExpiring,
 				Phrase:   fmt.Sprintf("expires in %dd", days),
-				Detail:   fmt.Sprintf("Certificate %s expires in %d day(s).", certID, days),
+				Detail:   catalog.Detail(transferCodeCertExpiring),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			}, true

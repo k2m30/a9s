@@ -108,11 +108,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `glue`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -124,12 +128,12 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| latest run `FAILED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run failed: <ErrorMessage head>` | `Most recent run FAILED on <StartedOn>: <ErrorMessage>.` |
-| latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run timed out at <Timeout>m` | `Most recent run hit the configured timeout of <Timeout> minutes on <StartedOn>.` |
-| latest run `ERROR` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run errored: <ErrorMessage head>` | `Most recent run ended in ERROR on <StartedOn>: <ErrorMessage>.` |
-| latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run expired (queued too long)` | `Most recent run EXPIRED on <StartedOn> — job was queued past its TTL and never started.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| latest run `FAILED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run failed: <ErrorMessage head>` |
+| latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run timed out at <Timeout>m` |
+| latest run `ERROR` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run errored: <ErrorMessage head>` |
+| latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run expired (queued too long)` |
 
 Notes on the S4 text:
 
@@ -177,10 +181,10 @@ glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycl
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| glue.latest-run-failed | latest run <STATUS> | broken | wave2 | — |
-| glue.no-security-configuration | no security configuration | warn | wave1 | — |
-| glue.continuous-logging-off | continuous logging off | warn | wave1 | — |
-| glue.argument-secret | credential in job arguments | broken | wave1 | — |
+| glue.latest-run-failed | latest run <STATUS> | broken | wave2 | The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job. |
+| glue.no-security-configuration | no security configuration | warn | wave1 | This job names no security configuration, so its S3 output, its CloudWatch log stream and its job bookmarks are all written without encryption at rest. Create a security configuration with a KMS key and attach it to the job. |
+| glue.continuous-logging-off | continuous logging off | warn | wave1 | Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments. |
+| glue.argument-secret | credential in job arguments | broken | wave1 | A default argument on this job holds what looks like a credential, and default arguments are readable by anyone who can describe the job and are echoed into run history. Move the value into Secrets Manager, pass its name instead, and rotate the exposed credential. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -23,10 +23,6 @@ const (
 	codeartifactCodeNoPermissionsPolicy domain.FindingCode = "codeartifact.no-permissions-policy"
 )
 
-// codeartifactPublicAccessPolicyDetail is the S5 operator sentence for
-// codeartifactCodePublicAccessPolicy.
-const codeartifactPublicAccessPolicyDetail = "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or scope the grant with a condition."
-
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
 // EnrichmentCap) to surface IAM policy findings.
 //
@@ -117,7 +113,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if err != nil {
 			if _, ok := errors.AsType[*codeartifacttypes.ResourceNotFoundException](err); ok {
 				// No policy set — default open within the domain.
-				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil, "")
+				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil)
 				return
 			}
 			// Any other error — skip this repo but flag truncation.
@@ -136,7 +132,8 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 		if ex := iampolicy.Evaluate(parsed, ownAccount); ex.Public {
 			setWave2Finding(&result, key, codeartifactCodePublicAccessPolicy, "public access policy", "!", "codeartifact",
-				publicPolicyRows(ex), codeartifactPublicAccessPolicyDetail)
+				publicPolicyRows(ex))
+
 		}
 	})
 	result.Truncated = truncated

@@ -146,11 +146,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `pipeline`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -164,12 +168,12 @@ Because pipeline has no Wave 1 health signals, every row starts green and any §
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `latestExecution.status == Failed` | 2 | Broken | `!` | S1, S2, S4, S5 | `failed: <stage>` | `Stage <stage> failed on last execution — open CodePipeline console for action logs.` |
-| `latestExecution.status == Stopped` | 2 | Broken | `!` | S1, S2, S4, S5 | `stopped: <stage>` | `Stage <stage> was stopped by a user before completing.` |
-| `latestExecution.status == Cancelled` | 2 | Broken | `!` | S1, S2, S4, S5 | `cancelled: <stage>` | `Stage <stage> was cancelled — pipeline definition changed mid-run.` |
-| `latestExecution.status == InProgress >2h` | 2 | Warning | `!` | S1, S2, S4, S5 | `stuck >2h: <stage>` | `Stage <stage> has been running over 2 hours — likely hung action or awaiting approval.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `latestExecution.status == Failed` | 2 | Broken | `!` | S1, S2, S4, S5 | `failed: <stage>` |
+| `latestExecution.status == Stopped` | 2 | Broken | `!` | S1, S2, S4, S5 | `stopped: <stage>` |
+| `latestExecution.status == Cancelled` | 2 | Broken | `!` | S1, S2, S4, S5 | `cancelled: <stage>` |
+| `latestExecution.status == InProgress >2h` | 2 | Warning | `!` | S1, S2, S4, S5 | `stuck >2h: <stage>` |
 
 Notes:
 

@@ -121,11 +121,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. orphan, unencrypted. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `orphan: unattached 42d`, `impaired: I/O failing`). **Healthy rows render blank** — no `in-use`, no `OK`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ebs`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -137,16 +141,16 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State == creating` | 1 | Warning | n/a | S2, S4 | `creating` | `Volume creation in progress.` |
-| `State == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | `Volume is being deleted.` |
-| `State == error` | 1 | Broken | n/a | S2, S4 | `error: volume unusable` | `Volume entered error state — AWS marked it unusable; recreate from snapshot.` |
-| `State == available` & age > 7d | 1 | Warning | n/a | S2, S4 | `orphan: unattached <N>d` | `Unattached since creation <N> days ago — billed hourly for no workload.` |
-| `Encrypted == false` (row in-use) | 2 | Healthy | `!` | S1, S3, S4, S5 | `unencrypted` | `Volume is not encrypted at rest — re-create from encrypted snapshot.` |
-| `VolumeStatus.Status == impaired` | 2 | Broken | n/a | S2, S4, S5 | `impaired: I/O failing` | `AWS reports impaired volume status — I/O is failing; detach and restore from snapshot.` |
-| `VolumeStatus.Status == warning` | 2 | Warning | n/a | S2, S4, S5 | `degraded: I/O warning` | `AWS reports degraded performance — investigate recent workload and snapshot before action.` |
-| `Events[] non-empty` (row in-use) | 2 | Warning | `~` | S3, S4, S5 | `event: <EventType>` | `<Event.Description> — window <NotBefore> to <NotAfter>.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State == creating` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `State == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `State == error` | 1 | Broken | n/a | S2, S4 | `error: volume unusable` |
+| `State == available` & age > 7d | 1 | Warning | n/a | S2, S4 | `orphan: unattached <N>d` |
+| `Encrypted == false` (row in-use) | 2 | Healthy | `!` | S1, S3, S4, S5 | `unencrypted` |
+| `VolumeStatus.Status == impaired` | 2 | Broken | n/a | S2, S4, S5 | `impaired: I/O failing` |
+| `VolumeStatus.Status == warning` | 2 | Warning | n/a | S2, S4, S5 | `degraded: I/O warning` |
+| `Events[] non-empty` (row in-use) | 2 | Warning | `~` | S3, S4, S5 | `event: <EventType>` |
 
 Notes on rows omitted:
 
@@ -199,11 +203,11 @@ ebs — COMPUTE. Lifecycle key: `state`.
 | --- | --- | --- | --- | --- |
 | ebs.state.creating | creating | warn | wave1 | — |
 | ebs.state.error | error | broken | wave1 | — |
-| ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 | — |
-| ebs.encryption.disabled | unencrypted | warn | wave1 | — |
+| ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
+| ebs.encryption.disabled | unencrypted | warn | wave1 | Volume is not encrypted at rest — re-create from encrypted snapshot. |
 | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 | — |
-| ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 | — |
-| ebs.no-snapshot | no snapshot exists | warn | wave2 | — |
+| ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
+| ebs.no-snapshot | no snapshot exists | warn | wave2 | This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

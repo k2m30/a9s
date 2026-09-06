@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -51,7 +52,7 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 	return append(findings, domain.Finding{
 			Code:     CodeEFSUnencrypted,
 			Phrase:   "not encrypted",
-			Detail:   efsUnencryptedDetail,
+			Detail:   catalog.Detail(CodeEFSUnencrypted),
 			Severity: domain.SevWarn,
 			Source:   "wave1",
 		}), map[domain.FindingCode]domain.AttentionDetail{

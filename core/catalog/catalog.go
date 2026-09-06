@@ -45,6 +45,7 @@ func SetTypes(types []ResourceTypeDef) {
 	}
 	registry = types
 	installed = true
+	indexDetails(types)
 }
 
 // SetChildTypes installs the child-type catalog. Same lifecycle as SetTypes.
@@ -63,6 +64,7 @@ func SetChildTypes(children []ResourceTypeDef) {
 	}
 	childRegistry = m
 	childInstalled = true
+	indexDetails(children)
 }
 
 // Find returns the ResourceTypeDef for the given name (ShortName or Alias),

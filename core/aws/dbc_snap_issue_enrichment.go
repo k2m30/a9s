@@ -49,10 +49,6 @@ const (
 	dbcSnapPublicCode        domain.FindingCode = "dbc-snap.public"
 )
 
-// dbcSnapPublicDetail is the S5 operator sentence for a snapshot shared with
-// the "all" group.
-const dbcSnapPublicDetail = "The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove `all` from the snapshot's restore attribute."
-
 // enrichDBCSnapCrossRef is the IssueEnricherFunc registered for dbc-snap.
 var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	ParentShortName:    "dbc",
@@ -71,7 +67,6 @@ var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	PublicAttr:         dbcSnapShareAttributes,
 	PublicCode:         dbcSnapPublicCode,
 	PublicPhrase:       "shared with all AWS accounts",
-	PublicDetail:       dbcSnapPublicDetail,
 })
 
 // dbcSnapShareAttributes reads one cluster snapshot's share attributes. The

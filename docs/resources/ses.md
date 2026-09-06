@@ -112,11 +112,15 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `SUCCESS` / `verified`. |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+<!-- BEGIN GENERATED: badge -->
+Badge aggregation for `ses`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+<!-- END GENERATED: badge -->
 
 Wave → surface mapping:
 
@@ -128,16 +132,16 @@ Wave → surface mapping:
 
 One row per signal from §3:
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `VerificationStatus==PENDING` | 1 | Warning | n/a | S2, S4 | `pending verification` | `Verification in progress — add the DKIM/TXT DNS records and wait for SES to detect them.` |
-| `VerificationStatus==FAILED` | 1 | Broken | n/a | S2, S4 | `verification failed` | `SES could not verify this identity — DNS records are missing or incorrect.` |
-| `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | n/a | S2, S4 | `verify: temp failure` | `Temporary SES-side issue prevented verification — retry from the SES console.` |
-| `VerificationStatus==NOT_STARTED` | 1 | Broken | n/a | S2, S4 | `verification not started` | `Identity registered but verification was never initiated — start verification to enable sending.` |
-| `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S2, S4 | `sending disabled` | `Sending paused on this identity — re-enable to resume outbound mail.` |
-| `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account PROBATION` | `SES account is on probation — AWS flagged reputation issues; fix bounces/complaints before SES shuts sending down.` |
-| `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `account SHUTDOWN` | `SES account sending is paused by AWS — open a support case after fixing the underlying issue.` |
-| `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S1, S2, S3, S4, S5 | `quota 80%+ used` | `24h sending quota is over 80% consumed — request a quota increase before throttling begins.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `VerificationStatus==PENDING` | 1 | Warning | n/a | S2, S4 | `pending verification` |
+| `VerificationStatus==FAILED` | 1 | Broken | n/a | S2, S4 | `verification failed` |
+| `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | n/a | S2, S4 | `verify: temp failure` |
+| `VerificationStatus==NOT_STARTED` | 1 | Broken | n/a | S2, S4 | `verification not started` |
+| `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S2, S4 | `sending disabled` |
+| `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account PROBATION` |
+| `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `account SHUTDOWN` |
+| `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S1, S2, S3, S4, S5 | `quota 80%+ used` |
 
 Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the account, not any single identity — a9s-devops: surface the finding on **every** identity row's S4 with the compact `account ...:` prefix so a glance at the list correctly attributes the problem to the account, not the identity; S1 counts the account-level finding once, not N times.
 

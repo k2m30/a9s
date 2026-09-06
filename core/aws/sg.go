@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -34,11 +35,6 @@ const sgCodeDefaultWithRules domain.FindingCode = "sg.default-with-rules"
 
 // sgDefaultWithRulesPhrase is the S4 status phrase for sgCodeDefaultWithRules.
 const sgDefaultWithRulesPhrase = "default group allows traffic"
-
-// sgDefaultWithRulesDetail is the S5 operator sentence for sgCodeDefaultWithRules.
-const sgDefaultWithRulesDetail = "The VPC's default security group still carries rules, and AWS attaches it to " +
-	"any resource launched without an explicit group. Remove every ingress rule and every egress rule other than " +
-	"the AWS-created allow-all, and give each workload its own group."
 
 // sensitivePorts is the set of ports that are considered security-sensitive
 // when exposed to the internet (0.0.0.0/0 or ::/0). Single source: both the
@@ -186,17 +182,6 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
 }
 
-// sgWideOpenDetail and sgDangerousPortsDetail are the S5 operator sentences
-// for the two internet-exposure findings.
-const (
-	sgWideOpenDetail = "One ingress rule opens every port and protocol to the whole internet, so nothing this " +
-		"group protects is reachable only from where you intended. Replace it with rules naming the ports each " +
-		"workload actually serves and the addresses allowed to reach them."
-	sgDangerousPortsDetail = "An administrative or database port on this group accepts connections from any " +
-		"address on the internet, which is how credential-stuffing and direct database access start. Narrow the " +
-		"rule to the addresses that need it, or move the access behind a bastion or private link."
-)
-
 // sgWideOpenPhrase is the single owner-worded source for the all-protocols
 // exposure phrase, shared by risk_summary (display) and sgRiskFindings
 // (the Broken-color explanation) so the two never drift.
@@ -235,12 +220,12 @@ func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.F
 	switch {
 	case wideOpen == "true":
 		return []domain.Finding{{
-			Code: sgCodeWideOpen, Phrase: sgWideOpenPhrase, Detail: sgWideOpenDetail,
+			Code: sgCodeWideOpen, Phrase: sgWideOpenPhrase, Detail: catalog.Detail(sgCodeWideOpen),
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
 		return []domain.Finding{{
-			Code: sgCodeDangerousPorts, Phrase: riskSummary, Detail: sgDangerousPortsDetail,
+			Code: sgCodeDangerousPorts, Phrase: riskSummary, Detail: catalog.Detail(sgCodeDangerousPorts),
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
 	}
@@ -323,7 +308,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 			findings = append(findings, domain.Finding{
 				Code:     sgCodeDefaultWithRules,
 				Phrase:   sgDefaultWithRulesPhrase,
-				Detail:   sgDefaultWithRulesDetail,
+				Detail:   catalog.Detail(sgCodeDefaultWithRules),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			})

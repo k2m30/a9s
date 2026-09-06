@@ -141,16 +141,16 @@ Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner
 
 Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing (no glyph-on-green case exists for transfer).
 
-| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
-|---|---|---|---|---|---|---|
-| `State == OFFLINE` | 1 | Warning | n/a | S2, S4 | `offline: not accepting transfers` | `Server is offline; partners cannot connect until it is started.` |
-| `State == STARTING` | 1 | Warning | n/a | S2, S4 | `starting` | `Server is starting; not yet fully able to respond.` |
-| `State == STOPPING` | 1 | Warning | n/a | S2, S4 | `stopping` | `Server is stopping; transfers are draining.` |
-| `State == START_FAILED` | 1 | Broken | n/a | S2, S4 | `start failed` | `Server failed to come online; partner transfers are down.` |
-| `State == STOP_FAILED` | 1 | Warning | n/a | S2, S4 | `stop failed` | `Stop failed; the server may still be serving transfers.` |
-| legacy security policy | 2 | Warning | n/a | S2, S4, S5 | `legacy security policy` | `Security policy <name> allows weak ciphers / old TLS; move to a current policy.` |
-| no activity logging | 2 | Warning | n/a | S2, S4, S5 | `no activity logging` | `Neither a logging role nor structured log destinations are configured.` |
-| `DescribeServer` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` | `Access to server details was denied; only the listed fields are visible.` |
+| Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
+|---|---|---|---|---|---|
+| `State == OFFLINE` | 1 | Warning | n/a | S2, S4 | `offline: not accepting transfers` |
+| `State == STARTING` | 1 | Warning | n/a | S2, S4 | `starting` |
+| `State == STOPPING` | 1 | Warning | n/a | S2, S4 | `stopping` |
+| `State == START_FAILED` | 1 | Broken | n/a | S2, S4 | `start failed` |
+| `State == STOP_FAILED` | 1 | Warning | n/a | S2, S4 | `stop failed` |
+| legacy security policy | 2 | Warning | n/a | S2, S4, S5 | `legacy security policy` |
+| no activity logging | 2 | Warning | n/a | S2, S4, S5 | `no activity logging` |
+| `DescribeServer` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` |
 
 Notes:
 
@@ -190,15 +190,15 @@ transfer — NETWORKING. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| transfer.warn.offline | offline: not accepting transfers | warn | wave1 | — |
-| transfer.warn.starting | starting | warn | wave1 | — |
-| transfer.warn.stopping | stopping | warn | wave1 | — |
-| transfer.broken.start\_failed | start failed | broken | wave1 | — |
-| transfer.warn.stop\_failed | stop failed | warn | wave1 | — |
-| transfer.warn.legacy\_policy | legacy security policy | warn | wave1 | — |
-| transfer.warn.no\_logging | no activity logging | warn | wave1 | — |
-| transfer.warn.details\_denied | details denied | warn | wave1 | — |
-| transfer.warn.details\_unavailable | details unavailable | warn | wave1 | — |
+| transfer.warn.offline | offline: not accepting transfers | warn | wave1 | Server is offline; partners cannot connect until it is started. |
+| transfer.warn.starting | starting | warn | wave1 | Server is starting; not yet fully able to respond. |
+| transfer.warn.stopping | stopping | warn | wave1 | Server is stopping; transfers are draining. |
+| transfer.broken.start\_failed | start failed | broken | wave1 | Server failed to come online; partner transfers are down. |
+| transfer.warn.stop\_failed | stop failed | warn | wave1 | Stop failed; the server may still be serving transfers. |
+| transfer.warn.legacy\_policy | legacy security policy | warn | wave1 | The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy. |
+| transfer.warn.no\_logging | no activity logging | warn | wave1 | Neither a logging role nor structured log destinations are configured. |
+| transfer.warn.details\_denied | details denied | warn | wave1 | Access to server details was denied; only the listed fields are visible. |
+| transfer.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -62,15 +63,15 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 		var findings []domain.Finding
 		switch state {
 		case "pending":
-			findings = []domain.Finding{{Code: CodeTGWStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeTGWStatePending, Phrase: "pending", Detail: catalog.Detail(CodeTGWStatePending), Severity: domain.SevWarn, Source: "wave1"}}
 		case "modifying":
-			findings = []domain.Finding{{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeTGWStateModifying, Phrase: "modifying", Detail: catalog.Detail(CodeTGWStateModifying), Severity: domain.SevWarn, Source: "wave1"}}
 		case "deleting":
-			findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeTGWStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
 		case "failed":
-			findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeTGWStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
 		case "deleted":
-			findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+			findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Detail: catalog.Detail(CodeTGWStateDeleted), Severity: domain.SevDim, Source: "wave1"}}
 		}
 
 		// A gateway on its way out cannot accept anything; a posture finding
@@ -82,7 +83,7 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			findings = append(findings, domain.Finding{
 				Code:     CodeTGWAutoAccept,
 				Phrase:   TGWAutoAcceptPhrase,
-				Detail:   TGWAutoAcceptDetail,
+				Detail:   catalog.Detail(CodeTGWAutoAccept),
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			})

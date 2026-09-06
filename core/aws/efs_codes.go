@@ -15,6 +15,3 @@ const (
 // CodeEFSUnencrypted is the wave-1 posture finding read from the
 // DescribeFileSystems output the fetcher already holds (Prowler gap closure).
 const CodeEFSUnencrypted domain.FindingCode = "efs.unencrypted"
-
-// efsUnencryptedDetail is the S5 operator sentence for it.
-const efsUnencryptedDetail = "File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across."

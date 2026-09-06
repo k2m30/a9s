@@ -37,26 +37,18 @@ const (
 	ec2CodeUserDataSecret domain.FindingCode = "ec2.user-data-secret"
 )
 
-// S5 operator sentences for the Wave-2 posture codes above.
-const (
-	ec2InternetExposedDetail = "Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion."
-	//nolint:gosec // G101 false positive: operator prose about a credential, not one
-	ec2UserDataSecretDetail = "A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it."
-)
-
-// ec2StatusFinding is the (code, tier, phrase, detail) quadruple for a
+// ec2StatusFinding is the (code, tier, phrase) triple for a
 // single SystemStatus/InstanceStatus value, per docs/resources/ec2.md §4
 // rows "impaired" / "initializing" / "insufficient-data" (lines 225-227).
 type ec2StatusFinding struct {
 	code   domain.FindingCode
 	tier   string
 	phrase string
-	detail string
 }
 
 // classifyEC2Status maps an AWS instance/system status-check value to its
-// FindingCode, severity, list phrase (S4), and detail sentence (S5)
-// mandated by docs/resources/ec2.md §4. Only "impaired" is Broken;
+// FindingCode, severity and list phrase (S4) mandated by
+// docs/resources/ec2.md §4. Only "impaired" is Broken;
 // "initializing" and "insufficient-data" are Warning and must never carry
 // the "impaired" wording, and each gets its own code. "ok" and
 // "not-applicable" produce no finding — "not-applicable" is explicitly out
@@ -69,21 +61,18 @@ func classifyEC2Status(status ec2types.SummaryStatus) (ec2StatusFinding, bool) {
 			code:   ec2CodeInstanceStatusImpaired,
 			tier:   "!",
 			phrase: "impaired: system checks failing",
-			detail: "AWS reports this instance is impaired — system or instance status checks are failing.",
 		}, true
 	case ec2types.SummaryStatusInitializing:
 		return ec2StatusFinding{
 			code:   ec2CodeInstanceStatusInitializing,
 			tier:   "~",
 			phrase: "initializing: checks in progress",
-			detail: "Instance status checks have not yet passed since start.",
 		}, true
 	case ec2types.SummaryStatusInsufficientData:
 		return ec2StatusFinding{
 			code:   ec2CodeInstanceStatusInsufficient,
 			tier:   "~",
 			phrase: "status unknown: AWS insufficient-data",
-			detail: "AWS cannot determine status — insufficient data from the hypervisor.",
 		}, true
 	default:
 		// "ok" and "not-applicable" — no finding.
@@ -179,14 +168,13 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		type condition struct {
 			tier   string
 			phrase string
-			detail string
 			rows   []domain.DetailRow
 		}
 		conditions := make(map[domain.FindingCode]*condition)
-		addRow := func(code domain.FindingCode, tier, phrase, detail string, row domain.DetailRow) {
+		addRow := func(code domain.FindingCode, tier, phrase string, row domain.DetailRow) {
 			c, ok := conditions[code]
 			if !ok {
-				c = &condition{tier: tier, phrase: phrase, detail: detail}
+				c = &condition{tier: tier, phrase: phrase}
 				conditions[code] = c
 			}
 			c.rows = append(c.rows, row)
@@ -196,7 +184,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		if is.InstanceStatus != nil {
 			if sf, ok := classifyEC2Status(is.InstanceStatus.Status); ok {
 				statusStr := domain.HumanizeStatusPhrase(string(is.InstanceStatus.Status))
-				addRow(sf.code, sf.tier, sf.phrase, sf.detail, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: sf.tier})
+				addRow(sf.code, sf.tier, sf.phrase, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: sf.tier})
 			}
 		}
 
@@ -204,7 +192,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		if is.SystemStatus != nil {
 			if sf, ok := classifyEC2Status(is.SystemStatus.Status); ok {
 				statusStr := domain.HumanizeStatusPhrase(string(is.SystemStatus.Status))
-				addRow(sf.code, sf.tier, sf.phrase, sf.detail, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: sf.tier})
+				addRow(sf.code, sf.tier, sf.phrase, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: sf.tier})
 			}
 		}
 
@@ -224,7 +212,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 			code := string(ev.Code)
 			dateStr := eventDate.Format("2006-01-02")
 			value := fmt.Sprintf("%s at %s", code, dateStr)
-			addRow(ec2CodeScheduledEvent, "~", fmt.Sprintf("scheduled event: %s", value), "", domain.DetailRow{
+			addRow(ec2CodeScheduledEvent, "~", fmt.Sprintf("scheduled event: %s", value), domain.DetailRow{
 				Label: "Scheduled Event",
 				Value: value,
 				Tier:  "~",
@@ -243,7 +231,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		slices.Sort(codes)
 		for _, code := range codes {
 			c := conditions[code]
-			setWave2Finding(&result, id, code, c.phrase, c.tier, "ec2", c.rows, c.detail)
+			setWave2Finding(&result, id, code, c.phrase, c.tier, "ec2", c.rows)
 		}
 	}
 
@@ -325,7 +313,8 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 				{Label: "Public address", Value: publicIP, Tier: "!"},
 				{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
 				{Label: "Ports", Value: portList, Tier: "!"},
-			}, ec2InternetExposedDetail)
+			})
+
 	}
 }
 
@@ -388,7 +377,8 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 			rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
 		}
 		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "credential in user data", "!", "ec2",
-			rows, ec2UserDataSecretDetail)
+			rows)
+
 	})
 	sort.Strings(failures)
 	return Finish(result, failures, len(targets), op)

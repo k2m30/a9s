@@ -28,12 +28,6 @@ const (
 	efsCodeNoBackupPolicy  domain.FindingCode = "efs.no-backup-policy"
 )
 
-// S5 operator sentences for the policy findings.
-const (
-	efsPublicPolicyDetail   = "The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access."
-	efsNoBackupPolicyDetail = "AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on."
-)
-
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
 // pagination up to PerParentPageCap pages) and emits one EnrichmentFinding per file system
 // with any mount target whose LifeCycleState is not "available".
@@ -157,7 +151,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			{Label: "AZ", Value: az},
 			{Label: "State", Value: state, Tier: "!"},
 			{Label: "Degraded", Value: fmt.Sprintf("%d/%d", unavailableCount, totalMT)},
-		}, "")
+		})
+
 	})
 	sort.Strings(failures)
 	sort.Strings(policyFailures)
@@ -212,7 +207,8 @@ func enrichEFSPolicies(
 				[]domain.DetailRow{
 					{Label: "Principal", Value: "*", Tier: "!"},
 					{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-				}, efsPublicPolicyDetail)
+				})
+
 		}
 	}
 
@@ -230,7 +226,7 @@ func enrichEFSPolicies(
 	if backedUp {
 		return
 	}
-	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, "automatic backups off", "~", "efs", nil, efsNoBackupPolicyDetail)
+	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, "automatic backups off", "~", "efs", nil)
 }
 
 // isEFSPolicyNotFound reports whether err is EFS's "no policy is set" answer
