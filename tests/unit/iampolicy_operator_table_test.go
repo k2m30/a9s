@@ -5,6 +5,7 @@ package unit
 import (
 	"testing"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 )
 
@@ -102,6 +103,47 @@ var operatorTable = []condCase{
 		cond:      `{"IpAddress":{"aws:SourceIp":"203.0.113.0/24"}}`,
 		restricts: true,
 	},
+	{
+		name: "StringEquals on SourceIp compares an address to a literal, not to a range",
+		cond: `{"StringEquals":{"aws:SourceIp":"203.0.113.10"}}`,
+	},
+	{
+		name:        "StringEqualsIgnoreCase on SourceAccount",
+		cond:        `{"StringEqualsIgnoreCase":{"aws:SourceAccount":"123456789012"}}`,
+		restricts:   true,
+		sourceScope: true,
+	},
+	{
+		name:        "StringEquals on SourceOrgID",
+		cond:        `{"StringEquals":{"aws:SourceOrgID":"o-abc123"}}`,
+		restricts:   true,
+		sourceScope: true,
+	},
+	{
+		name:        "a SourceArn value whose letters spell the ARN scaffolding is still a concrete value",
+		cond:        `{"StringEquals":{"aws:SourceArn":"arnaws"}}`,
+		restricts:   true,
+		sourceScope: true,
+	},
+	{
+		name:        "ArnLike on SourceArn with a bare partition wildcard matches every ARN",
+		cond:        `{"ArnLike":{"aws:SourceArn":"arn:*"}}`,
+		sourceScope: true,
+	},
+	{
+		name:        "a set prefix IAM does not define is an unknown operator",
+		cond:        `{"Bogus:StringEquals":{"aws:SourceArn":"arn:aws:s3:::example-bucket"}}`,
+		sourceScope: true,
+	},
+	{
+		name: "FunctionUrlAuthType NONE lets anyone invoke the URL",
+		cond: `{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}`,
+	},
+	{
+		name:      "FunctionUrlAuthType AWS_IAM demands a signed request",
+		cond:      `{"StringEquals":{"lambda:FunctionUrlAuthType":"AWS_IAM"}}`,
+		restricts: true,
+	},
 }
 
 // A wildcard-principal Allow is public unless its condition positively
@@ -145,14 +187,17 @@ func TestHasServicePrincipalWithoutSourceScope_OperatorTableDecidesScoping(t *te
 	}
 }
 
-// aws:SourceOrgID scopes a service trust to an organisation and is not one
-// of the keys that scope a wildcard principal, so it is deliberately absent
-// from the shared table. Narrowing the confused-deputy check to an
-// operator-aware rule must not drop it.
-func TestHasServicePrincipalWithoutSourceScope_SourceOrgIDStillScopes(t *testing.T) {
-	doc := `{"Statement":{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceOrgID":"o-abc123"}}}}`
-	if got := mustParse(t, doc).HasServicePrincipalWithoutSourceScope(); got != nil {
-		t.Errorf("HasServicePrincipalWithoutSourceScope() = %v, want nil: StringEquals on aws:SourceOrgID positively scopes the trust", got)
+// A source-IP range says where the caller connects from, not which account
+// it acts for. AWS services call a trusted role from AWS-owned addresses, so
+// an IP condition leaves the confused-deputy hole wide open even though the
+// same condition genuinely narrows a wildcard principal on a resource policy.
+// This is the one case where the two lanes must answer differently, which is
+// why it cannot be a row of the shared table.
+func TestHasServicePrincipalWithoutSourceScope_SourceIPIsNotConfusedDeputyScoping(t *testing.T) {
+	doc := `{"Statement":{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"IpAddress":{"aws:SourceIp":"203.0.113.0/24"}}}}`
+	got := mustParse(t, doc).HasServicePrincipalWithoutSourceScope()
+	if !strSliceEqual(got, []string{"lambda"}) {
+		t.Errorf("HasServicePrincipalWithoutSourceScope() = %v, want [lambda]: aws:SourceIp is not one of the source-scope keys", got)
 	}
 }
 
@@ -252,4 +297,31 @@ func TestEvaluate_WildcardRootPrincipalInEveryPartition(t *testing.T) {
 			}
 		})
 	}
+}
+
+// pw1FunctionURLPolicy is the resource policy AWS writes when a function URL
+// is created with the given auth type: a wildcard principal narrowed only by
+// lambda:FunctionUrlAuthType. With NONE the grant is what it says, an
+// endpoint anyone may invoke, and the enricher that reads it through the
+// engine has to say so.
+func pw1FunctionURLPolicy(name, authType string) string {
+	return `{"Version":"2012-10-17","Id":"default","Statement":[{"Sid":"FunctionURLAllowPublicAccess",` +
+		`"Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl",` +
+		`"Resource":"arn:aws:lambda:us-east-1:123456789012:function:` + name + `",` +
+		`"Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"` + authType + `"}}}]}`
+}
+
+func TestLambda_PublicPolicy_FunctionURLAuthTypeNoneIsPublic(t *testing.T) {
+	const name = "acme-url-policy-none"
+	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}}
+	res := pw1EnrichLambda(t, fake, name)
+	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
+		"invokable by anyone", domain.SevBroken, "wave2:lambda")
+}
+
+func TestLambda_PublicPolicy_FunctionURLAuthTypeIAMIsHealthy(t *testing.T) {
+	const name = "acme-url-policy-iam"
+	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "AWS_IAM")}}
+	res := pw1EnrichLambda(t, fake, name)
+	pw1RequireNoFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy)
 }
