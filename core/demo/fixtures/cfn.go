@@ -324,7 +324,7 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/cccc5555-dddd-6666-eeee-777777777777"),
 			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
-		// DELETE_COMPLETE → Dim (cfnStackColor). DescribeStacks still reports a
+		// DELETE_COMPLETE → Dim (cfnStackFindings). DescribeStacks still reports a
 		// recently torn-down stack for a retention window after deletion.
 		{
 			StackName:                   aws.String("acme-decommissioned-poc"),
