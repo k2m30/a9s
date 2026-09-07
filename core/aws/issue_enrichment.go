@@ -90,6 +90,16 @@ func formatDate(t interface{ Format(string) string }) string {
 	return t.Format("2006-01-02")
 }
 
+// Wave2EmissionObserver, when non-nil, receives every Finding setWave2Finding
+// builds, before the same-code collapse below keeps only the first emission of
+// a code. Nothing in the app installs one — it is the only seam from which the
+// phrase/severity/detail a second emission of a (resourceID, code) carries is
+// observable at all, since the collapse discards it.
+//
+// An observer must be safe for concurrent use: enrichers emit from
+// ForEachParallel workers, and not all of them hold a lock across the call.
+var Wave2EmissionObserver func(resourceID string, f domain.Finding)
+
 // setWave2Finding writes a Wave-2 Finding + AttentionDetail pair into the
 // IssueEnricherResult maps. Every enricher constructs its emission via this
 // helper rather than re-implementing the glyph→Severity mapping and the
@@ -147,14 +157,18 @@ func setWave2Finding(
 	shortName string,
 	rows []domain.DetailRow,
 ) {
-	if !slices.ContainsFunc(r.Findings[resourceID], func(f domain.Finding) bool { return f.Code == code }) {
-		r.Findings[resourceID] = append(r.Findings[resourceID], domain.Finding{
-			Code:     code,
-			Phrase:   phrase,
-			Detail:   catalog.Detail(code),
-			Severity: glyphToSeverity(severityGlyph),
-			Source:   "wave2:" + shortName,
-		})
+	f := domain.Finding{
+		Code:     code,
+		Phrase:   phrase,
+		Detail:   catalog.Detail(code),
+		Severity: glyphToSeverity(severityGlyph),
+		Source:   "wave2:" + shortName,
+	}
+	if Wave2EmissionObserver != nil {
+		Wave2EmissionObserver(resourceID, f)
+	}
+	if !slices.ContainsFunc(r.Findings[resourceID], func(g domain.Finding) bool { return g.Code == code }) {
+		r.Findings[resourceID] = append(r.Findings[resourceID], f)
 	}
 
 	if len(rows) > 0 {
