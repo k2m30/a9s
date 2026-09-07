@@ -24,6 +24,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
@@ -240,17 +241,133 @@ func TestCauseOf_ClassWordsComeFromTheClassTable(t *testing.T) {
 	if got, want := awsclient.CauseOf(timeoutShapedErr()), "timeout"; got != want {
 		t.Errorf("CauseOf(timeout) = %q, want %q", got, want)
 	}
+	// INVERTED by the acceptance ruling on pass 1 (spec "After acceptance
+	// pass 1" (a)): a transport failure's own words are a URL and a socket
+	// address, which name the endpoint and not the failure, so the class now
+	// supplies the phrase. The old assertion required "no such host" — the
+	// hostname it arrives with is exactly what must not reach the screen. Do
+	// not restore it.
 	cause := awsclient.CauseOf(transportShapedErr())
 	if strings.Contains(cause, "operation error") {
 		t.Errorf("CauseOf(transport) = %q keeps the SDK operation prefix", cause)
 	}
-	if !strings.Contains(cause, "no such host") {
-		t.Errorf("CauseOf(transport) = %q drops what the operator can act on", cause)
+	if cause != "transport failure" {
+		t.Errorf("CauseOf(transport) = %q, want the transport class's own phrase", cause)
+	}
+	if strings.Contains(cause, "codeartifact.eu-central-2.amazonaws.com") {
+		t.Errorf("CauseOf(transport) = %q carries the endpoint address", cause)
 	}
 	if awsclient.CauseOf(nil) != "" {
 		t.Errorf("CauseOf(nil) = %q, want empty", awsclient.CauseOf(nil))
 	}
 	if !errors.Is(timeoutShapedErr(), context.DeadlineExceeded) {
 		t.Fatal("fixture drift: the timeout-shaped error no longer unwraps to context.DeadlineExceeded")
+	}
+}
+
+// refusedTransportErr is a transport failure that is NOT a region gap: the
+// endpoint resolved and the connection was refused. A DNS not-found takes the
+// dedicated "service not available in region" path instead.
+func refusedTransportErr() error {
+	return &smithy.OperationError{
+		ServiceID: "EC2", OperationName: "DescribeInstances",
+		Err: &url.Error{Op: "Post", URL: "https://ec2.eu-west-1.amazonaws.com/",
+			Err: &net.OpError{Op: "dial", Net: "tcp",
+				Addr: &net.TCPAddr{IP: net.IPv4(203, 0, 113, 7), Port: 443},
+				Err:  errors.New("connect: connection refused")}},
+	}
+}
+
+// probeAllTypes drives one probe failure per resource type through the runtime
+// and applies the resulting intents, the shape a sweep in which every type
+// fails the same way takes.
+func probeAllTypes(t *testing.T, c *app.Controller, core *runtime.Core, err error, types []string) {
+	t.Helper()
+	// One more type is expected than is delivered, so the sweep stays in
+	// flight: its completion emits ClearFlash, which would wipe the very
+	// failure text this drives to the screen.
+	core.Session().AvailTotal = len(types) + 1
+	for _, shortName := range types {
+		intents, _ := core.HandleEvent(messages.AvailabilityChecked{
+			ResourceType: shortName,
+			Err:          err,
+			Gen:          core.Session().AvailabilityGen,
+		})
+		c.ApplyIntents(intents)
+	}
+}
+
+// TestProbeFailure_RowTitleAndLogAgreeOnTheClass pins that a timed-out and an
+// unreachable probe read as themselves everywhere the operator meets them: the
+// row's alias column, the account-wide title when every type failed that way,
+// and the flash the failure logs. Before this, both read "error" on the row
+// while the log said "timeout" — two tables, two vocabularies.
+func TestProbeFailure_RowTitleAndLogAgreeOnTheClass(t *testing.T) {
+	for _, tc := range []struct {
+		name, class, rowWord, sweepTitle string
+		err                              error
+	}{
+		{"timeout", "timeout", "timeout", "sweep: timeout", timeoutShapedErr()},
+		{"transport", "transport", "transport", "sweep: transport failure", refusedTransportErr()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := awsclient.ErrClass(tc.err); got != tc.class {
+				t.Fatalf("ErrClass = %q, want %q", got, tc.class)
+			}
+
+			// One type fails: the row carries the word, the title does not.
+			c, core := newTestControllerAndCore(t)
+			probeAllTypes(t, c, core, tc.err, []string{"ec2"})
+			if got := menuEntryByShortName(t, c, "ec2").Cause; got != tc.rowWord {
+				t.Errorf("menu row cause word = %q, want %q", got, tc.rowWord)
+			}
+			flash := c.Snapshot().Header.Flash.Text
+			if !strings.Contains(flash, tc.class) {
+				t.Errorf("probe flash %q does not name the class %q the row shows", flash, tc.class)
+			}
+			for _, banned := range []string{"https://", "203.0.113.7", "operation error"} {
+				if strings.Contains(flash, banned) {
+					t.Errorf("probe flash %q carries %q — an address is not a cause", flash, banned)
+				}
+			}
+			if cause := awsclient.CauseOf(tc.err); !strings.Contains(cause, tc.class) ||
+				strings.Contains(cause, "https://") || strings.Contains(cause, "203.0.113.7") {
+				t.Errorf("CauseOf = %q, want a phrase naming %q with no URL or address", cause, tc.class)
+			}
+
+			// Every type fails the same way: one phrase in the title instead.
+			cAll, coreAll := newTestControllerAndCore(t)
+			probeAllTypes(t, cAll, coreAll, tc.err, resource.AllShortNames())
+			title := cAll.MenuFrameTitle()
+			if !strings.Contains(title, tc.sweepTitle) {
+				t.Errorf("frame title = %q, want it to carry %q", title, tc.sweepTitle)
+			}
+		})
+	}
+}
+
+// TestErrClassTable_EveryClassHasARowWordAndASweepTitle is the completeness
+// gate: a class added to ErrClass without a word for the row and a phrase for
+// the title would render as the generic "error" on one surface and as itself
+// on another.
+func TestErrClassTable_EveryClassHasARowWordAndASweepTitle(t *testing.T) {
+	classes := awsclient.NamedErrClasses()
+	if len(classes) == 0 {
+		t.Fatal("NamedErrClasses is empty — the gate is not looking at the class table")
+	}
+	for _, class := range classes {
+		word := awsclient.RowWord(class)
+		if word == "" || word == "error" {
+			t.Errorf("class %q has no row word of its own (got %q) — it would read as a generic error on the menu row", class, word)
+		}
+		if awsclient.SweepTitleForWord(word) == "" {
+			t.Errorf("class %q (row word %q) has no account-wide sweep title", class, word)
+		}
+	}
+	if got := awsclient.RowWord(""); got != "" {
+		t.Errorf("RowWord(\"\") = %q, want empty — no failure, no word", got)
+	}
+	if got := awsclient.RowWord("SomeUnmodeledAWSCode"); got != "error" {
+		t.Errorf("RowWord(unmodeled code) = %q, want %q", got, "error")
 	}
 }

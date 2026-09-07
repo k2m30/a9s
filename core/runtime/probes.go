@@ -824,10 +824,10 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 					softFailures = append(softFailures, fmt.Sprintf("%s: service not available in region %s", shortName, region))
 					continue
 				}
-				failures = append(failures, fmt.Sprintf("%s: %v", shortName, err))
+				failures = append(failures, fmt.Sprintf("%s: %s", shortName, awsclient.CauseOf(err)))
 				continue
 			}
-			softFailures = append(softFailures, fmt.Sprintf("%s: %v", shortName, err))
+			softFailures = append(softFailures, fmt.Sprintf("%s: %s", shortName, awsclient.CauseOf(err)))
 		}
 		entries[shortName] = len(result.Resources)
 		// Preserve full pagination meta so the seeded ResourceCache entry's

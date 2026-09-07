@@ -18,7 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/aws/smithy-go"
@@ -212,6 +214,13 @@ func ErrClass(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "timeout"
 	}
+	// A call that never reached a service has no AWS error code to classify;
+	// its own text is a URL and a socket address, which name the endpoint but
+	// not the failure.
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return "transport"
+	}
 	code, _, _ := ClassifyAWSError(err)
 	switch code {
 	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
@@ -225,6 +234,61 @@ func ErrClass(err error) string {
 	}
 }
 
+// errClassPhrasing is the vocabulary a9s owns for the failure classes it names
+// itself: the cause the failure renders as, the word a menu row shows in its
+// alias column, and the phrase the title uses when every type in the sweep
+// failed this way. One table, so a class cannot read as itself on one surface
+// and as a generic error on another.
+//
+// An empty cause means the error's own words say more than the class does — a
+// denied call names the action the role lacks, an API error carries its
+// message — and CauseOf keeps them.
+var errClassPhrasing = map[string]struct{ cause, row, sweepTitle string }{
+	"timeout":       {"timeout", "timeout", "sweep: timeout"},
+	"transport":     {"transport failure", "transport", "sweep: transport failure"},
+	"access-denied": {"", "denied", "sweep: access denied"},
+	"expired":       {"", "expired", "session expired"},
+	"throttled":     {"", "throttled", "sweep: throttled"},
+}
+
+// unmodeledWord is what a row shows for a class a9s does not name itself: a
+// raw AWS error code, which the operator can act on no differently than on any
+// other failure.
+const unmodeledWord = "error"
+
+// RowWord returns the word a menu row shows for an error class. Empty for no
+// failure at all — a row with nothing to explain shows its alias instead.
+func RowWord(class string) string {
+	if class == "" {
+		return ""
+	}
+	if p, ok := errClassPhrasing[class]; ok {
+		return p.row
+	}
+	return unmodeledWord
+}
+
+// SweepTitleForWord returns the account-wide phrasing for a row word: what the
+// title says when EVERY probe in the sweep failed the same way, in place of one
+// mark per row.
+func SweepTitleForWord(word string) string {
+	if word == unmodeledWord {
+		return "sweep: error"
+	}
+	for _, p := range errClassPhrasing {
+		if p.row == word {
+			return p.sweepTitle
+		}
+	}
+	return ""
+}
+
+// NamedErrClasses returns every class a9s names itself, sorted. A class outside
+// this set is a raw AWS error code passed through by ErrClass.
+func NamedErrClasses() []string {
+	return slices.Sorted(maps.Keys(errClassPhrasing))
+}
+
 // CauseOf is the error-level entry to the same reduction AggregateFailures
 // applies per failure: what an operator can act on, with the per-call
 // transport noise removed. Every surface that renders a failure — a flash, a
@@ -233,12 +297,8 @@ func CauseOf(err error) string {
 	if err == nil {
 		return ""
 	}
-	// A timed-out call is the one class whose message text says nothing the
-	// class word does not: it is the SDK's retry bookkeeping, an attempt count
-	// and a zero status code. Every other class carries its own words — the
-	// action a role lacks, the API message — and keeps them.
-	if ErrClass(err) == "timeout" {
-		return "timeout"
+	if p, ok := errClassPhrasing[ErrClass(err)]; ok && p.cause != "" {
+		return p.cause
 	}
 	return causeOf(err.Error())
 }

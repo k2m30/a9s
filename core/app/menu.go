@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -560,7 +561,7 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 		}
 		cause := ""
 		if sweepCause == "" && ms.ProbeCause != nil {
-			cause = menuCauseWord(ms.ProbeCause[activeKey])
+			cause = awsclient.RowWord(ms.ProbeCause[activeKey])
 		}
 
 		badge := IssueBadge{}
@@ -639,34 +640,6 @@ func menuProgressIndicator(ms *MenuState) string {
 	return ""
 }
 
-// menuCauseWord maps the probe error class the runtime already recorded
-// (classifyProbeErr) to the word a row shows in its alias column. Anything the
-// operator cannot act on differently reads as a plain "error".
-func menuCauseWord(errClass string) string {
-	switch errClass {
-	case "access-denied":
-		return "denied"
-	case "expired":
-		return "expired"
-	case "throttled":
-		return "throttled"
-	case "":
-		return ""
-	default:
-		return "error"
-	}
-}
-
-// menuSweepTitles is the account-wide phrasing of a cause: what the title says
-// when EVERY probe in the sweep failed the same way, in place of one mark per
-// row.
-var menuSweepTitles = map[string]string{
-	"denied":    "sweep: access denied",
-	"expired":   "session expired",
-	"throttled": "sweep: throttled",
-	"error":     "sweep: error",
-}
-
 // menuSweepCause returns the account-wide failure phrase when every probe in
 // the sweep failed for the same cause — an expired session or a role denied
 // everywhere is one fact about the session, not 71 facts about resource types.
@@ -683,7 +656,7 @@ func menuSweepCause(ms *MenuState) string {
 	}
 	word := ""
 	for _, errClass := range ms.ProbeCause {
-		w := menuCauseWord(errClass)
+		w := awsclient.RowWord(errClass)
 		if word == "" {
 			word = w
 		}
@@ -691,7 +664,7 @@ func menuSweepCause(ms *MenuState) string {
 			return ""
 		}
 	}
-	return menuSweepTitles[word]
+	return awsclient.SweepTitleForWord(word)
 }
 
 // menuPageSize is the default cursor jump for PageUp/PageDown when the renderer
