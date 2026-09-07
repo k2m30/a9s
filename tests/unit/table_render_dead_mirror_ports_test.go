@@ -83,7 +83,8 @@ func wave3MarkerColOf(t *testing.T, c *app.Controller) int {
 // IdentityColumnIndex cascade — port of resolve_identity_internal_test.go's
 // TestResolveIdentityColumn_* cases (cascade order: 1. td.IdentityKey matches
 // a column's key; 2. column key == "name"; 3. column title equals "Name"
-// (case-insensitive) or td.Name; 4. fall back to index 0). The dead test's EmptyColumns case is dropped —
+// (case-insensitive) or td.Name; 4. fall back to index 0). The dead test's
+// EmptyColumns case is dropped —
 // config.GetViewDef only replaces defaults when len(userDef.List) > 0, so an
 // intentionally-empty column list cannot be driven through this live seam;
 // the guard itself is a trivial zero-iteration loop with no branch to lose.
