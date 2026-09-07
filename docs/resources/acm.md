@@ -70,27 +70,27 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Healthy.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == PENDING_VALIDATION`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == PENDING_VALIDATION`. — emits `acm.status.pending-validation`
   - **State bucket**: Warning.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == EXPIRED`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == EXPIRED`. — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == REVOKED`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == REVOKED`. — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == FAILED`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == FAILED`. — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == VALIDATION_TIMED_OUT`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == VALIDATION_TIMED_OUT`. — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == INACTIVE`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == INACTIVE`. — emits `acm.status.inactive`
   - **State bucket**: Dim.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
@@ -152,12 +152,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == PENDING_VALIDATION` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `validating DNS` |
-| `Status == EXPIRED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `expired` |
-| `Status == REVOKED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `revoked` |
-| `Status == FAILED` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `issuance failed` |
-| `Status == VALIDATION_TIMED_OUT` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `validation timed out` |
-| `Status == INACTIVE` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `inactive` |
+| `Status == PENDING_VALIDATION` — emits `acm.status.pending-validation` | 1 | Warning | n/a | S2, S4 | `validating DNS` |
+| `Status == EXPIRED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `expired` |
+| `Status == REVOKED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `revoked` |
+| `Status == FAILED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `issuance failed` |
+| `Status == VALIDATION_TIMED_OUT` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `validation timed out` |
+| `Status == INACTIVE` — emits `acm.status.inactive` | 1 | Dim | n/a | S2, S4 | `inactive` |
 | `NotAfter within 30 days` | 1 | Warning | n/a | S2, S4 | `expires in <N>d` |
 | `NotAfter within 7 days` | 1 | Broken | n/a | S2, S4 | `expires in <N>d` |
 | `InUse == false on non-expired cert` | 1 | Warning | n/a | S2, S4 | `not in use` |
@@ -204,6 +204,9 @@ acm — DNS & CDN. Lifecycle key: `status`.
 | acm.expires-critical | expires in <N> days | broken | wave1 | — |
 | acm.expires-soon | expires in <N> days | warn | wave1 | — |
 | acm.orphan | certificate not in use (orphan) | warn | wave1 | — |
+| acm.status.pending-validation | pending validation | warn | wave1 | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |
+| acm.status.failed | <status, in words> | broken | wave1 | The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it. |
+| acm.status.inactive | inactive | dim | wave1 | An imported certificate marked inactive, because nothing is using it to terminate TLS. It costs nothing to keep, so this is a note rather than a fault; delete it once you are sure nothing will need it. |
 | acm.weak-key | weak key algorithm | warn | wave1 | The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key. |
 <!-- END GENERATED: findings -->
 

@@ -127,7 +127,7 @@ lines under "Not yet implemented".
 | `asg` | Auto Scaling Groups | wave2 | `asg.launch-config.public-ip` | launch configuration assigns public IPs | warn | Every instance this group launches gets a routable public address, so each new instance is reachable from the internet on whatever its security groups leave open. Copy the launch configuration to a launch template with public address assignment off. |
 | `asg` | Auto Scaling Groups | wave2 | `asg.launch-config.secret` | credential in launch configuration user data | broken | A credential is pasted into the launch configuration's user data, so it is readable by anyone who can call autoscaling:DescribeLaunchConfigurations and lands on every instance the group starts. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it. |
 | `ebs` | EBS Volumes | wave1 | `ebs.state.creating` | creating | warn | — |
-| `ebs` | EBS Volumes | wave1 | `ebs.state.deleting` | deleting | warn | — |
+| `ebs` | EBS Volumes | wave1 | `ebs.state.deleting` | deleting | warn | The volume is being deleted; its data is going with it and nothing else about it is worth reporting until it is gone. |
 | `ebs` | EBS Volumes | wave1 | `ebs.state.error` | error | broken | — |
 | `ebs` | EBS Volumes | wave1 | `ebs.orphan-unattached` | orphan: unattached Nd | warn | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
 | `ebs` | EBS Volumes | wave1 | `ebs.encryption.disabled` | unencrypted | warn | Volume is not encrypted at rest — re-create from encrypted snapshot. |
@@ -502,6 +502,9 @@ lines under "Not yet implemented".
 | `acm` | ACM Certificates | wave1 | `acm.expires-critical` | expires in <N> days | broken | — |
 | `acm` | ACM Certificates | wave1 | `acm.expires-soon` | expires in <N> days | warn | — |
 | `acm` | ACM Certificates | wave1 | `acm.orphan` | certificate not in use (orphan) | warn | — |
+| `acm` | ACM Certificates | wave1 | `acm.status.pending-validation` | pending validation | warn | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |
+| `acm` | ACM Certificates | wave1 | `acm.status.failed` | <status, in words> | broken | The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it. |
+| `acm` | ACM Certificates | wave1 | `acm.status.inactive` | inactive | dim | An imported certificate marked inactive, because nothing is using it to terminate TLS. It costs nothing to keep, so this is a note rather than a fault; delete it once you are sure nothing will need it. |
 | `acm` | ACM Certificates | wave1 | `acm.weak-key` | weak key algorithm | warn | The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key. |
 | `apigw` | API Gateways | wave2 | `apigw.no-deployed-stages` | no deployed stages | warn | — |
 | `apigw` | API Gateways | wave2 | `apigw.stage-config-issues` | no throttling configured (DoS risk); access logs disabled | warn | — |
