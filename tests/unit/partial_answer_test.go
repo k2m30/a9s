@@ -869,3 +869,170 @@ func TestPartialRedshift_ParameterWalkCutShortIsNotAnEmptyAnswer(t *testing.T) {
 		partialAssertInspected(t, res, id)
 	})
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// row 10 — backup: a Conditions block the flat tag list cannot represent
+// ───────────────────────────────────────────────────────────────────────────
+
+// partialRow10Volume is w7Volume carrying exactly the tags a case needs, so
+// what the selection does and does not take in is decided by the condition
+// under test rather than by the fixture's own tags.
+func partialRow10Volume(tags map[string]string) resource.Resource {
+	r := w7Volume("in-use")
+	vol := r.RawStruct.(ec2types.Volume)
+	vol.Tags = nil
+	for k, v := range tags {
+		vol.Tags = append(vol.Tags, ec2types.Tag{Key: aws.String(k), Value: aws.String(v)})
+	}
+	r.RawStruct = vol
+	return r
+}
+
+func partialRow10Param(key, value string) backuptypes.ConditionParameter {
+	return backuptypes.ConditionParameter{
+		ConditionKey:   aws.String("aws:ResourceTag/" + key),
+		ConditionValue: aws.String(value),
+	}
+}
+
+// partialRow10Plan runs the real plans fetcher over one selection carrying
+// conditions, and returns the plan row alongside the cache the join reads.
+func partialRow10Plan(t *testing.T, conditions *backuptypes.Conditions) (resource.Resource, resource.ResourceCache) {
+	t.Helper()
+	cacheEntry := partialBackupCache(t, &partialBackupFake{
+		selections: [][]backuptypes.BackupSelectionsListMember{{partialBackupSelectionMember("sel-conditions")}},
+		selectionByID: map[string]backuptypes.BackupSelection{
+			"sel-conditions": partialBackupSelection(nil, conditions),
+		},
+	})
+	plans := cacheEntry["backup"].Resources
+	if len(plans) != 1 {
+		t.Fatalf("the fetcher returned %d plan rows, want 1", len(plans))
+	}
+	return plans[0], cacheEntry
+}
+
+// TestPartialRow10_ConditionsTheFlatListCannotRepresentAbstain pins the limit
+// of the flat selection_tags list. That list is an OR of "k=v" pairs, while a
+// Conditions block is an AND across its four operators — so the only blocks
+// the list can carry without changing their meaning are the ones holding a
+// single positive parameter. Anything else read through the flat list widens
+// what the plan appears to cover, and a plan that appears to cover more is a
+// plan that silences warnings it has no business silencing.
+//
+// The rule is the same one row 5 established for a walk that was cut short:
+// abstain rather than model. A block a9s cannot represent is a selection it
+// did not finish reading.
+func TestPartialRow10_ConditionsTheFlatListCannotRepresentAbstain(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		conditions  *backuptypes.Conditions
+		tags        map[string]string
+		wantPartial bool
+		wantWarning bool
+	}{
+		{
+			// A negative operator has no "k=v" spelling at all, so today it
+			// folds to nothing and the volume it selects reads uncovered.
+			name: "one negative parameter",
+			conditions: &backuptypes.Conditions{
+				StringNotEquals: []backuptypes.ConditionParameter{partialRow10Param("environment", "sandbox")},
+			},
+			tags:        map[string]string{"environment": "production"},
+			wantPartial: true,
+			wantWarning: false,
+		},
+		{
+			name: "one negative wildcard parameter",
+			conditions: &backuptypes.Conditions{
+				StringNotLike: []backuptypes.ConditionParameter{partialRow10Param("environment", "sandbox*")},
+			},
+			tags:        map[string]string{"environment": "production"},
+			wantPartial: true,
+			wantWarning: false,
+		},
+		{
+			// Two parameters are an AND; the flat list ORs them, so a volume
+			// carrying either one alone reads covered when the plan selects
+			// neither. This volume carries neither, and today it warns while
+			// the plan's real reach is unknown.
+			name: "two positive parameters in one block",
+			conditions: &backuptypes.Conditions{
+				StringEquals: []backuptypes.ConditionParameter{
+					partialRow10Param("backup", "nightly"),
+					partialRow10Param("tier", "critical"),
+				},
+			},
+			tags:        map[string]string{"environment": "production"},
+			wantPartial: true,
+			wantWarning: false,
+		},
+		{
+			// Two parameters still count as two when they are spread across
+			// operators, which is the shape the console produces for
+			// "tagged nightly AND named prod-anything".
+			name: "one parameter in each positive operator",
+			conditions: &backuptypes.Conditions{
+				StringEquals: []backuptypes.ConditionParameter{partialRow10Param("backup", "nightly")},
+				StringLike:   []backuptypes.ConditionParameter{partialRow10Param("environment", "prod*")},
+			},
+			tags:        map[string]string{"environment": "production"},
+			wantPartial: true,
+			wantWarning: false,
+		},
+		{
+			// The shapes the flat list represents exactly keep their fold. A
+			// single positive parameter is its own AND, so "k=v" says the
+			// whole thing.
+			name: "a single StringEquals still covers what it names",
+			conditions: &backuptypes.Conditions{
+				StringEquals: []backuptypes.ConditionParameter{partialRow10Param("backup", "nightly")},
+			},
+			tags:        map[string]string{"backup": "nightly"},
+			wantPartial: false,
+			wantWarning: false,
+		},
+		{
+			name: "a single StringLike still covers what it globs",
+			conditions: &backuptypes.Conditions{
+				StringLike: []backuptypes.ConditionParameter{partialRow10Param("environment", "prod*")},
+			},
+			tags:        map[string]string{"environment": "production"},
+			wantPartial: false,
+			wantWarning: false,
+		},
+		{
+			// The negative half. A block a9s does represent still decides, so
+			// the abstention above cannot be a blanket one: a volume this
+			// selection does not name is uncovered, and says so.
+			name: "a single StringEquals still reports what it misses",
+			conditions: &backuptypes.Conditions{
+				StringEquals: []backuptypes.ConditionParameter{partialRow10Param("backup", "nightly")},
+			},
+			tags:        map[string]string{"backup": "weekly"},
+			wantPartial: false,
+			wantWarning: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, plans := partialRow10Plan(t, tc.conditions)
+
+			// selections_partial is the field the coverage join reads to tell
+			// a plan it could not finish reading from one that protects
+			// nothing.
+			gotPartial := plan.Fields["selections_partial"] != ""
+			if gotPartial != tc.wantPartial {
+				t.Errorf("plan row selections_partial = %q, want partial = %v; selection_tags folded to %q",
+					plan.Fields["selections_partial"], tc.wantPartial, plan.Fields["selection_tags"])
+			}
+
+			res := w7EnrichEBS(t, []resource.Resource{partialRow10Volume(tc.tags)}, plans)
+			if tc.wantWarning {
+				w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
+					"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+				return
+			}
+			w4AssertNoCode(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan)
+		})
+	}
+}
