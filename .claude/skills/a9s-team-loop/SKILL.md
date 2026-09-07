@@ -135,6 +135,7 @@ The orchestrator dispatches, integrates, and writes nothing else — with one fa
 - **Acceptance after every sign-off**, on a clean detached checkout of the landed tip, with the spec and its rulings as criteria. Never one integrated pass at the end.
 - **After a usage-limit reset, resume by name.** The agent keeps its transcript; `git status` in its worktree and the log say where it stopped. Never re-dispatch a fresh agent into a tree with half a round in it.
 - **Route every `deferred:` line** to the owning spec or the backlog with an owner before the next dispatch into that worktree.
+- **A round's gates match the round's diff, not the task.** The per-round contract is `make test` and `make lint` (what the stop hook reads), plus `make mdlint` when a `.md` moved and `make check-catalogen` when a doc or catalog literal moved. `make integration`, `make snapshot`, the smokes and `make test-race` run once per task: in the QA verify round that follows a rendering, runtime or fixture change, and in `make ready-to-push` at landing. A dispatch never asks a prose or one-line round for them (the user's rule, 2026-09-07: "reevaluate running long integration test for every one liner"; the unit suite alone is three minutes, integration and race together add ten).
 
 ### Landing checklist
 
