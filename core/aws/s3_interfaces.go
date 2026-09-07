@@ -93,6 +93,15 @@ type S3GetObjectLockConfigurationAPI interface {
 	GetObjectLockConfiguration(ctx context.Context, params *s3.GetObjectLockConfigurationInput, optFns ...func(*s3.Options)) (*s3.GetObjectLockConfigurationOutput, error)
 }
 
+// S3HeadBucketAPI defines the interface for the S3 HeadBucket operation. It
+// is the only call that answers whether a bucket exists when the bucket is
+// not this account's, so it is reached by type assertion from the cf issue
+// enricher rather than joined to the S3API aggregate, which every fetcher's
+// client has to satisfy.
+type S3HeadBucketAPI interface {
+	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+}
+
 // S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
 // *s3.Client structurally satisfies this interface.
 type S3API interface {

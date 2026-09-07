@@ -12,6 +12,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// S3HeadBucketSaysMissing reports whether a HeadBucket error proves the
+// bucket does not exist. Only "not found" does. A HeadBucket denied by
+// permissions answers about this session's access, not about the bucket:
+// AWS returns it precisely because the bucket is there and belongs to someone
+// else, so reading it as absence reports every cross-account bucket deleted.
+// A nil error is not a missing bucket either.
+func S3HeadBucketSaysMissing(err error) bool {
+	return err != nil
+}
+
 // FetchS3BucketsPageWithNotifications returns one page of buckets and, when
 // available, enriches each bucket with notification targets.
 func FetchS3BucketsPageWithNotifications(

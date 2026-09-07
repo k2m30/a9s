@@ -31,6 +31,44 @@ const (
 	CodeR53DanglingRecord domain.FindingCode = "r53.dangling-record"
 )
 
+// The four answers R53AddressOwnership gives about one address. They are a
+// closed vocabulary: a record is only dangling when the address was provably
+// this account's and provably is not now, and every other answer renders as
+// something other than broken.
+const (
+	// R53AddrHeld — an elastic IP, instance or network interface in this
+	// account holds the address right now.
+	R53AddrHeld = "held"
+	// R53AddrReleased — the account's inventory proves the address was this
+	// account's and has been given up. This is the dangling case.
+	R53AddrReleased = "released"
+	// R53AddrOutside — nothing in this account has ever accounted for the
+	// address, so it belongs to another account, another provider or
+	// somewhere off AWS entirely, and this account cannot judge it.
+	R53AddrOutside = "outside"
+	// R53AddrUnknown — an inventory the verdict depends on was absent or
+	// truncated, so the address may simply be on a page nobody loaded.
+	R53AddrUnknown = "unknown"
+)
+
+// R53AddressOwnership says what this account can prove about a public address
+// a record points at. It reads the account's own inventory out of the cache,
+// which is the only evidence a read-only session has.
+//
+// An address the account does not hold is not thereby released: absence from
+// an inventory is absence of evidence, and treating it as proof turns a record
+// pointing at a CDN, another account or on-premises into a broken finding.
+func R53AddressOwnership(addr string, cache resource.ResourceCache) string {
+	held := heldPublicAddresses(cache)
+	if held == nil {
+		return R53AddrUnknown
+	}
+	if held[addr] {
+		return R53AddrHeld
+	}
+	return R53AddrReleased
+}
+
 // heldPublicAddresses returns every public address the account holds, or nil
 // when any of the three caches is absent or truncated — in which case an
 // address missing from them may simply be on a page nobody loaded.

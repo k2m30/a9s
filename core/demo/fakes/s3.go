@@ -95,6 +95,20 @@ func (f *S3Fake) GetBucketNotificationConfiguration(_ context.Context, input *s3
 	return &s3.GetBucketNotificationConfigurationOutput{}, nil
 }
 
+// HeadBucket answers for the fixture buckets only. A name no fixture carries
+// is absent from this account, which is what NotFound means.
+func (f *S3Fake) HeadBucket(_ context.Context, input *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("HeadBucket: bucket name is required")
+	}
+	for _, b := range f.fix.Buckets {
+		if b.Name != nil && *b.Name == *input.Bucket {
+			return &s3.HeadBucketOutput{}, nil
+		}
+	}
+	return nil, &s3types.NotFound{}
+}
+
 func (f *S3Fake) GetBucketLocation(_ context.Context, input *s3.GetBucketLocationInput, _ ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
 	if input.Bucket == nil {
 		return nil, fmt.Errorf("GetBucketLocation: bucket name is required")

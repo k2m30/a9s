@@ -92,6 +92,21 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 	return "", domain.DetailRow{}, false
 }
 
+// ELBListenerIsPlaintext reports whether a listener carries traffic no one
+// encrypted. HTTP does. TCP is a byte pipe, so what it carries depends on the
+// port: a TCP listener on 443 is TLS passthrough — the session terminates on
+// the target rather than on the balancer — while one on a conventionally
+// plaintext port is clear traffic. TLS and HTTPS terminate on the balancer
+// and are never plaintext.
+//
+// The load balancer type is not a parameter: an Application Load Balancer
+// speaks only HTTP and HTTPS, a Network one only TCP, TLS, UDP and the rest,
+// so the protocol already says which kind of balancer it is on.
+func ELBListenerIsPlaintext(protocol elbtypes.ProtocolEnum, port int32) bool {
+	return protocol == elbtypes.ProtocolEnumHttp ||
+		(protocol == elbtypes.ProtocolEnumTcp && port == 443)
+}
+
 // redirectsToHTTPS reports whether every default action of the listener sends
 // the client to HTTPS instead of serving the request in the clear.
 func redirectsToHTTPS(listener elbtypes.Listener) bool {
