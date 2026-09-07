@@ -275,11 +275,13 @@ func TestCitesCodeartifactPublicAccessDescribedByTheEngine(t *testing.T) {
 
 // docSignalRow is one row of a resource doc's hand-written §4 table.
 type docSignalRow struct {
-	line      int
-	condition string
-	waveWord  string
-	stateWord string
-	listText  string
+	line       int
+	condition  string
+	waveWord   string
+	stateWord  string
+	glyphCell  string
+	surfaceTxt string
+	listText   string
 	// deferred is set when the row's condition carries the page's
 	// "not implemented" marker in the one shape the docs spell it.
 	deferred bool
@@ -308,11 +310,13 @@ func parseDocSignalTable(t *testing.T, path string) ([]docSignalRow, bool) {
 	lines := readLines(t, path)
 
 	waveCol, stateCol, textCol, condCol := -1, -1, -1, 0
+	glyphCol, surfaceCol := -1, -1
 	var rows []docSignalRow
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "|") {
 			waveCol, stateCol, textCol, condCol = -1, -1, -1, 0
+			glyphCol, surfaceCol = -1, -1
 			continue
 		}
 		cells := splitTableRow(trimmed)
@@ -327,6 +331,10 @@ func parseDocSignalTable(t *testing.T, path string) ([]docSignalRow, bool) {
 					textCol = c
 				case strings.HasPrefix(cell, "Signal"):
 					condCol = c
+				case strings.EqualFold(cell, "Severity"):
+					glyphCol = c
+				case strings.HasPrefix(cell, "Surfaces"):
+					surfaceCol = c
 				}
 			}
 			continue
@@ -344,6 +352,12 @@ func parseDocSignalTable(t *testing.T, path string) ([]docSignalRow, bool) {
 		}
 		if condCol < len(cells) {
 			row.condition = cells[condCol]
+		}
+		if glyphCol >= 0 && glyphCol < len(cells) {
+			row.glyphCell = docGlyphCell(cells[glyphCol])
+		}
+		if surfaceCol >= 0 && surfaceCol < len(cells) {
+			row.surfaceTxt = cells[surfaceCol]
 		}
 		row.deferred = reDeferredMarker.MatchString(row.condition)
 		row.markerOffShape = !row.deferred && strings.Contains(row.condition, "NOT IMPLEMENTED")
@@ -423,7 +437,55 @@ const (
 	kindWave       = "wrong wave"
 	kindBucket     = "wrong bucket"
 	kindMarker     = "stale not-implemented marker"
+	kindGlyph      = "wrong severity glyph"
+	kindSurfaces   = "wrong surfaces"
+	kindNoSignals  = "claims no signals in a wave that ships one"
+	kindNoFinding  = "claims no finding row for a registered finding"
 )
+
+// expectedGlyph derives the Severity cell of a §4 row from the finding alone.
+// The renderer is the only source: core/app/list_columns.go
+// resolveListDecoratorFull gives a row a glyph only when `td.ResolveColor`
+// returns Healthy, `!` for a SevBroken finding and `~` for a SevWarn one. A
+// wave-1 issue-severity finding colours the row itself, so it is never on a
+// green row and never carries a glyph; SevDim has no case in that switch.
+func expectedGlyph(sig catalogSignal) string {
+	if sig.wave != "wave2" {
+		return "n/a"
+	}
+	switch sig.severity {
+	case "broken":
+		return "!"
+	case "warn":
+		return "~"
+	}
+	return "n/a"
+}
+
+// expectedS1 derives whether a finding reaches surface S1, the menu `issues:N`
+// count and the list-title `!N` suffix. Same one source: core/app/list_body.go
+// counts a row whose wave-1 colour is an issue (`ResolveColor(Wave1Only(r)).IsIssue()`,
+// which is Warning or Broken and not Dim), and `listHasBadgeFinding` plus the
+// findings-map branch add a wave-2 finding only at SevBroken — "~ findings do
+// not bump".
+func expectedS1(sig catalogSignal) bool {
+	if sig.wave == "wave2" {
+		return sig.severity == "broken"
+	}
+	return sig.severity == "broken" || sig.severity == "warn"
+}
+
+var reSurfaceCell = regexp.MustCompile(`S[1-5]`)
+
+// docGlyphCell normalises the Severity cell: the docs write it as `n/a`, as a
+// code-spanned glyph, and once as "`!` (counted)".
+func docGlyphCell(cell string) string {
+	cell = strings.TrimSpace(strings.Trim(strings.Fields(cell + " ")[0], "`"))
+	if cell == "" {
+		return "n/a"
+	}
+	return cell
+}
 
 // docOffender is one contradiction between a resource doc and the shipped
 // definitions, at the line a reader opens to fix it.
@@ -539,7 +601,7 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 	deferredConditions := notYetImplementedConditions(t)[shortName]
 
 	var offenders []docOffender
-	rendered := map[string]bool{}
+	rendered := map[string]int{}
 	for _, row := range rows {
 		if row.markerOffShape {
 			offenders = append(offenders, docOffender{row.line, kindMarker, fmt.Sprintf(
@@ -557,7 +619,7 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 			continue
 		}
 
-		rendered[row.listText] = true
+		rendered[row.listText]++
 
 		var matching []catalogSignal
 		for _, sig := range signals {
@@ -591,16 +653,64 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 					return sig.wave
 				}))})
 		}
-	}
 
-	for _, sig := range signals {
-		if !rendered[sig.phrase] {
-			offenders = append(offenders, docOffender{rows[0].line, kindMissingRow, fmt.Sprintf(
-				"the §4 table renders no row for the shipped finding %s (%s, %s); the table is one row per signal, "+
-					"so a shipped finding missing from it is a signal the doc tells the reader does not exist",
-				sig.phrase, sig.code, sig.severity)})
+		if strings.Contains(row.condition, "no finding row") {
+			offenders = append(offenders, docOffender{row.line, kindNoFinding, fmt.Sprintf(
+				"the row says %q has no finding row, and the catalog registers it as %q; "+
+					"a signal in the generated table is a finding by construction",
+				row.listText, signalWords(matching, func(sig catalogSignal) string { return sig.code }))})
+		}
+
+		if row.glyphCell != "" && !anySignal(matching, func(sig catalogSignal) bool {
+			return expectedGlyph(sig) == row.glyphCell
+		}) {
+			offenders = append(offenders, docOffender{row.line, kindGlyph, fmt.Sprintf(
+				"the row gives %q the glyph %q; the renderer gives a %s %s finding %q",
+				row.listText, row.glyphCell, matching[0].wave, matching[0].severity, expectedGlyph(matching[0]))})
+		}
+
+		if row.surfaceTxt != "" {
+			has := map[string]bool{}
+			for _, s := range reSurfaceCell.FindAllString(row.surfaceTxt, -1) {
+				has[s] = true
+			}
+			if !anySignal(matching, func(sig catalogSignal) bool { return has["S1"] == expectedS1(sig) }) {
+				offenders = append(offenders, docOffender{row.line, kindSurfaces, fmt.Sprintf(
+					"the row %s S1 for %q; a %s %s finding %s the menu count",
+					map[bool]string{true: "lists", false: "omits"}[has["S1"]], row.listText, matching[0].wave, matching[0].severity,
+					map[bool]string{true: "bumps", false: "does not bump"}[expectedS1(matching[0])])})
+			}
+			if !anySignal(matching, func(sig catalogSignal) bool {
+				return has["S3"] == (expectedGlyph(sig) != "n/a")
+			}) {
+				offenders = append(offenders, docOffender{row.line, kindSurfaces, fmt.Sprintf(
+					"the row %s S3 for %q, and S3 is the glyph; the renderer gives this finding %q",
+					map[bool]string{true: "lists", false: "omits"}[has["S3"]], row.listText, expectedGlyph(matching[0]))})
+			}
 		}
 	}
+
+	// One row per shipped finding, counted rather than looked up: two codes can
+	// share a phrase (`modifying` is both `redshift.warn.modifying` and
+	// `redshift.warn.availability_modifying`), and a single row for the pair
+	// documents one of the two conditions and hides the other.
+	codesForPhrase := map[string][]string{}
+	for _, sig := range signals {
+		codesForPhrase[sig.phrase] = append(codesForPhrase[sig.phrase], sig.code)
+	}
+	for phrase, codes := range codesForPhrase {
+		if rendered[phrase] >= len(codes) {
+			continue
+		}
+		sort.Strings(codes)
+		offenders = append(offenders, docOffender{rows[0].line, kindMissingRow, fmt.Sprintf(
+			"the §4 table renders %d row(s) for %q and the catalog ships %d finding(s) under that phrase (%s); "+
+				"the table is one row per signal, so a shipped finding missing from it is a signal the doc tells "+
+				"the reader does not exist",
+			rendered[phrase], phrase, len(codes), strings.Join(codes, ", "))})
+	}
+
+	offenders = append(offenders, noSignalClaimOffenders(t, path, signals)...)
 
 	sectionBuckets, sectionLine := docSectionBuckets(t, path)
 	tableBuckets := map[string]int{}
@@ -620,6 +730,34 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 
 	sort.SliceStable(offenders, func(i, j int) bool { return offenders[i].line < offenders[j].line })
 	return offenders, true
+}
+
+var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?: [a-z]+)* signals`)
+
+// noSignalClaimOffenders finds sentences telling the reader a wave carries
+// nothing for this type while the catalog ships a finding in it. The sentence
+// is the first thing a reader takes from §3, and it is read before the table
+// that contradicts it.
+func noSignalClaimOffenders(t *testing.T, path string, signals []catalogSignal) []docOffender {
+	t.Helper()
+	shipped := map[string]int{}
+	for _, sig := range signals {
+		shipped[sig.wave]++
+	}
+
+	var offenders []docOffender
+	for i, line := range readLines(t, path) {
+		m := reNoWaveSignals.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		if n := shipped["wave"+m[1]]; n > 0 {
+			offenders = append(offenders, docOffender{i + 1, kindNoSignals, fmt.Sprintf(
+				"the sentence says wave %s carries no signals, and the catalog ships %d of them in that wave",
+				m[1], n)})
+		}
+	}
+	return offenders
 }
 
 func anySignal(signals []catalogSignal, pred func(catalogSignal) bool) bool {
