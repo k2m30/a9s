@@ -19,6 +19,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -428,9 +429,10 @@ func TestW4RoleInlinePrivilegeEscalation(t *testing.T) {
 	}
 	r := w4FetchRole(t, fake, "acme-inline-escalate-role")
 
+	// Inverted for spec row "phrase": the combo moved from the phrase into the
+	// Combo rows, one per escalation combination. Do not restore the old phrase.
 	w4AssertFinding(t, r.Findings, w4CodeRoleInlinePrivEsc,
-		"inline policy allows privilege escalation: iam:CreateLoginProfile",
-		domain.SevBroken, "wave1")
+		catalog.Phrase(w4CodeRoleInlinePrivEsc), domain.SevBroken, "wave1")
 	w4AssertRows(t, r.AttentionDetails, w4CodeRoleInlinePrivEsc, []domain.DetailRow{
 		{Label: "Policy", Value: "acme-break-glass"},
 		{Label: "Combo", Value: "iam:CreateLoginProfile"},
@@ -614,7 +616,7 @@ func TestW4RoleFindingDefs(t *testing.T) {
 	}{
 		{w4CodeRoleWildcardTrust, w4PhraseRoleWildcardTrust, domain.SevBroken, "wave1"},
 		{w4CodeRoleConfusedDeputy, w4PhraseRoleConfusedDeputy, domain.SevWarn, "wave1"},
-		{w4CodeRoleInlinePrivEsc, "inline policy allows privilege escalation: <combo>", domain.SevBroken, "wave1"},
+		{w4CodeRoleInlinePrivEsc, "inline policy allows privilege escalation", domain.SevBroken, "wave1"},
 		{w4CodeRoleAdminAttached, w4PhraseRoleAdminAttached, domain.SevWarn, "wave2"},
 	}
 	for _, tc := range cases {

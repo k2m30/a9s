@@ -359,9 +359,11 @@ func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 	if len(listed.Resources) != 1 {
 		t.Fatalf("listed %d roles, want 1", len(listed.Resources))
 	}
+	// Inverted for spec row "phrase": the first matched combo was the phrase,
+	// which left every other combo on the inline policy unsayable. The combos
+	// are Combo rows now. Do not restore the old phrase.
 	w4AssertFinding(t, listed.Resources[0].Findings, d3CodeRoleInline,
-		"inline policy allows privilege escalation: iam:CreateLoginProfile",
-		domain.SevBroken, "wave1")
+		catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave1")
 
 	drilled, err := awsclient.FetchRolesByIDs(context.Background(), fake, []string{name})
 	if err != nil {
@@ -371,8 +373,7 @@ func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 		t.Fatalf("drilled %d roles, want 1", len(drilled))
 	}
 	w4AssertFinding(t, drilled[0].Findings, d3CodeRoleInline,
-		"inline policy allows privilege escalation: iam:CreateLoginProfile",
-		domain.SevBroken, "wave1")
+		catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave1")
 }
 
 // --- row 12: one decoder ----------------------------------------------------
