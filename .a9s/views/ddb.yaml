@@ -11,6 +11,7 @@ list:
   Size:
     key: size_bytes
     width: 14
+    sort_path: TableSizeBytes
   Billing:
     key: billing_mode
     width: 16

@@ -11,6 +11,7 @@ list:
   Size:
     key: image_size
     width: 12
+    sort_path: ImageSizeInBytes
   Scan Status:
     key: scan_status
     width: 14

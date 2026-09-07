@@ -5,6 +5,7 @@ list:
   Size:
     key: size
     width: 12
+    sort_path: Size
   Storage Class:
     path: StorageClass
     width: 16

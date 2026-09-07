@@ -7,6 +7,7 @@ list:
   Size:
     key: stored_bytes
     width: 14
+    sort_path: StoredBytes
   Retention:
     path: RetentionInDays
     width: 10

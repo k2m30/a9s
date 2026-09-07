@@ -8,6 +8,7 @@ list:
   TIME:
     key: time
     width: 15
+    sort_key: event_time
   ACTOR:
     key: _ct.actor
     width: 36

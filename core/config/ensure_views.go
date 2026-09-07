@@ -29,6 +29,12 @@ func GenerateViewYAML(v ViewDef) []byte {
 				fmt.Fprintf(&b, "    key: %s\n", col.Key)
 			}
 			fmt.Fprintf(&b, "    width: %d\n", col.Width)
+			if col.SortKey != "" {
+				fmt.Fprintf(&b, "    sort_key: %s\n", col.SortKey)
+			}
+			if col.SortPath != "" {
+				fmt.Fprintf(&b, "    sort_path: %s\n", col.SortPath)
+			}
 			if col.Humanize {
 				b.WriteString("    humanize: true\n")
 			}
