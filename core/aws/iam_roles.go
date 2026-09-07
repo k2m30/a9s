@@ -147,13 +147,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		if listPoliciesAPI != nil && getPolicyAPI != nil && roleName != "" {
 			var inline inlinePolicyScan
 			policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
-			if inline.finding != nil {
-				findings = append(findings, *inline.finding)
-				if details == nil {
-					details = map[domain.FindingCode]domain.AttentionDetail{}
-				}
-				details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: inline.rows}
-			}
+			findings, details = addInlinePrivEsc(findings, details, inline)
 		}
 
 		r := resource.Resource{
@@ -290,13 +284,7 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) resource.R
 	if okList && okGet && roleName != "" {
 		var inline inlinePolicyScan
 		policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
-		if inline.finding != nil {
-			findings = append(findings, *inline.finding)
-			if details == nil {
-				details = map[domain.FindingCode]domain.AttentionDetail{}
-			}
-			details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: inline.rows}
-		}
+		findings, details = addInlinePrivEsc(findings, details, inline)
 	}
 
 	return resource.Resource{
@@ -379,6 +367,27 @@ func enumerateRoleInlinePolicies(
 		}
 	}
 	return strings.Join(allResources, ","), scan
+}
+
+// addInlinePrivEsc folds an inline-policy scan into the finding list and
+// detail map a role is about to be built from. The rows go through capRows,
+// the same bound setWave2Finding and addWave1Rows apply, because a role's
+// combo list is as unbounded as any other emitter's: the role is assembled
+// before its resource.Resource exists, so this is the sink for that path.
+func addInlinePrivEsc(
+	findings []domain.Finding,
+	details map[domain.FindingCode]domain.AttentionDetail,
+	inline inlinePolicyScan,
+) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	if inline.finding == nil {
+		return findings, details
+	}
+	findings = append(findings, *inline.finding)
+	if details == nil {
+		details = map[domain.FindingCode]domain.AttentionDetail{}
+	}
+	details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: capRows(nil, inline.rows)}
+	return findings, details
 }
 
 // extractPolicyResources parses a policy-document JSON string and returns
