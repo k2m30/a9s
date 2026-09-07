@@ -378,6 +378,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   list opens on Enter, so the row renders like any other; only a type the
   sweep confirmed empty is dimmed.
 - Opening a resource list now marks that type verified on the menu. It used to keep showing last session's count as unverified until the background sweep happened to reach it.
+- Switching profile or region no longer leaves menu rows claiming they were verified under the previous account: every per-type fact the old pair established is dropped with the counts.
+- A failed enrichment now flashes what went wrong instead of the raw AWS error, so a request id, a host id and an encoded authorization message no longer reach the status bar.
+- A service the selected region does not offer now says `no service` on its menu row instead of reading like a network failure.
+- A menu row whose probe timed out now says `timeout`, and one that could not reach the service says `transport`, instead of both reading a bare `error` while the log said otherwise.
+- A timed-out or unreachable-endpoint failure reads as its cause; the `operation error <Service>: <Op>` preamble is gone from every error class, not just from API errors.
 
 ### Added
 
