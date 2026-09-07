@@ -213,6 +213,10 @@ func markAllUninspected(result *IssueEnricherResult, resources []resource.Resour
 	}
 }
 
+// resourceIDsOf is capAtEnrichmentCap's idsOf for the common case: a work list
+// of resources, where inspecting one item decides exactly its own row.
+func resourceIDsOf(r resource.Resource) []string { return []string{r.ID} }
+
 // capAtEnrichmentCap trims a per-item work list to EnrichmentCap and records
 // every row the dropped items would have answered for as uninspected. A cap is
 // a limit on what a9s looked at, so the rows past it are "?" and never clean.

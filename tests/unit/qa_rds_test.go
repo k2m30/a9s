@@ -377,7 +377,7 @@ func TestQA_RDS_Detail_EndpointField(t *testing.T) {
 
 func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 	// Use an RDS-only config to avoid non-deterministic map iteration
-	// over all resource ViewDefs in renderFromConfig.
+	// over all resource ViewDefs.
 	rdsViewDef := config.DefaultViewDef("dbi")
 	viewCfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{

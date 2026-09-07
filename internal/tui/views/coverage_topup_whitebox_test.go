@@ -6,8 +6,7 @@
 // Init/View/Update/updateKeyMsg/HasActionableRows (reached in production via
 // rs.rightCol in app_stack.go / NewRightColumn in runtime_adapter_related.go,
 // but never previously exercised directly), the config-driven detail render
-// path (renderFromConfig/computeKeyWidthFromFields/renderContent), and the
-// DetailModel-specific SetSize/refreshViewportContent pair in
+// path, and the DetailModel-specific SetSize in
 // detail_helpers.go. All are unexported (or exercise unexported branches), so
 // they are tested directly from package views.
 package views
@@ -19,7 +18,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -211,179 +209,6 @@ func TestTopUp_RightColumn_Update_FilterMode_Enter_ExitsFilterModeKeepsQuery(t *
 }
 
 // ---------------------------------------------------------------------------
-// computeKeyWidthFromFields (detail_render.go:96)
-// ---------------------------------------------------------------------------
-
-func TestTopUp_ComputeKeyWidthFromFields_ShortLabels_ReturnsMinimum22(t *testing.T) {
-	fields := []config.DetailField{{Key: "a"}, {Label: "Short"}}
-	if got := computeKeyWidthFromFields(fields); got != 22 {
-		t.Errorf("computeKeyWidthFromFields(short labels) = %d, want minimum 22", got)
-	}
-}
-
-func TestTopUp_ComputeKeyWidthFromFields_LongLabel_ExpandsWidth(t *testing.T) {
-	fields := []config.DetailField{{Label: "ThisIsAVeryLongDetailFieldLabel"}} // 31 chars
-	want := len("ThisIsAVeryLongDetailFieldLabel") + 1
-	if got := computeKeyWidthFromFields(fields); got != want {
-		t.Errorf("computeKeyWidthFromFields(long label) = %d, want %d", got, want)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// renderFromConfig (detail_render.go:111) + renderContent (detail_render.go:39)
-// ---------------------------------------------------------------------------
-
-type topUpRawStruct struct {
-	Nested struct {
-		Value string
-	}
-}
-
-func topUpConfigModel(res resource.Resource) DetailModel {
-	const rt = "topup-renderfromconfig-type"
-	vc := &config.ViewsConfig{Views: map[string]config.ViewDef{
-		rt: {Detail: []config.DetailField{
-			{Key: "state", Label: "State"},               // Key-form, present
-			{Key: "missing_key", Label: "Missing"},       // Key-form, absent -> "-"
-			{Path: "Name", Label: "Name"},                // Path-form, exact Fields match
-			{Path: "InstanceType", Label: "Type"},        // Path-form, snake_case Fields fallback
-			{Path: "Nested.Value", Label: "Nested"},      // Path-form, RawStruct fallback
-			{Path: "NoSuchField", Label: "Missing Path"}, // Path-form, resolves to "-"
-			{Path: "Notes", Label: "Notes"},              // Path-form, multiline value
-		}},
-	}}
-	m := NewDetailWithCtrl(res, rt, vc, keys.Default(), nil)
-	return m
-}
-
-func topUpConfigResource() resource.Resource {
-	raw := topUpRawStruct{}
-	raw.Nested.Value = "nested-value"
-	return resource.Resource{
-		Fields: map[string]string{
-			"state":         "running",
-			"Name":          "my-instance",
-			"instance_type": "t3.micro",
-			"Notes":         "line one\nline two",
-		},
-		RawStruct: raw,
-	}
-}
-
-func TestTopUp_RenderFromConfig_KeyForm_PresentAndAbsent(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	kv := func(k, v string) string { return k + "=" + v }
-	lines := m.renderFromConfig(kv)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "State=running") {
-		t.Errorf("renderFromConfig() = %q, want it to contain %q (Key-form present)", joined, "State=running")
-	}
-	if !strings.Contains(joined, "Missing=-") {
-		t.Errorf("renderFromConfig() = %q, want it to contain %q (Key-form absent falls back to \"-\")", joined, "Missing=-")
-	}
-}
-
-func TestTopUp_RenderFromConfig_PathForm_ExactFieldsMatch(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	kv := func(k, v string) string { return k + "=" + v }
-	lines := m.renderFromConfig(kv)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "Name=my-instance") {
-		t.Errorf("renderFromConfig() = %q, want it to contain %q (Path-form exact Fields match)", joined, "Name=my-instance")
-	}
-}
-
-func TestTopUp_RenderFromConfig_PathForm_SnakeCaseFallback(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	kv := func(k, v string) string { return k + "=" + v }
-	lines := m.renderFromConfig(kv)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "Type=t3.micro") {
-		t.Errorf("renderFromConfig() = %q, want it to contain %q (Path %q snake_case fallback to Fields[%q])", joined, "Type=t3.micro", "InstanceType", "instance_type")
-	}
-}
-
-func TestTopUp_RenderFromConfig_PathForm_RawStructFallback(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	kv := func(k, v string) string { return k + "=" + v }
-	lines := m.renderFromConfig(kv)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "Nested=nested-value") {
-		t.Errorf("renderFromConfig() = %q, want it to contain %q (Path-form RawStruct reflection fallback)", joined, "Nested=nested-value")
-	}
-}
-
-func TestTopUp_RenderFromConfig_PathForm_UnresolvedFallsBackToDash(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	kv := func(k, v string) string { return k + "=" + v }
-	lines := m.renderFromConfig(kv)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "Missing Path=-") {
-		t.Errorf("renderFromConfig() = %q, want it to contain %q (no Fields nor RawStruct match falls back to \"-\")", joined, "Missing Path=-")
-	}
-}
-
-func TestTopUp_RenderFromConfig_MultilineValue_RendersAsSection(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	kv := func(k, v string) string { return k + "=" + v }
-	lines := m.renderFromConfig(kv)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "line one") || !strings.Contains(joined, "line two") {
-		t.Errorf("renderFromConfig() = %q, want both multiline sub-lines rendered", joined)
-	}
-	// A multiline value must NOT go through kv() (no "Notes=" prefix line).
-	if strings.Contains(joined, "Notes=line one") {
-		t.Errorf("renderFromConfig() = %q, multiline values should render as a section, not via kv()", joined)
-	}
-}
-
-func TestTopUp_RenderFromConfig_NoDetailFields_ReturnsNil(t *testing.T) {
-	const rt = "topup-renderfromconfig-empty"
-	m := NewDetailWithCtrl(resource.Resource{}, rt, nil, keys.Default(), nil) // no ViewsConfig and no default entry for rt
-	kv := func(k, v string) string { return k + "=" + v }
-	if got := m.renderFromConfig(kv); got != nil {
-		t.Errorf("renderFromConfig() with no registered Detail fields = %v, want nil", got)
-	}
-}
-
-func TestTopUp_RenderContent_ConfigDriven_UsesRenderFromConfig(t *testing.T) {
-	m := topUpConfigModel(topUpConfigResource())
-	content := m.renderContent()
-	if !strings.Contains(content, "running") {
-		t.Errorf("renderContent() (config-driven) = %q, want it to contain the Key-form value %q", content, "running")
-	}
-}
-
-func TestTopUp_RenderContent_FieldsMapFallback_NoConfig_SortedKeys(t *testing.T) {
-	m := NewDetailWithCtrl(resource.Resource{Fields: map[string]string{
-		"Zebra": "z-val",
-		"Alpha": "a-val",
-	}}, "topup-renderfromconfig-fieldsfallback", nil, keys.Default(), nil)
-	content := m.renderContent()
-
-	if !strings.Contains(content, "a-val") || !strings.Contains(content, "z-val") {
-		t.Fatalf("renderContent() (Fields-map fallback, no config) = %q, want both field values", content)
-	}
-	if strings.Index(content, "Alpha") > strings.Index(content, "Zebra") {
-		t.Errorf("renderContent() (Fields-map fallback) = %q, want keys in sorted order (Alpha before Zebra)", content)
-	}
-}
-
-func TestTopUp_RenderContent_NoViewConfigNoFields_ShowsNoDetailData(t *testing.T) {
-	m := NewDetailWithCtrl(resource.Resource{}, "topup-renderfromconfig-nodata", nil, keys.Default(), nil)
-	content := m.renderContent()
-	if !strings.Contains(content, "No detail data available") {
-		t.Errorf("renderContent() with no config and no fields = %q, want %q", content, "No detail data available")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // DetailModel.SetSize (detail_helpers.go:25)
 // ---------------------------------------------------------------------------
 
@@ -433,50 +258,6 @@ func TestTopUp_DetailModel_SetSize_NarrowAfterWide_HidesAutoShownRightColumn(t *
 	m.SetSize(40, 20)
 	if m.rightColShowing() {
 		t.Error("SetSize(40, 20) after an auto-shown right column: should hide below MinInnerContentWidth")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// DetailModel.refreshViewportContent (detail_helpers.go:105)
-// ---------------------------------------------------------------------------
-
-func TestTopUp_DetailModel_RefreshViewportContent_SearchActiveScrollsToMatch(t *testing.T) {
-	const marker = "zzz-detailhelpers-marker-zzz"
-	res := resource.Resource{Fields: map[string]string{
-		"AFirst": "first-field",
-		"Marker": marker,
-		"ZLast":  "last-field",
-	}}
-	m := NewDetailWithCtrl(res, "topup-refreshviewport-match", nil, keys.Default(), nil)
-	m.SetSize(80, 1)
-
-	wantLine := livegapFindLine(m.renderContent(), marker)
-	if wantLine <= 0 {
-		t.Fatalf("precondition: want the marker on a non-zero line, got %d in:\n%s", wantLine, m.renderContent())
-	}
-
-	m.search.Activate()
-	m.search.SetQuery(marker)
-	m.refreshViewportContent()
-
-	vp := m.Viewport()
-	if got := vp.YOffset(); got != wantLine {
-		t.Errorf("refreshViewportContent() with active search: viewport YOffset = %d, want %d", got, wantLine)
-	}
-}
-
-func TestTopUp_DetailModel_RefreshViewportContent_SearchNoMatch_NoScroll(t *testing.T) {
-	res := resource.Resource{Fields: map[string]string{"Field": "value"}}
-	m := NewDetailWithCtrl(res, "topup-refreshviewport-nomatch", nil, keys.Default(), nil)
-	m.SetSize(80, 10)
-
-	m.search.Activate()
-	m.search.SetQuery("no-such-substring-anywhere")
-	m.refreshViewportContent()
-
-	vp := m.Viewport()
-	if got := vp.YOffset(); got != 0 {
-		t.Errorf("refreshViewportContent() with a non-matching search query: viewport YOffset = %d, want 0", got)
 	}
 }
 

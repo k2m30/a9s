@@ -1024,44 +1024,6 @@ func TestEnrichment_FindingsInBody(t *testing.T) {
 	}
 }
 
-func TestEnrichment_BrokenRowHasDecoratorError(t *testing.T) {
-	c := newListController(t, "ec2")
-	c.ApplyResourcesLoaded("ec2", []resource.Resource{
-		{ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
-			Fields: map[string]string{"instance_id": "i-0aaa111111111111a", "state": "running"}},
-	}, nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
-		"i-0aaa111111111111a": {{Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken}},
-	}, nil)
-
-	lb := listBodyOrFail(t, c)
-	if len(lb.Rows) != 1 {
-		t.Fatalf("expected 1 row, got %d", len(lb.Rows))
-	}
-	if lb.Rows[0].Decorator != app.DecoratorError {
-		t.Errorf("Decorator: got %q want %q", lb.Rows[0].Decorator, app.DecoratorError)
-	}
-}
-
-func TestEnrichment_WarnRowHasDecoratorWarning(t *testing.T) {
-	c := newListController(t, "ec2")
-	c.ApplyResourcesLoaded("ec2", []resource.Resource{
-		{ID: "i-0bbb222222222222b", Name: "db-server", Type: "ec2",
-			Fields: map[string]string{"instance_id": "i-0bbb222222222222b", "state": "running"}},
-	}, nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
-		"i-0bbb222222222222b": {{Code: "ec2.degraded", Phrase: "instance degraded", Severity: domain.SevWarn}},
-	}, nil)
-
-	lb := listBodyOrFail(t, c)
-	if len(lb.Rows) != 1 {
-		t.Fatalf("expected 1 row, got %d", len(lb.Rows))
-	}
-	if lb.Rows[0].Decorator != app.DecoratorWarning {
-		t.Errorf("Decorator: got %q want %q", lb.Rows[0].Decorator, app.DecoratorWarning)
-	}
-}
-
 func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
 	c := newListController(t, "ec2")
 	resources := []resource.Resource{

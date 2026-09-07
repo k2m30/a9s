@@ -50,7 +50,8 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 	if clients.ElasticBeanstalk == nil {
 		return result, nil
 	}
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -101,7 +102,8 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 	if !ok {
 		return
 	}
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]

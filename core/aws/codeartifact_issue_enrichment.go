@@ -43,8 +43,9 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	truncated := len(resources) > EnrichmentCap
-	n := min(len(resources), EnrichmentCap)
+	truncated := false
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -136,6 +137,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 
 		}
 	})
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, nil
 }

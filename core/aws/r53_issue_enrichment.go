@@ -153,7 +153,8 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	held := heldPublicAddresses(cache)
 	var failures []string
 	total := 0
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -205,9 +206,6 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		})
 	})
 	sort.Strings(failures)
-	// r53.dangling-record is "!", so the cap bounds the issue count and a
-	// capped pass must say so rather than under-report the badge.
-	result.Truncated = len(resources) > EnrichmentCap
 	return result,
 		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
 }

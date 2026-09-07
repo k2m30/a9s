@@ -451,7 +451,7 @@ const (
 // gives it `!` at SevBroken and `~` otherwise. A finding that is not
 // Severity.IsIssue() — SevDim, SevOK — is skipped there, so it has no tier.
 //
-// Not the list decorator. core/app/list_columns.go resolveListDecoratorFull
+// Not the list decorator. core/app/list_columns.go resolveListRowSeverity
 // reaches its glyph branch only for a row td.ResolveColor calls Healthy, and
 // tests/unit/qa_color_findings_conformance_test.go holds every registered type
 // to "colour is the worst finding across both waves" with an empty divergence

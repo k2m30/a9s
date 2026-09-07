@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// detail_fields.go contains field list construction and field-list-based rendering for DetailModel.
-// Specifically: buildFieldList and renderFromFieldList.
+// detail_fields.go contains field-list-based rendering for DetailModel.
+// Specifically: renderFromFieldList.
 package views
 
 import (
@@ -10,126 +10,9 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/core/app"
-	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/fieldpath"
-	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/semantics/projection"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
-
-// buildFieldList computes m.fieldList by delegating to the per-type DetailProjector
-// (or projection.GenericWithConfig as fallback), then converts the returned
-// []domain.Section into []fieldpath.FieldItem for the existing renderFromFieldList
-// renderer.
-func (m *DetailModel) buildFieldList() {
-	// Inject type so projector can look up per-type metadata.
-	r := m.res
-	if r.Type == "" {
-		r.Type = m.resourceType
-	}
-	td := resource.FindResourceType(m.resourceType)
-	// Use m.navProvider to resolve navigable fields. The default (set in
-	// NewDetail) is resource.GetActiveNavigableFields (ACTIVE-only), which
-	// keeps tests isolated from init-time DEFAULT registry entries.
-	// TUI construction paths override this with resource.GetNavigableFields
-	// (merged ACTIVE+DEFAULT) via SetNavProvider.
-	navProv := m.navProvider
-	if navProv == nil {
-		navProv = resource.GetActiveNavigableFields
-	}
-	generic := projection.GenericWithConfigAndNavProvider(m.viewConfig, navProv)
-
-	var proj domain.DetailProjector
-	if td != nil && td.Project != nil {
-		proj = td.Project
-	} else {
-		proj = generic
-	}
-	sections := proj(r)
-	// Fallback: a custom projector may legitimately return nil for resource
-	// shapes it can't render (e.g. ctevent.Project against a stub ct-events
-	// resource that only has ID/Name from a related-cache hit, with no raw
-	// event body). Without this fallback the detail pane regresses to
-	// "No detail data available". The generic projector renders such stubs
-	// from r.Fields just fine.
-	if len(sections) == 0 && td != nil && td.Project != nil {
-		sections = generic(r)
-	}
-	if td != nil && td.Augment != nil {
-		sections = td.Augment(r, sections)
-	}
-	m.fieldList = sectionsToFieldItems(sections)
-}
-
-// sectionsToFieldItems converts []domain.Section to []fieldpath.FieldItem for
-// the existing renderFromFieldList renderer.  Each section with a non-empty
-// Title emits a leading FieldItem{IsSection: true}; then each domain.Item is
-// converted via domainItemToFieldItem.
-func sectionsToFieldItems(sections []domain.Section) []fieldpath.FieldItem {
-	if len(sections) == 0 {
-		return nil
-	}
-	var items []fieldpath.FieldItem
-	for _, sec := range sections {
-		if sec.Title != "" {
-			items = append(items, fieldpath.FieldItem{
-				IsSection: true,
-				Key:       sec.Title,
-				Path:      sec.Title,
-			})
-		}
-		for _, it := range sec.Items {
-			items = append(items, domainItemToFieldItem(it, sec.Title))
-		}
-	}
-	return items
-}
-
-// domainItemToFieldItem maps a domain.Item back to a fieldpath.FieldItem so
-// the unchanged renderFromFieldList renderer can consume projector output.
-//
-// Path is taken directly from it.Path when set, preserving the real field path
-// from the projector. Fallback to synthesized paths is used only when it.Path
-// is empty, maintaining backward-compatible behaviour for any Items constructed
-// without a Path value.
-func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldItem {
-	fi := fieldpath.FieldItem{
-		Key:         it.Label,
-		Value:       it.Value,
-		Path:        it.Path,
-		IsNavigable: it.Navigable,
-		TargetType:  it.TargetType,
-		ColorTier:   it.Tier,
-		NavID:       it.NavID,
-	}
-	if fi.Path == "" {
-		fi.Path = sectionTitle + "." + it.Label
-	}
-	switch it.Kind {
-	case domain.ItemHeader:
-		fi.IsHeader = true
-		if it.Path == "" {
-			fi.Path = it.Label // headers use their own label as path (matches ExtractFieldList)
-		}
-	case domain.ItemSubfield:
-		fi.IsSubField = true
-		fi.IndentLevel = it.IndentLevel
-		if it.Label == "" {
-			// Raw YAML continuation line. Legacy buildFieldList convention:
-			// raw lines have Key == Value so renderFromFieldList takes the
-			// plain-line branch (no stray ": " prefix).
-			fi.Key = it.Value
-			// Path: no trailing dot for empty-label subfields.
-			if it.Path == "" {
-				fi.Path = sectionTitle
-			}
-		}
-	case domain.ItemSpacer:
-		fi.IsSpacer = true
-	}
-	return fi
-}
 
 // subFieldIndent returns the left margin for a sub-field at the given indent
 // level: level 1 is app.AttentionIndentColumns, each level below it two more.

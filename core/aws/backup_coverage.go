@@ -97,7 +97,8 @@ func backupTagsAccessor(
 		}
 		pending = append(pending, r)
 	}
-	n := min(len(pending), EnrichmentCap)
+	pending = capAtEnrichmentCap(result, pending, resourceIDsOf)
+	n := len(pending)
 
 	var mu sync.Mutex
 	var failures []string

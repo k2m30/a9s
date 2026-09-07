@@ -72,7 +72,6 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.viewport.SetWidth(viewportW)
 		m.viewport.SetHeight(h)
 	}
-	m.refreshViewportContent()
 }
 
 // rightColShowing returns true when the right column should be rendered.
@@ -103,25 +102,6 @@ func ComputeRightColWidth(innerWidth, baseWidth int) int {
 		w = maxAllowed
 	}
 	return w
-}
-
-// refreshViewportContent re-renders content and applies search highlights.
-func (m *DetailModel) refreshViewportContent() {
-	if m.fieldList == nil {
-		m.buildFieldList()
-	}
-	content := m.renderContent()
-	if m.search.IsActive() && m.search.Query() != "" {
-		plain := ansi.Strip(content)
-		m.search.SetContent(plain)
-		var matchLine int
-		content, matchLine = m.search.Apply(content)
-		if matchLine >= 0 {
-			m.viewport.GotoTop()
-			m.viewport.SetYOffset(matchLine)
-		}
-	}
-	m.viewport.SetContent(content)
 }
 
 // NeedsRelatedCheck returns true when the right column was auto-shown

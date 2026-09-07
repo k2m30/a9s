@@ -95,9 +95,10 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 	if clients.S3 == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
+	truncated := false
 	var failures []string
-	total := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	total := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, total, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -135,7 +136,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		}
 	})
 	sort.Strings(failures)
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, AggregateFailures("s3-enrich: bucket posture", failures, total)
 }
 

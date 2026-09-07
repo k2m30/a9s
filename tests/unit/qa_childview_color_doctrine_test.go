@@ -170,7 +170,7 @@ func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding(t *t
 // views.NewChildResourceList does for the live TUI), an unhealthy target row
 // must carry the broken/warning row color via the SAME render seam every
 // top-level list uses — core/app/list_columns.go's
-// resolveListDecoratorFull, which is td.ResolveColor(r) fed through
+// resolveListRowSeverity, which is td.ResolveColor(r) fed through
 // colorToTag into ListRow.Color, and IsIssue() fed into ListRow.Severity.
 // A healthy sibling row in the SAME child list must stay default/healthy.
 //

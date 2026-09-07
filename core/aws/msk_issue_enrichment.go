@@ -45,7 +45,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	}
 	var failures []string
 	total := 0
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -114,9 +115,6 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		}
 	})
 	sort.Strings(failures)
-	// This enrichment emits a "!" finding, so a capped run is a lower bound
-	// on the issue count and must say so.
-	result.Truncated = len(resources) > EnrichmentCap
 	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }

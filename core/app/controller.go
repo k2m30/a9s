@@ -64,7 +64,7 @@ type Controller struct {
 	// enrichmentTruncated: applyEnrichmentState's write and the profile/
 	// region-rotation reset in intents.go's MenuClearAvailabilityIntent case.
 	// buildListBody's memo (list_body.go) includes this in its cache key
-	// because resolveListDecoratorFull and the S4 status-cell override read
+	// because resolveListRowSeverity and the S4 status-cell override read
 	// these maps directly — a change invisible to a ListState's own
 	// rowsVersion, since the maps are controller-level, not per-screen.
 	enrichmentGen uint64

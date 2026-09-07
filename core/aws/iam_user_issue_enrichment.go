@@ -60,8 +60,9 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 	}
 
 	keyLastUsedAPI, _ := clients.IAM.(IAMGetAccessKeyLastUsedAPI)
-	truncated := len(resources) > EnrichmentCap
-	n := min(len(resources), EnrichmentCap)
+	truncated := false
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -222,7 +223,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			"has_console_password": consolePasswordVal, //nolint:gosec // not a credential, display field key
 		}
 	})
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, nil
 }
 

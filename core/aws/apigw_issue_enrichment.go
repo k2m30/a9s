@@ -62,7 +62,8 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	}
 	v1, hasV1 := clients.APIGatewayV1.(apigwV1API)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -186,10 +187,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues,
 			catalog.Phrase(apigwCodeStageConfigIssues), "~", "apigw", rows)
 	})
-	// apigw.no-authorizer-public and apigw.stage-variable-secret are "!", so
-	// the cap now bounds the issue count and a capped pass must say so rather
-	// than under-report the badge.
-	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
 }
 

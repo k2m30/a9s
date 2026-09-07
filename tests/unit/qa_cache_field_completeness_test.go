@@ -548,9 +548,8 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	// Since the color-findings-conformance wave, colorS3 is
 	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
-	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// directly (the glyph branch that used to fire when
+	// ResolveColor()==ColorHealthy was deleted as unreachable).
 	// The stronger, correct check is ListRow.Color=="broken", not the glyph
 	// Decorator.
 	preSwap := ctrl.Snapshot()
@@ -638,9 +637,8 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 	// Since the color-findings-conformance wave, colorS3 is
 	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
-	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// directly (the glyph branch that used to fire when
+	// ResolveColor()==ColorHealthy was deleted as unreachable).
 	// The stronger, correct check is ListRow.Color=="broken", not the glyph
 	// Decorator.
 	preSwap := ctrl.Snapshot()

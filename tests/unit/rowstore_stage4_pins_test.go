@@ -409,7 +409,7 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 // TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane extends (does
 // not duplicate the assertions of) qa_cache_field_completeness_test.go's
 // TestSilentSwap_NeverDropsKnownFindings: same production seams
-// (ApplyResourcesLoaded, GetListAllResources, Decorator==app.DecoratorError),
+// (ApplyResourcesLoaded, GetListAllResources, ListRow.Color),
 // same "seeded WAVE-2 finding survives a same-ID zero-findings replace"
 // contract, but ALSO asserts the finding survives a SUBSEQUENT stacked
 // screen's own independent silent swap of the SAME type — i.e. the carry
@@ -446,9 +446,8 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	// Since the color-findings-conformance wave, colorS3 is
 	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
-	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// directly (the glyph branch that used to fire when
+	// ResolveColor()==ColorHealthy was deleted as unreachable).
 	// ListRow.Color=="broken" is the stronger, correct check throughout this test.
 	preSwap := ctrl.Snapshot()
 	foundBefore := false

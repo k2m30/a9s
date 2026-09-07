@@ -283,52 +283,21 @@ func hasWave2Finding(findings []domain.Finding) bool {
 	return false
 }
 
-// resolveListDecoratorFull mirrors the marker logic in renderDataRow and extends it
-// ("healthy", "warning", "broken", "dim", "") so RenderList can reproduce
-// the exact lipgloss.Style that View() derives from td.ResolveColor(r).
-//
-// Per cache contract C6: a row's OWN persisted findings (r.Findings — what a cold-boot
-// reseed from cache.Row.Findings populates, and what the demo/live fold
-// layer mutates directly) are consulted FIRST, before falling back to the
-// findings map (the session-scoped Wave-2 enrichment store, which is empty
-// until a live enrichment probe lands this session). Without this, a
-// seeded row's persisted Findings never drive render-time severity — the
-// map lookup alone only ever hits after a live probe re-confirms the same
-// finding, so a freshly cold-booted list shows no glyph/severity on
-// flagged rows until the sweep completes. r.Findings is assumed
-// pre-ordered by severity (the same convention domain.StatusPhrase
-// relies on via findings[0]), so the first entry is "the top" finding. A
-// resource may carry more than one independently-evaluated Wave-2
-// condition in the findings map's per-ID slice; the decorator reduces to
-// the WORST-severity one via domain.WorstSeverityFinding.
-func resolveListDecoratorFull(td *resource.ResourceTypeDef, r resource.Resource, findings map[string][]domain.Finding) (RowDecorator, string, string) {
+// resolveListRowSeverity returns the row's issue-severity tag and its
+// pre-resolved colour tag ("healthy", "warning", "broken", "dim", "") so
+// RenderList can reproduce the exact lipgloss.Style that View() derives from
+// td.ResolveColor(r).
+func resolveListRowSeverity(td *resource.ResourceTypeDef, r resource.Resource) (string, string) {
 	if td == nil {
-		return DecoratorNormal, "", ""
+		return "", ""
 	}
 	color := td.ResolveColor(r)
 	colorTag := colorToTag(color)
-	if color == resource.ColorHealthy {
-		if len(r.Findings) > 0 {
-			switch r.Findings[0].Severity {
-			case domain.SevBroken:
-				return DecoratorError, "broken", colorTag
-			case domain.SevWarn:
-				return DecoratorWarning, "warn", colorTag
-			}
-		} else if fs, ok := findings[r.ID]; ok && len(fs) > 0 {
-			switch domain.WorstSeverityFinding(fs).Severity {
-			case domain.SevBroken:
-				return DecoratorError, "broken", colorTag
-			case domain.SevWarn:
-				return DecoratorWarning, "warn", colorTag
-			}
-		}
-	}
 	sev := ""
 	if color.IsIssue() {
 		sev = "issue"
 	}
-	return DecoratorNormal, sev, colorTag
+	return sev, colorTag
 }
 
 // colorToTag converts a domain.Color to the string tag carried by ListRow.Color.

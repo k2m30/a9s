@@ -117,6 +117,13 @@ func TopFinding(findings []Finding) (Finding, bool) {
 	return top, true
 }
 
+// NotInspectedPhrase is what every surface says about a row a Wave-2 enricher
+// could not inspect (IssueEnricherResult.TruncatedIDs — an API error on that
+// row, a per-parent page cap, or the tail past EnrichmentCap). The row's
+// posture is unknown, which is not the same as clean; without this word a
+// failed check renders exactly like a passed one.
+const NotInspectedPhrase = "not inspected"
+
 // StatusPhrase is the list Status cell for a resource's findings: the phrase
 // of the finding TopFinding selects, suffixed "(+N)" for the other
 // issue-severity findings stacked behind it. Dim findings never count — a

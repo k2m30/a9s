@@ -39,8 +39,9 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 
-	truncated := len(resources) > EnrichmentCap
-	n := min(len(resources), EnrichmentCap)
+	truncated := false
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -144,6 +145,6 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			catalog.Phrase(ebRuleCodeTargetIssue), "~", "eb-rule", rows)
 	})
 
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, nil
 }

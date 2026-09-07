@@ -445,7 +445,7 @@ func (s *SearchModel) recomputeMatches() {
 		}
 	}
 	// Preserve the match index across recomputation (e.g. after NextMatch
-	// triggers refreshViewportContent which calls SetContent → recomputeMatches).
+	// triggers a re-render which calls SetContent → recomputeMatches).
 	switch {
 	case len(s.matches) == 0:
 		s.currentIdx = 0

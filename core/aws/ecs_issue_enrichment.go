@@ -41,17 +41,13 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	checked := 0
+	clusterNames = capAtEnrichmentCap(&result, clusterNames, func(n string) []string { return []string{n} })
 
 	// DescribeClusters accepts up to 100 cluster names per call.
 	const descBatch = 100
 	for i := 0; i < len(clusterNames); i += descBatch {
-		if checked >= EnrichmentCap {
-			break
-		}
 		end := min(i+descBatch, len(clusterNames))
 		batch := clusterNames[i:end]
-		checked += len(batch)
 
 		out, err := clients.ECS.DescribeClusters(ctx, &ecs.DescribeClustersInput{
 			Clusters: batch,

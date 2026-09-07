@@ -48,7 +48,8 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
 	var failures []string
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -99,7 +100,6 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 
 		}
 	})
-	result.Truncated = len(resources) > EnrichmentCap
 	err := Finish(&result, failures, n, "secrets-policy")
 	return result, err
 }

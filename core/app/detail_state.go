@@ -78,8 +78,8 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 // unsorted order previously caused a prepend-count mismatch (see
 // tests/unit/app_detail_attention_cursor_test.go), shifting FieldCursor by
 // the wrong delta after a mixed-severity Attention re-sort.
-func attentionPrependCount(ds *DetailState) int {
-	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth)
+func (c *Controller) attentionPrependCount(ds *DetailState) int {
+	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, c.detailNotInspected(ds))
 	if len(entries) == 0 {
 		return 0
 	}
@@ -406,7 +406,7 @@ func newlyReportedFindings(current, candidates []domain.Finding) []domain.Findin
 // just-appended entry). Callers must hold c.mu (write).
 func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
 	// Capture old prepend size before stripping, so the cursor delta can be computed.
-	oldPrepend := attentionPrependCount(ds)
+	oldPrepend := c.attentionPrependCount(ds)
 
 	// Strip prior wave-2 findings (same strip semantics as DetailModel.SetEnrichmentFinding).
 	if len(ds.Findings) > 0 {
@@ -451,7 +451,7 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	//   2. If cursor was in content (>= oldPrepend): shift by delta, but only when
 	//      content items actually exist after injection — mirrors haveSnapshot=false
 	//      for resources with no content fields (empty resource).
-	newPrepend := attentionPrependCount(ds)
+	newPrepend := c.attentionPrependCount(ds)
 	delta := newPrepend - oldPrepend
 	if delta != 0 {
 		if ds.FieldCursor < oldPrepend {
@@ -462,7 +462,7 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 			// in the new layout. Skip if no content exists beyond the attention block
 			// (empty resource case), matching SetEnrichmentFinding's haveSnapshot=false.
 			adjusted := ds.FieldCursor - oldPrepend + newPrepend
-			newTotalItems := len(buildDetailFieldItems(ds, c.viewConfig))
+			newTotalItems := len(c.buildDetailFieldItems(ds))
 			if adjusted < newTotalItems {
 				ds.FieldCursor = adjusted
 			}

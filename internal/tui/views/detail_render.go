@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // detail_render.go contains YAML generation and config-driven rendering for DetailModel.
-// Specifically: RawYAML, renderContent, computeKeyWidth, renderFromConfig.
+// Specifically: RawYAML and computeKeyWidth.
 package views
 
 import (
 	"reflect"
-	"sort"
-	"strings"
 
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
-	"github.com/k2m30/a9s/v3/internal/tui/text"
 
 	"gopkg.in/yaml.v3"
 )
@@ -35,51 +30,6 @@ func (m DetailModel) RawYAML() string {
 	return string(data)
 }
 
-// renderContent builds the styled key-value lines from the resource.
-func (m DetailModel) renderContent() string {
-	// Use structured field list when available.
-	if m.fieldList != nil {
-		return m.renderFromFieldList()
-	}
-
-	// Try config-driven rendering.
-	if m.viewConfig != nil {
-		vd := config.GetViewDef(m.viewConfig, m.resourceType)
-		if len(vd.Detail) > 0 {
-			keyW := computeKeyWidthFromFields(vd.Detail)
-			kv := func(key, val string) string {
-				return " " + styles.DetailKey.Render(text.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
-			}
-			if lines := m.renderFromConfig(kv); len(lines) > 0 {
-				return strings.Join(lines, "\n")
-			}
-		}
-	}
-
-	// Fallback: render from Fields map (no config or no matching ViewDef).
-	if len(m.res.Fields) == 0 {
-		return styles.DimText.Render("  No detail data available")
-	}
-
-	// Sort keys for stable output.
-	fieldKeys := make([]string, 0, len(m.res.Fields))
-	for k := range m.res.Fields {
-		fieldKeys = append(fieldKeys, k)
-	}
-	sort.Strings(fieldKeys)
-
-	keyW := computeKeyWidth(fieldKeys)
-	kv := func(key, val string) string {
-		return " " + styles.DetailKey.Render(text.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
-	}
-
-	var lines []string
-	for _, k := range fieldKeys {
-		lines = append(lines, kv(k, m.res.Fields[k]))
-	}
-	return strings.Join(lines, "\n")
-}
-
 // computeKeyWidth returns the width needed for the key column: longest key + 1 (for colon), minimum 22.
 func computeKeyWidth(keys []string) int {
 	w := 22
@@ -89,76 +39,4 @@ func computeKeyWidth(keys []string) int {
 		}
 	}
 	return w
-}
-
-// computeKeyWidthFromFields returns the key-column width for a []DetailField slice,
-// using each field's DisplayLabel for width calculation.
-func computeKeyWidthFromFields(fields []config.DetailField) int {
-	w := 22
-	for _, df := range fields {
-		label := df.DisplayLabel()
-		if len(label)+1 > w {
-			w = len(label) + 1
-		}
-	}
-	return w
-}
-
-// renderFromConfig looks up the correct ViewDef by resource type and renders detail lines.
-// Tries RawStruct extraction first, then falls back to Fields map for each path.
-// Empty/nil fields are shown as "-" (not skipped).
-// Handles both Path-form (struct reflection) and Key-form (Fields[] map lookup) DetailFields.
-func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
-	vd := config.GetViewDef(m.viewConfig, m.resourceType)
-	if len(vd.Detail) == 0 {
-		return nil
-	}
-	var lines []string
-	for _, df := range vd.Detail {
-		label := df.DisplayLabel()
-		val := ""
-
-		if df.Key != "" {
-			// Key-form: read directly from Resource.Fields[key].
-			if v, ok := m.res.Fields[df.Key]; ok {
-				val = v
-			}
-		} else {
-			path := df.Path
-			// Path-form: try Fields map first, then RawStruct reflection.
-			if len(m.res.Fields) > 0 {
-				// Try exact case-insensitive match
-				for k, v := range m.res.Fields {
-					if strings.EqualFold(k, path) {
-						val = v
-						break
-					}
-				}
-				// Try underscore-separated version: "InstanceId" → "instance_id"
-				if val == "" {
-					snakeKey := fieldpath.ToSnakeCase(path)
-					if v, ok := m.res.Fields[snakeKey]; ok {
-						val = v
-					}
-				}
-			}
-			// Fall back to RawStruct extraction for fields not in Fields map
-			if val == "" && m.res.RawStruct != nil {
-				val = fieldpath.ExtractSubtree(m.res.RawStruct, path)
-			}
-		}
-
-		if val == "" {
-			val = "-"
-		}
-		if strings.Contains(val, "\n") {
-			lines = append(lines, " "+styles.DetailSection.Render(label+":"))
-			for subLine := range strings.SplitSeq(val, "\n") {
-				lines = append(lines, "     "+styles.DetailVal.Render(subLine))
-			}
-		} else {
-			lines = append(lines, kv(label, val))
-		}
-	}
-	return lines
 }

@@ -145,7 +145,8 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 // of calls — and emits the deprecated-engine finding for every instance on a
 // version AWS no longer lists as available.
 func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) {
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	n := len(resources)
 	if n < len(resources) {
 		result.Truncated = true
 	}

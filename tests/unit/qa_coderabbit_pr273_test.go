@@ -410,7 +410,7 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 
 	// Step 5: the finding must have been applied. Since the
 	// color-findings-conformance wave, colorEC2 derives ColorBroken directly
-	// from this Finding (colorFromAnyFinding) — resolveListDecoratorFull no
+	// from this Finding (colorFromAnyFinding) — resolveListRowSeverity no
 	// longer emits the "! " glyph prefix for a non-Healthy row (that branch
 	// only fires when ResolveColor()==ColorHealthy; see
 	// core/app/list_columns.go). The stronger, renderer-agnostic contract

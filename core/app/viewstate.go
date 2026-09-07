@@ -159,13 +159,13 @@ type ColumnDef struct {
 }
 
 // RowDecorator is a short tag that renderers use to apply per-row
-// formatting: "!" = attention/error, "~" = warning, "" = normal.
+// formatting. A list row's colour is the worst finding over both waves
+// (docs/attention-signals.md S3), so no severity glyph is produced: the only
+// value a ListRow carries today is DecoratorNormal.
 type RowDecorator string
 
 const (
-	DecoratorError   RowDecorator = "!"
-	DecoratorWarning RowDecorator = "~"
-	DecoratorNormal  RowDecorator = ""
+	DecoratorNormal RowDecorator = ""
 )
 
 // ListRow is one row in a resource-list body.

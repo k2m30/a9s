@@ -45,8 +45,9 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 	if !ok1 || !ok2 {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
-	n := min(len(resources), EnrichmentCap)
+	truncated := false
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -101,7 +102,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			"risk": riskVal,
 		}
 	})
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, nil
 }
 

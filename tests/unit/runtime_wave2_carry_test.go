@@ -414,12 +414,11 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	// Since the color-findings-conformance wave, colorS3 is
 	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — the
 	// carried SevBroken Finding now resolves td.ResolveColor(r) to
-	// ColorBroken directly, so resolveListDecoratorFull's DecoratorError
-	// glyph branch (which only fires when ResolveColor()==ColorHealthy; see
-	// core/app/list_columns.go) is skipped entirely. The row instead
-	// renders as a full broken row via colorTag: Decorator==DecoratorNormal
-	// (no glyph prefix needed — the WHOLE row is colored) and
-	// Severity=="issue" (see resolveListDecoratorFull's IsIssue() branch).
+	// ColorBroken directly, so no glyph is produced at all: the branch that
+	// used to fire when ResolveColor()==ColorHealthy was deleted as
+	// unreachable. The row instead renders as a full broken row via colorTag
+	// (the WHOLE row is coloured) and
+	// Severity=="issue" (see resolveListRowSeverity's IsIssue() branch).
 	// This is the CORRECT, stronger contract — whole-row color beats a small
 	// glyph prefix — not a regression; see
 	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md.
@@ -436,6 +435,6 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	// (and only) place to observe the disk-seeded finding/status on the
 	// FIRST rendered frame.
 	if row.Severity != "issue" {
-		t.Errorf(`Rows[0].Severity = %q, want "issue" (resolveListDecoratorFull's IsIssue() branch, once ResolveColor() is ColorBroken directly) — the FIRST render must already reflect the carried wave2 finding, no enrichment needed`, row.Severity)
+		t.Errorf(`Rows[0].Severity = %q, want "issue" (resolveListRowSeverity's IsIssue() branch, once ResolveColor() is ColorBroken directly) — the FIRST render must already reflect the carried wave2 finding, no enrichment needed`, row.Severity)
 	}
 }

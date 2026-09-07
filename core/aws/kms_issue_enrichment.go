@@ -39,7 +39,8 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	}
 	keyPolicyAPI, _ := clients.KMS.(KMSGetKeyPolicyAPI)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -84,7 +85,6 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil)
 		}
 	})
-	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
 }
 

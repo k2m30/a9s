@@ -49,11 +49,12 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	truncated := len(resources) > EnrichmentCap
+	truncated := false
 	var failures []string
 	var policyFailures []string
 	total := 0
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -156,7 +157,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	})
 	sort.Strings(failures)
 	sort.Strings(policyFailures)
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	result.FieldUpdates = make(map[string]map[string]string)
 	// The two passes are counted separately: each names how many of the same
 	// N file systems it could not answer for, and folding them into one

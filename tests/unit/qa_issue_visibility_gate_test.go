@@ -246,7 +246,7 @@ func detailHasAttentionFor(t *testing.T, res resource.Resource, shortName string
 // RULE: the rule triggers on PROBLEM signals — a row color with
 // IsIssue()==true (domain.Color.IsIssue: Warning/Broken), OR at least one
 // issue-severity Finding (domain.Severity.IsIssue: SevWarn/SevBroken) —
-// Wave-1 seeded or Wave-2 merged. A glyph decorator (resolveListDecoratorFull
+// Wave-1 seeded or Wave-2 merged. A glyph decorator (deleted with resolveListDecoratorFull
 // in core/app/list_columns.go) only ever fires from that same
 // issue-severity Finding check (the "healthy color + hidden issue-severity
 // Finding" case), so it is already covered by the Finding leg above and is

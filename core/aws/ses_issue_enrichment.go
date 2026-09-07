@@ -78,7 +78,8 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 // reports a domain that does not sign its outbound mail. A single verified
 // address cannot carry DKIM at all, so only domains are checked.
 func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) {
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]

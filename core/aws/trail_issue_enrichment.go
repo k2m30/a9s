@@ -43,7 +43,8 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	var mu sync.Mutex
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		bucket := r.Fields["s3_bucket"]
@@ -82,8 +83,5 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 				[]domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "~"}})
 		}
 	})
-	// CodeTrailLogBucketPublic is "!", so the cap bounds the issue count and a
-	// capped pass must say so rather than under-report the badge.
-	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
 }

@@ -46,7 +46,8 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	if n < len(resources) {
 		result.Truncated = true
 	}

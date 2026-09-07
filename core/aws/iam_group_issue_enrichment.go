@@ -46,7 +46,8 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		return result, nil
 	}
 
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]

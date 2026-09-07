@@ -12,7 +12,7 @@ import (
 //
 // WARNING: If a future change "fixes" ACM → a_c_m, review both call sites first:
 //   - core/fieldpath/extract.go ExtractFieldList fallback lookup (line ~400)
-//   - internal/tui/views/detail_render.go renderFromConfig fallback lookup (line ~140)
+//   - the config-driven detail fallback lookup
 //
 // Both only pass PascalCase paths like VpcId today, so the limitation never fires.
 // If you need acronym-aware snake_case, add a new function — don't edit this one

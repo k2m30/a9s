@@ -61,7 +61,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			targets = append(targets, r)
 		}
 	}
-	targets = capAtEnrichmentCap(&result, targets, func(r resource.Resource) []string { return []string{r.ID} })
+	targets = capAtEnrichmentCap(&result, targets, resourceIDsOf)
 
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	const op = "lambda-enrich: GetPolicy/ListFunctionUrlConfigs"

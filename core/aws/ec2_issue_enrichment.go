@@ -324,7 +324,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		}
 		targets = append(targets, r)
 	}
-	targets = capAtEnrichmentCap(result, targets, func(r resource.Resource) []string { return []string{r.ID} })
+	targets = capAtEnrichmentCap(result, targets, resourceIDsOf)
 
 	const op = "ec2-enrich: DescribeInstanceAttribute(userData)"
 	var mu sync.Mutex

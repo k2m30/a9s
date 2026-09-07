@@ -53,7 +53,8 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	if clients.DynamoDB == nil {
 		return result, tagErr
 	}
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -100,7 +101,8 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 // A table with no policy at all is the common case and is not a finding.
 func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	n := len(resources)
 	if n < len(resources) {
 		result.Truncated = true
 	}

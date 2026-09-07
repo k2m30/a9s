@@ -23,9 +23,7 @@ package unit
 //     GetListEnrichmentFindings, see core/app/list_filter.go
 //     applyEnrichmentState) is issue-severity (SevWarn/SevBroken), the
 //     Status/lifecycle cell must show that Finding's Phrase — not just a
-//     glyph prefix on the identity column (today's ONLY effect of
-//     SetEnrichmentState per resolveListDecoratorFull in
-//     core/app/list_columns.go).
+//     glyph prefix on the identity column (no glyph prefix is produced any more).
 //   - core/app/detail_body.go (injectAttentionSectionDetail): each Attention
 //     entry must render both the short Phrase line (capitalized for display)
 //     AND — on lines of its own below it — the full Detail sentence, wrapped
@@ -39,7 +37,7 @@ package unit
 //     only existing fields) but fails at assertion time because
 //     SetEnrichmentState's findings map never reaches listExtractCellValue —
 //     it only drives the "! "/"~ " glyph prefix on the identity column, per
-//     resolveListDecoratorFull (core/app/list_columns.go) and
+//     resolveListRowSeverity (core/app/list_columns.go) and
 //     buildMarkerModel-style harnesses (see qa_enrichment_marker_test.go).
 //   - Tests #5-#7 (s3/ec2/dbi exemplars, driven through the real Wave-2
 //     enrichers) are COMPILE-RED for the same reason as #2/#3 (they assert

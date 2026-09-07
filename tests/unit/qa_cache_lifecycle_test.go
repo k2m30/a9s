@@ -330,9 +330,8 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	// Since the color-findings-conformance wave, colorS3 is
 	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
-	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// directly (the glyph branch that used to fire when
+	// ResolveColor()==ColorHealthy was deleted as unreachable).
 	// ListRow.Color=="broken" is the stronger, correct check.
 	if row1.Color != "broken" {
 		t.Errorf("bucket-s1-1 Color = %q, want %q (broken row for its finding)", row1.Color, "broken")
@@ -463,7 +462,7 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		t.Fatal("seeded ListBody.Rows missing bucket-s2-1")
 	}
 	// colorS3 is colorFromAnyFinding-only (see the Scenario 1 comment above) —
-	// ListRow.Color=="broken" is the correct check, not the DecoratorError glyph.
+	// ListRow.Color=="broken" is the correct check; no glyph is produced.
 	if seededRow1.Color != "broken" {
 		t.Errorf("seeded bucket-s2-1 Color = %q, want %q — the persisted finding's row color must show on the seeded (pre-verify) frame", seededRow1.Color, "broken")
 	}
@@ -599,7 +598,7 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 		t.Fatal("seeded ListBody.Rows missing bucket-s3-resolved")
 	}
 	// colorS3 is colorFromAnyFinding-only (see the Scenario 1 comment above) —
-	// ListRow.Color=="broken" is the correct check, not the DecoratorError glyph.
+	// ListRow.Color=="broken" is the correct check; no glyph is produced.
 	if resolvedSeeded.Color != "broken" {
 		t.Errorf("seeded (pre-verify) bucket-s3-resolved Color = %q, want %q — the OLD (still-broken) row color must show before verification", resolvedSeeded.Color, "broken")
 	}

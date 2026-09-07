@@ -11,7 +11,6 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -21,9 +20,10 @@ import (
 // buildDetailBody constructs a DetailBody from a DetailState, mirroring the
 // data that DetailModel.View() + renderFromFieldList() consume. The body is
 // renderer-agnostic: scroll, width, and height remain owned by the renderer.
-// vc may be nil; when nil the built-in projection defaults are used.
-func buildDetailBody(ds *DetailState, vc *config.ViewsConfig) *DetailBody {
-	items := buildDetailFieldItems(ds, vc)
+// The projection config and the "could not inspect this row" fact are both
+// read from the controller, so no caller has to carry them.
+func (c *Controller) buildDetailBody(ds *DetailState) *DetailBody {
+	items := c.buildDetailFieldItems(ds)
 
 	// Convert []fieldpath.FieldItem → []FieldRow for the body.
 	fields := fieldItemsToFieldRows(items)
@@ -123,8 +123,10 @@ func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
 // buildDetailFieldItems runs the same projector pipeline as
 // DetailModel.buildFieldList and returns the
 // []fieldpath.FieldItem that both the TUI renderer and buildDetailBody consume.
-// vc may be nil; projection.GenericWithConfig(nil) uses built-in defaults.
-func buildDetailFieldItems(ds *DetailState, vc *config.ViewsConfig) []fieldpath.FieldItem {
+// c.viewConfig may be nil; projection.GenericWithConfig(nil) uses built-in
+// defaults.
+func (c *Controller) buildDetailFieldItems(ds *DetailState) []fieldpath.FieldItem {
+	vc := c.viewConfig
 	r := ds.Resource
 	if r.Type == "" {
 		r.Type = ds.ResourceType
@@ -161,12 +163,26 @@ func buildDetailFieldItems(ds *DetailState, vc *config.ViewsConfig) []fieldpath.
 		sections = td.Augment(r, sections)
 	}
 	items := sectionsToFieldItemsDetail(sections)
-	items = injectAttentionSectionDetail(items, ds, td)
+	items = injectAttentionSectionDetail(items, ds, td, c.detailNotInspected(ds))
 	return items
 }
 
+// detailNotInspected returns the name of the check that could not answer for
+// this detail's row, or "" when the row was inspected. It is the same session
+// set the list's Status cell reads (Controller.listUninspectedIDs), so the two
+// surfaces can never disagree about whether a row's posture is known.
+func (c *Controller) detailNotInspected(ds *DetailState) string {
+	if ds == nil || ds.Resource.ID == "" || ds.ResourceType == "" {
+		return ""
+	}
+	if !c.listUninspectedIDs(ds.ResourceType)[ds.Resource.ID] {
+		return ""
+	}
+	return ds.ResourceType
+}
+
 // sectionsToFieldItemsDetail converts []domain.Section → []fieldpath.FieldItem,
-// mirroring sectionsToFieldItems in detail_fields.go.
+// the single implementation (the TUI renders from these items, not its own).
 func sectionsToFieldItemsDetail(sections []domain.Section) []fieldpath.FieldItem {
 	if len(sections) == 0 {
 		return nil
@@ -187,7 +203,7 @@ func sectionsToFieldItemsDetail(sections []domain.Section) []fieldpath.FieldItem
 	return items
 }
 
-// domainItemToFieldItemDetail mirrors domainItemToFieldItem in detail_fields.go.
+// domainItemToFieldItemDetail maps a domain.Item back to a fieldpath.FieldItem.
 func domainItemToFieldItemDetail(it domain.Item, sectionTitle string) fieldpath.FieldItem {
 	fi := fieldpath.FieldItem{
 		Key:         it.Label,
@@ -296,8 +312,16 @@ func wrapSentence(s string, width int) []string {
 // (warning), stable otherwise — the SAME order both the renderer and the
 // prepend-count calculation must observe, so they extract from this one
 // function rather than deriving the order independently in two places.
-func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int) []attentionEntry {
+func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int, notInspected string) []attentionEntry {
 	var entries []attentionEntry
+	if notInspected != "" {
+		entries = append(entries, attentionEntry{
+			tier:          "~",
+			primary:       domain.NotInspectedPhrase + ": " + notInspected,
+			detailLines:   wrapSentence("The "+notInspected+" check did not answer for this row, so its posture is unknown rather than clean.", width),
+			splitKeyValue: true,
+		})
+	}
 	for _, f := range findings {
 		if !f.Severity.IsIssue() {
 			continue
@@ -329,8 +353,8 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 // injectAttentionSectionDetail prepends the Attention block when the resource
 // has issue-severity findings. It is the only place the block is built: the
 // renderer paints the rows it emits.
-func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef) []fieldpath.FieldItem {
-	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth)
+func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef, notInspected string) []fieldpath.FieldItem {
+	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, notInspected)
 	if len(entries) == 0 {
 		return items
 	}

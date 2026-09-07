@@ -48,6 +48,12 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		return result, nil
 	}
 
+	// Cap the work list BEFORE grouping: the cap is a limit on how many
+	// services a9s looked at, and capping the input keeps which services those
+	// are deterministic (grouping first made it depend on map order) while
+	// recording every dropped row as uninspected.
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
 	clusterServices := make(map[string][]string)
 	resourceByService := make(map[string]resource.Resource)
@@ -61,8 +67,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		resourceByService[svcName] = r
 	}
 
-	truncated := len(resources) > EnrichmentCap
-	checked := 0
+	truncated := false
 	var failures []string
 	total := 0
 	const op = "ecs-svc-enrich: DescribeServices"
@@ -71,13 +76,8 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		// ECS DescribeServices accepts up to 10 services per call.
 		const descBatch = 10
 		for i := 0; i < len(svcNames); i += descBatch {
-			if checked >= EnrichmentCap {
-				truncated = true
-				break
-			}
 			end := min(i+descBatch, len(svcNames))
 			batch := svcNames[i:end]
-			checked += len(batch)
 			total += len(batch)
 
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeServicesOutput, error) {
@@ -193,7 +193,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	err := Finish(&result, failures, total, op)
 	return result, err
 }

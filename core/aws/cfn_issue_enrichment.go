@@ -38,10 +38,11 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	if clients.CloudFormation == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
+	truncated := false
 	var failures []string
 	total := 0
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -113,7 +114,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 
 	})
 	sort.Strings(failures)
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
 
@@ -179,10 +180,11 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	if clients.CloudFormation == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
+	truncated := false
 	var failures []string
 	total := 0
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -232,6 +234,6 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	})
 	sort.Strings(failures)
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

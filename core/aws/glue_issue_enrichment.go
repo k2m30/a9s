@@ -33,8 +33,9 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 	if clients.Glue == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
-	n := min(len(resources), EnrichmentCap)
+	truncated := false
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -76,6 +77,6 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	})
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	return result, nil
 }

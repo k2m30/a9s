@@ -124,7 +124,7 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	// Checked via ctrl+z survival, not the literal "! " glyph text: since the
 	// color-findings-conformance wave, colorDBI prefers colorFromAnyFinding
 	// (core/aws/catalog_databases.go) — once the SevBroken Finding is
-	// applied, resolveListDecoratorFull's glyph branch is skipped entirely
+	// applied, no glyph is produced: that branch was deleted as unreachable
 	// (only fires when ResolveColor()==ColorHealthy; see
 	// core/app/list_columns.go and
 	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).

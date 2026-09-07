@@ -790,9 +790,7 @@ func renderListVisibleWindow(selected, total, viewHeight int) (int, int) {
 // app.ListRow: cell text comes from row.Cells verbatim (buildListBody has
 // already baked any S4 status-column override into the appropriate cell,
 // docs/resources/*.md §4) and the marker glyph comes from row.Decorator
-// verbatim (buildListBody has already resolved it via
-// resolveListDecoratorFull). No re-derivation from an enrichment findings map
-// happens here.
+// verbatim. No re-derivation from an enrichment findings map happens here.
 func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int, cellOffset int) string {
 	var b strings.Builder
 	b.WriteString(base.Render(" "))
@@ -829,12 +827,5 @@ func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, tot
 // layer unreduced. Invalidates the render cache.
 func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail) {
 	m.ctrl.ApplyEnrichmentState(m.typeDef.ShortName, issueCount, truncated, findings, details)
-	m.styledRowCache = nil
-}
-
-// SetTruncatedIDs stores the per-resource truncation set for this resource type.
-// Delegated to the controller.
-func (m *ResourceListModel) SetTruncatedIDs(truncatedIDs map[string]bool) {
-	m.ctrl.ApplyListTruncatedIDs(m.typeDef.ShortName, truncatedIDs)
 	m.styledRowCache = nil
 }

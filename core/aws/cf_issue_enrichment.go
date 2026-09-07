@@ -191,7 +191,8 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	}
 	knownBuckets := cachedBucketNames(cache)
 	bucketGone := cfBucketGoneFunc(clients)
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	n := len(resources)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -255,8 +256,5 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		setWave2Finding(&result, distID, cfCodeInsecureProtocol,
 			catalog.Phrase(cfCodeInsecureProtocol), "~", "cf", rows)
 	})
-	// cf.origin-bucket-missing is "!", so the cap now bounds the issue count
-	// and a capped pass must say so rather than under-report the badge.
-	result.Truncated = len(resources) > EnrichmentCap
 	return result, nil
 }

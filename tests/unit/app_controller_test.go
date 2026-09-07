@@ -116,8 +116,8 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 				},
 				Rows: []app.ListRow{
 					{Cells: []string{"i-0abc123def456", "running", "t3.micro"}, Decorator: app.DecoratorNormal, Severity: ""},
-					{Cells: []string{"i-0def789abc012", "stopped", "m5.large"}, Decorator: app.DecoratorWarning, Severity: "medium"},
-					{Cells: []string{"i-0000000000001", "terminated", "t2.nano"}, Decorator: app.DecoratorError, Severity: "critical"},
+					{Cells: []string{"i-0def789abc012", "stopped", "m5.large"}, Decorator: app.RowDecorator("~"), Severity: "medium"},
+					{Cells: []string{"i-0000000000001", "terminated", "t2.nano"}, Decorator: app.RowDecorator("!"), Severity: "critical"},
 				},
 				Selected:      1,
 				ScrollX:       4,

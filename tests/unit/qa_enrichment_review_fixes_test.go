@@ -50,10 +50,9 @@ import (
 // original model so callers can keep making assertions without ctrl+z
 // bleeding into later checks). Since the color-findings-conformance wave,
 // colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go) —
-// once a SevBroken/SevWarn Finding is applied, resolveListDecoratorFull's
-// "! "/"~ " glyph prefix branch is skipped entirely (it only fires when
-// ResolveColor()==ColorHealthy; see core/app/list_columns.go and
-// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+// once a SevBroken/SevWarn Finding is applied, no "! "/"~ " glyph prefix is produced at
+// all: that branch was deleted as unreachable, since a row carrying a
+// finding is never ColorHealthy.
 // The renderer-agnostic, stronger check for "is this row an applied issue"
 // is ctrl+z survival, not the literal glyph text.
 func isVisibleUnderCtrlZ(m tui.Model, needle string) (tui.Model, bool) {

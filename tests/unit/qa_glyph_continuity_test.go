@@ -75,16 +75,27 @@ func findingsForID(ctrl *app.Controller, id string) []domain.Finding {
 	return nil
 }
 
-// hasDecoratorForID reports whether the currently-built list body shows the
-// given decorator ("!" or "~") on the row with the given ResourceID.
-func hasDecoratorForID(ctrl *app.Controller, id string, want app.RowDecorator) bool {
+// hasStorePhraseForID reports whether the currently-built list body shows the
+// given Wave-2 finding phrase in the Status cell of the row with the given
+// ResourceID. This replaces an earlier decorator probe: a list row's colour is
+// the worst finding over both waves, so a row carrying a finding is never
+// green for a glyph to annotate, and resolveListDecoratorFull's glyph branch
+// was deleted with the spec row that proved it unreachable. The rendered
+// Status cell is the surface the enrichment store still drives on its own,
+// which is what these rotation pins need to observe.
+func hasStorePhraseForID(ctrl *app.Controller, id, phrase string) bool {
 	snap := ctrl.Snapshot()
 	if snap.Body.List == nil {
 		return false
 	}
 	for _, r := range snap.Body.List.Rows {
-		if r.ResourceID == id && r.Decorator == want {
-			return true
+		if r.ResourceID != id {
+			continue
+		}
+		for _, cell := range r.Cells {
+			if cell == phrase {
+				return true
+			}
 		}
 	}
 	return false
@@ -117,10 +128,9 @@ func hasDecoratorForID(ctrl *app.Controller, id string, want app.RowDecorator) b
 // the "is this finding applied" check, not the literal "! " glyph text.
 // Since the color-findings-conformance wave, colorEC2 is
 // colorFromAnyFinding-only (core/aws/catalog_compute.go) — once a
-// SevBroken Finding is applied, resolveListDecoratorFull's glyph branch is
-// skipped entirely (only fires when ResolveColor()==ColorHealthy; see
-// core/app/list_columns.go and
-// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+// SevBroken Finding is applied the row is ColorBroken, and no glyph is
+// produced at all: the branch that used to fire when
+// ResolveColor()==ColorHealthy was deleted as unreachable.
 // isVisibleUnderCtrlZ (qa_enrichment_review_fixes_test.go) is the
 // renderer-agnostic, stronger replacement.
 func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
@@ -279,8 +289,8 @@ func TestProfileSwitch_StillClearsFindings(t *testing.T) {
 		"i-sharedid": {{Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}, nil)
 
-	if !hasDecoratorForID(ctrl, "i-sharedid", app.DecoratorError) {
-		t.Fatal("fixture assumption broken — expected an error decorator on i-sharedid before rotation")
+	if !hasStorePhraseForID(ctrl, "i-sharedid", "system check failed") {
+		t.Fatal("fixture assumption broken — expected the Wave-2 phrase on i-sharedid's Status cell before rotation")
 	}
 
 	// Simulate the ONLY rotation-adjacent clear that production code actually
@@ -296,8 +306,8 @@ func TestProfileSwitch_StillClearsFindings(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("ec2", freshFromNewProfile, nil, false)
 
-	if hasDecoratorForID(ctrl, "i-sharedid", app.DecoratorError) {
-		t.Error("error decorator from the OLD profile's enrichment survived a rotation-shaped sequence (MenuClearAvailabilityIntent + fresh fetch) — Controller.enrichmentStore must be cleared on profile/region rotation, not just MenuState")
+	if hasStorePhraseForID(ctrl, "i-sharedid", "system check failed") {
+		t.Error("the OLD profile's enrichment phrase survived a rotation-shaped sequence (MenuClearAvailabilityIntent + fresh fetch) — Controller.enrichmentStore must be cleared on profile/region rotation, not just MenuState")
 	}
 
 	got := findingsForID(ctrl, "i-sharedid")

@@ -252,7 +252,7 @@ func TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender(t *testing.T) 
 // TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRender
 // renders a healthy row, applies a Wave-2 finding via ApplyEnrichmentState
 // (the same seam production code's Wave-2 sweep uses), then renders again.
-// TestEnrichment_BrokenRowHasDecoratorError (core/app/list_test.go) and
+// TestEnrichment_BrokenRowHasDecoratorError (deleted with the glyph branch) and
 // TestListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState
 // (this file) both apply the finding BEFORE ever rendering, so neither
 // proves a SECOND render — as opposed to the first-ever render of that
@@ -278,11 +278,14 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 	if len(render1.Rows) != 1 {
 		t.Fatalf("render1: Rows count: got %d want 1", len(render1.Rows))
 	}
-	if render1.Rows[0].Decorator != app.DecoratorNormal {
-		t.Fatalf("render1 (before enrichment): Decorator: got %q want %q", render1.Rows[0].Decorator, app.DecoratorNormal)
-	}
-	if render1.Rows[0].Severity != "" {
-		t.Fatalf("render1 (before enrichment): Severity: got %q want empty", render1.Rows[0].Severity)
+	// The probe is the rendered Status cell, not the row decorator: the glyph
+	// branch that used to answer here was deleted (a list row's colour is the
+	// worst finding over both waves, so buildListBody produces no glyph). The
+	// S4 status-cell override still reads the enrichment store directly, so it
+	// is the surface this memo-invalidation pin can observe. Do not restore a
+	// decorator assertion.
+	if got := render1.Rows[0].Cells[render1.StatusCol]; got == "system check failed" {
+		t.Fatalf("render1 (before enrichment): Status cell already carries the Wave-2 phrase")
 	}
 
 	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
@@ -293,11 +296,8 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 	if len(render2.Rows) != 1 {
 		t.Fatalf("render2: Rows count: got %d want 1", len(render2.Rows))
 	}
-	if render2.Rows[0].Decorator != app.DecoratorError {
-		t.Errorf("render2 (after enrichment): Decorator: got %q want %q — stale cache would still show %q", render2.Rows[0].Decorator, app.DecoratorError, app.DecoratorNormal)
-	}
-	if render2.Rows[0].Severity != "broken" {
-		t.Errorf("render2 (after enrichment): Severity: got %q want %q", render2.Rows[0].Severity, "broken")
+	if got := render2.Rows[0].Cells[render2.StatusCol]; got != "system check failed" {
+		t.Errorf("render2 (after enrichment): Status cell: got %q want %q — a stale memo would still show the pre-enrichment cell", got, "system check failed")
 	}
 }
 

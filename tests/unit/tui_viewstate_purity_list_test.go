@@ -10,7 +10,7 @@
 //  1. renderListDataRow (~line 882 resourcelist.go): the "!"/"~" glyph is
 //     re-derived from body.EnrichmentFindings[row.ResourceID] + row.Color ==
 //     "healthy", instead of consuming row.Decorator (which buildListBody
-//     already computed via resolveListDecoratorFull).
+//     already computed by buildListBody).
 //  2. renderListDataRow (~line 874): the S4 status-cell override re-applies
 //     findings[row.ResourceID].Phrase at statusColIdx, even though
 //     buildListBody (list_body.go ~line 124) already bakes the phrase into
@@ -86,6 +86,12 @@ func newPurityListModel(td resource.ResourceTypeDef) views.ResourceListModel {
 // renderer re-derives from findings[row.ResourceID] (absent) and shows none.
 // ---------------------------------------------------------------------------
 
+// The named DecoratorError/DecoratorWarning constants were deleted with
+// resolveListDecoratorFull's glyph branch: a list row's colour is the worst
+// finding over both waves, so buildListBody never produces a glyph. These pins
+// are about the RENDERER's purity, not about what the body produces — they
+// construct the decorator value directly, so they still hold if a body ever
+// carries one again. Do not restore the constants to make them read better.
 func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Present(t *testing.T) {
 	ensureNoColor(t)
 	styles.ReinitForTest()
@@ -96,7 +102,7 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Present(t *testin
 
 	row := app.ListRow{
 		Cells:      []string{"demo-instance-1", "running"},
-		Decorator:  app.DecoratorError, // "!" — pre-resolved by buildListBody
+		Decorator:  app.RowDecorator("!"), // pre-resolved by buildListBody
 		ResourceID: "res-1",
 		Color:      "healthy",
 	}
@@ -239,7 +245,7 @@ func TestViewStatePurity_List_MarkerColSelectsPrefixedColumn(t *testing.T) {
 
 	row := app.ListRow{
 		Cells:      []string{"demo-instance-4", "needs-attention"},
-		Decorator:  app.DecoratorError,
+		Decorator:  app.RowDecorator("!"),
 		ResourceID: "res-4",
 		Color:      "healthy",
 	}

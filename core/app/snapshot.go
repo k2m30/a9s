@@ -67,7 +67,7 @@ func (c *Controller) snapshot() ViewState {
 		vs.Footer = c.buildTextFooterHints(top.ID, top.Ctx)
 	}
 	if top.State.Detail != nil {
-		vs.Body.Detail = buildDetailBody(top.State.Detail, c.viewConfig)
+		vs.Body.Detail = c.buildDetailBody(top.State.Detail)
 		vs.FrameTitle = c.detailFrameTitleLocked()
 		vs.Footer = c.buildDetailFooterHints(top.State.Detail)
 	}

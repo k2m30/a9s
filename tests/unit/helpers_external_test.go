@@ -73,8 +73,8 @@ func buildResourceWithFields(id, name string, fields map[string]string) resource
 // ---------------------------------------------------------------------------
 
 // configForType returns a ViewsConfig containing only the ViewDef for the given
-// resource type. This avoids the non-deterministic map iteration in renderFromConfig
-// matching a wrong ViewDef whose paths happen to extract values from the struct.
+// resource type. This avoids non-deterministic map iteration over the full
+// config matching a wrong ViewDef whose paths extract values from the struct.
 func configForType(typeName string) *config.ViewsConfig {
 	full := config.DefaultConfig()
 	vd, ok := full.Views[typeName]

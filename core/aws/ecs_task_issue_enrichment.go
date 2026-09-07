@@ -61,6 +61,13 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		return result, nil
 	}
 
+	// Cap the work list BEFORE grouping: the cap limits how many tasks a9s
+	// looked at, and capping the input keeps which tasks those are
+	// deterministic (grouping first made it depend on map order) while
+	// recording every dropped row as uninspected. Resource.ID IS the task ID
+	// (core/aws/ecs_task.go), which is also how TruncatedIDs is keyed below.
+	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+
 	// Group task ARNs by cluster ARN.
 	clusterTasks := make(map[string][]string)
 	taskIDToResource := make(map[string]string) // taskID → resource key (task_id field)
@@ -78,8 +85,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	}
 
 	taskDefByTaskID := make(map[string]string, len(resources))
-	truncated := len(resources) > EnrichmentCap
-	checked := 0
+	truncated := false
 	var failures []string
 	total := 0
 	const op = "ecs-task-enrich: DescribeTasks"
@@ -88,13 +94,8 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	const descBatch = 100
 	for clusterARN, taskIDs := range clusterTasks {
 		for i := 0; i < len(taskIDs); i += descBatch {
-			if checked >= EnrichmentCap {
-				truncated = true
-				break
-			}
 			end := min(i+descBatch, len(taskIDs))
 			batch := taskIDs[i:end]
-			checked += len(batch)
 			total += len(batch)
 
 			out, err := clients.ECS.DescribeTasks(ctx, &ecs.DescribeTasksInput{
@@ -170,7 +171,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		failures = append(failures, err.Error())
 	}
 
-	result.Truncated = truncated
+	result.Truncated = result.Truncated || truncated
 	err := Finish(&result, failures, total, op)
 	return result, err
 }

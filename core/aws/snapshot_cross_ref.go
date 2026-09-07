@@ -277,7 +277,8 @@ func enrichSnapshotPublicShare(
 	if cfg.PublicAttr == nil || clients == nil {
 		return nil
 	}
-	n := min(len(resources), EnrichmentCap)
+	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	n := len(resources)
 	if n < len(resources) {
 		result.Truncated = true
 	}

@@ -456,13 +456,14 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 
 	// Enrichment data.
 	findings := c.listEnrichmentFindings(typeName)
+	uninspected := c.listUninspectedIDs(typeName)
 
 	// Build rows.
 	statusCol := resolveListStatusCol(columns, td)
 	rows := make([]ListRow, 0, len(visible))
 	for _, r := range visible {
 		cells := extractListCells(columns, r, td)
-		decorator, severity, colorTag := resolveListDecoratorFull(td, r, findings)
+		severity, colorTag := resolveListRowSeverity(td, r)
 		// S4: bake the Wave-2 issue-Finding Phrase into the status cell, from the
 		// same enrichment findings map that drives the glyph. Without this the web
 		// renders a blank Status for flagged rows in live mode (the cell only
@@ -484,16 +485,25 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		// notation — so applying it on top of an already-stacked cell would
 		// silently drop the "(+N)" suffix and/or clobber a higher-priority
 		// Wave-1 phrase with a same-or-lower-severity Wave-2 one.
+		phrased := domain.StatusPhrase(r.Findings) != ""
 		if statusCol >= 0 && statusCol < len(cells) && !hasWave2Finding(r.Findings) {
 			if fs, ok := findings[r.ID]; ok && len(fs) > 0 {
 				if f := domain.WorstSeverityFinding(fs); f.Severity.IsIssue() && f.Phrase != "" {
 					cells[statusCol] = f.Phrase
+					phrased = true
 				}
 			}
 		}
+		// A row the enricher could not inspect says so, in the one cell an
+		// operator reads for the check's answer. A phrase wins: a row that
+		// already reports something concrete is not "unknown". The colour is
+		// deliberately left alone — an uninspected row is not an issue, so it
+		// must neither tint the row nor bump a badge.
+		if statusCol >= 0 && statusCol < len(cells) && !phrased && uninspected[r.ID] {
+			cells[statusCol] = domain.NotInspectedPhrase
+		}
 		rows = append(rows, ListRow{
 			Cells:      cells,
-			Decorator:  decorator,
 			Severity:   severity,
 			ResourceID: r.ID,
 			Color:      colorTag,
@@ -990,13 +1000,21 @@ func listHasBadgeFinding(r resource.Resource) bool {
 	return false
 }
 
-// ApplyListTruncatedIDs stores the per-resource truncation set for typeName.
-// Currently retained for API parity with ResourceListModel.SetTruncatedIDs;
-// the controller's attention filter does not yet consult this set.
-func (c *Controller) ApplyListTruncatedIDs(_ string, _ map[string]bool) {
-	// Intentional no-op: truncatedByID was stored but never read in the filter
-	// pipeline. Retained for caller parity. No lock needed — no shared state
-	// is accessed.
+// listUninspectedIDs returns the rows of typeName that the type's Wave-2
+// issue enricher could not inspect — IssueEnricherResult.TruncatedIDs, written
+// to the session by Core.HandleEvent(messages.EnrichmentChecked). The session
+// is the only store for this fact; the controller reads it rather than keeping
+// a copy, so a refresh that clears the session set cannot leave a stale
+// "not inspected" on a row the next sweep answered for.
+//
+// The session keys the set by ShortName (Core.handleEnrichmentChecked
+// canonicalizes msg.ResourceType before the write), so a screen opened under
+// an alias has to canonicalize its own query to find it.
+func (c *Controller) listUninspectedIDs(typeName string) map[string]bool {
+	if td := resource.FindResourceType(typeName); td != nil {
+		typeName = td.ShortName
+	}
+	return c.core.EnrichmentTruncatedIDs(typeName)
 }
 
 // PushChildListScreen pushes a ScreenChildList for the given resource type
