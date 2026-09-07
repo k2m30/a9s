@@ -199,7 +199,7 @@ Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals
 Badge aggregation for `eks`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-One row per signal from §3. The fetcher's own `DescribeCluster` sets the row color, so every signal is Wave 1 and S3 is suppressed — the row is never green when one fires:
+One row per signal from §3. The fetcher's own `DescribeCluster` sets the row color, so every signal is Wave 1:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
@@ -218,8 +218,8 @@ One row per signal from §3. The fetcher's own `DescribeCluster` sets the row co
 
 Notes:
 
-- No `!`-on-green case exists for EKS: every signal moves the row off green (Warning or Broken). The S1 count is driven by the Broken rows, `Status == FAILED` among them, under the standard "red rows bump the menu count" rule.
-- `Health.Issues[]` can appear on an `ACTIVE` cluster (health is tracked independently of lifecycle state). When it does, the row moves to Warning — the health issue is the cause, and the `!`-on-green rule does not apply because the color already changed.
+- Every EKS signal moves the row off green (Warning or Broken). The S1 count is driven by the Broken rows, `Status == FAILED` among them, under the standard "red rows bump the menu count" rule.
+- `Health.Issues[]` can appear on an `ACTIVE` cluster (health is tracked independently of lifecycle state). When it does, the row moves to Warning — the health issue is the cause, and each reported code is a row under the finding in the detail view.
 - A failed cluster reads `failed` in the list; every health issue AWS reports for it is a supporting row in the detail view, which is where the codes are read. `types.Cluster` carries no `StatusReason`-style field to name a cause in the list.
 
 ## 4.1 UX review (two sentences)

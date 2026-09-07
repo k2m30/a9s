@@ -148,8 +148,8 @@ One row per signal from §3:
 
 Rules applied:
 
-- `scanOnPush==false` is a Wave 1 Warning and paints the row yellow; S4 carries the cause. No glyph (S3 is forbidden on yellow rows). No S5 (Wave 1 does not produce a finding object).
-- `CRITICAL>0` is a Wave 2 Broken finding; the row is repainted red and the full cause appears in S4/S5. S1 counts this `!` finding. S3 is suppressed because the row is no longer green.
+- `scanOnPush==false` is a Wave 1 Warning and paints the row yellow; S4 carries the cause, and the Attention section carries `~` and the sentence like any other Warning finding.
+- `CRITICAL>0` is a Wave 2 Broken finding; the row is repainted red and the full cause appears in S4/S5. S1 counts this `!` finding.
 - `CRITICAL>0` and `HIGH>0` are the same finding, `ecr.vulnerabilities`, and it is Broken: the phrase counts both severities, so a repository with high findings and no critical ones reaches the menu count like any other.
 - When multiple signals fire on the same repo, the highest-severity bucket wins the row color (Broken > Warning) and S4 shows the Broken cause; secondary causes go to S5.
 

@@ -130,8 +130,8 @@ One row per signal from §3:
 
 Notes on the table above:
 
-- The `DISABLED` + targets signal lands on a row that is already Dim (gray). Per the Wave → surface mapping, S3 is suppressed on non-green rows; the `!` still bumps S1, and S4 deduplicates with the bare `disabled — admin-off` cause by appending `— still wired to N targets`. S5 carries the full sentence.
-- The missing-DLQ signal is the only `~` on `eb-rule` — it's informational background hygiene, not a rule-is-broken event. It gets a glyph only when the row is green (ENABLED and has targets); on yellow/red/dim rows the signal still records in S5 but no glyph is painted.
+- The `DISABLED` + targets signal lands on a row that is already Dim (gray). The `!` still bumps S1, and S4 deduplicates with the bare `disabled — admin-off` cause by appending `— still wired to N targets`. S5 carries the full sentence.
+- The missing-DLQ signal is the only `~` on `eb-rule` — it's informational background hygiene, not a rule-is-broken event. It carries `~` in the detail view's Attention section, whatever colour the row is.
 - Severity choice (`!` for no-targets and disabled-with-targets, `~` for missing DLQ) — a9s-devops: no-targets on an enabled rule and stale disabled-but-wired rules are both "something is broken right now"; missing DLQ is a latent risk that only matters when another failure occurs, which is textbook `~`.
 
 ## 4.1 UX review (two sentences)

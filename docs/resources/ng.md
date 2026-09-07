@@ -173,9 +173,8 @@ One row per signal from §3 that reaches at least one surface. Healthy is omitte
 
 The two health rows carry what AWS reported: each code in `health.issues[]` is a
 row under the finding in the detail view, so `insufficient free addresses` is
-read there rather than squeezed into the Status column. S3 is suppressed on all
-of these — the row is never green when one fires — and the Broken rows count
-toward S1.
+read there rather than squeezed into the Status column. S4 carries one cause;
+the Attention section carries every finding.
 
 Healthy (`status==ACTIVE` with no issues) is omitted from the table: S2 renders green, S4 renders blank, no finding. Silence is the UX.
 

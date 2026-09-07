@@ -78,7 +78,7 @@ Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals
 Badge aggregation for `iam-group`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Orphan groups are informational-cost signals, not operational breakage — `~` severity (informational background finding on a Healthy row). S1 is not bumped; operator sees the `~` glyph on the green row and can triage later.
+Orphan groups are informational-cost signals, not operational breakage — `~` severity (informational background finding on a Healthy row). S1 is not bumped: the count takes a Wave 2 finding only at Broken. The row is yellow and the Attention section carries `~` and the cause, so the operator can triage later.
 
 One row per signal from §3:
 

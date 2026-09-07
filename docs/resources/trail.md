@@ -170,7 +170,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 2 `LatestDeliveryError` non-empty → Broken — `docs/attention-signals.md § Signals § MONITORING` row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § LatestDeliveryError`.
 - Wave 2 `LatestDeliveryTime` >1h stale while `IsLogging==true` → Broken — `docs/attention-signals.md § Signals § MONITORING` row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § LatestDeliveryTime, IsLogging`.
 - Wave 3 `LookupEvents` absence detection (OUT OF SCOPE) — `docs/attention-signals.md § Not yet implemented`.
-- `!` severity for the three Wave 2 Broken signals — a9s-devops (2026-04-20): possible=yes, worth=yes. A stopped trail, a failing S3 delivery, or a silent delivery are all cases where the audit record is actively being lost — this is a compliance/security break and must bump the menu `issues:N` count; `~` would under-sell the risk. S3 is suppressed per the HOW rule because the row is already red.
+- `!` severity for the three Wave 2 Broken signals — a9s-devops (2026-04-20): possible=yes, worth=yes. A stopped trail, a failing S3 delivery, or a silent delivery are all cases where the audit record is actively being lost — this is a compliance/security break and must bump the menu `issues:N` count; `~` would under-sell the risk.
 - Out-of-scope rationale for `LatestDigestDeliveryError`, `LatestNotificationError`, `LatestCloudWatchLogsDeliveryError` — a9s-devops (2026-04-20): possible=yes, worth=no. The golden-doc signals already cover the actively-losing-data cases; these extra fields surface niche sub-failures whose fix path is the existing `kms` / `logs` / `role` pivots.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 

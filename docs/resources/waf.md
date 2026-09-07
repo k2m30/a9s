@@ -104,7 +104,7 @@ One row per signal from §3 that has operator-readable surface text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — both WAF findings carry the cause in the Status column (`no rules — ACL inert`, `allow-all: no rules, default Allow`), so a red/yellow-less green row with `!` or `~` prefix tells the operator exactly which configuration gap exists without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — both WAF findings carry the cause in the Status column (`no rules — ACL inert`, `allow-all: no rules, default Allow`), so the row colour and that text tell the operator exactly which configuration gap exists without opening detail.
 
 ## 5. Out of Scope
 

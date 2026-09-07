@@ -119,7 +119,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled: no new queries accepted` tells the operator the workgroup is admin-off, and a green row prefixed with `~` and `query results stored unencrypted` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still write results in the clear, and a merged cell could name only the first. Operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled: no new queries accepted` tells the operator the workgroup is admin-off, and a yellow row reading `query results stored unencrypted` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still write results in the clear, and a merged cell could name only the first. Operator can triage without opening detail.
 
 ## 5. Out of Scope
 

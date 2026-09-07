@@ -175,7 +175,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - `TemplateURL` is not on `DescribeStacks` response — `AWS SDK Go v2 — cloudformation/types.Stack` (no `TemplateURL` field; template recovery requires `GetTemplate`/`GetTemplateSummary`).
 - `eb-rule` discovered by reverse scan (no direct stack field) — a9s-devops (2026-04-20): possible=yes via reverse-scan of EventBridge rules for `source: aws.cloudformation`, worth=yes for "where do stack events fan out?" workflow; direct field on Stack would be ideal but does not exist.
 - S3 pivot not directly discoverable from list row — a9s-devops (2026-04-20): possible=partial (requires `GetTemplateSummary` not in Wave 2 budget), worth=yes workflow but not worth the extra per-stack call; treat as "open S3 list" manual pivot, no count.
-- `!` vs `~` severity — not applicable to `cfn`: Wave 2 failures land on rows that are already colored by Wave 1 `*_FAILED`/`ROLLBACK_*`, so S3 glyphs are suppressed by rule (glyphs only on green rows).
+- Wave 2 failures land on rows Wave 1 has already coloured `*_FAILED` / `ROLLBACK_*`, so the colour is not news; the Attention section still lists the Wave 2 finding under its own `!`.
 - Wave 1 `StackStatus` buckets — `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 - `StackStatusReason` carries the cause surfaced in S4 — `AWS SDK Go v2 — cloudformation/types.Stack § StackStatusReason` ("Success/failure message associated with the stack status").
 - `DriftInformation.StackDriftStatus` is the drift field — `AWS SDK Go v2 — cloudformation/types.Stack § DriftInformation` → `cloudformation/types.StackDriftInformation § StackDriftStatus` (values include `DRIFTED`, `IN_SYNC`, `NOT_CHECKED`, `UNKNOWN`).

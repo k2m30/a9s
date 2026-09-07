@@ -87,7 +87,7 @@ Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals
 Badge aggregation for `backup`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Because Wave 1 is silent, every signal below is a Wave 2 background finding that lands on a Healthy green row — the glyph is always the first signal the operator sees.
+Because Wave 1 is silent, every signal below is a Wave 2 finding. Each colours the row it lands on, so the colour and the cause text are what the operator sees first.
 
 One row per signal from §3:
 

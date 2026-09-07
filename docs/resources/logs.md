@@ -159,7 +159,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 2 `lastEventTimestamp` staleness — `docs/attention-signals.md § Signals § MONITORING` row `logs`; `AWS SDK Go v2 — cloudwatchlogs/types.LogStream § LastEventTimestamp` (`*int64`, ms since epoch).
 - Wave 3 metric-filter-count check (OUT OF SCOPE) — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
-- `~` severity choice for `lastEventTimestamp` staleness — user decision deferred; defaulted to `~` (informational background check on a green row) because a stale log stream is a lagging signal, not an active break. a9s-devops (2026-04-20): stale-log-group does not itself cause user-facing impact — it flags a silent emitter; worth surfacing but not worth bumping the menu `issues:N` count.
+- `~` severity choice for `lastEventTimestamp` staleness — user decision deferred; defaulted to `~` (informational, not an active break) because a stale log stream is a lagging signal, not an active break. a9s-devops (2026-04-20): stale-log-group does not itself cause user-facing impact — it flags a silent emitter; worth surfacing but not worth bumping the menu `issues:N` count.
 
 <!-- BEGIN GENERATED: header -->
 logs — MONITORING. Lifecycle key: none (the list API returns no lifecycle field).

@@ -151,12 +151,12 @@ One row per signal from §3:
 
 Notes:
 
-- The `RenewalSummary.RenewalStatus == FAILED` finding is the canonical `!`-on-green case: a cert is currently `ISSUED` (green) but its next auto-renewal has already failed silently. Operators want the menu count, the glyph, and the detail line — classic ACM landmine.
-- The `DomainValidationOptions` failure typically lands on a cert whose Wave 1 `Status` is already `PENDING_VALIDATION` (yellow). The row is already yellow, so S3 is suppressed. S4 replaces the generic `validating DNS` wording with the specific `validation failed: <domain>` cause.
+- The `RenewalSummary.RenewalStatus == FAILED` condition is the ACM landmine: a cert reads `ISSUED` while its next auto-renewal has already failed silently. Were it implemented it would colour the row on its own, bump the menu count, and carry `!` and its sentence in the detail view.
+- The `DomainValidationOptions` failure typically lands on a cert whose Wave 1 `Status` is already `PENDING_VALIDATION` (yellow). S4 replaces the generic `validating DNS` wording with the specific `validation failed: <domain>` cause.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy cert carries a specific cause in S4 (`expires in 5d`, `issuance failed`, `validation timed out`, `auto-renewal failed`), and the `!` glyph on an otherwise-green cert is the only case where the cause lives in S5, reachable via the standard detail keypress. The only wording that could be tightened is the generic `issuance failed` for `Status == FAILED` — when `CertificateDetail.FailureReason` is available from a prior describe, the Wave 2 pass may refine S4 to `issuance failed: <FailureReason>`.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy cert carries a specific cause in S4 (`expires in 5d`, `issuance failed`, `validation timed out`, `auto-renewal failed`), and the detail view carries the full sentence for each, one keypress away. The only wording that could be tightened is the generic `issuance failed` for `Status == FAILED` — when `CertificateDetail.FailureReason` is available from a prior describe, the Wave 2 pass may refine S4 to `issuance failed: <FailureReason>`.
 
 ## 5. Out of Scope
 

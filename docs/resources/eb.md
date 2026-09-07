@@ -178,7 +178,7 @@ Notes on the `Causes[]` row:
 
 - `Causes[]` is only populated when enhanced health is enabled; with basic health the field is absent. When absent, the row is omitted entirely from S5.
 - On a Yellow/Grey/Red row, S4 already carries a cause from Wave 1. S4 should deduplicate: if the first `Cause` string adds information beyond the Wave 1 text, replace the Wave 1 text; otherwise leave the Wave 1 text and put `Causes[]` in S5 only.
-- `Causes[]` is never raised on a Green environment in practice (enhanced-health reports Causes only when degradation is detected). If it ever is, treat as `~` (informational) on the green row.
+- `Causes[]` is never raised on a Green environment in practice (enhanced-health reports Causes only when degradation is detected). If it ever is, treat as `~` (informational): it colours the row like any other Warning finding.
 
 Rules for filling list and detail text:
 

@@ -172,7 +172,7 @@ Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals
 Badge aggregation for `mwaa`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
 
-One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironments` is opaque; the `GetEnvironment` pass sets the row color, so the state-bucket rows behave like Wave 1 colors to the operator (yellow/red is the attention signal, S3 suppressed because the row is not green):
+One row per signal from §3. `ListEnvironments` is opaque, so `GetEnvironment` runs as the row is built and every signal is Wave 1; yellow or red is the attention signal in the list, and the detail view's Attention section carries one entry per finding:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
@@ -194,7 +194,7 @@ One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironmen
 
 Notes:
 
-- No glyph case exists for mwaa: every signal moves the row off green (the color is the signal; per the color-findings conformance contract, any issue-severity finding is color-bearing). S1 is driven by all issue-colored rows under the standard aggregation.
+- Every mwaa signal moves the row off green: the colour is the signal, and per the color-findings conformance contract any issue-severity finding is colour-bearing. S1 is driven by all issue-coloured rows under the standard aggregation.
 - When `LastUpdate.Status == FAILED` coincides with another signal row (e.g. `ROLLING_BACK`), S4 keeps the state cause with the `(+N)` suffix; the failed-update sentence still appears in S5.
 - No raw AWS enum ever reaches a rendered surface — `ErrorCode` and `WebserverAccessMode` values are humanized (`INCORRECT_CONFIGURATION` → `Incorrect configuration`) per the issue-text style gate.
 - AccessDenied on `mwaa:ListEnvironments`: the main-menu row carries the error state, never `0` — "you can't see it" must be distinguishable from "it isn't there".

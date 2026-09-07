@@ -166,7 +166,7 @@ One row per signal from §3:
 
 Notes:
 
-- The Wave 2 findings land on rows that are Healthy (green) at Wave 1 unless Wave 1 already flagged them (e.g. orphan). For the Warning row, severity is `n/a` rather than `~` because the row color is already yellow — S2 is the attention signal; S3 would be redundant and is suppressed. For the Broken row (all targets unhealthy), the row color is already red; S1 still counts this as an `!`-equivalent issue because it represents a user-facing outage, but the glyph is suppressed per the "already red" rule.
+- Both Wave 2 findings colour the row themselves: yellow for unhealthy targets, red when every target is down. S2 is the attention signal in the list, and the Attention section carries the tier — `~` for the Warning row, `!` for the Broken one. Only the Broken one bumps S1, which is right for a user-facing outage.
 - List-text `<K>/<N>` is derived from the `DescribeTargetHealth` response: `K = count(TargetHealthDescriptions where TargetHealth.State == "unhealthy")`, `N = len(TargetHealthDescriptions)`. The detail lists one `Unhealthy target` row per failing target, `<id>:<port> — <reason>`, from `Target.Id`, `Target.Port` and `TargetHealth.Reason` (e.g. `Target.Timeout`, `Target.ResponseCodeMismatch`, `Target.FailedHealthChecks`). The ratio is the phrase's, so no row repeats it.
 
 ## 4.1 UX review (two sentences)

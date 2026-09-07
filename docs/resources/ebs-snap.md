@@ -111,7 +111,7 @@ Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals
 Badge aggregation for `ebs-snap`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Note: the Wave 1 signals `age > 365d` and `Encrypted == false` are background-check-style concerns but are Wave 1 (zero extra calls). They apply to rows that would otherwise be Healthy (`State == completed`). Treating them strictly per the mapping rules, they turn a green row yellow (Warning) via S2, and S4 carries the cause. They do not get a `~` glyph because the row is no longer green.
+Note: the Wave 1 signals `age > 365d` and `Encrypted == false` are background-check-style concerns but are Wave 1 (zero extra calls). They apply to rows that would otherwise be Healthy (`State == completed`). They turn a green row yellow (Warning) via S2, S4 carries the cause, and the Attention section carries `~` and the sentence.
 
 One row per signal from §3:
 

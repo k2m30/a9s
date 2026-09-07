@@ -135,7 +135,7 @@ Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals
 Badge aggregation for `pipeline`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Because pipeline has no Wave 1 health signals, every row starts green and any §4 row here describes a Wave 2 finding that flips the row directly. These Wave 2 findings are operational failures (a stage failed) not "background concerns", so they bump S2 to red/yellow (not a green-row glyph); S3 is suppressed because the row is no longer green. S1 still counts the `!` findings.
+Because pipeline has no Wave 1 health signals, every row starts green and any §4 row here describes a Wave 2 finding that flips the row directly. These Wave 2 findings are operational failures (a stage failed) not "background concerns", so they bump S2 to red or yellow. S1 still counts the `!` findings.
 
 One row per signal from §3:
 

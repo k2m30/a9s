@@ -118,7 +118,7 @@ Rules applied:
 - All cause text avoids banned jargon (`Wave 1`, `Wave 2`, `finding`, `enrichment`, etc.).
 - No bare state keyword stands alone — every S4 value pairs the state with an operator-readable cause and (where relevant) an age.
 - Wave 1 Healthy users (active console user OR user created <90d ago) produce no §4 row — green, blank Status, no glyph. Silence is the UX.
-- The "console login without MFA" finding is classed Broken (`!`) even though the user's row is green under Wave 1 — the security risk is critical enough to bump S1 and draw a `!` on the green row. Per skill rule "Wave 2 Broken-style background finding on a Healthy resource gets `!` → S1, S3, S4, S5".
+- The "console login without MFA" finding is classed Broken even though the user's row raises nothing in Wave 1 — the security risk is critical enough to bump S1. It colours the row red and carries `!` in the Attention section.
 - Stale/never-used key findings are `~` informational — they're hygiene prompts, not incidents, and shouldn't inflate the menu issues count.
 
 ## 4.1 UX review

@@ -114,7 +114,7 @@ One row per signal from §3:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for the orphan-topic row — `~ no subscribers` on a green row is self-explanatory. The missing-KMS row is only actionable if the "sensitive topic" trigger is first defined (tag? name regex?); until then the spec row is documentation, not an implementation target — implementers must resolve the trigger before surfacing this finding, otherwise every unencrypted topic in the account lights up with `~ not encrypted` and the signal degrades to noise.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for the orphan-topic row — a yellow row reading `no subscribers` is self-explanatory. The missing-KMS row is only actionable if the "sensitive topic" trigger is first defined (tag? name regex?); until then the spec row is documentation, not an implementation target — implementers must resolve the trigger before surfacing this finding, otherwise every unencrypted topic in the account lights up with `~ not encrypted` and the signal degrades to noise.
 
 ## 4.2 On-Demand Detail Enrichment
 

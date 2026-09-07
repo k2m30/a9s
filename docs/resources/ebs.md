@@ -145,8 +145,7 @@ One row per signal from §3:
 Notes on rows omitted:
 
 - `State == in-use` is Healthy and produces no §4 row — S2 renders green, S4 renders blank.
-- The `available` + age>7d case is rendered as a yellow row (Warning), not a green row with `!`, because the condition is the current state of the volume, not a background check over a Healthy row. `!` is reserved for background-check findings on Healthy (in-use) rows. `Encrypted == false` on an `in-use` row is the canonical `!` case — the volume is running fine, but there is a security concern worth flagging.
-- The `Events[] non-empty` signal is rendered as `~` (informational) on an `in-use` row. When the same volume is already yellow/red for another reason (e.g. `VolumeStatus.Status == warning`), the `~` glyph is suppressed per the "finding on already-yellow/red row" rule; the event sentence still appears in S5.
+- The `available` + age>7d case is a yellow row: the condition is the current state of the volume. `Encrypted == false` is yellow too and carries `~` in the Attention section — the volume is running fine, but there is a security concern worth flagging.
 
 ## 4.1 UX review (two sentences)
 

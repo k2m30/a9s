@@ -181,7 +181,7 @@ Badge aggregation for `asg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity 
 
 Notes:
 
-- The Wave 2 launch-failure signal typically co-occurs with Wave 1 `InService < MinSize` (Broken) — the row is already red. Per mapping rules, S3 is suppressed (no glyph on red rows), S4 should deduplicate with the existing `below min: …` text (prefer the more specific `launch failed: …` when both are present), and S5 carries the full `StatusMessage`. The `!` severity still bumps S1 because it is an important finding.
+- The Wave 2 launch-failure signal typically co-occurs with Wave 1 `InService < MinSize` (Broken) — the row is already red. S4 should deduplicate with the existing `below min: …` text (prefer the more specific `launch failed: …` when both are present), and S5 carries the full `StatusMessage`. The `!` severity still bumps S1 because it is an important finding.
 - If the launch-failure signal appears on a Healthy row (edge case: activity failed but `InService >= MinSize` because old instances are still serving), treat as `!` on green → S1, S3 (`!`), S4, S5.
 
 ### 4.1 UX review (two sentences)
@@ -210,7 +210,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `ng` reverse discovery — `a9s-devops (2026-04-20): possible=yes, worth=yes. Nodegroup.Resources.AutoScalingGroups.Name is the sole forward link. Reverse cross-ref from the already-loaded ng list identifies the owning node group so operators don't accidentally mutate k8s-managed ASGs.`.
 - a9s-devops consultation — `sns` discovery (two extra ASG-scoped calls) — `a9s-devops (2026-04-20): possible=yes, worth=yes. DescribeNotificationConfigurations + DescribeLifecycleHooks are the only APIs that expose scale-event paging topology; two calls per ASG is acceptable because this info is invisible anywhere else in the detail view.`.
 - a9s-devops consultation — `role` discovery (service-linked + instance-profile) — `a9s-devops (2026-04-20): possible=yes, worth=yes. ServiceLinkedRoleARN is on the list response; the instance-profile role requires one GetInstanceProfile round-trip but is central to permission troubleshooting when health checks or scaling fail.`.
-- a9s-devops consultation — severity call for Wave 2 launch-failure on Healthy row — `a9s-devops (2026-04-20): possible=yes, worth=yes. Failed latest activity on an otherwise-green ASG is operator-actionable (new instances won't come up) — severity !, not ~. When the same condition coincides with InService < MinSize the row is already red and S3 is suppressed per S1–S5 rules.`.
+- a9s-devops consultation — severity call for Wave 2 launch-failure on Healthy row — `a9s-devops (2026-04-20): possible=yes, worth=yes. Failed latest activity on an otherwise-green ASG is operator-actionable (new instances won't come up) — severity !, not ~.`.
 
 <!-- BEGIN GENERATED: header -->
 asg — COMPUTE. Lifecycle key: `status`.

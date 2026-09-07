@@ -151,7 +151,7 @@ Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner
 
 ## 4. Issue Visualization
 
-Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave→surface mapping as standard. Every signal is color-bearing (no glyph-on-green case exists for transfer).
+Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave→surface mapping as standard. Every signal is colour-bearing, and each carries its tier in the detail view's Attention section.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
