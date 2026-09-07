@@ -31,7 +31,7 @@ type listCol struct {
 }
 
 // applySortKeyPrefixWidths auto-grows the first 10 columns' widths to fit the
-// "N:Title↑" header colHeaderTitle produces. Without this, columns declared
+// "N:Title↑" header colHeaderCell produces. Without this, columns declared
 // narrower would truncate the header (e.g. "5:Instanc…" at width=10) and hide
 // the sort hint. The architectural rule: any sortable column (positions 0-9)
 // MUST reserve enough room for its prefix and for the arrow — a column wide
@@ -92,38 +92,47 @@ func (m ResourceListModel) fitColumns(cols []listCol) []listCol {
 func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 	parts := make([]string, len(cols))
 	for i, c := range cols {
-		absIdx := i + m.hScrollOffset
-		title := m.colHeaderTitle(c, absIdx)
-		parts[i] = text.PadOrTrunc(title, c.width)
+		parts[i] = m.colHeaderCell(c, i+m.hScrollOffset)
 	}
 	headerText := " " + strings.Join(parts, "  ")
 	return styles.TableHeader.Render(headerText)
 }
 
-// colHeaderTitle returns the column title with a position number prefix and
-// sort indicator. absIdx is the 0-based absolute column index (accounting for
-// hScrollOffset). Position numbers 1-9 correspond to keys "1"-"9"; position 10
-// shows as "0". The prefix is always shown for columns 0-9 — PadOrTrunc in
-// renderHeaders will truncate the rendered text if it exceeds the column width,
-// so a truncated "5:Ins" is still more informative than a full "Instances↓".
-func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
-	title := c.title
-	// Append sort glyph if this is the active sort column.
+// colHeaderCell renders one finished header cell: the position prefix, the
+// title, and the sort indicator, fitted to exactly c.width visible columns.
+// absIdx is the 0-based absolute column index (accounting for hScrollOffset);
+// position numbers 1-9 correspond to keys "1"-"9" and position 10 shows as
+// "0". The prefix is always emitted for columns 0-9 — a truncated "5:Ins" is
+// still more informative than a full "Instances".
+//
+// The indicator is appended AFTER the title is fitted to what is left over, so
+// the ellipsis eats the title and never the arrow. Two independent things
+// decide this cell's width — applySortKeyPrefixWidths grows it to the declared
+// title, fitColumns shrinks it to whatever the terminal has left — and neither
+// knows which column is sorted. Fitting the title around the arrow instead of
+// truncating the two together means no width on either path can drop it, and a
+// column cut down by a narrow terminal still says the list is sorted.
+func (m ResourceListModel) colHeaderCell(c listCol, absIdx int) string {
+	glyph := ""
 	if m.sortColKey != "" && c.sortKey == m.sortColKey {
+		glyph = sortDescGlyph
 		if m.sortAsc {
-			title += sortAscGlyph
-		} else {
-			title += sortDescGlyph
+			glyph = sortAscGlyph
 		}
 	}
-	// Add position number prefix (1-based, max 10 columns for sort).
-	// Always emit the prefix; narrow columns get truncated by PadOrTrunc.
+	title := c.title
 	if absIdx < 10 {
 		displayNum := absIdx + 1 // 0-based → 1-based
 		if displayNum == 10 {
 			displayNum = 0 // key "0" = column 10
 		}
-		return fmt.Sprintf("%d:%s", displayNum, title)
+		title = fmt.Sprintf("%d:%s", displayNum, title)
 	}
-	return title
+	// Only the truncation happens before the indicator is appended, never the
+	// padding: on a column with room to spare the arrow stays beside its
+	// title, and on one without, the ellipsis eats the title instead.
+	if fit := c.width - len([]rune(glyph)); len([]rune(title)) > fit {
+		title = text.PadOrTrunc(title, fit)
+	}
+	return text.PadOrTrunc(title+glyph, c.width)
 }
