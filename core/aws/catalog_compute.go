@@ -531,7 +531,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeECSTaskStateStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"},
-			{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <stop code>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: ecsTaskCodeTaskFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: ecsTaskCodePrivileged, Phrase: "privileged container", Severity: domain.SevBroken, Source: "wave2", Detail: "A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs."},
@@ -845,7 +845,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeAMIStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeAMIStateDim, Phrase: "deregistered", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeAMIStateDim, Phrase: "<image state>", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeAMIDeprecated, Phrase: "deprecated", Severity: domain.SevWarn, Source: "wave1", Detail: "The deprecation date has passed — AWS no longer recommends this AMI for new launches."},
 			{Code: CodeAMIPublic, Phrase: "shared with all AWS accounts", Severity: domain.SevBroken, Source: "wave1", Detail: "This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission."},
 		},

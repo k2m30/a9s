@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -199,33 +198,15 @@ func imageResource(img ec2types.Image) resource.Resource {
 	// otherwise a passed DeprecationTime bumps an available AMI to warning.
 	switch img.State {
 	case ec2types.ImageStatePending, ec2types.ImageStateTransient:
-		r.Findings = []domain.Finding{{
-			Code: CodeAMIStatePending, Phrase: "pending",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeAMIStatePending, domain.SevWarn)}
 	case ec2types.ImageStateFailed, ec2types.ImageStateError, ec2types.ImageStateInvalid:
-		r.Findings = []domain.Finding{{
-			Code: CodeAMIStateFailed, Phrase: "failed",
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
-	case ec2types.ImageStateDeregistered:
-		r.Findings = []domain.Finding{{
-			Code: CodeAMIStateDim, Phrase: "deregistered",
-			Severity: domain.SevDim, Source: "wave1",
-		}}
-	case ec2types.ImageStateDisabled:
-		r.Findings = []domain.Finding{{
-			Code: CodeAMIStateDim, Phrase: "disabled",
-			Severity: domain.SevDim, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateFailed, domain.SevBroken)}
+	case ec2types.ImageStateDeregistered, ec2types.ImageStateDisabled:
+		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateDim, domain.SevDim, string(img.State))}
 	default:
 		if img.DeprecationTime != nil && *img.DeprecationTime != "" {
 			if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
-				r.Findings = []domain.Finding{{
-					Code: CodeAMIDeprecated, Phrase: "deprecated",
-					Detail:   catalog.Detail(CodeAMIDeprecated),
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
+				r.Findings = []domain.Finding{wave1Finding(CodeAMIDeprecated, domain.SevWarn)}
 			}
 		}
 	}
@@ -235,11 +216,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 	// exposes nothing, however open its permission reads. The fetcher asks
 	// for Owners=self, so a public image here is one this account owns.
 	if amiLaunchable(img.State) && img.Public != nil && *img.Public {
-		r.Findings = append(r.Findings, domain.Finding{
-			Code: CodeAMIPublic, Phrase: "shared with all AWS accounts",
-			Detail:   catalog.Detail(CodeAMIPublic),
-			Severity: domain.SevBroken, Source: "wave1",
-		})
+		r.Findings = append(r.Findings, wave1Finding(CodeAMIPublic, domain.SevBroken))
 		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "yes", Tier: "!"})
 	}
 

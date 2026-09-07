@@ -327,6 +327,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
 		// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
 		Findings: []catalog.FindingDef{
+			{Code: wafCodeOrphan, Phrase: "not associated with any resource", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not attached to any load balancer, gateway stage or distribution, so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it."},
 			{Code: wafCodeNoLogging, Phrase: "no logging configuration", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group."},
 			{Code: wafCodeNoRules, Phrase: "web ACL has no rules", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing."},
 		},

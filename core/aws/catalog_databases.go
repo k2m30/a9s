@@ -504,7 +504,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			// DescribeDomains is one batched call, so a denial degrades every
 			// listed domain at once and no demo fixture can witness this row
 			// beside healthy domains; the row renders its phrase alone.
-			{Code: DetailsDeniedCode("opensearch"), Phrase: "details denied", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: DetailsDeniedCode("opensearch"), Phrase: detailsDeniedPhrase, Severity: domain.SevWarn, Source: "wave1"},
 			DetailsUnavailableFindingDef("opensearch"),
 		},
 	},

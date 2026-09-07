@@ -75,7 +75,7 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 		// in the console. Nil means DescribeAlarms did not resolve the switch,
 		// which is not evidence that it is off.
 		if alarm.ActionsEnabled != nil && !*alarm.ActionsEnabled {
-			addWave1Finding(&r, CodeAlarmActionsDisabled, "actions disabled", domain.SevWarn)
+			addWave1Finding(&r, CodeAlarmActionsDisabled, domain.SevWarn)
 			// The phrase already says the actions are off; the row says how
 			// much is wired behind the switch.
 			addWave1Rows(&r, CodeAlarmActionsDisabled, domain.DetailRow{
@@ -113,12 +113,12 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 func alarmStateFindings(state string, actionsCount int) []domain.Finding {
 	switch state {
 	case "ALARM":
-		return []domain.Finding{{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeAlarmStateAlarm, domain.SevBroken)}
 	case "INSUFFICIENT_DATA":
-		return []domain.Finding{{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeAlarmStateInsufficient, domain.SevWarn)}
 	case "OK":
 		if actionsCount == 0 {
-			return []domain.Finding{{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1"}}
+			return []domain.Finding{wave1Finding(CodeAlarmNoActions, domain.SevWarn)}
 		}
 	}
 	return nil

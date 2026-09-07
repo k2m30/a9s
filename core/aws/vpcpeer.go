@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"net/netip"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -136,44 +136,25 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding
 	}
 	switch code {
 	case ec2types.VpcPeeringConnectionStateReasonCodeProvisioning:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeProvisioning, Phrase: "provisioning",
-			Detail: catalog.Detail(vpcPeerCodeProvisioning), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeProvisioning, domain.SevWarn))
 	case ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeInitiating, Phrase: "initiating",
-			Detail: catalog.Detail(vpcPeerCodeInitiating), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeInitiating, domain.SevWarn))
 	case ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance:
 		f, rows := vpcPeerPendingAcceptanceFinding(pc.ExpirationTime)
 		findings = append(findings, f)
 		attention[vpcPeerCodePendingAcceptance] = domain.AttentionDetail{Rows: rows}
 	case ec2types.VpcPeeringConnectionStateReasonCodeExpired:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeExpired, Phrase: "expired: never accepted",
-			Detail: catalog.Detail(vpcPeerCodeExpired), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeExpired, domain.SevWarn))
 	case ec2types.VpcPeeringConnectionStateReasonCodeRejected:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeRejected, Phrase: "rejected", Detail: catalog.Detail(vpcPeerCodeRejected), Severity: domain.SevBroken, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeRejected, domain.SevBroken))
 		statusRow(vpcPeerCodeRejected)
 	case ec2types.VpcPeeringConnectionStateReasonCodeFailed:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeFailed, Phrase: "failed", Detail: catalog.Detail(vpcPeerCodeFailed), Severity: domain.SevBroken, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeFailed, domain.SevBroken))
 		statusRow(vpcPeerCodeFailed)
 	case ec2types.VpcPeeringConnectionStateReasonCodeDeleting:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeDeleting, Phrase: "deleting",
-			Detail: catalog.Detail(vpcPeerCodeDeleting), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeDeleting, domain.SevWarn))
 	case ec2types.VpcPeeringConnectionStateReasonCodeDeleted:
-		findings = append(findings, domain.Finding{
-			Code: vpcPeerCodeDeleted, Phrase: "deleted",
-			Detail: catalog.Detail(vpcPeerCodeDeleted), Severity: domain.SevDim, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(vpcPeerCodeDeleted, domain.SevDim))
 	}
 
 	// CIDR overlap is active-only: CidrBlock/CidrBlockSet are nil for every
@@ -181,11 +162,7 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding
 	// docs/resources/vpc-peer.md §3.1.
 	if code == ec2types.VpcPeeringConnectionStateReasonCodeActive {
 		if ranges, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
-			findings = append(findings, domain.Finding{
-				Code: vpcPeerCodeCidrOverlap, Phrase: "CIDR overlap with peer",
-				Detail:   catalog.Detail(vpcPeerCodeCidrOverlap),
-				Severity: domain.SevWarn, Source: "wave1",
-			})
+			findings = append(findings, wave1Finding(vpcPeerCodeCidrOverlap, domain.SevWarn))
 			attention[vpcPeerCodeCidrOverlap] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Overlapping range", Value: ranges, Tier: "~"}}}
 		}
 	}
@@ -210,8 +187,7 @@ func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []d
 		}
 		rows = []domain.DetailRow{{Label: "Expires", Value: expiration.Format("2006-01-02"), Tier: "~"}}
 	}
-	return wave1Finding(vpcPeerCodePendingAcceptance,
-		fmt.Sprintf("pending acceptance: expires in %dd", days), domain.SevWarn), rows
+	return wave1Finding(vpcPeerCodePendingAcceptance, domain.SevWarn, strconv.Itoa(days)), rows
 }
 
 // vpcPeerCIDROverlapDetail reports whether any IPv4 prefix in requester's

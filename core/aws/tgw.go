@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -129,24 +128,18 @@ func tgwFindings(state, autoAccept string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "pending":
-		findings = []domain.Finding{{Code: CodeTGWStatePending, Phrase: "pending", Detail: catalog.Detail(CodeTGWStatePending), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeTGWStatePending, domain.SevWarn)}
 	case "modifying":
-		findings = []domain.Finding{{Code: CodeTGWStateModifying, Phrase: "modifying", Detail: catalog.Detail(CodeTGWStateModifying), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateModifying, domain.SevWarn)}
 	case "deleting":
-		findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeTGWStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleting, domain.SevWarn)}
 	case "failed":
-		findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeTGWStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateFailed, domain.SevBroken)}
 	case "deleted":
-		findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Detail: catalog.Detail(CodeTGWStateDeleted), Severity: domain.SevDim, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleted, domain.SevDim)}
 	}
 	if autoAccept == "yes" && state != "deleting" && state != "deleted" {
-		findings = append(findings, domain.Finding{
-			Code:     CodeTGWAutoAccept,
-			Phrase:   TGWAutoAcceptPhrase,
-			Detail:   catalog.Detail(CodeTGWAutoAccept),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeTGWAutoAccept, domain.SevWarn))
 	}
 	return findings
 }

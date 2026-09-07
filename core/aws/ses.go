@@ -109,16 +109,16 @@ func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {
 	var findings []domain.Finding
 	switch identity.VerificationStatus {
 	case sesv2types.VerificationStatusFailed:
-		findings = append(findings, domain.Finding{Code: CodeSESVerificationFailed, Phrase: "verification failed", Severity: domain.SevBroken, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeSESVerificationFailed, domain.SevBroken))
 	case sesv2types.VerificationStatusTemporaryFailure:
-		findings = append(findings, domain.Finding{Code: CodeSESVerificationTempFail, Phrase: "verify: temp failure", Severity: domain.SevBroken, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeSESVerificationTempFail, domain.SevBroken))
 	case sesv2types.VerificationStatusNotStarted:
-		findings = append(findings, domain.Finding{Code: CodeSESVerificationNotStarted, Phrase: "verification not started", Severity: domain.SevBroken, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeSESVerificationNotStarted, domain.SevBroken))
 	case sesv2types.VerificationStatusPending:
-		findings = append(findings, domain.Finding{Code: CodeSESVerificationPending, Phrase: "pending verification", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeSESVerificationPending, domain.SevWarn))
 	}
 	if !identity.SendingEnabled {
-		findings = append(findings, domain.Finding{Code: CodeSESSendingDisabled, Phrase: "sending disabled", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeSESSendingDisabled, domain.SevWarn))
 	}
 	return findings
 }

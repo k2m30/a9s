@@ -5,13 +5,13 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	autoscalingtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -124,32 +124,20 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			continue
 		}
 		if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code: CodeASGLegacyLaunchConfig, Phrase: "uses a launch configuration",
-				Detail:   catalog.Detail(CodeASGLegacyLaunchConfig),
-				Severity: domain.SevWarn, Source: "wave1",
-			})
+			r.Findings = append(r.Findings, wave1Finding(CodeASGLegacyLaunchConfig, domain.SevWarn))
 			addWave1Rows(&r, CodeASGLegacyLaunchConfig, domain.DetailRow{
 				Label: "Launch configuration", Value: *asg.LaunchConfigurationName, Tier: "~",
 			})
 		}
 		if len(asg.AvailabilityZones) < 2 {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code: CodeASGSingleAZ, Phrase: "single availability zone",
-				Detail:   catalog.Detail(CodeASGSingleAZ),
-				Severity: domain.SevWarn, Source: "wave1",
-			})
+			r.Findings = append(r.Findings, wave1Finding(CodeASGSingleAZ, domain.SevWarn))
 			addWave1Rows(&r, CodeASGSingleAZ, domain.DetailRow{
 				Label: "Availability zones", Value: strings.Join(asg.AvailabilityZones, ", "), Tier: "~",
 			})
 		}
 		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&
 			aws.ToString(asg.HealthCheckType) != "ELB" {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code: CodeASGNoELBHealthCheck, Phrase: "no load balancer health check",
-				Detail:   catalog.Detail(CodeASGNoELBHealthCheck),
-				Severity: domain.SevWarn, Source: "wave1",
-			})
+			r.Findings = append(r.Findings, wave1Finding(CodeASGNoELBHealthCheck, domain.SevWarn))
 			// The API spells the type "EC2"/"ELB"; the row says which check the
 			// group runs, not how the SDK spells it.
 			addWave1Rows(&r, CodeASGNoELBHealthCheck, domain.DetailRow{
@@ -190,23 +178,17 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 func asgHealthFindings(status string, inServiceCount, unhealthyCount, minSize int, suspendedProcesses string) []domain.Finding {
 	switch {
 	case asgDeleting(status):
-		return []domain.Finding{{
-			Code: CodeASGStateDeleting, Phrase: "delete in progress",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeASGStateDeleting, domain.SevWarn)}
 	case inServiceCount < minSize:
-		return []domain.Finding{wave1Finding(CodeASGUnderprovisioned,
-			fmt.Sprintf("%d of %d instances in service", inServiceCount, minSize), domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeASGUnderprovisioned, domain.SevBroken,
+			strconv.Itoa(inServiceCount), strconv.Itoa(minSize))}
 	case unhealthyCount > 0:
-		return []domain.Finding{wave1Finding(CodeASGUnhealthyInstances,
-			fmt.Sprintf("%d unhealthy instance(s)", unhealthyCount), domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeASGUnhealthyInstances, domain.SevWarn,
+			strconv.Itoa(unhealthyCount))}
 	case strings.Contains(suspendedProcesses, "Launch") ||
 		strings.Contains(suspendedProcesses, "Terminate") ||
 		strings.Contains(suspendedProcesses, "HealthCheck"):
-		return []domain.Finding{{
-			Code: CodeASGScalingSuspended, Phrase: "scaling suspended",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeASGScalingSuspended, domain.SevWarn)}
 	}
 	return nil
 }

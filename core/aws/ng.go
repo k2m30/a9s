@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -54,7 +53,7 @@ func healthIssueFinding(code domain.FindingCode, issueCodes []string) (domain.Fi
 // per reported issue code: a node group with three issues has three to read,
 // and promoting the first into the phrase left the others unsayable.
 func healthIssueFindingSev(code domain.FindingCode, issueCodes []string, sev domain.Severity) (domain.Finding, []domain.DetailRow) {
-	f := wave1Finding(code, catalog.Phrase(code), sev)
+	f := wave1Finding(code, sev)
 	tier := "~"
 	if sev == domain.SevBroken {
 		tier = "!"
@@ -146,15 +145,15 @@ func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]do
 	}
 	switch status {
 	case "CREATING":
-		return []domain.Finding{{Code: CodeNGStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeNGStateCreating), Severity: domain.SevWarn, Source: "wave1"}}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateCreating, domain.SevWarn)}, nil
 	case "UPDATING":
-		return []domain.Finding{{Code: CodeNGStateUpdating, Phrase: "updating", Detail: catalog.Detail(CodeNGStateUpdating), Severity: domain.SevWarn, Source: "wave1"}}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateUpdating, domain.SevWarn)}, nil
 	case "DELETING":
-		return []domain.Finding{{Code: CodeNGStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeNGStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateDeleting, domain.SevWarn)}, nil
 	case "CREATE_FAILED":
-		return []domain.Finding{{Code: CodeNGStateCreateFailed, Phrase: "create failed", Detail: catalog.Detail(CodeNGStateCreateFailed), Severity: domain.SevBroken, Source: "wave1"}}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateCreateFailed, domain.SevBroken)}, nil
 	case "DELETE_FAILED":
-		return []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Detail: catalog.Detail(CodeNGStateDeleteFailed), Severity: domain.SevBroken, Source: "wave1"}}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateDeleteFailed, domain.SevBroken)}, nil
 	case "DEGRADED":
 		f, rows := healthIssueFinding(CodeNGStateDegraded, issueCodes)
 		return []domain.Finding{f}, rows

@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -217,10 +216,7 @@ func acmFindings(statusWords, notAfter, inUse, keyAlgorithmWords string, now tim
 		out = acmStatusFindings(statusWords)
 	}
 	if acmKeyIsWeak(keyAlgorithmWords) {
-		out = append(out, domain.Finding{
-			Code: CodeACMWeakKey, Phrase: "weak key algorithm",
-			Detail: catalog.Detail(CodeACMWeakKey), Severity: domain.SevWarn, Source: "wave1",
-		})
+		out = append(out, wave1Finding(CodeACMWeakKey, domain.SevWarn))
 	}
 	return out
 }
@@ -235,20 +231,17 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 		switch {
 		case remaining < 7*24*time.Hour:
 			if remaining < 0 {
-				return []domain.Finding{wave1Finding(acmCodeExpired, catalog.Phrase(acmCodeExpired), domain.SevBroken)}
+				return []domain.Finding{wave1Finding(acmCodeExpired, domain.SevBroken)}
 			}
-			return []domain.Finding{wave1Finding(acmCodeExpiresCritical,
-				fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)), domain.SevBroken)}
+			return []domain.Finding{wave1Finding(acmCodeExpiresCritical, domain.SevBroken,
+				strconv.Itoa(int(remaining.Hours()/24)))}
 		case remaining < 30*24*time.Hour:
-			return []domain.Finding{wave1Finding(acmCodeExpiresSoon,
-				fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)), domain.SevWarn)}
+			return []domain.Finding{wave1Finding(acmCodeExpiresSoon, domain.SevWarn,
+				strconv.Itoa(int(remaining.Hours()/24)))}
 		}
 	}
 	if inUse == "false" {
-		return []domain.Finding{{
-			Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)",
-			Detail: catalog.Detail(acmCodeOrphan), Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(acmCodeOrphan, domain.SevWarn)}
 	}
 	return nil
 }
@@ -260,20 +253,11 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 func acmStatusFindings(statusWords string) []domain.Finding {
 	switch statusWords {
 	case acmStatusPendingValidation:
-		return []domain.Finding{{
-			Code: acmCodeStatusPendingValidation, Phrase: "pending validation",
-			Detail: catalog.Detail(acmCodeStatusPendingValidation), Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(acmCodeStatusPendingValidation, domain.SevWarn)}
 	case acmStatusExpired, acmStatusRevoked, acmStatusFailed, acmStatusValidationTimedOut:
-		return []domain.Finding{{
-			Code: acmCodeStatusFailed, Phrase: statusWords,
-			Detail: catalog.Detail(acmCodeStatusFailed), Severity: domain.SevBroken, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(acmCodeStatusFailed, domain.SevBroken, statusWords)}
 	case acmStatusInactive:
-		return []domain.Finding{{
-			Code: acmCodeStatusInactive, Phrase: "inactive",
-			Detail: catalog.Detail(acmCodeStatusInactive), Severity: domain.SevDim, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(acmCodeStatusInactive, domain.SevDim)}
 	}
 	return nil
 }

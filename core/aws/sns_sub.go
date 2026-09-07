@@ -10,7 +10,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -126,13 +125,7 @@ func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Findin
 	if subscriptionArn == "Deleted" || protocol != "http" {
 		return findings, nil
 	}
-	findings = append(findings, domain.Finding{
-		Code:     CodeSNSSubPlainHTTP,
-		Phrase:   "delivers over plain HTTP",
-		Detail:   catalog.Detail(CodeSNSSubPlainHTTP),
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	})
+	findings = append(findings, wave1Finding(CodeSNSSubPlainHTTP, domain.SevWarn))
 	return findings, map[domain.FindingCode]domain.AttentionDetail{
 		CodeSNSSubPlainHTTP: {Rows: []domain.DetailRow{
 			// Scheme and host only. A webhook path is routinely the shared
@@ -158,15 +151,9 @@ func snsSubEndpointOrigin(endpoint string) string {
 func snsSubStateFindings(subscriptionArn string) []domain.Finding {
 	switch subscriptionArn {
 	case "PendingConfirmation":
-		return []domain.Finding{{
-			Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeSNSSubPendingConfirmation, domain.SevWarn)}
 	case "Deleted":
-		return []domain.Finding{{
-			Code: CodeSNSSubDeleted, Phrase: "endpoint deleted",
-			Severity: domain.SevDim, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeSNSSubDeleted, domain.SevDim)}
 	}
 	return nil
 }

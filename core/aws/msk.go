@@ -18,19 +18,19 @@ import (
 func computeMSKFindings(state kafkatypes.ClusterState) []domain.Finding {
 	switch state {
 	case kafkatypes.ClusterStateFailed:
-		return []domain.Finding{{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKFailed, domain.SevBroken)}
 	case kafkatypes.ClusterStateCreating:
-		return []domain.Finding{{Code: CodeMSKCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKCreating, domain.SevWarn)}
 	case kafkatypes.ClusterStateUpdating:
-		return []domain.Finding{{Code: CodeMSKUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKUpdating, domain.SevWarn)}
 	case kafkatypes.ClusterStateMaintenance:
-		return []domain.Finding{{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKMaintenance, domain.SevWarn)}
 	case kafkatypes.ClusterStateRebootingBroker:
-		return []domain.Finding{{Code: CodeMSKRebootingBroker, Phrase: "rebooting broker", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKRebootingBroker, domain.SevWarn)}
 	case kafkatypes.ClusterStateHealing:
-		return []domain.Finding{{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKHealing, domain.SevWarn)}
 	case kafkatypes.ClusterStateDeleting:
-		return []domain.Finding{{Code: CodeMSKDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeMSKDeleting, domain.SevWarn)}
 	default:
 		return nil
 	}

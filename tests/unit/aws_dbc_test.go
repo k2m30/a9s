@@ -992,8 +992,12 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("cross-region-copying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantPhrase:   "cross-region-copying",
-			wantFindings: []string{"cross-region-copying"},
+			// Inverted for the spec row that made a phrase the catalog's: an
+			// unrecognised status is still the transitional code, and that
+			// code declares one wording with the status in its slot. Do not
+			// restore the bare-keyword assertion.
+			wantPhrase:   "cross-region-copying: in progress",
+			wantFindings: []string{"cross-region-copying: in progress"},
 		},
 	}
 

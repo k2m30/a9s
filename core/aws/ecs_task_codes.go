@@ -62,17 +62,17 @@ const (
 func ecsTaskWave1Findings(status string) []domain.Finding {
 	switch status {
 	case "PROVISIONING":
-		return []domain.Finding{{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStateProvisioning, domain.SevWarn)}
 	case "PENDING":
-		return []domain.Finding{{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStatePending, domain.SevWarn)}
 	case "ACTIVATING":
-		return []domain.Finding{{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStateActivating, domain.SevWarn)}
 	case "DEACTIVATING":
-		return []domain.Finding{{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStateDeactivating, domain.SevWarn)}
 	case "STOPPING":
-		return []domain.Finding{{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStateStopping, domain.SevWarn)}
 	case "DEPROVISIONING":
-		return []domain.Finding{{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStateDeprovisioning, domain.SevWarn)}
 	}
 	return nil
 }
@@ -100,7 +100,7 @@ func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.F
 	// it strictly would retire the finding on exactly those rows: the cell
 	// would say the task is unhealthy while the row coloured green.
 	if strings.EqualFold(healthStatus, string(ecstypes.HealthStatusUnhealthy)) {
-		return []domain.Finding{{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskHealthUnhealthy, domain.SevBroken)}
 	}
 	// Not ecsTaskGone: that predicate answers "has teardown started", which
 	// is true for the transitional states below and would swallow their own
@@ -108,9 +108,10 @@ func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.F
 	// the task has actually stopped, which is what picks stop-code over dim.
 	if status == "STOPPED" {
 		if stopCode != "" && stopCode != "UserInitiated" {
-			return []domain.Finding{{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: " + stopCode, Severity: domain.SevBroken, Source: "wave1"}}
+			return []domain.Finding{wave1Finding(CodeECSTaskStopCodeFailed, domain.SevBroken,
+				domain.HumanizeStatusPhrase(stopCode))}
 		}
-		return []domain.Finding{{Code: CodeECSTaskStateStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECSTaskStateStopped, domain.SevDim)}
 	}
 	return ecsTaskWave1Findings(status)
 }

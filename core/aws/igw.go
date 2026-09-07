@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -104,12 +103,12 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 func igwFindings(state string, attachmentsCount int) []domain.Finding {
 	switch state {
 	case "attaching":
-		return []domain.Finding{{Code: CodeIGWStateAttaching, Phrase: "attaching", Detail: catalog.Detail(CodeIGWStateAttaching), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeIGWStateAttaching, domain.SevWarn)}
 	case "detaching":
-		return []domain.Finding{{Code: CodeIGWStateDetaching, Phrase: "detaching", Detail: catalog.Detail(CodeIGWStateDetaching), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeIGWStateDetaching, domain.SevWarn)}
 	}
 	if attachmentsCount == 0 {
-		return []domain.Finding{{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Detail: catalog.Detail(CodeIGWNoAttachments), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeIGWNoAttachments, domain.SevWarn)}
 	}
 	return nil
 }

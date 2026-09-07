@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -30,10 +31,10 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 	rawStatus := aws.ToString(snap.Status)
 
 	if rawStatus == "failed" {
-		return []domain.Finding{{Code: CodeDBISnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeDBISnapFailed, domain.SevBroken)}
 	}
 	if strings.HasPrefix(rawStatus, "incompatible-") {
-		return []domain.Finding{{Code: CodeDBISnapIncompatible, Phrase: rawStatus, Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeDBISnapIncompatible, domain.SevBroken, rawStatus)}
 	}
 
 	var findings []domain.Finding
@@ -43,16 +44,15 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 		if snap.PercentProgress != nil {
 			pct = *snap.PercentProgress
 		}
-		phrase := fmt.Sprintf("creating: %d%%", pct)
-		findings = append(findings, domain.Finding{Code: CodeDBISnapCreating, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeDBISnapCreating, domain.SevWarn, strconv.Itoa(int(pct))))
 	case rawStatus != "" && rawStatus != "available":
 		// Any other state AWS reports is one the snapshot cannot be restored
 		// from yet — copying, pending, and whatever RDS adds next. Passing the
 		// keyword through keeps a new state visible instead of silently ready.
-		findings = append(findings, domain.Finding{Code: CodeDBISnapTransitional, Phrase: rawStatus, Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeDBISnapTransitional, domain.SevWarn, rawStatus))
 	}
 	if isSnapUnencrypted(snap) {
-		findings = append(findings, domain.Finding{Code: CodeDBISnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeDBISnapUnencrypted, domain.SevWarn))
 	}
 	return findings
 }

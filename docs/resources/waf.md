@@ -81,9 +81,12 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
+- **Signal**: `ListResourcesForWebACL` returns no associations.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-- OUT OF SCOPE: `ListResourcesForWebACL` per ACL (as a Wave 3 coverage check — distinct from its Wave-independent use as the related-panel discovery path in §2).
 - OUT OF SCOPE: CloudWatch `BlockedRequests` spike detection.
 - OUT OF SCOPE: managed-rule-group version drift check.
 
@@ -101,10 +104,11 @@ One row per signal from §3 that has operator-readable surface text:
 |---|---|---|---|---|---|
 | `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S2, S3, S4, S5 | `web ACL has no rules` |
 | `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S2, S3, S4, S5 | `no logging configuration` |
+| `ListResourcesForWebACL` returns no associations | 2 | Warning | `~` | S2, S3, S4, S5 | `not associated with any resource` |
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — both WAF findings carry the cause in the Status column (`web ACL has no rules`, `no logging configuration`), so the row colour and that text tell the operator exactly which configuration gap exists without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every WAF finding carries its cause in the Status column (`web ACL has no rules`, `no logging configuration`, `not associated with any resource`), so the row colour and that text tell the operator exactly which configuration gap exists without opening detail.
 
 ## 5. Out of Scope
 
@@ -136,6 +140,7 @@ waf — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle f
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| waf.orphan | not associated with any resource | warn | wave2 | This web ACL is not attached to any load balancer, gateway stage or distribution, so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it. |
 | waf.no-logging | no logging configuration | warn | wave2 | This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group. |
 | waf.no-rules | web ACL has no rules | warn | wave2 | This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
 <!-- END GENERATED: findings -->

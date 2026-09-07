@@ -61,13 +61,13 @@ const (
 // DescribeTrails payload alone, and attaches each one's supporting rows.
 func trailPostureFindings(r *resource.Resource, trail cttypes.Trail) {
 	if aws.ToString(trail.CloudWatchLogsLogGroupArn) == "" {
-		addWave1Finding(r, CodeTrailNoCloudWatchLogs, "not delivering to CloudWatch Logs", domain.SevWarn)
+		addWave1Finding(r, CodeTrailNoCloudWatchLogs, domain.SevWarn)
 		addWave1Rows(r, CodeTrailNoCloudWatchLogs, domain.DetailRow{
 			Label: "Log group", Value: "none", Tier: "~",
 		})
 	}
 	if aws.ToString(trail.KmsKeyId) == "" {
-		addWave1Finding(r, CodeTrailNoKMS, "log files not KMS-encrypted", domain.SevWarn)
+		addWave1Finding(r, CodeTrailNoKMS, domain.SevWarn)
 		addWave1Rows(r, CodeTrailNoKMS, domain.DetailRow{
 			Label: "KMS key", Value: "none", Tier: "~",
 		})
@@ -98,28 +98,16 @@ func trailDeliveryIsStale(isLogging, latestDeliveryTime string) bool {
 func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logFileValidationEnabled string) []domain.Finding {
 	var findings []domain.Finding
 	if isLogging == "false" {
-		findings = append(findings, domain.Finding{
-			Code: CodeTrailNotLogging, Phrase: "not logging",
-			Severity: domain.SevBroken, Source: "wave2",
-		})
+		findings = append(findings, wave2Finding(CodeTrailNotLogging, domain.SevBroken, ""))
 	}
 	if latestDeliveryError != "" && latestDeliveryError != "-" {
-		findings = append(findings, domain.Finding{
-			Code: CodeTrailDeliveryError, Phrase: "delivery error: " + latestDeliveryError,
-			Severity: domain.SevBroken, Source: "wave2",
-		})
+		findings = append(findings, wave2Finding(CodeTrailDeliveryError, domain.SevBroken, "", latestDeliveryError))
 	}
 	if trailDeliveryIsStale(isLogging, latestDeliveryTime) {
-		findings = append(findings, domain.Finding{
-			Code: CodeTrailDeliveryStale, Phrase: "delivery stale since " + latestDeliveryTime,
-			Severity: domain.SevBroken, Source: "wave2",
-		})
+		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, domain.SevBroken, "", latestDeliveryTime))
 	}
 	if logFileValidationEnabled == "false" {
-		findings = append(findings, domain.Finding{
-			Code: CodeTrailLogFileValidationDisabled, Phrase: "log file validation disabled",
-			Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeTrailLogFileValidationDisabled, domain.SevWarn))
 	}
 	return findings
 }

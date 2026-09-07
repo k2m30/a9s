@@ -157,13 +157,8 @@ func setWave2Finding(
 	shortName string,
 	rows []domain.DetailRow,
 ) {
-	f := domain.Finding{
-		Code:     code,
-		Phrase:   phrase,
-		Detail:   catalog.Detail(code),
-		Severity: glyphToSeverity(severityGlyph),
-		Source:   "wave2:" + shortName,
-	}
+	f := wave2Finding(code, glyphToSeverity(severityGlyph), shortName)
+	f.Phrase = phrase
 	if Wave2EmissionObserver != nil {
 		Wave2EmissionObserver(resourceID, f)
 	}
@@ -181,6 +176,29 @@ func setWave2Finding(
 		ad := r.AttentionDetails[resourceID][code]
 		ad.Rows = capRows(ad.Rows, rows)
 		r.AttentionDetails[resourceID][code] = ad
+	}
+}
+
+// wave2Finding builds a Wave-2 Finding carrying the phrase and detail its
+// code declares. It is the Wave-2 counterpart of wave1Finding: the two are the
+// only places a domain.Finding is constructed, so a wording, a sentence and a
+// Source string each have one owner.
+//
+// shortName stamps Source = "wave2:<shortName>". Pass "" for a predicate that
+// recomputes a Wave-2 finding from a row's Fields, where the enricher that
+// originally emitted it is not in hand. values fill the declared phrase's
+// "<…>" slots left to right.
+func wave2Finding(code domain.FindingCode, severity domain.Severity, shortName string, values ...string) domain.Finding {
+	source := "wave2"
+	if shortName != "" {
+		source += ":" + shortName
+	}
+	return domain.Finding{
+		Code:     code,
+		Phrase:   fillPhrase(catalog.Phrase(code), values...),
+		Detail:   catalog.Detail(code),
+		Severity: severity,
+		Source:   source,
 	}
 }
 

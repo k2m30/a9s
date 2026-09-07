@@ -322,10 +322,11 @@ func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 		}
 	}
 
-	// 15, not 14: iam-user.console-dormant joined the bench with its own
-	// witness (lapsed-console-user). The count moves with the witness, which
-	// is what this pin exists to force.
-	const wantWitnessed = 15
+	// 16, not 15: waf.orphan joined the bench with its own witness
+	// (acme-unattached-waf) when the web-ACL orphan condition was split out
+	// of waf.no-logging. The count moves with the witness, which is what this
+	// pin exists to force.
+	const wantWitnessed = 16
 	if singles != wantWitnessed {
 		t.Errorf("%d witness-backed wave-2 codes on the bench, want %d — a witness was added or lost "+
 			"without this count moving with it; codes seen: %v", singles, wantWitnessed, codes)

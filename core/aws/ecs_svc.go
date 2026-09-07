@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -143,23 +142,17 @@ func ecsSvcFindings(status string, desiredCount, runningCount int32) []domain.Fi
 	var findings []domain.Finding
 	switch status {
 	case "DRAINING":
-		findings = append(findings, domain.Finding{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeECSSvcStateDraining, domain.SevWarn))
 	case "INACTIVE":
-		findings = append(findings, domain.Finding{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeECSSvcStateInactive, domain.SevBroken))
 	}
 	// A service that asks for nothing is idle by design, not short of capacity.
 	switch {
 	case desiredCount <= 0:
 	case runningCount == 0:
-		findings = append(findings, domain.Finding{
-			Code: CodeECSSvcNoTasksRunning, Phrase: "no tasks running",
-			Detail: catalog.Detail(CodeECSSvcNoTasksRunning), Severity: domain.SevBroken, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeECSSvcNoTasksRunning, domain.SevBroken))
 	case runningCount < desiredCount:
-		findings = append(findings, domain.Finding{
-			Code: CodeECSSvcTasksBelowDesired, Phrase: "running below desired count",
-			Detail: catalog.Detail(CodeECSSvcTasksBelowDesired), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeECSSvcTasksBelowDesired, domain.SevWarn))
 	}
 	return findings
 }

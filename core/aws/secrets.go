@@ -113,17 +113,17 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 func secretFindings(status, rotationEnabled, lastChanged string) []domain.Finding {
 	switch status {
 	case "DELETED":
-		return []domain.Finding{{Code: CodeSecretStateDeleted, Phrase: "deleted", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSecretStateDeleted, domain.SevBroken)}
 	case "OVERDUE":
-		return []domain.Finding{{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSecretStateRotationOverdue, domain.SevWarn)}
 	case "DORMANT":
-		return []domain.Finding{{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSecretStateDormant, domain.SevWarn)}
 	}
 	if rotationEnabled == "No" {
-		return []domain.Finding{{Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSecretRotationDisabled, domain.SevWarn)}
 	}
 	if t, err := time.Parse("2006-01-02", lastChanged); err == nil && time.Since(t) > 365*24*time.Hour {
-		return []domain.Finding{{Code: CodeSecretStaleValue, Phrase: "value unchanged in over 365 days", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSecretStaleValue, domain.SevWarn)}
 	}
 	return nil
 }

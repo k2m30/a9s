@@ -78,9 +78,9 @@ func capRunes(s string, n int) string {
 func logEventFindings(status string) []domain.Finding {
 	switch status {
 	case "ERROR":
-		return []domain.Finding{{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCWLogError, domain.SevBroken)}
 	case "WARN":
-		return []domain.Finding{{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCWLogWarn, domain.SevWarn)}
 	}
 	return nil
 }

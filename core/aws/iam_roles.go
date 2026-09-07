@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -55,16 +54,10 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 	}
 	if iampolicy.EvaluateTrust(doc, "").Public {
 		out.wildcard, out.summary = "true", "WILDCARD"
-		out.findings = append(out.findings, domain.Finding{
-			Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role",
-			Detail: catalog.Detail(roleCodeWildcardTrust), Severity: domain.SevBroken, Source: "wave1",
-		})
+		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust, domain.SevBroken))
 	}
 	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {
-		out.findings = append(out.findings, domain.Finding{
-			Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping",
-			Detail: catalog.Detail(roleCodeConfusedDeputy), Severity: domain.SevWarn, Source: "wave1",
-		})
+		out.findings = append(out.findings, wave1Finding(roleCodeConfusedDeputy, domain.SevWarn))
 		out.details = map[domain.FindingCode]domain.AttentionDetail{
 			roleCodeConfusedDeputy: {Rows: []domain.DetailRow{
 				{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
@@ -359,7 +352,7 @@ func enumerateRoleInlinePolicies(
 			continue
 		}
 		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
-			f := wave1Finding(roleCodeInlinePrivEsc, catalog.Phrase(roleCodeInlinePrivEsc), domain.SevBroken)
+			f := wave1Finding(roleCodeInlinePrivEsc, domain.SevBroken)
 			scan.finding = &f
 			scan.rows = append(
 				[]domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "!"}},

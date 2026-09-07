@@ -821,6 +821,12 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Color:        colorAnyFindingOrHealthy,
 		LifecycleKey: "health",
 		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description", "target_group_arn"},
+		Findings: []catalog.FindingDef{
+			{Code: CodeTGHealthUnhealthy, Phrase: "<health check reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "This target is failing the group's health check, so the load balancer has stopped sending it requests; the reason the check gave is the phrase. Fix the target or the check's path, port and matcher."},
+			{Code: CodeTGHealthUnavailable, Phrase: "<health check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer cannot health-check this target at all, usually because a security group or network path blocks the check. Open the check's port from the load balancer to the target."},
+			{Code: CodeTGHealthDraining, Phrase: "<health check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The target is deregistering and finishing the requests it already holds. It stops receiving new ones and leaves the group when the deregistration delay elapses."},
+			{Code: CodeTGHealthInitial, Phrase: "<health check reason>", Severity: domain.SevDim, Source: "wave1", Detail: "The target has just registered and has not passed enough health checks to receive traffic yet. It becomes healthy once the configured threshold of consecutive successes is met."},
+		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)
 		}),

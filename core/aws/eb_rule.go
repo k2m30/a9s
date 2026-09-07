@@ -105,7 +105,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 // colorEBRule runs it over Fields for rows built outside the fetcher.
 func ebRuleStateFindings(state string) []domain.Finding {
 	if strings.EqualFold(state, "DISABLED") {
-		return []domain.Finding{{Code: CodeEBRuleDisabled, Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBRuleDisabled, domain.SevDim)}
 	}
 	return nil
 }

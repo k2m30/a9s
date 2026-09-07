@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -141,16 +140,10 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 // two never disagree.
 func cfWave1Findings(enabled, status string) []domain.Finding {
 	if enabled == "false" {
-		return []domain.Finding{{
-			Code: cfCodeDisabled, Phrase: "disabled (admin-off)",
-			Detail: catalog.Detail(cfCodeDisabled), Severity: domain.SevDim, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(cfCodeDisabled, domain.SevDim)}
 	}
 	if status == "InProgress" {
-		return []domain.Finding{{
-			Code: cfCodeInProgress, Phrase: "deploying: config propagating",
-			Detail: catalog.Detail(cfCodeInProgress), Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(cfCodeInProgress, domain.SevWarn)}
 	}
 	return nil
 }

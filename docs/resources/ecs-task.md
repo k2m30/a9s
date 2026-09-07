@@ -211,11 +211,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
+| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
+| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
+| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
+| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
 | `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped` |
 | `healthStatus==UNHEALTHY` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unhealthy` |
 | `lastStatus == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
@@ -240,7 +240,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every non-healthy state: a red row carries the stop code translated into plain words as `stopped: <stop code>`, or reads `task failed` or `unhealthy`, so the operator can triage from the list alone; detail is only needed when they want the specific container name and its `Reason` text. A task stopped for no fault greys out to `stopped`, and the transitional words (`provisioning`, `pending`, `activating`, `deactivating`, `stopping`, `deprovisioning`) stand on their own — the implementation never shows a bare state word without its cause where a cause exists.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every non-healthy state: a red row carries the stop code translated into plain words as `stopped: <reason>`, or reads `task failed` or `unhealthy`, so the operator can triage from the list alone; detail is only needed when they want the specific container name and its `Reason` text. A task stopped for no fault greys out to `stopped`, and the transitional words (`provisioning`, `pending`, `activating`, `deactivating`, `stopping`, `deprovisioning`) stand on their own — the implementation never shows a bare state word without its cause where a cause exists.
 
 ## 5. Out of Scope
 
@@ -286,7 +286,7 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-task.state.stopping | stopping | warn | wave1 | — |
 | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 | — |
 | ecs-task.state.stopped | stopped | dim | wave1 | — |
-| ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 | — |
+| ecs-task.stop-code.failed | stopped: <reason> | broken | wave1 | — |
 | ecs-task.health.unhealthy | unhealthy | broken | wave1 | — |
 | ecs-task.task-failed | task failed | broken | wave2 | — |
 | ecs-task.privileged | privileged container | broken | wave2 | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |

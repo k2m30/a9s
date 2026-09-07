@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -156,15 +155,15 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 		"storage-full":            CodeRedshiftStorageFull,
 	}
 	if code, ok := brokenByStatus[clusterStatus]; ok {
-		return []domain.Finding{wave1Finding(code, catalog.Phrase(code), domain.SevBroken)}
+		return []domain.Finding{wave1Finding(code, domain.SevBroken)}
 	}
 
 	// Broken: ClusterAvailabilityStatus-driven
 	switch clusterAvailStatus {
 	case "Unavailable":
-		return []domain.Finding{{Code: CodeRedshiftUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeRedshiftUnavailable, domain.SevBroken)}
 	case "Failed":
-		return []domain.Finding{{Code: CodeRedshiftFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeRedshiftFailed, domain.SevBroken)}
 	}
 
 	// Transitional (Warning, ClusterStatus-driven)
@@ -177,7 +176,7 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 		"deleting":  CodeRedshiftDeleting,
 	}
 	if code, ok := transitionalByStatus[clusterStatus]; ok {
-		return []domain.Finding{{Code: code, Phrase: clusterStatus, Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(code, domain.SevWarn)}
 	}
 
 	// Warning bucket — stack all active warnings
@@ -185,22 +184,22 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 
 	switch clusterAvailStatus {
 	case "Maintenance":
-		findings = append(findings, domain.Finding{Code: CodeRedshiftMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeRedshiftMaintenance, domain.SevWarn))
 	case "Modifying":
-		findings = append(findings, domain.Finding{Code: CodeRedshiftAvailabilityModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeRedshiftAvailabilityModifying, domain.SevWarn))
 	}
 
 	if hasPendingRedshiftModifiedValues(cluster.PendingModifiedValues) {
-		findings = append(findings, domain.Finding{Code: CodeRedshiftPendingChange, Phrase: "pending change queued", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeRedshiftPendingChange, domain.SevWarn))
 	}
 	if hasActiveDeferredMaintenanceWindow(cluster.DeferredMaintenanceWindows, time.Now().UTC()) {
-		findings = append(findings, domain.Finding{Code: CodeRedshiftMaintenanceDeferred, Phrase: "maintenance deferred", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeRedshiftMaintenanceDeferred, domain.SevWarn))
 	}
 	if cluster.PubliclyAccessible != nil && *cluster.PubliclyAccessible {
-		findings = append(findings, domain.Finding{Code: CodeRedshiftPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeRedshiftPubliclyAccessible, domain.SevWarn))
 	}
 	if cluster.Encrypted != nil && !*cluster.Encrypted {
-		findings = append(findings, domain.Finding{Code: CodeRedshiftUnencryptedAtRest, Phrase: "unencrypted at rest", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeRedshiftUnencryptedAtRest, domain.SevWarn))
 	}
 
 	return findings

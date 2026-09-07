@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -149,12 +148,12 @@ func eniFindings(status, requesterManaged string) []domain.Finding {
 	switch status {
 	case "available":
 		if requesterManaged != "true" {
-			return []domain.Finding{{Code: CodeENIStateAvailable, Phrase: "available", Detail: catalog.Detail(CodeENIStateAvailable), Severity: domain.SevWarn, Source: "wave1"}}
+			return []domain.Finding{wave1Finding(CodeENIStateAvailable, domain.SevWarn)}
 		}
 	case "attaching":
-		return []domain.Finding{{Code: CodeENIStateAttaching, Phrase: "attaching", Detail: catalog.Detail(CodeENIStateAttaching), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeENIStateAttaching, domain.SevWarn)}
 	case "detaching":
-		return []domain.Finding{{Code: CodeENIStateDetaching, Phrase: "detaching", Detail: catalog.Detail(CodeENIStateDetaching), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeENIStateDetaching, domain.SevWarn)}
 	}
 	return nil
 }

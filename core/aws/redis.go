@@ -12,20 +12,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// computeShardIssues returns one phrase per non-available NodeGroup on a
+// shardIssue names one non-available NodeGroup: the two values the
+// redis.warn.shard_issue phrase declares slots for, kept apart so the wording
+// that joins them stays the catalog's.
+type shardIssue struct{ id, status string }
+
+// computeShardIssues returns one entry per non-available NodeGroup on a
 // multi-shard (cluster-mode-enabled) replication group, ordered alphabetically
-// by phrase so rule-7 precedence is stable. Returns nil when the RG has ≤1
+// by shard id so rule-7 precedence is stable. Returns nil when the RG has ≤1
 // NodeGroup — single-shard RGs use the RG-level phrase instead.
-func computeShardIssues(nodeGroups []elasticachetypes.NodeGroup) []string {
+func computeShardIssues(nodeGroups []elasticachetypes.NodeGroup) []shardIssue {
 	if len(nodeGroups) <= 1 {
 		return nil
 	}
-	var out []string
+	var out []shardIssue
 	for _, ng := range nodeGroups {
 		ngStatus := strings.ToLower(aws.ToString(ng.Status))
 		if ngStatus == "" || ngStatus == "available" {
@@ -35,21 +39,10 @@ func computeShardIssues(nodeGroups []elasticachetypes.NodeGroup) []string {
 		if ngID == "" {
 			continue
 		}
-		out = append(out, fmt.Sprintf("shard %s: %s", ngID, ngStatus))
+		out = append(out, shardIssue{id: ngID, status: ngStatus})
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].id < out[j].id })
 	return out
-}
-
-// rgTransientPhrase maps a transient RG-level status to its list phrase.
-func rgTransientPhrase(state string) string {
-	switch state {
-	case "modifying":
-		return "modifying — config change"
-	case "snapshotting":
-		return "snapshotting — backup running"
-	}
-	return ""
 }
 
 // FetchRedisPage fetches a single page of ElastiCache ReplicationGroups and maps
@@ -165,31 +158,28 @@ func computeRedisFindings(status string, multiAZ bool, autoFailover bool, rg ela
 	case "available":
 		// healthy
 	case "creating":
-		warnings = append(warnings, domain.Finding{Code: CodeRedisCreating, Phrase: "creating — new group", Severity: domain.SevWarn, Source: "wave1"})
+		warnings = append(warnings, wave1Finding(CodeRedisCreating, domain.SevWarn))
 	case "deleting":
-		warnings = append(warnings, domain.Finding{Code: CodeRedisDeleting, Phrase: "deleting — teardown", Severity: domain.SevWarn, Source: "wave1"})
+		warnings = append(warnings, wave1Finding(CodeRedisDeleting, domain.SevWarn))
 	case "create-failed":
-		broken = append(broken, domain.Finding{Code: CodeRedisCreateFailed, Phrase: "create failed — see events", Severity: domain.SevBroken, Source: "wave1"})
+		broken = append(broken, wave1Finding(CodeRedisCreateFailed, domain.SevBroken))
 	case "modifying", "snapshotting":
 		shardIssues := computeShardIssues(nodeGroups)
 		if len(shardIssues) > 0 {
 			for _, si := range shardIssues {
-				warnings = append(warnings, domain.Finding{Code: CodeRedisShardIssue, Phrase: si, Severity: domain.SevWarn, Source: "wave1"})
+				warnings = append(warnings, wave1Finding(CodeRedisShardIssue, domain.SevWarn, si.id, si.status))
 			}
 		} else {
-			p := rgTransientPhrase(status)
-			if p != "" {
-				code := CodeRedisModifying
-				if status == "snapshotting" {
-					code = CodeRedisSnapshotting
-				}
-				warnings = append(warnings, domain.Finding{Code: code, Phrase: p, Severity: domain.SevWarn, Source: "wave1"})
+			code := CodeRedisModifying
+			if status == "snapshotting" {
+				code = CodeRedisSnapshotting
 			}
+			warnings = append(warnings, wave1Finding(code, domain.SevWarn))
 		}
 	}
 
 	if multiAZ && !autoFailover {
-		warnings = append(warnings, domain.Finding{Code: CodeRedisMultiAZWithoutAutoFailover, Phrase: "multi-AZ without auto-failover", Severity: domain.SevWarn, Source: "wave1"})
+		warnings = append(warnings, wave1Finding(CodeRedisMultiAZWithoutAutoFailover, domain.SevWarn))
 	}
 
 	sort.Slice(warnings, func(i, j int) bool { return warnings[i].Phrase < warnings[j].Phrase })
@@ -213,30 +203,28 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	var findings []domain.Finding
 	details := map[domain.FindingCode]domain.AttentionDetail{}
 
-	add := func(code domain.FindingCode, phrase string, sev domain.Severity, rows []domain.DetailRow) {
-		findings = append(findings, domain.Finding{
-			Code: code, Phrase: phrase, Detail: catalog.Detail(code), Severity: sev, Source: "wave1",
-		})
+	add := func(code domain.FindingCode, sev domain.Severity, rows []domain.DetailRow) {
+		findings = append(findings, wave1Finding(code, sev))
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
 	if !aws.ToBool(rg.AtRestEncryptionEnabled) {
-		add(CodeRedisAtRestOff, "encryption at rest off", domain.SevWarn, nil)
+		add(CodeRedisAtRestOff, domain.SevWarn, nil)
 	}
 	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
 	if !transitOn {
-		add(CodeRedisTransitOff, "encryption in transit off", domain.SevWarn, nil)
+		add(CodeRedisTransitOff, domain.SevWarn, nil)
 	}
 	// AWS only accepts an AUTH token on a group that also encrypts in
 	// transit, so a group without in-transit encryption is already reported
 	// by the row above — reporting a missing AUTH token there too would name
 	// the same misconfiguration twice.
 	if transitOn && !aws.ToBool(rg.AuthTokenEnabled) {
-		add(CodeRedisNoAuth, "no authentication token", domain.SevBroken,
+		add(CodeRedisNoAuth, domain.SevBroken,
 			[]domain.DetailRow{{Label: "Authentication token", Value: "none", Tier: "!"}})
 	}
 	if rg.SnapshotRetentionLimit == nil || *rg.SnapshotRetentionLimit == 0 {
-		add(CodeRedisNoBackup, "automatic backups off", domain.SevWarn,
+		add(CodeRedisNoBackup, domain.SevWarn,
 			[]domain.DetailRow{{Label: "Snapshot retention", Value: "0 days", Tier: "~"}})
 	}
 

@@ -21,11 +21,11 @@ import (
 func sfnExecutionFindings(status sfntypes.ExecutionStatus) []domain.Finding {
 	switch status {
 	case sfntypes.ExecutionStatusFailed:
-		return []domain.Finding{{Code: CodeSFNExecutionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSFNExecutionFailed, domain.SevBroken)}
 	case sfntypes.ExecutionStatusTimedOut:
-		return []domain.Finding{{Code: CodeSFNExecutionTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSFNExecutionTimedOut, domain.SevBroken)}
 	case sfntypes.ExecutionStatusAborted:
-		return []domain.Finding{{Code: CodeSFNExecutionAborted, Phrase: "aborted", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeSFNExecutionAborted, domain.SevBroken)}
 	}
 	return nil
 }

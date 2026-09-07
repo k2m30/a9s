@@ -35,7 +35,10 @@ func TestDegradedDetails_ClassifiesAuthVsNonAuth(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := awsclient.DegradedDetails("svc", "res-1", tc.err)
+			// A registered short name: the degraded codes are generated from
+			// it, and their wording is read back from the declaration that
+			// type carries, so an unregistered name has nothing to read.
+			r := awsclient.DegradedDetails("ddb", "res-1", tc.err)
 			if len(r.Findings) != 1 {
 				t.Fatalf("want exactly 1 finding, got %+v", r.Findings)
 			}

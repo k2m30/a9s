@@ -127,12 +127,12 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	// bookmark encryption all live on the security configuration a job either
 	// names or does not, so a job naming none fails all three at once.
 	if aws.ToString(job.SecurityConfiguration) == "" {
-		addWave1Finding(r, CodeGlueNoSecurityConfiguration, "no security configuration", domain.SevWarn)
+		addWave1Finding(r, CodeGlueNoSecurityConfiguration, domain.SevWarn)
 	}
 
 	// The flag is a string, so "false" is off exactly as surely as absent.
 	if job.DefaultArguments[glueContinuousLogArgument] != "true" {
-		addWave1Finding(r, CodeGlueContinuousLoggingOff, "continuous logging off", domain.SevWarn)
+		addWave1Finding(r, CodeGlueContinuousLoggingOff, domain.SevWarn)
 		addWave1Rows(r, CodeGlueContinuousLoggingOff, domain.DetailRow{
 			Label: "Argument to add", Value: glueContinuousLogArgument, Tier: "~",
 		})
@@ -145,5 +145,5 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	for k, v := range job.DefaultArguments {
 		args[strings.TrimPrefix(k, "--")] = v
 	}
-	addSecretScanFinding(r, CodeGlueArgumentSecret, "credential in job arguments", args)
+	addSecretScanFinding(r, CodeGlueArgumentSecret, args)
 }

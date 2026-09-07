@@ -345,12 +345,8 @@ func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.
 // while its Color func is nil and therefore structurally never reads
 // Findings at all.
 var knownColorlessChildTypes = map[string]bool{
-	// tg_health: this PR's own bug — Findings will be added by the coder in
-	// the SAME change that must also set Color (colorAnyFindingOrHealthy or
-	// equivalent). Present here as a starting inventory entry so the
-	// generic census below does not immediately fail on the very type this
-	// PR exists to fix; the concrete tests above are what pin the fix itself.
-	"tg_health": true,
+	// Empty: tg_health, the type this inventory was opened for, now declares
+	// its target-health findings and derives its colour from them.
 }
 
 // TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc is

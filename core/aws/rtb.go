@@ -129,15 +129,9 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 func rtbFindings(blackholeCount, associationsCount int, isMain string) []domain.Finding {
 	switch {
 	case blackholeCount > 0:
-		return []domain.Finding{{
-			Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)",
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(rtbCodeBlackholeRoute, domain.SevBroken)}
 	case associationsCount == 0 && isMain != "true":
-		return []domain.Finding{{
-			Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(rtbCodeOrphanUnassociated, domain.SevWarn)}
 	}
 	return nil
 }

@@ -130,9 +130,9 @@ func alarmHistoryFindings(historyItemType, historyData string) []domain.Finding 
 	}
 	switch parsed.NewState.StateValue {
 	case "ALARM":
-		return []domain.Finding{{Code: CodeAlarmHistoryStateAlarm, Phrase: "alarm", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeAlarmHistoryStateAlarm, domain.SevBroken)}
 	case "INSUFFICIENT_DATA":
-		return []domain.Finding{{Code: CodeAlarmHistoryStateInsufficientData, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeAlarmHistoryStateInsufficientData, domain.SevWarn)}
 	}
 	return nil
 }

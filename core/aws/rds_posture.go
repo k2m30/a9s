@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -84,28 +83,22 @@ func rdsPostureFindings(p rdsPosture, c rdsPostureCodes) ([]domain.Finding, map[
 	var findings []domain.Finding
 	details := map[domain.FindingCode]domain.AttentionDetail{}
 
-	add := func(code domain.FindingCode, phrase string, rows []domain.DetailRow) {
-		findings = append(findings, domain.Finding{
-			Code: code, Phrase: phrase, Detail: catalog.Detail(code),
-			Severity: domain.SevWarn, Source: "wave1",
-		})
+	add := func(code domain.FindingCode, rows []domain.DetailRow) {
+		findings = append(findings, wave1Finding(code, domain.SevWarn))
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
 	if !p.SkipSingleAZ && !p.IsReadReplica && p.MultiAZ != nil && !*p.MultiAZ {
-		add(c.singleAZ, "single-AZ",
-			[]domain.DetailRow{{Label: "Multi-AZ", Value: "no", Tier: "~"}})
+		add(c.singleAZ, []domain.DetailRow{{Label: "Multi-AZ", Value: "no", Tier: "~"}})
 	}
 	if p.AutoMinorVersionUpgrade != nil && !*p.AutoMinorVersionUpgrade {
-		add(c.minorUpgrade, "auto minor version upgrade off", nil)
+		add(c.minorUpgrade, nil)
 	}
 	if engineSupportsIAMAuth(p.Engine) && p.IAMAuthEnabled != nil && !*p.IAMAuthEnabled {
-		add(c.iamAuth, "IAM database authentication off",
-			[]domain.DetailRow{{Label: "Database authentication", Value: "identity-based, off", Tier: "~"}})
+		add(c.iamAuth, []domain.DetailRow{{Label: "Database authentication", Value: "identity-based, off", Tier: "~"}})
 	}
 	if p.MasterUsername != nil && isDefaultMasterUsername(*p.MasterUsername) {
-		add(c.defaultMasterUser, "default master username",
-			[]domain.DetailRow{{Label: "Master username", Value: *p.MasterUsername, Tier: "~"}})
+		add(c.defaultMasterUser, []domain.DetailRow{{Label: "Master username", Value: *p.MasterUsername, Tier: "~"}})
 	}
 
 	if len(details) == 0 {
@@ -144,16 +137,10 @@ func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code dom
 		sev = domain.SevBroken
 		tier = "!"
 	}
-	f := &domain.Finding{
-		Code:     code,
-		Phrase:   "server certificate expires in " + strconv.Itoa(days) + " days",
-		Detail:   catalog.Detail(code),
-		Severity: sev,
-		Source:   "wave1",
-	}
+	f := wave1Finding(code, sev, strconv.Itoa(days))
 	rows := []domain.DetailRow{
 		{Label: "Certificate authority", Value: caID, Tier: tier},
 		{Label: "Valid till", Value: validTill.Format("2006-01-02"), Tier: tier},
 	}
-	return f, rows
+	return &f, rows
 }

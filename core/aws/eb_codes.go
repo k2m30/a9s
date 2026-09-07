@@ -47,15 +47,18 @@ func ebEnvironmentFindings(status, health string) []domain.Finding {
 	var healthFinding *domain.Finding
 	switch health {
 	case "Red":
-		healthFinding = &domain.Finding{Code: CodeEBHealthRed, Phrase: "health: red", Severity: domain.SevBroken, Source: "wave1"}
+		f := wave1Finding(CodeEBHealthRed, domain.SevBroken)
+		healthFinding = &f
 	case "Yellow":
-		healthFinding = &domain.Finding{Code: CodeEBHealthYellow, Phrase: "health: yellow", Severity: domain.SevWarn, Source: "wave1"}
+		f := wave1Finding(CodeEBHealthYellow, domain.SevWarn)
+		healthFinding = &f
 	case "Grey":
-		healthFinding = &domain.Finding{Code: CodeEBHealthGrey, Phrase: "health: grey", Severity: domain.SevWarn, Source: "wave1"}
+		f := wave1Finding(CodeEBHealthGrey, domain.SevWarn)
+		healthFinding = &f
 	}
 
 	if status == "Terminated" && (healthFinding == nil || healthFinding.Severity != domain.SevBroken) {
-		return []domain.Finding{{Code: CodeEBTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBTerminated, domain.SevDim)}
 	}
 	if healthFinding != nil {
 		return []domain.Finding{*healthFinding}
@@ -63,9 +66,9 @@ func ebEnvironmentFindings(status, health string) []domain.Finding {
 
 	switch status {
 	case "Launching", "Updating":
-		return []domain.Finding{{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBLaunching, domain.SevWarn)}
 	case "Terminating":
-		return []domain.Finding{{Code: CodeEBTerminating, Phrase: "terminating", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBTerminating, domain.SevDim)}
 	}
 	return nil
 }

@@ -21,15 +21,15 @@ import (
 func cbBuildFindings(status cbtypes.StatusType) []domain.Finding {
 	switch status {
 	case cbtypes.StatusTypeFailed:
-		return []domain.Finding{{Code: CodeCBBuildFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCBBuildFailed, domain.SevBroken)}
 	case cbtypes.StatusTypeFault:
-		return []domain.Finding{{Code: CodeCBBuildFault, Phrase: "fault", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCBBuildFault, domain.SevBroken)}
 	case cbtypes.StatusTypeTimedOut:
-		return []domain.Finding{{Code: CodeCBBuildTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCBBuildTimedOut, domain.SevBroken)}
 	case cbtypes.StatusTypeInProgress:
-		return []domain.Finding{{Code: CodeCBBuildInProgress, Phrase: "in progress", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCBBuildInProgress, domain.SevWarn)}
 	case cbtypes.StatusTypeStopped:
-		return []domain.Finding{{Code: CodeCBBuildStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCBBuildStopped, domain.SevDim)}
 	}
 	return nil
 }

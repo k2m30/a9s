@@ -258,37 +258,96 @@ func TestNoEmitterBuildsItsPhraseFromAnItem(t *testing.T) {
 	}
 }
 
+// findingSeamFiles are the two files a domain.Finding may be constructed in:
+// the Wave-1 constructor and the Wave-2 one. Everywhere else a finding is
+// obtained by calling one of them, so a phrase, a detail and a Source string
+// each have one owner.
+var findingSeamFiles = map[string]bool{
+	"wave1_rows.go":       true,
+	"issue_enrichment.go": true,
+}
+
+// isFindingLiteralType reports whether e names domain.Finding or a slice of
+// it. The elements of a []domain.Finding{{…}} carry no type of their own, so
+// the enclosing slice is what identifies them.
+// The package qualifier is not checked: core/aws imports core/domain under
+// two different names (domain, domainpkg), and matching on one of them is how
+// a whole file's worth of literals stayed invisible to this gate.
+func isFindingLiteralType(e ast.Expr) (elided bool, isFinding bool) {
+	named := func(x ast.Expr) bool {
+		sel, ok := x.(*ast.SelectorExpr)
+		if !ok {
+			return false
+		}
+		_, isIdent := sel.X.(*ast.Ident)
+		return isIdent && sel.Sel.Name == "Finding"
+	}
+	if named(e) {
+		return false, true
+	}
+	if arr, ok := e.(*ast.ArrayType); ok && named(arr.Elt) {
+		return true, true
+	}
+	return false, false
+}
+
 func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 	fset, files := parseAWSPackage(t)
 
-	var offenders []string
+	var literals, phrases []string
 	for path, src := range files {
-		// Matched on the field name alone rather than on the literal's type:
-		// the Finding literals that build a phrase sit inside an elided
-		// []domain.Finding{{…}} element, whose CompositeLit carries no type at
-		// all. "Phrase" names one field in this package.
+		base := filepath.Base(path)
+		record := func(bucket *[]string, pos token.Pos) {
+			*bucket = append(*bucket, fmt.Sprintf("%s:%d", base, fset.Position(pos).Line))
+		}
 		ast.Inspect(src, func(n ast.Node) bool {
-			kv, ok := n.(*ast.KeyValueExpr)
-			if !ok {
+			if kv, ok := n.(*ast.KeyValueExpr); ok {
+				key, isIdent := kv.Key.(*ast.Ident)
+				if isIdent && key.Name == "Phrase" &&
+					!strings.HasPrefix(base, "catalog_") && !findingSeamFiles[base] {
+					record(&phrases, kv.Pos())
+				}
+			}
+			cl, ok := n.(*ast.CompositeLit)
+			if !ok || findingSeamFiles[base] {
 				return true
 			}
-			key, isIdent := kv.Key.(*ast.Ident)
-			if !isIdent || key.Name != "Phrase" {
+			elided, isFinding := isFindingLiteralType(cl.Type)
+			if mt, isMap := cl.Type.(*ast.MapType); isMap {
+				// A lookup table keyed by state holds findings as its values;
+				// the elements carry no type of their own either.
+				if _, ok := isFindingLiteralType(mt.Value); ok {
+					elided, isFinding = true, true
+				}
+			}
+			if !isFinding {
 				return true
 			}
-			if _, isCall := kv.Value.(*ast.CallExpr); !isCall {
-				return true
+			for _, elt := range cl.Elts {
+				inner, isLit := elt.(*ast.CompositeLit)
+				if elided && isLit && inner.Type == nil && len(inner.Elts) > 0 {
+					record(&literals, inner.Pos())
+				}
 			}
-			pos := fset.Position(kv.Pos())
-			offenders = append(offenders, fmt.Sprintf("%s:%d", filepath.Base(path), pos.Line))
+			// domain.Finding{} with no fields is the "no finding" answer a
+			// two-result helper returns, not a finding anyone reads.
+			if !elided && len(cl.Elts) > 0 {
+				record(&literals, cl.Pos())
+			}
 			return true
 		})
 	}
 
-	sort.Strings(offenders)
-	for _, o := range offenders {
-		t.Errorf("Wave-1 finding builds its phrase in a literal: %s — call addWave1Finding so "+
-			"wave 1 has the one seam a phrase can be observed and checked at, the way "+
-			"setWave2Finding is for wave 2", o)
+	sort.Strings(literals)
+	sort.Strings(phrases)
+	for _, o := range literals {
+		t.Errorf("finding built by a struct literal: %s — call wave1Finding (or setWave2Finding) "+
+			"so a finding is born in one place and its phrase, detail and source cannot be "+
+			"written a second way", o)
+	}
+	for _, o := range phrases {
+		t.Errorf("phrase written outside the catalog: %s — a code's wording is declared on its "+
+			"catalog.FindingDef and read from there; a phrase spelled at the emit site is a "+
+			"second copy that drifts", o)
 	}
 }

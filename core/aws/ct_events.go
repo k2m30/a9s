@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
@@ -607,26 +606,25 @@ func ctEventFindings(status, cause, errorCode, eventName string) []domain.Findin
 	switch status {
 	case "ct-danger":
 		if cause == ctCauseError {
-			return []domain.Finding{wave1Finding(CodeCTEventFailedCall,
-				"failed: "+domain.HumanizeStatusPhrase(errorCode), domain.SevBroken)}
+			return []domain.Finding{wave1Finding(CodeCTEventFailedCall, domain.SevBroken,
+				domain.HumanizeStatusPhrase(errorCode))}
 		}
-		return []domain.Finding{wave1Finding(CodeCTEventDanger, catalog.Phrase(CodeCTEventDanger), domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeCTEventDanger, domain.SevBroken)}
 	case "ct-attention":
 		switch cause {
 		case ctCauseWrite:
-			return []domain.Finding{wave1Finding(CodeCTEventWrite, catalog.Phrase(CodeCTEventWrite), domain.SevWarn)}
+			return []domain.Finding{wave1Finding(CodeCTEventWrite, domain.SevWarn)}
 		case ctCauseCrossAccount:
-			return []domain.Finding{wave1Finding(CodeCTEventCrossAccount, catalog.Phrase(CodeCTEventCrossAccount), domain.SevWarn)}
+			return []domain.Finding{wave1Finding(CodeCTEventCrossAccount, domain.SevWarn)}
 		case ctCauseSensitiveRead:
-			return []domain.Finding{wave1Finding(CodeCTEventSensitiveRead,
-				"reads sensitive data ("+eventName+")", domain.SevWarn)}
+			return []domain.Finding{wave1Finding(CodeCTEventSensitiveRead, domain.SevWarn, eventName)}
 		}
-		return []domain.Finding{wave1Finding(CodeCTEventAttention, catalog.Phrase(CodeCTEventAttention), domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeCTEventAttention, domain.SevWarn)}
 	}
 	// ct-info (or any unrecognized tier) — colorCTEvents has no healthy
 	// bucket for events, so the routine/no-signal tier still needs a
 	// Finding to explain its Dim color on the list/detail surfaces.
-	return []domain.Finding{wave1Finding(CodeCTEventInfo, catalog.Phrase(CodeCTEventInfo), domain.SevDim)}
+	return []domain.Finding{wave1Finding(CodeCTEventInfo, domain.SevDim)}
 }
 
 // computeCTStatus implements the §1.2 severity ladder, returning the tier

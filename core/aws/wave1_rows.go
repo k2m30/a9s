@@ -7,6 +7,8 @@
 package aws
 
 import (
+	"strings"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -28,21 +30,60 @@ func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.
 	r.AttentionDetails[code] = ad
 }
 
-// wave1Finding builds a Wave-1 Finding, reading the operator sentence from the
-// code's registered definition the way setWave2Finding does, so a finding has
-// exactly one Detail wherever it is emitted from. It is the one place a Wave-1
-// Finding is constructed: a fetcher that returns []domain.Finding rather than
-// decorating a Resource calls this, so wave 1 has the seam wave 2 has in
-// setWave2Finding.
-func wave1Finding(code domain.FindingCode, phrase string, severity domain.Severity) domain.Finding {
+// wave1Finding builds a Wave-1 Finding. It is the one place a Wave-1 Finding
+// is constructed, and the phrase it carries is the one the code's
+// catalog.FindingDef declares, so a wording exists in exactly one place and
+// the rendered row, the detail view and the generated signals page cannot
+// drift apart.
+//
+// values fill the declared phrase's "<…>" slots left to right — a code whose
+// wording carries a measurement ("expires in <N> days") passes the
+// measurement, never a sentence it assembled itself.
+func wave1Finding(code domain.FindingCode, severity domain.Severity, values ...string) domain.Finding {
 	return domain.Finding{
-		Code: code, Phrase: phrase, Detail: catalog.Detail(code), Severity: severity, Source: "wave1",
+		Code: code, Phrase: fillPhrase(catalog.Phrase(code), values...),
+		Detail: catalog.Detail(code), Severity: severity, Source: "wave1",
 	}
 }
 
+// stateFinding is one row of a lifecycle lookup table: the code a state maps
+// to and the severity it carries. The wording is not here — wave1Finding
+// reads it from the code's declaration, so a table cannot become a second
+// phrase list.
+type stateFinding struct {
+	code     domain.FindingCode
+	severity domain.Severity
+}
+
+// fillPhrase substitutes values into the "<…>" slots of a declared phrase, in
+// order. A value with no slot left to fill is dropped rather than appended:
+// the declared wording is the shape of the sentence, and a caller passing more
+// values than the declaration has slots is caught by the phrase gate, not
+// papered over with text nobody registered.
+func fillPhrase(phrase string, values ...string) string {
+	// done is where the last value ended: scanning resumes past it, because a
+	// value AWS supplied may itself contain a "<" and must not be re-read as
+	// the next slot's opening bracket.
+	done := 0
+	for _, v := range values {
+		open := strings.Index(phrase[done:], "<")
+		if open < 0 {
+			break
+		}
+		open += done
+		closeAt := strings.Index(phrase[open:], ">")
+		if closeAt < 0 {
+			break
+		}
+		phrase = phrase[:open] + v + phrase[open+closeAt+1:]
+		done = open + len(v)
+	}
+	return phrase
+}
+
 // addWave1Finding appends the Wave-1 posture Finding for code to r.
-func addWave1Finding(r *resource.Resource, code domain.FindingCode, phrase string, severity domain.Severity) {
-	r.Findings = append(r.Findings, wave1Finding(code, phrase, severity))
+func addWave1Finding(r *resource.Resource, code domain.FindingCode, severity domain.Severity, values ...string) {
+	r.Findings = append(r.Findings, wave1Finding(code, severity, values...))
 }
 
 // secretScanRows and secretScanTextRows scan the two shapes a credential
@@ -75,11 +116,11 @@ func secretScanHitRows(hits []secretscan.Hit) []domain.DetailRow {
 
 // addSecretScanFinding scans kv and, on any hit, emits the Wave-1 finding
 // plus its supporting rows.
-func addSecretScanFinding(r *resource.Resource, code domain.FindingCode, phrase string, kv map[string]string) {
+func addSecretScanFinding(r *resource.Resource, code domain.FindingCode, kv map[string]string) {
 	rows := secretScanRows(kv)
 	if len(rows) == 0 {
 		return
 	}
-	addWave1Finding(r, code, phrase, domain.SevBroken)
+	addWave1Finding(r, code, domain.SevBroken)
 	addWave1Rows(r, code, rows...)
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -29,17 +28,17 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 	switch table.TableStatus {
 	case ddbtypes.TableStatusActive:
 	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
-		lifecycle = []domain.Finding{{Code: CodeDDBKMSKeyInaccessible, Phrase: "kms key inaccessible", Severity: domain.SevBroken, Source: "wave1"}}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBKMSKeyInaccessible, domain.SevBroken)}
 	case ddbtypes.TableStatusArchived:
-		lifecycle = []domain.Finding{{Code: CodeDDBArchivedKMSLost, Phrase: "archived: kms key lost", Severity: domain.SevBroken, Source: "wave1"}}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchivedKMSLost, domain.SevBroken)}
 	case ddbtypes.TableStatusCreating:
-		lifecycle = []domain.Finding{{Code: CodeDDBCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBCreating, domain.SevWarn)}
 	case ddbtypes.TableStatusUpdating:
-		lifecycle = []domain.Finding{{Code: CodeDDBUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBUpdating, domain.SevWarn)}
 	case ddbtypes.TableStatusDeleting:
-		lifecycle = []domain.Finding{{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBDeleting, domain.SevWarn)}
 	case ddbtypes.TableStatusArchiving:
-		lifecycle = []domain.Finding{{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"}}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchiving, domain.SevWarn)}
 	}
 
 	if resourceIsTearingDown(table) {
@@ -48,13 +47,7 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 	if aws.ToBool(table.DeletionProtectionEnabled) {
 		return lifecycle, nil
 	}
-	return append(lifecycle, domain.Finding{
-		Code:     CodeDDBDeletionProtectionOff,
-		Phrase:   "deletion protection off",
-		Detail:   catalog.Detail(CodeDDBDeletionProtectionOff),
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	}), nil
+	return append(lifecycle, wave1Finding(CodeDDBDeletionProtectionOff, domain.SevWarn)), nil
 }
 
 // FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get

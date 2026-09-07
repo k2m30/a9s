@@ -186,11 +186,23 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 // (the Broken-color explanation) so the two never drift.
 const sgWideOpenPhrase = "all ports open to 0.0.0.0/0"
 
-// sgDangerousPortsPhrase is the single owner-worded source for the
-// specific-ports exposure phrase, shared by risk_summary (display) and
-// sgRiskFindings (the Broken-color explanation) so the two never drift.
+// sgDangerousPortsPhrase renders the specific-ports exposure wording for the
+// risk_summary field. The wording itself is the one sgCodeDangerousPorts
+// declares, so the field and the finding cannot drift apart.
 func sgDangerousPortsPhrase(ports string) string {
-	return "ports " + ports + " open to 0.0.0.0/0"
+	return fillPhrase(catalog.Phrase(sgCodeDangerousPorts), ports)
+}
+
+// sgPortsSlot recovers whatever sgDangerousPortsPhrase put in the declared
+// phrase's slot, including the "unspecified" stand-in a large port range
+// yields. It reads the declaration rather than restating it, so renaming the
+// wording cannot leave the inverse behind.
+func sgPortsSlot(summary string) string {
+	pre, post, ok := strings.Cut(catalog.Phrase(sgCodeDangerousPorts), "<list>")
+	if !ok || !strings.HasPrefix(summary, pre) || !strings.HasSuffix(summary, post) {
+		return ""
+	}
+	return summary[len(pre) : len(summary)-len(post)]
 }
 
 // sgPortsFromRiskSummary is the inverse of sgDangerousPortsPhrase: it recovers
@@ -200,14 +212,10 @@ func sgDangerousPortsPhrase(ports string) string {
 // which ports a group leaves open — the sensitive-port set stays owned here.
 // Returns "" for a summary that names no specific ports.
 func sgPortsFromRiskSummary(summary string) string {
-	if !strings.HasPrefix(summary, "ports ") {
-		return ""
+	if ports := sgPortsSlot(summary); ports != "unspecified" {
+		return ports
 	}
-	ports := strings.TrimSuffix(strings.TrimPrefix(summary, "ports "), " open to 0.0.0.0/0")
-	if ports == summary || ports == "unspecified" {
-		return ""
-	}
-	return ports
+	return ""
 }
 
 // sgRiskFindings ranks wide-open ahead of dangerous ports so the list Status
@@ -218,15 +226,9 @@ func sgPortsFromRiskSummary(summary string) string {
 func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.Finding {
 	switch {
 	case wideOpen == "true":
-		return []domain.Finding{{
-			Code: sgCodeWideOpen, Phrase: sgWideOpenPhrase, Detail: catalog.Detail(sgCodeWideOpen),
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(sgCodeWideOpen, domain.SevBroken)}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
-		return []domain.Finding{{
-			Code: sgCodeDangerousPorts, Phrase: riskSummary, Detail: catalog.Detail(sgCodeDangerousPorts),
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, domain.SevBroken, sgPortsSlot(riskSummary))}
 	}
 	return nil
 }
@@ -304,13 +306,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		findings := sgRiskFindings(wideOpen, dangerousCount, riskSummary)
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
 		if sgDefaultAllowsTraffic(sg) {
-			findings = append(findings, domain.Finding{
-				Code:     sgCodeDefaultWithRules,
-				Phrase:   sgDefaultWithRulesPhrase,
-				Detail:   catalog.Detail(sgCodeDefaultWithRules),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+			findings = append(findings, wave1Finding(sgCodeDefaultWithRules, domain.SevWarn))
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				sgCodeDefaultWithRules: {Rows: []domain.DetailRow{
 					{Label: "Ingress rules", Value: strconv.Itoa(len(sg.IpPermissions)), Tier: "~"},

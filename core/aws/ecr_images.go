@@ -181,23 +181,21 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 // untagged (dangling) image. Healthy/unscanned images carry no finding.
 func ecrImageFindings(img ecrtypes.ImageDetail) []domain.Finding {
 	if img.ImageScanStatus != nil && img.ImageScanStatus.Status == ecrtypes.ScanStatusFailed {
-		return []domain.Finding{{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECRImageScanFailed, domain.SevBroken)}
 	}
 
 	if img.ImageScanFindingsSummary != nil {
 		counts := img.ImageScanFindingsSummary.FindingSeverityCounts
 		if c, ok := counts["CRITICAL"]; ok && c > 0 {
-			phrase := fmt.Sprintf("%d critical vulnerabilities", c)
-			return []domain.Finding{{Code: CodeECRImageCritical, Phrase: phrase, Severity: domain.SevBroken, Source: "wave1"}}
+			return []domain.Finding{wave1Finding(CodeECRImageCritical, domain.SevBroken, strconv.Itoa(int(c)))}
 		}
 		if h, ok := counts["HIGH"]; ok && h > 0 {
-			phrase := fmt.Sprintf("%d high vulnerabilities", h)
-			return []domain.Finding{{Code: CodeECRImageHigh, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+			return []domain.Finding{wave1Finding(CodeECRImageHigh, domain.SevWarn, strconv.Itoa(int(h)))}
 		}
 	}
 
 	if len(img.ImageTags) == 0 {
-		return []domain.Finding{{Code: CodeECRImageUntagged, Phrase: "untagged", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeECRImageUntagged, domain.SevDim)}
 	}
 
 	return nil

@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	domainpkg "github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -52,46 +51,31 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 		// A domain being torn down has no actionable posture left; the
 		// background signals would only add issue-severity noise to a row
 		// that is on its way out.
-		return []domainpkg.Finding{{Code: CodeOpenSearchDeleting, Phrase: "deleting: removal in progress", Severity: domainpkg.SevDim, Source: "wave1"}}
+		return []domainpkg.Finding{wave1Finding(CodeOpenSearchDeleting, domainpkg.SevDim)}
 	}
 	if d.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated {
-		findings = append(findings, domainpkg.Finding{Code: CodeOpenSearchIsolated, Phrase: "isolated: quarantined by AWS", Severity: domainpkg.SevBroken, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeOpenSearchIsolated, domainpkg.SevBroken))
 	}
 	if (d.Processing != nil && *d.Processing) || (d.UpgradeProcessing != nil && *d.UpgradeProcessing) {
-		findings = append(findings, domainpkg.Finding{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domainpkg.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeOpenSearchProcessing, domainpkg.SevWarn))
 	}
 	if openSearchUpdateForcedSoon(d, now) {
-		findings = append(findings, domainpkg.Finding{
-			Code: opensearchCodeUpdateForced, Phrase: "software update forced soon",
-			Detail: catalog.Detail(opensearchCodeUpdateForced), Severity: domainpkg.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(opensearchCodeUpdateForced, domainpkg.SevWarn))
 	}
 	if d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled {
-		findings = append(findings, domainpkg.Finding{
-			Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off",
-			Detail: catalog.Detail(opensearchCodeEncryptionOff), Severity: domainpkg.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(opensearchCodeEncryptionOff, domainpkg.SevWarn))
 	}
 	// Reachable outside a VPC only counts when the access policy also lets
 	// anyone in: a public endpoint fronted by a scoped policy is a deliberate,
 	// defended design.
 	if d.VPCOptions == nil && openSearchPolicyIsPublic(d) {
-		findings = append(findings, domainpkg.Finding{
-			Code: opensearchCodePublic, Phrase: "reachable outside a VPC",
-			Detail: catalog.Detail(opensearchCodePublic), Severity: domainpkg.SevBroken, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(opensearchCodePublic, domainpkg.SevBroken))
 	}
 	if d.DomainEndpointOptions == nil || !aws.ToBool(d.DomainEndpointOptions.EnforceHTTPS) {
-		findings = append(findings, domainpkg.Finding{
-			Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced",
-			Detail: catalog.Detail(opensearchCodeHTTPSNotForced), Severity: domainpkg.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(opensearchCodeHTTPSNotForced, domainpkg.SevWarn))
 	}
 	if d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled) {
-		findings = append(findings, domainpkg.Finding{
-			Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off",
-			Detail: catalog.Detail(opensearchCodeN2NOff), Severity: domainpkg.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(opensearchCodeN2NOff, domainpkg.SevWarn))
 	}
 	return findings
 }

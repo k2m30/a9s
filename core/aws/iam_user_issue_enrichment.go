@@ -330,9 +330,5 @@ func iamUserConsoleDormantFindings(hasConsolePassword, passwordLastUsed string) 
 	if hasConsolePassword != "true" || !olderThan(passwordLastUsed, unusedCredentialAge) {
 		return nil
 	}
-	return []domain.Finding{{
-		Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days",
-		Detail:   catalog.Detail(iamUserCodeConsoleDormant),
-		Severity: domain.SevWarn, Source: "wave2:iam-user",
-	}}
+	return []domain.Finding{wave2Finding(iamUserCodeConsoleDormant, domain.SevWarn, "iam-user")}
 }

@@ -27,7 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -152,23 +151,11 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 	}
 
 	if policy := aws.ToString(server.SecurityPolicyName); transferLegacySecurityPolicies[policy] {
-		findings = append(findings, domain.Finding{
-			Code:     transferCodeLegacyPolicy,
-			Phrase:   "legacy security policy",
-			Detail:   catalog.Detail(transferCodeLegacyPolicy),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		findings = append(findings, wave1Finding(transferCodeLegacyPolicy, domain.SevWarn))
 	}
 
 	if server.LoggingRole == nil && len(server.StructuredLogDestinations) == 0 {
-		findings = append(findings, domain.Finding{
-			Code:     transferCodeNoLogging,
-			Phrase:   "no activity logging",
-			Detail:   catalog.Detail(transferCodeNoLogging),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		findings = append(findings, wave1Finding(transferCodeNoLogging, domain.SevWarn))
 	}
 
 	return findings
@@ -177,27 +164,12 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 // transferStateFindings maps ListedServer/DescribedServer.State to its
 // docs/resources/transfer.md §4 state-bucket Finding. ONLINE has no entry
 // (Healthy — no finding).
-var transferStateFindings = map[transfertypes.State]domain.Finding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
-	transfertypes.StateOffline: {
-		Code: transferCodeOffline, Phrase: "offline: not accepting transfers",
-		Severity: domain.SevWarn, Source: "wave1",
-	},
-	transfertypes.StateStarting: {
-		Code: transferCodeStarting, Phrase: "starting",
-		Severity: domain.SevWarn, Source: "wave1",
-	},
-	transfertypes.StateStopping: {
-		Code: transferCodeStopping, Phrase: "stopping",
-		Severity: domain.SevWarn, Source: "wave1",
-	},
-	transfertypes.StateStartFailed: {
-		Code: transferCodeStartFailed, Phrase: "start failed",
-		Severity: domain.SevBroken, Source: "wave1",
-	},
-	transfertypes.StateStopFailed: {
-		Code: transferCodeStopFailed, Phrase: "stop failed",
-		Severity: domain.SevWarn, Source: "wave1",
-	},
+var transferStateFindings = map[transfertypes.State]stateFinding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+	transfertypes.StateOffline:     {code: transferCodeOffline, severity: domain.SevWarn},
+	transfertypes.StateStarting:    {code: transferCodeStarting, severity: domain.SevWarn},
+	transfertypes.StateStopping:    {code: transferCodeStopping, severity: domain.SevWarn},
+	transfertypes.StateStartFailed: {code: transferCodeStartFailed, severity: domain.SevBroken},
+	transfertypes.StateStopFailed:  {code: transferCodeStopFailed, severity: domain.SevWarn},
 }
 
 // transferStateFinding maps ListedServer/DescribedServer.State to its
@@ -205,9 +177,11 @@ var transferStateFindings = map[transfertypes.State]domain.Finding{ //nolint:goc
 // ONLINE (Healthy — no finding). Shared by the healthy-row and degraded-row
 // builders since State is present on both ListedServer and DescribedServer.
 func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
-	f, ok := transferStateFindings[state]
-	f.Detail = catalog.Detail(f.Code)
-	return f, ok
+	sf, ok := transferStateFindings[state]
+	if !ok {
+		return domain.Finding{}, false
+	}
+	return wave1Finding(sf.code, sf.severity), true
 }
 
 // buildTransferDegradedResource builds the RICH degraded row for a server

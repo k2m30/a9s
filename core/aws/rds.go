@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -194,7 +193,7 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 	}
 
 	if code, ok := brokenMap[status]; ok {
-		lead := []domain.Finding{wave1Finding(code, catalog.Phrase(code), domain.SevBroken)}
+		lead := []domain.Finding{wave1Finding(code, domain.SevBroken)}
 		return append(lead, postureFindings...), postureDetails
 	}
 	if _, ok := transitionalStatusSet[status]; ok {
@@ -203,22 +202,22 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 		if key != "" {
 			phrase = status + ": " + key
 		}
-		lead := []domain.Finding{{Code: CodeDBITransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		lead := []domain.Finding{wave1Finding(CodeDBITransitional, domain.SevWarn, phrase)}
 		return append(lead, postureFindings...), postureDetails
 	}
 	if status == "available" {
 		var findings []domain.Finding
 		if db.BackupRetentionPeriod != nil && *db.BackupRetentionPeriod == 0 {
-			findings = append(findings, domain.Finding{Code: CodeDBINoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBINoAutomatedBackups, domain.SevWarn))
 		}
 		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
-			findings = append(findings, domain.Finding{Code: CodeDBIPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBIPubliclyAccessible, domain.SevWarn))
 		}
 		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
-			findings = append(findings, domain.Finding{Code: CodeDBIUnencryptedStorage, Phrase: "unencrypted storage", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBIUnencryptedStorage, domain.SevWarn))
 		}
 		if db.DeletionProtection != nil && !*db.DeletionProtection {
-			findings = append(findings, domain.Finding{Code: CodeDBIDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBIDeletionProtectionOff, domain.SevWarn))
 		}
 		return append(findings, postureFindings...), postureDetails
 	}

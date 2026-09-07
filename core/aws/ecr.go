@@ -102,13 +102,13 @@ func addECRPostureFindings(r *resource.Resource, repo ecrtypes.Repository) {
 	// false — AWS does not scan either way — so this is one of the documented
 	// places where a missing field is a finding.
 	if repo.ImageScanningConfiguration == nil || !repo.ImageScanningConfiguration.ScanOnPush {
-		addWave1Finding(r, CodeECRScanOnPushOff, "scan on push off", domain.SevWarn)
+		addWave1Finding(r, CodeECRScanOnPushOff, domain.SevWarn)
 	}
 
 	// Only MUTABLE is the finding. IMMUTABLE_WITH_EXCLUSION still pins the
 	// tags that matter, and an empty value is unknown rather than mutable, so
 	// this must not be written as "anything that is not IMMUTABLE".
 	if repo.ImageTagMutability == ecrtypes.ImageTagMutabilityMutable {
-		addWave1Finding(r, CodeECRMutableTags, "tags are mutable", domain.SevWarn)
+		addWave1Finding(r, CodeECRMutableTags, domain.SevWarn)
 	}
 }

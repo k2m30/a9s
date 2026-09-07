@@ -28,7 +28,6 @@
 package aws
 
 import (
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -47,33 +46,10 @@ func DetailsDeniedCode(shortName string) domain.FindingCode {
 	return domain.FindingCode(shortName + ".warn.details_denied")
 }
 
-// DetailsDeniedFindingDef returns the catalog declaration matching what
-// DegradedDetailsDenied emits. Every adopting type lists this in its
-// `Findings` slice so the coverage gates demand a demo witness for it.
-// detail is the type's own S5 sentence; "" takes the name-only default.
-func DetailsDeniedFindingDef(shortName, detail string) catalog.FindingDef {
-	if detail == "" {
-		detail = detailsDeniedDetail
-	}
-	return catalog.FindingDef{
-		Code:     DetailsDeniedCode(shortName),
-		Phrase:   detailsDeniedPhrase,
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-		Detail:   detail,
-	}
-}
-
 // detailsDeniedFinding builds the shared details-denied Finding for shortName.
 func detailsDeniedFinding(shortName string) domain.Finding {
 	code := DetailsDeniedCode(shortName)
-	return domain.Finding{
-		Code:     code,
-		Phrase:   detailsDeniedPhrase,
-		Detail:   catalog.Detail(code),
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	}
+	return wave1Finding(code, domain.SevWarn)
 }
 
 // DetailsUnavailableCode returns the per-type FindingCode for the neutral
@@ -82,31 +58,11 @@ func DetailsUnavailableCode(shortName string) domain.FindingCode {
 	return domain.FindingCode(shortName + ".warn.details_unavailable")
 }
 
-// DetailsUnavailableFindingDef returns the catalog declaration matching what
-// detailsUnavailableFinding emits. Every adopting type lists this alongside
-// DetailsDeniedFindingDef in its `Findings` slice so the coverage gates
-// demand a demo witness for the non-auth path too.
-func DetailsUnavailableFindingDef(shortName string) catalog.FindingDef {
-	return catalog.FindingDef{
-		Code:     DetailsUnavailableCode(shortName),
-		Phrase:   detailsUnavailablePhrase,
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-		Detail:   detailsUnavailableDetail,
-	}
-}
-
 // detailsUnavailableFinding builds the shared details-unavailable Finding
 // for shortName.
 func detailsUnavailableFinding(shortName string) domain.Finding {
 	code := DetailsUnavailableCode(shortName)
-	return domain.Finding{
-		Code:     code,
-		Phrase:   detailsUnavailablePhrase,
-		Detail:   catalog.Detail(code),
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	}
+	return wave1Finding(code, domain.SevWarn)
 }
 
 // degradedStatusFindings recovers the degraded row's finding for a row rebuilt

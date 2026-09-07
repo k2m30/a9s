@@ -15,6 +15,11 @@ import (
 // least one rule.
 const WAFNoRules = "acme-empty-waf"
 
+// WAFOrphan is the witness Web ACL for waf.orphan: it has rules and a logging
+// configuration, and is attached to nothing. Every other demo ACL appears in
+// ResourcesByWebACL with at least one associated resource.
+const WAFOrphan = "acme-unattached-waf"
+
 // WAFFixtures holds typed fixture data for WAFv2.
 type WAFFixtures struct {
 	// WebACLSummaries holds REGIONAL-scope Web ACLs (served by ListWebACLs
@@ -44,6 +49,13 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRules + "/a1b2c3d4-5678-90ab-cdef-444444444444"),
 				Description: aws.String("Web ACL attached to the internal ALB with no rules configured"),
 				LockToken:   aws.String("lock-token-444"),
+			},
+			{
+				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-555555555555"),
+				Name:        aws.String(WAFOrphan),
+				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFOrphan + "/a1b2c3d4-5678-90ab-cdef-555555555555"),
+				Description: aws.String("Web ACL left behind after the ALB it protected was deleted"),
+				LockToken:   aws.String("lock-token-555"),
 			},
 			{
 				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-333333333333"),
@@ -92,5 +104,5 @@ func NewWAFFixtures() *WAFFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "waf", Rows: 4, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "waf", Rows: 5, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
 }

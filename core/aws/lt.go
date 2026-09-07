@@ -35,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -169,26 +168,14 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 	// Unset defaults to optional (SDK-confirmed) — absence of
 	// MetadataOptions IS the signal, not its negation.
 	if !endpointDisabled && (data.MetadataOptions == nil || data.MetadataOptions.HttpTokens != ec2types.LaunchTemplateHttpTokensStateRequired) {
-		findings = append(findings, domain.Finding{
-			Code:     ltCodeIMDSv1,
-			Phrase:   "IMDSv1 allowed",
-			Detail:   catalog.Detail(ltCodeIMDSv1),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		findings = append(findings, wave1Finding(ltCodeIMDSv1, domain.SevWarn))
 	}
 
 	// nil Encrypted is UNKNOWN, not unencrypted — never flag nil. Only an
 	// explicit Encrypted=false fires; one mapping is enough to flag the row.
 	for _, bdm := range data.BlockDeviceMappings {
 		if bdm.Ebs != nil && bdm.Ebs.Encrypted != nil && !*bdm.Ebs.Encrypted {
-			findings = append(findings, domain.Finding{
-				Code:     ltCodeUnencrypted,
-				Phrase:   "EBS encryption disabled",
-				Detail:   catalog.Detail(ltCodeUnencrypted),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			})
+			findings = append(findings, wave1Finding(ltCodeUnencrypted, domain.SevWarn))
 			break
 		}
 	}

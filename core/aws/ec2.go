@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -161,58 +160,32 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 	// Healthy ("running") has no Finding.
 	switch state {
 	case "pending":
-		r.Findings = []domain.Finding{{
-			Code: CodeEC2StatePending, Phrase: "pending",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StatePending, domain.SevWarn)}
 	case "shutting-down":
-		r.Findings = []domain.Finding{{
-			Code: CodeEC2StateShuttingDown, Phrase: "shutting down",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateShuttingDown, domain.SevWarn)}
 	case "stopping":
-		r.Findings = []domain.Finding{{
-			Code: CodeEC2StateStopping, Phrase: "stopping",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopping, domain.SevWarn)}
 	case "stopped":
 		if strings.HasPrefix(stateReasonCode, "Server.") {
-			r.Findings = []domain.Finding{{
-				Code: CodeEC2StateStoppedServer, Phrase: "stopped",
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStoppedServer, domain.SevBroken)}
 		} else {
-			r.Findings = []domain.Finding{{
-				Code: CodeEC2StateStopped, Phrase: "stopped",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopped, domain.SevWarn)}
 		}
 	case "terminated":
-		r.Findings = []domain.Finding{{
-			Code: CodeEC2StateTerminated, Phrase: "terminated",
-			Severity: domain.SevDim, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateTerminated, domain.SevDim)}
 	}
 
 	// Posture signals. Independently evaluated and appended, so an instance
 	// that is both IMDSv1-permissive and publicly addressed carries both.
 	if !ec2InstanceGone(state) {
 		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code: CodeEC2IMDSv1Allowed, Phrase: "IMDSv1 allowed",
-				Detail:   catalog.Detail(CodeEC2IMDSv1Allowed),
-				Severity: domain.SevWarn, Source: "wave1",
-			})
+			r.Findings = append(r.Findings, wave1Finding(CodeEC2IMDSv1Allowed, domain.SevWarn))
 			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
 				Label: "Metadata tokens", Value: "optional", Tier: "~",
 			})
 		}
 		if publicIP != "" {
-			r.Findings = append(r.Findings, domain.Finding{
-				Code: CodeEC2PublicIP, Phrase: "public address",
-				Detail:   catalog.Detail(CodeEC2PublicIP),
-				Severity: domain.SevWarn, Source: "wave1",
-			})
+			r.Findings = append(r.Findings, wave1Finding(CodeEC2PublicIP, domain.SevWarn))
 			addWave1Rows(&r, CodeEC2PublicIP, domain.DetailRow{
 				Label: "Public address", Value: publicIP, Tier: "~",
 			})

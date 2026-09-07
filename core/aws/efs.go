@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -25,17 +24,17 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 
 	switch lcs {
 	case efstypes.LifeCycleStateError:
-		findings = append(findings, domain.Finding{Code: CodeEFSError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeEFSError, domain.SevBroken))
 	case efstypes.LifeCycleStateCreating:
-		findings = append(findings, domain.Finding{Code: CodeEFSCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeEFSCreating, domain.SevWarn))
 	case efstypes.LifeCycleStateUpdating:
-		findings = append(findings, domain.Finding{Code: CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeEFSUpdating, domain.SevWarn))
 	case efstypes.LifeCycleStateDeleting:
-		findings = append(findings, domain.Finding{Code: CodeEFSDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"})
+		findings = append(findings, wave1Finding(CodeEFSDeleting, domain.SevWarn))
 	}
 
 	if numMT == 0 && lcs != efstypes.LifeCycleStateDeleted {
-		noMTFinding := domain.Finding{Code: CodeEFSNoMountTargets, Phrase: "no mount targets", Severity: domain.SevBroken, Source: "wave1"}
+		noMTFinding := wave1Finding(CodeEFSNoMountTargets, domain.SevBroken)
 		if len(findings) > 0 && findings[0].Code == CodeEFSError {
 			findings = append([]domain.Finding{findings[0], noMTFinding}, findings[1:]...)
 		} else {
@@ -49,17 +48,11 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 	if aws.ToBool(encrypted) {
 		return findings, nil
 	}
-	return append(findings, domain.Finding{
-			Code:     CodeEFSUnencrypted,
-			Phrase:   "not encrypted",
-			Detail:   catalog.Detail(CodeEFSUnencrypted),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		}), map[domain.FindingCode]domain.AttentionDetail{
-			CodeEFSUnencrypted: {Rows: []domain.DetailRow{
-				{Label: "Encryption at rest", Value: "off", Tier: "~"},
-			}},
-		}
+	return append(findings, wave1Finding(CodeEFSUnencrypted, domain.SevWarn)), map[domain.FindingCode]domain.AttentionDetail{
+		CodeEFSUnencrypted: {Rows: []domain.DetailRow{
+			{Label: "Encryption at rest", Value: "off", Tier: "~"},
+		}},
+	}
 }
 
 // FetchEFSFileSystemsPage fetches a single page of EFS file systems.

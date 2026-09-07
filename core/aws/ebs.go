@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -299,15 +298,9 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	// error / recoverable / recovering → SevBroken.
 	switch snap.State {
 	case ec2types.SnapshotStatePending:
-		r.Findings = []domain.Finding{{
-			Code: CodeEBSSnapStatePending, Phrase: "pending",
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending, domain.SevWarn)}
 	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
-		r.Findings = []domain.Finding{{
-			Code: CodeEBSSnapStateError, Phrase: "error",
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateError, domain.SevBroken)}
 	}
 
 	if len(r.Findings) == 0 {
@@ -333,11 +326,7 @@ const ebsSnapAge = 365 * 24 * time.Hour
 // per-item helper does not have access to.
 func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	if snap.Encrypted == nil || !*snap.Encrypted {
-		return []domain.Finding{{
-			Code: CodeEBSSnapUnencrypted, Phrase: "unencrypted",
-			Detail:   catalog.Detail(CodeEBSSnapUnencrypted),
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeEBSSnapUnencrypted, domain.SevWarn)}
 	}
 	if snap.StartTime != nil {
 		if age := time.Since(*snap.StartTime); age > ebsSnapAge {
@@ -349,12 +338,7 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 				strings.Contains(strings.ToLower(desc), "automated")
 			if isAutomated {
 				days := int(age.Hours() / 24)
-				return []domain.Finding{{
-					Code:     CodeEBSSnapAgedAutomated,
-					Phrase:   "automated, " + strconv.Itoa(days) + "d old",
-					Detail:   catalog.Detail(CodeEBSSnapAgedAutomated),
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
+				return []domain.Finding{wave1Finding(CodeEBSSnapAgedAutomated, domain.SevWarn, strconv.Itoa(days))}
 			}
 		}
 	}
@@ -369,31 +353,22 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 func ebsFindings(state, attachedTo, created, encrypted string) []domain.Finding {
 	switch state {
 	case "creating":
-		return []domain.Finding{{Code: CodeEBSStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeEBSStateCreating), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBSStateCreating, domain.SevWarn)}
 	case "deleting":
-		return []domain.Finding{{Code: CodeEBSStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeEBSStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBSStateDeleting, domain.SevWarn)}
 	case "error":
-		return []domain.Finding{{Code: CodeEBSStateError, Phrase: "error", Detail: catalog.Detail(CodeEBSStateError), Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeEBSStateError, domain.SevBroken)}
 	}
 	if state == "available" && attachedTo == "" {
 		if t, err := time.Parse("2006-01-02 15:04", created); err == nil {
 			if age := time.Since(t); age > ebsOrphanAge {
 				days := int(age.Hours() / 24)
-				return []domain.Finding{{
-					Code:     CodeEBSOrphanUnattached,
-					Phrase:   "orphan: unattached " + strconv.Itoa(days) + "d",
-					Detail:   catalog.Detail(CodeEBSOrphanUnattached),
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
+				return []domain.Finding{wave1Finding(CodeEBSOrphanUnattached, domain.SevWarn, strconv.Itoa(days))}
 			}
 		}
 	}
 	if encrypted == "false" {
-		return []domain.Finding{{
-			Code: CodeEBSUnencrypted, Phrase: "unencrypted",
-			Detail:   catalog.Detail(CodeEBSUnencrypted),
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeEBSUnencrypted, domain.SevWarn)}
 	}
 	return nil
 }

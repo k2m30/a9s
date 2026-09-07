@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -139,22 +138,16 @@ func subnetFindings(state, autoPublicIP string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "pending":
-		findings = []domain.Finding{{Code: CodeSubnetStatePending, Phrase: "pending", Detail: catalog.Detail(CodeSubnetStatePending), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStatePending, domain.SevWarn)}
 	case "unavailable":
-		findings = []domain.Finding{{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Detail: catalog.Detail(CodeSubnetStateUnavailable), Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStateUnavailable, domain.SevBroken)}
 	case "failed":
-		findings = []domain.Finding{{Code: CodeSubnetStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeSubnetStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailed, domain.SevBroken)}
 	case "failed-insufficient-capacity":
-		findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Detail: catalog.Detail(CodeSubnetStateFailedInsufficientCapacity), Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailedInsufficientCapacity, domain.SevBroken)}
 	}
 	if autoPublicIP == "yes" {
-		findings = append(findings, domain.Finding{
-			Code:     CodeSubnetAutoPublicIP,
-			Phrase:   SubnetAutoPublicIPPhrase,
-			Detail:   catalog.Detail(CodeSubnetAutoPublicIP),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeSubnetAutoPublicIP, domain.SevWarn))
 	}
 	return findings
 }

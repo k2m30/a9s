@@ -128,16 +128,13 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 				// Check stop code for known failure modes.
 				switch task.StopCode {
-				case ecstypes.TaskStopCodeTaskFailedToStart:
+				case ecstypes.TaskStopCodeTaskFailedToStart, ecstypes.TaskStopCodeEssentialContainerExited:
+					// The plain-English reading of the stop code is the
+					// finding's phrase; the row is where the identifier
+					// itself is stated, once.
 					rows = append(rows, domain.DetailRow{
 						Label: "Stop Code",
-						Value: "TaskFailedToStart — task never launched",
-						Tier:  "!",
-					})
-				case ecstypes.TaskStopCodeEssentialContainerExited:
-					rows = append(rows, domain.DetailRow{
-						Label: "Stop Code",
-						Value: "EssentialContainerExited — essential container died",
+						Value: string(task.StopCode),
 						Tier:  "!",
 					})
 				}

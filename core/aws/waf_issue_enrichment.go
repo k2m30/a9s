@@ -22,6 +22,7 @@ import (
 const (
 	wafCodeNoLogging domain.FindingCode = "waf.no-logging"
 	wafCodeNoRules   domain.FindingCode = "waf.no-rules"
+	wafCodeOrphan    domain.FindingCode = "waf.orphan"
 )
 
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
@@ -29,7 +30,8 @@ const (
 //   - GetLoggingConfiguration returns WAFNonexistentItemException → "~" finding
 //     "no logging configuration"
 //   - ListResourcesForWebACL returns empty ResourceArns → "~" finding
-//     "WebACL not associated with any resources (orphan)"
+//     "not associated with any resource" (waf.orphan — a separate condition
+//     from the logging one, and separately worded)
 //
 // Also writes FieldUpdates["rules_summary"] = "<N> rules BLOCK" or "0 rules ALLOW".
 // Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) are
@@ -60,7 +62,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		total++
 		mu.Unlock()
-		var rows []domain.DetailRow
+		var loggingRows, orphanRows []domain.DetailRow
 
 		// Check logging configuration.
 		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetLoggingConfigurationOutput, error) {
@@ -70,7 +72,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		})
 		if err != nil {
 			if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-				rows = append(rows, domain.DetailRow{
+				loggingRows = append(loggingRows, domain.DetailRow{
 					Label: "Logging",
 					Value: "off",
 					Tier:  "~",
@@ -97,9 +99,9 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			return
 		}
 		if len(assocOut.ResourceArns) == 0 {
-			rows = append(rows, domain.DetailRow{
+			orphanRows = append(orphanRows, domain.DetailRow{
 				Label: "Associations",
-				Value: "WebACL not associated with any resources (orphan)",
+				Value: "none",
 				Tier:  "~",
 			})
 		}
@@ -150,10 +152,12 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 
 		}
 
-		if len(rows) == 0 {
-			return
+		if len(loggingRows) > 0 {
+			setWave2Finding(&result, r.ID, wafCodeNoLogging, catalog.Phrase(wafCodeNoLogging), "~", "waf", loggingRows)
 		}
-		setWave2Finding(&result, r.ID, wafCodeNoLogging, catalog.Phrase(wafCodeNoLogging), "~", "waf", rows)
+		if len(orphanRows) > 0 {
+			setWave2Finding(&result, r.ID, wafCodeOrphan, catalog.Phrase(wafCodeOrphan), "~", "waf", orphanRows)
+		}
 	})
 
 	// All WAF logging findings are severity "~" (informational).

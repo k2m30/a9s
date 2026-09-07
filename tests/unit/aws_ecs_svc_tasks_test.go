@@ -246,7 +246,11 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		// The stop code is what makes this row actionable, so it is a finding
 		// rather than a field the reader has to open the row to see. A task
 		// stopped by anything other than a person is broken.
-		if len(r.Findings) != 1 || r.Findings[0].Phrase != "stopped: EssentialContainerExited" {
+		// Inverted for the spec row on the stop-code phrase: the phrase now
+		// reads the stop code in plain English and the identifier itself is
+		// stated once, in the finding's supporting row. Do not restore the
+		// raw-identifier assertion.
+		if len(r.Findings) != 1 || r.Findings[0].Phrase != "stopped: essential container exited" {
 			t.Errorf("Findings = %+v, want one stop-code finding", r.Findings)
 		}
 	})

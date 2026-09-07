@@ -17,13 +17,13 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -111,13 +111,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 
 	var findings []domain.Finding
 	if agreement.Status == transfertypes.AgreementStatusTypeInactive {
-		findings = append(findings, domain.Finding{
-			Code:     transferCodeAgreementInactive,
-			Phrase:   "inactive: partner traffic rejected",
-			Detail:   catalog.Detail(transferCodeAgreementInactive),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		findings = append(findings, wave1Finding(transferCodeAgreementInactive, domain.SevWarn))
 	}
 
 	return resource.Resource{
@@ -247,21 +241,14 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 		expired = true
 	}
 	if expired {
-		return domain.Finding{
-			Code:     transferCodeCertExpired,
-			Phrase:   "expired",
-			Detail:   catalog.Detail(transferCodeCertExpired),
-			Severity: domain.SevBroken,
-			Source:   "wave1",
-		}, true
+		return wave1Finding(transferCodeCertExpired, domain.SevBroken), true
 	}
 
 	if cert.InactiveDate != nil {
 		remaining := time.Until(*cert.InactiveDate)
 		if remaining > 0 && remaining <= transferCertExpiringWindow {
 			days := int(remaining.Hours() / 24)
-			return wave1Finding(transferCodeCertExpiring,
-				fmt.Sprintf("expires in %dd", days), domain.SevWarn), true
+			return wave1Finding(transferCodeCertExpiring, domain.SevWarn, strconv.Itoa(days)), true
 		}
 	}
 	return domain.Finding{}, false

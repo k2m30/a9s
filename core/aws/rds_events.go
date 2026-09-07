@@ -128,13 +128,13 @@ func dbiEventFindings(categories []string) []domain.Finding {
 
 	switch {
 	case has("failure"):
-		return []domain.Finding{{Code: CodeDBIEventFailure, Phrase: "failure", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeDBIEventFailure, domain.SevBroken)}
 	case has("low storage"):
-		return []domain.Finding{{Code: CodeDBIEventLowStorage, Phrase: "low storage", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeDBIEventLowStorage, domain.SevBroken)}
 	case has("failover"):
-		return []domain.Finding{{Code: CodeDBIEventFailover, Phrase: "failover", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeDBIEventFailover, domain.SevWarn)}
 	case has("recovery"):
-		return []domain.Finding{{Code: CodeDBIEventRecovery, Phrase: "recovery", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeDBIEventRecovery, domain.SevWarn)}
 	}
 	return nil
 }

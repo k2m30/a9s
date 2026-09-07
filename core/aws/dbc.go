@@ -173,19 +173,14 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 		"inaccessible-encryption-credentials": CodeDBCEncryptionKeyUnreachable,
 		"incompatible-parameters":             CodeDBCIncompatibleParameters,
 	}
-	brokenPhrase := map[string]string{
-		"failed":                              "failed: cluster operation",
-		"inaccessible-encryption-credentials": "encryption key unreachable",
-		"incompatible-parameters":             "parameter group incompatible",
-	}
 	if code, ok := brokenCode[status]; ok {
-		lead := []domain.Finding{{Code: code, Phrase: brokenPhrase[status], Severity: domain.SevBroken, Source: "wave1"}}
+		lead := []domain.Finding{wave1Finding(code, domain.SevBroken)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
 	// No writer on an available cluster — reads only (Broken; beats warnings).
 	if status == "available" && countWriters(cluster.DBClusterMembers) == 0 {
-		lead := []domain.Finding{{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1"}}
+		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter, domain.SevBroken)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
@@ -196,8 +191,7 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 
 	// Transitional statuses.
 	if _, ok := transitionalDBCStatusSet[status]; ok {
-		phrase := status + ": in progress"
-		lead := []domain.Finding{{Code: CodeDBCTransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, domain.SevWarn, status)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
@@ -205,19 +199,19 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 	if status == "available" {
 		var findings []domain.Finding
 		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
-			findings = append(findings, domain.Finding{Code: CodeDBCDeletionProtectionOff, Phrase: "delete-protection off", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff, domain.SevWarn))
 		}
 		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
-			findings = append(findings, domain.Finding{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest, domain.SevWarn))
 		}
 		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
-			findings = append(findings, domain.Finding{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"})
+			findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups, domain.SevWarn))
 		}
 		return append(findings, postureFindings...), postureDetails
 	}
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	lead := []domain.Finding{{Code: CodeDBCTransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
+	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, domain.SevWarn, status)}
 	return append(lead, postureFindings...), postureDetails
 }
 

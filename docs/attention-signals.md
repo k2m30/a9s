@@ -119,7 +119,7 @@ conditions no code emits are lines under "Not yet implemented".
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.stopping` | stopping | warn | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.deprovisioning` | deprovisioning | warn | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.stopped` | stopped | dim | — |
-| `ecs-task` | ECS Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <stop code> | broken | — |
+| `ecs-task` | ECS Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <reason> | broken | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.health.unhealthy` | unhealthy | broken | — |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.task-failed` | task failed | broken | — |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.privileged` | privileged container | broken | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |
@@ -163,7 +163,7 @@ conditions no code emits are lines under "Not yet implemented".
 | `ebs-snap` | EBS Snapshots | wave2 | `ebs-snap.public` | shared with all AWS accounts | broken | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the `all` group. |
 | `ami` | AMIs | wave1 | `ami.state.pending` | pending | warn | — |
 | `ami` | AMIs | wave1 | `ami.state.failed` | failed | broken | — |
-| `ami` | AMIs | wave1 | `ami.state.dim` | deregistered | dim | — |
+| `ami` | AMIs | wave1 | `ami.state.dim` | <image state> | dim | — |
 | `ami` | AMIs | wave1 | `ami.deprecated` | deprecated | warn | The deprecation date has passed — AWS no longer recommends this AMI for new launches. |
 | `ami` | AMIs | wave1 | `ami.public` | shared with all AWS accounts | broken | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
 | `lt` | Launch Templates | wave1 | `lt.warn.imdsv1` | IMDSv1 allowed | warn | Instance metadata does not require session tokens; IMDSv1 credentials are exposed to SSRF. |
@@ -565,6 +565,7 @@ conditions no code emits are lines under "Not yet implemented".
 | `iam-user` | IAM Users | wave2 | `iam-user.two-active-keys` | two active access keys | warn | This user has both of its access-key slots active at once, which doubles the exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use. |
 | `iam-group` | IAM Groups | wave2 | `iam-group.orphan-or-noop` | no members or no policies | warn | This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for. |
 | `iam-group` | IAM Groups | wave2 | `iam-group.admin-attached` | has an administrator policy | warn | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
+| `waf` | WAF Web ACLs | wave2 | `waf.orphan` | not associated with any resource | warn | This web ACL is not attached to any load balancer, gateway stage or distribution, so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it. |
 | `waf` | WAF Web ACLs | wave2 | `waf.no-logging` | no logging configuration | warn | This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group. |
 | `waf` | WAF Web ACLs | wave2 | `waf.no-rules` | web ACL has no rules | warn | This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
 
@@ -659,7 +660,7 @@ conditions no code emits are lines under "Not yet implemented".
 | `ecs_svc_logs` | Service Logs | wave1 | `log-event.broken.error` | error | broken | — |
 | `ecs_svc_logs` | Service Logs | wave1 | `log-event.warn.warning` | warning | warn | — |
 | `ecs_tasks` | Service Tasks | wave1 | `ecs-task.health.unhealthy` | unhealthy | broken | — |
-| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <stop code> | broken | — |
+| `ecs_tasks` | Service Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <reason> | broken | — |
 | `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.stopped` | stopped | dim | — |
 | `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.provisioning` | provisioning | warn | — |
 | `ecs_tasks` | Service Tasks | wave1 | `ecs-task.state.pending` | pending | warn | — |
@@ -690,6 +691,10 @@ conditions no code emits are lines under "Not yet implemented".
 | `sns_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.state.pending-confirmation` | endpoint has not confirmed the subscription | warn | — |
 | `sns_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.state.deleted` | endpoint deleted | dim | — |
 | `sns_subscriptions` | SNS Subscriptions | wave1 | `sns-sub.plain-http` | delivers over plain HTTP | warn | The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint. |
+| `tg_health` | Target Health | wave1 | `tg_health.state.unhealthy` | <health check reason> | broken | This target is failing the group's health check, so the load balancer has stopped sending it requests; the reason the check gave is the phrase. Fix the target or the check's path, port and matcher. |
+| `tg_health` | Target Health | wave1 | `tg_health.state.unavailable` | <health check reason> | warn | The load balancer cannot health-check this target at all, usually because a security group or network path blocks the check. Open the check's port from the load balancer to the target. |
+| `tg_health` | Target Health | wave1 | `tg_health.state.draining` | <health check reason> | warn | The target is deregistering and finishing the requests it already holds. It stops receiving new ones and leaves the group when the deregistration delay elapses. |
+| `tg_health` | Target Health | wave1 | `tg_health.state.initial` | <health check reason> | dim | The target has just registered and has not passed enough health checks to receive traffic yet. It becomes healthy once the configured threshold of consecutive successes is met. |
 | `transfer_agreements` | Agreements | wave1 | `transfer.warn.agreement_inactive` | inactive: partner traffic rejected | warn | Agreement is inactive; partner traffic is rejected. |
 | `transfer_agreements` | Agreements | wave1 | `transfer.broken.cert_expired` | expired | broken | The certificate has expired, so partner connections that present or verify it now fail. Import a renewed certificate and point the profile at it. |
 | `transfer_agreements` | Agreements | wave1 | `transfer.warn.cert_expiring` | expires in <N>d | warn | The certificate expires soon; once it does, partner connections that present or verify it will fail. Import a renewed certificate before the inactive date. |

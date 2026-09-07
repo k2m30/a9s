@@ -230,13 +230,17 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
-	if want := catalog.Phrase("waf.no-logging"); f.Phrase != want {
+	// Inverted for the spec row that split waf.no-logging in two: an ACL that
+	// is attached to nothing is not a logging gap, and it now carries its own
+	// code and its own wording. Do not restore the waf.no-logging assertion.
+	if f.Code != "waf.orphan" {
+		t.Errorf("Code = %q, want waf.orphan", f.Code)
+	}
+	if want := catalog.Phrase("waf.orphan"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
-	if rows := fmt.Sprintf("%v", result.AttentionDetails[wafACLARN1]["waf.no-logging"].Rows); !strings.Contains(strings.ToLower(rows), "not associated") {
-		t.Errorf("no supporting row names the orphaned ACL: %s", rows)
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[wafACLARN1]["waf.orphan"].Rows); !strings.Contains(rows, "Associations") {
+		t.Errorf("no supporting row names the missing associations: %s", rows)
 	}
 	if _, ok := result.Findings[wafACLARN2]; ok {
 		t.Error("acl-2 must NOT appear in Findings — it is associated with a resource")

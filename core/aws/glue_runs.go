@@ -21,23 +21,23 @@ import (
 func glueRunFindings(state gluetypes.JobRunState) []domain.Finding {
 	switch state {
 	case gluetypes.JobRunStateFailed:
-		return []domain.Finding{{Code: CodeGlueRunFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunFailed, domain.SevBroken)}
 	case gluetypes.JobRunStateTimeout:
-		return []domain.Finding{{Code: CodeGlueRunTimeout, Phrase: "timeout", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunTimeout, domain.SevBroken)}
 	case gluetypes.JobRunStateError:
-		return []domain.Finding{{Code: CodeGlueRunError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunError, domain.SevBroken)}
 	case gluetypes.JobRunStateExpired:
-		return []domain.Finding{{Code: CodeGlueRunExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunExpired, domain.SevBroken)}
 	case gluetypes.JobRunStateRunning:
-		return []domain.Finding{{Code: CodeGlueRunRunning, Phrase: "running", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunRunning, domain.SevWarn)}
 	case gluetypes.JobRunStateStarting:
-		return []domain.Finding{{Code: CodeGlueRunStarting, Phrase: "starting", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunStarting, domain.SevWarn)}
 	case gluetypes.JobRunStateStopping:
-		return []domain.Finding{{Code: CodeGlueRunStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunStopping, domain.SevWarn)}
 	case gluetypes.JobRunStateWaiting:
-		return []domain.Finding{{Code: CodeGlueRunWaiting, Phrase: "waiting", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunWaiting, domain.SevWarn)}
 	case gluetypes.JobRunStateStopped:
-		return []domain.Finding{{Code: CodeGlueRunStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeGlueRunStopped, domain.SevDim)}
 	}
 	return nil
 }

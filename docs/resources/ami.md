@@ -121,14 +121,14 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `State == pending` or `transient` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
 | `State == failed / error / invalid` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
-| `State == deregistered` | 1 | Dim | n/a | S2, S4 | `deregistered` |
+| `State == deregistered` or `disabled` | 1 | Dim | n/a | S2, S4 | `<image state>` |
 | `DeprecationTime < now()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deprecated` |
 | `Public == true` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |
 | Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` |
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows carry a cause next to the AMI name — `failed`, `deprecated`, `shared with all AWS accounts`, or the dim `deregistered` keyword — so the operator can triage (re-register, re-create, or rotate to a newer AMI) straight from the list without pressing detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows carry a cause next to the AMI name — `failed`, `deprecated`, `shared with all AWS accounts`, or the dim `<image state>` keyword naming the terminal state — so the operator can triage (re-register, re-create, or rotate to a newer AMI) straight from the list without pressing detail.
 
 ## 5. Out of Scope
 
@@ -166,7 +166,7 @@ ami — COMPUTE. Lifecycle key: `state`.
 | --- | --- | --- | --- | --- |
 | ami.state.pending | pending | warn | wave1 | — |
 | ami.state.failed | failed | broken | wave1 | — |
-| ami.state.dim | deregistered | dim | wave1 | — |
+| ami.state.dim | <image state> | dim | wave1 | — |
 | ami.deprecated | deprecated | warn | wave1 | The deprecation date has passed — AWS no longer recommends this AMI for new launches. |
 | ami.public | shared with all AWS accounts | broken | wave1 | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
 <!-- END GENERATED: findings -->

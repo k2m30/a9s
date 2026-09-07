@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -55,30 +54,12 @@ func logsGroupFindings(retention, storedBytes, creationTime, encryption string) 
 	var out []domain.Finding
 	switch {
 	case retention == logsRetentionNeverExpires:
-		out = append(out, domain.Finding{
-			Code:     logsCodeRetentionNeverExpire,
-			Phrase:   "retention: never expire",
-			Detail:   catalog.Detail(logsCodeRetentionNeverExpire),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		out = append(out, wave1Finding(logsCodeRetentionNeverExpire, domain.SevWarn))
 	case storedBytes == "0 B" && olderThan(creationTime, logsStaleEmptyAge):
-		out = append(out, domain.Finding{
-			Code:     logsCodeStaleEmpty,
-			Phrase:   "empty, created over 90 days ago",
-			Detail:   catalog.Detail(logsCodeStaleEmpty),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		out = append(out, wave1Finding(logsCodeStaleEmpty, domain.SevWarn))
 	}
 	if encryption == logsEncryptionNone {
-		out = append(out, domain.Finding{
-			Code:     CodeLogsNoKMS,
-			Phrase:   "not encrypted with KMS",
-			Detail:   catalog.Detail(CodeLogsNoKMS),
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		})
+		out = append(out, wave1Finding(CodeLogsNoKMS, domain.SevWarn))
 	}
 	return out
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -30,10 +29,7 @@ func r53ZoneFindings(recordCount string) []domain.Finding {
 		return nil
 	}
 	// Two or fewer records means only the default NS+SOA remain.
-	return []domain.Finding{{
-		Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain",
-		Detail: catalog.Detail(r53CodeUnusedZone), Severity: domain.SevWarn, Source: "wave1",
-	}}
+	return []domain.Finding{wave1Finding(r53CodeUnusedZone, domain.SevWarn)}
 }
 
 // FetchHostedZonesPage fetches a single page of Route53 hosted zones.

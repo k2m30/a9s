@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -119,15 +118,15 @@ func cfnStackFindings(status string) []domain.Finding {
 	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
 		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
 		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
-		return []domain.Finding{wave1Finding(CodeCFNStackRollback, cfnStatusWords(status), domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeCFNStackRollback, domain.SevBroken, cfnStatusWords(status))}
 	case "DELETE_COMPLETE":
-		return []domain.Finding{wave1Finding(CodeCFNStackDeleted, cfnStatusWords(status), domain.SevDim)}
+		return []domain.Finding{wave1Finding(CodeCFNStackDeleted, domain.SevDim, cfnStatusWords(status))}
 	}
 	if strings.HasSuffix(status, "_FAILED") {
-		return []domain.Finding{wave1Finding(CodeCFNStackFailed, cfnStatusWords(status), domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeCFNStackFailed, domain.SevBroken, cfnStatusWords(status))}
 	}
 	if strings.HasSuffix(status, "_IN_PROGRESS") {
-		return []domain.Finding{wave1Finding(CodeCFNStackInProgress, cfnStatusWords(status), domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeCFNStackInProgress, domain.SevWarn, cfnStatusWords(status))}
 	}
 	return nil
 }
@@ -188,16 +187,10 @@ func cfnStackOutputs(stack cfntypes.Stack) map[string]string {
 func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
 	var out []domain.Finding
 	if protection == cfnProtectionOff {
-		out = append(out, domain.Finding{
-			Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off",
-			Detail: catalog.Detail(CodeCFNTerminationProtectionOff), Severity: domain.SevWarn, Source: "wave1",
-		})
+		out = append(out, wave1Finding(CodeCFNTerminationProtectionOff, domain.SevWarn))
 	}
 	if outputSecret == cfnOutputSecretPresent {
-		out = append(out, domain.Finding{
-			Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs",
-			Detail: catalog.Detail(CodeCFNOutputSecret), Severity: domain.SevBroken, Source: "wave1",
-		})
+		out = append(out, wave1Finding(CodeCFNOutputSecret, domain.SevBroken))
 	}
 	return out
 }

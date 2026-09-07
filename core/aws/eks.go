@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -331,28 +330,16 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 		if p.PublicEndpoint == eksEndpointOpen {
 			severity = domain.SevBroken
 		}
-		findings = append(findings, domain.Finding{
-			Code: CodeEKSPublicEndpoint, Phrase: "cluster endpoint reachable from the internet",
-			Detail: catalog.Detail(CodeEKSPublicEndpoint), Severity: severity, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeEKSPublicEndpoint, severity))
 	}
 	if p.ControlPlaneLogging == eksLoggingIncomplete {
-		findings = append(findings, domain.Finding{
-			Code: CodeEKSControlPlaneLoggingOff, Phrase: "control plane logging incomplete",
-			Detail: catalog.Detail(CodeEKSControlPlaneLoggingOff), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeEKSControlPlaneLoggingOff, domain.SevWarn))
 	}
 	if p.SecretsEncryption == eksSecretsNone {
-		findings = append(findings, domain.Finding{
-			Code: CodeEKSSecretsNotKMS, Phrase: "secrets not encrypted with KMS",
-			Detail: catalog.Detail(CodeEKSSecretsNotKMS), Severity: domain.SevWarn, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeEKSSecretsNotKMS, domain.SevWarn))
 	}
 	if p.VersionSupport == eksSupportEnded {
-		findings = append(findings, domain.Finding{
-			Code: CodeEKSVersionUnsupported, Phrase: "Kubernetes " + version + " is out of standard support",
-			Detail: catalog.Detail(CodeEKSVersionUnsupported), Severity: domain.SevBroken, Source: "wave1",
-		})
+		findings = append(findings, wave1Finding(CodeEKSVersionUnsupported, domain.SevBroken, version))
 	}
 	return findings
 }
@@ -401,13 +388,13 @@ func eksClusterFindings(status string, healthIssuesCount int, issueCodes []strin
 		f, r := healthIssueFinding(CodeEKSStateFailed, issueCodes)
 		findings, rows = []domain.Finding{f}, r
 	case string(ekstypes.ClusterStatusCreating):
-		findings = []domain.Finding{{Code: CodeEKSStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeEKSStateCreating), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeEKSStateCreating, domain.SevWarn)}
 	case string(ekstypes.ClusterStatusUpdating):
-		findings = []domain.Finding{{Code: CodeEKSStateUpdating, Phrase: "updating", Detail: catalog.Detail(CodeEKSStateUpdating), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeEKSStateUpdating, domain.SevWarn)}
 	case string(ekstypes.ClusterStatusDeleting):
-		findings = []domain.Finding{{Code: CodeEKSStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeEKSStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeEKSStateDeleting, domain.SevWarn)}
 	case string(ekstypes.ClusterStatusPending):
-		findings = []domain.Finding{{Code: CodeEKSStatePending, Phrase: "pending", Detail: catalog.Detail(CodeEKSStatePending), Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{wave1Finding(CodeEKSStatePending, domain.SevWarn)}
 	default:
 		if healthIssuesCount > 0 {
 			f, r := healthIssueFindingSev(CodeEKSHealthIssue, issueCodes, domain.SevWarn)

@@ -118,42 +118,24 @@ func FetchLambdaFunctionsPageWithEventSources(
 		// deprecated runtime, then lifecycle state, then no-DLQ fallback.
 		switch {
 		case fn.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed:
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply",
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaLastUpdateFailed, domain.SevBroken)}
 		case isDeprecatedLambdaRuntime(runtime):
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaDeprecatedRuntime, Phrase: "runtime is end-of-life",
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaDeprecatedRuntime, domain.SevBroken)}
 		case fn.State == lambdatypes.StatePending:
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaStatePending, Phrase: "pending",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStatePending, domain.SevWarn)}
 		case fn.State == lambdatypes.StateFailed:
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaStateFailed, Phrase: "failed",
-				Severity: domain.SevBroken, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStateFailed, domain.SevBroken)}
 		case fn.State == lambdatypes.StateInactive:
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time",
-				Severity: domain.SevDim, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaInactive, domain.SevDim)}
 		case dlqTargetARN == "":
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaNoDLQ, domain.SevWarn)}
 		}
 
 		// Independent of the lifecycle switch above: ListFunctions already
 		// carries the environment, so a pasted credential is readable in
 		// Wave 1 and colours the row on its own.
 		if fn.Environment != nil {
-			addSecretScanFinding(&r, CodeLambdaEnvSecret, "credential in environment variables", fn.Environment.Variables)
+			addSecretScanFinding(&r, CodeLambdaEnvSecret, fn.Environment.Variables)
 		}
 
 		resources = append(resources, r)
