@@ -14,10 +14,11 @@ import (
 // support.
 //
 // A word the fetcher always writes is absent only on a row built outside it, so
-// absent means unknown, never bad. This pins that for every word a converted
-// classifier reads, and the shape takes a second type by adding a row to the
-// table — cfn's termination-protection and output-secret words land here when
-// the late group converts it.
+// absent means unknown, never bad. The same is true of a word the fetcher never
+// writes: a stale cache entry or a later spelling is unknown, not bad, so an arm
+// has to match the values it recognises rather than exclude the good one. This
+// pins both for every word a converted classifier reads, and takes another type
+// by adding a row to the table.
 
 // w29PostureWords is the derived-word vocabulary each converted classifier
 // reads back out of Fields: the lifecycle fields that put the row in its
@@ -28,10 +29,6 @@ var w29PostureWords = []struct { //nolint:gochecknoglobals // test-only table
 	words   map[string]string
 	allBad  map[string]string
 	wantBad resource.Color
-	// openVocabulary are words whose bad set is open by design, so "not the
-	// good value" is the honest arm and an unrecognised token cannot be told
-	// from a real one. They sit outside the unknown-token sweep.
-	openVocabulary map[string]string
 }{
 	{
 		short:   "cfn",
@@ -43,6 +40,22 @@ var w29PostureWords = []struct { //nolint:gochecknoglobals // test-only table
 		allBad: map[string]string{
 			"termination_protection": "off",
 			"output_secret":          "yes",
+		},
+		wantBad: resource.ColorBroken,
+	},
+	{
+		short: "acm",
+		// A certificate not in use is an orphan whatever its key is, so the
+		// lifecycle half of the row has to say it is attached before the words
+		// can be read on their own.
+		healthy: map[string]string{"in_use": "true"},
+		words: map[string]string{
+			"status":        "issued",
+			"key_algorithm": "RSA 2048",
+		},
+		allBad: map[string]string{
+			"status":        "revoked",
+			"key_algorithm": "RSA 1024",
 		},
 		wantBad: resource.ColorBroken,
 	},
@@ -72,13 +85,9 @@ var w29PostureWords = []struct { //nolint:gochecknoglobals // test-only table
 			"public_endpoint":       "open",
 			"control_plane_logging": "incomplete",
 			"secrets_encryption":    "none",
-			"version_support":       "extended support",
+			"version_support":       "out of standard support",
 		},
 		wantBad: resource.ColorBroken,
-		openVocabulary: map[string]string{
-			"version_support": "the catalogue names every status that is not standard support, " +
-				"so the arm cannot enumerate the bad ones",
-		},
 	},
 }
 
@@ -90,8 +99,29 @@ func TestW29_AbsentWordIsUnknownNotBad(t *testing.T) {
 				t.Fatalf("%s not registered", tc.short)
 			}
 
-			// The positive control. Without it every case below could pass
-			// because the classifier ignores the words entirely.
+			// The positive controls. Without them every case below could pass
+			// because the classifier ignores the words entirely. The first is
+			// per word, since a sweep that only ever sets them together proves
+			// nothing about the one word an arm stopped reading; what colour
+			// each word carries on its own is pinned by its type's own table,
+			// so the control only asks that the word moves the row off healthy.
+			for word, badValue := range tc.allBad {
+				fields := map[string]string{}
+				for k, v := range tc.healthy {
+					fields[k] = v
+				}
+				for k, v := range tc.words {
+					fields[k] = v
+				}
+				fields[word] = badValue
+				if got := td.ResolveColor(resource.Resource{ID: tc.short + "-probe", Fields: fields}); got == resource.ColorHealthy {
+					t.Fatalf("%q at %q leaves the row healthy; nothing reads that word, so the cases below prove nothing",
+						word, badValue)
+				}
+			}
+
+			// The second is every word at once, which is also where the worst
+			// of them has to win.
 			bad := map[string]string{}
 			for k, v := range tc.healthy {
 				bad[k] = v
@@ -100,8 +130,7 @@ func TestW29_AbsentWordIsUnknownNotBad(t *testing.T) {
 				bad[k] = v
 			}
 			if got := td.ResolveColor(resource.Resource{ID: tc.short + "-probe", Fields: bad}); got != tc.wantBad {
-				t.Fatalf("every word at its bad value = %v, want %v — the rest of this test would prove nothing",
-					got, tc.wantBad)
+				t.Fatalf("every word at its bad value = %v, want %v", got, tc.wantBad)
 			}
 
 			t.Run("no_fields_at_all", func(t *testing.T) {
@@ -119,9 +148,6 @@ func TestW29_AbsentWordIsUnknownNotBad(t *testing.T) {
 			// A word the fetcher never writes is unknown too. An arm that
 			// matches "not the good value" reads it as the bad one.
 			for unknown := range tc.words {
-				if _, open := tc.openVocabulary[unknown]; open {
-					continue
-				}
 				t.Run("unknown_"+unknown, func(t *testing.T) {
 					fields := map[string]string{}
 					for k, v := range tc.healthy {

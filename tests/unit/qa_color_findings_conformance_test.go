@@ -34,11 +34,11 @@
 // No exemption is carved out for "lifecycle dim without findings": the one
 // exported function in core/resource/severity_color.go (ColorFromSeverity)
 // defines no such carve-out, and colorFromAnyFinding's ok=false path (no
-// Finding present) returns (ColorHealthy, false), not Dim. Per-type helpers
-// like colorFallback / cfnStackColor / acmColor / r53Color in
-// core/aws/catalog_color_helpers.go are exactly the raw-field classifiers
-// this gate is designed to catch — they are not "the shared severity
-// functions" the owner's exemption clause refers to.
+// Finding present) returns (ColorHealthy, false), not Dim. A classifier that
+// reads a raw status word, such as colorFallback in
+// core/catalog/color_helpers.go, is exactly what this gate is designed to
+// catch — it is not one of "the shared severity functions" the owner's
+// exemption clause refers to.
 //
 // RATCHET semantics (identical contract to knownVisibilityGaps /
 // knownStateCoverageGaps):
