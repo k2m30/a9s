@@ -95,9 +95,9 @@ One row per §3 signal (Healthy case omitted per rule):
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Attachments[0].State == attaching` | 1 | Warning | n/a | S1, S2, S4 | `attaching` |
-| `Attachments[0].State == detaching` | 1 | Warning | n/a | S1, S2, S4 | `detaching` |
-| `len(Attachments) == 0` | 1 | Warning | n/a | S1, S2, S4 | `no VPC attachments` |
+| `Attachments[0].State == attaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `attaching` |
+| `Attachments[0].State == detaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `detaching` |
+| `len(Attachments) == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no VPC attachments` |
 | `Attachments[0].State == detached` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `detached: orphan gateway` |
 | IGW attached but VPC has no `0.0.0.0/0 → igw` route — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached but unused: no default route` |
 

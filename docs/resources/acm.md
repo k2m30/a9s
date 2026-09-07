@@ -136,16 +136,16 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == PENDING_VALIDATION` — emits `acm.status.pending-validation` | 1 | Warning | n/a | S1, S2, S4 | `pending validation` |
-| `Status == EXPIRED` — emits `acm.status.failed` | 1 | Broken | n/a | S1, S2, S4 | `expired` |
-| `Status == REVOKED` — emits `acm.status.failed` | 1 | Broken | n/a | S1, S2, S4 | `<status, in words>` |
-| `Status == FAILED` — emits `acm.status.failed` | 1 | Broken | n/a | S1, S2, S4 | `<status, in words>` |
-| `Status == VALIDATION_TIMED_OUT` — emits `acm.status.failed` | 1 | Broken | n/a | S1, S2, S4 | `<status, in words>` |
+| `Status == PENDING_VALIDATION` — emits `acm.status.pending-validation` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending validation` |
+| `Status == EXPIRED` — emits `acm.status.failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expired` |
+| `Status == REVOKED` — emits `acm.status.failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
+| `Status == FAILED` — emits `acm.status.failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
+| `Status == VALIDATION_TIMED_OUT` — emits `acm.status.failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
 | `Status == INACTIVE` — emits `acm.status.inactive` | 1 | Dim | n/a | S2, S4 | `inactive` |
-| `NotAfter within 30 days` | 1 | Warning | n/a | S1, S2, S4 | `expires in <N> days` |
-| `NotAfter within 7 days` | 1 | Broken | n/a | S1, S2, S4 | `expires in <N> days` |
-| `InUse == false on non-expired cert` | 1 | Warning | n/a | S1, S2, S4 | `certificate not in use (orphan)` |
-| `KeyAlgorithm` is RSA below 2048 bits | 1 | Warning | n/a | S1, S2, S4 | `weak key algorithm` |
+| `NotAfter within 30 days` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `expires in <N> days` |
+| `NotAfter within 7 days` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expires in <N> days` |
+| `InUse == false on non-expired cert` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `certificate not in use (orphan)` |
+| `KeyAlgorithm` is RSA below 2048 bits | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `weak key algorithm` |
 | `RenewalSummary.RenewalStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `auto-renewal failed` |
 | `DomainValidationOptions[].ValidationStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | n/a | S4, S5 | `validation failed: <domain>` |
 

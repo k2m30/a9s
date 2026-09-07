@@ -211,25 +211,25 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | n/a | S1, S2, S4 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | n/a | S1, S2, S4 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | n/a | S1, S2, S4 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | n/a | S1, S2, S4 | `stopped: <stop code>` |
-| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | n/a | S1, S2, S4 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <stop code>` |
 | `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped` |
-| `healthStatus==UNHEALTHY` | 1 | Broken | n/a | S1, S2, S4 | `unhealthy` |
-| `lastStatus == PROVISIONING` | 1 | Warning | n/a | S1, S2, S4 | `provisioning` |
-| `lastStatus == PENDING` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `lastStatus == ACTIVATING` | 1 | Warning | n/a | S1, S2, S4 | `activating` |
-| `lastStatus == DEACTIVATING` | 1 | Warning | n/a | S1, S2, S4 | `deactivating` |
-| `lastStatus == STOPPING` | 1 | Warning | n/a | S1, S2, S4 | `stopping` |
-| `lastStatus == DEPROVISIONING` | 1 | Warning | n/a | S1, S2, S4 | `deprovisioning` |
-| `ExitCode != 0` on an essential container of a stopped task | 2 | Broken | `!` | S1, S3, S4, S5 | `task failed` |
-| any container `privileged` (task definition) | 2 | Broken | `!` | S1, S3, S4, S5 | `privileged container` |
+| `healthStatus==UNHEALTHY` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unhealthy` |
+| `lastStatus == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
+| `lastStatus == PENDING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `lastStatus == ACTIVATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `activating` |
+| `lastStatus == DEACTIVATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deactivating` |
+| `lastStatus == STOPPING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stopping` |
+| `lastStatus == DEPROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deprovisioning` |
+| `ExitCode != 0` on an essential container of a stopped task | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `task failed` |
+| any container `privileged` (task definition) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `privileged container` |
 | `networkMode == host` or `pidMode == host` | 2 | Warning | `~` | S2, S3, S4, S5 | `shares the host network or process namespace` |
 | any container without `readonlyRootFilesystem` | 2 | Warning | `~` | S2, S3, S4, S5 | `writable root filesystem` |
 | any container without `logConfiguration` | 2 | Warning | `~` | S2, S3, S4, S5 | `container without log driver` |
-| credential in a container `environment[]` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in container environment` |
+| credential in a container `environment[]` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in container environment` |
 
 Rules for filling list and detail text:
 

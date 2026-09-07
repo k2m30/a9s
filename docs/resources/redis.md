@@ -180,20 +180,20 @@ Badge aggregation for `redis`: Wave 1 issue-colored rows only — this type regi
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating — new group` |
-| `Status == modifying` (single-shard) | 1 | Warning | n/a | S1, S2, S4 | `modifying — config change` |
-| `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S1, S2, S4 | `snapshotting — backup running` |
-| `Status == deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting — teardown` |
-| `Status == create-failed` | 1 | Broken | n/a | S1, S2, S4 | `create failed — see events` |
-| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S1, S2, S4 | `multi-AZ without auto-failover` |
-| `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S1, S2, S4, S5 | `encryption at rest off` |
-| `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S1, S2, S4, S5 | `encryption in transit off` |
-| `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | n/a | S1, S2, S4, S5 | `no authentication token` |
-| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | n/a | S1, S2, S4, S5 | `automatic backups off` |
+| `Status == creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating — new group` |
+| `Status == modifying` (single-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying — config change` |
+| `Status == snapshotting` (single-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `snapshotting — backup running` |
+| `Status == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting — teardown` |
+| `Status == create-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `create failed — see events` |
+| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `multi-AZ without auto-failover` |
+| `AtRestEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
+| `TransitEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption in transit off` |
+| `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no authentication token` |
+| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automatic backups off` |
 
 Notes for fillers:
 

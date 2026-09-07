@@ -163,16 +163,16 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Health == Yellow` | 1 | Warning | n/a | S1, S2, S4 | `health: yellow` |
-| `Health == Grey` | 1 | Warning | n/a | S1, S2, S4 | `health: grey` |
-| `Health == Red` | 1 | Broken | n/a | S1, S2, S4 | `health: red` |
+| `Health == Yellow` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `health: yellow` |
+| `Health == Grey` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `health: grey` |
+| `Health == Red` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `health: red` |
 | `Status == Terminated` | 1 | Dim | n/a | S2, S4 | `terminated` |
-| `Status` is `Launching` or `Updating` with no health signal | 1 | Warning | n/a | S1, S2, S4 | `launching` |
+| `Status` is `Launching` or `Updating` with no health signal | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `launching` |
 | `Status == Terminating` with no health signal | 1 | Dim | n/a | S2, S4 | `terminating` |
-| `Causes[]` non-empty | 2 | Warning | `~` | S3, S4, S5 | `environment reports health causes` |
-| managed platform updates not enabled | 2 | Warning | `~` | S3, S4, S5 | `managed platform updates off` |
-| health reporting not `enhanced` | 2 | Warning | `~` | S3, S4, S5 | `enhanced health reporting off` |
-| log streaming to CloudWatch not enabled | 2 | Warning | `~` | S3, S4, S5 | `log streaming to CloudWatch off` |
+| `Causes[]` non-empty | 2 | Warning | `~` | S2, S3, S4, S5 | `environment reports health causes` |
+| managed platform updates not enabled | 2 | Warning | `~` | S2, S3, S4, S5 | `managed platform updates off` |
+| health reporting not `enhanced` | 2 | Warning | `~` | S2, S3, S4, S5 | `enhanced health reporting off` |
+| log streaming to CloudWatch not enabled | 2 | Warning | `~` | S2, S3, S4, S5 | `log streaming to CloudWatch off` |
 
 Notes on the `Causes[]` row:
 

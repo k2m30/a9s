@@ -132,15 +132,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `State == deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `State == error` | 1 | Broken | n/a | S1, S2, S4 | `error` |
-| `State == available` & age > 7d | 1 | Warning | n/a | S1, S2, S4 | `orphan: unattached <N>d` |
-| `Encrypted == false` (row in-use) | 1 | Warning | n/a | S1, S2, S4 | `unencrypted` |
+| `State == creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `State == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `State == error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `error` |
+| `State == available` & age > 7d | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `orphan: unattached <N>d` |
+| `Encrypted == false` (row in-use) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted` |
 | `VolumeStatus.Status == impaired` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `volume I/O degraded` |
 | `VolumeStatus.Status == warning` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `volume I/O degraded` |
-| no backup plan selection matches this volume | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
-| an attached volume with no snapshot behind it | 2 | Warning | `~` | S3, S4, S5 | `no snapshot exists` |
+| no backup plan selection matches this volume | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
+| an attached volume with no snapshot behind it | 2 | Warning | `~` | S2, S3, S4, S5 | `no snapshot exists` |
 
 Notes on rows omitted:
 

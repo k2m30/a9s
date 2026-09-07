@@ -176,21 +176,21 @@ One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironmen
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `Status == CREATING_SNAPSHOT` | 1 | Warning | n/a | S1, S2, S4 | `creating snapshot` |
-| `Status == PENDING` | 1 | Warning | n/a | S1, S2, S4 | `pending: awaiting VPC endpoints` |
-| `Status == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `Status == ROLLING_BACK` | 1 | Warning | n/a | S1, S2, S4 | `rolling back: update failed` |
-| `Status == MAINTENANCE` | 1 | Warning | n/a | S1, S2, S4 | `maintenance in progress` |
-| `Status == CREATE_FAILED` | 1 | Broken | n/a | S1, S2, S4 | `create failed` |
-| `Status == UPDATE_FAILED` | 1 | Broken | n/a | S1, S2, S4 | `update failed: rolled back` |
-| `Status == UNAVAILABLE` | 1 | Broken | n/a | S1, S2, S4 | `unavailable: not stable` |
+| `Status == CREATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `Status == CREATING_SNAPSHOT` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating snapshot` |
+| `Status == PENDING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending: awaiting VPC endpoints` |
+| `Status == UPDATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `Status == ROLLING_BACK` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rolling back: update failed` |
+| `Status == MAINTENANCE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance in progress` |
+| `Status == CREATE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `create failed` |
+| `Status == UPDATE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `update failed: rolled back` |
+| `Status == UNAVAILABLE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unavailable: not stable` |
 | `Status == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting` |
 | `Status == DELETED` | 1 | Dim | n/a | S2, S4 | `deleted` |
-| `LastUpdate.Status == FAILED` on `AVAILABLE` | 1 | Warning | n/a | S1, S2, S4 | `last update failed` |
-| `WebserverAccessMode` public | 1 | Warning | n/a | S1, S2, S4 | `webserver public` |
-| `GetEnvironment` denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
-| `GetEnvironment` answered with nothing usable | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
+| `LastUpdate.Status == FAILED` on `AVAILABLE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `last update failed` |
+| `WebserverAccessMode` public | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `webserver public` |
+| `GetEnvironment` denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `GetEnvironment` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 
 Notes:
 

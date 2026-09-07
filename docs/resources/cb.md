@@ -163,10 +163,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| build results public | 1 | Broken | n/a | S1, S2, S4, S5 | `build results publicly visible` |
-| buildspec from the source repository | 1 | Warning | n/a | S1, S2, S4, S5 | `buildspec taken from the source repository` |
-| credential in the source address | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in the source repository address` |
-| credential in a plaintext environment variable | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in environment variables` |
+| build results public | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `build results publicly visible` |
+| buildspec from the source repository | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `buildspec taken from the source repository` |
+| credential in the source address | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in the source repository address` |
+| credential in a plaintext environment variable | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
 | latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest build <status> (<date>)` |
 
 Cause-field sources for S4 / S5: `Build.BuildStatus` (enum) and `Build.EndTime` from the batched `BatchGetBuilds` response (AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, EndTime`). `FAULT` reflects a platform problem, `FAILED` a user-code exit, `TIMED_OUT` the project's `TimeoutInMinutes`; the list line pairs the status with the date so the operator sees whether it is fresh without opening detail.

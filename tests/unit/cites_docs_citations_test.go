@@ -444,15 +444,18 @@ const (
 )
 
 // expectedGlyph derives the Severity cell of a §4 row from the finding alone.
-// The renderer is the only source: core/app/list_columns.go
-// resolveListDecoratorFull gives a row a glyph only when `td.ResolveColor`
-// returns Healthy, `!` for a SevBroken finding and `~` for a SevWarn one. A
-// wave-1 issue-severity finding colours the row itself, so it is never on a
-// green row and never carries a glyph; SevDim has no case in that switch.
+// The renderer is the only source: internal/tui/views/detail_fields.go builds
+// the detail-view Attention section, one entry per finding of either wave, and
+// gives it `!` at SevBroken and `~` otherwise. A finding that is not
+// Severity.IsIssue() — SevDim, SevOK — is skipped there, so it has no tier.
+//
+// Not the list decorator. core/app/list_columns.go resolveListDecoratorFull
+// reaches its glyph branch only for a row td.ResolveColor calls Healthy, and
+// tests/unit/qa_color_findings_conformance_test.go holds every registered type
+// to "colour is the worst finding across both waves" with an empty divergence
+// allowlist, so a Healthy row carries no warn or broken finding and that branch
+// cannot fire. A glyph derived from the list row is not to be restored.
 func expectedGlyph(sig catalogSignal) string {
-	if sig.wave != "wave2" {
-		return "n/a"
-	}
 	switch sig.severity {
 	case "broken":
 		return "!"

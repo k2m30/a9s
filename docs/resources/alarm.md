@@ -172,10 +172,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `StateValue == INSUFFICIENT_DATA` | 1 | Warning | n/a | S1, S2, S4 | `insufficient data` |
-| `StateValue == ALARM` | 1 | Broken | n/a | S1, S2, S4 | `alarm triggered` |
-| `AlarmActions == []` (emits the single `alarm.no_actions` finding — one finding code for both this and the row above) | 1 | Warning | n/a | S1, S2, S4 | `no actions` |
-| `ActionsEnabled == false` | 1 | Warning | n/a | S1, S2, S4 | `actions disabled` |
+| `StateValue == INSUFFICIENT_DATA` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `insufficient data` |
+| `StateValue == ALARM` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `alarm triggered` |
+| `AlarmActions == []` (emits the single `alarm.no_actions` finding — one finding code for both this and the row above) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no actions` |
+| `ActionsEnabled == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `actions disabled` |
 | `INSUFFICIENT_DATA older than 2×Period` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `metric pipeline stale <Xm>` |
 | zombie alarm (dimension points at missing resource) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `zombie: <dim-name>=<dim-value>` |
 

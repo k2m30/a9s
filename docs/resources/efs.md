@@ -166,12 +166,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `LifeCycleState == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `LifeCycleState == updating` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `LifeCycleState == deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `LifeCycleState == error` | 1 | Broken | n/a | S1, S2, S4 | `error` |
-| `NumberOfMountTargets == 0` | 1 | Broken | n/a | S1, S2, S4 | `no mount targets` |
-| `Encrypted` not true | 1 | Warning | n/a | S1, S2, S4, S5 | `not encrypted` |
+| `LifeCycleState == creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `LifeCycleState == updating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `LifeCycleState == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `LifeCycleState == error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `error` |
+| `NumberOfMountTargets == 0` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no mount targets` |
+| `Encrypted` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted` |
 | any mount target `LifeCycleState != available` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `mount target down` |
 | File system policy allows any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `file system policy open to anyone` |
 | AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `automatic backups off` |

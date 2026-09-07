@@ -117,12 +117,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `State == error` | 1 | Broken | n/a | S1, S2, S4 | `error` |
-| age > 365d AND automated description | 1 | Warning | n/a | S1, S2, S4 | `automated, <N>d old` |
-| `Encrypted == false` | 1 | Warning | n/a | S1, S2, S4 | `unencrypted` |
-| orphan: source volume deleted | 2 | Warning | `~` | S3, S4, S5 | `orphan: source volume deleted` |
-| restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S3, S4, S5 | `shared with all AWS accounts` |
+| `State == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State == error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `error` |
+| age > 365d AND automated description | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automated, <N>d old` |
+| `Encrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted` |
+| orphan: source volume deleted | 2 | Warning | `~` | S2, S3, S4, S5 | `orphan: source volume deleted` |
+| restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)
 

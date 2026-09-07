@@ -90,7 +90,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `AttachmentCount == 0` on a customer-managed policy | 1 | Warning | n/a | S1, S2, S4 | `unattached, no roles/users/groups use it` |
+| `AttachmentCount == 0` on a customer-managed policy | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unattached, no roles/users/groups use it` |
 | Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `admin star (allows * on *)` |
 | Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `allows privilege escalation` |
 

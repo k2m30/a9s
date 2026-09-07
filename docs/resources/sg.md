@@ -124,11 +124,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | n/a | S1, S2, S4, S5 | `all ports open to 0.0.0.0/0` |
-| an all-protocols (`-1`) rule open to `0.0.0.0/0` | 1 | Broken | n/a | S1, S2, S4, S5 | `all ports open to 0.0.0.0/0` |
-| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | n/a | S1, S2, S4, S5 | `default group allows traffic` |
-| ingress opens a sensitive port (SSH, RDP, a database port) to `0.0.0.0/0` | 1 | Broken | n/a | S1, S2, S4 | `ports <list> open to 0.0.0.0/0` |
-| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S3, S4, S5 | `not attached to anything` |
+| `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `all ports open to 0.0.0.0/0` |
+| an all-protocols (`-1`) rule open to `0.0.0.0/0` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `all ports open to 0.0.0.0/0` |
+| `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default group allows traffic` |
+| ingress opens a sensitive port (SSH, RDP, a database port) to `0.0.0.0/0` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `ports <list> open to 0.0.0.0/0` |
+| Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S2, S3, S4, S5 | `not attached to anything` |
 
 Rules for filling list and detail text:
 

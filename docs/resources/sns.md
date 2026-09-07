@@ -107,10 +107,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| zero subscriptions on the topic | 2 | Warning | `~` | S3, S4, S5 | `topic has no subscribers` |
-| all subscriptions unconfirmed | 2 | Warning | `~` | S3, S4, S5 | `all pending confirmation` |
-| `KmsMasterKeyId` absent or empty | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
-| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `topic policy open to anyone` |
+| zero subscriptions on the topic | 2 | Warning | `~` | S2, S3, S4, S5 | `topic has no subscribers` |
+| all subscriptions unconfirmed | 2 | Warning | `~` | S2, S3, S4, S5 | `all pending confirmation` |
+| `KmsMasterKeyId` absent or empty | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
+| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `topic policy open to anyone` |
 
 ## 4.1 UX review
 

@@ -122,15 +122,15 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `State==modifying` | 1 | Warning | n/a | S1, S2, S4 | `modifying` |
-| `State==deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| `State==pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State==modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying` |
+| `State==deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 | `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
-| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | n/a | S1, S2, S4, S5 | `auto-accepts shared attachments` |
-| `State == failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S3, S4, S5 | `attachment failed` |
-| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S3, S4, S5 | `attachment failed` |
-| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment between states` |
+| `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `auto-accepts shared attachments` |
+| `State == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `attachment failed` |
+| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `attachment failed` |
+| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S2, S3, S4, S5 | `attachment between states` |
 
 ## 4.1 UX review (two sentences)
 

@@ -118,10 +118,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| Recent failed execution (single) | 2 | Broken | `!` | S1, S3, S4, S5 | `latest execution <STATUS>` |
-| `LoggingConfiguration` absent or level OFF | 2 | Warning | `~` | S3, S4, S5 | `execution logging off` |
-| `EncryptionConfiguration` not a customer managed key | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with a customer key` |
-| a credential in the `Definition` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in state machine definition` |
+| Recent failed execution (single) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest execution <STATUS>` |
+| `LoggingConfiguration` absent or level OFF | 2 | Warning | `~` | S2, S3, S4, S5 | `execution logging off` |
+| `EncryptionConfiguration` not a customer managed key | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with a customer key` |
+| a credential in the `Definition` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in state machine definition` |
 
 ## 4.1 UX review (two sentences)
 

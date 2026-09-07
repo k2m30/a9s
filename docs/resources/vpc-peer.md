@@ -120,15 +120,15 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| provisioning | 1 | Warning | n/a | S1, S2, S4 | `provisioning` |
-| initiating-request | 1 | Warning | n/a | S1, S2, S4 | `initiating` |
-| pending-acceptance | 1 | Warning | n/a | S1, S2, S4, S5 | `pending acceptance: expires in <N>d` |
-| expired | 1 | Warning | n/a | S1, S2, S4 | `expired: never accepted` |
-| rejected | 1 | Broken | n/a | S1, S2, S4, S5 | `rejected` |
-| failed | 1 | Broken | n/a | S1, S2, S4, S5 | `failed` |
-| deleting | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| provisioning | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
+| initiating-request | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `initiating` |
+| pending-acceptance | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending acceptance: expires in <N>d` |
+| expired | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `expired: never accepted` |
+| rejected | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `rejected` |
+| failed | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| deleting | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 | deleted | 1 | Dim | n/a | S2, S4 | `deleted` |
-| CIDR overlap (active) | 1 | Warning | n/a | S1, S2, S4, S5 | `CIDR overlap with peer` |
+| CIDR overlap (active) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `CIDR overlap with peer` |
 | no local route (active) | 2 | Warning | `~` | S2, S3, S4, S5 | `no local route to peer` |
 | route blackholed | 2 | Warning | `~` | S2, S3, S4, S5 | `route to peer blackholed` |
 

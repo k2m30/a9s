@@ -159,19 +159,19 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 1 | Broken | n/a | S1, S2, S4 | `kms key inaccessible` |
-| `TableStatus == ARCHIVED` | 1 | Broken | n/a | S1, S2, S4 | `archived: kms key lost` |
-| `DeletionProtectionEnabled` not true | 1 | Warning | n/a | S1, S2, S4, S5 | `deletion protection off` |
-| `TableStatus == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `TableStatus == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `TableStatus == DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `TableStatus == ARCHIVING` | 1 | Warning | n/a | S1, S2, S4 | `archiving` |
-| `DescribeTable` was denied for this table | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
-| `DescribeTable` answered with nothing usable | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
-| PITR disabled | 2 | Warning | `~` | S3, S4, S5 | `point-in-time recovery disabled` |
-| Resource policy names a foreign account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
+| `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `kms key inaccessible` |
+| `TableStatus == ARCHIVED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `archived: kms key lost` |
+| `DeletionProtectionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deletion protection off` |
+| `TableStatus == CREATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `TableStatus == UPDATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `TableStatus == DELETING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `TableStatus == ARCHIVING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `archiving` |
+| `DescribeTable` was denied for this table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `DescribeTable` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| PITR disabled | 2 | Warning | `~` | S2, S3, S4, S5 | `point-in-time recovery disabled` |
+| Resource policy names a foreign account | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
-| no backup plan selection matches this table | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
+| no backup plan selection matches this table | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
 
 Rules for filling list and detail text:
 

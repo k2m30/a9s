@@ -126,14 +126,14 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `LogFileValidationEnabled==false` | 1 | Warning | n/a | S1, S2, S4 | `log file validation disabled` |
-| `CloudWatchLogsLogGroupArn` empty | 1 | Warning | n/a | S1, S2, S4 | `not delivering to CloudWatch Logs` |
-| `KmsKeyId` empty | 1 | Warning | n/a | S1, S2, S4 | `log files not KMS-encrypted` |
+| `LogFileValidationEnabled==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `log file validation disabled` |
+| `CloudWatchLogsLogGroupArn` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not delivering to CloudWatch Logs` |
+| `KmsKeyId` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `log files not KMS-encrypted` |
 | `IsLogging==false` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not logging` |
 | `LatestDeliveryError` non-empty | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `delivery error: <LatestDeliveryError>` |
 | `LatestDeliveryTime` >1h stale (on `IsLogging==true`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `delivery stale since <LatestDeliveryTime>` |
-| the S3 bucket this trail delivers to carries the `s3.public` finding | 2 | Broken | `!` | S1, S3, S4, S5 | `log bucket is publicly accessible` |
-| the S3 bucket this trail delivers to carries the `s3.access-logging-off` finding | 2 | Warning | `~` | S3, S4, S5 | `log bucket has no access logging` |
+| the S3 bucket this trail delivers to carries the `s3.public` finding | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `log bucket is publicly accessible` |
+| the S3 bucket this trail delivers to carries the `s3.access-logging-off` finding | 2 | Warning | `~` | S2, S3, S4, S5 | `log bucket has no access logging` |
 
 Rules for filling list and detail text:
 

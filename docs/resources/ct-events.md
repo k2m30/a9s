@@ -181,12 +181,12 @@ Badge aggregation for `ct-events`: Wave 1 issue-colored rows only — this type 
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| destructive call (`ct_event.severity.danger`) | 1 | Broken | n/a | S1, S2, S4 | `destructive call` |
-| call AWS rejected (`ct_event.danger.failed`) | 1 | Broken | n/a | S1, S2, S4 | `failed: <error>` |
-| root user made the call (`ct_event.severity.attention`) | 1 | Warning | n/a | S1, S2, S4 | `root account activity` |
-| call changed configuration (`ct_event.attention.write`) | 1 | Warning | n/a | S1, S2, S4 | `modifying call` |
-| caller from another account (`ct_event.attention.cross-account`) | 1 | Warning | n/a | S1, S2, S4 | `cross-account access` |
-| read of secret or parameter material (`ct_event.attention.sensitive-read`) | 1 | Warning | n/a | S1, S2, S4 | `reads sensitive data (<event>)` |
+| destructive call (`ct_event.severity.danger`) | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `destructive call` |
+| call AWS rejected (`ct_event.danger.failed`) | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed: <error>` |
+| root user made the call (`ct_event.severity.attention`) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `root account activity` |
+| call changed configuration (`ct_event.attention.write`) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying call` |
+| caller from another account (`ct_event.attention.cross-account`) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `cross-account access` |
+| read of secret or parameter material (`ct_event.attention.sensitive-read`) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `reads sensitive data (<event>)` |
 | every other event (`ct_event.severity.info`) | 1 | Dim | n/a | S2, S4 | `routine event` |
 
 Rules for filling list and detail text:

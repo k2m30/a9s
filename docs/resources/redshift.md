@@ -210,26 +210,26 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ClusterStatus == incompatible-parameters` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-parameters` |
-| `ClusterStatus==hardware-failure` | 1 | Broken | n/a | S1, S2, S4 | `broken: hardware-failure` |
-| `ClusterStatus==storage-full` | 1 | Broken | n/a | S1, S2, S4 | `broken: storage-full` |
-| `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | n/a | S1, S2, S4 | `unavailable` |
-| `ClusterAvailabilityStatus==Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | n/a | S1, S2, S4 | `maintenance` |
-| `ClusterStatus == modifying` | 1 | Warning | n/a | S1, S2, S4 | `modifying` |
-| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | n/a | S1, S2, S4 | `modifying` |
-| `PendingModifiedValues` non-empty | 1 | Warning | n/a | S1, S2, S4 | `pending change queued` |
-| `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S1, S2, S4 | `maintenance deferred` |
-| `PubliclyAccessible==true` | 1 | Warning | n/a | S1, S2, S4 | `publicly accessible` |
-| `Encrypted==false` | 1 | Warning | n/a | S1, S2, S4 | `unencrypted at rest` |
-| `ClusterStatus == incompatible-hsm` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-hsm` |
-| `ClusterStatus == incompatible-network` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-network` |
-| `ClusterStatus == incompatible-restore` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-restore` |
-| `ClusterStatus == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `ClusterStatus == resizing` | 1 | Warning | n/a | S1, S2, S4 | `resizing` |
-| `ClusterStatus == rebooting` | 1 | Warning | n/a | S1, S2, S4 | `rebooting` |
-| `ClusterStatus == renaming` | 1 | Warning | n/a | S1, S2, S4 | `renaming` |
-| `ClusterStatus == deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| `ClusterStatus == incompatible-parameters` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-parameters` |
+| `ClusterStatus==hardware-failure` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: hardware-failure` |
+| `ClusterStatus==storage-full` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: storage-full` |
+| `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unavailable` |
+| `ClusterAvailabilityStatus==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance` |
+| `ClusterStatus == modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying` |
+| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying` |
+| `PendingModifiedValues` non-empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending change queued` |
+| `DeferredMaintenanceWindows[]` active | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance deferred` |
+| `PubliclyAccessible==true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `publicly accessible` |
+| `Encrypted==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted at rest` |
+| `ClusterStatus == incompatible-hsm` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-hsm` |
+| `ClusterStatus == incompatible-network` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-network` |
+| `ClusterStatus == incompatible-restore` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-restore` |
+| `ClusterStatus == creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `ClusterStatus == resizing` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `resizing` |
+| `ClusterStatus == rebooting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rebooting` |
+| `ClusterStatus == renaming` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `renaming` |
+| `ClusterStatus == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 | `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S3, S4, S5 | `audit logging off` |
 | Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S3, S4, S5 | `SSL not required` |
 

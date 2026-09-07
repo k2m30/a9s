@@ -140,16 +140,16 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `KeyState==Disabled` | 1 | Warning | n/a | S1, S2, S4 | `disabled` |
-| `KeyState==PendingDeletion` | 1 | Broken | n/a | S1, S2, S4 | `pending deletion` |
-| `KeyState==Creating` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
-| `KeyState==Updating` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
-| `KeyState==PendingImport` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
-| `KeyState==PendingReplicaDeletion` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
-| `KeyState==Unavailable` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
-| `DescribeKey` was denied for this key | 1 | Broken | n/a | S1, S2, S4 | `access denied (kms:DescribeKey)` |
-| `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S3, S4, S5 | `key rotation disabled` |
-| Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `key policy open to anyone` |
+| `KeyState==Disabled` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `disabled` |
+| `KeyState==PendingDeletion` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `pending deletion` |
+| `KeyState==Creating` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `KeyState==Updating` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `KeyState==PendingImport` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `KeyState==PendingReplicaDeletion` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `KeyState==Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `DescribeKey` was denied for this key | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `access denied (kms:DescribeKey)` |
+| `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S2, S3, S4, S5 | `key rotation disabled` |
+| Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `key policy open to anyone` |
 
 Rules for filling list and detail text:
 

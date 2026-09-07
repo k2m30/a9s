@@ -119,10 +119,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `retentionInDays` nil | 1 | Warning | n/a | S1, S2, S4 | `retention: never expire` |
-| `storedBytes==0` + age >90d | 1 | Warning | n/a | S1, S2, S4 | `empty, created over 90 days ago` |
-| `kmsKeyId` empty | 1 | Warning | n/a | S1, S2, S4 | `not encrypted with KMS` |
-| an audit log group with no metric filter over it | 2 | Warning | `~` | S3, S4, S5 | `audit log group missing metric filters` |
+| `retentionInDays` nil | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `retention: never expire` |
+| `storedBytes==0` + age >90d | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `empty, created over 90 days ago` |
+| `kmsKeyId` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted with KMS` |
+| an audit log group with no metric filter over it | 2 | Warning | `~` | S2, S3, S4, S5 | `audit log group missing metric filters` |
 
 Rules for filling list and detail text:
 

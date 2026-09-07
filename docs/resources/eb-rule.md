@@ -125,8 +125,8 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `State == DISABLED` | 1 | Dim | n/a | S2, S4 | `disabled` |
 | `ENABLED` rule with `len(Targets)==0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `enabled rule has no targets` |
-| `DISABLED` rule with `len(Targets)>0` | 2 | Warning | `~` | S3, S4, S5 | `target drift or no dead-letter config` |
-| target without `DeadLetterConfig` | 2 | Warning | `~` | S3, S4, S5 | `target drift or no dead-letter config` |
+| `DISABLED` rule with `len(Targets)>0` | 2 | Warning | `~` | S2, S3, S4, S5 | `target drift or no dead-letter config` |
+| target without `DeadLetterConfig` | 2 | Warning | `~` | S2, S3, S4, S5 | `target drift or no dead-letter config` |
 
 Notes on the table above:
 

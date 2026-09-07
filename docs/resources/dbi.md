@@ -219,28 +219,28 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S1, S2, S4 | `<transitional status>` |
-| `failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `storage-full` | 1 | Broken | n/a | S1, S2, S4 | `storage-full` |
-| `incompatible-network` | 1 | Broken | n/a | S1, S2, S4 | `incompatible-network` |
-| `incompatible-option-group` | 1 | Broken | n/a | S1, S2, S4 | `incompatible-option-group` |
-| `incompatible-parameters` | 1 | Broken | n/a | S1, S2, S4 | `incompatible-parameters` |
-| `incompatible-restore` | 1 | Broken | n/a | S1, S2, S4 | `incompatible-restore` |
-| `restore-error` | 1 | Broken | n/a | S1, S2, S4 | `restore-error` |
-| `inaccessible-encryption-credentials` | 1 | Broken | n/a | S1, S2, S4 | `encryption key unavailable` |
-| `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S1, S2, S4 | `no automated backups` |
-| `PubliclyAccessible == true` | 1 | Warning | n/a | S1, S2, S4 | `publicly accessible` |
-| `StorageEncrypted == false` | 1 | Warning | n/a | S1, S2, S4 | `unencrypted storage` |
-| `DeletionProtection == false` | 1 | Warning | n/a | S1, S2, S4 | `deletion protection off` |
-| `MultiAZ == false` on a non-Aurora primary | 1 | Warning | n/a | S1, S2, S4, S5 | `single-AZ` |
-| `AutoMinorVersionUpgrade == false` | 1 | Warning | n/a | S1, S2, S4, S5 | `auto minor version upgrade off` |
-| `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | n/a | S1, S2, S4, S5 | `IAM database authentication off` |
-| `MasterUsername` is a vendor default | 1 | Warning | n/a | S1, S2, S4, S5 | `default master username` |
-| `CertificateDetails.ValidTill` within 90d | 1 | Warning | n/a | S1, S2, S4, S5 | `server certificate expires in <N> days` |
-| `DBInstanceStatus == stopped` | 1 | Broken | n/a | S1, S2, S4 | `stopped` |
-| Pending maintenance overdue | 2 | Warning | `~` | S3, S4, S5 | `maintenance scheduled` |
+| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<transitional status>` |
+| `failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `storage-full` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `storage-full` |
+| `incompatible-network` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-network` |
+| `incompatible-option-group` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-option-group` |
+| `incompatible-parameters` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-parameters` |
+| `incompatible-restore` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-restore` |
+| `restore-error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `restore-error` |
+| `inaccessible-encryption-credentials` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unavailable` |
+| `BackupRetentionPeriod == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no automated backups` |
+| `PubliclyAccessible == true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `publicly accessible` |
+| `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted storage` |
+| `DeletionProtection == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deletion protection off` |
+| `MultiAZ == false` on a non-Aurora primary | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `single-AZ` |
+| `AutoMinorVersionUpgrade == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `auto minor version upgrade off` |
+| `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IAM database authentication off` |
+| `MasterUsername` is a vendor default | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default master username` |
+| `CertificateDetails.ValidTill` within 90d | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `server certificate expires in <N> days` |
+| `DBInstanceStatus == stopped` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped` |
+| Pending maintenance overdue | 2 | Warning | `~` | S2, S3, S4, S5 | `maintenance scheduled` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `engine version deprecated` |
-| no backup plan selection matches this instance | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
+| no backup plan selection matches this instance | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
 
 Notes on the table:
 

@@ -161,15 +161,15 @@ One row per signal from §3 that reaches at least one surface. Healthy is omitte
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status==CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `status==UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `status==DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `status==CREATE_FAILED` | 1 | Broken | n/a | S1, S2, S4, S5 | `create failed` |
-| `status==DELETE_FAILED` | 1 | Broken | n/a | S1, S2, S4, S5 | `delete failed` |
-| `status==DEGRADED` | 1 | Broken | n/a | S1, S2, S4, S5 | `degraded` |
-| `health.issues[]` non-empty on an `ACTIVE` group | 1 | Warning | n/a | S1, S2, S4, S5 | `health issue` |
-| describe denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
-| describe answered with nothing | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
+| `status==CREATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `status==UPDATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `status==DELETING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `status==CREATE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `create failed` |
+| `status==DELETE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `delete failed` |
+| `status==DEGRADED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `degraded` |
+| `health.issues[]` non-empty on an `ACTIVE` group | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `health issue` |
+| describe denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| describe answered with nothing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 
 The two health rows carry what AWS reported: each code in `health.issues[]` is a
 row under the finding in the detail view, so `insufficient free addresses` is

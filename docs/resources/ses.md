@@ -127,15 +127,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `VerificationStatus==PENDING` | 1 | Warning | n/a | S1, S2, S4 | `pending verification` |
-| `VerificationStatus==FAILED` | 1 | Broken | n/a | S1, S2, S4 | `verification failed` |
-| `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | n/a | S1, S2, S4 | `verify: temp failure` |
-| `VerificationStatus==NOT_STARTED` | 1 | Broken | n/a | S1, S2, S4 | `verification not started` |
-| `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S1, S2, S4 | `sending disabled` |
-| `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account under review (probation)` |
-| `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `sending paused by AWS (shutdown)` |
+| `VerificationStatus==PENDING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending verification` |
+| `VerificationStatus==FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `verification failed` |
+| `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `verify: temp failure` |
+| `VerificationStatus==NOT_STARTED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `verification not started` |
+| `SendingEnabled==false` (on verified identity) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `sending disabled` |
+| `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `account under review (probation)` |
+| `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `sending paused by AWS (shutdown)` |
 | `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S2, S3, S4, S5 | `quota 80%+ used` |
-| a domain identity not signing its outbound mail | 2 | Warning | `~` | S3, S4, S5 | `DKIM not enabled` |
+| a domain identity not signing its outbound mail | 2 | Warning | `~` | S2, S3, S4, S5 | `DKIM not enabled` |
 
 Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the account, not any single identity — a9s-devops: surface the finding on **every** identity row's S4 with the compact `account ...:` prefix so a glance at the list correctly attributes the problem to the account, not the identity; S1 counts the account-level finding once, not N times.
 

@@ -169,14 +169,14 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State.Code == provisioning` | 1 | Warning | n/a | S1, S2, S4 | `provisioning` |
-| `State.Code == active_impaired` | 1 | Warning | n/a | S1, S2, S4 | `active impaired` |
-| `State.Code == failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` |
-| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` |
-| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `<ports> in the clear` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on <ports>` |
-| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` | 2 | Warning | `~` | S3, S4, S5 | `deletion protection or access logs disabled` |
+| `State.Code == provisioning` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
+| `State.Code == active_impaired` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `active impaired` |
+| `State.Code == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S2, S3, S4, S5 | `HTTP desync mitigation off` |
+| ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S2, S3, S4, S5 | `invalid HTTP headers not dropped` |
+| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S2, S3, S4, S5 | `<ports> in the clear` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S2, S3, S4, S5 | `weak TLS policy on <ports>` |
+| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` | 2 | Warning | `~` | S2, S3, S4, S5 | `deletion protection or access logs disabled` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 

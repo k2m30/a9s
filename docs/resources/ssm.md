@@ -75,8 +75,8 @@ Badge aggregation for `ssm`: Wave 1 issue-colored rows only — this type regist
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `SecureString not rotated >365d` | 1 | Warning | n/a | S1, S2, S4 | `not modified in over 365 days` |
-| `String name looks like a secret` | 1 | Broken | n/a | S1, S2, S4 | `plaintext value looks like a credential` |
+| `SecureString not rotated >365d` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not modified in over 365 days` |
+| `String name looks like a secret` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `plaintext value looks like a credential` |
 | `Advanced tier aged >90d` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `advanced: aged 90d+ ($0.05/mo)` |
 
 Rules for filling list and detail text:

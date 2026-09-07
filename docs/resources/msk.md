@@ -171,17 +171,17 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `State == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `State == MAINTENANCE` | 1 | Warning | n/a | S1, S2, S4 | `maintenance` |
-| `State == REBOOTING_BROKER` | 1 | Warning | n/a | S1, S2, S4 | `rebooting broker` |
-| `State == HEALING` | 1 | Warning | n/a | S1, S2, S4 | `healing` |
-| `State == DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `State == FAILED` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `PublicAccess.Type` publishes the brokers | 2 | Broken | `!` | S1, S3, S4, S5 | `brokers reachable from the internet` |
-| `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S3, S4, S5 | `unauthenticated access allowed` |
-| the cluster runs a broker version behind the newest AWS offers | 2 | Warning | `~` | S3, S4, S5 | `broker software outdated` |
-| client-broker encryption allows plaintext | 2 | Warning | `~` | S3, S4, S5 | `encryption in transit not enforced` |
+| `State == CREATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `State == UPDATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `State == MAINTENANCE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance` |
+| `State == REBOOTING_BROKER` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rebooting broker` |
+| `State == HEALING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `healing` |
+| `State == DELETING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `State == FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `PublicAccess.Type` publishes the brokers | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `brokers reachable from the internet` |
+| `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `unauthenticated access allowed` |
+| the cluster runs a broker version behind the newest AWS offers | 2 | Warning | `~` | S2, S3, S4, S5 | `broker software outdated` |
+| client-broker encryption allows plaintext | 2 | Warning | `~` | S2, S3, S4, S5 | `encryption in transit not enforced` |
 
 Notes:
 

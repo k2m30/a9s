@@ -199,10 +199,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status == DRAINING` | 1 | Warning | n/a | S1, S2, S4 | `draining` |
-| `status == INACTIVE` | 1 | Broken | n/a | S1, S2, S4 | `inactive` |
-| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | n/a | S1, S2, S4, S5 | `no tasks running` |
-| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | n/a | S1, S2, S4, S5 | `running below desired count` |
+| `status == DRAINING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `draining` |
+| `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive` |
+| `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no tasks running` |
+| `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `running below desired count` |
 | `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not running its desired tasks` |
 | `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not running its desired tasks` |
 | `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not running its desired tasks` |

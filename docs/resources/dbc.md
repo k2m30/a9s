@@ -192,20 +192,20 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status` transitional | 1 | Warning | n/a | S1, S2, S4 | `<status>: in progress` |
-| `Status == failed` | 1 | Broken | n/a | S1, S2, S4 | `failed: cluster operation` |
-| `Status == inaccessible-encryption-credentials` | 1 | Broken | n/a | S1, S2, S4 | `encryption key unreachable` |
-| `Status == incompatible-parameters` | 1 | Broken | n/a | S1, S2, S4 | `parameter group incompatible` |
-| No writer in `DBClusterMembers[]` | 1 | Broken | n/a | S1, S2, S4 | `no writer: reads only` |
-| `DeletionProtection == false` | 1 | Warning | n/a | S1, S2, S4 | `delete-protection off` |
-| `StorageEncrypted == false` | 1 | Warning | n/a | S1, S2, S4 | `not encrypted at rest` |
-| `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S1, S2, S4 | `no automated backups` |
-| `MultiAZ == false` | 1 | Warning | n/a | S1, S2, S4, S5 | `single-AZ` |
-| `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | n/a | S1, S2, S4, S5 | `auto minor version upgrade off` |
-| `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | n/a | S1, S2, S4, S5 | `IAM database authentication off` |
-| `MasterUsername` is a vendor default | 1 | Warning | n/a | S1, S2, S4, S5 | `default master username` |
-| Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` |
-| no backup plan selection matches this cluster | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
+| `Status` transitional | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>: in progress` |
+| `Status == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed: cluster operation` |
+| `Status == inaccessible-encryption-credentials` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unreachable` |
+| `Status == incompatible-parameters` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `parameter group incompatible` |
+| No writer in `DBClusterMembers[]` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no writer: reads only` |
+| `DeletionProtection == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delete-protection off` |
+| `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted at rest` |
+| `BackupRetentionPeriod == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no automated backups` |
+| `MultiAZ == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `single-AZ` |
+| `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `auto minor version upgrade off` |
+| `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IAM database authentication off` |
+| `MasterUsername` is a vendor default | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default master username` |
+| Pending maintenance action overdue | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `maintenance overdue` |
+| no backup plan selection matches this cluster | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
 
 Rules for filling list and detail text:
 

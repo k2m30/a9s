@@ -106,7 +106,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == DISABLED` | 1 | Warning | n/a | S1, S2, S4 | `disabled` |
+| `State == DISABLED` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `disabled` |
 | `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `settings can be overridden per query` |
 | `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S3, S4, S5 | `query results stored unencrypted` |
 

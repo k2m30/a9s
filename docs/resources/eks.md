@@ -203,18 +203,18 @@ One row per signal from §3. The fetcher's own `DescribeCluster` sets the row co
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `Status == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `Status == DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `Status == PENDING` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `Status == FAILED` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `Health.Issues[]` non-empty | 1 | Warning | n/a | S1, S2, S4, S5 | `health issue` |
-| endpoint open to the internet | 1 | Broken | n/a | S1, S2, S4, S5 | `cluster endpoint reachable from the internet` |
-| control-plane log types missing | 1 | Warning | n/a | S1, S2, S4, S5 | `control plane logging incomplete` |
-| no KMS key over secrets | 1 | Warning | n/a | S1, S2, S4, S5 | `secrets not encrypted with KMS` |
-| Kubernetes minor past standard support | 1 | Broken | n/a | S1, S2, S4, S5 | `Kubernetes <version> is out of standard support` |
-| describe denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
-| describe answered with nothing | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
+| `Status == CREATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `Status == UPDATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `Status == DELETING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `Status == PENDING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `Status == FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `Health.Issues[]` non-empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `health issue` |
+| endpoint open to the internet | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `cluster endpoint reachable from the internet` |
+| control-plane log types missing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `control plane logging incomplete` |
+| no KMS key over secrets | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `secrets not encrypted with KMS` |
+| Kubernetes minor past standard support | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `Kubernetes <version> is out of standard support` |
+| describe denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| describe answered with nothing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 
 Notes:
 

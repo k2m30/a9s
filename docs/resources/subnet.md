@@ -161,11 +161,11 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `State == unavailable` | 1 | Broken | n/a | S1, S2, S4 | `unavailable` |
-| `State == failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `State == failed-insufficient-capacity` | 1 | Broken | n/a | S1, S2, S4 | `failed-insufficient-capacity` |
-| `MapPublicIpOnLaunch == true` | 1 | Warning | n/a | S1, S2, S4, S5 | `auto-assigns public IPs` |
+| `State == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State == unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unavailable` |
+| `State == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `State == failed-insufficient-capacity` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed-insufficient-capacity` |
+| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `auto-assigns public IPs` |
 | IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` |
 | IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` |
 | public subnet with no `0.0.0.0/0` route to an internet gateway — NOT IMPLEMENTED (backlog; no emission in code as of 2026-09-07) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` |

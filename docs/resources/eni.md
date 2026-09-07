@@ -131,9 +131,9 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == attaching` | 1 | Warning | n/a | S1, S2, S4 | `attaching` |
-| `Status == detaching` | 1 | Warning | n/a | S1, S2, S4 | `detaching` |
-| `Status == available` (orphan) | 1 | Warning | n/a | S1, S2, S4 | `available` |
+| `Status == attaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `attaching` |
+| `Status == detaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `detaching` |
+| `Status == available` (orphan) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `available` |
 | Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` |
 
 ## 4.1 UX review (two sentences)

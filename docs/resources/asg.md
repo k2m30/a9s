@@ -167,17 +167,17 @@ Badge aggregation for `asg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity 
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == "Delete in progress"` | 1 | Warning | n/a | S1, S2, S4 | `delete in progress` |
-| Any `Instances[].HealthStatus == Unhealthy` | 1 | Warning | n/a | S1, S2, S4 | `<N> unhealthy instance(s)` |
-| `InService < MinSize` | 1 | Broken | n/a | S1, S2, S4 | `<N> of <M> instances in service` |
-| `SuspendedProcesses` contains `Launch`/`Terminate`/`HealthCheck` | 1 | Warning | n/a | S1, S2, S4 | `scaling suspended` |
-| `LaunchConfigurationName` set | 1 | Warning | n/a | S1, S2, S4, S5 | `uses a launch configuration` |
-| fewer than two `AvailabilityZones` | 1 | Warning | n/a | S1, S2, S4, S5 | `single availability zone` |
-| behind a load balancer with `HealthCheckType != ELB` | 1 | Warning | n/a | S1, S2, S4, S5 | `no load balancer health check` |
-| Latest `DescribeScalingActivities.StatusCode == Failed` | 2 | Broken | `!` | S1, S3, S4, S5 | `latest scaling activity failed` |
+| `Status == "Delete in progress"` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delete in progress` |
+| Any `Instances[].HealthStatus == Unhealthy` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<N> unhealthy instance(s)` |
+| `InService < MinSize` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> of <M> instances in service` |
+| `SuspendedProcesses` contains `Launch`/`Terminate`/`HealthCheck` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `scaling suspended` |
+| `LaunchConfigurationName` set | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `uses a launch configuration` |
+| fewer than two `AvailabilityZones` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `single availability zone` |
+| behind a load balancer with `HealthCheckType != ELB` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no load balancer health check` |
+| Latest `DescribeScalingActivities.StatusCode == Failed` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest scaling activity failed` |
 | launch configuration `MetadataOptions` absent or `HttpTokens != required` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration allows IMDSv1` |
 | launch configuration `AssociatePublicIpAddress == true` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration assigns public IPs` |
-| credential in launch configuration `UserData` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in launch configuration user data` |
+| credential in launch configuration `UserData` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in launch configuration user data` |
 
 Notes:
 

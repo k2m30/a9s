@@ -113,9 +113,9 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `State==deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `State==failed` + `FailureCode` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
+| `State==pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State==deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `State==failed` + `FailureCode` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
 | `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 
 Notes on filling list and detail text:

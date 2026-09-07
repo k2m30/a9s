@@ -129,7 +129,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| unattached EIP (no association/instance/ENI) | 1 | Warning | n/a | S1, S2, S4 | `unassociated` |
+| unattached EIP (no association/instance/ENI) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unassociated` |
 | attached to stopped EC2 instance — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached to stopped instance` |
 
 Rules for filling list and detail text:

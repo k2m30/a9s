@@ -84,8 +84,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| no members, or members but no attached or inline policies | 2 | Warning | `~` | S3, S4, S5 | `no members or no policies` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
+| no members, or members but no attached or inline policies | 2 | Warning | `~` | S2, S3, S4, S5 | `no members or no policies` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
 
 ## 4.1 UX review (two sentences)
 

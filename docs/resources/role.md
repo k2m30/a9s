@@ -127,11 +127,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | n/a | S1, S2, S4, S5 | `anyone can assume this role` |
-| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | n/a | S1, S2, S4, S5 | `service can assume without source scoping` |
-| an inline policy grants a known privilege-escalation action combination | 1 | Broken | n/a | S1, S2, S4, S5 | `inline policy allows privilege escalation` |
-| dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S3, S4, S5 | `dormant role (>90d)` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
+| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `anyone can assume this role` |
+| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `service can assume without source scoping` |
+| an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inline policy allows privilege escalation` |
+| dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S2, S3, S4, S5 | `dormant role (>90d)` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
 
 Rules for filling list and detail text:
 

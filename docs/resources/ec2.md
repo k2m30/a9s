@@ -231,20 +231,20 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State.Name == shutting-down` | 1 | Warning | n/a | S1, S2, S4 | `shutting down` |
-| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | n/a | S1, S2, S4 | `stopped` |
-| `State.Name == stopped` with no `Server.*` state reason | 1 | Warning | n/a | S1, S2, S4 | `stopped` |
+| `State.Name == shutting-down` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shutting down` |
+| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped` |
+| `State.Name == stopped` with no `Server.*` state reason | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stopped` |
 | `terminated` | 1 | Dim | n/a | S2, S4 | `terminated` |
-| instance metadata answers without a session token | 1 | Warning | n/a | S1, S2, S4, S5 | `IMDSv1 allowed` |
-| `PublicIpAddress` set | 1 | Warning | n/a | S1, S2, S4, S5 | `public address` |
-| `State.Name == pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `State.Name == stopping` | 1 | Warning | n/a | S1, S2, S4 | `stopping` |
-| `SystemStatus.Status == impaired` (or `InstanceStatus.Status == impaired`) | 2 | Broken | `!` | S1, S3, S4, S5 | `impaired: system checks failing` |
-| `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 | `initializing: checks in progress` |
-| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4, S5 | `status unknown: AWS insufficient-data` |
-| `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `~` | S3, S4, S5 | `scheduled event` |
-| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S3, S4, S5 | `port(s) <list> reachable from the internet` |
-| credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` |
+| instance metadata answers without a session token | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IMDSv1 allowed` |
+| `PublicIpAddress` set | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `public address` |
+| `State.Name == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State.Name == stopping` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stopping` |
+| `SystemStatus.Status == impaired` (or `InstanceStatus.Status == impaired`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `impaired: system checks failing` |
+| `SystemStatus.Status == initializing` | 2 | Warning | `~` | S2, S3, S4, S5 | `initializing: checks in progress` |
+| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S2, S3, S4, S5 | `status unknown: AWS insufficient-data` |
+| `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `~` | S2, S3, S4, S5 | `scheduled event` |
+| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `port(s) <list> reachable from the internet` |
+| credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in user data` |
 
 Notes on list-text construction:
 

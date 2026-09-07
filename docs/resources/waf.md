@@ -99,8 +99,8 @@ One row per signal from §3 that has operator-readable surface text:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S3, S4, S5 | `web ACL has no rules` |
-| `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S3, S4, S5 | `no logging configuration` |
+| `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S2, S3, S4, S5 | `web ACL has no rules` |
+| `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S2, S3, S4, S5 | `no logging configuration` |
 
 ## 4.1 UX review (two sentences)
 

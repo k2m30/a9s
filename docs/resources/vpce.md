@@ -178,14 +178,14 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == PendingAcceptance` | 1 | Warning | n/a | S1, S2, S4 | `pending acceptance` |
-| `State == Pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
-| `State == Deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `State == Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `State == Rejected` | 1 | Broken | n/a | S1, S2, S4 | `rejected` |
-| `State == Expired` | 1 | Broken | n/a | S1, S2, S4 | `expired` |
-| `State == Partial` | 1 | Broken | n/a | S1, S2, S4 | `partial` |
-| `PolicyDocument` grants a wildcard action — `*` or a service-wide `s3:*` — to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | n/a | S1, S2, S4, S5 | `endpoint policy open to anyone` |
+| `State == PendingAcceptance` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending acceptance` |
+| `State == Pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State == Deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `State == Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `State == Rejected` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `rejected` |
+| `State == Expired` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expired` |
+| `State == Partial` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `partial` |
+| `PolicyDocument` grants a wildcard action — `*` or a service-wide `s3:*` — to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `endpoint policy open to anyone` |
 | `State == Deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 
 Note: S4 cells pair the state with a cause per the "state keywords are not explanations" rule; bare `Pending` or `Failed` would be insufficient. When `LastError.Message` is present for a `Failed` row, it replaces the generic `failed` cause at render time. Truncate `LastError.Message` at 40 chars for the list view — the full sentence is available in the detail view's field block (which is always rendered for any resource and is not an S5 enrichment line).

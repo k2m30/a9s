@@ -171,13 +171,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| No deployed stage (v2) | 2 | Warning | `~` | S3, S4, S5 | `no deployed stages` |
-| a deployed stage carries a configuration gap with no code of its own | 2 | Warning | `~` | S3, S4, S5 | `stage configuration issues` |
-| internet-facing REST API with no authorizer and no scoped resource policy | 2 | Broken | `!` | S1, S3, S4, S5 | `internet-facing with no authorizer` |
-| private REST API, or HTTP API, with no authorizer | 2 | Warning | `~` | S3, S4, S5 | `no authorizer` |
-| a stage with no access log settings | 2 | Warning | `~` | S3, S4, S5 | `no access logs` |
-| a REST stage with `TracingEnabled == false` | 2 | Warning | `~` | S3, S4, S5 | `X-Ray tracing off` |
-| a REST stage variable whose value scans as a credential | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in stage variables` |
+| No deployed stage (v2) | 2 | Warning | `~` | S2, S3, S4, S5 | `no deployed stages` |
+| a deployed stage carries a configuration gap with no code of its own | 2 | Warning | `~` | S2, S3, S4, S5 | `stage configuration issues` |
+| internet-facing REST API with no authorizer and no scoped resource policy | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `internet-facing with no authorizer` |
+| private REST API, or HTTP API, with no authorizer | 2 | Warning | `~` | S2, S3, S4, S5 | `no authorizer` |
+| a stage with no access log settings | 2 | Warning | `~` | S2, S3, S4, S5 | `no access logs` |
+| a REST stage with `TracingEnabled == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `X-Ray tracing off` |
+| a REST stage variable whose value scans as a credential | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in stage variables` |
 
 Notes on the single row above:
 

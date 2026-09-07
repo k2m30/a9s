@@ -240,13 +240,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==Pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
+| `State==Pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
 | `State==Inactive` | 1 | Dim | n/a | S2, S4 | `inactive, evicted after extended idle time` |
-| `State==Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `LastUpdateStatus==Failed` | 1 | Broken | n/a | S1, S2, S4 | `last update failed to apply` |
-| `Runtime` deprecated | 1 | Broken | n/a | S1, S2, S4 | `runtime is end-of-life` |
-| `DeadLetterConfig==nil` | 1 | Warning | n/a | S1, S2, S4 | `no dead-letter queue configured` |
-| credential in `Environment.Variables` | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in environment variables` |
+| `State==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `LastUpdateStatus==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `last update failed to apply` |
+| `Runtime` deprecated | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `runtime is end-of-life` |
+| `DeadLetterConfig==nil` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no dead-letter queue configured` |
+| credential in `Environment.Variables` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
 | resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `invokable by anyone` |
 | function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `function endpoint open without authentication` |
 

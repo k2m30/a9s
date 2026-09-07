@@ -151,16 +151,16 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == InProgress` | 1 | Warning | n/a | S1, S2, S4 | `deploying: config propagating` |
+| `Status == InProgress` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deploying: config propagating` |
 | `Enabled == false` | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
-| Weak TLS policy on aliased distribution | 2 | Warning | `~` | S3, S4, S5 | `minimum TLS below 1.2` |
-| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Warning | `~` | S3, S4, S5 | `traffic allowed without TLS` |
-| `LoggingConfig.Enabled == false` | 2 | Warning | `~` | S3, S4, S5 | `access logging off` |
-| an S3 origin naming a bucket absent from the account | 2 | Broken | `!` | S1, S3, S4, S5 | `S3 origin bucket does not exist` |
-| `DefaultRootObject` empty | 2 | Warning | `~` | S3, S4, S5 | `no default root object` |
-| an S3 origin with neither an origin access control nor a legacy origin access identity | 2 | Warning | `~` | S3, S4, S5 | `S3 origin without origin access control` |
-| the default CloudFront certificate on a distribution with custom aliases | 2 | Warning | `~` | S3, S4, S5 | `uses the default CloudFront certificate` |
-| `GeoRestriction.RestrictionType == none` | 2 | Warning | `~` | S3, S4, S5 | `no geo restriction` |
+| Weak TLS policy on aliased distribution | 2 | Warning | `~` | S2, S3, S4, S5 | `minimum TLS below 1.2` |
+| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Warning | `~` | S2, S3, S4, S5 | `traffic allowed without TLS` |
+| `LoggingConfig.Enabled == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `access logging off` |
+| an S3 origin naming a bucket absent from the account | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `S3 origin bucket does not exist` |
+| `DefaultRootObject` empty | 2 | Warning | `~` | S2, S3, S4, S5 | `no default root object` |
+| an S3 origin with neither an origin access control nor a legacy origin access identity | 2 | Warning | `~` | S2, S3, S4, S5 | `S3 origin without origin access control` |
+| the default CloudFront certificate on a distribution with custom aliases | 2 | Warning | `~` | S2, S3, S4, S5 | `uses the default CloudFront certificate` |
+| `GeoRestriction.RestrictionType == none` | 2 | Warning | `~` | S2, S3, S4, S5 | `no geo restriction` |
 | `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` |
 
 ## 4.1 UX review (two sentences)

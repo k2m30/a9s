@@ -140,9 +140,9 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Job.SecurityConfiguration` empty | 1 | Warning | n/a | S1, S2, S4 | `no security configuration` |
-| the job's default arguments do not enable continuous CloudWatch logging | 1 | Warning | n/a | S1, S2, S4 | `continuous logging off` |
-| a default argument value scans as a credential | 1 | Broken | n/a | S1, S2, S4 | `credential in job arguments` |
+| `Job.SecurityConfiguration` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no security configuration` |
+| the job's default arguments do not enable continuous CloudWatch logging | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `continuous logging off` |
+| a default argument value scans as a credential | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in job arguments` |
 | latest run `FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |
 | latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |
 | latest run `ERROR` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |

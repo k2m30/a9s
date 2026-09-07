@@ -128,11 +128,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating: <pct>%` |
-| `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S1, S2, S4 | `<status>` |
-| `Status == failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `Status == incompatible-*` | 1 | Broken | n/a | S1, S2, S4 | `<incompatible-* status>` |
-| `Encrypted == false` | 1 | Warning | n/a | S1, S2, S4 | `unencrypted` |
+| `Status == creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating: <pct>%` |
+| `Status` neither `available` nor an enumerated state | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>` |
+| `Status == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `Status == incompatible-*` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<incompatible-* status>` |
+| `Encrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted` |
 | orphan: source DB deleted | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `orphan: source DB deleted` |
 | automated age > parent `BackupRetentionPeriod` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `automated, <N>d past retention` |
 | `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |

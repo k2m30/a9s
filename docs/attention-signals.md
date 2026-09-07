@@ -28,28 +28,31 @@ definition; `docs/resources/<shortName>.md` §4 transcribes it verbatim.
 |---|---|---|
 | S1 | Menu `issues:N` count + list frame title `!N` suffix | A row counts when its Wave 1 colour is an issue — Warning or Broken, never Dim — and a Wave 2 finding counts only at `!` severity; `~` findings do not bump. `core/runtime/handlers_availability.go` `unifiedIssueCount` and `core/app/list_body.go` are the two callers, and both read the same rule. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
+| S3 | `!` / `~` tier in the detail-view Attention section | One entry per finding, `!` at Broken and `~` at Warning — `internal/tui/views/detail_fields.go`. A finding that is neither, such as a Dim lifecycle state, is skipped there and has no tier. **Not a list-row marker**: a list row's colour is the worst finding over both waves (`tests/unit/qa_color_findings_conformance_test.go`, empty divergence allowlist), so a row carrying a finding is never green for a glyph to annotate. |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
 
 ### Wave → surface mapping
 
-Which surfaces a finding reaches follows from its wave and its severity, and
+Which surfaces a finding reaches follows from its severity and its wave, and
 `docs/resources/<shortName>.md` §4 names them per signal rather than restating
-the rule:
+the rule. A finding colours its row the same way whichever wave found it, so
+there is no separate case for a Wave 2 finding landing on a green row:
 
-- **Wave 1, Healthy** — no §4 row. S2 renders green and S4 renders blank.
-- **Wave 1, Warning or Broken** — S2 (colour) and S4 (cause text), and the row
-  counts towards S1. No glyph: `core/app/list_columns.go`
-  `resolveListDecoratorFull` gives one only to a row whose colour is Healthy,
-  and a Wave 1 issue finding has already coloured it. So no S3.
-- **Wave 1, Dim** — S2 and S4. Dim is not an issue colour, so no S1, and no
-  glyph for the same reason as above.
-- **Wave 2 on a Healthy row** — `!` when the finding is Broken, `~` when it is
-  Warning, on S3, with S4 and S5. Only the `!` case reaches S1.
-- **Wave 2 on a row Wave 1 already coloured** — S3 is suppressed, S4
-  deduplicates with the cause already there, S5 carries the full sentence, and
-  S1 still counts the row.
+- **Healthy** — no §4 row. S2 renders green and S4 renders blank.
+- **Warning or Broken, Wave 1** — S1, S2, S3, S4, S5.
+- **Broken, Wave 2** — S1, S2, S3, S4, S5.
+- **Warning, Wave 2** — S2, S3, S4, S5. No S1: the count takes a Wave 2 finding
+  only at Broken.
+- **Dim** — S2 and S4. Dim is not an issue colour, so no S1, and
+  `internal/tui/views/detail_fields.go` skips a finding that is not an issue
+  severity, so no S3 and no S5 either.
+
+S2 and S4 are on every row: the colour and the cause text are what a non-healthy
+row is. S3 and S5 are the Attention section's tier and sentence, so they follow
+the same issue-severity test that section applies. S1 is
+`core/runtime/handlers_availability.go` `unifiedIssueCount` with
+`core/app/list_body.go`.
 
 ### S1 — list frame title issue count
 

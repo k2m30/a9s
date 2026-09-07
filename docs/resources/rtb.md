@@ -116,8 +116,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Routes[].State == blackhole` | 1 | Broken | n/a | S1, S2, S4 | `blackhole route (target deleted)` |
-| no associations AND not VPC main | 1 | Warning | n/a | S1, S2, S4 | `no subnet associations` |
+| `Routes[].State == blackhole` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `blackhole route (target deleted)` |
+| no associations AND not VPC main | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no subnet associations` |
 
 Rules for filling list and detail text:
 

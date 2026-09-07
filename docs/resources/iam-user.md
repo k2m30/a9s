@@ -105,13 +105,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` |
-| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` |
-| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused` |
-| Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
-| Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` |
-| an access key created more than 90 days ago | 2 | Warning | `~` | S3, S4, S5 | `access key past rotation` |
+| Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S2, S3, S4, S5 | `console password never used` |
+| Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S2, S3, S4, S5 | `console sign-in unused for 90 days` |
+| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S2, S3, S4, S5 | `access key unused` |
+| Two Active access keys | 2 | Warning | `~` | S2, S3, S4, S5 | `two active access keys` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| Console login without MFA | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `console user without MFA` |
+| an access key created more than 90 days ago | 2 | Warning | `~` | S2, S3, S4, S5 | `access key past rotation` |
 
 Rules applied:
 

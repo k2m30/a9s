@@ -136,12 +136,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status == PROVISIONING` | 1 | Warning | n/a | S1, S2, S4 | `provisioning` |
-| `status == DEPROVISIONING` | 1 | Warning | n/a | S1, S2, S4 | `deprovisioning` |
-| `status == FAILED` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
-| `status == INACTIVE` | 1 | Broken | n/a | S1, S2, S4 | `inactive` |
-| `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning | `~` | S3, S4, S5 | `tasks pending or not running` |
-| `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning | `~` | S3, S4, S5 | `tasks pending or not running` |
+| `status == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
+| `status == DEPROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deprovisioning` |
+| `status == FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive` |
+| `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks pending or not running` |
+| `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks pending or not running` |
 
 Rules for filling list and detail text:
 

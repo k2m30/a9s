@@ -139,12 +139,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | n/a | S1, S2, S4 | `scan on push off` |
-| `ImageTagMutability == MUTABLE` | 1 | Warning | n/a | S1, S2, S4 | `tags are mutable` |
+| `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `scan on push off` |
+| `ImageTagMutability == MUTABLE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `tags are mutable` |
 | latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
 | latest image `HIGH>0` (no CRITICAL) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
-| the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `repository policy open to anyone` |
-| `GetLifecyclePolicy` reports no policy | 2 | Warning | `~` | S3, S4, S5 | `no lifecycle policy` |
+| the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `repository policy open to anyone` |
+| `GetLifecyclePolicy` reports no policy | 2 | Warning | `~` | S2, S3, S4, S5 | `no lifecycle policy` |
 
 Rules applied:
 

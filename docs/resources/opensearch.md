@@ -163,15 +163,15 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `Deleted==true` | 1 | Dim | n/a | S2, S4 | `deleting: removal in progress` |
-| `Processing==true` or `UpgradeProcessing==true` | 1 | Warning | n/a | S1, S2, S4 | `processing: config change in flight` |
-| `DomainProcessingStatus=="Isolated"` | 1 | Broken | n/a | S1, S2, S4 | `isolated: quarantined by AWS` |
-| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | n/a | S1, S2, S4, S5 | `software update forced soon` |
-| `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | n/a | S1, S2, S4 | `encryption at rest off` |
-| No `VPCOptions` AND access policy allows any principal | 1 | Broken | n/a | S1, S2, S4 | `reachable outside a VPC` |
-| `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | n/a | S1, S2, S4 | `HTTPS not enforced` |
-| `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | n/a | S1, S2, S4 | `node-to-node encryption off` |
-| `DescribeDomains` was denied for this domain | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
-| the domain is absent from the `DescribeDomains` response | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
+| `Processing==true` or `UpgradeProcessing==true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `processing: config change in flight` |
+| `DomainProcessingStatus=="Isolated"` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `isolated: quarantined by AWS` |
+| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` |
+| `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
+| No `VPCOptions` AND access policy allows any principal | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `reachable outside a VPC` |
+| `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `HTTPS not enforced` |
+| `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `node-to-node encryption off` |
+| `DescribeDomains` was denied for this domain | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| the domain is absent from the `DescribeDomains` response | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 
 ## 4.1 UX review
 

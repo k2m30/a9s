@@ -124,14 +124,14 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | n/a | S1, S2, S4 | `<status, in words>` |
-| `ROLLBACK_COMPLETE` | 1 | Broken | n/a | S1, S2, S4 | `<status, in words>` |
-| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Broken | n/a | S1, S2, S4 | `<status, in words>` |
-| `*_FAILED` | 1 | Broken | n/a | S1, S2, S4 | `<status, in words>` |
+| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status, in words>` |
+| `ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
+| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
+| `*_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
 | `StackStatus == DELETE_COMPLETE` | 1 | Dim | n/a | S2, S4 | `delete complete` |
-| `EnableTerminationProtection == false` on a live, top-level stack | 1 | Warning | n/a | S1, S2, S4 | `termination protection off` |
-| a stack output value scans as a credential | 1 | Broken | n/a | S1, S2, S4 | `credential in stack outputs` |
-| `DriftInformation.StackDriftStatus == DRIFTED` | 2 | Warning | `~` | S3, S4, S5 | `stack drifted from template` |
+| `EnableTerminationProtection == false` on a live, top-level stack | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `termination protection off` |
+| a stack output value scans as a credential | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in stack outputs` |
+| `DriftInformation.StackDriftStatus == DRIFTED` | 2 | Warning | `~` | S2, S3, S4, S5 | `stack drifted from template` |
 | Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `recent resource failure` |
 
 Rules for filling list and detail text:

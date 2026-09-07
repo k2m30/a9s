@@ -94,8 +94,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `SubscriptionArn == "PendingConfirmation"` | 1 | Warning | n/a | S1, S2, S4 | `endpoint has not confirmed the subscription` |
-| `Protocol == "http"` | 1 | Warning | n/a | S1, S2, S4, S5 | `delivers over plain HTTP` |
+| `SubscriptionArn == "PendingConfirmation"` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `endpoint has not confirmed the subscription` |
+| `Protocol == "http"` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delivers over plain HTTP` |
 | the subscription's endpoint has been deleted | 1 | Dim | n/a | S2, S4 | `endpoint deleted` |
 
 ### 4.1 UX review (two sentences)

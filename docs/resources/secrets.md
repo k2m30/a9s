@@ -164,13 +164,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `now > NextRotationDate` | 1 | Warning | n/a | S1, S2, S4 | `rotation overdue` |
-| `LastAccessedDate > 180d` | 1 | Warning | n/a | S1, S2, S4 | `dormant` |
-| `DeletedDate set` | 1 | Broken | n/a | S1, S2, S4 | `deleted` |
-| `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | n/a | S1, S2, S4 | `rotation not enabled` |
-| the secret's value has not changed in over 365 days | 1 | Warning | n/a | S1, S2, S4 | `value unchanged in over 365 days` |
-| Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `resource policy open to anyone` |
-| Resource policy names a principal in another account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
+| `now > NextRotationDate` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rotation overdue` |
+| `LastAccessedDate > 180d` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `dormant` |
+| `DeletedDate set` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `deleted` |
+| `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rotation not enabled` |
+| the secret's value has not changed in over 365 days | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `value unchanged in over 365 days` |
+| Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
+| Resource policy names a principal in another account | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | rotation failing for more than two full intervals, `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |
 | `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` |
 

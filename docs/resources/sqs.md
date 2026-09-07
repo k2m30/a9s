@@ -139,8 +139,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S3, S4, S5 | `no DLQ configured` |
-| `KmsMasterKeyId` unset | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
-| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `queue policy open to anyone` |
+| `KmsMasterKeyId` unset | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
+| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `queue policy open to anyone` |
 | `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` |
 | `ApproximateNumberOfMessages rising unbounded` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S2, S4, S5 | `backlog growing: <N> msgs` |
 | `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `oldest msg age: <D>` |

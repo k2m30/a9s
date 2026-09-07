@@ -116,11 +116,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `StreamStatus == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
-| `StreamStatus == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
-| `StreamStatus == DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
-| `EncryptionType` NONE or absent | 2 | Warning | `~` | S3, S4, S5 | `not encrypted at rest` |
-| `RetentionPeriodHours` at or below the 24-hour default | 2 | Warning | `~` | S3, S4, S5 | `24h retention` |
+| `StreamStatus == CREATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `StreamStatus == UPDATING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating` |
+| `StreamStatus == DELETING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `EncryptionType` NONE or absent | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted at rest` |
+| `RetentionPeriodHours` at or below the 24-hour default | 2 | Warning | `~` | S2, S3, S4, S5 | `24h retention` |
 
 Rules for filling list and detail text:
 
