@@ -37,27 +37,18 @@ import (
 // false-positive finding (e.g. "no encryption configured" on a bucket that
 // no longer exists).
 //
-// Unwraps via errors.As to smithy.APIError, so both a typed SDK error (e.g.
-// route53 types.NoSuchHostedZone, which implements smithy.APIError) and the
-// generic smithy.GenericAPIError shape are covered by the same ErrorCode
-// match — classification is code-based, never a message substring scan.
+// Reads the code through the one classifier, so both a typed SDK error (e.g.
+// route53 types.NoSuchHostedZone) and the generic API error shape are covered
+// by the same match — classification is code-based, never a message substring scan.
 // "NotFound" also covers S3's empty-body-404 synthesis from HTTP status
 // text, which carries no modeled error shape of its own.
 func IsNotFoundErr(err error) bool {
-	var apiErr smithy.APIError
-	if !errors.As(err, &apiErr) {
-		return false
-	}
-	switch apiErr.ErrorCode() {
-	case "NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException", "InvalidInstanceID.NotFound",
+	return ErrCodeIs(err,
+		"NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException", "InvalidInstanceID.NotFound",
 		// RDS and DocumentDB spell the same race with their own codes; a
 		// snapshot deleted between the list call and a per-snapshot
 		// describe answers one of these.
-		"DBSnapshotNotFound", "DBClusterSnapshotNotFoundFault":
-		return true
-	default:
-		return false
-	}
+		"DBSnapshotNotFound", "DBClusterSnapshotNotFoundFault")
 }
 
 // aggregateFailuresCap is the maximum number of distinct causes
@@ -66,10 +57,86 @@ func IsNotFoundErr(err error) bool {
 // by how many resources they happened to.
 const aggregateFailuresCap = 5
 
+// Failure is one failed per-item call, recorded from the error's own fields:
+// which item refused, the class every surface branches on, and the cause it
+// phrases. It is the only shape a failure travels in — a caller that rendered
+// its own "<id>: <err>" would hand the aggregate a string it could only reduce
+// back to a cause by re-reading words the SDK wrote.
+type Failure struct {
+	ID    string
+	Class string
+	Cause string
+}
+
+// FailedCall records a per-item call that failed with err.
+func FailedCall(id string, err error) Failure {
+	return FailedCallInRegion(id, err, "")
+}
+
+// FailedCallInRegion is FailedCall for a call whose failure may be about the
+// region itself; the region is named only when the class says so, exactly as
+// CauseInRegion decides for every other surface.
+func FailedCallInRegion(id string, err error, region string) Failure {
+	cause := CauseInRegion(err, region)
+	if cause == "" {
+		// A failure with nothing to say still has to say something: an empty
+		// cause would read as a failure with no reason at all.
+		cause = "no reason given"
+	}
+	return Failure{ID: id, Class: ErrClass(err), Cause: cause}
+}
+
+// UnusableAnswer records an item the service answered for without the field
+// the caller needs — a nil struct, a missing default version, a page that says
+// it is truncated and names no marker. There is no error to classify, so a9s
+// states the cause itself.
+func UnusableAnswer(id, cause string) Failure {
+	return Failure{ID: id, Class: classUnknown, Cause: cause}
+}
+
+// SortFailures orders records by id so an aggregate built from a parallel walk
+// reads the same on every run: which failure a cause names as its example is
+// otherwise whichever goroutine happened to finish first.
+func SortFailures(failures []Failure) {
+	slices.SortFunc(failures, func(a, b Failure) int {
+		if c := strings.Compare(a.ID, b.ID); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Cause, b.Cause)
+	})
+}
+
+// classErr carries the recorded class of a partial-batch failure out through
+// the composite error. The composite's own words are a9s's sentence and hold
+// no AWS error to read, so without this every aggregated denial reclassifies
+// as Unknown on the surfaces downstream of the fetcher.
+type classErr struct {
+	error
+	class string
+}
+
+// classCarrier is what ErrClass looks for before it inspects the chain: an
+// error that already knows its class because a recorder read it off the
+// original.
+type classCarrier interface {
+	error
+	errClass() string
+}
+
+func (e classErr) errClass() string { return e.class }
+
+// isPhrased reports whether err is a composite AggregateFailures has already
+// phrased. Its words are the failure line — the class it carries is for a
+// surface that branches on it, never for one that reads it.
+func isPhrased(err error) bool {
+	_, ok := errors.AsType[classCarrier](err)
+	return ok
+}
+
 // AggregateFailures builds the canonical composite error for a partial-batch
 // operation. opName is the operation label (e.g. "kms FetchByIDs",
-// "policy FetchByIDs", "ecs-task ListTargets"). failures is a slice of
-// "<id>: <reason>" strings collected during iteration. total is the total
+// "policy FetchByIDs", "ecs-task ListTargets"). failures are the records the
+// iteration collected through FailedCall/UnusableAnswer. total is the total
 // number of items attempted (failures + successes).
 //
 // Returns nil when len(failures) == 0 so callers can write:
@@ -80,15 +147,18 @@ const aggregateFailuresCap = 5
 //
 // This is the one place a partial-batch failure is phrased. A role denied one
 // action fails on every resource of the type at once, so the failures are
-// grouped by cause and each cause is stated once, with how many resources it
-// covered and one example:
+// grouped by their recorded cause and each cause is stated once, with how many
+// resources it covered and one example:
 //
 //	"<op> failed for 46 of 46 IDs: not authorized to perform ec2:DescribeSnapshotAttribute (e.g. snap-0abc)"
-//	"<op> failed for 3 of 9 IDs: context deadline exceeded (2, e.g. snap-1); no metadata (1, e.g. snap-3)"
+//	"<op> failed for 3 of 9 IDs: timeout (2, e.g. snap-1); no metadata (1, e.g. snap-3)"
 //
 // Above aggregateFailuresCap distinct causes the rest are summarized as
-// "; and N more causes".
-func AggregateFailures(opName string, failures []string, total int) error {
+// "; and N more causes". Grouping is per cause rather than per class so two
+// actions the same role lacks stay two lines: one denial must never speak for
+// another. The class travels with the composite when every failure shares one,
+// which is what lets a fetcher's denied batch still read as access-denied.
+func AggregateFailures(opName string, failures []Failure, total int) error {
 	if len(failures) == 0 {
 		return nil
 	}
@@ -100,21 +170,18 @@ func AggregateFailures(opName string, failures []string, total int) error {
 	}
 	var groups []*group
 	byCause := map[string]*group{}
+	class := failures[0].Class
 	for _, f := range failures {
-		// AggregateFailures' documented input shape is "<id>: <reason>"; an
-		// entry with no separator is all reason and contributes no example.
-		id, reason, ok := strings.Cut(f, ": ")
+		g, ok := byCause[f.Cause]
 		if !ok {
-			id, reason = "", f
-		}
-		cause := groupCause(reason)
-		g, ok := byCause[cause]
-		if !ok {
-			g = &group{cause: cause, example: id}
-			byCause[cause] = g
+			g = &group{cause: f.Cause, example: f.ID}
+			byCause[f.Cause] = g
 			groups = append(groups, g)
 		}
 		g.n++
+		if f.Class != class {
+			class = ""
+		}
 	}
 
 	suffix := ""
@@ -137,8 +204,12 @@ func AggregateFailures(opName string, failures []string, total int) error {
 		parts = append(parts, part)
 	}
 
-	return fmt.Errorf("%s failed for %d of %d IDs: %s%s",
+	err := fmt.Errorf("%s failed for %d of %d IDs: %s%s",
 		opName, len(failures), total, strings.Join(parts, "; "), suffix)
+	if class == "" {
+		return err
+	}
+	return classErr{error: err, class: class}
 }
 
 // deniedAction reads the action a role lacks out of an AWS authorization
@@ -158,53 +229,71 @@ func deniedAction(message string) (string, bool) {
 	return action, action != ""
 }
 
-// groupCause is AggregateFailures' grouping key over reasons its callers have
-// already rendered to text. It undoes the SDK's own Error() formatting: the
-// operation preamble, the "api error" marker, and the per-call request id,
-// host id and encoded authorization message, which differ on every resource
-// and would otherwise put each failure in a group of its own.
-//
-// ponytail: a text reduction, because AggregateFailures' callers hand it
-// "<id>: <err>" strings and the error's fields are gone by then. Upgrade path
-// is an error-carrying collector, after which this reads CauseOf like every
-// other surface and disappears.
-func groupCause(reason string) string {
-	if action, ok := deniedAction(reason); ok {
-		return "not authorized to perform " + action
+// classUnknown is the class of an error carrying no AWS error code at all: a
+// response the SDK could not bind, or a failure that never reached a service
+// and is not one of the transport classes named below.
+const classUnknown = "Unknown"
+
+// ClassifyAWSError inspects an error for a smithy.APIError and returns the
+// error code, message, and whether the operation is retryable. This is the one
+// read of the SDK's error type in a9s: every other site asks ErrClass for the
+// class, ErrCodeIs for a code it names itself, or MessageOf for the message.
+func ClassifyAWSError(err error) (code string, message string, retryable bool) {
+	if err == nil {
+		return "", "", false
 	}
-	const opMarker = "operation error "
-	if i := strings.Index(reason, opMarker); i >= 0 {
-		head, rest, ok := strings.Cut(reason[i+len(opMarker):], ", ")
-		if ok && strings.Contains(head, ": ") {
-			reason = rest
-		}
+
+	apiErr, ok := errors.AsType[smithy.APIError](err)
+	if !ok {
+		return classUnknown, err.Error(), false
 	}
-	stripped := reason
-	if i := strings.Index(stripped, "api error "); i >= 0 {
-		stripped = stripped[i+len("api error "):]
+
+	code = apiErr.ErrorCode()
+	message = apiErr.ErrorMessage()
+
+	switch code {
+	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded", "SlowDown":
+		retryable = true
+	default:
+		retryable = false
 	}
-	for _, noise := range []string{"Encoded authorization failure message:", "RequestID:", "HostID:", "\n"} {
-		if i := strings.Index(stripped, noise); i >= 0 {
-			stripped = stripped[:i]
-		}
-	}
-	stripped = strings.TrimRight(strings.TrimSpace(stripped), " ,.")
-	if stripped != "" {
-		return stripped
-	}
-	// A reason that was nothing but per-call noise still has to say something:
-	// an empty cause would read as a failure with no reason at all.
-	if reason = strings.TrimSpace(reason); reason != "" {
-		return reason
-	}
-	return "no reason given"
+
+	return code, message, retryable
 }
 
-// ClassRegionUnavailable is the class of a service the selected region does
-// not offer: the endpoint host's DNS does not resolve. Named because two
-// surfaces branch on it, and a literal in either would be a second decision
-// that agrees with the class only by luck.
-const ClassRegionUnavailable = "region-unavailable"
+// ErrCodeIs reports whether err carries one of the named AWS error codes.
+//
+// The codes a site names itself are the ones AWS models as errors but an
+// operator reads as answers: "this table has no resource policy", "this launch
+// template is gone", "this bucket lives in another region". They are not
+// classes — a9s says nothing about them beyond "this one is not a failure" —
+// so they are asked for by code, through the one classifier, rather than by
+// each site unwrapping the SDK's error type for itself.
+func ErrCodeIs(err error, codes ...string) bool {
+	code, _, _ := ClassifyAWSError(err)
+	if code == "" || code == classUnknown {
+		return false
+	}
+	return slices.Contains(codes, code)
+}
+
+// The classes several surfaces branch on are named: a literal at a branch
+// would be a second decision that agrees with the class only by luck.
+//
+// ClassRegionUnavailable is a service the selected region does not offer —
+// the endpoint host's DNS does not resolve.
+const (
+	ClassRegionUnavailable = "region-unavailable"
+	ClassAccessDenied      = "access-denied"
+	ClassThrottled         = "throttled"
+)
+
+// IsAccessDenied reports whether the role was refused the call. It is the one
+// reading of that condition: the several codes AWS spells it with live in
+// ErrClass's table, not at the sites that act on it.
+func IsAccessDenied(err error) bool {
+	return ErrClass(err) == ClassAccessDenied
+}
 
 // ErrClass maps an error to the short class word every surface that phrases a
 // failure reads — the menu row's cause mark, ScanStatus.Err, the account-wide
@@ -214,6 +303,9 @@ const ClassRegionUnavailable = "region-unavailable"
 func ErrClass(err error) string {
 	if err == nil {
 		return ""
+	}
+	if c, ok := errors.AsType[classCarrier](err); ok {
+		return c.errClass()
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "timeout"
@@ -248,16 +340,16 @@ func ErrClass(err error) string {
 	code, _, _ := ClassifyAWSError(err)
 	switch code {
 	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
-		return "throttled"
+		return ClassThrottled
 	case "AccessDenied", "AccessDeniedException":
-		return "access-denied"
+		return ClassAccessDenied
 	case "ExpiredToken", "ExpiredTokenException", "RequestExpired":
 		return "expired"
 	case "":
 		// An empty class means no failure at all — the menu row shows its
 		// alias and the operator is told nothing. A response with no modeled
 		// code still failed.
-		return "Unknown"
+		return classUnknown
 	default:
 		return code
 	}
@@ -284,9 +376,9 @@ var errClassPhrasing = map[string]struct{ cause, row, sweepTitle string }{
 	"tls":                  {"TLS handshake failed", "tls", "sweep: TLS failure"},
 	"dns":                  {"DNS resolution failed", "dns", "sweep: DNS failure"},
 	"transport":            {"transport failure", "transport", "sweep: transport failure"},
-	"access-denied":        {"", "denied", "sweep: access denied"},
+	ClassAccessDenied:      {"", "denied", "sweep: access denied"},
 	"expired":              {"", "expired", "session expired"},
-	"throttled":            {"", "throttled", "sweep: throttled"},
+	ClassThrottled:         {"", "throttled", "sweep: throttled"},
 }
 
 // unmodeledWord is what a row shows for a class a9s does not name itself: a
@@ -360,11 +452,21 @@ func CauseOf(err error) string {
 	if err == nil {
 		return ""
 	}
+	if isPhrased(err) {
+		return err.Error()
+	}
 	if cause := CauseForClass(ErrClass(err)); cause != "" {
 		return cause
 	}
 	apiErr, ok := errors.AsType[smithy.APIError](err)
 	if !ok {
+		// An error the SDK could not model still arrives wrapped in the
+		// operation error, whose own words are the service and operation the
+		// caller has already named. Reading the error it carries drops that
+		// preamble by structure rather than by trimming text.
+		if opErr, wrapped := errors.AsType[*smithy.OperationError](err); wrapped && opErr.Unwrap() != nil {
+			return opErr.Unwrap().Error()
+		}
 		return err.Error()
 	}
 	message := strings.TrimSpace(apiErr.ErrorMessage())
@@ -396,6 +498,11 @@ func CauseOf(err error) string {
 func CauseInRegion(err error, region string) string {
 	cause := CauseOf(err)
 	if region == "" || ErrClass(err) != ClassRegionUnavailable {
+		return cause
+	}
+	// A composite's records were each recorded in a region and already say so;
+	// naming it again around the whole sentence would name it twice.
+	if isPhrased(err) {
 		return cause
 	}
 	return cause + " (" + region + ")"

@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
@@ -44,7 +43,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.UnknownRelated("kms")
 	}
 	seen := make(map[string]struct{})
-	var failures []string
+	var failures []Failure
 	total := 0
 	for _, item := range items {
 		if item.IntegrationUri == nil || !strings.Contains(*item.IntegrationUri, ":function:") {
@@ -68,7 +67,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 			return lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &rest})
 		})
 		if lerr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", rest, lerr))
+			failures = append(failures, FailedCall(rest, lerr))
 			continue
 		}
 		if out == nil || out.Configuration == nil {
@@ -222,7 +221,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.ErrorRelated("acm", err)
 	}
 	seen := make(map[string]struct{})
-	var failures []string
+	var failures []Failure
 	total := 0
 	for _, d := range dn.Items {
 		if d.DomainName == nil {
@@ -234,7 +233,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 			return mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName})
 		})
 		if merr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", *d.DomainName, merr))
+			failures = append(failures, FailedCall(*d.DomainName, merr))
 			continue
 		}
 		if m == nil {

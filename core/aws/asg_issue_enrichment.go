@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"sync"
 
@@ -40,7 +39,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		return result, nil
 	}
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -63,7 +62,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -94,7 +93,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed,
 			catalog.Phrase(asgCodeScalingActivityFailed), "!", "asg", rows)
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	SetTruncated(&result, truncated)
 	activitiesErr := AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
 	lcErr := asgLaunchConfigurationPosture(ctx, clients, &result, resources)
@@ -147,11 +146,11 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 			// Any page failing leaves the whole batch uninspected: pages read
 			// before it are dropped rather than applied, so no group reports a
 			// clean posture on a partial read.
-			var failures []string
+			var failures []Failure
 			groups := 0
 			for _, name := range names {
 				for _, id := range groupsByLC[name] {
-					MarkSkipped(result, id, &failures, op, err)
+					MarkSkipped(result, id, &failures, err)
 					groups++
 				}
 			}

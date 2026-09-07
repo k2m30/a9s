@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -305,7 +304,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		return resource.UnknownRelated("eb-rule")
 	}
 	idSet := make(map[string]struct{})
-	var failures []string
+	var failures []Failure
 	for _, ruleRes := range ruleList {
 		parentCtx := map[string]string{
 			"rule_name": ruleRes.ID,
@@ -313,7 +312,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		}
 		targets, err := FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, "")
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", ruleRes.ID, err))
+			failures = append(failures, FailedCall(ruleRes.ID, err))
 			continue
 		}
 		for _, tgt := range targets.Resources {

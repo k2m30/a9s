@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -96,7 +95,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 
 	// Collect LB names, resolve each to ARN via DescribeLoadBalancers.
 	var tgARNs []string
-	var failures []string
+	var failures []Failure
 	for _, lb := range resOut.EnvironmentResources.LoadBalancers {
 		if lb.Name == nil || *lb.Name == "" {
 			continue
@@ -110,7 +109,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 			})
 		})
 		if lbErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: DescribeLoadBalancers: %v", lbName, lbErr))
+			failures = append(failures, FailedCall(lbName, lbErr))
 			continue
 		}
 		if len(lbOut.LoadBalancers) == 0 {
@@ -128,7 +127,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 			})
 		})
 		if lsnErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: DescribeListeners: %v", lbName, lsnErr))
+			failures = append(failures, FailedCall(lbName, lsnErr))
 			continue
 		}
 		for _, l := range lsnOut.Listeners {

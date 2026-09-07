@@ -65,8 +65,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			code, _, _ := ClassifyAWSError(err)
-			if code == "AccessDeniedException" || code == "AccessDenied" {
+			if IsAccessDenied(err) {
 				// AWS-managed keys: skip silently without marking truncated
 				return
 			}

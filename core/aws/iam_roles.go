@@ -214,7 +214,7 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 		return nil, nil
 	}
 
-	var failures []string
+	var failures []Failure
 	resources := make([]resource.Resource, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -231,7 +231,7 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 			if err == nil {
 				err = fmt.Errorf("empty response")
 			}
-			failures = append(failures, fmt.Sprintf("%s: %s", id, err.Error()))
+			failures = append(failures, FailedCall(id, err))
 			continue
 		}
 		resources = append(resources, roleToResource(ctx, api, *output.Role))

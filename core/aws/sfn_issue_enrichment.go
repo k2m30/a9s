@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -41,7 +40,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		return result, nil
 	}
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -86,10 +85,10 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			// (e.g. Fields["type"] was unset/stale), AWS rejects the call with
 			// StateMachineTypeNotSupported — that is a benign, expected skip,
 			// not a real failure.
-			if code, _, _ := ClassifyAWSError(err); code == "StateMachineTypeNotSupported" {
+			if ErrCodeIs(err, "StateMachineTypeNotSupported") {
 				return
 			}
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -124,7 +123,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	SetTruncated(&result, truncated)
 	return result,
 		AggregateFailures("sfn-enrich: ListExecutions", failures, total)

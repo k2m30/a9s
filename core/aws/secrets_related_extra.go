@@ -7,8 +7,6 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"strings"
 
 	ecspkg "github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -18,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
-	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -100,7 +97,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
 	var ids []string
-	var failures []string
+	var failures []Failure
 	for _, ebRes := range entry.Resources {
 		eb, ok := assertStruct[ebtypes.EnvironmentDescription](ebRes.RawStruct)
 		if !ok {
@@ -124,7 +121,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 			})
 		})
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", ebRes.ID, err))
+			failures = append(failures, FailedCall(ebRes.ID, err))
 			continue
 		}
 		for _, cfg := range cfgOut.ConfigurationSettings {
@@ -190,7 +187,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	}
 
 	var ids []string
-	var failures []string
+	var failures []Failure
 	for _, taskRes := range entry.Resources {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
 		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
@@ -218,11 +215,10 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 			// absence, not a real failure — skip without aggregating. Every
 			// other error (AccessDenied, Throttling, transient) aggregates per
 			// the E3 rule. Mirrors ecsJoinEFSVolumes in ecs_task.go.
-			var apiErr smithy.APIError
-			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ClientException" {
+			if ErrCodeIs(err, "ClientException") {
 				continue
 			}
-			failures = append(failures, fmt.Sprintf("%s: %v", taskRes.ID, err))
+			failures = append(failures, FailedCall(taskRes.ID, err))
 			continue
 		}
 		if tdOut == nil || tdOut.TaskDefinition == nil {

@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"sort"
 	"strings"
 	"sync"
 
@@ -39,7 +38,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		return result, nil
 	}
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -64,7 +63,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -113,7 +112,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			catalog.Phrase(cfnCodeRecentResourceFailure), "!", "cfn", failedRows)
 
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
@@ -181,7 +180,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		return result, nil
 	}
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -206,7 +205,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -233,7 +232,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 			}
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

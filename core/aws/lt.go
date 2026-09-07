@@ -86,7 +86,7 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 
 	total := len(listOutput.LaunchTemplates)
 	var resources []resource.Resource
-	var failures []string
+	var failures []Failure
 	for i := range listOutput.LaunchTemplates {
 		tpl := listOutput.LaunchTemplates[i]
 		id := aws.ToString(tpl.LaunchTemplateId)
@@ -99,10 +99,10 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		})
 		switch {
 		case versionErr != nil:
-			failures = append(failures, fmt.Sprintf("%s: %s", id, versionErr.Error()))
+			failures = append(failures, FailedCall(id, versionErr))
 			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", versionErr)}))
 		case len(versionOutput.LaunchTemplateVersions) == 0:
-			failures = append(failures, fmt.Sprintf("%s: no $Default version in DescribeLaunchTemplateVersions response", id))
+			failures = append(failures, UnusableAnswer(id, "no $Default version in DescribeLaunchTemplateVersions response"))
 			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", nil)}))
 		default:
 			ver := versionOutput.LaunchTemplateVersions[0]

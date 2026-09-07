@@ -8,7 +8,6 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -394,7 +393,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	var ids []string
-	var failures []string
+	var failures []Failure
 	for _, sfnRes := range entry.Resources {
 		sfnARN := sfnRes.Fields["arn"]
 		if sfnARN == "" {
@@ -402,7 +401,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 		sm, err := sfnDescribe(ctx, clients, sfnARN)
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", sfnRes.ID, err))
+			failures = append(failures, FailedCall(sfnRes.ID, err))
 			continue
 		}
 		if sm == nil || sm.Definition == nil || *sm.Definition == "" {

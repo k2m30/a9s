@@ -11,7 +11,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -48,7 +47,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 	if !ok {
 		return result, nil
 	}
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -81,7 +80,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 			// gone, not unreadable — unknown either way, but not a failure
 			// worth surfacing in the error log.
 			if !isKinesisStreamGone(err) {
-				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+				failures = append(failures, FailedCall(r.ID, err))
 			}
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -104,7 +103,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 				[]domain.DetailRow{{Label: "Records kept", Value: fmt.Sprintf("%dh", *h), Tier: "~"}})
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	MarkInformationalOnly(&result)
 	return result, AggregateFailures("kinesis-enrich: DescribeStreamSummary", failures, total)
 }

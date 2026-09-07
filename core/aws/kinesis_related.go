@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -140,7 +139,7 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	var ids []string
-	var failures []string
+	var failures []Failure
 	for _, ddbRes := range entry.Resources {
 		tableName := ddbRes.ID
 		if tableName == "" {
@@ -152,7 +151,7 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 			})
 		})
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", tableName, err))
+			failures = append(failures, FailedCall(tableName, err))
 			continue
 		}
 		for _, dest := range out.KinesisDataStreamDestinations {

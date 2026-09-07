@@ -7,14 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
@@ -50,8 +48,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	truncated := false
-	var failures []string
-	var policyFailures []string
+	var failures []Failure
+	var policyFailures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -110,7 +108,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			if pageFailed {
-				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, pageErr))
+				failures = append(failures, FailedCall(r.ID, pageErr))
 			}
 			return
 		}
@@ -155,8 +153,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		})
 
 	})
-	sort.Strings(failures)
-	sort.Strings(policyFailures)
+	SortFailures(failures)
+	SortFailures(policyFailures)
 	SetTruncated(&result, truncated)
 	result.FieldUpdates = make(map[string]map[string]string)
 	// The two passes are counted separately: each names how many of the same
@@ -178,7 +176,7 @@ func enrichEFSPolicies(
 	fsID string,
 	ownAccount string,
 	result *IssueEnricherResult,
-	failures *[]string,
+	failures *[]Failure,
 	mu *sync.Mutex,
 ) {
 	policyOut, policyErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeFileSystemPolicyOutput, error) {
@@ -195,7 +193,7 @@ func enrichEFSPolicies(
 	case isEFSPolicyNotFound(policyErr):
 		// No file system policy at all: nothing grants public access.
 	case policyErr != nil:
-		MarkSkipped(result, fsID, failures, "DescribeFileSystemPolicy", policyErr)
+		MarkSkipped(result, fsID, failures, policyErr)
 	default:
 		doc, parseErr := iampolicy.Parse(aws.ToString(policyOut.Policy))
 		if parseErr != nil {
@@ -219,7 +217,7 @@ func enrichEFSPolicies(
 	switch {
 	case isEFSPolicyNotFound(backupErr):
 	case backupErr != nil:
-		MarkSkipped(result, fsID, failures, "DescribeBackupPolicy", backupErr)
+		MarkSkipped(result, fsID, failures, backupErr)
 		return
 	case backupOut.BackupPolicy != nil:
 		backedUp = backupOut.BackupPolicy.Status == efstypes.StatusEnabled
@@ -238,12 +236,7 @@ func isEFSPolicyNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	var notFound *efstypes.PolicyNotFound
-	if errors.As(err, &notFound) {
-		return true
-	}
-	var apiErr smithy.APIError
-	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PolicyNotFound"
+	return ErrCodeIs(err, "PolicyNotFound")
 }
 
 // efsMountTargetState words a mount target's lifecycle state for a detail

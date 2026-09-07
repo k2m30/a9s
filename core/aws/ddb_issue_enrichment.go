@@ -12,8 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
@@ -106,7 +104,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 	if n < len(resources) {
 		SetTruncated(result, true)
 	}
-	var failures []string
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -128,12 +126,12 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		case isDDBPolicyAbsent(err):
 			return
 		case err != nil:
-			MarkSkipped(result, r.ID, &failures, "GetResourcePolicy", err)
+			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
 		doc, parseErr := iampolicy.Parse(aws.ToString(out.Policy))
 		if parseErr != nil {
-			MarkSkipped(result, r.ID, &failures, "GetResourcePolicy", parseErr)
+			MarkSkipped(result, r.ID, &failures, parseErr)
 			return
 		}
 		ex := iampolicy.Evaluate(doc, ownAccount)
@@ -165,12 +163,7 @@ func isDDBPolicyAbsent(err error) bool {
 	if err == nil {
 		return false
 	}
-	var notFound *ddbtypes.PolicyNotFoundException
-	if errors.As(err, &notFound) {
-		return true
-	}
-	var apiErr smithy.APIError
-	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PolicyNotFoundException"
+	return ErrCodeIs(err, "PolicyNotFoundException")
 }
 
 // dynamoDBTagsForARN reads one table's tags. The call answers ten tags a page,

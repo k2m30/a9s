@@ -38,7 +38,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 		return result, nil
 	}
 
-	var failures []string
+	var failures []Failure
 	// Spec §3.2 — filter to the 24h window server-side so AWS returns only
 	// the jobs we care about. Without this, accounts with months of job
 	// history scan far more pages than needed and hit EnrichmentCap early,
@@ -64,7 +64,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 			return out.BackupJobs, out.NextToken, nil
 		})
 	if walkErr != nil {
-		failures = append(failures, fmt.Sprintf("page %d: %v", pages, walkErr))
+		failures = append(failures, FailedCall(fmt.Sprintf("page %d", pages), walkErr))
 	}
 
 	// Bucket jobs by plan ID. Each plan tracks all in-window jobs.

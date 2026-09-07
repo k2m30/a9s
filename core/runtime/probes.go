@@ -792,8 +792,8 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	issueTruncated := make(map[string]bool)
 	retainedResources := make(map[string][]resource.Resource, len(allNames))
 	pagination := make(map[string]*resource.PaginationMeta, len(allNames))
-	var failures []string
-	var softFailures []string
+	var failures []awsclient.Failure
+	var softFailures []awsclient.Failure
 	attempted := 0
 
 	for _, shortName := range allNames {
@@ -817,11 +817,11 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 		if err != nil {
 			_, region := c.session.CurrentPair()
 			hasRows := len(result.Resources) > 0
-			line := failureLine(shortName, err, region)
+			failure := awsclient.FailedCallInRegion(shortName, err, region)
 			if softFailure(err, hasRows) {
-				softFailures = append(softFailures, line)
+				softFailures = append(softFailures, failure)
 			} else {
-				failures = append(failures, line)
+				failures = append(failures, failure)
 			}
 			if !hasRows {
 				continue

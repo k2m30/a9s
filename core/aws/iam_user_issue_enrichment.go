@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -230,11 +228,12 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 // isNoSuchEntity reports the IAM "this entity does not exist" error, which
 // GetLoginProfile returns for a user with no console password — an answer,
 // not a failure.
+//
+// Both spellings: IAM's modeled *NoSuchEntityException answers ErrorCode()
+// "NoSuchEntity", while a response the SDK could not bind to it carries the
+// exception name itself.
 func isNoSuchEntity(err error) bool {
-	var noSuchEntity *iamtypes.NoSuchEntityException
-	var apiErr smithy.APIError
-	return errors.As(err, &noSuchEntity) ||
-		(errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntityException")
+	return ErrCodeIs(err, "NoSuchEntity", "NoSuchEntityException")
 }
 
 // olderThan reports whether a "2006-01-02 15:04" field value parses and is

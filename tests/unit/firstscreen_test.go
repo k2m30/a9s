@@ -21,6 +21,7 @@
 package unit_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -218,17 +219,20 @@ func TestMenuTitle_WholeSweepFailed_SaysCauseOnce(t *testing.T) {
 // that phrases an aggregated failure, and pins the operator-readable result.
 func TestAggregateFailures_DeniedEnrichment_OneLinePerCause(t *testing.T) {
 	const total = 46
-	failures := make([]string, 0, total)
+	failures := make([]awsclient.Failure, 0, total)
 	for i := range total {
 		id := fmt.Sprintf("snap-%04d", i)
 		awsErr := fmt.Errorf("operation error EC2: DescribeSnapshotAttribute, "+
 			"https response error StatusCode: 403, RequestID: 11111111-2222-3333-4444-5555555%05d, "+
-			"api error UnauthorizedOperation: You are not authorized to perform this operation. "+
-			"User: arn:aws:sts::123456789012:assumed-role/example-readonly/session "+
-			"is not authorized to perform: ec2:DescribeSnapshotAttribute because no identity-based "+
-			"policy allows the ec2:DescribeSnapshotAttribute action. "+
-			"Encoded authorization failure message: %s", i, strings.Repeat("QUJDRE", 20))
-		failures = append(failures, fmt.Sprintf("%s: %v", id, awsErr))
+			"api error UnauthorizedOperation: %w", i, &smithy.GenericAPIError{
+			Code: "UnauthorizedOperation",
+			Message: "You are not authorized to perform this operation. " +
+				"User: arn:aws:sts::123456789012:assumed-role/example-readonly/session " +
+				"is not authorized to perform: ec2:DescribeSnapshotAttribute because no identity-based " +
+				"policy allows the ec2:DescribeSnapshotAttribute action. " +
+				"Encoded authorization failure message: " + strings.Repeat("QUJDRE", 20),
+		})
+		failures = append(failures, awsclient.FailedCall(id, awsErr))
 	}
 
 	err := awsclient.AggregateFailures("ebs-snap-enrich DescribeSnapshotAttribute", failures, total)
@@ -269,17 +273,19 @@ func TestAggregateFailures_DeniedEnrichment_OneLinePerCause(t *testing.T) {
 // cause, not "collapse everything": two different reasons stay visible, each
 // with its own count and example.
 func TestAggregateFailures_DistinctCauses_OneLineEach(t *testing.T) {
-	failures := []string{
-		"snap-0001: context deadline exceeded",
-		"snap-0002: context deadline exceeded",
-		"snap-0003: no metadata",
+	failures := []awsclient.Failure{
+		awsclient.FailedCall("snap-0001", context.DeadlineExceeded),
+		awsclient.FailedCall("snap-0002", context.DeadlineExceeded),
+		awsclient.UnusableAnswer("snap-0003", "no metadata"),
 	}
 	err := awsclient.AggregateFailures("ebs-snap-enrich", failures, 9)
 	if err == nil {
 		t.Fatal("AggregateFailures returned nil, want a composite error")
 	}
 	msg := err.Error()
-	for _, want := range []string{"3 of 9", "context deadline exceeded", "no metadata"} {
+	// "timeout" is the class's own word for a deadline; the Go error's text is
+	// no longer read by anything ("skipped" spec row 1).
+	for _, want := range []string{"3 of 9", "timeout", "no metadata"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("aggregated failure missing %q; got: %s", want, msg)
 		}
@@ -320,11 +326,18 @@ func TestMenuOrigin_FailedListFetch_DoesNotVerify(t *testing.T) {
 	}
 }
 
-// TestAggregateFailures_NoiseOnlyReason_StillSaysSomething pins that a reason
-// made entirely of per-call transport noise does not aggregate into an empty
-// phrase. Found by probing row 3's own change.
-func TestAggregateFailures_NoiseOnlyReason_StillSaysSomething(t *testing.T) {
-	err := awsclient.AggregateFailures("op", []string{"id-1: RequestID: abc-123"}, 3)
+// TestAggregateFailures_NothingToSay_StillSaysSomething pins that a failure
+// whose error carries neither a code nor a message does not aggregate into an
+// empty phrase.
+//
+// INVERTED for the "skipped" spec row 1: this was
+// TestAggregateFailures_NoiseOnlyReason_StillSaysSomething and fed a rendered
+// "<id>: <noise>" string. There is no string lane left to feed — a failure is
+// recorded from the error's fields — so the same hole is probed with an error
+// that has no fields. Do not restore the string input.
+func TestAggregateFailures_NothingToSay_StillSaysSomething(t *testing.T) {
+	err := awsclient.AggregateFailures("op",
+		[]awsclient.Failure{awsclient.FailedCall("id-1", &smithy.GenericAPIError{})}, 3)
 	if err == nil {
 		t.Fatal("AggregateFailures returned nil, want a composite error")
 	}

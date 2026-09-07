@@ -186,17 +186,15 @@ func setWave2Finding(
 
 // MarkSkipped records one item from a failed batch call: it sets
 // result.TruncatedIDs[id] so the row renders "?" instead of vanishing, and
-// appends "<id>: <err>" to *failures for Finish to fold into the caller's
-// composite error. Every "!"-severity Wave 2 enricher that iterates batched
-// AWS calls (DescribeTasks, DescribeServices, …) MUST call this once per item
-// in a failed batch — recording only the aggregate Truncated flag drops the
+// records the failure for Finish to fold into the caller's composite error.
+// Every "!"-severity Wave 2 enricher that iterates batched AWS calls
+// (DescribeTasks, DescribeServices, …) MUST call this once per item in a
+// failed batch — recording only the aggregate Truncated flag drops the
 // per-row signal the list view needs to distinguish "not inspected" from
-// "inspected and healthy". op identifies the caller's operation for parity
-// with Finish's signature; the per-item string itself omits it since the
-// composite error built by Finish already carries the op prefix once.
-func MarkSkipped(result *IssueEnricherResult, id string, failures *[]string, op string, err error) {
+// "inspected and healthy".
+func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, err error) {
 	result.TruncatedIDs[id] = true
-	*failures = append(*failures, fmt.Sprintf("%s: %v", id, err))
+	*failures = append(*failures, FailedCall(id, err))
 }
 
 // SetTruncated raises result.Truncated when cut is true and never lowers it.
@@ -270,7 +268,7 @@ func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf fun
 // through SetTruncated, so a call with zero failures composes safely with a
 // flag another pass raised earlier in the same enricher (EnrichmentCap, the
 // page cap, a per-parent cap).
-func Finish(result *IssueEnricherResult, failures []string, total int, op string) error {
+func Finish(result *IssueEnricherResult, failures []Failure, total int, op string) error {
 	SetTruncated(result, len(failures) > 0)
 	return AggregateFailures(op, failures, total)
 }

@@ -86,7 +86,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 	taskDefByTaskID := make(map[string]string, len(resources))
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	const op = "ecs-task-enrich: DescribeTasks"
 
@@ -105,7 +105,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 			if err != nil {
 				truncated = true
 				for _, taskID := range batch {
-					MarkSkipped(&result, taskID, &failures, op, err)
+					MarkSkipped(&result, taskID, &failures, err)
 				}
 				continue
 			}
@@ -168,7 +168,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	}
 
 	if err := ecsTaskDefinitionPosture(ctx, clients, &result, taskDefByTaskID); err != nil {
-		failures = append(failures, err.Error())
+		failures = append(failures, FailedCall("", err))
 	}
 
 	SetTruncated(&result, truncated)
@@ -197,7 +197,7 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 
 	const op = "ecs-task-enrich: DescribeTaskDefinition"
 	var mu sync.Mutex
-	var failures []string
+	var failures []Failure
 	_ = ForEachParallel(ctx, len(defARNs), EnrichmentParallelism, func(i int) {
 		defARN := defARNs[i]
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
@@ -213,7 +213,7 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 					result.TruncatedIDs[taskID] = true
 					continue
 				}
-				MarkSkipped(result, taskID, &failures, op, err)
+				MarkSkipped(result, taskID, &failures, err)
 			}
 			return
 		}
@@ -221,7 +221,7 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 			applyTaskDefinitionFindings(result, taskID, *out.TaskDefinition)
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	return Finish(result, failures, len(defARNs), op)
 }
 

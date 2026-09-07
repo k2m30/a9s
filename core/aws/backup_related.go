@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/backup"
@@ -117,7 +116,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	seen := make(map[string]struct{})
 	var topicARNs []string
-	var failures []string
+	var failures []Failure
 	for _, v := range vaults {
 		name := v
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupVaultNotificationsOutput, error) {
@@ -130,7 +129,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 			if _, ok := errors.AsType[*backuptypes.ResourceNotFoundException](err); ok {
 				continue
 			}
-			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
+			failures = append(failures, FailedCall(name, err))
 			continue
 		}
 		if out == nil || out.SNSTopicArn == nil || *out.SNSTopicArn == "" {

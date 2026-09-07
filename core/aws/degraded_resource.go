@@ -133,13 +133,9 @@ func degradedStatusFindings(shortName, status string) []domain.Finding {
 // Deliberately local: accessDeniedErr (kms.go) stays KMS-only, its semantics
 // untouched.
 func degradedAuthDenial(err error) bool {
-	code, _, _ := ClassifyAWSError(err)
-	switch code {
-	case "AccessDenied", "AccessDeniedException", "UnauthorizedOperation":
-		return true
-	default:
-		return false
-	}
+	// EC2 spells the same refusal UnauthorizedOperation, which is no class of
+	// its own — it is a code this one site adds to the denial class.
+	return IsAccessDenied(err) || ErrCodeIs(err, "UnauthorizedOperation")
 }
 
 // degradedDetailsFinding classifies a per-item describe failure: an

@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
@@ -43,7 +42,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	if clients.MSK == nil {
 		return result, nil
 	}
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -68,7 +67,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -114,7 +113,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			setWave2Finding(&result, r.ID, mskCodeUnauthenticated, "unauthenticated access allowed", "!", "msk", nil)
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }

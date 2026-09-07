@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"slices"
 	"strings"
 
@@ -16,7 +15,6 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -37,8 +35,7 @@ func s3BenignAbsenceErr(err error, code string) bool {
 	if code == "" {
 		return false
 	}
-	var apiErr smithy.APIError
-	return errors.As(err, &apiErr) && apiErr.ErrorCode() == code
+	return ErrCodeIs(err, code)
 }
 
 // checkS3Lambda returns the Lambda function ARNs referenced by this bucket's

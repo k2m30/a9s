@@ -73,7 +73,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	now := nowFunc()
-	var failures []string
+	var failures []Failure
 
 	// clusterKeyOf names the row one pending-maintenance entry answers for, or
 	// "" when it belongs to an instance or to a cluster this list does not
@@ -104,7 +104,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			return out.PendingMaintenanceActions, out.Marker, nil
 		})
 	if walkErr != nil {
-		failures = append(failures, fmt.Sprintf("page %d: %v", pages, walkErr))
+		failures = append(failures, FailedCall(fmt.Sprintf("page %d", pages), walkErr))
 	}
 
 	for _, action := range allActions {

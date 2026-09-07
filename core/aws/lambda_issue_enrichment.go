@@ -9,7 +9,6 @@ import (
 	"cmp"
 	"context"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 
@@ -66,7 +65,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	const op = "lambda-enrich: GetPolicy/ListFunctionUrlConfigs"
 	var mu sync.Mutex
-	var failures []string
+	var failures []Failure
 	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {
 		r := targets[i]
 		policyRows, policyPublic, policyErr := lambdaPolicyExposure(ctx, api, r.ID, ownAccount)
@@ -89,10 +88,10 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
-			MarkSkipped(&result, r.ID, &failures, op, err)
+			MarkSkipped(&result, r.ID, &failures, err)
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	err := Finish(&result, failures, len(targets), op)
 	return result, err
 }
@@ -159,6 +158,5 @@ func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlCon
 // state — distinct from a deleted function, which the enricher can only see
 // as the same code and therefore also treats as "nothing to report".
 func isLambdaNoPolicy(err error) bool {
-	code, _, _ := ClassifyAWSError(err)
-	return code == "ResourceNotFoundException"
+	return ErrCodeIs(err, "ResourceNotFoundException")
 }

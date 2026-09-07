@@ -5,9 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
-
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -118,8 +115,7 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ res
 		})
 	})
 	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntity" {
+		if ErrCodeIs(err, "NoSuchEntity") {
 			return resource.KnownRelated("role", nil, false)
 		}
 		return resource.ErrorRelated("role", err)

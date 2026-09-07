@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +49,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	// as a nil zero value will panic at call time — safeDescribeLogStreams recovers.
 	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
 
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -112,7 +111,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -127,7 +126,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		})
 
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	MarkInformationalOnly(&result)
 	return result,
 		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)

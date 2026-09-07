@@ -75,7 +75,7 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		return resource.FetchResult{}, fmt.Errorf("listing DynamoDB tables: %w", err)
 	}
 
-	var failures []string
+	var failures []Failure
 	var resources []resource.Resource
 	for _, tableName := range listOutput.TableNames {
 		descOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeTableOutput, error) {
@@ -86,14 +86,14 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		if err != nil {
 			// Surface per-table failures to the error log AND keep the row —
 			// a listed table must never vanish behind a describe denial.
-			failures = append(failures, fmt.Sprintf("%s: %v", tableName, err))
+			failures = append(failures, FailedCall(tableName, err))
 			resources = append(resources, DegradedDetails("ddb", tableName, err))
 			continue
 		}
 
 		table := descOutput.Table
 		if table == nil {
-			failures = append(failures, fmt.Sprintf("%s: nil table in response", tableName))
+			failures = append(failures, UnusableAnswer(tableName, "nil table in response"))
 			resources = append(resources, DegradedDetails("ddb", tableName, nil))
 			continue
 		}

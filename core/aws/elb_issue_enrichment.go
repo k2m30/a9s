@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -145,7 +144,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	if clients.ELBv2 == nil {
 		return result, nil
 	}
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -173,7 +172,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -223,7 +222,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		defer mu.Unlock()
 		total++
 		if err != nil {
-			MarkSkipped(&result, r.ID, &failures, "DescribeListeners", err)
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		// Every offending port is a port to fix, so each finding names all of
@@ -251,7 +250,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	MarkInformationalOnly(&result)
 	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
 }

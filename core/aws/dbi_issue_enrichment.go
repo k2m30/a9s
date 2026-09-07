@@ -144,7 +144,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 
 	type enginePair struct{ engine, version string }
 	deprecatedByPair := map[enginePair]bool{}
-	var failures []string
+	var failures []Failure
 
 	for i := range resources {
 		r := resources[i]
@@ -169,7 +169,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 				})
 			})
 			if err != nil {
-				MarkSkipped(result, r.ID, &failures, "DescribeDBEngineVersions", err)
+				MarkSkipped(result, r.ID, &failures, err)
 				continue
 			}
 			deprecated = isDeprecatedEngineVersion(out.DBEngineVersions)

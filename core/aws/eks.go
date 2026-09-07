@@ -44,7 +44,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 
 	total := len(listOutput.Clusters)
 	var resources []resource.Resource
-	var failures []string
+	var failures []Failure
 	for _, name := range listOutput.Clusters {
 		descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeClusterOutput, error) {
 			return c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
@@ -52,12 +52,12 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 			})
 		})
 		if descErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %s", name, descErr.Error()))
+			failures = append(failures, FailedCall(name, descErr))
 			resources = append(resources, DegradedDetails("eks", name, descErr))
 			continue
 		}
 		if descOutput.Cluster == nil {
-			failures = append(failures, fmt.Sprintf("%s: nil cluster in response", name))
+			failures = append(failures, UnusableAnswer(name, "nil cluster in response"))
 			resources = append(resources, DegradedDetails("eks", name, nil))
 			continue
 		}

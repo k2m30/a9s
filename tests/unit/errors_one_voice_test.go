@@ -218,7 +218,7 @@ func TestErrorHistory_OneShapeForEveryFailedCall(t *testing.T) {
 	}{
 		{"region gap, no rows", regionGapErr(), nil},
 		{"partial result, rows present", awsclient.AggregateFailures("ec2: DescribeInstances",
-			[]string{"i-0abc: " + apiErrWithMessage("RequestLimitExceeded", "Request limit exceeded").Error()}, 3),
+			[]awsclient.Failure{awsclient.FailedCall("i-0abc", apiErrWithMessage("RequestLimitExceeded", "Request limit exceeded"))}, 3),
 			[]resource.Resource{{ID: "i-0abc", Name: "web-01"}, {ID: "i-0def", Name: "web-02"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

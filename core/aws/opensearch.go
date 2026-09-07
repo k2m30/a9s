@@ -281,16 +281,16 @@ func FetchOpenSearchDomainsAt(
 	// denial) or this domain was individually absent from its response —
 	// are KEPT as name-only degraded rows; a listed domain must never
 	// vanish from the list.
-	var failures []string
+	var failures []Failure
 	for _, name := range domainNames {
 		if described[name] {
 			continue
 		}
-		reason := "absent from DescribeDomains response"
 		if describeErr != nil {
-			reason = describeErr.Error()
+			failures = append(failures, FailedCall(name, describeErr))
+		} else {
+			failures = append(failures, UnusableAnswer(name, "absent from DescribeDomains response"))
 		}
-		failures = append(failures, fmt.Sprintf("%s: %s", name, reason))
 		resources = append(resources, DegradedDetails("opensearch", name, describeErr))
 	}
 

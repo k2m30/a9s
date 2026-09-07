@@ -77,7 +77,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 		output, err := api.FilterLogEvents(ctx, input)
 		if err != nil {
 			// ResourceNotFoundException means the log group doesn't exist → 0
-			if code, _, _ := ClassifyAWSError(err); code == "ResourceNotFoundException" {
+			if ErrCodeIs(err, "ResourceNotFoundException") {
 				return resource.FetchResult{}, nil
 			}
 			return resource.FetchResult{}, fmt.Errorf("fetching invocations for %s: %w", functionName, err)

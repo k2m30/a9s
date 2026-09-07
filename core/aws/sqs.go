@@ -42,7 +42,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 
 	total := len(listOutput.QueueUrls)
 	var resources []resource.Resource
-	var failures []string
+	var failures []Failure
 	for _, queueURL := range listOutput.QueueUrls {
 		attrOutput, attrErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqs.GetQueueAttributesOutput, error) {
 			return attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
@@ -53,7 +53,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 			})
 		})
 		if attrErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %s", queueURL, attrErr.Error()))
+			failures = append(failures, FailedCall(queueURL, attrErr))
 			continue
 		}
 

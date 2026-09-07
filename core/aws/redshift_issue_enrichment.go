@@ -51,7 +51,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 	if n < len(resources) {
 		SetTruncated(&result, true)
 	}
-	var failures []string
+	var failures []Failure
 	var mu sync.Mutex
 	var requireSSLByGroup redshiftParamGroupCache
 
@@ -71,13 +71,13 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if sslErr != nil {
-			MarkSkipped(&result, r.ID, &failures, "DescribeClusterParameters", sslErr)
+			MarkSkipped(&result, r.ID, &failures, sslErr)
 		}
 		switch {
 		case logErr != nil && IsNotFoundErr(logErr):
 			result.TruncatedIDs[r.ID] = true
 		case logErr != nil:
-			MarkSkipped(&result, r.ID, &failures, "DescribeLoggingStatus", logErr)
+			MarkSkipped(&result, r.ID, &failures, logErr)
 		case !aws.ToBool(logging.LoggingEnabled):
 			// No supporting row: "Audit logging: off" is the phrase split on a
 			// colon, and U11 forbids restating it under the finding it belongs to.

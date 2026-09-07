@@ -282,7 +282,7 @@ func enrichSnapshotPublicShare(
 	if n < len(resources) {
 		SetTruncated(result, true)
 	}
-	var failures []string
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		res := resources[i]
@@ -299,7 +299,7 @@ func enrichSnapshotPublicShare(
 			result.TruncatedIDs[res.ID] = true
 			return
 		case err != nil:
-			MarkSkipped(result, res.ID, &failures, "DescribeSnapshotAttributes", err)
+			MarkSkipped(result, res.ID, &failures, err)
 			return
 		}
 		if !restoreSharedWithAll(attrs) {

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -44,7 +43,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	if clients.WAFv2 == nil {
 		return result, nil
 	}
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -79,7 +78,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			} else {
 				// Unexpected error — skip this ACL.
 				mu.Lock()
-				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+				failures = append(failures, FailedCall(r.ID, err))
 				result.TruncatedIDs[r.ID] = true
 				mu.Unlock()
 				return
@@ -94,7 +93,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		})
 		if err != nil {
 			mu.Lock()
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			mu.Unlock()
 			return
@@ -158,7 +157,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		}
 		setWave2Finding(&result, r.ID, wafCodeNoLogging, catalog.Phrase(wafCodeNoLogging), "~", "waf", rows)
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	// All WAF logging findings are severity "~" (informational).
 	MarkInformationalOnly(&result)
 	return result,

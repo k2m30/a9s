@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -237,8 +235,7 @@ func ecsJoinTaskDefinition(
 			// (access denied, throttled, transient) is propagated so the
 			// fetcher marks Pagination.IsTruncated and reverse-scan
 			// checkers report Truncated.
-			var apiErr smithy.APIError
-			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ClientException" {
+			if ErrCodeIs(err, "ClientException") {
 				return taskDefJoinFields{}, nil
 			}
 			return taskDefJoinFields{}, fmt.Errorf("describing task definition %s: %w", arn, err)

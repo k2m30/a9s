@@ -9,7 +9,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
@@ -358,7 +357,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	}
 
 	var ids []string
-	var failures []string
+	var failures []Failure
 	for _, tgRes := range lambdaTGs {
 		tgArn := tgRes.Fields["target_group_arn"]
 		if tgArn == "" {
@@ -373,7 +372,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 			return healthAPI.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
 		})
 		if healthErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", tgRes.ID, healthErr))
+			failures = append(failures, FailedCall(tgRes.ID, healthErr))
 			continue
 		}
 		for _, thd := range out.TargetHealthDescriptions {

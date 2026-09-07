@@ -78,7 +78,7 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 
 	total := len(listOutput.Servers)
 	var resources []resource.Resource
-	var failures []string
+	var failures []Failure
 	for i := range listOutput.Servers {
 		listed := listOutput.Servers[i]
 		id := aws.ToString(listed.ServerId)
@@ -88,10 +88,10 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 		})
 		switch {
 		case describeErr != nil:
-			failures = append(failures, fmt.Sprintf("%s: %s", id, describeErr.Error()))
+			failures = append(failures, FailedCall(id, describeErr))
 			resources = append(resources, buildTransferDegradedResource(listed, describeErr))
 		case describeOutput.Server == nil:
-			failures = append(failures, fmt.Sprintf("%s: nil server in DescribeServer response", id))
+			failures = append(failures, UnusableAnswer(id, "nil server in DescribeServer response"))
 			resources = append(resources, buildTransferDegradedResource(listed, nil))
 		default:
 			resources = append(resources, buildTransferResource(describeOutput.Server))

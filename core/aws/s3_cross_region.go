@@ -29,24 +29,10 @@
 // consistent by default.
 package aws
 
-import (
-	"errors"
-
-	smithy "github.com/aws/smithy-go"
-)
-
 // isS3CrossRegionErr reports whether err is the S3 cross-region rejection
 // pair: PermanentRedirect (301) or IllegalLocationConstraintException (400).
 // Both indicate the configured S3 client's region does not match the target
 // bucket's region — not a bug, just multi-region account topology.
 func isS3CrossRegionErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	var apiErr smithy.APIError
-	if !errors.As(err, &apiErr) {
-		return false
-	}
-	code := apiErr.ErrorCode()
-	return code == "PermanentRedirect" || code == "IllegalLocationConstraintException"
+	return ErrCodeIs(err, "PermanentRedirect", "IllegalLocationConstraintException")
 }

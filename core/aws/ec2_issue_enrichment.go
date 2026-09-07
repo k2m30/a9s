@@ -315,7 +315,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 
 	const op = "ec2-enrich: DescribeInstanceAttribute(userData)"
 	var mu sync.Mutex
-	var failures []string
+	var failures []Failure
 	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {
 		r := targets[i]
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeInstanceAttributeOutput, error) {
@@ -331,7 +331,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
-			MarkSkipped(result, r.ID, &failures, op, err)
+			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
 		if out == nil || out.UserData == nil || aws.ToString(out.UserData.Value) == "" {
@@ -345,6 +345,6 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 			rows)
 
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	return Finish(result, failures, len(targets), op)
 }

@@ -206,7 +206,7 @@ func TestAggregateFailures_StripsOperationPrefixForEveryClass(t *testing.T) {
 		"api":        bareAWSError(),
 	} {
 		t.Run(name, func(t *testing.T) {
-			agg := awsclient.AggregateFailures("ec2 FetchByIDs", []string{"i-0abc: " + err.Error()}, 1)
+			agg := awsclient.AggregateFailures("ec2 FetchByIDs", []awsclient.Failure{awsclient.FailedCall("i-0abc", err)}, 1)
 			if agg == nil {
 				t.Fatal("AggregateFailures returned nil for one failure")
 			}
@@ -217,12 +217,20 @@ func TestAggregateFailures_StripsOperationPrefixForEveryClass(t *testing.T) {
 	}
 }
 
-// TestAggregateFailures_AllNoisePrefixNotRestored pins the fallback path: a
-// reason left empty by the noise trim falls back to its own words, and those
-// words no longer include the operation prefix that was already stripped.
+// TestAggregateFailures_AllNoisePrefixNotRestored pins that an error whose
+// only words are the SDK's own preamble and a request id still aggregates
+// without that preamble.
+//
+// INVERTED for the "skipped" spec row 1: the input was the rendered string
+// "<id>: <noise>", which the aggregate reduced back to a cause. The lane is
+// gone; the same shape is now an error the recorder reads. Do not restore the
+// string input.
 func TestAggregateFailures_AllNoisePrefixNotRestored(t *testing.T) {
 	agg := awsclient.AggregateFailures("ec2 FetchByIDs",
-		[]string{"i-0abc: operation error EC2: DescribeInstances, RequestID: 11111111-2222-3333-4444-555555555555"}, 1)
+		[]awsclient.Failure{awsclient.FailedCall("i-0abc", &smithy.OperationError{
+			ServiceID: "EC2", OperationName: "DescribeInstances",
+			Err: errors.New("RequestID: 11111111-2222-3333-4444-555555555555"),
+		})}, 1)
 	if agg == nil {
 		t.Fatal("AggregateFailures returned nil for one failure")
 	}

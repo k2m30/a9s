@@ -296,7 +296,7 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 	}
 
 	var resources []resource.Resource
-	var failures []string
+	var failures []Failure
 	totalAttempted := 0
 
 	// processNGNames describes and appends resources for names, stopping the
@@ -316,12 +316,12 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 				})
 			})
 			if descErr != nil {
-				failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
+				failures = append(failures, FailedCall(cluster+"/"+ngName, descErr))
 				resources = append(resources, degradedNodeGroup(cluster, ngName, descErr))
 				continue
 			}
 			if descOutput.Nodegroup == nil {
-				failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
+				failures = append(failures, UnusableAnswer(cluster+"/"+ngName, "nil nodegroup in response"))
 				resources = append(resources, degradedNodeGroup(cluster, ngName, nil))
 				continue
 			}
@@ -381,7 +381,7 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 				})
 			})
 			if ngErr != nil {
-				failures = append(failures, fmt.Sprintf("%s: %s", cluster, ngErr.Error()))
+				failures = append(failures, FailedCall(cluster, ngErr))
 				break
 			}
 			leftover, hitCap := processNGNames(cluster, ngOutput.Nodegroups)

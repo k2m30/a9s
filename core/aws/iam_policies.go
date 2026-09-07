@@ -239,8 +239,8 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 			// so next call retries the inline fetch — it might succeed after a
 			// transient throttle. Surface as aggregate failure with the partial
 			// results we did recover.
-			var failures []string
-			failures = append(failures, inlineErr.Error())
+			var failures []Failure
+			failures = append(failures, FailedCall("", inlineErr))
 			resources := make([]resource.Resource, 0, len(ids))
 			seen := make(map[string]struct{}, len(ids))
 			for _, id := range ids {
@@ -254,7 +254,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 				if r, hit := store.Lookup(id); hit {
 					resources = append(resources, r)
 				} else {
-					failures = append(failures, fmt.Sprintf("%s: not found", id))
+					failures = append(failures, UnusableAnswer(id, "not found"))
 				}
 			}
 			return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
@@ -262,7 +262,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 		store.MarkInlineBuilt()
 	}
 
-	var failures []string
+	var failures []Failure
 	resources := make([]resource.Resource, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -284,7 +284,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 			store.Set(id, r)
 			resources = append(resources, r)
 		} else {
-			failures = append(failures, fmt.Sprintf("%s: %v", id, err))
+			failures = append(failures, FailedCall(id, err))
 		}
 	}
 	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
@@ -401,7 +401,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 	perGroup := make([][]resource.Resource, n)
 	visited := make([]bool, n)
 	var mu sync.Mutex
-	var groupFailures []string
+	var groupFailures []Failure
 
 	// Bounded fan-out (ForEachParallel, core/aws/parallel.go — the same
 	// mechanism issue-enrichment fetchers use): sequential per-group calls
@@ -430,7 +430,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 		})
 		if gpErr != nil {
 			mu.Lock()
-			groupFailures = append(groupFailures, fmt.Sprintf("%s: %v", groupName, gpErr))
+			groupFailures = append(groupFailures, FailedCall(groupName, gpErr))
 			mu.Unlock()
 			return
 		}
@@ -473,8 +473,8 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 			// silently drop the one entry that names the truly UNSWEPT
 			// remainder (never even attempted), the whole point of this
 			// check.
-			groupFailures = append([]string{fmt.Sprintf(
-				"%d of %d groups never visited before the sweep's context ended: %v", unvisited, n, sweepErr)}, groupFailures...)
+			groupFailures = append([]Failure{FailedCall(
+				fmt.Sprintf("%d of %d groups never visited before the sweep's context ended", unvisited, n), sweepErr)}, groupFailures...)
 		}
 	}
 

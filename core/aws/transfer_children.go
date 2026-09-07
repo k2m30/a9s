@@ -67,7 +67,7 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 
 	total := len(listOutput.Agreements)
 	var resources []resource.Resource
-	var failures []string
+	var failures []Failure
 	for i := range listOutput.Agreements {
 		listed := listOutput.Agreements[i]
 		id := aws.ToString(listed.AgreementId)
@@ -82,7 +82,7 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 			if describeErr == nil {
 				describeErr = fmt.Errorf("nil agreement in DescribeAgreement response")
 			}
-			failures = append(failures, fmt.Sprintf("%s: %s", id, describeErr.Error()))
+			failures = append(failures, FailedCall(id, describeErr))
 			continue
 		}
 		resources = append(resources, buildTransferAgreementResource(describeOutput.Agreement, serverID))

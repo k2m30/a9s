@@ -68,7 +68,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 	}
 
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	const op = "ecs-svc-enrich: DescribeServices"
 
@@ -89,9 +89,9 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			if err != nil {
 				for _, svcName := range batch {
 					if r, ok := resourceByService[svcName]; ok {
-						MarkSkipped(&result, r.ID, &failures, op, err)
+						MarkSkipped(&result, r.ID, &failures, err)
 					} else {
-						failures = append(failures, fmt.Sprintf("%s: %v", svcName, err))
+						failures = append(failures, FailedCall(svcName, err))
 					}
 				}
 				truncated = true

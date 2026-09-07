@@ -80,7 +80,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 			// One account-wide call answers for every row on screen, so its
 			// failure leaves every row uninspected, not inspected-and-private.
 			markAllUninspected(result, resources)
-			return AggregateFailures(op, []string{err.Error()}, len(resources))
+			return AggregateFailures(op, []Failure{FailedCall("", err)}, len(resources))
 		}
 		for _, snap := range out.Snapshots {
 			id := aws.ToString(snap.SnapshotId)

@@ -50,7 +50,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 	// soft-fallback (aliases become empty) but must surface to the operator
 	// via the composite error — silently stopping would hide a permissions
 	// issue or throttling that's actively degrading the view.
-	var failures []string
+	var failures []Failure
 	aliasMap := make(map[string]string)
 	var aliasMarker *string
 	for {
@@ -61,7 +61,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			})
 		})
 		if aliasErr != nil {
-			failures = append(failures, fmt.Sprintf("ListAliases: %v", aliasErr))
+			failures = append(failures, FailedCall("ListAliases", aliasErr))
 			break
 		}
 		for _, alias := range aliasOutput.Aliases {
@@ -77,7 +77,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			// Restarting from aliasMarker=nil would page 1 forever, so treat
 			// it the same as any other alias-fetch failure: stop and surface
 			// it via the composite error, keeping the (already-fetched) keys.
-			failures = append(failures, "ListAliases: truncated response with no NextMarker")
+			failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
 			break
 		}
 		aliasMarker = aliasOutput.NextMarker
@@ -94,11 +94,11 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			})
 		})
 		if descErr != nil {
-			if accessDeniedErr(descErr) {
+			if IsAccessDenied(descErr) {
 				resources = append(resources, kmsAccessDeniedResource(*key.KeyId))
 				continue
 			}
-			failures = append(failures, fmt.Sprintf("%s: %v", *key.KeyId, descErr))
+			failures = append(failures, FailedCall(*key.KeyId, descErr))
 			continue
 		}
 		meta := descOutput.KeyMetadata
@@ -172,7 +172,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		return nil, nil
 	}
 
-	var failures []string
+	var failures []Failure
 
 	aliasMap := make(map[string]string)
 	var aliasMarker *string
@@ -186,7 +186,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		if err != nil {
 			// Soft-fallback: aliases become empty strings, but record the failure
 			// so operators know aliases may be missing.
-			failures = append(failures, fmt.Sprintf("ListAliases: %v", err))
+			failures = append(failures, FailedCall("ListAliases", err))
 			break
 		}
 		for _, a := range out.Aliases {
@@ -200,7 +200,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		if out.NextMarker == nil {
 			// See the identical guard in FetchKMSKeysPage: Truncated=true with
 			// no marker would otherwise restart the page-1 fetch forever.
-			failures = append(failures, "ListAliases: truncated response with no NextMarker")
+			failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
 			break
 		}
 		aliasMarker = out.NextMarker
@@ -215,15 +215,15 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			return c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
 		})
 		if err != nil {
-			if accessDeniedErr(err) {
+			if IsAccessDenied(err) {
 				resources = append(resources, kmsAccessDeniedResource(id))
 				continue
 			}
-			failures = append(failures, fmt.Sprintf("%s: %v", id, err))
+			failures = append(failures, FailedCall(id, err))
 			continue
 		}
 		if out == nil || out.KeyMetadata == nil {
-			failures = append(failures, fmt.Sprintf("%s: no metadata", id))
+			failures = append(failures, UnusableAnswer(id, "no metadata"))
 			continue
 		}
 		meta := out.KeyMetadata
@@ -252,13 +252,6 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 	}
 
 	return resources, AggregateFailures("kms FetchByIDs", failures, len(ids))
-}
-
-// accessDeniedErr reports whether err is an AWS AccessDenied(Exception) API
-// error, via ClassifyAWSError's smithy.APIError code check.
-func accessDeniedErr(err error) bool {
-	code, _, _ := ClassifyAWSError(err)
-	return code == "AccessDenied" || code == "AccessDeniedException"
 }
 
 // kmsAccessDeniedResource synthesizes a row for a key whose DescribeKey call

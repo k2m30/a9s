@@ -52,8 +52,7 @@ func FetchEC2InstancesByIDs(ctx context.Context, api EC2DescribeInstancesAPI, id
 
 	resources, unrecovered, err := fetchEC2InstancesByIDsOnce(ctx, api, requested)
 	if err != nil {
-		code, _, _ := ClassifyAWSError(err)
-		if code != "InvalidInstanceID.NotFound" {
+		if !ErrCodeIs(err, "InvalidInstanceID.NotFound") {
 			return resources, fmt.Errorf("fetching EC2 instances by id: %w", err)
 		}
 		bad := ec2InstanceIDPattern.FindAllString(err.Error(), -1)

@@ -50,22 +50,18 @@ var (
 
 // classifyCostsError wraps err with the matching typed sentinel when it
 // carries a recognized CE error code; anything else passes through
-// unmodified so the caller can render/log the raw failure. Code-matching
-// delegates to ClassifyAWSError (core/aws/errors.go), the shared
-// taxonomy — it recognizes both the bare "AccessDenied" code some AWS API
-// paths return and the "...Exception"-suffixed form, where this file's own
-// switch previously matched only the latter.
+// unmodified so the caller can render/log the raw failure. Which codes are a
+// denial and which a throttle is the class table's decision, not this file's.
 func classifyCostsError(err error) error {
 	if err == nil {
 		return nil
 	}
-	code, _, _ := ClassifyAWSError(err)
-	switch code {
-	case "AccessDenied", "AccessDeniedException":
+	switch {
+	case IsAccessDenied(err):
 		return fmt.Errorf("%w: %w", ErrCostsAccessDenied, err)
-	case "DataUnavailableException":
+	case ErrCodeIs(err, "DataUnavailableException"):
 		return fmt.Errorf("%w: %w", ErrCostsDataUnavailable, err)
-	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
+	case ErrClass(err) == ClassThrottled:
 		return fmt.Errorf("%w: %w", ErrCostsThrottled, err)
 	}
 	return err

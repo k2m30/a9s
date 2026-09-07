@@ -104,7 +104,7 @@ func backupTagsAccessor(
 	n := len(pending)
 
 	var mu sync.Mutex
-	var failures []string
+	var failures []Failure
 	walkErr := ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := pending[i]
 		t, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (map[string]string, error) {
@@ -113,7 +113,7 @@ func backupTagsAccessor(
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			MarkSkipped(result, r.ID, &failures, op, err)
+			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
 		tags[r.ID] = t

@@ -564,14 +564,16 @@ func TestFetchInlineGroupPolicies_ConcurrencyStaysBounded(t *testing.T) {
 // Item 3 — partial-failure aggregation must cap enumeration
 // ---------------------------------------------------------------------------
 
-// syntheticGroupFailures builds n realistic "<group>: <reason>" failure
-// strings in the exact shape fetchInlineGroupPolicies feeds to
-// AggregateFailures (core/aws/iam_policies.go:444).
-func syntheticGroupFailures(n, startIdx int) []string {
-	failures := make([]string, 0, n)
+// syntheticGroupFailures builds n realistic failure records in the exact
+// shape fetchInlineGroupPolicies feeds to AggregateFailures
+// (core/aws/iam_policies.go:444). The reason is the real error, not a
+// rendered string: the "skipped" spec row 1 removed the string lane, so a
+// failure only ever reaches the aggregate as id, class and cause.
+func syntheticGroupFailures(n, startIdx int) []awsclient.Failure {
+	failures := make([]awsclient.Failure, 0, n)
 	for i := 0; i < n; i++ {
 		name := inlineSweepGroupName(startIdx + i)
-		failures = append(failures, fmt.Sprintf("%s: context deadline exceeded", name))
+		failures = append(failures, awsclient.FailedCall(name, context.DeadlineExceeded))
 	}
 	return failures
 }
@@ -601,7 +603,10 @@ func TestAggregateFailures_GroupsByCause_36of49GroupSweep(t *testing.T) {
 	if !strings.HasPrefix(msg, fmt.Sprintf("ListGroupPolicies failed for %d of %d IDs", failCount, total)) {
 		t.Errorf("composite error dropped its header shape; got: %s", msg)
 	}
-	if !strings.Contains(msg, "context deadline exceeded") {
+	// "timeout", not "context deadline exceeded": the class supplies the
+	// cause now that the record carries it ("skipped" spec row 1). Do not
+	// restore the Go error's own words — no site renders them any more.
+	if !strings.Contains(msg, "timeout") {
 		t.Errorf("composite error dropped the shared cause; got: %s", msg)
 	}
 
@@ -666,7 +671,7 @@ func TestAggregateFailures_SmallFailureSet_StillOneLinePerCause(t *testing.T) {
 func TestAggregateFailures_DistinctCauses_EachNamedOnce(t *testing.T) {
 	const total = 49
 	failures := append(syntheticGroupFailures(4, 0),
-		inlineSweepGroupName(90)+": no metadata")
+		awsclient.UnusableAnswer(inlineSweepGroupName(90), "no metadata"))
 
 	err := awsclient.AggregateFailures("ListGroupPolicies", failures, total)
 	if err == nil {
@@ -676,7 +681,7 @@ func TestAggregateFailures_DistinctCauses_EachNamedOnce(t *testing.T) {
 
 	for _, want := range []string{
 		fmt.Sprintf("failed for %d of %d IDs", len(failures), total),
-		"context deadline exceeded (4, e.g. " + inlineSweepGroupName(0) + ")",
+		"timeout (4, e.g. " + inlineSweepGroupName(0) + ")",
 		"no metadata (1, e.g. " + inlineSweepGroupName(90) + ")",
 	} {
 		if !strings.Contains(msg, want) {

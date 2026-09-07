@@ -5,8 +5,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -42,7 +40,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		return result, nil
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -70,7 +68,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -99,7 +97,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	return result,
 		AggregateFailures("sqs-enrich: GetQueueAttributes", failures, total)
 }

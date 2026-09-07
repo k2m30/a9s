@@ -47,7 +47,7 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
-	var failures []string
+	var failures []Failure
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
 	var mu sync.Mutex
@@ -77,7 +77,7 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
-			MarkSkipped(&result, r.ID, &failures, "secrets-policy", err)
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if out == nil || aws.ToString(out.ResourcePolicy) == "" {

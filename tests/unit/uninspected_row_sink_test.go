@@ -53,9 +53,9 @@ func uninspectedResultFor(ids ...string) awsclient.IssueEnricherResult {
 		TruncatedIDs: map[string]bool{},
 		Findings:     map[string][]domain.Finding{},
 	}
-	var failures []string
+	var failures []awsclient.Failure
 	for _, id := range ids {
-		awsclient.MarkSkipped(&result, id, &failures, "DescribeInstanceStatus", errors.New("AccessDenied"))
+		awsclient.MarkSkipped(&result, id, &failures, errors.New("AccessDenied"))
 	}
 	return result
 }

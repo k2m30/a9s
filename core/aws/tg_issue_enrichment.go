@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,7 +39,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		return result, nil
 	}
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -69,7 +68,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
@@ -145,7 +144,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			}
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	SetTruncated(&result, truncated)
 	return result,
 		AggregateFailures("tg-enrich: DescribeTargetHealth", failures, total)

@@ -5,9 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -96,7 +92,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		return result, nil
 	}
 	truncated := false
-	var failures []string
+	var failures []Failure
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	total := len(resources)
 	var mu sync.Mutex
@@ -126,7 +122,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			// each would report more failures than there were buckets.
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			failures = append(failures, fmt.Sprintf("%s: %v", bucketName, p.failures[0]))
+			failures = append(failures, FailedCall(bucketName, p.failures[0]))
 		}
 		for _, f := range p.findings {
 			setWave2Finding(&result, bucketName, f.code, f.phrase, f.glyph, "s3", f.rows)
@@ -135,7 +131,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			result.FieldUpdates[bucketName] = map[string]string{"status": "public access block incomplete"}
 		}
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("s3-enrich: bucket posture", failures, total)
 }
@@ -338,6 +334,5 @@ func s3PABRows(out *s3.GetPublicAccessBlockOutput, err error) []domain.DetailRow
 // NoSuchLifecycleConfiguration, ObjectLockConfigurationNotFoundError) are
 // answers, not failures, and each caller matches its own.
 func isS3APIErrCode(err error, code string) bool {
-	var apiErr smithy.APIError
-	return errors.As(err, &apiErr) && apiErr.ErrorCode() == code
+	return ErrCodeIs(err, code)
 }

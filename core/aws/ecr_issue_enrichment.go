@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,7 +75,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
 	truncated := false
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -104,7 +103,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		})
 		if err != nil {
 			mu.Lock()
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			mu.Unlock()
@@ -189,7 +188,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		summary := strings.Join(parts, ", ") + " vulnerabilities"
 		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, summary, tier, "ecr", rows)
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("ecr-enrich: DescribeImages", failures, total)

@@ -176,7 +176,7 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 	})
 	if err != nil {
 		// RepositoryPolicyNotFoundException means no policy exists → 0
-		if code, _, _ := ClassifyAWSError(err); code == "RepositoryPolicyNotFoundException" {
+		if ErrCodeIs(err, "RepositoryPolicyNotFoundException") {
 			return resource.KnownRelated("role", nil, false)
 		}
 		return resource.ErrorRelated("role", err)

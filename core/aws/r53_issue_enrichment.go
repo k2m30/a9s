@@ -5,8 +5,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
-	"sort"
 	"sync"
 
 	"net/netip"
@@ -151,7 +149,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		return result, nil
 	}
 	held := heldPublicAddresses(cache)
-	var failures []string
+	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -182,7 +180,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
-			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			failures = append(failures, FailedCall(r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -205,7 +203,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 			{Label: "Zone ID", Value: zoneID, Tier: "~"},
 		})
 	})
-	sort.Strings(failures)
+	SortFailures(failures)
 	return result,
 		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
 }

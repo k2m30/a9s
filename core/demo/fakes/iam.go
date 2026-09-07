@@ -196,11 +196,11 @@ func (f *IAMFake) GetRole(_ context.Context, input *iam.GetRoleInput, _ ...func(
 			return &iam.GetRoleOutput{Role: &r}, nil
 		}
 	}
-	// Match the real AWS IAM API shape so checkers that branch on
-	// apiErr.ErrorCode() == "NoSuchEntity" (e.g. checkTGWRole, checkXRole
-	// service-linked-role probes) can distinguish "role absent" (Count=0)
-	// from "unexpected error" (Count=-1). NoSuchEntityException satisfies
-	// the smithy APIError interface with ErrorCode() == "NoSuchEntity".
+	// Match the real AWS IAM API shape so checkers that ask for the code
+	// "NoSuchEntity" (e.g. checkTGWRole, checkXRole service-linked-role
+	// probes) can distinguish "role absent" (Count=0) from "unexpected
+	// error" (Count=-1). The modeled exception answers the code
+	// "NoSuchEntity" — the code is not the type's name.
 	return nil, &iamtypes.NoSuchEntityException{
 		Message: aws.String("Role with name " + *input.RoleName + " cannot be found."),
 	}

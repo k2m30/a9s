@@ -5,8 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,7 +14,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -137,7 +134,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	amiSet := make(map[string]struct{})
-	var failures []string
+	var failures []Failure
 	for _, ngName := range ngOut.Nodegroups {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
@@ -146,7 +143,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			})
 		})
 		if descErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", ngName, descErr))
+			failures = append(failures, FailedCall(ngName, descErr))
 			continue
 		}
 		if descOut.Nodegroup == nil {
@@ -172,11 +169,10 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			// Soft-skip when the launch template has been deleted upstream:
 			// AWS returns InvalidLaunchTemplateId.NotFound, which is a true
 			// "no AMI to relate to" rather than a fetch failure.
-			var apiErr smithy.APIError
-			if errors.As(ltErr, &apiErr) && apiErr.ErrorCode() == "InvalidLaunchTemplateId.NotFound" {
+			if ErrCodeIs(ltErr, "InvalidLaunchTemplateId.NotFound") {
 				continue
 			}
-			failures = append(failures, fmt.Sprintf("%s/lt: %v", ngName, ltErr))
+			failures = append(failures, FailedCall(ngName+"/lt", ltErr))
 			continue
 		}
 		for _, v := range ltOut.LaunchTemplateVersions {
@@ -238,7 +234,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	var asgNames []string
-	var ngFailures []string
+	var ngFailures []Failure
 	ngTotal := len(ngOut.Nodegroups)
 	for _, ngName := range ngOut.Nodegroups {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
@@ -248,7 +244,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 			})
 		})
 		if descErr != nil {
-			ngFailures = append(ngFailures, fmt.Sprintf("%s: %v", ngName, descErr))
+			ngFailures = append(ngFailures, FailedCall(ngName, descErr))
 			continue
 		}
 		if descOut.Nodegroup == nil || descOut.Nodegroup.Resources == nil {
