@@ -22,12 +22,10 @@ func containersDefaultViews() map[string]ViewDef {
 		"ng": {
 			List: []ListColumn{
 				{Title: "Node Group", Path: "NodegroupName", Width: 28},
-				// Keyed as well as Path-based, unlike the identity columns
-				// beside it: "ClusterName" contains "name", so on a row with
-				// no RawStruct — a warm cache replay, or a node group whose
-				// describe was denied — the extractor's name fallback would
-				// resolve it to the row's own name and print the node group
-				// in the Cluster cell. Fields carries the real cluster.
+				// Keyed as well as Path-based, unlike the columns beside
+				// it: on a row with no RawStruct — a warm cache replay, or a
+				// node group whose describe was denied — the path cannot
+				// answer and Fields carries the real cluster.
 				{Title: "Cluster", Key: "cluster_name", Path: "ClusterName", Width: 24},
 				{Title: "Status", Key: "status", Path: "Status", Width: 14},
 				{Title: "Instance Types", Path: "InstanceTypes", Width: 20},

@@ -82,9 +82,8 @@ func wave3MarkerColOf(t *testing.T, c *app.Controller) int {
 // ===========================================================================
 // IdentityColumnIndex cascade — port of resolve_identity_internal_test.go's
 // TestResolveIdentityColumn_* cases (cascade order: 1. td.IdentityKey matches
-// a column's key; 2. column key == "name"; 3. column path contains "Name" or
-// "Identifier"; 4. column title equals "Name" (case-insensitive) or td.Name;
-// 5. fall back to index 0). The dead test's EmptyColumns case is dropped —
+// a column's key; 2. column key == "name"; 3. column title equals "Name"
+// (case-insensitive) or td.Name; 4. fall back to index 0). The dead test's EmptyColumns case is dropped —
 // config.GetViewDef only replaces defaults when len(userDef.List) > 0, so an
 // intentionally-empty column list cannot be driven through this live seam;
 // the guard itself is a trivial zero-iteration loop with no branch to lose.
@@ -117,7 +116,13 @@ func TestResolveListMarkerCol_FallsThroughToNameKey(t *testing.T) {
 	}
 }
 
-func TestResolveListMarkerCol_FallsThroughToPath_Identifier(t *testing.T) {
+// Inverted for w45 spec row 4, which deletes the path-substring election
+// step. "DBInstanceIdentifier" points at a name-shaped field; it does not make
+// its column the one that names the row, and electing it put the attention
+// marker on a foreign column. With the step gone the cascade reaches the
+// index-0 default. The old want of 2 asserts the deleted step and must not be
+// restored.
+func TestResolveListMarkerCol_PathIdentifierSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
 		{Key: "id", Title: "ID", Width: 10},
@@ -126,20 +131,22 @@ func TestResolveListMarkerCol_FallsThroughToPath_Identifier(t *testing.T) {
 		{Path: "Engine", Title: "Engine", Width: 10},
 	}
 	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 2 {
-		t.Errorf("MarkerCol via path=DBInstanceIdentifier: got %d, want 2", got)
+	if got := wave3MarkerColOf(t, c); got != 0 {
+		t.Errorf("MarkerCol with path=DBInstanceIdentifier: got %d, want 0", got)
 	}
 }
 
-func TestResolveListMarkerCol_FallsThroughToPath_NameInPath(t *testing.T) {
+// Inverted for w45 spec row 4, as above: "FunctionName" in a path is a
+// substring, not a declaration. The old want of 1 asserts the deleted step.
+func TestResolveListMarkerCol_PathNameSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "Lambda Functions"}
 	cols := []config.ListColumn{
 		{Title: "Arn", Width: 10},
 		{Path: "FunctionName", Title: "Function", Width: 10},
 	}
 	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 1 {
-		t.Errorf("MarkerCol via path containing Name: got %d, want 1", got)
+	if got := wave3MarkerColOf(t, c); got != 0 {
+		t.Errorf("MarkerCol with path containing Name: got %d, want 0", got)
 	}
 }
 

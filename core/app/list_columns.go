@@ -238,15 +238,32 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 		}
 	}
 
-	// Name fallback: title OR key OR path contains "name" → r.Name.
-	if r.Name != "" &&
-		(strings.Contains(strings.ToLower(col.Key), "name") ||
-			strings.Contains(strings.ToLower(col.Title), "name") ||
-			strings.Contains(strings.ToLower(col.Path), "name")) {
+	// Name fallback: the row's name belongs in the one column that names the
+	// row, and nowhere else. A struct-less row (a warm-cache replay, a
+	// degraded fetch) leaves every other path-only column with nothing to
+	// say, and blank is what it has to say.
+	if r.Name != "" && isIdentityColumn(col, td) {
 		return r.Name
 	}
 
 	return ""
+}
+
+// isIdentityColumn reports whether col is the column that names a row of
+// td's type.
+//
+// The election runs over the type's built-in column set, and the match is on
+// the title: the extractor has no session view config to resolve against, and
+// a column read back from a view file carries only what the YAML stores — the
+// title is that file's map key, while a Key equal to the snake-cased title is
+// omitted as redundant, so Key and Title do not survive the round trip alike.
+func isIdentityColumn(col ColumnDef, td *resource.ResourceTypeDef) bool {
+	if td == nil {
+		return false
+	}
+	cols := resolveListColumnsForBuild(nil, td.ShortName, td)
+	i := IdentityColumnIndex(cols, td)
+	return i >= 0 && i < len(cols) && cols[i].Title == col.Title
 }
 
 // humanizeListCell applies domain.HumanizeStatusPhrase when col.Humanize is
@@ -359,19 +376,13 @@ func IdentityColumnIndex(columns []ColumnDef, td *resource.ResourceTypeDef) int 
 			return i
 		}
 	}
-	// Step 3: column path contains "Name" or "Identifier" (mirrors resolveIdentityColumn step 3).
-	for i, c := range columns {
-		if strings.Contains(c.Path, "Name") || strings.Contains(c.Path, "Identifier") {
-			return i
-		}
-	}
-	// Step 4: column title equals "Name" (case-insensitive) or the type's display name.
+	// Step 3: column title equals "Name" (case-insensitive) or the type's display name.
 	for i, c := range columns {
 		if strings.EqualFold(c.Title, "Name") || (td != nil && strings.EqualFold(c.Title, td.Name)) {
 			return i
 		}
 	}
-	// Step 5: fall back to index 0.
+	// Step 4: fall back to index 0.
 	return 0
 }
 
