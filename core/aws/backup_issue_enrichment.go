@@ -112,23 +112,17 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 		if failedCount >= 1 {
 			summary := fmt.Sprintf("%d job%s failed in last 24h", failedCount, plural(failedCount))
 
-			// Cap displayed failed jobs at 5.
-			cap := min(failedCount, 5)
-			var rows []domain.DetailRow
-			for _, job := range b.failedJobs[:cap] {
-				rows = append(rows, domain.DetailRow{
-					Label: "State",
-					Value: domain.HumanizeStatusPhrase(string(job.State)),
-					Tier:  "!",
-				})
-			}
-			// Most recent failed job creation date.
+			// The two facts about the whole bucket lead, and the per-job rows
+			// follow, because only the per-job list is unbounded: capRows
+			// keeps the head of what it is given, so a fact placed after the
+			// list would be the first thing a plan with many failures loses.
 			var mostRecent *time.Time
 			for _, j := range b.failedJobs {
 				if mostRecent == nil || j.CreationDate.After(*mostRecent) {
 					mostRecent = j.CreationDate
 				}
 			}
+			var rows []domain.DetailRow
 			if mostRecent != nil {
 				rows = append(rows, domain.DetailRow{
 					Label: "Most recent",
@@ -136,12 +130,18 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 					Tier:  "!",
 				})
 			}
-			// If there are also partial jobs, append a partial row so nothing silently disappears.
 			if partialCount > 0 {
 				rows = append(rows, domain.DetailRow{
 					Label: "Partial jobs",
 					Value: fmt.Sprintf("%d", partialCount),
 					Tier:  "~",
+				})
+			}
+			for _, job := range b.failedJobs {
+				rows = append(rows, domain.DetailRow{
+					Label: "State",
+					Value: domain.HumanizeStatusPhrase(string(job.State)),
+					Tier:  "!",
 				})
 			}
 

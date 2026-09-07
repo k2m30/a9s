@@ -404,6 +404,16 @@ var capBypass = []struct {
 		regexp.MustCompile(`\.Truncated\s*=[^=]`),
 		"raise the flag with SetTruncated(result, cut), or drop it with MarkInformationalOnly(result)",
 	},
+	{
+		// A builder that trims its own row list to a number of its own
+		// choosing drops the rest with nothing said, and no reader can tell
+		// a plan with five failures from one with fifty. capRows is the only
+		// bound on supporting rows and it closes with "… +K more". A batch
+		// size the AWS API imposes is named, not a literal, so it does not
+		// match. Added by the cap batch's spec row 8.
+		regexp.MustCompile(`\b(min|max)\([^()]*,\s*\d+\)`),
+		"hand every row to setWave2Finding / addWave1Rows and let capRows bound the list",
+	},
 }
 
 // TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper is the standing gate for

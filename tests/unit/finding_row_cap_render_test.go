@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backupsdk "github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -76,4 +79,74 @@ func TestFindingRowCap_OverflowRowRendersInTheDetailAttentionSection(t *testing.
 		}
 	}
 	t.Errorf("detail Attention section never rendered the overflow row %q; values=%q", want, values)
+}
+
+// backupJobsFake serves one page of ListBackupJobs. Embedding the interface
+// leaves every other backup call unimplemented, which is what a wave-2 pin
+// wants: a call this enricher must not make panics rather than passing.
+type backupJobsFake struct {
+	awsclient.BackupAPI
+	jobs []backuptypes.BackupJob
+}
+
+func (f *backupJobsFake) ListBackupJobs(_ context.Context, _ *backupsdk.ListBackupJobsInput, _ ...func(*backupsdk.Options)) (*backupsdk.ListBackupJobsOutput, error) {
+	return &backupsdk.ListBackupJobsOutput{BackupJobs: f.jobs}, nil
+}
+
+// TestFindingRowCap_BackupFailedJobRowsCloseWithTheOverflowRow drives more
+// failed jobs through the backup enricher than one finding shows.
+//
+// The rows are not one list: the per-job State rows are unbounded, while
+// "Most recent" and "Partial jobs" are single facts about the whole bucket.
+// Dropping the per-job rows silently loses evidence, and dropping the two
+// facts loses the summary — so the facts lead and the list follows the cap,
+// which is why this asserts both the closing row and the surviving fact.
+func TestFindingRowCap_BackupFailedJobRowsCloseWithTheOverflowRow(t *testing.T) {
+	const planID = "acme-render-plan-0000-1111-2222-333333333333"
+	const failed = 14
+
+	now := time.Now()
+	jobs := make([]backuptypes.BackupJob, 0, failed)
+	for i := range failed {
+		when := now.Add(-time.Duration(i) * time.Minute)
+		jobs = append(jobs, backuptypes.BackupJob{
+			BackupJobId:  aws.String(fmt.Sprintf("job-%04d", i)),
+			State:        backuptypes.BackupJobStateFailed,
+			CreationDate: &when,
+			CreatedBy:    &backuptypes.RecoveryPointCreator{BackupPlanId: aws.String(planID)},
+		})
+	}
+
+	rows := []resource.Resource{{ID: planID, Name: "acme-render-plan", Type: "backup"}}
+	result, err := awsclient.EnrichBackupJobs(context.Background(),
+		&awsclient.ServiceClients{Backup: &backupJobsFake{jobs: jobs}}, rows, nil)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs: unexpected error: %v", err)
+	}
+
+	var td resource.ResourceTypeDef
+	for _, d := range resource.AllResourceTypes() {
+		if d.ShortName == "backup" {
+			td = d
+			break
+		}
+	}
+	if td.ShortName == "" {
+		t.Fatalf("no registered resource type \"backup\"")
+	}
+
+	row := rows[0]
+	a9sruntime.ApplyWave2ToRow(&row, td, result.Findings, result.AttentionDetails)
+	values := detailAttentionValuesFor(t, row, "backup")
+	joined := strings.Join(values, "\n")
+
+	// One "Most recent" row joins the 14 per-job rows, so the cap hides
+	// everything past the tenth of the 15.
+	want := fmt.Sprintf("… +%d more", failed+1-awsclient.FindingRowCap)
+	if !strings.Contains(joined, want) {
+		t.Errorf("detail Attention section never rendered the overflow row %q; values=%q", want, values)
+	}
+	if !strings.Contains(joined, now.UTC().Format("2006-01-02 15:04 UTC")) {
+		t.Errorf("the \"Most recent\" fact was pushed out by the per-job rows; values=%q", values)
+	}
 }
