@@ -874,22 +874,36 @@ func collectThreeLevelCalls(body ast.Node, rootIdent string) []callSite {
 		sites = append(sites, callSite{
 			opName:    sel.Sel.Name,
 			pos:       call.Pos(),
-			paginated: inPaginatedLoop(stack),
+			paginated: inPaginatedWalk(stack),
 		})
 		return true
 	})
 	return sites
 }
 
-// inPaginatedLoop reports whether any loop enclosing the call currently on top
-// of stack drives a pagination token. The token has to live in the loop that
-// contains the call, because a second loop elsewhere in the same function says
-// nothing about this call.
-func inPaginatedLoop(stack []ast.Node) bool {
+// inPaginatedWalk reports whether the call currently on top of stack is part
+// of a pagination walk: either a loop enclosing it drives a token, or it is
+// the page reader handed to walkAccountPages.
+//
+// The token has to live in the loop that contains the call, because a second
+// loop elsewhere in the same function says nothing about this call.
+//
+// The walkAccountPages arm inverts what this audit asserted before the cap
+// batch's spec row 1 ("one page-cap helper owns the walk bound"): an
+// account-wide enricher no longer writes its own loop, because the loop and
+// the marking of the rows past the last walked page are one rule. A call
+// inside that helper's page reader is paginated AND bounded AND accounted
+// for, which is strictly more than the loop this used to demand — do not
+// restore the loop-only form.
+func inPaginatedWalk(stack []ast.Node) bool {
 	for _, n := range stack {
-		switch n.(type) {
+		switch node := n.(type) {
 		case *ast.ForStmt, *ast.RangeStmt:
 			if bodyContainsAny(n, "NextToken", "Marker", "ContinuationToken") {
+				return true
+			}
+		case *ast.CallExpr:
+			if fn, ok := node.Fun.(*ast.Ident); ok && fn.Name == "walkAccountPages" {
 				return true
 			}
 		}

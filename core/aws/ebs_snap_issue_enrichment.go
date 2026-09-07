@@ -96,7 +96,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 		}
 		nextToken = out.NextToken
 	}
-	result.Truncated = true
+	SetTruncated(result, true)
 	return nil
 }
 

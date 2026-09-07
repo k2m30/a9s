@@ -376,27 +376,56 @@ func TestEnrichmentCap_FiftyFirstRowRendersNotInspected(t *testing.T) {
 	}
 }
 
+// capBypass names one shape that bounds or unbounds an enricher's answer
+// without going through the helper that owns it. Every cap in core/aws has one
+// owner, and each owner does the half a hand-written site forgets: recording
+// what the bound dropped.
+var capBypass = []struct {
+	pattern *regexp.Regexp
+	fix     string
+}{
+	{
+		// A per-item work list trimmed by hand drops its tail silently;
+		// only capAtEnrichmentCap records the dropped rows in TruncatedIDs.
+		regexp.MustCompile(`min\(len\([^)]*\), EnrichmentCap\)`),
+		"route the work list through capAtEnrichmentCap(result, items, resourceIDsOf)",
+	},
+	{
+		// An account-wide walk that compares its own page counter stops at
+		// the right page and says nothing about the rows past it; only
+		// walkAccountPages marks them. Added by the cap batch's spec row 1.
+		regexp.MustCompile(`pages\s*(>=|<|>|<=)\s*EnrichmentCap`),
+		"drive the walk with walkAccountPages(result, resources, idOf, next)",
+	},
+	{
+		// A bare assignment to the flag composes with none of the passes
+		// that raise it, so the last one to finish cleanly erases what an
+		// earlier one found. Added by the cap batch's spec row 3.
+		regexp.MustCompile(`\.Truncated\s*=[^=]`),
+		"raise the flag with SetTruncated(result, cut), or drop it with MarkInformationalOnly(result)",
+	},
+}
+
 // TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper is the standing gate for
-// the sweep: a per-item work list trimmed with a bare min(len(x),
-// EnrichmentCap) drops the tail silently, because only capAtEnrichmentCap
-// records the dropped rows in TruncatedIDs. A new enricher that reintroduces
-// the bare form fails here rather than shipping 50 answered rows and an
-// unbounded number of rows that quietly claim to be clean.
+// the sweep. A new enricher that writes any of the bounds above out by hand
+// fails here rather than shipping answered rows beside an unbounded number of
+// rows that quietly claim to be clean.
+//
+// issue_enrichment.go is where all three owners live, so it is the one file
+// the scan does not read.
 func TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper(t *testing.T) {
 	root, err := filepath.Abs("../../core/aws")
 	if err != nil {
 		t.Fatalf("resolve core/aws: %v", err)
 	}
-	bare := regexp.MustCompile(`min\(len\([^)]*\), EnrichmentCap\)`)
-
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatalf("read core/aws: %v", err)
 	}
-	var offenders []string
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if e.IsDir() || !strings.HasSuffix(name, ".go") ||
+			strings.HasSuffix(name, "_test.go") || name == "issue_enrichment.go" {
 			continue
 		}
 		src, err := os.ReadFile(filepath.Join(root, name))
@@ -404,14 +433,12 @@ func TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper(t *testing.T) {
 			t.Fatalf("read %s: %v", name, err)
 		}
 		for i, line := range strings.Split(string(src), "\n") {
-			if bare.MatchString(line) {
-				offenders = append(offenders, fmt.Sprintf("%s:%d: %s", name, i+1, strings.TrimSpace(line)))
+			for _, b := range capBypass {
+				if b.pattern.MatchString(line) {
+					t.Errorf("%s:%d bypasses the cap it applies — %s\n    %s",
+						name, i+1, b.fix, strings.TrimSpace(line))
+				}
 			}
 		}
-	}
-	if len(offenders) > 0 {
-		t.Errorf("%d cap site(s) trim a work list without recording the dropped rows as uninspected; "+
-			"route each through capAtEnrichmentCap(result, items, resourceIDsOf):\n%s",
-			len(offenders), strings.Join(offenders, "\n"))
 	}
 }

@@ -95,7 +95,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 			catalog.Phrase(asgCodeScalingActivityFailed), "!", "asg", rows)
 	})
 	sort.Strings(failures)
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	activitiesErr := AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
 	lcErr := asgLaunchConfigurationPosture(ctx, clients, &result, resources)
 	return result, errors.Join(activitiesErr, lcErr)
@@ -173,7 +173,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 	// marked — a group whose configuration DID arrive was inspected, and
 	// hiding its finding behind a "?" would lose a real one.
 	if aws.ToString(nextToken) != "" {
-		result.Truncated = true
+		SetTruncated(result, true)
 		read := make(map[string]bool, len(configs))
 		for _, lc := range configs {
 			read[aws.ToString(lc.LaunchConfigurationName)] = true

@@ -157,7 +157,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	})
 	sort.Strings(failures)
 	sort.Strings(policyFailures)
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	result.FieldUpdates = make(map[string]map[string]string)
 	// The two passes are counted separately: each names how many of the same
 	// N file systems it could not answer for, and folding them into one

@@ -171,7 +171,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		failures = append(failures, err.Error())
 	}
 
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	err := Finish(&result, failures, total, op)
 	return result, err
 }

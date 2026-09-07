@@ -252,8 +252,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 	sort.Strings(failures)
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
 }
 

@@ -102,7 +102,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			"risk": riskVal,
 		}
 	})
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, nil
 }
 

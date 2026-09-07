@@ -77,6 +77,6 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	})
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, nil
 }

@@ -212,7 +212,6 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop,
 			catalog.Phrase(iamGroupCodeOrphanOrNoop), "~", "iam-group", rows)
 	})
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result, nil
 }

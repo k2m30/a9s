@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -48,32 +49,20 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 			knownIDs[r.ID] = true
 		}
 	}
-	var allVolumeStatuses []ec2types.VolumeStatusItem
-	var nextToken *string
-	truncated := false
-	pages := 0
-	for {
-		if pages >= EnrichmentCap {
-			truncated = true
-			break
-		}
-		out, err := clients.EC2.DescribeVolumeStatus(ctx, &ec2svc.DescribeVolumeStatusInput{
-			NextToken: nextToken,
+	// The cache-only joins above already answered; only the status question is
+	// affected by a short walk, so their findings stay and the rows the walk
+	// did not reach are marked uninspected for this check alone.
+	allVolumeStatuses, _, cut, walkErr := walkAccountPages(&result, resources,
+		func(v ec2types.VolumeStatusItem) string { return aws.ToString(v.VolumeId) },
+		func(token *string) ([]ec2types.VolumeStatusItem, *string, error) {
+			out, err := clients.EC2.DescribeVolumeStatus(ctx, &ec2svc.DescribeVolumeStatusInput{
+				NextToken: token,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.VolumeStatuses, out.NextToken, nil
 		})
-		pages++
-		if err != nil {
-			// The cache-only joins above already answered; only the status
-			// question is now unknown, so their findings stay and every row
-			// is marked uninspected for this check alone.
-			markAllUninspected(&result, resources)
-			return result, err
-		}
-		allVolumeStatuses = append(allVolumeStatuses, out.VolumeStatuses...)
-		if out.NextToken == nil {
-			break
-		}
-		nextToken = out.NextToken
-	}
 	for _, v := range allVolumeStatuses {
 		if v.VolumeId == nil {
 			continue
@@ -113,8 +102,8 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "volume I/O degraded", "!", "ebs", rows)
 	}
-	result.Truncated = truncated
-	return result, nil
+	SetTruncated(&result, cut)
+	return result, walkErr
 }
 
 // ebsVolumeARN builds the ARN a backup selection matches on. The ebs fetcher

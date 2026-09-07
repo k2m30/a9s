@@ -114,7 +114,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 
 	})
 	sort.Strings(failures)
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
 
@@ -234,6 +234,6 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	})
 	sort.Strings(failures)
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

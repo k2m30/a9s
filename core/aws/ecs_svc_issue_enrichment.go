@@ -193,7 +193,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	err := Finish(&result, failures, total, op)
 	return result, err
 }

@@ -51,6 +51,12 @@ const (
 	fixtLambdaProcessorTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/lambda-processor-tg/3333333333333333"
 )
 
+// GRPCTargetGroupARN is the demo witness for a finding that carries more
+// supporting rows than the detail view shows: acme-grpc-tg registers more
+// wholly unhealthy targets than the row cap, which is the only way `--demo`
+// renders the closing "… +K more" row of a capped Attention list.
+const GRPCTargetGroupARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-grpc-tg/1111111111111111"
+
 // Prowler-gap witnesses for the elb type. Each names the ONE demo load
 // balancer that carries the corresponding Wave-2 finding; no other load
 // balancer has the attribute or the listener that would trip it.
@@ -339,7 +345,7 @@ func buildTargetGroups() []elbv2types.TargetGroup {
 		},
 		{
 			TargetGroupName:    aws.String("acme-grpc-tg"),
-			TargetGroupArn:     aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-grpc-tg/1111111111111111"),
+			TargetGroupArn:     aws.String(GRPCTargetGroupARN),
 			Port:               aws.Int32(50051),
 			Protocol:           elbv2types.ProtocolEnumHttp,
 			ProtocolVersion:    aws.String("GRPC"),
@@ -538,11 +544,16 @@ func buildTargetHealth(f *ELBFixtures) {
 	}
 	// acme-grpc-tg — every target reports literal "unhealthy": the sole demo
 	// witness for the tg Broken color bucket (EnrichTargetGroupHealth: "!"
-	// only when every reporting target is unhealthy, not merely a mix).
-	f.TargetHealth["arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-grpc-tg/1111111111111111"] = []elbv2types.TargetHealthDescription{
-		{
+	// only when every reporting target is unhealthy, not merely a mix), and
+	// the sole demo witness for a finding with more supporting rows than the
+	// detail view shows. Twelve is the smallest count that puts two rows past
+	// awsclient.FindingRowCap, so the closing "… +2 more" row renders with a
+	// count no reader can mistake for the number of targets.
+	grpcTargets := make([]elbv2types.TargetHealthDescription, 0, 12)
+	for i := range 12 {
+		grpcTargets = append(grpcTargets, elbv2types.TargetHealthDescription{
 			Target: &elbv2types.TargetDescription{
-				Id:   aws.String("10.0.6.80"),
+				Id:   aws.String(fmt.Sprintf("10.0.6.%d", 80+i)),
 				Port: aws.Int32(50051),
 			},
 			TargetHealth: &elbv2types.TargetHealth{
@@ -550,19 +561,9 @@ func buildTargetHealth(f *ELBFixtures) {
 				Reason:      elbv2types.TargetHealthReasonEnumFailedHealthChecks,
 				Description: aws.String("Health checks failed"),
 			},
-		},
-		{
-			Target: &elbv2types.TargetDescription{
-				Id:   aws.String("10.0.6.81"),
-				Port: aws.Int32(50051),
-			},
-			TargetHealth: &elbv2types.TargetHealth{
-				State:       elbv2types.TargetHealthStateEnumUnhealthy,
-				Reason:      elbv2types.TargetHealthReasonEnumFailedHealthChecks,
-				Description: aws.String("Health checks failed"),
-			},
-		},
+		})
 	}
+	f.TargetHealth[GRPCTargetGroupARN] = grpcTargets
 	// Lambda-type target — Target.Id is the function ARN (no Port for
 	// lambda targets). process-orders is a real lambda.go fixture; matches
 	// the lambda:tg related-panel pivot witness (checkLambdaTG).

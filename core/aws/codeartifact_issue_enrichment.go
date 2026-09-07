@@ -137,6 +137,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 
 		}
 	})
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, nil
 }

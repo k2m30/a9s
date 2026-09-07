@@ -105,8 +105,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 		}
 	})
 	sort.Strings(failures)
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count.
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result, AggregateFailures("kinesis-enrich: DescribeStreamSummary", failures, total)
 }
 

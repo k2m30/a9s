@@ -199,13 +199,39 @@ func MarkSkipped(result *IssueEnricherResult, id string, failures *[]string, op 
 	*failures = append(*failures, fmt.Sprintf("%s: %v", id, err))
 }
 
+// SetTruncated raises result.Truncated when cut is true and never lowers it.
+//
+// One enricher discovers a cut answer in several independent places — a failed
+// batch, a work list trimmed at EnrichmentCap, a walk stopped at the page cap,
+// a second pass over the same rows — and each of them runs whether or not the
+// others did. A bare assignment composes with none of them: the last pass to
+// finish cleanly erases what an earlier one found. This is the only writer
+// that raises the flag; MarkInformationalOnly is the only one that lowers it.
+func SetTruncated(result *IssueEnricherResult, cut bool) {
+	if cut {
+		result.Truncated = true
+	}
+}
+
+// MarkInformationalOnly declares that an enricher's whole answer is "~":
+// capping or cutting its walk hides no issue, only informational coverage, so
+// the issue count it contributes to is not a lower bound and the flag every
+// cap along the way raised is dropped. Call it last — a later pass that emits
+// "!" would have nothing to raise the flag with afterwards.
+//
+// Per-resource truncation is unaffected: TruncatedIDs still says which rows
+// were not looked at.
+func MarkInformationalOnly(result *IssueEnricherResult) {
+	result.Truncated = false
+}
+
 // markAllUninspected records that a single account-wide call answered for
 // every row and failed, so none of them was inspected. Without it the rows
 // render as inspected-and-healthy, which is the one thing a failed check must
 // never claim. Enrichers whose calls are per-item use MarkSkipped instead —
 // only the row whose own call failed is uninspected there.
 func markAllUninspected(result *IssueEnricherResult, resources []resource.Resource) {
-	result.Truncated = true
+	SetTruncated(result, true)
 	for _, r := range resources {
 		if r.ID != "" {
 			result.TruncatedIDs[r.ID] = true
@@ -235,19 +261,17 @@ func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf fun
 			}
 		}
 	}
-	result.Truncated = true
+	SetTruncated(result, true)
 	return items[:EnrichmentCap]
 }
 
 // Finish folds a Wave 2 enricher's accumulated per-batch failures into result
-// and returns the composite error via AggregateFailures. Truncated is only
-// ever set to true here, never reset to false, so a call with zero failures
-// composes safely with Truncated already set for other reasons (EnrichmentCap,
-// per-parent page caps) earlier in the same enricher.
+// and returns the composite error via AggregateFailures. It raises Truncated
+// through SetTruncated, so a call with zero failures composes safely with a
+// flag another pass raised earlier in the same enricher (EnrichmentCap, the
+// page cap, a per-parent cap).
 func Finish(result *IssueEnricherResult, failures []string, total int, op string) error {
-	if len(failures) > 0 {
-		result.Truncated = true
-	}
+	SetTruncated(result, len(failures) > 0)
 	return AggregateFailures(op, failures, total)
 }
 
@@ -356,8 +380,15 @@ const overflowRowFormat = "… +%d more"
 func capRows(kept, incoming []domain.DetailRow) []domain.DetailRow {
 	hidden := 0
 	if n := len(kept); n > 0 {
+		// Only a value capRows itself wrote is a stored count. Sscanf stops at
+		// the last verb and ignores whatever follows, so "… +3 more replicas"
+		// would parse as 3 and swallow the row it belongs to; rendering the
+		// parse back and requiring the whole value to match rejects that, and
+		// requiring a positive count rejects "… +0 more" and "… +-2 more",
+		// which round-trip but which no closing row is ever written for.
 		var k int
-		if _, err := fmt.Sscanf(kept[n-1].Value, overflowRowFormat, &k); err == nil {
+		if _, err := fmt.Sscanf(kept[n-1].Value, overflowRowFormat, &k); err == nil &&
+			k > 0 && fmt.Sprintf(overflowRowFormat, k) == kept[n-1].Value {
 			hidden, kept = k, kept[:n-1]
 		}
 	}
@@ -377,4 +408,55 @@ func capRows(kept, incoming []domain.DetailRow) []domain.DetailRow {
 		Value: fmt.Sprintf(overflowRowFormat, hidden),
 		Tier:  last.Tier,
 	})
+}
+
+// walkAccountPages runs an account-wide paginated walk bounded at
+// EnrichmentCap pages and returns everything the walked pages carried.
+//
+// next reads one page for the given token and returns that page's items and
+// the token of the page after it; a nil or empty token ends the walk, as does
+// a page that fails. Between them they are the whole loop, because the bound
+// is only half the rule and an enricher that writes the bound out itself
+// writes the visible half only.
+//
+// The other half is the rows the walk never reached. A cap limits what a9s
+// looked at, not what exists, so when the walk ends early every resource no
+// walked page named is recorded as uninspected: its answer sat on a page
+// nobody read, and such a row must not render as inspected-and-healthy. idOf
+// maps one item to the resource ID it answers for, and returns "" for an item
+// that answers for no row of this type.
+//
+// The aggregate Truncated flag stays with the caller: a walk that can hide
+// only informational coverage lower-bounds no issue count.
+func walkAccountPages[T any](
+	result *IssueEnricherResult,
+	resources []resource.Resource,
+	idOf func(T) string,
+	next func(token *string) ([]T, *string, error),
+) (items []T, pages int, cut bool, err error) {
+	seen := make(map[string]bool, len(resources))
+	var token *string
+	for pages < EnrichmentCap {
+		var page []T
+		page, token, err = next(token)
+		pages++
+		if err != nil {
+			break
+		}
+		items = append(items, page...)
+		for _, item := range page {
+			if id := idOf(item); id != "" {
+				seen[id] = true
+			}
+		}
+		if token == nil || *token == "" {
+			return items, pages, false, nil
+		}
+	}
+	for _, r := range resources {
+		if r.ID != "" && !seen[r.ID] {
+			result.TruncatedIDs[r.ID] = true
+		}
+	}
+	return items, pages, true, err
 }

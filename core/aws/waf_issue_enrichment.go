@@ -160,8 +160,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	})
 	sort.Strings(failures)
 	// All WAF logging findings are severity "~" (informational).
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result,
 		AggregateFailures("waf-enrich", failures, total)
 }

@@ -136,7 +136,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		}
 	})
 	sort.Strings(failures)
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, AggregateFailures("s3-enrich: bucket posture", failures, total)
 }
 

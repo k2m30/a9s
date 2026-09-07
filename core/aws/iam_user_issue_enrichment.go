@@ -223,7 +223,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			"has_console_password": consolePasswordVal, //nolint:gosec // not a credential, display field key
 		}
 	})
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, nil
 }
 

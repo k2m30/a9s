@@ -67,10 +67,12 @@ type backupTagReader func(ctx context.Context, arn string) (map[string]string, e
 // carry an ARN but no tags.
 //
 // It reads tags only where they can change the answer: when no cached plan
-// selects by tag, and for every resource a selection's ARNs already take in,
-// the read is skipped. The rest are read one call each, in parallel, up to
-// EnrichmentCap. A resource whose read fails or falls outside the cap has
-// unknown tags, which the join leaves alone.
+// selects by tag, when a plan's own selection list could not be read to the
+// end (addBackupCoverage reports nothing at all in that case), and for every
+// resource a selection's ARNs already take in, the read is skipped. The rest
+// are read one call each, in parallel, up to EnrichmentCap. A resource whose
+// read fails or falls outside the cap has unknown tags, which the join leaves
+// alone.
 func backupTagsAccessor(
 	ctx context.Context,
 	cache resource.ResourceCache,
@@ -80,7 +82,8 @@ func backupTagsAccessor(
 	op string,
 ) (func(resource.Resource) (string, map[string]string, bool), error) {
 	entry, ok := cache["backup"]
-	if !ok || entry.IsTruncated || read == nil || !backupPlansSelectByTag(entry.Resources) {
+	if !ok || entry.IsTruncated || read == nil ||
+		backupPlansIncomplete(entry.Resources) || !backupPlansSelectByTag(entry.Resources) {
 		return backupARNFromField, nil
 	}
 

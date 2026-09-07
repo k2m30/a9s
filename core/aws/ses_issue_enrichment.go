@@ -70,7 +70,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 	// above rather than sharing its shape.
 	sesIdentityDKIM(ctx, clients, &result, resources)
 
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result, nil
 }
 

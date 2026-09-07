@@ -128,8 +128,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 
 	})
 	sort.Strings(failures)
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result,
 		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)
 }

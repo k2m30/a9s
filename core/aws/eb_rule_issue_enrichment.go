@@ -145,6 +145,6 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			catalog.Phrase(ebRuleCodeTargetIssue), "~", "eb-rule", rows)
 	})
 
-	result.Truncated = result.Truncated || truncated
+	SetTruncated(&result, truncated)
 	return result, nil
 }

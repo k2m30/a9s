@@ -53,30 +53,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return result, tagErr
 	}
 
-	// Paginate with a cap. A page that fails ends the walk but keeps the pages
-	// already read: the instances they name have real pending maintenance
-	// whatever happened afterwards. A failed page does lower-bound the walk,
-	// unlike the cap, which bounds only informational coverage for this
-	// "~"-only pass.
-	var allActions []rdstypes.ResourcePendingMaintenanceActions
-	var marker *string
-	var walkErr error
-	pages := 0
-	for pages < EnrichmentCap {
-		out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
-		pages++
-		if err != nil {
-			walkErr = err
-			result.Truncated = true
-			break
-		}
-		allActions = append(allActions, out.PendingMaintenanceActions...)
-		if out.Marker == nil || *out.Marker == "" {
-			break
-		}
-		marker = out.Marker
-	}
-
 	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
 	// parallel statusByID map: the merged S4 phrase (single-finding or
 	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
@@ -88,21 +64,40 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		}
 	}
 
-	for _, action := range allActions {
-		if action.ResourceIdentifier == nil {
-			continue
-		}
-		arn := *action.ResourceIdentifier
-		if !isInstanceARN(arn) {
-			continue // dbc / other RDS resources — not dbi
+	// instanceKeyOf names the row one pending-maintenance entry answers for,
+	// or "" for a cluster, another RDS resource, or an instance this list does
+	// not show. The page walk and the finding loop below must agree on that,
+	// so they read the same function.
+	instanceKeyOf := func(action rdstypes.ResourcePendingMaintenanceActions) string {
+		if action.ResourceIdentifier == nil || !isInstanceARN(*action.ResourceIdentifier) {
+			return ""
 		}
 		// Find the longest matching probeID (specificity wins over prefix).
 		key := ""
 		for _, id := range probeIDs {
-			if strings.HasSuffix(arn, ":"+id) && len(id) > len(key) {
+			if strings.HasSuffix(*action.ResourceIdentifier, ":"+id) && len(id) > len(key) {
 				key = id
 			}
 		}
+		return key
+	}
+
+	// A page that fails ends the walk but keeps the pages already read: the
+	// instances they name have real pending maintenance whatever happened
+	// afterwards. A failed page does lower-bound the walk, unlike the cap,
+	// which bounds only informational coverage for this "~"-only pass.
+	allActions, _, _, walkErr := walkAccountPages(&result, resources, instanceKeyOf,
+		func(token *string) ([]rdstypes.ResourcePendingMaintenanceActions, *string, error) {
+			out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: token})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.PendingMaintenanceActions, out.Marker, nil
+		})
+	SetTruncated(&result, walkErr != nil)
+
+	for _, action := range allActions {
+		key := instanceKeyOf(action)
 		if key == "" {
 			continue
 		}
@@ -146,16 +141,12 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 // version AWS no longer lists as available.
 func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) {
 	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
-	n := len(resources)
-	if n < len(resources) {
-		result.Truncated = true
-	}
 
 	type enginePair struct{ engine, version string }
 	deprecatedByPair := map[enginePair]bool{}
 	var failures []string
 
-	for i := range n {
+	for i := range resources {
 		r := resources[i]
 		db, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
 		if !ok || resourceIsTearingDown(r.RawStruct) {
@@ -192,9 +183,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 
 	}
 
-	if len(failures) > 0 {
-		result.Truncated = true
-	}
+	SetTruncated(result, len(failures) > 0)
 }
 
 // isDeprecatedEngineVersion reads the DescribeDBEngineVersions answer for one

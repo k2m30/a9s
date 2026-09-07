@@ -88,8 +88,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		setWave2Finding(&result, key, ebCodeEnvironmentCauses, catalog.Phrase(ebCodeEnvironmentCauses), "~", "eb", rows)
 	})
 	ebConfigurationPosture(ctx, clients, &result, resources)
-	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
-	result.Truncated = false
+	MarkInformationalOnly(&result)
 	return result, nil
 }
 

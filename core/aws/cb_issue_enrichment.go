@@ -50,12 +50,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, len(names), EnrichmentParallelism, func(i int) {
 		name := names[i]
-		mu.Lock()
-		atCap := len(buildIDs) >= EnrichmentCap
-		mu.Unlock()
-		if atCap {
-			return
-		}
 		out, err := clients.CodeBuild.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
 			ProjectName: aws.String(name),
 			SortOrder:   cbtypes.SortOrderTypeDescending,
@@ -63,7 +57,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			result.Truncated = true
+			SetTruncated(&result, true)
 			result.TruncatedIDs[name] = true
 			return
 		}

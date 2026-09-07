@@ -103,35 +103,23 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 			knownIDs[r.ID] = true
 		}
 	}
-	var allInstanceStatuses []ec2types.InstanceStatus
-	var nextToken *string
-	truncated := false
-	pages := 0
-	for {
-		if pages >= EnrichmentCap {
-			truncated = true
-			break
-		}
-		out, err := clients.EC2.DescribeInstanceStatus(ctx, &ec2svc.DescribeInstanceStatusInput{
-			IncludeAllInstances: aws.Bool(true),
-			NextToken:           nextToken,
+	// One account-wide call answers for every row on screen, so a walk that
+	// stops early leaves the rows it never named uninspected — the list then
+	// renders "?" rather than inspected-and-healthy, the same contract as the
+	// ebs-snap public-share query. The findings the cache-only and user-data
+	// passes already produced survive.
+	allInstanceStatuses, _, cut, walkErr := walkAccountPages(&result, resources,
+		func(is ec2types.InstanceStatus) string { return aws.ToString(is.InstanceId) },
+		func(token *string) ([]ec2types.InstanceStatus, *string, error) {
+			out, err := clients.EC2.DescribeInstanceStatus(ctx, &ec2svc.DescribeInstanceStatusInput{
+				IncludeAllInstances: aws.Bool(true),
+				NextToken:           token,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.InstanceStatuses, out.NextToken, nil
 		})
-		pages++
-		if err != nil {
-			// One account-wide call answers for every row on screen, so its
-			// failure leaves every row's status uninspected. Each input ID is
-			// marked so the list renders "?" rather than inspected-and-healthy
-			// — same contract as the ebs-snap public-share query. The findings
-			// the cache-only and user-data passes already produced survive.
-			markAllUninspected(&result, resources)
-			return result, err
-		}
-		allInstanceStatuses = append(allInstanceStatuses, out.InstanceStatuses...)
-		if out.NextToken == nil {
-			break
-		}
-		nextToken = out.NextToken
-	}
 
 	now := time.Now()
 	cutoff := now.Add(7 * 24 * time.Hour)
@@ -219,8 +207,8 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		}
 	}
 
-	result.Truncated = result.Truncated || truncated
-	return result, nil
+	SetTruncated(&result, cut)
+	return result, walkErr
 }
 
 // ec2InternetExposure is the ec2 ↔ sg cross-reference: an instance holding a

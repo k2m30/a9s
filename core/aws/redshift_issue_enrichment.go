@@ -49,7 +49,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
 	if n < len(resources) {
-		result.Truncated = true
+		SetTruncated(&result, true)
 	}
 	var failures []string
 	var mu sync.Mutex

@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -71,94 +72,88 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		}
 	}
 
-	var marker *string
-	truncated := false
-	pages := 0
 	now := nowFunc()
 	var failures []string
 
-	for {
-		if pages >= EnrichmentCap {
-			truncated = true
-			break
+	// clusterKeyOf names the row one pending-maintenance entry answers for, or
+	// "" when it belongs to an instance or to a cluster this list does not
+	// show. The page walk and the finding loop below must agree on that, so
+	// they read the same function.
+	clusterKeyOf := func(action docdbtypes.ResourcePendingMaintenanceActions) string {
+		if action.ResourceIdentifier == nil || !isClusterARN(*action.ResourceIdentifier) {
+			return ""
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribePendingMaintenanceActionsOutput, error) {
-			return clients.DocDB.DescribePendingMaintenanceActions(ctx, &docdb.DescribePendingMaintenanceActionsInput{Marker: marker})
-		})
-		pages++
-		if err != nil {
-			truncated = true
-			failures = append(failures, fmt.Sprintf("page %d: %v", pages, err))
-			break
+		// Find the longest matching probeID (specificity wins over prefix).
+		key := ""
+		for _, id := range probeIDs {
+			if strings.HasSuffix(*action.ResourceIdentifier, ":"+id) && len(id) > len(key) {
+				key = id
+			}
 		}
-
-		for _, action := range out.PendingMaintenanceActions {
-			if action.ResourceIdentifier == nil {
-				continue
-			}
-			arn := *action.ResourceIdentifier
-			if !isClusterARN(arn) {
-				continue // instance ARN or other resource — not dbc
-			}
-
-			// Find the longest matching probeID (specificity wins over prefix).
-			key := ""
-			for _, id := range probeIDs {
-				if strings.HasSuffix(arn, ":"+id) && len(id) > len(key) {
-					key = id
-				}
-			}
-			if key == "" {
-				continue
-			}
-
-			// Check overdue: emit a finding ONLY when any action detail has a past date.
-			overdue := false
-			for _, pa := range action.PendingMaintenanceActionDetails {
-				if pa.ForcedApplyDate != nil && pa.ForcedApplyDate.Before(now) {
-					overdue = true
-					break
-				}
-				if pa.AutoAppliedAfterDate != nil && pa.AutoAppliedAfterDate.Before(now) {
-					overdue = true
-					break
-				}
-			}
-			if !overdue {
-				continue
-			}
-
-			// Build rows. Summary is the short S5 phrase; every concrete fact
-			// (Action, Description, Earliest Target, Apply Method) lives only in
-			// Rows so the Attention section does not render duplicated content (U11).
-			var rows []domain.DetailRow
-			for _, pa := range action.PendingMaintenanceActionDetails {
-				if pa.Action != nil && *pa.Action != "" {
-					rows = append(rows, domain.DetailRow{Label: "Action", Value: *pa.Action, Tier: "!"})
-				}
-				if pa.OptInStatus != nil && *pa.OptInStatus != "" {
-					rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: *pa.OptInStatus})
-				}
-				if pa.AutoAppliedAfterDate != nil {
-					rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "!"})
-				} else if pa.ForcedApplyDate != nil {
-					rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "!"})
-				}
-				if pa.Description != nil && *pa.Description != "" {
-					rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
-				}
-			}
-
-			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows)
-		}
-
-		if out.Marker == nil || *out.Marker == "" {
-			break
-		}
-		marker = out.Marker
+		return key
 	}
 
-	result.Truncated = truncated
+	allActions, pages, cut, walkErr := walkAccountPages(&result, resources, clusterKeyOf,
+		func(token *string) ([]docdbtypes.ResourcePendingMaintenanceActions, *string, error) {
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribePendingMaintenanceActionsOutput, error) {
+				return clients.DocDB.DescribePendingMaintenanceActions(ctx, &docdb.DescribePendingMaintenanceActionsInput{Marker: token})
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.PendingMaintenanceActions, out.Marker, nil
+		})
+	if walkErr != nil {
+		failures = append(failures, fmt.Sprintf("page %d: %v", pages, walkErr))
+	}
+
+	for _, action := range allActions {
+		key := clusterKeyOf(action)
+		if key == "" {
+			continue
+		}
+
+		// Check overdue: emit a finding ONLY when any action detail has a past date.
+		overdue := false
+		for _, pa := range action.PendingMaintenanceActionDetails {
+			if pa.ForcedApplyDate != nil && pa.ForcedApplyDate.Before(now) {
+				overdue = true
+				break
+			}
+			if pa.AutoAppliedAfterDate != nil && pa.AutoAppliedAfterDate.Before(now) {
+				overdue = true
+				break
+			}
+		}
+		if !overdue {
+			continue
+		}
+
+		// Build rows. Summary is the short S5 phrase; every concrete fact
+		// (Action, Description, Earliest Target, Apply Method) lives only in
+		// Rows so the Attention section does not render duplicated content (U11).
+		var rows []domain.DetailRow
+		for _, pa := range action.PendingMaintenanceActionDetails {
+			if pa.Action != nil && *pa.Action != "" {
+				rows = append(rows, domain.DetailRow{Label: "Action", Value: *pa.Action, Tier: "!"})
+			}
+			if pa.OptInStatus != nil && *pa.OptInStatus != "" {
+				rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: *pa.OptInStatus})
+			}
+			if pa.AutoAppliedAfterDate != nil {
+				rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "!"})
+			} else if pa.ForcedApplyDate != nil {
+				rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "!"})
+			}
+			if pa.Description != nil && *pa.Description != "" {
+				rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
+			}
+		}
+
+		setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows)
+	}
+
+	SetTruncated(&result, cut)
 	return result, errors.Join(tagErr, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages))
 }
 
