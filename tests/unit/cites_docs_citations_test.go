@@ -453,6 +453,23 @@ func assertDocTableMatchesCatalog(t *testing.T, shortName string) {
 		}
 	}
 
+	rendered := map[string]bool{}
+	for _, row := range parseDocSignalTable(t, path) {
+		rendered[row.listText] = true
+	}
+	var missing []string
+	for _, sig := range signals {
+		if !rendered[sig.phrase] {
+			missing = append(missing, fmt.Sprintf("%s (%s, %s)", sig.phrase, sig.code, sig.severity))
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Errorf("%s: the §4 table renders no row for %d finding(s) the catalog ships for `%s`: %s. "+
+			"The table is one row per signal, so a shipped finding missing from it is a signal the doc "+
+			"tells the reader does not exist", rel, len(missing), shortName, strings.Join(missing, ", "))
+	}
+
 	assertDocSignalSectionsAgree(t, path)
 }
 
@@ -545,6 +562,20 @@ func TestCitesEksSignalTableMatchesTheCatalog(t *testing.T) {
 // hand-written §4 table against the shipped definitions, for the same reason.
 func TestCitesCtEventsSignalTableMatchesTheCatalog(t *testing.T) {
 	assertDocTableMatchesCatalog(t, "ct-events")
+}
+
+// TestCitesSignalTablesMatchTheCatalog pins the resource docs that assert what
+// the catalog does not ship: ng §3.2 promises Broken for seventeen named
+// health-issue codes while core/aws/ng.go reads no code list, cb §3.1 says the
+// list response carries no health signal, lambda §3 accounts for one wave, and
+// the two RDS snapshot docs put their cross-reference signals in a wave and a
+// bucket of their own.
+func TestCitesSignalTablesMatchTheCatalog(t *testing.T) {
+	for _, shortName := range []string{"ng", "cb", "lambda", "dbi-snap", "dbc-snap"} {
+		t.Run(shortName, func(t *testing.T) {
+			assertDocTableMatchesCatalog(t, shortName)
+		})
+	}
 }
 
 // TestCitesCodeartifactSignalTableMatchesTheCatalog pins the codeartifact
