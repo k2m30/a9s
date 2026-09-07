@@ -146,7 +146,7 @@ One row per §3 signal (Healthy case omitted per rule):
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, a yellow row with `pending: VPC being created` or `empty: no subnets` is already self-explanatory, and a green row prefixed `~` with `no flow logs` tells the operator what's missing without requiring a detail pivot. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, a yellow row with `pending: VPC being created` or `empty: no subnets` is already self-explanatory, and a yellow row reading `no active VPC flow logs` tells the operator what's missing without requiring a detail pivot. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 

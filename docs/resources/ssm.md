@@ -93,7 +93,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above).
 - Per-parameter `GetParameter` / `GetParameterHistory` to read values or last-access timestamps — a9s-devops: not worth it for the default list view; belongs to a dedicated "reveal" action governed by the read-only invariant and explicit user intent, not to the attention/issue surfacing.
-- Cross-account sharing, parameter-policy expiry, advanced policies (`ParameterInlinePolicy[]`) — a9s-devops: possible=yes (field is on `ParameterMetadata.Policies`) but worth=no for the default list view; policy expiry alerting is a niche feature better delivered via EventBridge / a dedicated advanced-policies view than via a list-row glyph.
+- Cross-account sharing, parameter-policy expiry, advanced policies (`ParameterInlinePolicy[]`) — a9s-devops: possible=yes (field is on `ParameterMetadata.Policies`) but worth=no for the default list view; policy expiry alerting is a niche feature better delivered via EventBridge / a dedicated advanced-policies view than via a finding on the parameter row.
 - Any UI element not listed in §4 — no new columns, no new icons, no new views, no new key bindings.
 - Any write operation. a9s is read-only by design (`docs/architecture.md` § "What is a9s?").
 

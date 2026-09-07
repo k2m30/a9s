@@ -175,7 +175,7 @@ One row per signal from §3:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-green row carries an explicit cause in the Status column (`isolated: quarantined by AWS`, `processing: config change in flight`, `deleting: removal in progress`), and the two background-check glyphs (`!` software update forced soon, `~` encryption at rest off) each pair their glyph with a short readable S4 cause so detail-view navigation is optional. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-green row carries an explicit cause in the Status column (`isolated: quarantined by AWS`, `processing: config change in flight`, `deleting: removal in progress`), and the posture signals do the same (`software update forced soon`, `encryption at rest off`), so detail-view navigation is optional. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 

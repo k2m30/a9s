@@ -182,7 +182,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: every non-healthy DynamoDB row pairs its state with a cause operators recognise (`kms key inaccessible`, `archived: kms key lost`, `PITR off`), and the `~` PITR annotation tells them at a glance "green but PITR is off" without needing detail view.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: every non-healthy DynamoDB row pairs its state with a cause operators recognise (`kms key inaccessible`, `archived: kms key lost`), and a table with no point-in-time recovery goes yellow reading `point-in-time recovery disabled`, which is the whole of it.
 
 ## 5. Out of Scope
 

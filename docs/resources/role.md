@@ -141,7 +141,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `anyone can assume this role` is actionable on sight (name the accounts, or add an external-id condition), and a green row prefixed `~` with `unused >90d` tells the operator this role is a candidate for deletion without needing to open detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `anyone can assume this role` is actionable on sight (name the accounts, or add an external-id condition), and a yellow row reading `dormant role (>90d)` tells the operator this role is a candidate for deletion without needing to open detail.
 
 ## 5. Out of Scope
 

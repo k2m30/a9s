@@ -132,7 +132,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all three Wave 1 signals (retention, orphan, KMS deletion) — the S4 text names both the condition and its consequence; for the Wave 2 `lastEventTimestamp` staleness, the `~` glyph + `last event 3d ago` in S4 answers the question inline, with S5 carrying the exact timestamp for follow-up. No §4 gap identified.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all three Wave 1 signals (retention, orphan, KMS deletion) — the S4 text names both the condition and its consequence; an audit group with no metric filter over it goes yellow reading `audit log group missing metric filters`, and the detail view names which filters are missing. No §4 gap identified.
 
 ## 5. Out of Scope
 

@@ -160,7 +160,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: every non-Healthy row carries a short cause in S4 (`pending deletion`, `disabled: admin off`, `unavailable: custom key store offline`) and every green `!` row carries `rotation off` — the operator can triage "which key is about to strand encrypted data?" without pressing detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: every non-Healthy row carries a short cause in S4 (`pending deletion`, `disabled: admin off`, `unavailable: custom key store offline`) and a key that never rotates goes yellow reading `key rotation disabled` — the operator can triage "which key is about to strand encrypted data?" without pressing detail.
 
 ## 5. Out of Scope
 

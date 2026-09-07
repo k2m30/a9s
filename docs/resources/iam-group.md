@@ -89,7 +89,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — the `~` glyph flags the row as worth knowing about and the Status column names the cause ("empty group, created 47d ago") so the operator can decide to ignore or drill into detail without a second keypress.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — the row goes yellow and the Status column names the cause (`no members or no policies`), so the operator can decide to ignore it or drill into detail without a second keypress.
 
 ## 5. Out of Scope
 

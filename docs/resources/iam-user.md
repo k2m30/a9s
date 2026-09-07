@@ -123,7 +123,7 @@ Rules applied:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every row carries a cause in the Status column: never-signed-in rows say `console password never used`, console-without-MFA rows say `console user without MFA` with a `!` glyph, and stale-key rows say `access key unused` with a `~` glyph. The operator can triage the whole list (delete dormant users, fix MFA on the flagged users, rotate the aging keys) without opening a single detail view.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every row carries a cause in the Status column: never-signed-in rows say `console password never used`, console-without-MFA rows go red reading `console user without MFA`, and stale-key rows say `access key unused`. The operator can triage the whole list (delete dormant users, fix MFA on the flagged users, rotate the aging keys) without opening a single detail view.
 
 ## 5. Out of Scope
 

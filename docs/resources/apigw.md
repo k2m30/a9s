@@ -186,7 +186,7 @@ Notes on the single row above:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for v2 — a `~` glyph with `no deployed stage` in the Status column is self-explanatory — and yes for v1 by design, because v1 rows carry no enrichment today and therefore never surface a false alarm; the cost is that a genuinely broken v1 API won't surface either, which is a known gap the operator learns from the tool's docs, not from a surprise.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for v2 — a yellow row reading `no deployed stages` is self-explanatory — and yes for v1 by design, because v1 rows carry no enrichment today and therefore never surface a false alarm; the cost is that a genuinely broken v1 API won't surface either, which is a known gap the operator learns from the tool's docs, not from a surprise.
 
 ## 5. Out of Scope
 

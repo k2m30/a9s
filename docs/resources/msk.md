@@ -188,7 +188,7 @@ Notes:
 - `ACTIVE` is Healthy and has no §4 row by design — S4 renders blank, no glyph.
 - For `FAILED`, the cause text is always `StateInfo.Code` (compact) in S4 and `StateInfo.Message` (sentence) in S5. When `StateInfo` is nil (can happen on very old clusters that failed before the field existed), fall back to `failed` in S4 and a generic detail line; this should be rare.
 - For `UPDATING`, `StateInfo.Code` often carries the update reason (e.g. `UPDATING_CONFIGURATION`, `UPDATING_BROKER_STORAGE`) — surface it when present; fall back to the generic wording above.
-- There is no Wave 2, so no `!` / `~` glyphs appear on MSK rows under the current contract. If per-broker runtime state becomes available via a future AWS API, new §3.2 signals could introduce them.
+- The four Wave 2 signals are posture, not runtime: broker software version, client-broker encryption, public broker access, unauthenticated access. If per-broker runtime state becomes available via a future AWS API, it would join them.
 
 ## 4.1 UX review (two sentences)
 

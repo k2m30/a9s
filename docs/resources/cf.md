@@ -165,9 +165,11 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §3 signal: each yellow/red/dim row carries a self-explanatory cause in the Status column (`deploying: config propagating`, `disabled (admin-off)`, `weak TLS: MinimumProtocolVersion=TLSv1`, `no WAF attached`, `access logs off`) so the operator can triage without opening detail; the logging-disabled case is `~` in the detail view rather than `!`, because it is a hygiene concern, not an outage.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §3 signal: each yellow/red/dim row carries a self-explanatory cause in the Status column (`deploying: config propagating`, `disabled (admin-off)`, `weak TLS: MinimumProtocolVersion=TLSv1`, `no WAF attached`, `access logs off`) so the operator can triage without opening detail.
 
 ## 5. Out of Scope
+
+- The logging-disabled case carries `~` in the detail view's Attention section rather than `!`, because it is a hygiene concern, not an outage.
 
 - All §3.3 Wave 3 signals (copied above).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.

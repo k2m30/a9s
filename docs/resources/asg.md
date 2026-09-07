@@ -182,7 +182,7 @@ Badge aggregation for `asg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity 
 Notes:
 
 - The Wave 2 launch-failure signal typically co-occurs with Wave 1 `InService < MinSize` (Broken) — the row is already red. S4 should deduplicate with the existing `below min: …` text (prefer the more specific `launch failed: …` when both are present), and S5 carries the full `StatusMessage`. The `!` severity still bumps S1 because it is an important finding.
-- If the launch-failure signal appears on a Healthy row (edge case: activity failed but `InService >= MinSize` because old instances are still serving), treat as `!` on green → S1, S3 (`!`), S4, S5.
+- The launch-failure signal can fire while `InService >= MinSize`, because old instances are still serving. It colours the row red on its own then, and the menu count takes it.
 
 ### 4.1 UX review (two sentences)
 

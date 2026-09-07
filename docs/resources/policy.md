@@ -103,7 +103,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — an orphan policy reads `orphan: 0 attachments` (yellow row) and a wildcard-admin policy reads `wildcard admin: Allow *:*` (red row with `!` in S1 count); both problems are legible without opening detail, so triage happens on the list page. Operators drill into detail only to see the actual affected users/groups/roles in the related panel.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — an orphan policy reads `orphan: 0 attachments` (yellow row) and a wildcard-admin policy reads `admin star (allows * on *)` on a red row the menu count takes; both problems are legible without opening detail, so triage happens on the list page. Operators drill into detail only to see the actual affected users/groups/roles in the related panel.
 
 ## 5. Out of Scope
 

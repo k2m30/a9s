@@ -152,7 +152,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 states — `failed: cluster creation failed`, `inactive: deleted (stale ref)`, `provisioning/deprovisioning` — each pairs the keyword with a cause. Wave 2 rows (`tasks stuck pending: N`, `idle: N instances, 0 tasks`) give the operator the counts that drove the `~` glyph, so they can triage "known-bad shape" vs "transient burst" from the list alone; deeper reason (agent disconnect vs ENI attach failure) needs detail, which is acceptable because `~` is informational. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 states — `failed: cluster creation failed`, `inactive: deleted (stale ref)`, `provisioning/deprovisioning` — each pairs the keyword with a cause. A cluster whose tasks are not running goes yellow reading `tasks pending or not running`, which separates "known-bad shape" from "transient burst" once the operator knows the cluster; the deeper reason (agent disconnect vs ENI attach failure) needs detail, where the counts are. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
