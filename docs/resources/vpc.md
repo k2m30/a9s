@@ -107,10 +107,6 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `vpc`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State == available` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `State` field (type `VpcState`) on the `Vpc` returned by `DescribeVpcs`.
-
 - **Signal**: `State == pending` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `State` field on the list-response VPC.
@@ -158,9 +154,9 @@ One row per §3 signal (Healthy case omitted per rule):
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending: VPC being created` |
+| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| no flow logs for this VPC | 2 | Warning | `~` | S3, S4, S5 | `no active VPC flow logs` |
 | no subnets in VPC — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `empty: no subnets` |
-| no flow logs for this VPC | 2 | Healthy | `~` | S3, S4, S5 | `no flow logs` |
 
 ## 4.1 UX review (two sentences)
 

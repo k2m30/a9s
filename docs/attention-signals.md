@@ -730,7 +730,7 @@ Wave 3 — the deeper reads, mostly CloudWatch, that no type performs yet:
 - `iam-group` — blast-radius analysis across the group's members.
 - `waf` — CloudWatch `BlockedRequests` spike; managed-rule-group version drift.
 - `r53` — registrar nameserver lookup (external); health-check status aggregation per zone.
-- `cf` — CloudWatch `5xxErrorRate`/`TotalErrorRate`; origin-deleted cross-check.
+- `cf` — CloudWatch `5xxErrorRate`/`TotalErrorRate`; origin-deleted cross-check; no WAF web ACL on the distribution (`WebACLId`).
 - `apigw` — CloudWatch `5XXError`/`4XXError`; `GetUsagePlans` quota-breach detection.
 - `trail` — `LookupEvents` absence detection.
 - `ct-events` — absence-of-expected-events alerting.

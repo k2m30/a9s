@@ -89,18 +89,18 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ecs`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `status == ACTIVE` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Cluster.Status` field from the `DescribeClusters` response wrapping the `ListClusters` output.
 - **Signal**: `status == PROVISIONING` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Cluster.Status` field from `DescribeClusters`.
+
 - **Signal**: `status == DEPROVISIONING` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Cluster.Status` field from `DescribeClusters`.
+
 - **Signal**: `status == FAILED` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Cluster.Status` field from `DescribeClusters`.
+
 - **Signal**: `status == INACTIVE` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Cluster.Status` field from `DescribeClusters` (per SDK: `INACTIVE` = deleted but still visible for a grace period — surfaces as Broken so operators notice a stale reference).
@@ -113,6 +113,7 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **API call**: `DescribeClusters(include=STATISTICS)` — one call per batch of up to 100 clusters; the same response already consumed for Wave 1.
   - **Cost shape**: hybrid (piggy-backs on the existing describe, so effectively free per cluster beyond the first batch).
+
 - **Signal**: `runningTasksCount == 0 && registeredContainerInstancesCount > 0` → Warning.
   - **State bucket**: Warning.
   - **API call**: `DescribeClusters(include=STATISTICS)` — same call as above.
@@ -151,12 +152,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status == PROVISIONING` | 1 | Warning | n/a | S2, S4 | `provisioning: capacity coming up` |
-| `status == DEPROVISIONING` | 1 | Warning | n/a | S2, S4 | `deprovisioning: being torn down` |
-| `status == FAILED` | 1 | Broken | n/a | S2, S4 | `failed: cluster creation failed` |
-| `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive: deleted (stale ref)` |
-| `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning (informational) | `~` | S3, S4, S5 | `tasks stuck pending: N` |
-| `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning (informational) | `~` | S3, S4, S5 | `idle: N instances, 0 tasks` |
+| `status == PROVISIONING` | 1 | Warning | n/a | S2, S4 | `provisioning` |
+| `status == DEPROVISIONING` | 1 | Warning | n/a | S2, S4 | `deprovisioning` |
+| `status == FAILED` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive` |
+| `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning | `~` | S3, S4, S5 | `tasks pending or not running` |
+| `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning | `~` | S3, S4, S5 | `tasks pending or not running` |
 
 Rules for filling list and detail text:
 

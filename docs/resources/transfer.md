@@ -95,34 +95,38 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `trans
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `State == ONLINE` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `ListedServer.State`.
 - **Signal**: `State == OFFLINE` — the partner-facing endpoint is not accepting transfers (legitimate as a cost-stop, but partners can't connect).
   - **State bucket**: Warning.
   - **How obtained**: `ListedServer.State`.
+
 - **Signal**: `State` in `STARTING` / `STOPPING` (transient).
   - **State bucket**: Warning.
   - **How obtained**: `ListedServer.State`.
+
+- **Signal**: `State == STOPPING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `State == START_FAILED` — server failed to come online; partners are down.
   - **State bucket**: Broken.
   - **How obtained**: `ListedServer.State`.
+
 - **Signal**: `State == STOP_FAILED` — error condition, server likely still serving.
   - **State bucket**: Warning.
   - **How obtained**: `ListedServer.State`.
 
 Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `LoggingRole == nil` (structured logging makes nil legitimate — the gap check needs `StructuredLogDestinations`, a Describe field → Wave 2); `UserCount == 0` (AS2 and external-IdP servers legitimately 0 — column only). `Protocols` is absent from `ListedServer` — AS2-vs-SFTP is unknowable at Wave 1.
 
-### 3.2 Wave 2 — bounded extra API calls
-
 - **Signal**: `SecurityPolicyName` in the known-weak legacy denylist (`TransferSecurityPolicy-2018-11`, `TransferSecurityPolicy-2020-06`) — weak ciphers / old TLS. Denylist, not latest-chasing: FIPS/PQ/restricted variants must not false-positive.
   - **State bucket**: Warning.
   - **API call**: `DescribeServer`, one per server (N+1; accounts run 1–5).
   - **Cost shape**: per-resource.
+
 - **Signal**: `LoggingRole == nil` AND `len(StructuredLogDestinations) == 0` — no activity logging at all; an audit gap for a B2B endpoint.
   - **State bucket**: Warning.
   - **API call**: `DescribeServer` (same call).
   - **Cost shape**: per-resource.
+
 - **Signal**: per-name `DescribeServer` denied — the row is KEPT name-only (`details denied`, shared DegradedDetailsDenied contract).
   - **State bucket**: Warning.
   - **API call**: `DescribeServer` (the denial IS the response).
@@ -131,6 +135,12 @@ Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `LoggingRole == nil` (s
 Wave-2 detail facts (not signals): `Protocols`, `As2ServiceManagedEgressIpAddresses` (partners allowlist these — copyable), `HostKeyFingerprint` (SFTP clients pin it), `EndpointDetails` wiring, `IdentityProviderDetails.Url`.
 
 Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner traffic rejected`; certificate rows (on agreement detail): `InactiveDate` past or `Status == INACTIVE` → Broken `expired`, within 30 days → Warning `expires in <N>d`. Never bubbled account-wide to the server row.
+
+- **Signal**: `DescribeServer` answered with nothing usable.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+### 3.2 Wave 2 — bounded extra API calls
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -150,9 +160,10 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 | `State == STOPPING` | 1 | Warning | n/a | S2, S4 | `stopping` |
 | `State == START_FAILED` | 1 | Broken | n/a | S2, S4 | `start failed` |
 | `State == STOP_FAILED` | 1 | Warning | n/a | S2, S4 | `stop failed` |
-| legacy security policy | 2 | Warning | n/a | S2, S4, S5 | `legacy security policy` |
-| no activity logging | 2 | Warning | n/a | S2, S4, S5 | `no activity logging` |
-| `DescribeServer` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` |
+| legacy security policy | 1 | Warning | n/a | S2, S4 | `legacy security policy` |
+| no activity logging | 1 | Warning | n/a | S2, S4 | `no activity logging` |
+| `DescribeServer` denied | 1 | Warning | n/a | S2, S4 | `details denied` |
+| `DescribeServer` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
 
 Notes:
 

@@ -131,10 +131,6 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `tg`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `LoadBalancerArns == []` (orphan — TG is not attached to any load balancer).
-  - **State bucket**: Warning.
-  - **How obtained**: `elbv2:DescribeTargetGroups` response field `TargetGroup.LoadBalancerArns` is an empty slice.
-
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -143,6 +139,7 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **API call**: `elbv2:DescribeTargetHealth(TargetGroupArn=<this>)` — one call per target group.
   - **Cost shape**: per-resource.
+
 - **Signal**: all targets `TargetHealth.State == unhealthy` (every registered target is failing — TG is effectively down, and if this TG fronts user traffic the site is down).
   - **State bucket**: Broken.
   - **API call**: `elbv2:DescribeTargetHealth(TargetGroupArn=<this>)` — one call per target group.
@@ -180,8 +177,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `LoadBalancerArns == []` | 1 | Warning | n/a | S2, S4 | `orphan: no load balancer` |
-| any target `unhealthy` (not all) | 2 | Warning | n/a | S2, S4, S5 | `unhealthy targets: <K>/<N>` |
+| any target `unhealthy` (not all) | 2 | Warning | n/a | S2, S4, S5 | `unhealthy targets: <N>/<M>` |
 | all targets `unhealthy` | 2 | Broken | n/a | S2, S4, S5 | `all <N> targets unhealthy` |
 
 Notes:

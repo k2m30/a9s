@@ -91,18 +91,17 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `DescribeLogGroups` list response — fields `storedBytes` and `creationTime` (`types.LogGroup § StoredBytes`, `§ CreationTime`).
 
-- **Signal**: Cross-ref `kms` — referenced `kmsKeyId` is in `PendingDeletion` → Broken.
-  - **State bucket**: Broken.
-  - **How obtained**: Read `kmsKeyId` from the list response and cross-reference the already-loaded `kms` sibling-list by key ARN; if that key's `KeyState==PendingDeletion`, log ingestion will fail.
+- **Signal**: `kmsKeyId` empty.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
 
-- **Signal**: `lastEventTimestamp` stale beyond expected write cadence → Warning (silent service).
+- **Signal**: an audit log group with no metric filter over it.
   - **State bucket**: Warning.
-  - **API call**: `DescribeLogStreams(logGroupName=…, orderBy=LastEventTime, descending=true, limit=1)` — one per log group.
-  - **Cost shape**: per-resource.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -137,9 +136,9 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `retentionInDays` nil | 1 | Warning | n/a | S2, S4 | `retention: never expire` |
-| `storedBytes==0` + age >90d | 1 | Warning | n/a | S2, S4 | `orphan: 0 bytes, age 90d+` |
-| KMS key `PendingDeletion` | 1 | Broken | n/a | S2, S4 | `kms key pending deletion` |
-| `lastEventTimestamp` stale | 2 | Warning | `~` | S3, S4, S5 | `last event 3d ago` |
+| `storedBytes==0` + age >90d | 1 | Warning | n/a | S2, S4 | `empty, created over 90 days ago` |
+| `kmsKeyId` empty | 1 | Warning | n/a | S2, S4 | `not encrypted with KMS` |
+| an audit log group with no metric filter over it | 2 | Warning | `~` | S3, S4, S5 | `audit log group missing metric filters` |
 
 Rules for filling list and detail text:
 

@@ -111,10 +111,6 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
   - **State bucket**: Warning.
   - **How obtained**: `SecretListEntry.RotationEnabled` and `SecretListEntry.NextRotationDate` on the `ListSecrets` response.
 
-- **Signal**: `RotationEnabled==true && (now - LastRotatedDate) > RotationRules.AutomaticallyAfterDays × 2` → rotation failing. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
-  - **State bucket**: Broken.
-  - **How obtained**: `SecretListEntry.RotationEnabled`, `SecretListEntry.LastRotatedDate`, and `SecretListEntry.RotationRules.AutomaticallyAfterDays` on the `ListSecrets` response. Note: rotations scheduled via `RotationRules.ScheduleExpression` (cron/rate) leave `AutomaticallyAfterDays` null and this rule cannot fire on them — a9s-devops: possible=yes but not covered by the golden doc; worth=yes for operators using cron-based schedules, so flagged as a UX gap in §4.1.
-
 - **Signal**: `LastAccessedDate` older than 180 days → dormant.
   - **State bucket**: Warning.
   - **How obtained**: `SecretListEntry.LastAccessedDate` on the `ListSecrets` response. Caveat carried from the golden doc: the field is day-truncated and excludes access in the current call, so the "180d" threshold is truncated.
@@ -123,9 +119,29 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
   - **State bucket**: Broken.
   - **How obtained**: `SecretListEntry.DeletedDate` on the `ListSecrets` response; presence of a non-null value means the secret is inside its recovery window and will be permanently deleted at the end of it.
 
+- **Signal**: `RotationEnabled` not true — no automatic rotation configured.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: the secret's value has not changed in over 365 days.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `RotationEnabled==true && (now - LastRotatedDate) > RotationRules.AutomaticallyAfterDays × 2` → rotation failing. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **State bucket**: Broken.
+  - **How obtained**: `SecretListEntry.RotationEnabled`, `SecretListEntry.LastRotatedDate`, and `SecretListEntry.RotationRules.AutomaticallyAfterDays` on the `ListSecrets` response. Note: rotations scheduled via `RotationRules.ScheduleExpression` (cron/rate) leave `AutomaticallyAfterDays` null and this rule cannot fire on them — a9s-devops: possible=yes but not covered by the golden doc; worth=yes for operators using cron-based schedules, so flagged as a UX gap in §4.1.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
+
+- **Signal**: Resource policy allows a wildcard principal with no restrictive condition.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: Resource policy names a principal in another account.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: `VersionIdsToStages` stuck on `AWSPENDING` → rotation started but never finished. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
@@ -162,13 +178,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `now > NextRotationDate` | 1 | Warning | n/a | S2, S4 | `rotation overdue: due Apr 10` |
-| `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |
-| `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant: not read in 210d` |
-| `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deletion in 6d` |
-| `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` |
+| `now > NextRotationDate` | 1 | Warning | n/a | S2, S4 | `rotation overdue` |
+| `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant` |
+| `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deleted` |
+| `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | n/a | S2, S4 | `rotation not enabled` |
+| the secret's value has not changed in over 365 days | 1 | Warning | n/a | S2, S4 | `value unchanged in over 365 days` |
 | Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `resource policy open to anyone` |
 | Resource policy names a principal in another account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
+| rotation failing for more than two full intervals, `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |
+| `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` |
 
 Formatting notes applied:
 

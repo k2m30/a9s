@@ -70,6 +70,10 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `p
   - **API call**: `GetPolicyVersion(PolicyArn, VersionId=<DefaultVersionId>)` — one call per policy. The `Document` field is URL-encoded JSON per SDK docs — decode, parse, then scan the `Statement[]` array for any entry with `Effect==Allow`, `Action` containing `*`, and `Resource` containing `*` (accounting for the field being either a string or a list).
   - **Cost shape**: per-resource.
 
+- **Signal**: Document grants a known privilege-escalation action combination (and is not already reported as admin).
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 ### 3.3 Wave 3 — OUT OF SCOPE
 
 - OUT OF SCOPE: IAM Access Advisor unused-permission analysis.
@@ -102,8 +106,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `AttachmentCount==0`, customer-managed — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: 0 attachments` |
-| Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `wildcard admin: Allow *:*` |
+| `AttachmentCount == 0` on a customer-managed policy | 1 | Warning | n/a | S2, S4 | `unattached, no roles/users/groups use it` |
+| Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `admin star (allows * on *)` |
 | Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `allows privilege escalation` |
 
 Rules for filling list and detail text:

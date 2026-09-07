@@ -83,30 +83,41 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `lt`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention.
+`DescribeLaunchTemplates` returns no field an operator can act on, so the fetcher reads each template's default version before it builds the row. The signals below are computed from that response as the row is built, with no second pass.
 
 Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `DefaultVersionNumber != LatestVersionNumber` is DISPLAY ONLY (live-witnessed as the healthy steady state — a pending-rollout latest version is normal working practice; flagging it is alarm fatigue). "Who references this template" is answered by the related panel (`asg`/`ng`/`ec2` pivot counts, one detail keypress) — NOT a list column: a cross-cache computed column has no existing mechanism and an unreferenced template is not a problem worth flagging (templates are free and inert). `CreatedBy`/`CreateTime` are plain columns.
-
-### 3.2 Wave 2 — bounded extra API calls
-
-All three signals ride the same single call: `DescribeLaunchTemplateVersions(Versions=["$Default"])`, one per template.
 
 - **Signal**: `MetadataOptions.HttpTokens != "required"` — IMDSv1 allowed. Unset defaults to `optional` (SDK-confirmed), so absence of MetadataOptions IS the signal, not its negation. `HttpEndpoint == disabled` is NOT a risk and produces no signal.
   - **State bucket**: Warning.
   - **API call**: `DescribeLaunchTemplateVersions`, one per template.
   - **Cost shape**: per-resource.
+
 - **Signal**: any `BlockDeviceMappings[].Ebs.Encrypted == false` — explicitly disabled EBS encryption. `nil` is UNKNOWN, not unencrypted (accounts with default-encryption make nil legitimate) — never flag nil.
   - **State bucket**: Warning.
   - **API call**: same call.
   - **Cost shape**: per-resource.
-- **Signal**: `ImageId` present in the already-loaded `ami` cache AND that AMI's `DeprecationTime` is past — new launches use a deprecated image. NOT-in-cache ≠ deregistered (public/marketplace AMIs are legitimately absent from the owner-scoped cache) — no signal then. `resolve:ssm:` references are skipped.
-  - **State bucket**: Warning.
-  - **API call**: none beyond the same call (cross-ref of the loaded `ami` list).
-  - **Cost shape**: per-resource.
+
 - **Signal**: per-template `DescribeLaunchTemplateVersions` denied — the row is KEPT with all its list fields (`details denied`, shared rich-degradation contract).
   - **State bucket**: Warning.
   - **API call**: the denial IS the response.
   - **Cost shape**: per-resource.
+
+- **Signal**: `DescribeLaunchTemplateVersions` answered with nothing usable.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+### 3.2 Wave 2 — bounded extra API calls
+
+All three signals ride the same single call: `DescribeLaunchTemplateVersions(Versions=["$Default"])`, one per template.
+
+- **Signal**: `ImageId` present in the already-loaded `ami` cache AND that AMI's `DeprecationTime` is past — new launches use a deprecated image. NOT-in-cache ≠ deregistered (public/marketplace AMIs are legitimately absent from the owner-scoped cache) — no signal then. `resolve:ssm:` references are skipped.
+  - **State bucket**: Warning.
+  - **API call**: none beyond the same call (cross-ref of the loaded `ami` list).
+  - **Cost shape**: per-resource.
+
+- **Signal**: credential in the `$Default` version's `UserData`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -124,10 +135,11 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| IMDSv1 allowed | 2 | Warning | n/a | S2, S4, S5 | `IMDSv1 allowed` |
-| EBS encryption off | 2 | Warning | n/a | S2, S4, S5 | `EBS encryption disabled` |
-| deprecated AMI | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `deprecated AMI` |
-| `DescribeLaunchTemplateVersions` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` |
+| IMDSv1 allowed | 1 | Warning | n/a | S2, S4 | `IMDSv1 allowed` |
+| EBS encryption off | 1 | Warning | n/a | S2, S4 | `EBS encryption disabled` |
+| `DescribeLaunchTemplateVersions` denied | 1 | Warning | n/a | S2, S4 | `details denied` |
+| `DescribeLaunchTemplateVersions` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
+| deprecated AMI | 2 | Warning | n/a | S2, S4, S5 | `deprecated AMI` |
 | credential in the `$Default` version's `UserData` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` |
 
 Notes:

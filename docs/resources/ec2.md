@@ -150,24 +150,37 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State.Name == running` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Instance.State.Name` on the `DescribeInstances` response.
-- **Signal**: `State.Name` in `pending` / `shutting-down` / `stopping` → Warning.
+- **Signal**: `State.Name == shutting-down` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Instance.State.Name` on the `DescribeInstances` response.
-- **Signal**: `State.Name == stopped` → Warning.
-  - **State bucket**: Warning.
-  - **How obtained**: `Instance.State.Name` on the `DescribeInstances` response.
-- **Signal**: `State.Name == terminated` → Dim.
-  - **State bucket**: Dim.
-  - **How obtained**: `Instance.State.Name` on the `DescribeInstances` response.
+
 - **Signal**: `State.Name == stopped` AND `StateReason.Code` begins with `Server.*` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Instance.StateReason.Code` + `Instance.StateReason.Message` on the `DescribeInstances` response.
-- **Signal**: `StateTransitionReason` carrying a user-initiated date more than 30 days ago on a `stopped` instance → Warning (long-stopped).
+
+- **Signal**: `State.Name == stopped` → Warning.
   - **State bucket**: Warning.
-  - **How obtained**: parse the trailing timestamp in `Instance.StateTransitionReason` on the `DescribeInstances` response.
+  - **How obtained**: `Instance.State.Name` on the `DescribeInstances` response.
+
+- **Signal**: `State.Name == terminated` → Dim.
+  - **State bucket**: Dim.
+  - **How obtained**: `Instance.State.Name` on the `DescribeInstances` response.
+
+- **Signal**: instance metadata answers without a session token.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `PublicIpAddress` set.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `State.Name == pending`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `State.Name == stopping`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -177,18 +190,29 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **API call**: `DescribeInstanceStatus(IncludeAllInstances=true)` — one account-wide call.
   - **Cost shape**: account-wide.
+
 - **Signal**: `SystemStatus.Status == initializing` or `InstanceStatus.Status == initializing` → Warning (checks have not yet passed since start).
   - **State bucket**: Warning.
   - **API call**: `DescribeInstanceStatus(IncludeAllInstances=true)` — one account-wide call.
   - **Cost shape**: account-wide.
+
 - **Signal**: `SystemStatus.Status == insufficient-data` or `InstanceStatus.Status == insufficient-data` → Warning (AWS cannot determine).
   - **State bucket**: Warning.
   - **API call**: `DescribeInstanceStatus(IncludeAllInstances=true)` — one account-wide call.
   - **Cost shape**: account-wide.
+
 - **Signal**: `Events[]` containing a scheduled retirement or reboot with `NotBefore` within 7 days → Warning.
   - **State bucket**: Warning.
   - **API call**: `DescribeInstanceStatus(IncludeAllInstances=true)` — one account-wide call; inspects `InstanceStatus.Events[].Code` in `instance-retirement`/`system-reboot`/`instance-reboot`/`system-maintenance`/`instance-stop` with `NotBefore <= now + 7d`.
   - **Cost shape**: account-wide.
+
+- **Signal**: public address behind a security group open on a sensitive port (`sg` cache cross-ref).
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: credential in `DescribeInstanceAttribute(userData)`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -223,18 +247,19 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `pending` / `shutting-down` / `stopping` | 1 | Warning | n/a | S2, S4 | `stopping` (or `pending` / `shutting-down`) |
-| `stopped` (user-initiated, recent) | 1 | Warning | n/a | S2, S4 | `stopped: user-initiated` |
-| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | n/a | S2, S4 | `stopped: Server.SpotInstanceShutdown` (or actual `StateReason.Code`) |
-| `stopped` >30 days (long-stopped) | 1 | Warning | n/a | S2, S4 | `stopped 42d ago` |
+| `State.Name == shutting-down` | 1 | Warning | n/a | S2, S4 | `shutting down` |
+| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | n/a | S2, S4 | `stopped` |
+| `State.Name == stopped` with no `Server.*` state reason | 1 | Warning | n/a | S2, S4 | `stopped` |
 | `terminated` | 1 | Dim | n/a | S2, S4 | `terminated` |
+| instance metadata answers without a session token | 1 | Warning | `~` | S2, S4, S5 | `IMDSv1 allowed` |
+| `PublicIpAddress` set | 1 | Warning | `~` | S2, S4, S5 | `public address` |
+| `State.Name == pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State.Name == stopping` | 1 | Warning | n/a | S2, S4 | `stopping` |
 | `SystemStatus.Status == impaired` (or `InstanceStatus.Status == impaired`) | 2 | Broken | `!` | S1, S3, S4, S5 (row stays green only if Wave 1 is Healthy; otherwise S3 suppressed and S4 deduplicates) | `impaired: system checks failing` |
 | `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 | `initializing: checks in progress` |
 | `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4, S5 | `status unknown: AWS insufficient-data` |
-| `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `!` | S1, S3, S4, S5 | `retires in 3d` (or `reboot in 5d`) |
-| instance metadata answers without a session token | 1 | Warning | `~` | S2, S4, S5 | `IMDSv1 allowed` |
-| `PublicIpAddress` set | 1 | Warning | `~` | S2, S4, S5 | `public address` |
-| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S3, S4, S5 | `port(s) 22 reachable from the internet` |
+| `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `!` | S1, S3, S4, S5 | `scheduled event` |
+| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S3, S4, S5 | `port(s) <list> reachable from the internet` |
 | credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` |
 
 Notes on list-text construction:

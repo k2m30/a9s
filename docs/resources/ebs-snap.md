@@ -71,15 +71,11 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs-snap
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State == completed`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response.
-
 - **Signal**: `State == pending`.
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response. `Progress` (`"0%"`..`"100%"`) is available on the same shape for detail.
 
-- **Signal**: `State` in `error` / `recoverable` / `recovering`.
+- **Signal**: `State == error`.
   - **State bucket**: Broken.
   - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response. `StateMessage` carries AWS's human-readable cause (e.g. KMS permission failure on an encrypted copy) and is used for S4/S5 text.
 
@@ -91,13 +87,17 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.Encrypted` on the `DescribeSnapshots` list response.
 
+### 3.2 Wave 2 — bounded extra API calls
+
+One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
+
 - **Signal**: source volume deleted — orphan snapshot. Cross-reference `ebs`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.VolumeId` not present in the already-loaded `ebs` list (rule skipped when the `ebs` list was not loaded in this sweep).
 
-### 3.2 Wave 2 — bounded extra API calls
-
-No Wave 2 signals.
+- **Signal**: restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`).
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -133,13 +133,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S2, S4 | `creating (Progress%)` |
-| `State == error` | 1 | Broken | n/a | S2, S4 | `error: <StateMessage>` |
-| `State == recoverable` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recoverable: AWS degraded` |
-| `State == recovering` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recovering: being restored by AWS` |
-| age > 365d AND automated description — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `age 420d: automated, review cost` |
-| `Encrypted == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unencrypted: CIS EC2.1` |
-| orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: source volume deleted` |
+| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State == error` | 1 | Broken | n/a | S2, S4 | `error` |
+| age > 365d AND automated description — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `automated, <N>d old` |
+| `Encrypted == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unencrypted` |
+| orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 2 | Warning | `~` | S3, S4, S5 | `orphan: source volume deleted` |
 | restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S3, S4, S5 | `shared with all AWS accounts` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)

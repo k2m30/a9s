@@ -133,17 +133,17 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 > Note: every Wave 1 signal below reads a field from the `DescribeServices` response body. ECS's `ListServices` returns ARNs only, so a9s already issues `DescribeServices` as part of the "list load" for this type; Wave 1 here means "readable from the list-load response without any additional API call."
 
-- **Signal**: `Service.status == "ACTIVE"`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Service.Status` field on the list-load response.
-
 - **Signal**: `Service.status == "DRAINING"`.
-  - **State bucket**: Dim.
+  - **State bucket**: Warning.
   - **How obtained**: `Service.Status` field on the list-load response.
 
 - **Signal**: `Service.status == "INACTIVE"`.
   - **State bucket**: Broken.
   - **How obtained**: `Service.Status` field on the list-load response.
+
+- **Signal**: `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context).
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `Service.runningCount < Service.desiredCount`.
   - **State bucket**: Warning.
@@ -170,10 +170,18 @@ One bullet per distinct signal.
   - **API call**: none beyond list-load (`Events[]` is a rolling buffer of up to 100 most-recent events on the Service object).
   - **Cost shape**: per-resource (amortised).
 
+- **Signal**: `events[]` matches `ELB health checks failed` ≤10m.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: deployment circuit-breaker triggered (inferred from `Service.deployments[]` entry with `rolloutState == "FAILED"` plus `DeploymentConfiguration.DeploymentCircuitBreaker.Enable == true`).
   - **State bucket**: Broken.
   - **API call**: none beyond list-load.
   - **Cost shape**: per-resource (amortised).
+
+- **Signal**: `awsvpcConfiguration.assignPublicIp == ENABLED`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -207,15 +215,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status == DRAINING` | 1 | Dim | n/a | S2, S4 | `draining` |
+| `status == DRAINING` | 1 | Warning | n/a | S2, S4 | `draining` |
 | `status == INACTIVE` | 1 | Broken | n/a | S2, S4 | `inactive` |
 | `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S4, S5 | `no tasks running` |
 | `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S4, S5 | `running below desired count` |
-| `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S2, S4, S5, S1 (via Broken color + finding count) | `deploy failed` |
-| `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S2, S4, S5, S1 | `running 2/4: no active deploy` |
-| `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `unable to place` |
-| `events[]` matches `ELB health checks failed` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `ELB health checks failed` |
-| deployment circuit-breaker triggered | 2 | Broken | `!` | S2, S4, S5, S1 | `circuit breaker` |
+| `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S2, S4, S5, S1 (via Broken color + finding count) | `not running its desired tasks` |
+| `runningCount < desiredCount` AND no IN_PROGRESS deployment | 2 | Broken | `!` | S2, S4, S5, S1 | `not running its desired tasks` |
+| `events[]` matches `unable to place` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `not running its desired tasks` |
+| `events[]` matches `ELB health checks failed` ≤10m | 2 | Broken | `!` | S2, S4, S5, S1 | `not running its desired tasks` |
+| deployment circuit-breaker triggered | 2 | Broken | `!` | S2, S4, S5, S1 | `not running its desired tasks` |
 | `awsvpcConfiguration.assignPublicIp == ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks get public IPs` |
 
 Rules for filling list and detail text:

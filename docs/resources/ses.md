@@ -69,21 +69,22 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `VerificationStatus==SUCCESS`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `IdentityInfo.VerificationStatus` on the `ListEmailIdentities` response.
 - **Signal**: `VerificationStatus==PENDING`.
   - **State bucket**: Warning.
   - **How obtained**: `IdentityInfo.VerificationStatus` on the list response.
+
 - **Signal**: `VerificationStatus==FAILED`.
   - **State bucket**: Broken.
   - **How obtained**: `IdentityInfo.VerificationStatus` on the list response.
+
 - **Signal**: `VerificationStatus==TEMPORARY_FAILURE`.
   - **State bucket**: Broken.
   - **How obtained**: `IdentityInfo.VerificationStatus` on the list response.
+
 - **Signal**: `VerificationStatus==NOT_STARTED`.
   - **State bucket**: Broken.
   - **How obtained**: `IdentityInfo.VerificationStatus` on the list response.
+
 - **Signal**: `SendingEnabled==false`.
   - **State bucket**: Warning.
   - **How obtained**: `IdentityInfo.SendingEnabled` on the list response. If combined with a non-`SUCCESS` verification status, the more severe bucket (Broken) wins.
@@ -94,14 +95,20 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
   - **State bucket**: Broken.
   - **API call**: `sesv2:GetAccount` — one account-wide call.
   - **Cost shape**: account-wide.
+
 - **Signal**: `EnforcementStatus==SHUTDOWN`.
   - **State bucket**: Broken.
   - **API call**: `sesv2:GetAccount` — one account-wide call.
   - **Cost shape**: account-wide.
+
 - **Signal**: `SendQuota.SentLast24Hours > 0.8 × SendQuota.Max24HourSend`.
   - **State bucket**: Warning.
   - **API call**: `sesv2:GetAccount` — one account-wide call (same call as above; no extra cost).
   - **Cost shape**: account-wide.
+
+- **Signal**: a domain identity not signing its outbound mail.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -141,8 +148,8 @@ One row per signal from §3:
 | `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | n/a | S2, S4 | `verify: temp failure` |
 | `VerificationStatus==NOT_STARTED` | 1 | Broken | n/a | S2, S4 | `verification not started` |
 | `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S2, S4 | `sending disabled` |
-| `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account PROBATION` |
-| `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `account SHUTDOWN` |
+| `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account under review (probation)` |
+| `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `sending paused by AWS (shutdown)` |
 | `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S1, S2, S3, S4, S5 | `quota 80%+ used` |
 | a domain identity not signing its outbound mail | 2 | Warning | `~` | S3, S4, S5 | `DKIM not enabled` |
 

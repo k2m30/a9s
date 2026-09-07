@@ -88,7 +88,19 @@ Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row 
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `GetJobs` returns job *definitions* only; runtime state lives in `JobRun`, which is a separate API.
+`GetJobs` returns job definitions, and every signal below is read off that response as the row is built, with no second pass. Runtime state is not among them: it lives in `JobRun`, a separate API, and is a Wave 2 signal.
+
+- **Signal**: `Job.SecurityConfiguration` empty.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: the job's default arguments do not enable continuous CloudWatch logging.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: a default argument value scans as a credential.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -98,6 +110,18 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **API call**: `GetJobRuns(JobName, MaxResults=1)` — one call per Glue job. Runs are returned in descending `StartedOn` order so `MaxResults=1` is always the latest run.
   - **Cost shape**: per-resource.
+
+- **Signal**: latest run `TIMEOUT`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: latest run `ERROR`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: latest run `EXPIRED`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -132,10 +156,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| latest run `FAILED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run failed: <ErrorMessage head>` |
-| latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run timed out at <Timeout>m` |
-| latest run `ERROR` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run errored: <ErrorMessage head>` |
-| latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S4, S5 | `last run expired (queued too long)` |
+| `Job.SecurityConfiguration` empty | 1 | Warning | n/a | S2, S4 | `no security configuration` |
+| the job's default arguments do not enable continuous CloudWatch logging | 1 | Warning | n/a | S2, S4 | `continuous logging off` |
+| a default argument value scans as a credential | 1 | Broken | n/a | S2, S4 | `credential in job arguments` |
+| latest run `FAILED` | 2 | Broken | `!` | S1, S2, S4, S5 | `latest run <STATUS>` |
+| latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S4, S5 | `latest run <STATUS>` |
+| latest run `ERROR` | 2 | Broken | `!` | S1, S2, S4, S5 | `latest run <STATUS>` |
+| latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S4, S5 | `latest run <STATUS>` |
 
 Notes on the S4 text:
 

@@ -130,10 +130,29 @@ No Wave 1 signals — the list API does not return fields usable for attention.
   - **API call**: `apigatewayv2:GetStages` — one per v2 resource.
   - **Cost shape**: per-resource.
 
-- **Signal**: REST v1 API — stage enrichment not wired. Surfaced as informational only, not as an issue.
-  - **State bucket**: Healthy (not an issue, just a caveat for the operator that a9s doesn't currently enrich v1).
-  - **API call**: none (deliberately skipped).
-  - **Cost shape**: n/a.
+- **Signal**: a deployed stage carries a configuration gap with no code of its own.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: internet-facing REST API with no authorizer and no scoped resource policy.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: private REST API, or HTTP API, with no authorizer.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: a stage with no access log settings.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: a REST stage with `TracingEnabled == false`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: a REST stage variable whose value scans as a credential.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -168,7 +187,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| No deployed stage (v2) | 2 | Warning (background finding on Healthy row) | `~` | S3, S4, S5 | `no deployed stage` |
+| No deployed stage (v2) | 2 | Warning | `~` | S3, S4, S5 | `no deployed stages` |
+| a deployed stage carries a configuration gap with no code of its own | 2 | Warning | `~` | S3, S4, S5 | `stage configuration issues` |
+| internet-facing REST API with no authorizer and no scoped resource policy | 2 | Broken | `!` | S1, S3, S4, S5 | `internet-facing with no authorizer` |
+| private REST API, or HTTP API, with no authorizer | 2 | Warning | `~` | S3, S4, S5 | `no authorizer` |
+| a stage with no access log settings | 2 | Warning | `~` | S3, S4, S5 | `no access logs` |
+| a REST stage with `TracingEnabled == false` | 2 | Warning | `~` | S3, S4, S5 | `X-Ray tracing off` |
+| a REST stage variable whose value scans as a credential | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in stage variables` |
 
 Notes on the single row above:
 

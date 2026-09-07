@@ -95,11 +95,11 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `eni`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `Status` in `in-use` or `associated` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `NetworkInterface.Status` on the `DescribeNetworkInterfaces` list response.
-
 - **Signal**: `Status` in `attaching` or `detaching` → Warning (transitional).
+  - **State bucket**: Warning.
+  - **How obtained**: `NetworkInterface.Status` on the list response.
+
+- **Signal**: `Status == detaching`.
   - **State bucket**: Warning.
   - **How obtained**: `NetworkInterface.Status` on the list response.
 
@@ -149,7 +149,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `Status == attaching` | 1 | Warning | n/a | S2 + S4 | `attaching` |
 | `Status == detaching` | 1 | Warning | n/a | S2 + S4 | `detaching` |
-| `Status == available` (orphan) | 1 | Warning | n/a | S2 + S4 | `unattached — billed while idle` |
+| `Status == available` (orphan) | 1 | Warning | n/a | S2 + S4 | `available` |
 | Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` |
 
 ## 4.1 UX review (two sentences)

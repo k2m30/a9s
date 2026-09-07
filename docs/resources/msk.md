@@ -102,10 +102,6 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State == ACTIVE`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Cluster.State` from `ListClustersV2`.
-
 - **Signal**: `State == CREATING`.
   - **State bucket**: Warning.
   - **How obtained**: `Cluster.State` from `ListClustersV2`.
@@ -127,7 +123,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `Cluster.State` from `ListClustersV2`. `HEALING` buckets with the other transient-warning states because cluster capacity is degraded while AWS replaces the broker — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
 
 - **Signal**: `State == DELETING`.
-  - **State bucket**: Dim.
+  - **State bucket**: Warning.
   - **How obtained**: `Cluster.State` from `ListClustersV2`.
 
 - **Signal**: `State == FAILED`.
@@ -136,9 +132,25 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals.
+One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
 
 Per-broker runtime state is not on any read-only AWS action: `ListNodes` returns node metadata but no `RUNNING` enum. Deeper broker-level health belongs to CloudWatch and is deferred (see §3.3).
+
+- **Signal**: `PublicAccess.Type` publishes the brokers.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `ClientAuthentication.Unauthenticated.Enabled`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: the cluster runs a broker version behind the newest AWS offers.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: client-broker encryption allows plaintext.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -176,14 +188,16 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `State == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `State == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating: <StateInfo.Code or "config change">` |
+| `State == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
 | `State == MAINTENANCE` | 1 | Warning | n/a | S2, S4 | `maintenance` |
 | `State == REBOOTING_BROKER` | 1 | Warning | n/a | S2, S4 | `rebooting broker` |
-| `State == HEALING` | 1 | Warning | n/a | S2, S4 | `healing broker` |
-| `State == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting` |
-| `State == FAILED` | 1 | Broken | n/a | S2, S4 | `failed: <StateInfo.Code>` |
+| `State == HEALING` | 1 | Warning | n/a | S2, S4 | `healing` |
+| `State == DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `State == FAILED` | 1 | Broken | n/a | S2, S4 | `failed` |
 | `PublicAccess.Type` publishes the brokers | 2 | Broken | `!` | S1, S3, S4, S5 | `brokers reachable from the internet` |
 | `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S3, S4, S5 | `unauthenticated access allowed` |
+| the cluster runs a broker version behind the newest AWS offers | 2 | Warning | `~` | S3, S4, S5 | `broker software outdated` |
+| client-broker encryption allows plaintext | 2 | Warning | `~` | S3, S4, S5 | `encryption in transit not enforced` |
 
 Notes:
 

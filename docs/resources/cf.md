@@ -87,33 +87,52 @@ Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `Status == Deployed`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `DistributionSummary.Status` field on the list response.
 - **Signal**: `Status == InProgress`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.Status` field on the list response.
+
 - **Signal**: `Enabled == false`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `DistributionSummary.Enabled` field on the list response.
-- **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`.
-  - **State bucket**: Warning.
-  - **How obtained**: `DistributionSummary.ViewerCertificate.MinimumProtocolVersion` field on the list response.
+
 - **Signal**: `WebACLId == ""` (no WAF attached). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.WebACLId` field on the list response.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `DefaultCacheBehavior.ViewerProtocolPolicy == allow-all` (no HTTPS redirect) or any origin with `CustomOriginConfig.OriginProtocolPolicy == http-only` (origin without TLS). Emitted by `EnrichCloudFrontDistribution` (`core/aws/cf_issue_enrichment.go`) as the single `cf.insecure-protocol` finding — distinct from the Wave 1 weak-TLS `MinimumProtocolVersion` signal above.
-  - **State bucket**: Healthy (informational `~` finding on a green row).
-  - **API call**: `GetDistributionConfig` — one call per distribution.
-  - **Cost shape**: per-resource.
+- **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`.
+  - **State bucket**: Warning.
+  - **How obtained**: `DistributionSummary.ViewerCertificate.MinimumProtocolVersion` field on the list response.
+
+- **Signal**: viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`).
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: `LoggingConfig.Enabled == false` on the full distribution config.
   - **State bucket**: Warning.
   - **API call**: `GetDistributionConfig` — one call per distribution.
   - **Cost shape**: per-resource.
+
+- **Signal**: an S3 origin naming a bucket absent from the account.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `DefaultRootObject` empty.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: an S3 origin with neither an origin access control nor a legacy origin access identity.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: the default CloudFront certificate on a distribution with custom aliases.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `GeoRestriction.RestrictionType == none`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -150,10 +169,15 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `Status == InProgress` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deploying: config propagating` |
 | `Enabled == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
-| Weak TLS policy on aliased distribution | 1 | Warning | n/a | S2, S4 | `minimum TLS below 1.2` |
+| Weak TLS policy on aliased distribution | 2 | Warning | `~` | S3, S4, S5 | `minimum TLS below 1.2` |
+| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Warning | `~` | S3, S4, S5 | `traffic allowed without TLS` |
+| `LoggingConfig.Enabled == false` | 2 | Warning | `~` | S3, S4, S5 | `access logging off` |
+| an S3 origin naming a bucket absent from the account | 2 | Broken | `!` | S1, S3, S4, S5 | `S3 origin bucket does not exist` |
+| `DefaultRootObject` empty | 2 | Warning | `~` | S3, S4, S5 | `no default root object` |
+| an S3 origin with neither an origin access control nor a legacy origin access identity | 2 | Warning | `~` | S3, S4, S5 | `S3 origin without origin access control` |
+| the default CloudFront certificate on a distribution with custom aliases | 2 | Warning | `~` | S3, S4, S5 | `uses the default CloudFront certificate` |
+| `GeoRestriction.RestrictionType == none` | 2 | Warning | `~` | S3, S4, S5 | `no geo restriction` |
 | `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` |
-| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `traffic allowed without TLS` (the offending policy and origin are supporting rows) |
-| `LoggingConfig.Enabled == false` | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logging off` |
 
 ## 4.1 UX review (two sentences)
 

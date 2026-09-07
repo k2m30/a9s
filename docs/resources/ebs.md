@@ -75,13 +75,13 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `State == "in-use"` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Volume.State` on the `DescribeVolumes` list response (`AWS SDK Go v2 — ec2/types.Volume § State`).
-
-- **Signal**: `State == "creating"` or `State == "deleting"` → Warning.
+- **Signal**: `State == "creating"` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Volume.State` on the `DescribeVolumes` list response.
+
+- **Signal**: `State == deleting`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `State == "error"` → Broken.
   - **State bucket**: Broken.
@@ -102,15 +102,18 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
   - **API call**: `DescribeVolumeStatus` — one paginated account/region-wide call covering all volumes.
   - **Cost shape**: account-wide.
 
-- **Signal**: `VolumeStatus.Status == "warning"` → Warning (degraded I/O).
-  - **State bucket**: Warning.
+- **Signal**: `VolumeStatus.Status == "warning"` → Broken (degraded I/O).
+  - **State bucket**: Broken.
   - **API call**: `DescribeVolumeStatus` — same call.
   - **Cost shape**: account-wide.
 
-- **Signal**: `Events[]` non-empty → Warning (scheduled action such as I/O-enabling event, volume-stuck event, or AWS-notification event on this volume).
+- **Signal**: no backup plan selection matches this volume.
   - **State bucket**: Warning.
-  - **API call**: `DescribeVolumeStatus` — same call; `Events[]` arrives on the same `VolumeStatusItem` (`AWS SDK Go v2 — ec2/types.VolumeStatusItem § Events`).
-  - **Cost shape**: account-wide.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: an attached volume with no snapshot behind it.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -147,12 +150,13 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `State == creating` | 1 | Warning | n/a | S2, S4 | `creating` |
 | `State == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
-| `State == error` | 1 | Broken | n/a | S2, S4 | `error: volume unusable` |
+| `State == error` | 1 | Broken | n/a | S2, S4 | `error` |
 | `State == available` & age > 7d | 1 | Warning | n/a | S2, S4 | `orphan: unattached <N>d` |
-| `Encrypted == false` (row in-use) | 2 | Healthy | `!` | S1, S3, S4, S5 | `unencrypted` |
-| `VolumeStatus.Status == impaired` | 2 | Broken | n/a | S2, S4, S5 | `impaired: I/O failing` |
-| `VolumeStatus.Status == warning` | 2 | Warning | n/a | S2, S4, S5 | `degraded: I/O warning` |
-| `Events[] non-empty` (row in-use) | 2 | Warning | `~` | S3, S4, S5 | `event: <EventType>` |
+| `Encrypted == false` (row in-use) | 1 | Warning | n/a | S2, S4 | `unencrypted` |
+| `VolumeStatus.Status == impaired` | 2 | Broken | n/a | S2, S4, S5 | `volume I/O degraded` |
+| `VolumeStatus.Status == warning` | 2 | Broken | n/a | S2, S4, S5 | `volume I/O degraded` |
+| no backup plan selection matches this volume | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
+| an attached volume with no snapshot behind it | 2 | Warning | `~` | S3, S4, S5 | `no snapshot exists` |
 
 Notes on rows omitted:
 

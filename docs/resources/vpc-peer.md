@@ -55,22 +55,45 @@ Load-bearing SDK fact (doc comment on `Requester/AccepterVpcInfo`): "CIDR block 
 
 ### 3.1 Wave 1 — zero extra API calls
 
+- `PeeringOptions.AllowDnsResolutionFromRemoteVpc` per side = config fact. ClassicLink fields are SDK-deprecated — ignored.
+
+- Cross-account / cross-region are FACTS (neutral detail badges), never signals — all seven live-witnessed rows are cross-account.
+
+- **Signal**: `Status.Code == deleting` → Warning; `deleted` → Dim (AWS keeps it listed for a window).
+
 - **Signal**: `Status.Code == active` → Healthy.
+
+- **Signal**: provisioning.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `Status.Code` in `provisioning` / `initiating-request` (transient).
   - **State bucket**: Warning. — **How obtained**: `VpcPeeringConnection.Status.Code`.
+
 - **Signal**: `Status.Code == pending-acceptance` — the other side has not accepted; AWS expires the request at 7 days. The countdown to `ExpirationTime` is the actionable bit.
   - **State bucket**: Warning. — **How obtained**: `Status.Code` + `ExpirationTime`.
+
 - **Signal**: `Status.Code == expired` — the request died unaccepted.
   - **State bucket**: Warning.
+  - **How obtained**: `VpcPeeringConnection.Status.Code`.
+
 - **Signal**: `Status.Code == rejected` — the peer said no; `Status.Message` carries the cause verbatim.
   - **State bucket**: Broken.
+  - **How obtained**: `VpcPeeringConnection.Status.Code` and `Status.Message`.
+
 - **Signal**: `Status.Code == failed` — `Status.Message` verbatim.
   - **State bucket**: Broken.
-- **Signal**: `Status.Code == deleting` → Warning; `deleted` → Dim (AWS keeps it listed for a window).
+
+- **Signal**: deleting.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: deleted.
+  - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: active-only IPv4 CIDR overlap — `RequesterVpcInfo.CidrBlockSet` × `AccepterVpcInfo.CidrBlockSet` intersection (≈15 lines of prefix math). Overlapping ranges silently blackhole traffic subsets.
   - **State bucket**: Warning. Ranked below missing-route.
-- Cross-account / cross-region are FACTS (neutral detail badges), never signals — all seven live-witnessed rows are cross-account.
-- `PeeringOptions.AllowDnsResolutionFromRemoteVpc` per side = config fact. ClassicLink fields are SDK-deprecated — ignored.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -78,6 +101,7 @@ No API-calling Wave 2 exists (no per-connection describe). Two derived zero-API 
 
 - **Signal**: active pcx with NO loaded-`rtb` route referencing it → "no local route to peer" (an accepted tunnel nobody routes into). Guards: rtb cache present AND not truncated — otherwise no signal, never a guess.
   - **State bucket**: Warning. — **Cost shape**: zero API calls (cache scan).
+
 - **Signal**: a route references the pcx but `Route.State == blackhole` → "route to peer blackholed" (the other side tore down; your route now eats packets).
   - **State bucket**: Warning. — **Cost shape**: zero API calls (cache scan).
 
@@ -105,8 +129,8 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 | deleting | 1 | Warning | n/a | S2, S4 | `deleting` |
 | deleted | 1 | Dim | n/a | S2, S4 | `deleted` |
 | CIDR overlap (active) | 1 | Warning | n/a | S2, S4, S5 | `CIDR overlap with peer` |
-| no local route (active) | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `no local route to peer` |
-| route blackholed | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `route to peer blackholed` |
+| no local route (active) | 2 | Warning | n/a | S2, S4, S5 | `no local route to peer` |
+| route blackholed | 2 | Warning | n/a | S2, S4, S5 | `route to peer blackholed` |
 
 Notes:
 

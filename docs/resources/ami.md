@@ -75,21 +75,26 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ami`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `State == available` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Image.State` on the `DescribeImages` list response.
 - **Signal**: `State == pending` or `State == transient` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Image.State` on the `DescribeImages` list response.
+
 - **Signal**: `State == failed` or `State == error` or `State == invalid` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Image.State` on the `DescribeImages` list response; pair with `StateReason.Message` for the cause string.
+
 - **Signal**: `State == deregistered` or `State == disabled` → Dim. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `Image.State` on the `DescribeImages` list response.
+
 - **Signal**: `DeprecationTime < now()` → Warning. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `Image.DeprecationTime` (ISO-8601 string) on the `DescribeImages` list response, parsed and compared against the current time.
+
+- **Signal**: `Public == true`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: Cross-ref `ebs-snap` (owner-scoped only — skip public/marketplace AMIs) — backing snapshot missing → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: read `Image.BlockDeviceMappings[].Ebs.SnapshotId` and look each ID up in the already-loaded `ebs-snap` list; a miss on an owner-scoped AMI is the signal. Skip the check when `ImageOwnerAlias` is `amazon`/`aws-marketplace` or the AMI is otherwise not in the caller's account.
@@ -130,13 +135,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` or `transient` | 1 | Warning | n/a | S2, S4 | `pending: registering image` |
-| `State == failed / error / invalid` | 1 | Broken | n/a | S2, S4 | `failed: <StateReason.Message>` |
+| `State == pending` or `transient` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State == failed / error / invalid` | 1 | Broken | n/a | S2, S4 | `failed` |
 | `State == deregistered` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `deregistered` |
-| `State == disabled` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled` |
-| `DeprecationTime < now()` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deprecated <Nd> ago` |
-| Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` |
+| `DeprecationTime < now()` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deprecated` |
 | `Public == true` | 1 | Broken | `!` | S2, S4, S5 | `shared with all AWS accounts` |
+| Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` |
 
 ## 4.1 UX review (two sentences)
 

@@ -53,21 +53,21 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `igw`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `Attachments[].State == attached` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Attachments[0].State` on the `InternetGateway` returned by `DescribeInternetGateways`.
-
 - **Signal**: `Attachments[].State == attaching` or `detaching` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Attachments[0].State` on the list-response IGW.
 
-- **Signal**: `Attachments[].State == detached` → Warning (orphan). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+- **Signal**: `Attachments[0].State == detaching`.
   - **State bucket**: Warning.
-  - **How obtained**: `Attachments[0].State` on the list-response IGW.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `len(Attachments) == 0` → Warning (orphan — never attached or fully detached). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: size of the `Attachments[]` slice on the list-response IGW.
+
+- **Signal**: `Attachments[].State == detached` → Warning (orphan). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **State bucket**: Warning.
+  - **How obtained**: `Attachments[0].State` on the list-response IGW.
 
 - **Signal**: IGW attached to a VPC but no route table in that VPC has a `0.0.0.0/0 → igw` route → Warning (unused — operator is paying for a gateway nothing routes through). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
@@ -109,10 +109,10 @@ One row per §3 signal (Healthy case omitted per rule):
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Attachments[0].State == attaching` | 1 | Warning | n/a | S2, S4 | `attaching to VPC` |
-| `Attachments[0].State == detaching` | 1 | Warning | n/a | S2, S4 | `detaching from VPC` |
+| `Attachments[0].State == attaching` | 1 | Warning | n/a | S2, S4 | `attaching` |
+| `Attachments[0].State == detaching` | 1 | Warning | n/a | S2, S4 | `detaching` |
+| `len(Attachments) == 0` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no VPC attachments` |
 | `Attachments[0].State == detached` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `detached: orphan gateway` |
-| `len(Attachments) == 0` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unattached: no VPC` |
 | IGW attached but VPC has no `0.0.0.0/0 → igw` route — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached but unused: no default route` |
 
 ## 4.1 UX review (two sentences)

@@ -113,25 +113,41 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `elb`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: ELBv2 `State.Code == active`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `DescribeLoadBalancers` response field `LoadBalancer.State.Code`.
 - **Signal**: ELBv2 `State.Code == provisioning`.
   - **State bucket**: Warning.
   - **How obtained**: `DescribeLoadBalancers` response field `LoadBalancer.State.Code`.
+
 - **Signal**: ELBv2 `State.Code == active_impaired`.
   - **State bucket**: Warning.
   - **How obtained**: `DescribeLoadBalancers` response field `LoadBalancer.State.Code`.
+
 - **Signal**: ELBv2 `State.Code == failed`; surface `State.Reason` as the Broken detail.
   - **State bucket**: Broken.
   - **How obtained**: `DescribeLoadBalancers` response fields `LoadBalancer.State.Code` and `LoadBalancer.State.Reason`.
-- **Signal**: Classic (ELBv1) Load Balancer — the list response has no `State` field, so no state-derived signal is available.
-  - **State bucket**: Healthy (default — nothing to flag from the list response).
-  - **How obtained**: absence of a state field on the ELBv1 `DescribeLoadBalancers` response. Target-health signals for Classic LBs live on `tg` (Wave 2 there), not here.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals. (Target health lives on `tg`; that Wave 2 belongs to the target-group spec.)
+One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen. Target health is not among them: it lives on `tg`, and that Wave 2 belongs to the target-group spec.
+
+- **Signal**: ALB `routing.http.desync_mitigation_mode == monitor`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: ALB `routing.http.drop_invalid_header_fields.enabled != true`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `deletion_protection.enabled` or `access_logs.s3.enabled` is `false`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -169,13 +185,14 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning: <State.Reason>` (fallback `provisioning: coming up`) |
-| `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `impaired: <State.Reason>` (fallback `impaired: scaling behind`) |
-| `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed: <State.Reason>` |
+| `State.Code == provisioning` | 1 | Warning | n/a | S2, S4 | `provisioning` |
+| `State.Code == active_impaired` | 1 | Warning | n/a | S2, S4 | `active impaired` |
+| `State.Code == failed` | 1 | Broken | n/a | S2, S4 | `failed` |
 | ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S3, S4, S5 | `HTTP desync mitigation off` |
 | ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S3, S4, S5 | `invalid HTTP headers not dropped` |
-| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `ports <ports> in the clear` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on ports <ports>` |
+| ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S3, S4, S5 | `<ports> in the clear` |
+| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S3, S4, S5 | `weak TLS policy on <ports>` |
+| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` | 2 | Warning | `~` | S3, S4, S5 | `deletion protection or access logs disabled` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 

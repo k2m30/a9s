@@ -54,13 +54,13 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `i
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `PasswordLastUsed` absent AND `CreateDate` >90d → dormant console user.
-  - **State bucket**: Warning.
-  - **How obtained**: `ListUsers` response — `User.PasswordLastUsed` (nullable `*time.Time`) and `User.CreateDate` (`*time.Time`). Both are on the `ListUsers` output shape, but whether the user has a console password at all is only knowable from `GetLoginProfile`, so the finding itself is emitted in Wave 2 alongside the other console signals.
-
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
+
+- **Signal**: `PasswordLastUsed` absent AND `CreateDate` >90d → dormant console user.
+  - **State bucket**: Warning.
+  - **How obtained**: `ListUsers` response — `User.PasswordLastUsed` (nullable `*time.Time`) and `User.CreateDate` (`*time.Time`). Both are on the `ListUsers` output shape, but whether the user has a console password at all is only knowable from `GetLoginProfile`, so the finding itself is emitted in Wave 2 alongside the other console signals.
 
 - **Signal**: Access key with `Status==Active` AND `AccessKeyLastUsed.LastUsedDate` >90d → stale active key.
   - **State bucket**: Warning.
@@ -72,10 +72,22 @@ One bullet per distinct signal.
   - **API call**: same pair as above — `ListAccessKeys(UserName)` + `GetAccessKeyLastUsed(AccessKeyId)`.
   - **Cost shape**: per-resource.
 
+- **Signal**: Two Active access keys.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `AdministratorAccess` or `PowerUserAccess` attached.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: `GetLoginProfile(UserName)` returns a profile (console login enabled) AND `ListMFADevices(UserName)` returns `MFADevices==[]` → console login without MFA.
   - **State bucket**: Broken.
   - **API call**: `GetLoginProfile(UserName)` — one per user; `ListMFADevices(UserName)` — one per user. Two calls per user total (short-circuit: skip `ListMFADevices` if `GetLoginProfile` throws `NoSuchEntity`).
   - **Cost shape**: per-resource.
+
+- **Signal**: an access key created more than 90 days ago.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -111,10 +123,11 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` |
 | Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` |
-| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused` (one Key/Last used/Idle row per idle key) |
+| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused` |
 | Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` |
 | `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
 | Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` |
+| an access key created more than 90 days ago | 2 | Warning | `~` | S3, S4, S5 | `access key past rotation` |
 
 Rules applied:
 

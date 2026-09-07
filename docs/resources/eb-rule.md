@@ -84,14 +84,6 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `eb-rul
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State == ENABLED`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Rule.State` from `ListRules`.
-
-- **Signal**: `State == ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Rule.State` from `ListRules`.
-
 - **Signal**: `State == DISABLED`.
   - **State bucket**: Dim (admin-off).
   - **How obtained**: `Rule.State` from `ListRules`.
@@ -147,10 +139,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == DISABLED` | 1 | Dim | n/a | S2, S4 | `disabled — admin-off` |
+| `State == DISABLED` | 1 | Dim | n/a | S2, S4 | `disabled` |
 | `ENABLED` rule with `len(Targets)==0` | 2 | Broken | `!` | S1, S2, S4, S5 | `enabled rule has no targets` |
-| `DISABLED` rule with `len(Targets)>0` | 2 | Dim + finding | `~` | S1, S4 (dedup), S5 | `target drift or no dead-letter config` (the drift is a supporting row) |
-| target without `DeadLetterConfig` | 2 | Warning | `~` | S3 (if rule row is green), S4, S5 | `target drift or no dead-letter config` (one row per target without a DLQ) |
+| `DISABLED` rule with `len(Targets)>0` | 2 | Warning | `~` | S1, S4 (dedup), S5 | `target drift or no dead-letter config` |
+| target without `DeadLetterConfig` | 2 | Warning | `~` | S3 (if rule row is green), S4, S5 | `target drift or no dead-letter config` |
 
 Notes on the table above:
 

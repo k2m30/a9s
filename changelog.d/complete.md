@@ -1,0 +1,4 @@
+## Fixed
+
+- Every resource page now lists exactly the attention signals its type ships. Sixty-two pages promised wording, colours or timing the app does not produce: a certificate page listing `revoked` when the app says `<status, in words>`, an API Gateway page describing one signal out of seven, an EBS page calling a broken volume a warning. Each page's signal table now names the phrase the list actually shows, the colour bucket it lands in, and whether it is read while the row is built or on the second pass.
+- A signal a page marks "not implemented" is now recorded once, on the signals page's own backlog list, in one wording. Four pages carried a stale marker: ECR's scan-on-push warning ships today, and the CloudFront, Secrets Manager and Subnet deferrals now say the same thing the signals page says.

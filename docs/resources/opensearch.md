@@ -131,6 +131,14 @@ One bullet per distinct signal.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
   - **Cost shape**: hybrid.
 
+- **Signal**: `DescribeDomains` was denied for this domain.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: the domain is absent from the `DescribeDomains` response.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 None. `DescribeDomains` is the fetcher's own call and its `DomainStatus`
@@ -168,14 +176,16 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Deleted==true` | 2 | Dim | n/a | S2, S4 | `deleting: removal in progress` |
-| `Processing==true` or `UpgradeProcessing==true` | 2 | Warning | n/a | S2, S4 | `processing: config change in flight` |
-| `DomainProcessingStatus=="Isolated"` | 2 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` |
+| `Deleted==true` | 1 | Dim | n/a | S2, S4 | `deleting: removal in progress` |
+| `Processing==true` or `UpgradeProcessing==true` | 1 | Warning | n/a | S2, S4 | `processing: config change in flight` |
+| `DomainProcessingStatus=="Isolated"` | 1 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` |
 | `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` |
-| `EncryptionAtRestOptions.Enabled==false` | 2 | Healthy | `~` | S3, S4, S5 | `encryption at rest off` |
-| No `VPCOptions` AND access policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `reachable outside a VPC` |
-| `DomainEndpointOptions.EnforceHTTPS` not true | 2 | Warning | `~` | S2, S4, S5 | `HTTPS not enforced` |
-| `NodeToNodeEncryptionOptions.Enabled` not true | 2 | Warning | `~` | S2, S4, S5 | `node-to-node encryption off` |
+| `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | n/a | S2, S4 | `encryption at rest off` |
+| No `VPCOptions` AND access policy allows any principal | 1 | Broken | n/a | S2, S4 | `reachable outside a VPC` |
+| `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | n/a | S2, S4 | `HTTPS not enforced` |
+| `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | n/a | S2, S4 | `node-to-node encryption off` |
+| `DescribeDomains` was denied for this domain | 1 | Warning | n/a | S2, S4 | `details denied` |
+| the domain is absent from the `DescribeDomains` response | 1 | Warning | n/a | S2, S4 | `details unavailable` |
 
 ## 4.1 UX review
 

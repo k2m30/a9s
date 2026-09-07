@@ -122,21 +122,6 @@ One bullet per distinct signal.
   - **API call**: `GetPipelineState` per pipeline — one call per pipeline.
   - **Cost shape**: per-resource.
 
-- **Signal**: any `stageStates[].latestExecution.status` in `Stopped`.
-  - **State bucket**: Broken.
-  - **API call**: `GetPipelineState` per pipeline — same call, no additional cost.
-  - **Cost shape**: per-resource.
-
-- **Signal**: any `stageStates[].latestExecution.status` in `Cancelled`.
-  - **State bucket**: Broken.
-  - **API call**: `GetPipelineState` per pipeline — same call, no additional cost.
-  - **Cost shape**: per-resource.
-
-- **Signal**: stage `latestExecution.status == InProgress` with the stage running >2h.
-  - **State bucket**: Warning.
-  - **API call**: `GetPipelineState` per pipeline — same call, no additional cost; elapsed time is derived from the stage's latest transition timestamp on the response.
-  - **Cost shape**: per-resource.
-
 ### 3.3 Wave 3 — OUT OF SCOPE
 
 - OUT OF SCOPE: `ListPipelineExecutions` trend (long-horizon success-rate / failure-rate trend across recent executions).
@@ -173,9 +158,6 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `latestExecution.status == Failed` | 2 | Broken | `!` | S1, S2, S4, S5 | `stage failed` |
-| `latestExecution.status == Stopped` | 2 | Broken | `!` | S1, S2, S4, S5 | `stopped: <stage>` |
-| `latestExecution.status == Cancelled` | 2 | Broken | `!` | S1, S2, S4, S5 | `cancelled: <stage>` |
-| `latestExecution.status == InProgress >2h` | 2 | Warning | `!` | S1, S2, S4, S5 | `stuck >2h: <stage>` |
 
 Notes:
 

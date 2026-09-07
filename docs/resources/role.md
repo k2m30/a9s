@@ -91,12 +91,24 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
   - **State bucket**: Broken.
   - **How obtained**: URL-decode and JSON-parse `Role.AssumeRolePolicyDocument` from the `ListRoles` response; search for a `Statement` whose `Effect==Allow` and `Principal.AWS=="*"` with no matching `Condition.StringEquals["sts:ExternalId"]`.
 
+- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: an inline policy grants a known privilege-escalation action combination.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `RoleLastUsed.LastUsedDate` missing or >90d (dormant; field is region-scoped — may false-warn in multi-region accounts).
   - **State bucket**: Warning.
   - **API call**: `GetRole` per role (one per resource).
   - **Cost shape**: per-resource.
+
+- **Signal**: `AdministratorAccess` or `PowerUserAccess` attached.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -134,8 +146,8 @@ One row per signal from §3:
 | trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S2, S4, S5 | `anyone can assume this role` |
 | an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S2, S4, S5 | `service can assume without source scoping` |
 | an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S2, S4, S5 | `inline policy allows privilege escalation` |
-| dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `unused >90d` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `has an administrator policy` |
+| dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S3, S4, S5 | `dormant role (>90d)` |
+| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
 
 Rules for filling list and detail text:
 

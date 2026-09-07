@@ -72,10 +72,6 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `kinesi
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `StreamStatus == ACTIVE`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `StreamSummary.StreamStatus` from `ListStreams`.
-
 - **Signal**: `StreamStatus == CREATING`.
   - **State bucket**: Warning.
   - **How obtained**: `StreamSummary.StreamStatus` from `ListStreams`.
@@ -90,7 +86,15 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals.
+One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
+
+- **Signal**: `EncryptionType` NONE or absent.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `RetentionPeriodHours` at or below the 24-hour default.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -129,7 +133,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `StreamStatus == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `StreamStatus == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating: resharding` |
+| `StreamStatus == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
 | `StreamStatus == DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
 | `EncryptionType` NONE or absent | 2 | Warning | `~` | S3, S4, S5 | `not encrypted at rest` |
 | `RetentionPeriodHours` at or below the 24-hour default | 2 | Warning | `~` | S3, S4, S5 | `24h retention` |

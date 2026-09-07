@@ -75,6 +75,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `DescribeTrails` list response — field `LogFileValidationEnabled` (`AWS SDK Go v2 — cloudtrail/types.Trail § LogFileValidationEnabled`, `*bool`). When `false` (or nil, which AWS treats as not-enabled), log files are not signed; tamper-evidence is off — a CIS / audit baseline violation.
 
+- **Signal**: `CloudWatchLogsLogGroupArn` empty.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `KmsKeyId` empty.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -93,6 +101,14 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **API call**: `GetTrailStatus(Name=<trailARN>)` — one per trail (same call — combine `IsLogging` and `LatestDeliveryTime` from the single response).
   - **Cost shape**: per-resource.
+
+- **Signal**: the S3 bucket this trail delivers to carries the `s3.public` finding.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: the S3 bucket this trail delivers to carries the `s3.access-logging-off` finding.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -127,9 +143,13 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `LogFileValidationEnabled==false` | 1 | Warning | n/a | S2, S4 | `log file validation disabled` |
+| `CloudWatchLogsLogGroupArn` empty | 1 | Warning | n/a | S2, S4 | `not delivering to CloudWatch Logs` |
+| `KmsKeyId` empty | 1 | Warning | n/a | S2, S4 | `log files not KMS-encrypted` |
 | `IsLogging==false` | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `not logging` |
 | `LatestDeliveryError` non-empty | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `delivery error: <LatestDeliveryError>` |
 | `LatestDeliveryTime` >1h stale (on `IsLogging==true`) | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `delivery stale since <LatestDeliveryTime>` |
+| the S3 bucket this trail delivers to carries the `s3.public` finding | 2 | Broken | `!` | S1, S3, S4, S5 | `log bucket is publicly accessible` |
+| the S3 bucket this trail delivers to carries the `s3.access-logging-off` finding | 2 | Warning | `~` | S3, S4, S5 | `log bucket has no access logging` |
 
 Rules for filling list and detail text:
 

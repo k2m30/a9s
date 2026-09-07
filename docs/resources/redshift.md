@@ -101,25 +101,33 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `ClusterStatus==available` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Cluster.ClusterStatus` on the `DescribeClusters` response.
-
-- **Signal**: `ClusterStatus` in `creating` / `modifying` / `resizing` / `rebooting` / `renaming` / `deleting` → Warning (transitional).
-  - **State bucket**: Warning.
-  - **How obtained**: `Cluster.ClusterStatus` on the `DescribeClusters` response.
-
-- **Signal**: `ClusterStatus` in `incompatible-hsm` / `incompatible-network` / `incompatible-parameters` / `incompatible-restore` / `hardware-failure` / `storage-full` → Broken.
+- **Signal**: `ClusterStatus == incompatible-parameters` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Cluster.ClusterStatus` on the `DescribeClusters` response.
+
+- **Signal**: `ClusterStatus==hardware-failure`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus==storage-full`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `ClusterAvailabilityStatus` in `Unavailable` / `Failed` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Cluster.ClusterAvailabilityStatus` on the `DescribeClusters` response.
 
+- **Signal**: `ClusterAvailabilityStatus==Failed`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `ClusterAvailabilityStatus` in `Maintenance` / `Modifying` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Cluster.ClusterAvailabilityStatus` on the `DescribeClusters` response.
+
+- **Signal**: `ClusterAvailabilityStatus==Modifying`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `PendingModifiedValues` non-empty → Warning.
   - **State bucket**: Warning.
@@ -137,9 +145,49 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `Cluster.Encrypted` on the `DescribeClusters` response.
 
+- **Signal**: `ClusterStatus == incompatible-hsm`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == incompatible-network`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == incompatible-restore`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == creating`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == resizing`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == rebooting`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == renaming`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == deleting`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals.
+One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
+
+- **Signal**: `DescribeLoggingStatus.LoggingEnabled` not true.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: Parameter group `require_ssl` not `true`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -174,8 +222,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ClusterStatus` creating / modifying / resizing / rebooting / renaming / deleting | 1 | Warning | n/a | S2, S4 | `modifying` / `resizing` / `rebooting` / `renaming` / `creating` / `deleting` |
-| `ClusterStatus` incompatible-hsm / incompatible-network / incompatible-parameters / incompatible-restore | 1 | Broken | n/a | S2, S4 | `broken: incompatible-<hsm/network/parameters/restore>` |
+| `ClusterStatus == incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-parameters` |
 | `ClusterStatus==hardware-failure` | 1 | Broken | n/a | S2, S4 | `broken: hardware-failure` |
 | `ClusterStatus==storage-full` | 1 | Broken | n/a | S2, S4 | `broken: storage-full` |
 | `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` |
@@ -186,6 +233,14 @@ One row per signal from §3:
 | `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S2, S4 | `maintenance deferred` |
 | `PubliclyAccessible==true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` |
 | `Encrypted==false` | 1 | Warning | n/a | S2, S4 | `unencrypted at rest` |
+| `ClusterStatus == incompatible-hsm` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-hsm` |
+| `ClusterStatus == incompatible-network` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-network` |
+| `ClusterStatus == incompatible-restore` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-restore` |
+| `ClusterStatus == creating` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `ClusterStatus == resizing` | 1 | Warning | n/a | S2, S4 | `resizing` |
+| `ClusterStatus == rebooting` | 1 | Warning | n/a | S2, S4 | `rebooting` |
+| `ClusterStatus == renaming` | 1 | Warning | n/a | S2, S4 | `renaming` |
+| `ClusterStatus == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
 | `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S4, S5 | `audit logging off` |
 | Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S4, S5 | `SSL not required` |
 

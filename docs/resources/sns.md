@@ -71,10 +71,20 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning (informational — the topic is Healthy in the AWS-state sense, but operationally orphaned).
   - **API call**: `ListSubscriptionsByTopic` — one paginated call chain per topic (follows `NextToken` to completion).
   - **Cost shape**: per-resource.
+
 - **Signal**: every subscription returned by `ListSubscriptionsByTopic` is still unconfirmed (`SubscriptionArn == "PendingConfirmation"`) → Warning (deliveries go nowhere until an endpoint confirms).
   - **State bucket**: Warning (informational — companion finding from the same per-topic call; fires only when at least one subscription exists and none is confirmed).
   - **API call**: `ListSubscriptionsByTopic` — same call as above; no added cost.
   - **Cost shape**: per-resource.
+
+- **Signal**: `KmsMasterKeyId` absent or empty.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: access `Policy` allows a wildcard principal.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: `KmsMasterKeyId` absent on sensitive topic → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **API call**: `GetTopicAttributes` — one call per topic (same call as above; no added cost).
@@ -111,7 +121,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| zero subscriptions on the topic | 2 | Warning | `~` | S3, S4, S5 | `no subscribers` |
+| zero subscriptions on the topic | 2 | Warning | `~` | S3, S4, S5 | `topic has no subscribers` |
 | all subscriptions unconfirmed | 2 | Warning | `~` | S3, S4, S5 | `all pending confirmation` |
 | `KmsMasterKeyId` absent or empty | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
 | access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `topic policy open to anyone` |

@@ -69,29 +69,39 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `StackStatus` ∈ {`CREATE_COMPLETE`, `UPDATE_COMPLETE`, `IMPORT_COMPLETE`, `UPDATE_COMPLETE_CLEANUP_IN_PROGRESS`} → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `StackStatus` field on each element of the `DescribeStacks` response.
 - **Signal**: `StackStatus` matches `*_IN_PROGRESS` or `REVIEW_IN_PROGRESS` → Warning (operation in flight).
   - **State bucket**: Warning.
   - **How obtained**: `StackStatus` field.
-- **Signal**: `StackStatus == ROLLBACK_COMPLETE` → Warning (failed-create tombstone — stack operationally dead, delete-and-recreate required, but not actively failing).
-  - **State bucket**: Warning.
+
+- **Signal**: `StackStatus == ROLLBACK_COMPLETE` → Broken (failed-create tombstone — stack operationally dead, delete-and-recreate required, but not actively failing).
+  - **State bucket**: Broken.
   - **How obtained**: `StackStatus` field.
-- **Signal**: `StackStatus` ∈ {`UPDATE_ROLLBACK_COMPLETE`, `IMPORT_ROLLBACK_COMPLETE`} → Warning (update failed, stack reverted to prior state).
-  - **State bucket**: Warning.
+
+- **Signal**: `StackStatus` ∈ {`UPDATE_ROLLBACK_COMPLETE`, `IMPORT_ROLLBACK_COMPLETE`} → Broken (update failed, stack reverted to prior state).
+  - **State bucket**: Broken.
   - **How obtained**: `StackStatus` field.
+
 - **Signal**: `StackStatus` matches `*_FAILED` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `StackStatus` field + `StackStatusReason` carries the human cause.
-- **Signal**: `StackStatus` matches `*_IN_PROGRESS` with stack in that state >1h → Broken (stuck).
+
+- **Signal**: `StackStatus == DELETE_COMPLETE`.
+  - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `EnableTerminationProtection == false` on a live, top-level stack.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: a stack output value scans as a credential.
   - **State bucket**: Broken.
-  - **How obtained**: `StackStatus` field + `LastUpdatedTime` (or `CreationTime` when never updated) on the list response.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+### 3.2 Wave 2 — bounded extra API calls
+
 - **Signal**: `DriftInformation.StackDriftStatus == DRIFTED` → Warning (signal is low-coverage until `DetectStackDrift` has been run).
   - **State bucket**: Warning.
   - **How obtained**: `DriftInformation.StackDriftStatus` field on the list response.
-
-### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: Recent stack event with `ResourceStatus == *_FAILED` → Broken.
   - **State bucket**: Broken.
@@ -129,13 +139,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | n/a | S2, S4 | `update in progress` (or verb matching status) |
-| `ROLLBACK_COMPLETE` | 1 | Warning | n/a | S2, S4 | `rollback: failed create, delete required` |
-| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Warning | n/a | S2, S4 | `update rolled back: <reason>` |
-| `*_FAILED` | 1 | Broken | n/a | S2, S4 | `failed: <StackStatusReason short>` |
-| `*_IN_PROGRESS` > 1h | 1 | Broken | n/a | S2, S4 | `stuck: in progress 2h` (actual age) |
-| `DriftInformation.StackDriftStatus == DRIFTED` | 1 | Warning | n/a | S2, S4 | `drifted since <LastCheckTimestamp>` |
-| Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | n/a | S2 (row already red), S4 (deduped), S5 | `failed: <LogicalResourceId>` |
+| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | n/a | S2, S4 | `<status, in words>` |
+| `ROLLBACK_COMPLETE` | 1 | Broken | n/a | S2, S4 | `<status, in words>` |
+| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Broken | n/a | S2, S4 | `<status, in words>` |
+| `*_FAILED` | 1 | Broken | n/a | S2, S4 | `<status, in words>` |
+| `StackStatus == DELETE_COMPLETE` | 1 | Dim | n/a | S2, S4 | `delete complete` |
+| `EnableTerminationProtection == false` on a live, top-level stack | 1 | Warning | n/a | S2, S4 | `termination protection off` |
+| a stack output value scans as a credential | 1 | Broken | n/a | S2, S4 | `credential in stack outputs` |
+| `DriftInformation.StackDriftStatus == DRIFTED` | 2 | Warning | `~` | S3, S4, S5 | `stack drifted from template` |
+| Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | n/a | S2 (row already red), S4 (deduped), S5 | `recent resource failure` |
 
 Rules for filling list and detail text:
 

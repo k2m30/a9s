@@ -132,8 +132,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Routes[].State == blackhole` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2 + S4 | `blackhole route: target gone` |
-| no associations AND not VPC main — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `orphan: no subnet associations` |
+| `Routes[].State == blackhole` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2 + S4 | `blackhole route (target deleted)` |
+| no associations AND not VPC main — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `no subnet associations` |
 
 Rules for filling list and detail text:
 

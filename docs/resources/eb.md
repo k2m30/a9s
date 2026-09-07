@@ -101,21 +101,29 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `eb`.
 
 One bullet per distinct signal. AWS field names verbatim.
 
-- **Signal**: `Health == Green`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `EnvironmentDescription.Health` on the `DescribeEnvironments` list response.
 - **Signal**: `Health == Yellow`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "something is wrong — two consecutive health-check failures".
+
 - **Signal**: `Health == Grey`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "new environment not fully launched, or health checks suspended during an `UpdateEnvironment`/`RestartEnvironment` request".
+
 - **Signal**: `Health == Red`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "environment not responsive — three or more consecutive health-check failures".
+
 - **Signal**: `Status == Terminated`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `EnvironmentDescription.Status` on the list response.
+
+- **Signal**: `Status` is `Launching` or `Updating` with no health signal.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == Terminating` with no health signal.
+  - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -125,6 +133,18 @@ One bullet per distinct signal.
   - **State bucket**: Warning (cause detail only — does not upgrade an already-Red environment to a different bucket; adds operator-readable reason text to whatever bucket Wave 1 produced).
   - **API call**: `DescribeEnvironmentHealth` — one per environment.
   - **Cost shape**: per-resource.
+
+- **Signal**: managed platform updates not enabled.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: health reporting not `enhanced`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: log streaming to CloudWatch not enabled.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -159,11 +179,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Health == Yellow` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `degraded: health checks failing` |
-| `Health == Grey` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `launching: health checks suspended` |
-| `Health == Red` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `unresponsive: 3+ health checks failed` |
+| `Health == Yellow` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `health: yellow` |
+| `Health == Grey` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `health: grey` |
+| `Health == Red` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `health: red` |
 | `Status == Terminated` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `terminated` |
-| `Causes[]` non-empty | 2 | Warning (adds detail to an existing non-green row) | n/a | S4 (dedupe), S5 | `<first Cause, truncated to 40 chars>` |
+| `Status` is `Launching` or `Updating` with no health signal | 1 | Warning | n/a | S2, S4 | `launching` |
+| `Status == Terminating` with no health signal | 1 | Dim | n/a | S2, S4 | `terminating` |
+| `Causes[]` non-empty | 2 | Warning | n/a | S4 (dedupe), S5 | `environment reports health causes` |
 | managed platform updates not enabled | 2 | Warning | `~` | S3, S4, S5 | `managed platform updates off` |
 | health reporting not `enhanced` | 2 | Warning | `~` | S3, S4, S5 | `enhanced health reporting off` |
 | log streaming to CloudWatch not enabled | 2 | Warning | `~` | S3, S4, S5 | `log streaming to CloudWatch off` |

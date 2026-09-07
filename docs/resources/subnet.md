@@ -105,10 +105,6 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `subne
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `State == available`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Subnet.State` on the `DescribeSubnets` response.
-
 - **Signal**: `State == pending`.
   - **State bucket**: Warning.
   - **How obtained**: `Subnet.State` on the list response.
@@ -125,6 +121,11 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `subne
   - **State bucket**: Broken.
   - **How obtained**: `Subnet.State` on the list response. Per AWS SDK: "The underlying infrastructure to support the subnet failed to provision due to a shortage of EC2 instance capacity." Operator implication: ENI provisioning into this subnet will fail — move workloads to another AZ.
 
+- **Signal**: `MapPublicIpOnLaunch == true`.
+  - **Finding**: `subnet.auto-public-ip`, phrase `auto-assigns public IPs`.
+  - **State bucket**: Warning.
+  - **How obtained**: read `Subnet.MapPublicIpOnLaunch` on the list response. A nil pointer is unknown, not misconfigured, and emits nothing.
+
 - **Signal**: `AvailableIpAddressCount / CIDR-size < 0.1` (IP pool running low). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: compute on the list response — `Subnet.AvailableIpAddressCount` against the host count of `Subnet.CidrBlock`.
@@ -133,12 +134,7 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `subne
   - **State bucket**: Broken.
   - **How obtained**: compute on the list response — same fields as above.
 
-- **Signal**: `MapPublicIpOnLaunch == true`.
-  - **Finding**: `subnet.auto-public-ip`, phrase `auto-assigns public IPs`.
-  - **State bucket**: Warning.
-  - **How obtained**: read `Subnet.MapPublicIpOnLaunch` on the list response. A nil pointer is unknown, not misconfigured, and emits nothing.
-
-- **Signal**: the same field AND the effective route table for this subnet has no `0.0.0.0/0 → IGW` default route (where "effective" = the explicitly associated route table, or the VPC main route table when no explicit association exists). — NOT IMPLEMENTED: the `MapPublicIpOnLaunch` half above ships; the route-table cross-reference does not, so a subnet that auto-assigns is flagged whether or not it has an internet route.
+- **Signal**: the same field AND the effective route table for this subnet has no `0.0.0.0/0 → IGW` default route (where "effective" = the explicitly associated route table, or the VPC main route table when no explicit association exists). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-09-07)
   - **State bucket**: Warning (misconfigured public subnet).
   - **How obtained**: read `Subnet.MapPublicIpOnLaunch`; cross-reference the already-loaded `rtb` list by `Associations[].SubnetId` (falling back to the VPC main route table); scan `Routes[]` for a `DestinationCidrBlock == "0.0.0.0/0"` with `GatewayId` starting `igw-`.
 
@@ -181,14 +177,14 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` |
+| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending` |
 | `State == unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` |
-| `State == failed` | 1 | Broken | n/a | S2, S4 | `failed: infrastructure` |
-| `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed: AZ out of capacity` |
+| `State == failed` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed-insufficient-capacity` |
+| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` |
 | IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` |
 | IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` |
-| `MapPublicIpOnLaunch == true` | 1 | Warning | `~` | S2, S4, S5 | `auto-assigns public IPs` |
-| Misconfigured public subnet (auto-assign public address, no IGW default route) — NOT IMPLEMENTED: the auto-assign half above ships, the route-table cross-reference does not | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` |
+| public subnet with no `0.0.0.0/0` route to an internet gateway — NOT IMPLEMENTED (backlog; no emission in code as of 2026-09-07) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` |
 
 Rules for filling list and detail text:
 

@@ -107,17 +107,41 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `DBInstanceStatus == "available"` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
-
 - **Signal**: `DBInstanceStatus` in transitional set (`creating`, `modifying`, `backing-up`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `upgrading`, `maintenance`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `moving-to-vpc`, `storage-optimization`, `deleting`) → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 
-- **Signal**: `DBInstanceStatus` in `failed`, `storage-full`, `incompatible-network`, `incompatible-option-group`, `incompatible-parameters`, `incompatible-restore`, `inaccessible-encryption-credentials`, `restore-error` → Broken.
+- **Signal**: `failed`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DBInstanceStatus == inaccessible-encryption-credentials` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
+
+- **Signal**: `incompatible-network`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `incompatible-option-group`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `incompatible-parameters`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `incompatible-restore`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `restore-error`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `inaccessible-encryption-credentials`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `BackupRetentionPeriod == 0` → Warning (no automated backups).
   - **State bucket**: Warning.
@@ -135,6 +159,30 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `DBInstance.DeletionProtection` on the `DescribeDBInstances` response.
 
+- **Signal**: `MultiAZ == false` on a non-Aurora primary.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `AutoMinorVersionUpgrade == false`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `IAMDatabaseAuthenticationEnabled == false` (supported engines).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `MasterUsername` is a vendor default.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `CertificateDetails.ValidTill` within 90d.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DBInstanceStatus == stopped`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -143,6 +191,14 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **API call**: `DescribePendingMaintenanceActions` — one account-wide call.
   - **Cost shape**: account-wide.
+
+- **Signal**: Engine version no longer available.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: no backup plan selection matches this instance.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -179,7 +235,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S2, S4 | `<status>: <PendingModifiedValues first non-empty key>` when available, else bare `<status>` (e.g. `modifying: DBInstanceClass`, `rebooting`) |
+| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S2, S4 | `<transitional status>` |
 | `failed` | 1 | Broken | n/a | S2, S4 | `failed` |
 | `storage-full` | 1 | Broken | n/a | S2, S4 | `storage-full` |
 | `incompatible-network` | 1 | Broken | n/a | S2, S4 | `incompatible-network` |
@@ -192,13 +248,15 @@ One row per signal from §3:
 | `PubliclyAccessible == true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` |
 | `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted storage` |
 | `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `deletion protection off` |
-| Pending maintenance overdue | 2 | Warning on Healthy row | `~` | S3, S4, S5 | `maintenance scheduled` |
 | `MultiAZ == false` on a non-Aurora primary | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` |
 | `AutoMinorVersionUpgrade == false` | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` |
 | `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` |
 | `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` |
-| `CertificateDetails.ValidTill` within 90d | 1 | Warning (Broken within 30d) | n/a | S2, S4, S5 | `server certificate expires in <N> days` |
+| `CertificateDetails.ValidTill` within 90d | 1 | Warning | n/a | S2, S4, S5 | `server certificate expires in <N> days` |
+| `DBInstanceStatus == stopped` | 1 | Broken | n/a | S2, S4 | `stopped` |
+| Pending maintenance overdue | 2 | Warning | `~` | S3, S4, S5 | `maintenance scheduled` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S4, S5 | `engine version deprecated` |
+| no backup plan selection matches this instance | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
 
 Notes on the table:
 

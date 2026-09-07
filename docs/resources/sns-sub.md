@@ -65,6 +65,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 All other Wave 1 `SubscriptionArn` values — i.e. a well-formed ARN like `arn:aws:sns:<region>:<account>:<topic>:<uuid>` — map to Healthy.
 
+- **Signal**: `Protocol == "http"`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: the subscription's endpoint has been deleted.
+  - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -102,8 +110,9 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `SubscriptionArn == "PendingConfirmation"` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `pending confirmation` |
+| `SubscriptionArn == "PendingConfirmation"` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `endpoint has not confirmed the subscription` |
 | `Protocol == "http"` | 1 | Warning | `~` | S2, S4, S5 | `delivers over plain HTTP` |
+| the subscription's endpoint has been deleted | 1 | Dim | n/a | S2, S4 | `endpoint deleted` |
 
 ### 4.1 UX review (two sentences)
 

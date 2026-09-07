@@ -82,13 +82,21 @@ No Wave 1 signals — the list API does not return fields usable for attention.
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `ListExecutions(statusFilter=FAILED, maxResults=1)` returns any recent failure.
-  - **State bucket**: Warning.
+  - **State bucket**: Broken.
   - **API call**: `ListExecutions` — one per state machine (N+1).
   - **Cost shape**: per-resource.
-- **Signal**: `ListExecutions(statusFilter=FAILED, maxResults=1)` shows consecutive failures (the most recent failed execution is newer than the most recent succeeded execution across multiple runs — interpreted as an ongoing failure loop).
+
+- **Signal**: `LoggingConfiguration` absent or level OFF.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `EncryptionConfiguration` not a customer managed key.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: a credential in the `Definition`.
   - **State bucket**: Broken.
-  - **API call**: `ListExecutions` — one per state machine (N+1); may call twice with differing `statusFilter` values to confirm no intervening success.
-  - **Cost shape**: per-resource.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -126,8 +134,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| Recent failed execution (single) | 2 | Warning | `~` | S3, S4, S5 | `last run failed` |
-| Consecutive failed executions (failure loop) | 2 | Broken | `!` | S1, S3, S4, S5 | `failing: consecutive failures` |
+| Recent failed execution (single) | 2 | Broken | `~` | S3, S4, S5 | `latest execution <STATUS>` |
 | `LoggingConfiguration` absent or level OFF | 2 | Warning | `~` | S3, S4, S5 | `execution logging off` |
 | `EncryptionConfiguration` not a customer managed key | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with a customer key` |
 | a credential in the `Definition` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in state machine definition` |

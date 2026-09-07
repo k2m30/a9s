@@ -85,30 +85,42 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `ApproximateNumberOfMessages` > threshold → Warning (queue backlog). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
-  - **State bucket**: Warning.
-  - **API call**: `GetQueueAttributes(AttributeNames=[All])` — one call per queue.
-  - **Cost shape**: per-resource.
-  - **Note**: the threshold is unspecified — see §5 Out of Scope for the deferral rationale.
-- **Signal**: `ApproximateNumberOfMessages` rising unbounded → Broken (consumer stopped). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
-  - **State bucket**: Broken.
-  - **API call**: `GetQueueAttributes` — same per-queue call (no added cost).
-  - **Cost shape**: per-resource.
-  - **Note**: "rising unbounded" requires two-sample trending across sweeps — the sampling cadence and delta-required are unspecified; see §5.
-- **Signal**: `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` → Warning (consumer lag). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
-  - **State bucket**: Warning.
-  - **API call**: `GetQueueAttributes` — same per-queue call.
-  - **Cost shape**: per-resource.
-  - **Rationale**: oldest-message age exceeding 5× the visibility timeout indicates consumers are failing to process messages within normal re-delivery windows.
-- **Signal**: is-DLQ with messages → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
-  - **State bucket**: Warning.
-  - **API call**: `GetQueueAttributes` — same per-queue call; DLQ-role detection uses either `Attributes["RedriveAllowPolicy"]` being present on this queue or cross-reference against sibling queues' `RedrivePolicy.deadLetterTargetArn`.
-  - **Cost shape**: per-resource (plus sibling list-scan, zero extra calls).
 - **Signal**: `RedrivePolicy` unset on main queue → Warning.
   - **State bucket**: Warning.
   - **API call**: `GetQueueAttributes` — same per-queue call.
   - **Cost shape**: per-resource.
   - **Note**: "main queue" (i.e. non-DLQ) is inferred as the complement of the is-DLQ detection above.
+
+- **Signal**: `KmsMasterKeyId` unset.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: access `Policy` allows a wildcard principal.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `ApproximateNumberOfMessages` > threshold → Warning (queue backlog). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **State bucket**: Warning.
+  - **API call**: `GetQueueAttributes(AttributeNames=[All])` — one call per queue.
+  - **Cost shape**: per-resource.
+  - **Note**: the threshold is unspecified — see §5 Out of Scope for the deferral rationale.
+
+- **Signal**: `ApproximateNumberOfMessages` rising unbounded → Broken (consumer stopped). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **State bucket**: Broken.
+  - **API call**: `GetQueueAttributes` — same per-queue call (no added cost).
+  - **Cost shape**: per-resource.
+  - **Note**: "rising unbounded" requires two-sample trending across sweeps — the sampling cadence and delta-required are unspecified; see §5.
+
+- **Signal**: `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` → Warning (consumer lag). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **State bucket**: Warning.
+  - **API call**: `GetQueueAttributes` — same per-queue call.
+  - **Cost shape**: per-resource.
+  - **Rationale**: oldest-message age exceeding 5× the visibility timeout indicates consumers are failing to process messages within normal re-delivery windows.
+
+- **Signal**: is-DLQ with messages → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+  - **State bucket**: Warning.
+  - **API call**: `GetQueueAttributes` — same per-queue call; DLQ-role detection uses either `Attributes["RedriveAllowPolicy"]` being present on this queue or cross-reference against sibling queues' `RedrivePolicy.deadLetterTargetArn`.
+  - **Cost shape**: per-resource (plus sibling list-scan, zero extra calls).
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -141,13 +153,13 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
+| `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S4, S5 | `no DLQ configured` |
+| `KmsMasterKeyId` unset | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
+| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `queue policy open to anyone` |
 | `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` |
 | `ApproximateNumberOfMessages rising unbounded` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S2, S4, S5 | `backlog growing: <N> msgs` |
 | `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `oldest msg age: <D>` |
 | `is-DLQ with messages` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `DLQ has <N> msgs` |
-| `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S4, S5 | `no DLQ configured` |
-| `KmsMasterKeyId` unset | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
-| access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `queue policy open to anyone` |
 
 ## 4.1 UX review
 

@@ -71,35 +71,57 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — `ListKeys` returns `{KeyId, KeyArn}` only; neither state, manager type, nor rotation status is exposed by the list API.
+`ListKeys` returns `{KeyId, KeyArn}` only, so the fetcher reads each key with `DescribeKey` before it builds the row. The signals below are computed from that response as the row is built, with no second pass.
+
+- **Signal**: `KeyState==Disabled`.
+  - **State bucket**: Warning.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `KeyState==PendingDeletion` or `KeyState==PendingImport` or `KeyState==PendingReplicaDeletion`.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `KeyState==PendingImport`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `KeyState==PendingReplicaDeletion`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `KeyState==Unavailable`.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `DescribeKey` was denied for this key.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
 All KMS attention signals are Wave 2. Two per-key calls are needed: `DescribeKey` (for `KeyState`) and `GetKeyRotationStatus` (for `KeyRotationEnabled`).
 
-- **Signal**: `KeyState==Enabled`.
-  - **State bucket**: Healthy.
-  - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
 - **Signal**: `KeyState==Creating` or `KeyState==Updating`.
   - **State bucket**: Warning.
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
-- **Signal**: `KeyState==Disabled`.
+
+- **Signal**: `KeyState==Updating`.
   - **State bucket**: Warning.
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
-- **Signal**: `KeyState==PendingDeletion` or `KeyState==PendingImport` or `KeyState==PendingReplicaDeletion`.
-  - **State bucket**: Broken.
+
+- **Signal**: `KeyRotationEnabled==false` on CMK.
+  - **State bucket**: Warning.
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
-- **Signal**: `KeyState==Unavailable`.
+
+- **Signal**: Default key policy allows a wildcard principal with no restrictive condition.
   - **State bucket**: Broken.
   - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
-- **Signal**: `KeyRotationEnabled==false` on a customer-managed key (`KeyManager==CUSTOMER`).
-  - **State bucket**: Healthy row + background concern (`!` glyph — rotation is a security must-have for CMKs; AWS-managed keys rotate automatically and are excluded).
-  - **API call**: `GetKeyRotationStatus` — one per key (N+1).
   - **Cost shape**: per-resource.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
@@ -134,14 +156,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `KeyState==Creating` | 2 | Warning | n/a | S2, S4 | `creating` |
-| `KeyState==Updating` | 2 | Warning | n/a | S2, S4 | `updating` |
-| `KeyState==Disabled` | 2 | Warning | n/a | S2, S4 | `disabled: admin off` |
-| `KeyState==PendingDeletion` | 2 | Broken | n/a | S2, S4 | `pending deletion` |
-| `KeyState==PendingImport` | 2 | Broken | n/a | S2, S4 | `awaiting key material` |
-| `KeyState==PendingReplicaDeletion` | 2 | Broken | n/a | S2, S4 | `pending replica deletion` |
-| `KeyState==Unavailable` | 2 | Broken | n/a | S2, S4 | `unavailable: custom key store offline` |
-| `KeyRotationEnabled==false` on CMK | 2 | Healthy + `!` | `!` | S1, S3, S4, S5 | `rotation off` |
+| `KeyState==Disabled` | 1 | Warning | n/a | S2, S4 | `disabled` |
+| `KeyState==PendingDeletion` | 1 | Broken | n/a | S2, S4 | `pending deletion` |
+| `KeyState==PendingImport` | 1 | Broken | n/a | S2, S4 | `<key state>` |
+| `KeyState==PendingReplicaDeletion` | 1 | Broken | n/a | S2, S4 | `<key state>` |
+| `KeyState==Unavailable` | 1 | Broken | n/a | S2, S4 | `<key state>` |
+| `DescribeKey` was denied for this key | 1 | Broken | n/a | S2, S4 | `access denied (kms:DescribeKey)` |
+| `KeyState==Creating` | 2 | Warning | n/a | S2, S4 | `key rotation disabled` |
+| `KeyState==Updating` | 2 | Warning | n/a | S2, S4 | `key rotation disabled` |
+| `KeyRotationEnabled==false` on CMK | 2 | Warning | `!` | S1, S3, S4, S5 | `key rotation disabled` |
 | Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `key policy open to anyone` |
 
 Rules for filling list and detail text:

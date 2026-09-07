@@ -106,10 +106,6 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `asg`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `Status == ""` (no delete in progress).
-  - **State bucket**: Healthy.
-  - **How obtained**: `AutoScalingGroup.Status` field on the list response.
-
 - **Signal**: `Status == "Delete in progress"`.
   - **State bucket**: Warning.
   - **How obtained**: `AutoScalingGroup.Status` field on the list response.
@@ -126,12 +122,36 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `asg`.
   - **State bucket**: Warning.
   - **How obtained**: `AutoScalingGroup.SuspendedProcesses[].ProcessName` field on the list response.
 
+- **Signal**: `LaunchConfigurationName` set.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: fewer than two `AvailabilityZones`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: behind a load balancer with `HealthCheckType != ELB`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: Most recent scaling activity `StatusCode == Failed` (launch-failure loop).
   - **State bucket**: Broken.
   - **API call**: `DescribeScalingActivities(AutoScalingGroupName=<name>, MaxRecords=1)` — one call per ASG.
   - **Cost shape**: per-resource.
+
+- **Signal**: launch configuration `MetadataOptions` absent or `HttpTokens != required`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: launch configuration `AssociatePublicIpAddress == true`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: credential in launch configuration `UserData`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -157,14 +177,14 @@ Wave → surface mapping applied below. Wave 1 Healthy (`Status == ""`) is omitt
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == "Delete in progress"` | 1 | Warning | n/a | S2, S4 | `deleting` |
-| Any `Instances[].HealthStatus == Unhealthy` | 1 | Warning | n/a | S2, S4 | `unhealthy: N of M instances` |
-| `InService < MinSize` | 1 | Broken | n/a | S2, S4 | `below min: K of MinSize` |
-| `SuspendedProcesses` contains `Launch`/`Terminate`/`HealthCheck` | 1 | Warning | n/a | S2, S4 | `suspended: <process list>` |
-| Latest `DescribeScalingActivities.StatusCode == Failed` | 2 | Broken | n/a (row is already red) | S1, S4 (dedup), S5 | `launch failed: <StatusMessage>` |
+| `Status == "Delete in progress"` | 1 | Warning | n/a | S2, S4 | `delete in progress` |
+| Any `Instances[].HealthStatus == Unhealthy` | 1 | Warning | n/a | S2, S4 | `<N> unhealthy instance(s)` |
+| `InService < MinSize` | 1 | Broken | n/a | S2, S4 | `<N> of <M> instances in service` |
+| `SuspendedProcesses` contains `Launch`/`Terminate`/`HealthCheck` | 1 | Warning | n/a | S2, S4 | `scaling suspended` |
 | `LaunchConfigurationName` set | 1 | Warning | `~` | S2, S4, S5 | `uses a launch configuration` |
 | fewer than two `AvailabilityZones` | 1 | Warning | `~` | S2, S4, S5 | `single availability zone` |
 | behind a load balancer with `HealthCheckType != ELB` | 1 | Warning | `~` | S2, S4, S5 | `no load balancer health check` |
+| Latest `DescribeScalingActivities.StatusCode == Failed` | 2 | Broken | n/a (row is already red) | S1, S4 (dedup), S5 | `latest scaling activity failed` |
 | launch configuration `MetadataOptions` absent or `HttpTokens != required` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration allows IMDSv1` |
 | launch configuration `AssociatePublicIpAddress == true` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration assigns public IPs` |
 | credential in launch configuration `UserData` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in launch configuration user data` |

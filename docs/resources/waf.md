@@ -74,13 +74,16 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `Rules==[]` (no-op ACL).
-  - **State bucket**: Healthy (background finding; row stays green — no runtime health signal available).
-  - **API call**: `GetWebACL` — one call per resource.
-  - **Cost shape**: per-resource.
-- **Signal**: `DefaultAction==Allow` with zero rules (allow-all, no protection).
-  - **State bucket**: Healthy (background finding; row stays green — no runtime health signal available).
-  - **API call**: `GetWebACL` — one call per resource.
-  - **Cost shape**: per-resource.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `DefaultAction==Allow` + zero rules.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `GetLoggingConfiguration` reports no destination for this web ACL.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -114,8 +117,9 @@ One row per signal from §3 that has operator-readable surface text:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Rules==[]` (no-op ACL) | 2 | Healthy | `~` | S3, S4, S5 | `web ACL has no rules` |
-| `DefaultAction==Allow` + zero rules | 2 | Healthy | `!` | S1, S3, S4, S5 | `allow-all: no rules, default Allow` |
+| `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S3, S4, S5 | `web ACL has no rules` |
+| `DefaultAction==Allow` + zero rules | 2 | Warning | `!` | S1, S3, S4, S5 | `web ACL has no rules` |
+| `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S3, S4, S5 | `no logging configuration` |
 
 ## 4.1 UX review (two sentences)
 

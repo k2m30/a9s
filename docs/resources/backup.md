@@ -109,8 +109,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S3, S4, S5 | `2 jobs failed in last 24h` |
-| recent job `PARTIAL` | 2 | Warning | `~` | S3, S4, S5 | `partial: 1 of 3 resources skipped` |
+| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S3, S4, S5 | `<N jobs> failed in last 24h` |
+| recent job `PARTIAL` | 2 | Warning | `~` | S3, S4, S5 | `partial: <N> of <M> resources skipped` |
 
 Rules for filling list and detail text:
 

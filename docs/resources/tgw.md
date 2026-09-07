@@ -63,14 +63,28 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `tgw`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `State == available` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `TransitGateway.State` on the `DescribeTransitGateways` list response (`AWS SDK Go v2 — ec2/types.TransitGateway § State`).
 - **Signal**: `State` in `pending` / `modifying` / `deleting` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `TransitGateway.State` on the list response.
+
+- **Signal**: `State==modifying`.
+  - **State bucket**: Warning.
+  - **How obtained**: `TransitGateway.State` on the list response.
+
+- **Signal**: `State==deleting`.
+  - **State bucket**: Warning.
+  - **How obtained**: `TransitGateway.State` on the list response.
+
 - **Signal**: `State == deleted` → Dim.
   - **State bucket**: Dim.
+  - **How obtained**: `TransitGateway.State` on the list response.
+
+- **Signal**: `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway).
+  - **State bucket**: Warning.
+  - **How obtained**: `TransitGateway.State` on the list response.
+
+- **Signal**: `State == failed`.
+  - **State bucket**: Broken.
   - **How obtained**: `TransitGateway.State` on the list response.
 
 ### 3.2 Wave 2 — bounded extra API calls
@@ -79,6 +93,11 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `tgw`.
   - **State bucket**: Broken.
   - **API call**: `DescribeTransitGatewayAttachments` — one per TGW, filtered by `transit-gateway-id`.
   - **Cost shape**: per-resource.
+
+- **Signal**: attachment `State==rejected`/`rejecting`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: Any attachment `State == pendingAcceptance` with age >24h → Warning.
   - **State bucket**: Warning.
   - **API call**: same `DescribeTransitGatewayAttachments` call; combine `State` with `CreationTime` (`AWS SDK Go v2 — ec2/types.TransitGatewayAttachment § State, CreationTime`).
@@ -119,14 +138,15 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: provisioning` |
-| `State==modifying` | 1 | Warning | n/a | S2, S4 | `modifying: config change` |
+| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State==modifying` | 1 | Warning | n/a | S2, S4 | `modifying` |
 | `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
 | `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
-| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` |
-| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment rejected` |
-| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment awaiting accept` |
 | `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S2, S4, S5 | `auto-accepts shared attachments` |
+| `State == failed` | 1 | Broken | n/a | S2, S4 | `failed` |
+| attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` |
+| attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S4, S5 (S3 suppressed on red row) | `attachment failed` |
+| attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S3, S4, S5 | `attachment between states` |
 
 ## 4.1 UX review (two sentences)
 

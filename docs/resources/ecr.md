@@ -89,9 +89,13 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `imageScanningConfiguration.scanOnPush==false` → no vulnerability scanning configured on new image pushes. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
+- **Signal**: `ImageScanningConfiguration` absent, or `ScanOnPush == false`.
   - **State bucket**: Warning.
   - **How obtained**: `DescribeRepositories` response — each `Repository` carries its `ImageScanningConfiguration.ScanOnPush` (bool). No extra call.
+
+- **Signal**: `ImageTagMutability == MUTABLE`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -101,11 +105,20 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **API call**: `DescribeImages` — one call per repository (N+1). Client-side sort by `imagePushedAt` descending to pick the latest image; the API itself does not order by time.
   - **Cost shape**: per-resource.
+
 - **Signal**: latest image `imageScanFindingsSummary.findingSeverityCounts.HIGH>0` (and `CRITICAL==0`) → HIGH-severity vulnerabilities present.
-  - **State bucket**: Warning.
+  - **State bucket**: Broken.
   - **API call**: same `DescribeImages` response as above — no extra call.
   - **Cost shape**: per-resource.
   - Note: `imageScanFindingsSummary` is present only when a scan has run; if absent, no finding is surfaced for this signal.
+
+- **Signal**: the repository policy grants a wildcard principal.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `GetLifecyclePolicy` reports no policy.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -134,9 +147,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `scanOnPush==false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `scan-on-push off` |
-| latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `CRITICAL CVEs in latest` |
-| latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S4, S5 | `HIGH CVEs in latest` |
+| `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | n/a | S2, S4 | `scan on push off` |
+| `ImageTagMutability == MUTABLE` | 1 | Warning | n/a | S2, S4 | `tags are mutable` |
+| latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `<N> critical, <M> high vulnerabilities` |
+| latest image `HIGH>0` (no CRITICAL) | 2 | Broken | `~` | S2, S4, S5 | `<N> critical, <M> high vulnerabilities` |
+| the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `repository policy open to anyone` |
+| `GetLifecyclePolicy` reports no policy | 2 | Warning | `~` | S3, S4, S5 | `no lifecycle policy` |
 
 Rules applied:
 

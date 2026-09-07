@@ -62,6 +62,10 @@ One bullet per distinct signal.
   - **API call**: `GetGroup` — one call per group.
   - **Cost shape**: per-resource.
 
+- **Signal**: `AdministratorAccess` or `PowerUserAccess` attached.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 ### 3.3 Wave 3 — OUT OF SCOPE
 
 - OUT OF SCOPE: `ListAttachedGroupPolicies` per group (admin-access + blast radius) — used by the related panel for the `policy` pivot, not for attention scoring. Detecting `AdministratorAccess` attachment or wildcard-policy blast radius on groups is deferred.
@@ -96,7 +100,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| Empty group >30d old | 2 | Warning | `~` | S3, S4, S5 | `empty group, created <age>d ago` |
+| no members, or members but no attached or inline policies | 2 | Warning | `~` | S3, S4, S5 | `no members or no policies` |
 | `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
 
 ## 4.1 UX review (two sentences)

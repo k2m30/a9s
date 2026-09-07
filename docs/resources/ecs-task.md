@@ -113,21 +113,58 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ecs-task
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `lastStatus==RUNNING`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Task.LastStatus` on the `DescribeTasks` response (list-mode uses `DescribeTasks` because `ListTasks` returns ARNs only).
+- **Signal**: container `exitCode` non-zero with `essential=true` → Broken.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeTasks` gives `Task.Containers[].ExitCode`; the `essential` flag lives on the task definition, so a paired `DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)` is needed to confirm essentiality.
+  - **Cost shape**: per-resource (one `DescribeTaskDefinition` per distinct `TaskDefinitionArn` in the list — task definitions are immutable per revision, so a per-session cache collapses this to roughly one call per unique revision).
 
-- **Signal**: `lastStatus` in transitional states (`PROVISIONING`, `PENDING`, `ACTIVATING`, `DEACTIVATING`, `STOPPING`, `DEPROVISIONING`).
-  - **State bucket**: Warning.
-  - **How obtained**: `Task.LastStatus`.
+- **Signal**: `lastStatus==STOPPED`, `StopCode==TaskFailedToStart`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus==STOPPED`, `StopCode==SpotInterruption`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus==STOPPED`, `StopCode==TerminationNotice`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `lastStatus==STOPPED` with `StopCode != UserInitiated`.
-  - **State bucket**: Broken.
+  - **State bucket**: Dim.
   - **How obtained**: `Task.LastStatus` and `Task.StopCode` (both on the `DescribeTasks` response; `StopCode` is one of `TaskFailedToStart`, `EssentialContainerExited`, `UserInitiated`, `ServiceSchedulerInitiated`, `SpotInterruption`, `TerminationNotice`).
 
 - **Signal**: `healthStatus==UNHEALTHY`.
   - **State bucket**: Broken.
   - **How obtained**: `Task.HealthStatus` (enum `HEALTHY` / `UNHEALTHY` / `UNKNOWN`).
+
+- **Signal**: `lastStatus == PROVISIONING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus == PENDING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus == ACTIVATING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus == DEACTIVATING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus == STOPPING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus == DEPROVISIONING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -138,10 +175,25 @@ One bullet per distinct signal.
   - **API call**: `DescribeTasks` (same call as list-mode; no additional network call — this is the same data surfaced again with a stricter rule on the StopCode value).
   - **Cost shape**: per-resource (already paid in list-mode).
 
-- **Signal**: container `exitCode` non-zero with `essential=true` → Broken.
+- **Signal**: any container `privileged` (task definition).
   - **State bucket**: Broken.
-  - **API call**: `DescribeTasks` gives `Task.Containers[].ExitCode`; the `essential` flag lives on the task definition, so a paired `DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)` is needed to confirm essentiality.
-  - **Cost shape**: per-resource (one `DescribeTaskDefinition` per distinct `TaskDefinitionArn` in the list — task definitions are immutable per revision, so a per-session cache collapses this to roughly one call per unique revision).
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: `networkMode == host` or `pidMode == host`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: any container without `readonlyRootFilesystem`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: any container without `logConfiguration`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: credential in a container `environment[]`.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -175,15 +227,20 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `lastStatus` transitional (`PROVISIONING`/`PENDING`/`ACTIVATING`/`STOPPING`/`DEPROVISIONING`) | 1 | Warning | n/a | S2, S4 | `starting` or `stopping` (match phase) |
-| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | n/a | S2, S4 | `stopped: essential container exited` |
-| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | n/a | S2, S4 | `stopped: failed to start` |
-| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | n/a | S2, S4 | `stopped: spot reclaimed` |
-| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | n/a | S2, S4 | `stopped: scheduler replaced` |
-| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | n/a | S2, S4 | `stopped: termination notice` |
-| `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped: user initiated` |
-| `healthStatus==UNHEALTHY` | 1 | Broken | n/a | S2, S4 | `running but unhealthy` |
-| Wave 2: `ExitCode!=0` on essential container (on an already-Broken row) | 2 | Broken | `!` (counted) | S1, S4 (dedup), S5 | `stopped: exit N` (merged with existing cause) |
+| `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | n/a | S2, S4 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | n/a | S2, S4 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | n/a | S2, S4 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | n/a | S2, S4 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | n/a | S2, S4 | `stopped: <stop code>` |
+| `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped` |
+| `healthStatus==UNHEALTHY` | 1 | Broken | n/a | S2, S4 | `unhealthy` |
+| `lastStatus == PROVISIONING` | 1 | Warning | n/a | S2, S4 | `provisioning` |
+| `lastStatus == PENDING` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `lastStatus == ACTIVATING` | 1 | Warning | n/a | S2, S4 | `activating` |
+| `lastStatus == DEACTIVATING` | 1 | Warning | n/a | S2, S4 | `deactivating` |
+| `lastStatus == STOPPING` | 1 | Warning | n/a | S2, S4 | `stopping` |
+| `lastStatus == DEPROVISIONING` | 1 | Warning | n/a | S2, S4 | `deprovisioning` |
+| `ExitCode != 0` on an essential container of a stopped task | 2 | Broken | `!` (counted) | S1, S4 (dedup), S5 | `task failed` |
 | any container `privileged` (task definition) | 2 | Broken | `!` | S1, S3, S4, S5 | `privileged container` |
 | `networkMode == host` or `pidMode == host` | 2 | Warning | `~` | S2, S3, S4, S5 | `shares the host network or process namespace` |
 | any container without `readonlyRootFilesystem` | 2 | Warning | `~` | S2, S3, S4, S5 | `writable root filesystem` |

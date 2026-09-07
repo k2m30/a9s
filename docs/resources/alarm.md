@@ -128,10 +128,6 @@ Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `alarm
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `StateValue == OK`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `MetricAlarm.StateValue` from `DescribeAlarms`.
-
 - **Signal**: `StateValue == INSUFFICIENT_DATA`.
   - **State bucket**: Warning.
   - **How obtained**: `MetricAlarm.StateValue` from `DescribeAlarms`.
@@ -140,13 +136,13 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `MetricAlarm.StateValue` from `DescribeAlarms`; operator-readable cause is carried in `MetricAlarm.StateReason`.
 
-- **Signal**: `ActionsEnabled == false` (muted alarm). — no separate finding code exists; the code emits only the single `alarm.no_actions` finding (phrase `no actions`, keyed on empty `AlarmActions`), shared with the alert-to-nowhere signal below
-  - **State bucket**: Warning.
-  - **How obtained**: `MetricAlarm.ActionsEnabled` from `DescribeAlarms`.
-
 - **Signal**: `AlarmActions == []` (alert-to-nowhere). — emitted as the single `alarm.no_actions` finding (phrase `no actions`); the only finding code covering both this and the muted-alarm concept above
   - **State bucket**: Warning.
   - **How obtained**: `MetricAlarm.AlarmActions` from `DescribeAlarms` (an empty slice means no action is wired for the ALARM transition).
+
+- **Signal**: `ActionsEnabled == false`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `StateValue == INSUFFICIENT_DATA` AND `StateUpdatedTimestamp` older than `2 × Period` (dead metric pipeline). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
@@ -192,10 +188,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `StateValue == INSUFFICIENT_DATA` | 1 | Warning | n/a | S2, S4 | `no data` |
-| `StateValue == ALARM` | 1 | Broken | n/a | S2, S4 | `firing: <StateReason short>` |
-| `ActionsEnabled == false` (no separate finding code — the single `alarm.no_actions` finding, shared with the row below, is the only emission) | 1 | Warning | n/a | S2, S4 | `no actions` |
+| `StateValue == INSUFFICIENT_DATA` | 1 | Warning | n/a | S2, S4 | `insufficient data` |
+| `StateValue == ALARM` | 1 | Broken | n/a | S2, S4 | `alarm triggered` |
 | `AlarmActions == []` (emits the single `alarm.no_actions` finding — one finding code for both this and the row above) | 1 | Warning | n/a | S2, S4 | `no actions` |
+| `ActionsEnabled == false` | 1 | Warning | n/a | S2, S4 | `actions disabled` |
 | `INSUFFICIENT_DATA older than 2×Period` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `metric pipeline stale <Xm>` |
 | zombie alarm (dimension points at missing resource) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `zombie: <dim-name>=<dim-value>` |
 

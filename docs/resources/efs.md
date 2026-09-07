@@ -108,10 +108,6 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `LifeCycleState == available`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `FileSystemDescription.LifeCycleState` from `DescribeFileSystems`.
-
 - **Signal**: `LifeCycleState == creating`.
   - **State bucket**: Warning.
   - **How obtained**: `FileSystemDescription.LifeCycleState` from `DescribeFileSystems`.
@@ -132,6 +128,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `FileSystemDescription.NumberOfMountTargets` from `DescribeFileSystems`. A FS with no mount targets is unreachable from any client — no NFS endpoint exists in any subnet.
 
+- **Signal**: `Encrypted` not true.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -140,6 +140,14 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **API call**: `DescribeMountTargets(FileSystemId=<fs-id>)` — one call per FS.
   - **Cost shape**: per-resource.
+
+- **Signal**: File system policy allows any principal.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: AWS Backup policy status not `ENABLED`.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -179,8 +187,8 @@ One row per signal from §3:
 | `LifeCycleState == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
 | `LifeCycleState == error` | 1 | Broken | n/a | S2, S4 | `error` |
 | `NumberOfMountTargets == 0` | 1 | Broken | n/a | S2, S4 | `no mount targets` |
-| any mount target `LifeCycleState != available` | 2 | Broken | n/a | S2, S4, S5 | `mount target down` |
 | `Encrypted` not true | 1 | Warning | n/a | S2, S4, S5 | `not encrypted` |
+| any mount target `LifeCycleState != available` | 2 | Broken | n/a | S2, S4, S5 | `mount target down` |
 | File system policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `file system policy open to anyone` |
 | AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S4, S5 | `automatic backups off` |
 

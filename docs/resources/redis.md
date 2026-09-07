@@ -93,29 +93,67 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `ReplicationGroup.Engine != "redis"` (Valkey / Memcached rows seen on the shared API response).
-  - **State bucket**: n/a — filtered OUT at fetch time. Non-Redis engines must never appear in the `redis` list; they are the domain of a future `valkey` / `memcached` short name, not this type.
-  - **How obtained**: list-response field `Engine` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.ReplicationGroup.Engine *string`; values `"redis"`, `"valkey"`, `"memcached"`). a9s-devops (2026-04-23): AWS lists every ElastiCache engine's RGs through the same API; the engine string is the only reliable filter, and the previous `DescribeCacheClusters` path did filter on Engine — parity requires the same filter here.
-- **Signal**: `ReplicationGroup.Status == "available"` AND `len(NodeGroups) == 0 || every NodeGroup.Status == "available"`.
-  - **State bucket**: Healthy.
-  - **How obtained**: list-response fields `Status` and `NodeGroups[].Status` on `DescribeReplicationGroups`. Healthy means the RG AND every shard is available.
+- **Not a signal — filtered OUT at fetch time**: `ReplicationGroup.Engine != "redis"` (Valkey / Memcached rows seen on the shared API response). Non-Redis engines must never appear in the `redis` list; they are the domain of a future `valkey` / `memcached` short name, not this type.
+  - **How obtained**: list-response field `Engine` on `DescribeReplicationGroups` (`elasticache/types.ReplicationGroup.Engine`; values `"redis"`, `"valkey"`, `"memcached"`). AWS lists every ElastiCache engine's replication groups through the same API, and the engine string is the only reliable filter.
+
+- **Detail-only visibility (no state bucket, no phrase — renders in the detail view only)**: per-node AZ + role breakdown.
+  - **How obtained**: list-response field `NodeGroups[].NodeGroupMembers[]` on `DescribeReplicationGroups`, exposing `CacheClusterId`, `CurrentRole` (`"primary"` / `"replica"` — docs note `CurrentRole` is populated for cluster-mode-DISABLED only; may be nil on cluster-mode-enabled), `PreferredAvailabilityZone`. a9s-devops (2026-04-23): operator needs to see "which AZ is the primary, which AZ(s) host replicas" during failover triage; this data is free on the list response and belongs in the detail view's Attention section or an adjacent detail row. It is NOT surfaced as a list-level phrase because "primary AZ = <x>" is not actionable by itself — it's context for the shard-transition signal above.
+
 - **Signal**: `ReplicationGroup.Status in ("creating", "deleting")`.
   - **State bucket**: Warning.
   - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`. Applies when the RG itself is being created or torn down — shards do not exist yet (creating) or are going away (deleting), so the shard-level signals below do not fire for these states.
+
+- **Signal**: `Status == modifying` (single-shard).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == snapshotting` (single-shard).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == deleting`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `ReplicationGroup.Status == "create-failed"`.
   - **State bucket**: Broken.
   - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`.
-- **Signal**: `ReplicationGroup.Status in ("modifying", "snapshotting")` AND `len(NodeGroups) <= 1`.
-  - **State bucket**: Warning.
-  - **How obtained**: list-response field `Status`. For cluster-mode-DISABLED Redis (0-1 node groups), the RG-level phrase is the operator's primary reading — no shard suffix is added on the common path.
+
 - **Signal**: `any NodeGroup.Status != "available"` AND `len(NodeGroups) > 1` (cluster-mode-enabled, per-shard transition).
   - **State bucket**: Warning.
   - **How obtained**: list-response field `NodeGroups[].Status` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.NodeGroup.Status *string`; enum matches RG `Status` — `available`, `creating`, `modifying`, `deleting`). One distinct §4 phrase per transitioning shard keyed on `NodeGroupId` + its status. Rule 7 `(+N-1)` suffix applies when multiple shards are non-available — N = total count of non-available NodeGroups in this RG; the rendered suffix is literally `(+N-1)` (e.g. three transitioning shards → `shard <top-id>: <state> (+2)`).
+
+- **Signal**: `ReplicationGroup.Status in ("modifying", "snapshotting")` AND `len(NodeGroups) <= 1`.
+  - **State bucket**: Warning.
+  - **How obtained**: list-response field `Status`. For cluster-mode-DISABLED Redis (0-1 node groups), the RG-level phrase is the operator's primary reading — no shard suffix is added on the common path.
+
+- **Signal**: `any NodeGroup.Status == creating` (multi-shard).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `any NodeGroup.Status == deleting` (multi-shard).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `AutomaticFailover != "enabled"` on a multi-AZ replication group.
   - **State bucket**: Warning.
   - **How obtained**: list-response fields `AutomaticFailover` and `MultiAZ` on `DescribeReplicationGroups` (multi-AZ detected via `MultiAZ == "enabled"` per `elasticache/types.MultiAZStatus`).
-- **Detail-only visibility (no state bucket, no phrase — renders in the detail view only)**: per-node AZ + role breakdown.
-  - **How obtained**: list-response field `NodeGroups[].NodeGroupMembers[]` on `DescribeReplicationGroups`, exposing `CacheClusterId`, `CurrentRole` (`"primary"` / `"replica"` — docs note `CurrentRole` is populated for cluster-mode-DISABLED only; may be nil on cluster-mode-enabled), `PreferredAvailabilityZone`. a9s-devops (2026-04-23): operator needs to see "which AZ is the primary, which AZ(s) host replicas" during failover triage; this data is free on the list response and belongs in the detail view's Attention section or an adjacent detail row. It is NOT surfaced as a list-level phrase because "primary AZ = <x>" is not actionable by itself — it's context for the shard-transition signal above.
+
+- **Signal**: `AtRestEncryptionEnabled` not true.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `TransitEncryptionEnabled` not true.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `AuthTokenEnabled` not true while in-transit encryption is on.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `SnapshotRetentionLimit` 0 or absent.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -157,10 +195,10 @@ Wave → surface mapping applied below. `Status == "available"` with `AutomaticF
 | `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S2, S4 | `snapshotting — backup running` |
 | `Status == deleting` | 1 | Warning | n/a | S2, S4 | `deleting — teardown` |
 | `Status == create-failed` | 1 | Broken | n/a | S2, S4 | `create failed — see events` |
-| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: modifying` |
-| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: snapshotting` |
-| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: creating` |
-| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: deleting` |
+| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
 | `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S2, S4 | `multi-AZ without auto-failover` |
 | `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption at rest off` |
 | `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption in transit off` |

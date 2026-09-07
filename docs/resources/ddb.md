@@ -81,21 +81,7 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `ListTables` returns table names only; state, capacity, encryption, and PITR posture all require `DescribeTable` / `DescribeContinuousBackups`.
-
-### 3.2 Wave 2 — bounded extra API calls
-
-One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` run once per table, and every finding they raise is a row on `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`.
-
-- **Signal**: `TableStatus == ACTIVE`.
-  - **State bucket**: Healthy.
-  - **API call**: `DescribeTable` — one call per table.
-  - **Cost shape**: per-resource.
-
-- **Signal**: `TableStatus` in `CREATING` / `UPDATING` / `DELETING` / `ARCHIVING`.
-  - **State bucket**: Warning.
-  - **API call**: `DescribeTable` — one call per table.
-  - **Cost shape**: per-resource.
+The list API returns table names only, so the fetcher reads each table with `DescribeTable` before it builds the row. Every signal below is computed from that response as the row is built, with no second pass. Capacity, encryption and point-in-time recovery posture need `DescribeContinuousBackups` as well.
 
 - **Signal**: `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS`.
   - **State bucket**: Broken.
@@ -107,10 +93,54 @@ One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` 
   - **API call**: `DescribeTable` — one call per table. Cause available on `ArchivalSummary.ArchivalReason` (currently always `INACCESSIBLE_ENCRYPTION_CREDENTIALS`) and `ArchivalSummary.ArchivalDateTime`.
   - **Cost shape**: per-resource.
 
+- **Signal**: `DeletionProtectionEnabled` not true.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `TableStatus == CREATING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `TableStatus == UPDATING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `TableStatus == DELETING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `TableStatus == ARCHIVING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DescribeTable` was denied for this table.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DescribeTable` answered with nothing usable.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+### 3.2 Wave 2 — bounded extra API calls
+
+One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` run once per table, and every finding they raise is a row on `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`.
+
 - **Signal**: PITR disabled (`PointInTimeRecoveryDescription.PointInTimeRecoveryStatus == DISABLED` on `DescribeContinuousBackups`).
   - **State bucket**: Warning (background finding — informational).
   - **API call**: `DescribeContinuousBackups` — one call per table.
   - **Cost shape**: per-resource.
+
+- **Signal**: Resource policy names a foreign account.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: Resource policy allows any principal.
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
+- **Signal**: no backup plan selection matches this table.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -145,14 +175,19 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `TableStatus == ACTIVE` (healthy) | 2 | Healthy | n/a | — (omitted) | *(blank)* |
-| `TableStatus` transitional (`CREATING`/`UPDATING`/`DELETING`/`ARCHIVING`) | 2 | Warning | n/a | S2 + S4 | `creating` / `updating` / `deleting` / `archiving` |
-| `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 2 | Broken | n/a | S2 + S4 + S5 | `kms key inaccessible` |
-| `TableStatus == ARCHIVED` | 2 | Broken | n/a | S2 + S4 + S5 | `archived: kms key lost` |
-| PITR disabled | 2 | Healthy (with `~` background finding) | `~` | S3 + S4 + S5 | `PITR off` |
+| `TableStatus == INACCESSIBLE_ENCRYPTION_CREDENTIALS` | 1 | Broken | n/a | S2, S4 | `kms key inaccessible` |
+| `TableStatus == ARCHIVED` | 1 | Broken | n/a | S2, S4 | `archived: kms key lost` |
 | `DeletionProtectionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `deletion protection off` |
+| `TableStatus == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `TableStatus == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
+| `TableStatus == DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `TableStatus == ARCHIVING` | 1 | Warning | n/a | S2, S4 | `archiving` |
+| `DescribeTable` was denied for this table | 1 | Warning | n/a | S2, S4 | `details denied` |
+| `DescribeTable` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
+| PITR disabled | 2 | Warning | `~` | S3 + S4 + S5 | `point-in-time recovery disabled` |
 | Resource policy names a foreign account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
 | Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S4, S5 | `resource policy open to anyone` |
+| no backup plan selection matches this table | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
 
 Rules for filling list and detail text:
 

@@ -83,34 +83,62 @@ Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row 
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. (`ListEnvironments` returns environment name strings only; the pattern matches `eks`/`ng`/`ddb`.)
+The list API returns environment name strings only, so the fetcher reads each environment with `GetEnvironment` before it builds the row. Every signal below is computed from that response as the row is built, with no second pass. The pattern matches `eks`, `ng` and `ddb`.
 
 AccessDenied contract: when the profile's role denies `mwaa:ListEnvironments`, the main-menu row shows the error state — never `0`. An operator who reads "0 environments" during an incident wrongly concludes the account runs no Airflow.
 
-### 3.2 Wave 2 — bounded extra API calls
-
-All signals come from `GetEnvironment` per environment (N+1; accounts run 1–5 environments, so the fan-out is small).
-
-- **Signal**: `Status == AVAILABLE` → Healthy.
-  - **State bucket**: Healthy.
-  - **API call**: `GetEnvironment`, one per environment.
-  - **Cost shape**: per-resource.
 - **Signal**: `Status` in `CREATING` / `CREATING_SNAPSHOT` / `PENDING` / `UPDATING` / `ROLLING_BACK` / `MAINTENANCE`.
   - **State bucket**: Warning.
   - **API call**: `GetEnvironment`, one per environment.
   - **Cost shape**: per-resource.
+
+- **Signal**: `Status == CREATING_SNAPSHOT`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == PENDING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == UPDATING`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == ROLLING_BACK`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == MAINTENANCE`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `Status` in `CREATE_FAILED` / `UPDATE_FAILED` / `UNAVAILABLE`.
   - **State bucket**: Broken.
   - **API call**: `GetEnvironment`, one per environment.
   - **Cost shape**: per-resource.
+
+- **Signal**: `LastUpdate.Status == FAILED` on an `AVAILABLE` environment — the last update silently failed while the environment keeps serving the previous configuration ("my change didn't take"). Surface `LastUpdate.Error.ErrorMessage` (and a humanized `ErrorCode`) as the cause.
+  - **State bucket**: Broken.
+  - **API call**: `GetEnvironment`, one per environment (same call as above).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `Status == UNAVAILABLE`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `Status` in `DELETING` / `DELETED`.
   - **State bucket**: Dim.
   - **API call**: `GetEnvironment`, one per environment.
   - **Cost shape**: per-resource.
-- **Signal**: `LastUpdate.Status == FAILED` on an `AVAILABLE` environment — the last update silently failed while the environment keeps serving the previous configuration ("my change didn't take"). Surface `LastUpdate.Error.ErrorMessage` (and a humanized `ErrorCode`) as the cause.
+
+- **Signal**: `Status == DELETED`.
+  - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `LastUpdate.Status == FAILED` on `AVAILABLE`.
   - **State bucket**: Warning.
-  - **API call**: `GetEnvironment`, one per environment (same call as above).
-  - **Cost shape**: per-resource.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `WebserverAccessMode` in `PUBLIC_ONLY` / `PUBLIC_AND_PRIVATE` — the Airflow webserver is reachable from the internet (still IAM-authed, but exposed; analogous to `dbi` `PubliclyAccessible`).
   - **State bucket**: Warning.
   - **API call**: `GetEnvironment`, one per environment (same call as above).
@@ -122,6 +150,14 @@ All signals come from `GetEnvironment` per environment (N+1; accounts run 1–5 
   - **Cost shape**: per-resource.
 
 Deliberately not signals (a9s-devops 2026-07-14): any `LoggingConfiguration` component disabled (logging is opt-in per component and cost-driven; a warning would fire on most environments — noise, not signal; detail-view fact only) and `AirflowVersion` EOL (no stable AWS source for the deprecation schedule; a hardcoded table goes stale and lies; fact only).
+
+- **Signal**: `GetEnvironment` answered with nothing usable.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+### 3.2 Wave 2 — bounded extra API calls
+
+All signals come from `GetEnvironment` per environment (N+1; accounts run 1–5 environments, so the fan-out is small).
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -156,20 +192,21 @@ One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironmen
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` |
-| `Status == CREATING_SNAPSHOT` | 2 | Warning | n/a | S2, S4 | `creating snapshot` |
-| `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending: awaiting VPC endpoints` |
-| `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
-| `Status == ROLLING_BACK` | 2 | Warning | n/a | S2, S4 | `rolling back: update failed` |
-| `Status == MAINTENANCE` | 2 | Warning | n/a | S2, S4 | `maintenance in progress` |
-| `Status == CREATE_FAILED` | 2 | Broken | n/a | S2, S4 | `create failed` |
-| `Status == UPDATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `update failed: rolled back` |
-| `Status == UNAVAILABLE` | 2 | Broken | n/a | S2, S4 | `unavailable: not stable` |
-| `Status == DELETING` | 2 | Dim | n/a | S2, S4 | `deleting` |
-| `Status == DELETED` | 2 | Dim | n/a | S2, S4 | `deleted` |
-| `LastUpdate.Status == FAILED` on `AVAILABLE` | 2 | Warning | n/a | S2, S4, S5 | `last update failed` |
-| `WebserverAccessMode` public | 2 | Warning | n/a | S2, S4, S5 | `webserver public` |
-| `GetEnvironment` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` |
+| `Status == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `Status == CREATING_SNAPSHOT` | 1 | Warning | n/a | S2, S4 | `creating snapshot` |
+| `Status == PENDING` | 1 | Warning | n/a | S2, S4 | `pending: awaiting VPC endpoints` |
+| `Status == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
+| `Status == ROLLING_BACK` | 1 | Warning | n/a | S2, S4 | `rolling back: update failed` |
+| `Status == MAINTENANCE` | 1 | Warning | n/a | S2, S4 | `maintenance in progress` |
+| `Status == CREATE_FAILED` | 1 | Broken | n/a | S2, S4 | `create failed` |
+| `Status == UPDATE_FAILED` | 1 | Broken | n/a | S2, S4 | `update failed: rolled back` |
+| `Status == UNAVAILABLE` | 1 | Broken | n/a | S2, S4 | `unavailable: not stable` |
+| `Status == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting` |
+| `Status == DELETED` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `LastUpdate.Status == FAILED` on `AVAILABLE` | 1 | Warning | n/a | S2, S4 | `last update failed` |
+| `WebserverAccessMode` public | 1 | Warning | n/a | S2, S4 | `webserver public` |
+| `GetEnvironment` denied | 1 | Warning | n/a | S2, S4 | `details denied` |
+| `GetEnvironment` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
 
 Notes:
 

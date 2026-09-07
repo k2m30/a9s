@@ -75,23 +75,21 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `nat`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `State==available`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `NatGateway.State` on the `DescribeNatGateways` response.
 - **Signal**: `State==pending`.
   - **State bucket**: Warning.
   - **How obtained**: `NatGateway.State` on the `DescribeNatGateways` response.
+
 - **Signal**: `State==deleting`.
   - **State bucket**: Warning.
   - **How obtained**: `NatGateway.State` on the `DescribeNatGateways` response.
+
 - **Signal**: `State==failed`.
   - **State bucket**: Broken.
   - **How obtained**: `NatGateway.State` on the `DescribeNatGateways` response.
-- **Signal**: `FailureCode` non-empty (pair with `FailureMessage`).
-  - **State bucket**: Broken.
-  - **How obtained**: `NatGateway.FailureCode` + `NatGateway.FailureMessage` on the `DescribeNatGateways` response. Codes per SDK: `InsufficientFreeAddressesInSubnet`, `Gateway.NotAttached`, `InvalidAllocationID.NotFound`, `Resource.AlreadyAssociated`, `InternalError`, `InvalidSubnetID.NotFound`.
 
-Note: `State==deleted` is not mentioned in the `docs/attention-signals.md § Signals § NETWORKING` row `nat`. The SDK exposes it; a9s-devops persona treats `deleted` as Dim (terminal tombstone) by analogy with other EC2 terminal states, but since it is not specified in the golden doc it is not included in §4.
+- **Signal**: `State == deleted`.
+  - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -131,9 +129,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending: being created` |
-| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting: winding down` |
-| `State==failed` + `FailureCode` | 1 | Broken | n/a | S2, S4 | `failed: <FailureCode>` |
+| `State==pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State==deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `State==failed` + `FailureCode` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 
 Notes on filling list and detail text:
 

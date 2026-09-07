@@ -72,10 +72,6 @@ Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row 
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State == ENABLED`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `WorkGroupSummary.State` from `ListWorkGroups`.
-
 - **Signal**: `State == DISABLED`.
   - **State bucket**: Warning.
   - **How obtained**: `WorkGroupSummary.State` from `ListWorkGroups`. Admin-off — the workgroup exists but will reject new query submissions.
@@ -126,7 +122,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled: no new queries accepted` |
+| `State == DISABLED` | 1 | Warning | n/a | S2, S4 | `disabled` |
 | `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S4, S5 | `settings can be overridden per query` |
 | `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S4, S5 | `query results stored unencrypted` |
 

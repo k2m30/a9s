@@ -115,17 +115,21 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `Status == "available"` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
-
 - **Signal**: `Status` is transitional (e.g. `creating`, `modifying`, `backing-up`, `maintenance`, `upgrading`, `starting`, `stopping`, `resetting-master-credentials`, `renaming`) → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
-- **Signal**: `Status` in `failed` / `inaccessible-encryption-credentials` / `incompatible-parameters` → Broken.
+- **Signal**: `Status == inaccessible-encryption-credentials` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: `Status == inaccessible-encryption-credentials`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == incompatible-parameters`.
+  - **State bucket**: Broken.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: No `DBClusterMembers[]` entry with `IsClusterWriter == true` → Broken.
   - **State bucket**: Broken.
@@ -143,6 +147,22 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `BackupRetentionPeriod` int on the list response.
 
+- **Signal**: `MultiAZ == false`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `AutoMinorVersionUpgrade == false` (Aurora only).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `IAMDatabaseAuthenticationEnabled == false` (Aurora only).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `MasterUsername` is a vendor default.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -151,6 +171,10 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **API call**: `DescribePendingMaintenanceActions` — one account-wide call (shared with `dbi`), bucket results by `ResourceIdentifier` (cluster ARN).
   - **Cost shape**: account-wide.
+
+- **Signal**: no backup plan selection matches this cluster.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -184,7 +208,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status` transitional | 1 | Warning | n/a | S2, S4 | `<status>: in progress` (e.g. `modifying: in progress`) |
+| `Status` transitional | 1 | Warning | n/a | S2, S4 | `<status>: in progress` |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed: cluster operation` |
 | `Status == inaccessible-encryption-credentials` | 1 | Broken | n/a | S2, S4 | `encryption key unreachable` |
 | `Status == incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `parameter group incompatible` |
@@ -192,11 +216,12 @@ One row per signal from §3:
 | `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `delete-protection off` |
 | `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `not encrypted at rest` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` |
-| Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` |
 | `MultiAZ == false` | 1 | Warning | n/a | S2, S4, S5 | `single-AZ` |
 | `AutoMinorVersionUpgrade == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `auto minor version upgrade off` |
 | `IAMDatabaseAuthenticationEnabled == false` (Aurora only) | 1 | Warning | n/a | S2, S4, S5 | `IAM database authentication off` |
 | `MasterUsername` is a vendor default | 1 | Warning | n/a | S2, S4, S5 | `default master username` |
+| Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` |
+| no backup plan selection matches this cluster | 2 | Warning | `~` | S3, S4, S5 | `not covered by a backup plan` |
 
 Rules for filling list and detail text:
 
