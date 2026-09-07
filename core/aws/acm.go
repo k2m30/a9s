@@ -236,19 +236,19 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 			}
 			return []domain.Finding{{
 				Code: acmCodeExpiresCritical, Phrase: phrase,
-				Severity: domain.SevBroken, Source: "wave1",
+				Detail: catalog.Detail(acmCodeExpiresCritical), Severity: domain.SevBroken, Source: "wave1",
 			}}
 		case remaining < 30*24*time.Hour:
 			return []domain.Finding{{
 				Code: acmCodeExpiresSoon, Phrase: fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)),
-				Severity: domain.SevWarn, Source: "wave1",
+				Detail: catalog.Detail(acmCodeExpiresSoon), Severity: domain.SevWarn, Source: "wave1",
 			}}
 		}
 	}
 	if inUse == "false" {
 		return []domain.Finding{{
 			Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)",
-			Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(acmCodeOrphan), Severity: domain.SevWarn, Source: "wave1",
 		}}
 	}
 	return nil

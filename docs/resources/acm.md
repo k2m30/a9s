@@ -70,27 +70,27 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Healthy.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == PENDING_VALIDATION`. — emits `acm.status.pending-validation`
+- **Signal**: `Status == PENDING_VALIDATION` — emits `acm.status.pending-validation`
   - **State bucket**: Warning.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == EXPIRED`. — emits `acm.status.failed`
+- **Signal**: `Status == EXPIRED` — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == REVOKED`. — emits `acm.status.failed`
+- **Signal**: `Status == REVOKED` — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == FAILED`. — emits `acm.status.failed`
+- **Signal**: `Status == FAILED` — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == VALIDATION_TIMED_OUT`. — emits `acm.status.failed`
+- **Signal**: `Status == VALIDATION_TIMED_OUT` — emits `acm.status.failed`
   - **State bucket**: Broken.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
-- **Signal**: `Status == INACTIVE`. — emits `acm.status.inactive`
+- **Signal**: `Status == INACTIVE` — emits `acm.status.inactive`
   - **State bucket**: Dim.
   - **How obtained**: `CertificateSummary.Status` from `ListCertificates`.
 
@@ -152,15 +152,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == PENDING_VALIDATION` — emits `acm.status.pending-validation` | 1 | Warning | n/a | S2, S4 | `validating DNS` |
+| `Status == PENDING_VALIDATION` — emits `acm.status.pending-validation` | 1 | Warning | n/a | S2, S4 | `pending validation` |
 | `Status == EXPIRED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `expired` |
 | `Status == REVOKED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `revoked` |
-| `Status == FAILED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `issuance failed` |
+| `Status == FAILED` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `failed` |
 | `Status == VALIDATION_TIMED_OUT` — emits `acm.status.failed` | 1 | Broken | n/a | S2, S4 | `validation timed out` |
 | `Status == INACTIVE` — emits `acm.status.inactive` | 1 | Dim | n/a | S2, S4 | `inactive` |
-| `NotAfter within 30 days` | 1 | Warning | n/a | S2, S4 | `expires in <N>d` |
-| `NotAfter within 7 days` | 1 | Broken | n/a | S2, S4 | `expires in <N>d` |
-| `InUse == false on non-expired cert` | 1 | Warning | n/a | S2, S4 | `not in use` |
+| `NotAfter within 30 days` | 1 | Warning | n/a | S2, S4 | `expires in <N> days` |
+| `NotAfter within 7 days` | 1 | Broken | n/a | S2, S4 | `expires in <N> days` |
+| `InUse == false on non-expired cert` | 1 | Warning | n/a | S2, S4 | `certificate not in use (orphan)` |
 | `RenewalSummary.RenewalStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `auto-renewal failed` |
 | `DomainValidationOptions[].ValidationStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | n/a | S4, S5 | `validation failed: <domain>` |
 
@@ -201,9 +201,9 @@ acm — DNS & CDN. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| acm.expires-critical | expires in <N> days | broken | wave1 | — |
-| acm.expires-soon | expires in <N> days | warn | wave1 | — |
-| acm.orphan | certificate not in use (orphan) | warn | wave1 | — |
+| acm.expires-critical | expires in <N> days | broken | wave1 | The certificate expires within a week, or already has, and every client reaching a listener that serves it will refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
+| acm.expires-soon | expires in <N> days | warn | wave1 | The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published. |
+| acm.orphan | certificate not in use (orphan) | warn | wave1 | Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for. |
 | acm.status.pending-validation | pending validation | warn | wave1 | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |
 | acm.status.failed | <status, in words> | broken | wave1 | The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it. |
 | acm.status.inactive | inactive | dim | wave1 | An imported certificate marked inactive, because nothing is using it to terminate TLS. It costs nothing to keep, so this is a note rather than a fault; delete it once you are sure nothing will need it. |
