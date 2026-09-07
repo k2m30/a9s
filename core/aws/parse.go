@@ -46,7 +46,8 @@ func S3OriginBucket(host string) (string, bool) {
 	labels := strings.Split(rest, ".")
 	for i := len(labels) - 1; i > 0; i-- {
 		if labels[i] == "s3" || strings.HasPrefix(labels[i], "s3-") {
-			return strings.Join(labels[:i], "."), true
+			bucket := strings.Join(labels[:i], ".")
+			return bucket, bucket != ""
 		}
 	}
 	return "", false
