@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `sns`, `
 ### `ct-events`
 
 - **Why related**: audit trail for subscription changes — who created/confirmed/deleted this sub, and recent errors. (`docs/related-resources.md` § `sns-sub` — "Audit trail for subscription changes.")
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy. Resolved by `LookupEvents` filtered on `SubscriptionArn`.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Resolved by `LookupEvents` filtered on `SubscriptionArn`.
 - **Count shown**: yes — reflects recent matching events, so volume is informative at a glance (a9s-devops 2026-04-20).
 
 ## 3. Attention / Issues Algorithm
@@ -106,9 +106,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
-- Subscription-level `kms` pivot — encryption is topic-level, not subscription-level (`docs/related-resources.md` § Explicitly excluded).
-- Subscription-level `policy` pivot — subscription policies are attributes, not standalone policies (`docs/related-resources.md` § Explicitly excluded).
-- `ecs` pivot — SNS subscriptions don't target ECS clusters/services directly (`docs/related-resources.md` § Explicitly excluded).
+- Subscription-level `kms` pivot — `docs/related-resources.md` § Explicitly excluded.
+- Subscription-level `policy` pivot — `docs/related-resources.md` § Explicitly excluded.
+- `ecs` pivot — `docs/related-resources.md` § Explicitly excluded.
 - Any write operation. a9s is read-only by design (`docs/architecture.md` § "What is a9s?").
 
 ## 6. Citations

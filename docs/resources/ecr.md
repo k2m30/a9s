@@ -76,7 +76,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `ct-events`
 
 - **Why related**: CloudTrail audit trail for image push/pull, repository policy changes, and lifecycle-policy edits.
-- **How discovered**: Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- **How discovered**: Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm
@@ -161,7 +161,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (full per-finding detail, lifecycle policies).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
-- `ecs` as a related target — `ecr` → `ecs` (cluster) has no first-class AWS API linkage; use `ecr` → `ecs-task` for the deterministic image-to-workload pivot. See `docs/related-resources.md` § Explicitly excluded (`ecr → ecs`, `ecr → eks`).
+- `ecs` as a related target — `docs/related-resources.md` § Explicitly excluded.
 - `eks` as a related target — image resolution lives in Kubernetes, not the EKS API; `ecr` → `ecs-task` covers ECS workloads, and EKS image usage is Wave 3.
 - Any write operation. a9s is read-only by design (`docs/architecture.md` §"What is a9s?").
 

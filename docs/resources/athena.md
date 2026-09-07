@@ -54,7 +54,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 - **Why related**: Universal pivot — who created, updated, enabled, or disabled this workgroup; which principals ran queries or changed its configuration.
 - **How discovered**: pre-built CloudTrail query scoped to the workgroup name (Athena events reference workgroups by `Name`, not ARN, in CloudTrail event payloads).
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 
@@ -137,7 +137,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `KmsKey` on `EncryptionConfiguration` (populated when `EncryptionOption` is `SSE_KMS` or `CSE_KMS`) — `AWS SDK Go v2 — service/athena/types.EncryptionConfiguration § KmsKey`.
 - AWS Go SDK v2 — `CloudWatchLoggingConfiguration.LogGroup` — `AWS SDK Go v2 — service/athena/types.CloudWatchLoggingConfiguration § LogGroup`.
 - a9s-devops consultation — glue discovery via region-local Glue Jobs list (no per-workgroup field) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Athena↔Glue binding is namespace-level; Glue Data Catalog is account/region-scoped. Operator workflow: failed query → pivot to Glue Jobs that populate the referenced tables.`
-- a9s-devops consultation — role pivot is partial (Spark/IAM IC only) via `Configuration.ExecutionRole` — `a9s-devops (2026-04-20): possible=yes (partial), worth=yes. Spark workgroups have ExecutionRole; SQL-only workgroups fall back to ct-events for audit. Matches the 1/6-audit borderline note in related-resources.md § athena.`
+- a9s-devops consultation — role pivot is partial (Spark/IAM IC only) via `Configuration.ExecutionRole` — `a9s-devops (2026-04-20): possible=yes (partial), worth=yes. Spark workgroups have ExecutionRole; SQL-only workgroups fall back to ct-events for audit. Matches the 1/6-audit borderline note in docs/related-resources.md § athena.`
 - a9s-devops consultation — count shown = yes for kms/logs/role/s3 (singular fields when set); glue = yes (region count); ct-events = unknown (windowed CloudTrail queries) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Per-target singular or account-wide; consistent with acm/s3/ec2 specs in docs/resources/.`
 
 <!-- BEGIN GENERATED: header -->

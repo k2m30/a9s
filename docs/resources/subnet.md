@@ -93,7 +93,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `
 
 ### `ct-events`
 
-- **Why related**: Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: `LookupEvents(ResourceName=<SubnetId>)`.
 - **Count shown**: unknown (ct-events is event-stream, not count-oriented).
 

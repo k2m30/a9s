@@ -90,7 +90,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 - **Why related**: Universal pivot — who created, modified, tagged, or deleted this file system; who changed lifecycle / throughput mode.
 - **How discovered**: pre-built CloudTrail query scoped to `FileSystemId` as the resource identifier (EFS `elasticfilesystem.amazonaws.com` event source).
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 

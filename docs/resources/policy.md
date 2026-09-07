@@ -27,29 +27,29 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 
 ### `iam-group`
 
-- **Why related**: Groups with this policy attached. Daily blast-radius question — when a policy is suspicious or being retired, the operator needs the list of groups carrying it. (related-resources.md §`policy`: "Groups with this policy attached.")
+- **Why related**: Groups with this policy attached. Daily blast-radius question — when a policy is suspicious or being retired, the operator needs the list of groups carrying it. (docs/related-resources.md §`policy`: "Groups with this policy attached.")
 - **How discovered**: Call `ListEntitiesForPolicy(PolicyArn, EntityFilter=Group)` — AWS returns `PolicyGroups[].GroupName/GroupId` directly. — a9s-devops: the `Policy` shape on the list response has no attached-entity list (only `AttachmentCount`, a count, not a list), so either we call `ListEntitiesForPolicy` per policy detail-open (one call, bounded, clearly worth it for the blast-radius pivot) or we fan out through every group's `AttachedPolicies` from the other direction (N calls across the group list). `ListEntitiesForPolicy` is the canonical answer.
 - **Count shown**: yes.
 
 ### `iam-user`
 
-- **Why related**: Users with this policy attached directly (not via group). Direct user-attachments are a common cleanup target during least-privilege reviews. (related-resources.md §`policy`: "Users with this policy attached.")
+- **Why related**: Users with this policy attached directly (not via group). Direct user-attachments are a common cleanup target during least-privilege reviews. (docs/related-resources.md §`policy`: "Users with this policy attached.")
 - **How discovered**: Call `ListEntitiesForPolicy(PolicyArn, EntityFilter=User)` — AWS returns `PolicyUsers[].UserName/UserId`. Shares a single `ListEntitiesForPolicy` call with `iam-group` and `role` when `EntityFilter` is omitted (all three entity types returned together). — a9s-devops: one API call answers all three pivots at once; call shape is account-wide per-policy, not N+1 across entities.
 - **Count shown**: yes.
 
 ### `role`
 
-- **Why related**: Roles with this policy attached. For an incident where a policy grants too much, the operator needs every role trusting it. (related-resources.md §`policy`: "Roles with this policy attached.")
+- **Why related**: Roles with this policy attached. For an incident where a policy grants too much, the operator needs every role trusting it. (docs/related-resources.md §`policy`: "Roles with this policy attached.")
 - **How discovered**: Call `ListEntitiesForPolicy(PolicyArn, EntityFilter=Role)` — AWS returns `PolicyRoles[].RoleName/RoleId`. Shares the single `ListEntitiesForPolicy` call noted above.
 - **Count shown**: yes.
 
 ### `ct-events`
 
-- **Why related**: Audit trail for policy version / attach events — `CreatePolicyVersion`, `SetDefaultPolicyVersion`, `AttachUserPolicy`, `AttachRolePolicy`, `AttachGroupPolicy`, `DeletePolicy`. Universal audit pivot, especially sharp on IAM where every change is a security event. (related-resources.md §`policy`: "Audit trail for policy version / attach events.")
+- **Why related**: Audit trail for policy version / attach events — `CreatePolicyVersion`, `SetDefaultPolicyVersion`, `AttachUserPolicy`, `AttachRolePolicy`, `AttachGroupPolicy`, `DeletePolicy`. Universal audit pivot, especially sharp on IAM where every change is a security event. (docs/related-resources.md §`policy`: "Audit trail for policy version / attach events.")
 - **How discovered**: CloudTrail `LookupEvents` filtered by `ResourceName == <policy ARN>` or `ResourceType == AWS::IAM::Policy`. Same pattern as every other type — universal pivot.
 - **Count shown**: unknown — universal pivot; count semantics vary by time window, not surfaced here.
 
-> `ct-events` is the **universal pivot — applies to every registered type**; see related-resources.md §Policy.
+> `ct-events` is the **universal pivot — applies to every registered type**; see docs/related-resources.md §Policy.
 
 ## 3. Attention / Issues Algorithm
 

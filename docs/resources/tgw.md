@@ -27,31 +27,31 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 
 ### `vpc`
 
-- **Why related**: VPCs attached to this TGW — the primary operator question when tracing connectivity: "which VPCs can talk through this gateway?" (`related-resources.md` § `tgw`).
+- **Why related**: VPCs attached to this TGW — the primary operator question when tracing connectivity: "which VPCs can talk through this gateway?" (`docs/related-resources.md` § `tgw`).
 - **How discovered**: call `DescribeTransitGatewayVpcAttachments` filtered by `transit-gateway-id`, then read `TransitGatewayVpcAttachment.VpcId` for each attachment — a9s-devops: the VPC-attachment API returns `VpcId` directly, no further hop needed.
 - **Count shown**: yes.
 
 ### `subnet`
 
-- **Why related**: The specific subnets carrying the TGW ENI per AZ; when cross-AZ traffic misbehaves, the operator needs to see which AZs the TGW is actually anchored in (`related-resources.md` § `tgw`).
+- **Why related**: The specific subnets carrying the TGW ENI per AZ; when cross-AZ traffic misbehaves, the operator needs to see which AZs the TGW is actually anchored in (`docs/related-resources.md` § `tgw`).
 - **How discovered**: same `DescribeTransitGatewayVpcAttachments` response — read `TransitGatewayVpcAttachment.SubnetIds[]` across attachments (`AWS SDK Go v2 — ec2/types.TransitGatewayVpcAttachment § SubnetIds`).
 - **Count shown**: yes.
 
 ### `rtb`
 
-- **Why related**: VPC route tables that direct traffic into this TGW — answers "which subnets actually send traffic through here?" (`related-resources.md` § `tgw`).
+- **Why related**: VPC route tables that direct traffic into this TGW — answers "which subnets actually send traffic through here?" (`docs/related-resources.md` § `tgw`).
 - **How discovered**: cross-reference the already-loaded `rtb` list client-side; match `Routes[].TransitGatewayId == this.TransitGatewayId`. Zero extra AWS calls — a9s-devops: this is the standard same-sweep sibling-list pivot used elsewhere (e.g. `subnet` ↔ `rtb`), and rtb's list response does include `Routes[]` with the target-ID fields populated.
 - **Count shown**: yes.
 
 ### `role`
 
-- **Why related**: Cross-account RAM-share IAM roles associated with this TGW in multi-account network hubs (`related-resources.md` § `tgw`).
+- **Why related**: Cross-account RAM-share IAM roles associated with this TGW in multi-account network hubs (`docs/related-resources.md` § `tgw`).
 - **How discovered**: TBD — a9s-devops: not available cleanly on the AWS surface. The `TransitGateway` response carries no `Role` ARN. RAM resource shares are reachable via `GetResourceShares` / `ListResources`, but those reference managed policies, not IAM roles. Discovering "the role used to accept a cross-account attachment" requires correlating CloudTrail `AcceptTransitGatewayVpcAttachment` events with principal ARNs — Wave 3 territory.
 - **Count shown**: unknown.
 
 ### `ct-events`
 
-- **Why related**: Audit trail for TGW attachment changes, RAM shares, and route-table edits — universal pivot applies to every registered type; see related-resources.md §Policy.
+- **Why related**: Audit trail for TGW attachment changes, RAM shares, and route-table edits — universal pivot applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: universal pivot — `LookupEvents` filtered by TGW ID.
 - **Count shown**: yes.
 

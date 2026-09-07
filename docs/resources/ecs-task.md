@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for task start/stop events — `RunTask`, `StartTask`, `StopTask`, and the `ecs.amazonaws.com` service principal actions that terminated or rescheduled the task.
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: unknown.
 
 ### `ec2`
@@ -263,7 +263,7 @@ One bullet per claim in §§2–4.1.
 - a9s golden doc — the `ecs-task` signals — `docs/attention-signals.md § Signals § COMPUTE` row `ecs-task`; the deferred cross-cluster outlier detection — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — related-panel contract for `ecs-task` (`alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet`) — `docs/related-resources.md` § Per-type contract and § `ecs-task`.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` § Policy item 4.
-- a9s golden doc — `ecs-task → kms` is explicitly out of the contract (no direct KMS reference on a task) — `docs/related-resources.md` § Explicitly excluded.
+- a9s golden doc — `ecs-task → kms` is out of the contract — `docs/related-resources.md` § Explicitly excluded.
 - a9s golden doc — read-only invariant cited in §5 — `docs/architecture.md` § "What is a9s?".
 - a9s golden doc — `list-attention-coverage.md` grades `ecs-task` "A-" and recommends adding `Stop Code` / `Health Status` information to the list, satisfied here via S4 — `docs/historical/analysis/list-attention-coverage.md` § `ecs-task` row.
 - a9s-devops persona (2026-04-20) — `alarm` pivot discovery via `ClusterName`/`ServiceName` alarm dimensions: possible=yes, worth=yes. Rationale: on-call uses CloudWatch alarm dimensions to scope cluster/service-level saturation alerts; the reverse join is zero-cost against the already-loaded alarm list. (Falling back to persona: agent dispatch unavailable in this session.)

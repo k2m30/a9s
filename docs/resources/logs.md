@@ -27,49 +27,49 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `alarm`
 
-- **Why related**: Metric-filter-driven alarms fire off patterns in this log group — when the operator is diagnosing a noisy log group, the very next question is which alarms are watching it. Cited in `related-resources.md` §`logs` → "Metric-filter-driven alarms."
+- **Why related**: Metric-filter-driven alarms fire off patterns in this log group — when the operator is diagnosing a noisy log group, the very next question is which alarms are watching it. Cited in `docs/related-resources.md` §`logs` → "Metric-filter-driven alarms."
 - **How discovered**: Call `DescribeMetricFilters(logGroupName=…)` to list the filters attached to this log group, read each filter's `metricTransformations[].metricName` + `metricNamespace`, then reverse-scan the already-loaded `alarm` list matching on `MetricName` + `Namespace`. — a9s-devops: the log group ↔ alarm linkage is indirect (log group → metric filter → CloudWatch metric → alarm); no direct field bridges them. possible=yes (DescribeMetricFilters is read-only, per-group), worth=yes (this is the canonical "what alerts if this log group goes bad?" workflow).
 - **Count shown**: yes.
 
 ### `apigw`
 
-- **Why related**: API Gateway writes execution and access logs to CloudWatch Logs — the operator reading a request failure wants to hop from the log group to the API definition. Cited in `related-resources.md` §`logs` → "APIGW access logs."
+- **Why related**: API Gateway writes execution and access logs to CloudWatch Logs — the operator reading a request failure wants to hop from the log group to the API definition. Cited in `docs/related-resources.md` §`logs` → "APIGW access logs."
 - **How discovered**: Match the log group `logGroupName` against the API Gateway naming conventions — `API-Gateway-Execution-Logs_<apiId>/<stage>` (REST v1), `/aws/apigateway/welcome`, `/aws/http-api/<apiId>` (HTTP v2), or a user-chosen access-log destination — and cross-reference the already-loaded `apigw` list by `apiId`. — a9s-devops: naming convention is the only stable link for execution logs; user-chosen access-log groups need tag/stage-config walk that is Wave 2+ and out of scope here. possible=yes (naming convention + reverse-scan), worth=yes (apigw troubleshooting starts in logs).
 - **Count shown**: yes.
 
 ### `ecs-task`
 
-- **Why related**: ECS tasks using the `awslogs` driver write stdout/stderr into this log group — the operator reading an error line wants the task that produced it. Cited in `related-resources.md` §`logs` → "awslogs driver log groups."
+- **Why related**: ECS tasks using the `awslogs` driver write stdout/stderr into this log group — the operator reading an error line wants the task that produced it. Cited in `docs/related-resources.md` §`logs` → "awslogs driver log groups."
 - **How discovered**: Reverse-scan the already-loaded `ecs-task` list — each task's `containers[]` carries a reference to its task definition's `containerDefinitions[].logConfiguration.logDriver=awslogs` and `options.awslogs-group` value; match that value against this log group's `logGroupName`. Requires the task-definition body to be available in the loaded task record; if not, pivot is best-effort. — a9s-devops: `awslogs-group` on the task-definition container is the authoritative field, but it's not on the `ListTasks` shape; enrichment may be needed. possible=yes (via loaded task-def), worth=yes (log → owning task is the core incident pivot).
 - **Count shown**: yes.
 
 ### `kinesis`
 
-- **Why related**: Subscription filters fan log events out to Kinesis Data Streams or Firehose — understanding where a log group's data is being consumed downstream matters for pipeline debugging. Cited in `related-resources.md` §`logs` → "Subscription filter → Kinesis/Firehose."
+- **Why related**: Subscription filters fan log events out to Kinesis Data Streams or Firehose — understanding where a log group's data is being consumed downstream matters for pipeline debugging. Cited in `docs/related-resources.md` §`logs` → "Subscription filter → Kinesis/Firehose."
 - **How discovered**: Call `DescribeSubscriptionFilters(logGroupName=…)` per log group, read each filter's `destinationArn`; when the ARN is `arn:aws:kinesis:…:stream/<name>`, match against the already-loaded `kinesis` list by stream name. Firehose destinations are a different service and surface in a dedicated pivot if registered. — a9s-devops: subscription filters are the canonical fan-out mechanism and the only read path from log group to stream. possible=yes, worth=yes (required for "where does this log data end up?").
 - **Count shown**: yes.
 
 ### `kms`
 
-- **Why related**: When the log group is encrypted with a customer-managed KMS key, any KMS key disable / pending-deletion will silently block log ingestion — the operator reading "no new events" needs the key one key press away. Cited in `related-resources.md` §`logs` → "LogGroup.KmsKeyId."
+- **Why related**: When the log group is encrypted with a customer-managed KMS key, any KMS key disable / pending-deletion will silently block log ingestion — the operator reading "no new events" needs the key one key press away. Cited in `docs/related-resources.md` §`logs` → "LogGroup.KmsKeyId."
 - **How discovered**: Read `LogGroup.kmsKeyId` directly from the list response (`AWS SDK Go v2 — cloudwatchlogs/types.LogGroup § KmsKeyId`); if non-empty, cross-reference the already-loaded `kms` list by key ARN.
 - **Count shown**: yes.
 
 ### `lambda`
 
-- **Why related**: Lambda functions write to log groups named `/aws/lambda/<function-name>` — the single most common operator pivot is "whose function logs am I looking at?" Subscription-filter consumers (Lambda target of a filter) are a second, rarer case. Cited in `related-resources.md` §`logs` → "Lambdas whose logs land here OR subscription-filter consumers."
+- **Why related**: Lambda functions write to log groups named `/aws/lambda/<function-name>` — the single most common operator pivot is "whose function logs am I looking at?" Subscription-filter consumers (Lambda target of a filter) are a second, rarer case. Cited in `docs/related-resources.md` §`logs` → "Lambdas whose logs land here OR subscription-filter consumers."
 - **How discovered**: (a) Match `logGroupName` against the `/aws/lambda/<name>` convention and cross-reference the already-loaded `lambda` list by function name; (b) call `DescribeSubscriptionFilters(logGroupName=…)` and cross-reference filters whose `destinationArn` is `arn:aws:lambda:…:function:<name>`. — a9s-devops: the naming convention is stable and unambiguous for function-owned log groups; the subscription-filter case is additive. possible=yes, worth=yes (this is the #1 Lambda debugging pivot).
 - **Count shown**: yes.
 
 ### `s3`
 
-- **Why related**: Export tasks archive a log group's events into an S3 bucket for long-term retention or downstream analytics — operator auditing archival posture or investigating export failures pivots here. Cited in `related-resources.md` §`logs` → "Export tasks to S3."
+- **Why related**: Export tasks archive a log group's events into an S3 bucket for long-term retention or downstream analytics — operator auditing archival posture or investigating export failures pivots here. Cited in `docs/related-resources.md` §`logs` → "Export tasks to S3."
 - **How discovered**: Call `DescribeExportTasks` and filter by `logGroupName`, then cross-reference each task's `destination` bucket name against the already-loaded `s3` list. — a9s-devops: DescribeExportTasks is the only read-only surface that links a log group to an S3 archive target; there is no reverse field on the bucket. possible=yes (per-group call, bounded), worth=yes (archive posture is a compliance/cost workflow).
 - **Count shown**: yes.
 
 ### `ct-events`
 
-- **Why related**: Universal pivot — applies to every registered type; see related-resources.md §Policy. Audit trail for log group configuration changes (create, delete, put-retention-policy, associate-kms-key, put-subscription-filter).
+- **Why related**: Universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Audit trail for log group configuration changes (create, delete, put-retention-policy, associate-kms-key, put-subscription-filter).
 - **How discovered**: `LookupEvents` with `LookupAttributes=[{AttributeKey:ResourceName, AttributeValue:<logGroupName>}]` in the current region.
 - **Count shown**: yes.
 

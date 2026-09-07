@@ -160,7 +160,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops persona — `asg` via two-hop `ec2` lookup (`Address.InstanceId` → `Instance.Tags[aws:autoscaling:groupName]`) — persona (2026-04-20): possible=yes, worth=yes. Operator needs to know whether the underlying instance is replaceable by an ASG.
 - a9s-devops persona — `cfn` via `Address.Tags[aws:cloudformation:stack-name]` — persona (2026-04-20): possible=yes, worth=yes. CFN writes reserved tags on stack-managed resources; cheap cache pivot.
 - a9s-devops persona — `ecs` / `ecs-svc` / `ecs-task` via `NetworkInterfaceId` match on `attachments[].details[]` — persona (2026-04-20): possible=yes, worth=yes-narrow. Pattern is rare (ALB/Fargate auto-IP is more common) but valid for legacy task-per-EIP setups; skip when no ENI association.
-- `logs` budget exclusion — EIPs emit no logs; flow-log group names are operator-defined and tying the address's traffic to a log group needs `DescribeFlowLogs` per associated ENI/subnet/VPC — `docs/related-resources.md` § Policy rule 7.
+- `logs` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - a9s-devops persona — `alarm` non-ENI/NAT dimensions, `logs` beyond best-effort, ECS without ENI recorded in §5 — persona (2026-04-20): possible=no / partial, worth=no. AWS surface does not expose a direct cross-reference and the operator benefit is below the Wave 1 cost budget.
 
 <!-- BEGIN GENERATED: header -->

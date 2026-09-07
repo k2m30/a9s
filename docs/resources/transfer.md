@@ -75,11 +75,11 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 
 ### `ct-events`
 
-- **Why related**: audit trail ("who stopped this server"). Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: audit trail ("who stopped this server"). Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: CloudTrail LookupEvents by ServerId.
 - **Count shown**: yes.
 
-Explicitly excluded (per `docs/related-resources.md` §`transfer`): `sg` (`EndpointDetails.SecurityGroupIds` documented-but-never-populated — reach via `vpce`), `apigw` (free-form IdP URL — copyable detail fact), `s3`/`efs` (`Domain` is an enum; the landing bucket lives in agreement `BaseDirectory`).
+Explicitly excluded: `sg`, `apigw`, `s3` and `efs` — `docs/related-resources.md` § `transfer`.
 
 ## 2.1 Child views
 

@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `backup`
 
 - **Why related**: Snapshots covered by AWS Backup. The operator wants to see whether retention and lifecycle for this snapshot are governed by a Backup plan (so "delete this orphan snapshot to save cost" is not safe when Backup still owns it).
-- **How discovered**: no direct field on `Snapshot` points at a Backup plan. AWS Backup-created snapshots typically carry a `Description` beginning `"Created by AWS Backup ..."` and an auto-tag `aws:backup:source-resource`; authoritative resolution is `backup:ListRecoveryPointsByResource(ResourceArn=<snapshot-arn>)`. Golden doc is silent on which route a9s uses — `a9s-devops: not specified in related-resources.md § ebs-snap; tag-scan on the already-loaded snapshot is preferred (zero extra calls), fall back to the Backup API when tags are absent`.
+- **How discovered**: no direct field on `Snapshot` points at a Backup plan. AWS Backup-created snapshots typically carry a `Description` beginning `"Created by AWS Backup ..."` and an auto-tag `aws:backup:source-resource`; authoritative resolution is `backup:ListRecoveryPointsByResource(ResourceArn=<snapshot-arn>)`. Golden doc is silent on which route a9s uses — `a9s-devops: not specified in docs/related-resources.md § ebs-snap; tag-scan on the already-loaded snapshot is preferred (zero extra calls), fall back to the Backup API when tags are absent`.
 - **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `ebs`
@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `ec2`
 
 - **Why related**: instances that could be restored from this snapshot. Rollback / forensic workflow — "which running instance did this snapshot belong to, and could I restore it?"
-- **How discovered**: indirect; `Snapshot` has no direct EC2 field. Two reverse-lookup paths, both against already-loaded lists: (a) find the `ebs` volume where `Volume.SnapshotId == Snapshot.SnapshotId` and then that volume's `Attachments[].InstanceId`; (b) find AMIs derived from the snapshot (see `ami` above), then instances with those AMI IDs. Golden doc is silent on which a9s uses — `a9s-devops: not specified in related-resources.md § ebs-snap; path (a) is cheaper and more accurate for the restore workflow`.
+- **How discovered**: indirect; `Snapshot` has no direct EC2 field. Two reverse-lookup paths, both against already-loaded lists: (a) find the `ebs` volume where `Volume.SnapshotId == Snapshot.SnapshotId` and then that volume's `Attachments[].InstanceId`; (b) find AMIs derived from the snapshot (see `ami` above), then instances with those AMI IDs. Golden doc is silent on which a9s uses — `a9s-devops: not specified in docs/related-resources.md § ebs-snap; path (a) is cheaper and more accurate for the restore workflow`.
 - **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `kms`

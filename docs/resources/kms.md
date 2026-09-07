@@ -54,7 +54,7 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 ### `ct-events`
 
 - **Why related**: audit trail for key usage — Encrypt / Decrypt / GenerateDataKey / ScheduleKeyDeletion calls against this key show who touched it and when.
-- **How discovered**: universal pivot — applies to every registered type; see `related-resources.md` §Policy. Filtered by `resources[].ARN` matching this key's `Arn`.
+- **How discovered**: universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy. Filtered by `resources[].ARN` matching this key's `Arn`.
 - **Count shown**: unknown (event stream, not a bounded collection).
 
 ## 3. Attention / Issues Algorithm
@@ -170,7 +170,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 2 `GetKeyRotationStatus` per key, `KeyRotationEnabled==false` on CMK → Warning — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms.GetKeyRotationStatusOutput § KeyRotationEnabled`.
 - CMK = customer-managed key (`KeyManager==CUSTOMER`); AWS-managed keys excluded from rotation check because AWS rotates them automatically — `AWS SDK Go v2 — service/kms/types.KeyManagerType § KeyManagerTypeAws, KeyManagerTypeCustomer` (enum values AWS and CUSTOMER). a9s-devops persona (2026-04-20, persona fallback per skill §"Handling gaps"): possible=yes, worth=yes. Rationale: surfacing rotation-off on AWS-managed keys would be noise because the operator cannot change it and AWS has already taken responsibility; the signal is actionable only for keys the account owns.
 - Related target discovery is reverse-index (sibling-list cross-reference on `KmsKeyId`/`KmsKeyArn`) for `dbi`, `ebs`, `secrets` — `docs/related-resources.md` § `kms` reasoning bullets (`StreamDescription.KeyId`, `Volume.KmsKeyId`, `SecretListEntry.KmsKeyId — UUID suffix matched against KMS key cache`). a9s-devops persona (2026-04-20, persona fallback): possible=yes, worth=yes. Rationale: `KeyMetadata` holds no consumer refs, so the pivot must traverse the other direction; these consumer types list their KMS key on the list-response shape, so no extra API call is needed when the sibling list is already loaded.
-- `s3` budget exclusion — bucket encryption config is not on `ListBuckets` and not cached; per-bucket `GetBucketEncryption` fan-out exceeds the checker budget — `docs/related-resources.md` § Policy rule 7.
+- `s3` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - `role` target count is unknown pending key-policy enrichment — `docs/attention-signals.md § Not yet implemented`. a9s-devops persona (2026-04-20, persona fallback): possible=yes (via `GetKeyPolicy`), worth=deferred. Rationale: the key-policy JSON parse is the same work the deferred grant-level analysis scopes; surfacing the role list requires that enrichment to land first, so the panel shows the target with no count rather than hiding it.
 - `ct-events` is the universal pivot — `docs/related-resources.md` § Policy (universal cross-reference via `resources[].ARN`).
 - Read-only invariant — `docs/architecture.md` § opening paragraph ("a9s is a read-only terminal UI for AWS").

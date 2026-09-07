@@ -93,7 +93,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 
 ### `ct-events`
 
-- **Why related**: Audit trail for secret rotation events, `GetSecretValue` access, policy changes. Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- **Why related**: Audit trail for secret rotation events, `GetSecretValue` access, policy changes. Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 - **How discovered**: CloudTrail `LookupEvents` filtered on `resources[].ARN` matching the secret ARN.
 - **Count shown**: yes.
 

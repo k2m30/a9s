@@ -78,7 +78,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 - **Why related**: Universal pivot — who created, updated, started, or deleted this job; who invoked `StartJobRun`; who modified its IAM role.
 - **How discovered**: pre-built CloudTrail query scoped to the Glue job's `Name` (and to `StartJobRun`/`UpdateJob`/`DeleteJob` event names when the operator wants to narrow).
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 
@@ -178,14 +178,14 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — S3 script/temp paths — `AWS SDK Go v2 — glue/types.JobCommand § ScriptLocation` and `glue/types.Job § DefaultArguments`.
 - AWS Go SDK v2 — KMS chain via SecurityConfiguration — `AWS SDK Go v2 — glue/types.Job § SecurityConfiguration` and `glue/types.SecurityConfiguration § EncryptionConfiguration`.
 - a9s-devops consultation — `alarm` pivot uses `AlarmActions`/`Dimensions` filter on loaded alarms — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudWatch alarms for Glue use JobName as the standard dimension; no inverse-index API, so filtering the already-loaded alarm list is the correct pivot.`
-- a9s-devops consultation — `athena` pivot is account-wide (not per-job filterable) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Catalog is shared-namespace; Athena→Glue linkage is one-way only, matching the Athena-queries-Glue-Catalog rationale in related-resources.md § glue.`
+- a9s-devops consultation — `athena` pivot is account-wide (not per-job filterable) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Catalog is shared-namespace; Athena→Glue linkage is one-way only, matching the Athena-queries-Glue-Catalog rationale in docs/related-resources.md § glue.`
 - a9s-devops consultation — `cfn` pivot via `aws:cloudformation:stack-name` tag — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every created resource; reachable via Glue GetTags.`
 - a9s-devops consultation — `kms` pivot walks SecurityConfiguration encryption sub-fields — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. KMS references on Glue jobs live only through the named SecurityConfiguration.`
 - a9s-devops consultation — `logs` pivot combines Glue convention groups + `--continuous-log-logGroup` arg — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Default groups and the continuous-logging argument are the documented log destinations; Job.LogUri is the deprecated S3 path.`
 - a9s-devops consultation — `s3` pivot parses ScriptLocation and Glue Special Parameters (`--TempDir`, `--spark-event-logs-path`, etc.) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. No first-class "buckets this job uses" API; argument parsing is the idiomatic path.`
 - a9s-devops consultation — `secrets` pivot via Connection `SECRET_ID` property — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Connections that wrap Secrets Manager expose the secret ID under this property; this is the only on-resource path.`
 - a9s-devops consultation — inner-script data paths are not discoverable — `a9s-devops persona (2026-04-20): possible=no, not available in AWS surface. Glue exposes no "datasets this script reads" API; static code analysis is out of scope.`
-- a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per related-resources.md § glue.`
+- a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per docs/related-resources.md § glue.`
 
 <!-- BEGIN GENERATED: header -->
 glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycle field).

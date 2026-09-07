@@ -42,7 +42,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 - **Why related**: Universal pivot — who created, updated shard count, changed retention, enabled encryption, or deleted this stream.
 - **How discovered**: pre-built CloudTrail query scoped to the stream name / ARN as the resource identifier.
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ### `ddb`
 

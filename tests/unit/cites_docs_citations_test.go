@@ -1173,8 +1173,13 @@ func TestCitesNotYetImplementedCitationsResolveToALine(t *testing.T) {
 // pointer that rots on the next edit. Headings do not: every per-type block is
 // a `### ` heading named for the type, and the three policy sections are `## `
 // headings. One shape, resolved against the page.
+// A citation names the page by the path a reader can open from the repository
+// root. `related-resources.md` alone is a sibling of the doc that carries it,
+// and no such file exists under docs/resources/.
+const relatedPagePrefix = "docs/"
+
 var (
-	reRelatedMention    = regexp.MustCompile(`related-resources\.md`)
+	reRelatedMention    = regexp.MustCompile(`related-resources(\.md)?`)
 	reRelatedLineNumber = regexp.MustCompile(`\blines?\s+[0-9]`)
 	reRelatedFrontEntry = regexp.MustCompile(`^\s*-\s+docs/related-resources\.md\s*$`)
 )
@@ -1238,7 +1243,7 @@ func TestCitesRelatedContractCitedByHeading(t *testing.T) {
 	}
 	sort.Strings(paths)
 
-	var byLine, byNothing, byUnknown []string
+	var byBare, byLine, byNothing, byUnknown []string
 	for _, path := range paths {
 		rel := relToRoot(t, path)
 		for i, line := range readLines(t, path) {
@@ -1251,6 +1256,10 @@ func TestCitesRelatedContractCitedByHeading(t *testing.T) {
 				continue
 			}
 			for _, loc := range locs {
+				if !strings.HasSuffix(line[:loc[0]], relatedPagePrefix) {
+					byBare = append(byBare, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
+					continue
+				}
 				after := strings.TrimLeft(line[loc[1]:], "` ")
 				if !strings.HasPrefix(after, "§") {
 					byNothing = append(byNothing, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
@@ -1263,6 +1272,11 @@ func TestCitesRelatedContractCitedByHeading(t *testing.T) {
 		}
 	}
 
+	if len(byBare) > 0 {
+		t.Errorf("%d mention(s) name the page without its `docs/` prefix. Read from docs/resources/, "+
+			"`related-resources.md` is a sibling file that does not exist; the page is `docs/related-resources.md`:\n%s",
+			len(byBare), strings.Join(byBare, "\n"))
+	}
 	if len(byLine) > 0 {
 		t.Errorf("%d citation(s) of docs/related-resources.md name a line number. The page is renumbered whenever a "+
 			"pivot is added, so the number points at whatever moved into that line; cite the heading:\n%s",

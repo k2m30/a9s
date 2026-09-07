@@ -49,31 +49,31 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `backup`
 
 ### `dbc`
 
-- **Why related**: the source cluster this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent cluster. Citation: `related-resources.md § dbc-snap` ("Source cluster").
+- **Why related**: the source cluster this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent cluster. Citation: `docs/related-resources.md § dbc-snap` ("Source cluster").
 - **How discovered**: read `DBClusterSnapshot.DBClusterIdentifier` from the list response, then cross-reference the already-loaded `dbc` list by that identifier. No extra API call. Citation: `AWS SDK Go v2 — docdb/types.DBClusterSnapshot § DBClusterIdentifier`.
 - **Count shown**: yes (0 or 1 — a snapshot has exactly one source cluster; 0 when the parent has been deleted, which is itself the orphan signal in §3.1).
 
 ### `kms`
 
-- **Why related**: the encryption key protecting the snapshot. If the key is disabled or pending deletion, the snapshot cannot be restored — a silent restore-blocker the operator needs to catch early. Citation: `related-resources.md § dbc-snap` ("Encryption key").
+- **Why related**: the encryption key protecting the snapshot. If the key is disabled or pending deletion, the snapshot cannot be restored — a silent restore-blocker the operator needs to catch early. Citation: `docs/related-resources.md § dbc-snap` ("Encryption key").
 - **How discovered**: read `DBClusterSnapshot.KmsKeyId` from the list response, then cross-reference the already-loaded `kms` list by KeyId/KeyArn. No extra API call. Citation: `AWS SDK Go v2 — docdb/types.DBClusterSnapshot § KmsKeyId`.
 - **Count shown**: yes (0 or 1 — one key per encrypted snapshot; 0 when `StorageEncrypted==false`).
 
 ### `vpc`
 
-- **Why related**: the VPC the source cluster lived in when the snapshot was taken — orients the operator when planning a restore into the same or a sibling network. Citation: `related-resources.md § dbc-snap` ("Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot").
+- **Why related**: the VPC the source cluster lived in when the snapshot was taken — orients the operator when planning a restore into the same or a sibling network. Citation: `docs/related-resources.md § dbc-snap` ("Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot").
 - **How discovered**: read `DBClusterSnapshot.VpcId` from the list response, then cross-reference the already-loaded `vpc` list by VPC ID. No extra API call. Citation: `AWS SDK Go v2 — docdb/types.DBClusterSnapshot § VpcId`.
 - **Count shown**: yes (0 or 1) — a9s-devops persona: the snapshot records the VPC of the source cluster at snapshot time; on restore, operator can choose a different VPC, so this is orienting context rather than a hard binding. possible=yes, worth=yes (weak). Marginal pivot but the field is free on the list response.
 
 ### `backup`
 
-- **Why related**: AWS Backup can produce DocDB cluster snapshots on behalf of a backup plan; knowing whether a snapshot was created by Backup (vs manual/automated by the cluster) tells the operator which retention policy governs its lifecycle. Citation: `related-resources.md § dbc-snap` ("Snapshots covered by Backup vaults").
+- **Why related**: AWS Backup can produce DocDB cluster snapshots on behalf of a backup plan; knowing whether a snapshot was created by Backup (vs manual/automated by the cluster) tells the operator which retention policy governs its lifecycle. Citation: `docs/related-resources.md § dbc-snap` ("Snapshots covered by Backup vaults").
 - **How discovered**: a9s-devops persona (2026-04-20): possible=yes, worth=yes (narrow). AWS Backup-created snapshots carry the identifier prefix `awsbackup:job-<uuid>` on `DBClusterSnapshotIdentifier`, and AWS Backup records the snapshot ARN on its recovery-point list (`ListRecoveryPointsByResource` with the cluster ARN). The cheap Wave-1-safe path is a string match on the snapshot identifier prefix — no extra API call required. Rationale: most DocDB operators split "restore from a DocDB-native snapshot" vs "restore from an AWS Backup recovery point" as different workflows with different audit trails; surfacing the pivot without a per-row API call is the right cost shape.
 - **Count shown**: yes (0 or 1 — a snapshot is either a Backup-created recovery point or it is not).
 
 ### `ct-events`
 
-- **Why related**: universal pivot — every registered type carries a CloudTrail pivot for audit ("who deleted this snapshot", "why was it created"). See `related-resources.md §Policy`.
+- **Why related**: universal pivot — every registered type carries a CloudTrail pivot for audit ("who deleted this snapshot", "why was it created"). See `docs/related-resources.md §Policy`.
 - **How discovered**: `LookupEvents` with `ResourceName = DBClusterSnapshotIdentifier` and `ResourceType = AWS::RDS::DBClusterSnapshot` (DocDB shares the RDS CloudTrail resource type). Called on demand when the operator opens the pivot, not on list load.
 - **Count shown**: unknown (lazy — the pivot is opened, not counted pre-emptively).
 

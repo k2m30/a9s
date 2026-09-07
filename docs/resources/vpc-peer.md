@@ -39,11 +39,11 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `rtb`, `
 
 ### `ct-events`
 
-- **Why related**: audit trail — Create/Accept/Reject/Delete/ModifyVpcPeeringConnection*; "who accepted this" is the first cross-account incident question. Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: audit trail — Create/Accept/Reject/Delete/ModifyVpcPeeringConnection*; "who accepted this" is the first cross-account incident question. Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: CloudTrail LookupEvents by VpcPeeringConnectionId.
 - **Count shown**: yes.
 
-Explicitly excluded (per `docs/related-resources.md` §`vpc-peer`): `sg` (no declared link; fuzzy CIDR/referenced-SG scans are noise; cross-region peers cannot reference SGs at all — Wave 3).
+Explicitly excluded: `sg` — `docs/related-resources.md` § `vpc-peer`.
 
 ## 3. Attention / Issues Algorithm
 

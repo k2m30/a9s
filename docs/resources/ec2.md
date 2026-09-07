@@ -138,7 +138,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 - **Why related**: Audit trail for all API calls touching this instance.
 - **How discovered**: call `cloudtrail:LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName, AttributeValue=<instance-id>}]`.
 - **Count shown**: yes.
-- **Note**: universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- **Note**: universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 

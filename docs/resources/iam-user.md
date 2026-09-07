@@ -42,7 +42,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `iam-gro
 - **Why related**: Universal pivot — "Audit trail for user actions and credential changes." Answers "what has this user been doing?" — the single most common question when a user looks dormant, has an old key, or is suspected of credential compromise.
 - **How discovered**: `LookupEvents` with attribute `Username == <user.UserName>` (the iam-user short-name is the bare user name, not the ARN — see `docs/testing-detail-view-coverage.md` §35 and `docs/design/resource-to-cloudtrail.md` §98).
 - **Count shown**: yes.
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 
@@ -128,8 +128,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (credential report polling flow).
-- `iam-user` → `kms` related panel — no direct key-user attribute on a user. Cited at `docs/related-resources.md` § Explicitly excluded.
-- `iam-user` → `role` related panel — indirect via trust policies across all roles; would require a reverse scan. Cited at `docs/related-resources.md` § Explicitly excluded.
+- `iam-user` → `kms` related panel — `docs/related-resources.md` § Explicitly excluded.
+- `iam-user` → `role` related panel — `docs/related-resources.md` § Explicitly excluded.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 

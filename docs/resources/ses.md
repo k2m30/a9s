@@ -57,7 +57,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 
 ### `ct-events`
 
-- **Why related**: universal pivot — applies to every registered type; see related-resources.md §Policy. Lets the operator audit "who changed this identity and when" during an incident.
+- **Why related**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Lets the operator audit "who changed this identity and when" during an incident.
 - **How discovered**: `cloudtrail:LookupEvents` filtered by the identity's resource ARN / name.
 - **Count shown**: yes.
 
@@ -148,7 +148,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (per-identity DKIM drift; reputation dashboard via CloudWatch).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- Related targets **deliberately not registered** for `ses` (from `docs/related-resources.md` § Explicitly excluded): `acm` (SES uses DKIM, not ACM, for domain identities); `alarm` (general reverse-scan of CloudWatch alarms); `cfn` (tag-heuristic only); `kms` (configuration set / identity encryption is AWS-managed by default); `logs` (event destinations go to Firehose/SNS/EventBridge, not CW Logs directly); `role` (role usage is embedded in receipt-rule actions / Firehose destinations); `trail` (CloudTrail data-events link is indirect).
+- Related targets **deliberately not registered** for `ses` (`acm`, `alarm`, `cfn`, `kms`, `logs`, `role`, `trail`) — `docs/related-resources.md` § Explicitly excluded.
 - `kinesis`: SES event destinations use Kinesis Firehose, which is not currently modeled as an a9s resource type. Follow-up: tracked separately.
 
 ## 6. Citations

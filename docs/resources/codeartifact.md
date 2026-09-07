@@ -37,7 +37,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 - **How discovered**: Universal — CloudTrail `LookupEvents` filtered by the repo's ARN (`RepositorySummary.Arn`). No per-type discovery rule needed; the ct-events pivot is applied uniformly to every registered type via the policy in `docs/related-resources.md § Policy #4`.
 - **Count shown**: yes (LookupEvents returns up to 50 events per call; the panel may display "50+" when paginated — general ct-events convention).
 
-> Universal pivot — applies to every registered type; see `related-resources.md § Policy #4`.
+> Universal pivot — applies to every registered type; see `docs/related-resources.md § Policy #4`.
 
 ## 3. Attention / Issues Algorithm
 
@@ -101,8 +101,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above): `DescribeRepository` encryption check.
 - Empty repository older than 30 days (unused registry) — a9s reads the package count but reports nothing for it; the condition is recorded on `docs/attention-signals.md § Not yet implemented`.
-- CodeArtifact-to-ACM, CodeArtifact-to-Kinesis, CodeArtifact-to-Lambda, CodeArtifact-to-Logs, CodeArtifact-to-R53, CodeArtifact-to-WAF pivots — deliberately excluded in `docs/related-resources.md` § Explicitly excluded (no direct AWS API integration exists for any of these paths).
-- CodeArtifact-to-CodeBuild and CodeArtifact-to-IAM-Role pivots — excluded as "heuristic-only / indirect" in `docs/related-resources.md` § Explicitly excluded.
+- CodeArtifact-to-ACM, CodeArtifact-to-Kinesis, CodeArtifact-to-Lambda, CodeArtifact-to-Logs, CodeArtifact-to-R53, CodeArtifact-to-WAF pivots — `docs/related-resources.md` § Explicitly excluded.
+- CodeArtifact-to-CodeBuild and CodeArtifact-to-IAM-Role pivots — `docs/related-resources.md` § Explicitly excluded.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md § What is a9s?`).
 

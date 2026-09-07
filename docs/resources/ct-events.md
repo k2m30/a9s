@@ -118,7 +118,7 @@ The self-pivot carries four facets, all convenience filters that re-launch `Look
 - **Count shown**: yes for each facet.
 - **Discovery**: parse the four fields out of `Event.CloudTrailEvent` JSON on the currently-selected event; no extra AWS call is made until the operator picks a facet.
 
-**Universal pivot note.** ct-events is the **universal pivot** referenced by every other registered type (see `related-resources.md` §Policy, rule 4: "`ct-events` is implicitly relevant for every registered type"). The panel on those other types carries a single `ct-events` entry pre-scoped to that resource's ARN; the rich self-pivot structure above only appears when the operator is already *on* a ct-events row.
+**Universal pivot note.** ct-events is the **universal pivot** referenced by every other registered type (see `docs/related-resources.md` §Policy, rule 4: "`ct-events` is implicitly relevant for every registered type"). The panel on those other types carries a single `ct-events` entry pre-scoped to that resource's ARN; the rich self-pivot structure above only appears when the operator is already *on* a ct-events row.
 
 ## 3. Attention / Issues Algorithm
 

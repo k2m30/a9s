@@ -76,7 +76,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for endpoint lifecycle and configuration changes — universal pivot for "who deleted / modified / accepted this endpoint, and when?". Typical CloudTrail event names: `CreateVpcEndpoint`, `DeleteVpcEndpoints`, `ModifyVpcEndpoint`, `AcceptVpcEndpointConnections`, `RejectVpcEndpointConnections`.
-- **How discovered**: Call CloudTrail `LookupEvents` filtered by `ResourceName==this.VpcEndpointId` (and/or event-name filter on the names above). Universal pivot — applies to every registered type; see `related-resources.md` § Policy.
+- **How discovered**: Call CloudTrail `LookupEvents` filtered by `ResourceName==this.VpcEndpointId` (and/or event-name filter on the names above). Universal pivot — applies to every registered type; see `docs/related-resources.md` § Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm
@@ -189,15 +189,15 @@ At 3am, glancing at the list, a red vpce row reading `failed`, `rejected`, `expi
 - `DnsEntry.{DnsName, HostedZoneId}` shape (detail-view field block) — `AWS SDK Go v2 — service/ec2/types.DnsEntry § DnsName, HostedZoneId`.
 - `ct-events` as universal pivot — `docs/related-resources.md` § Policy.
 - CloudTrail event-name filter (`CreateVpcEndpoint`, `DeleteVpcEndpoints`, `ModifyVpcEndpoint`, `AcceptVpcEndpointConnections`, `RejectVpcEndpointConnections`) — `a9s-devops (2026-04-20): possible=yes (CloudTrail records all endpoint management-plane calls), worth=yes. These event names are the filter operators run when investigating endpoint lifecycle and PrivateLink connection decisions.`
-- `acm` budget exclusion — the list response carries no certificate reference, and resolving one needs a `PrivateDnsNameConfiguration` lookup per endpoint service — `docs/related-resources.md` § Explicitly excluded.
+- `acm` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - `alarm` discovery via dimension-scan on `VPC Endpoint Id` — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS/PrivateLinkEndpoints publishes per-endpoint metrics; dimension-based scan of the already-loaded alarm list is the cheap path.`
-- `cf` budget exclusion — the CloudFront→endpoint link goes through VPC Origins, which are not on `DistributionSummary` — `docs/related-resources.md` § Explicitly excluded.
+- `cf` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - `eni`, `rtb`, `sg`, `subnet`, `vpc` discovered via direct FK fields on `VpcEndpoint` (`NetworkInterfaceIds`, `RouteTableIds`, `Groups[].GroupId`, `SubnetIds`, `VpcId`) — `a9s-devops (2026-04-20): possible=yes, worth=yes. These are first-class FKs on every DescribeVpcEndpoints response and are the standard operator pivots.`
 - `logs` discovery via reuse of the vpc-level `DescribeFlowLogs` cache, matching on `ResourceId == this.VpcId` or subnet IDs — `a9s-devops (2026-04-20): possible=yes, worth=yes. Reuses an existing account-wide Wave 2 call from the vpc spec; no new AWS call for the vpce pivot.`
 - `r53` discovery via `route53:ListHostedZonesByVPC` per endpoint (keyed by `VpcId`) — `a9s-devops (2026-04-20): possible=yes, worth=yes. The VPC-associated private zones are not in the account hosted-zone cache; the dedicated API is one bounded call per endpoint.`
-- `s3` budget exclusion — naming the reachable buckets means interpreting `VpcEndpoint.PolicyDocument` against bucket policies, with no deterministic join — `docs/related-resources.md` § Explicitly excluded.
-- `tg` budget exclusion — the target-group cache carries no registered targets, so matching endpoint IPs needs `DescribeTargetHealth` per group — `docs/related-resources.md` § Explicitly excluded.
-- `waf` budget exclusion — the endpoint list response has no Web ACL binding; associations resolve only from the WAF side — `docs/related-resources.md` § Explicitly excluded.
+- `s3` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
+- `tg` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
+- `waf` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - Truncation of `LastError.Message` at 40 chars for S4 — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS error messages exceed 40 chars regularly; truncation preserves the identity/state columns and the full message is still in the detail field block.`
 - `PrivateDnsEnabled==false` not a signal — `a9s-devops (2026-04-20): possible=yes, worth=no. Deliberate configuration choice for services with DNS conflicts, not a misconfiguration.`
 - CloudWatch Wave 3 metrics rationale — `a9s-devops (2026-04-20): possible=yes, worth=no for Wave 2. Per-endpoint GetMetricStatistics exceeds the Wave 2 budget; alarm pivot covers the operational path.`

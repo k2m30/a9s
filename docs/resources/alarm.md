@@ -116,7 +116,7 @@ All non-action pivots (everything except `sns`, `asg`, and `ct-events`) are disc
 - **Why related**: Universal pivot — audit trail for alarm configuration changes (create, modify, enable/disable-actions, delete).
 - **How discovered**: pre-built CloudTrail query scoped to `AlarmArn` as the resource identifier.
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 

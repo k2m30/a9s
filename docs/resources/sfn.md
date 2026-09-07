@@ -65,7 +65,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ct-events`
 
-- **Why related**: universal pivot — applies to every registered type; see related-resources.md §Policy. Lets the operator audit "who changed this state machine and when" during an incident (definition updates, role changes, encryption-config flips).
+- **Why related**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Lets the operator audit "who changed this state machine and when" during an incident (definition updates, role changes, encryption-config flips).
 - **How discovered**: `cloudtrail:LookupEvents` filtered by the state machine's ARN / name.
 - **Count shown**: yes.
 
@@ -167,7 +167,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - `Wave 3 signals: CloudWatch ExecutionsFailed/ExecutionsTimedOut/ExecutionThrottled trends` — `docs/attention-signals.md § Not yet implemented`.
 - `ListExecutions` is the supported API for failure enumeration — [ListExecutions](https://docs.aws.amazon.com/step-functions/latest/apireference/API_ListExecutions.html); the findings it feeds are `docs/attention-signals.md § Signals § MESSAGING` row `sfn`.
 - `S4 wording "last run failed" and "failing: consecutive failures", S5 sentences` — `a9s-devops (2026-04-20): possible=yes, worth=yes. State keywords alone violate the skill's "state keywords are not explanations" rule; pairing state with an operator-readable cue ("last run failed", "consecutive failures") plus a detail sentence that hints at the likely class of root cause (IAM / definition / downstream) matches the §4 surface rules and the 3am test.`
-- `Out-of-scope: ASL parse beyond lambda` — `a9s-devops (2026-04-20): possible=yes, worth=no. related-resources.md § sfn restricts ASL-derived targets to lambda; widening violates the contract and risks combinatorial panel growth.`
+- `Out-of-scope: ASL parse beyond lambda` — `a9s-devops (2026-04-20): possible=yes, worth=no. docs/related-resources.md § sfn restricts ASL-derived targets to lambda; widening violates the contract and risks combinatorial panel growth.`
 - `Out-of-scope: per-execution drill-down` — `a9s-devops (2026-04-20): possible=yes, worth=no for v1. Belongs in a future execution-browser child view; CloudTrail + Console cover incident workflow today.`
 - `Read-only invariant` — `docs/architecture.md` § "What is a9s?".
 

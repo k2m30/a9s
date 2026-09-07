@@ -94,7 +94,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `ct-events`
 
 - **Why related**: Audit trail for LB config changes — universal "who changed what, when" pivot.
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm
@@ -198,7 +198,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `cf` discovery via `Distribution.Origins.Items[].DomainName == LB.DNSName` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Matches the reverse pivot from the cf contract row.`
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. CFN stamps this tag on every created resource.`
 - a9s-devops consultation — `eni` discovery via Description prefix `ELB app/...` / `ELB net/...` / `ELB <name>` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Canonical SRE pivot for ELB-owned ENIs.`
-- `r53` budget exclusion — record sets are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); the `AliasTarget.DNSName == LB.DNSName` join needs per-zone `ListResourceRecordSets` fan-out — `docs/related-resources.md` § Policy rule 7.
+- `r53` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - a9s-devops consultation — `waf` discovery via `wafv2:ListResourcesForWebACL(ResourceType=APPLICATION_LOAD_BALANCER)` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Documented reverse pivot; matches waf contract row listing elb.`
 - a9s-devops consultation — `s3` (access-log bucket) discovery deferred — `a9s-devops (2026-04-20): possible=yes via DescribeLoadBalancerAttributes, worth=no at list time. Would require an N+1 fan-out.`
 - a9s-devops consultation — Classic (ELBv1) default Healthy bucket when no State field — implicit from `docs/attention-signals.md § Signals § NETWORKING` row `elb`; no state signal available, so the row defaults to Healthy and target-health signalling moves to `tg`. No separate devops dispatch.

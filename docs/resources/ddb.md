@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for table schema/capacity changes — who resized capacity, who changed TTL, who deleted the table.
-- **How discovered**: Universal pivot — applies to every registered type; see `related-resources.md` §Policy. `LookupEvents` filtered by `ResourceName==<table name>` or `ResourceType==AWS::DynamoDB::Table` with ARN match.
+- **How discovered**: Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy. `LookupEvents` filtered by `ResourceName==<table name>` or `ResourceType==AWS::DynamoDB::Table` with ARN match.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

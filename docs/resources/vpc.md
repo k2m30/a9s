@@ -94,7 +94,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 ### `ct-events`
 
 - **Why related**: Audit trail for VPC-level changes — universal pivot for "who changed this, and when?". Typical CloudTrail event names for VPC operations: `CreateVpc`, `DeleteVpc`, `ModifyVpcAttribute`, `AssociateVpcCidrBlock`, `CreateFlowLogs`, `DeleteFlowLogs`.
-- **How discovered**: Call CloudTrail `LookupEvents` filtered by `ResourceName == VpcId` (and/or event-name filter). Universal pivot — applies to every registered type; see `related-resources.md` § Policy.
+- **How discovered**: Call CloudTrail `LookupEvents` filtered by `ResourceName == VpcId` (and/or event-name filter). Universal pivot — applies to every registered type; see `docs/related-resources.md` § Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

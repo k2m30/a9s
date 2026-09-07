@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: Backup Plans
 - **AWS API reference**: <https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html>
 - **List API**: `ListBackupPlans` (returns `BackupPlansListMember` — config-only; no runtime state).
-- **Describe API (if any)**: `ListBackupJobs` — one account-wide call filtered by `ByCreatedAfter=now-24h`, results bucketed client-side by `BackupPlanId`. `GetBackupPlan`, `ListBackupSelections`, `GetBackupSelection`, `DescribeBackupVault`, `GetBackupVaultNotifications` are used on demand to populate the related-resources panel (see §2), not the row state.
+- **Describe API (if any)**: `ListBackupJobs` — one account-wide call filtered by `ByCreatedAfter=now-24h`, results bucketed client-side by `BackupPlanId`. `GetBackupPlan`, `ListBackupSelections`, `GetBackupSelection`, `DescribeBackupVault`, `GetBackupVaultNotifications` are used on demand to populate the related panel (see §2), not the row state.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -113,7 +113,7 @@ At 3am, glancing at the list, the operator sees a red plan row reading `<N jobs>
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings. In particular, the derived list-level `⚠ N issues detected by background checks` banner, the row middle-dot `·` marker, and the `⚠ Background Check` detail header described in `docs/historical/analysis/enrichment-visibility.md` are superseded HOW that this spec does not reuse.
 - Per-rule cadence comparison ("newest completed older than rule cadence × 2") — requires `GetBackupPlan` per plan and is Wave 3 by budget.
 - Write operations. a9s is read-only by design (`docs/architecture.md` — What is a9s?).
-- `backup` → `eb-rule` and `backup` → `logs` linkages. Both are explicitly excluded in `docs/related-resources.md` § Explicitly excluded — the former is only achievable via reverse-scan of EventBridge rules for `source: aws.backup`, the latter has no direct Backup→Logs API.
+- `backup` → `eb-rule` and `backup` → `logs` linkages — `docs/related-resources.md` § Explicitly excluded.
 
 ## 6. Citations
 

@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `ct-events`
 
 - **Why related**: Universal pivot — audit trail for group membership changes (`AddUserToGroup`, `RemoveUserFromGroup`), policy attach/detach, and group-level config edits. Operator uses this to answer "who changed this group and when?".
-- **How discovered**: Call `LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName, AttributeValue=<GroupName>}]`. Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: Call `LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName, AttributeValue=<GroupName>}]`. Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes (count of matched events in the lookup window).
 
 ## 3. Attention / Issues Algorithm

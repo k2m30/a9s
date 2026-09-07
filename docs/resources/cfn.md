@@ -57,7 +57,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 
 ### `ct-events`
 
-- **Why related**: Universal pivot — applies to every registered type; see `related-resources.md` §Policy 4. CloudTrail events filtered by `resources[].ARN == <StackId>` give the audit trail of who created/updated/rolled back the stack.
+- **Why related**: Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy 4. CloudTrail events filtered by `resources[].ARN == <StackId>` give the audit trail of who created/updated/rolled back the stack.
 - **How discovered**: Query `LookupEvents` filtered on the stack ARN.
 - **Count shown**: yes (event count).
 

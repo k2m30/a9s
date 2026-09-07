@@ -27,37 +27,37 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 
 ### `kms`
 
-- **Why related**: Log-file encryption key. If the trail is configured to encrypt log files with a customer-managed KMS key, a KMS disable / pending-deletion silently blocks log file write-out — the operator investigating "trail is logging but no files appear" must reach the key one key press away. Cited in `related-resources.md` §`trail` → "Trail.KmsKeyId — log-file encryption key."
+- **Why related**: Log-file encryption key. If the trail is configured to encrypt log files with a customer-managed KMS key, a KMS disable / pending-deletion silently blocks log file write-out — the operator investigating "trail is logging but no files appear" must reach the key one key press away. Cited in `docs/related-resources.md` §`trail` → "Trail.KmsKeyId — log-file encryption key."
 - **How discovered**: Read `Trail.KmsKeyId` directly from the list response (`AWS SDK Go v2 — cloudtrail/types.Trail § KmsKeyId`, `*string`, KMS ARN or key id). If non-empty, cross-reference the already-loaded `kms` list by key ARN.
 - **Count shown**: yes (single-value field, 0 or 1).
 
 ### `logs`
 
-- **Why related**: Associated CloudWatch Logs log group. CloudTrail can stream events into a log group for near-real-time metric filters and alarms — an operator reading a trail expects to pivot to the log group actually receiving events. Cited in `related-resources.md` §`trail` → "Trail.CloudWatchLogsLogGroupArn — associated log group."
+- **Why related**: Associated CloudWatch Logs log group. CloudTrail can stream events into a log group for near-real-time metric filters and alarms — an operator reading a trail expects to pivot to the log group actually receiving events. Cited in `docs/related-resources.md` §`trail` → "Trail.CloudWatchLogsLogGroupArn — associated log group."
 - **How discovered**: Read `Trail.CloudWatchLogsLogGroupArn` directly from the list response (`AWS SDK Go v2 — cloudtrail/types.Trail § CloudWatchLogsLogGroupArn`, `*string`, log-group ARN). If non-empty, cross-reference the already-loaded `logs` list by log-group ARN.
 - **Count shown**: yes (single-value field, 0 or 1).
 
 ### `role`
 
-- **Why related**: IAM role the CloudWatch Logs endpoint assumes to write to the user's log group; for organization trails it also underlies cross-account delivery. When log delivery fails, the role's trust policy and permissions are the second thing the operator checks after the destination. Cited in `related-resources.md` §`trail` → "CloudWatchLogsRoleArn / org-trail role."
+- **Why related**: IAM role the CloudWatch Logs endpoint assumes to write to the user's log group; for organization trails it also underlies cross-account delivery. When log delivery fails, the role's trust policy and permissions are the second thing the operator checks after the destination. Cited in `docs/related-resources.md` §`trail` → "CloudWatchLogsRoleArn / org-trail role."
 - **How discovered**: Read `Trail.CloudWatchLogsRoleArn` directly from the list response (`AWS SDK Go v2 — cloudtrail/types.Trail § CloudWatchLogsRoleArn`, `*string`, IAM role ARN). If non-empty, cross-reference the already-loaded `role` list by role ARN. — a9s-devops: this is the only IAM role surfaced on the Trail shape; organization-trail delivery roles are managed by the org feature but do not appear as a separate field on `Trail`. possible=yes (direct field), worth=yes (CWL delivery role is the canonical failure-point when `LatestCloudWatchLogsDeliveryError` is non-empty).
 - **Count shown**: yes (single-value field, 0 or 1).
 
 ### `s3`
 
-- **Why related**: Destination bucket for raw log files — the primary evidence store for every CloudTrail. When `LatestDeliveryError` is non-empty, the bucket policy is the single most common culprit; the operator must reach the bucket directly. Cited in `related-resources.md` §`trail` → "Trail.S3BucketName — destination bucket."
+- **Why related**: Destination bucket for raw log files — the primary evidence store for every CloudTrail. When `LatestDeliveryError` is non-empty, the bucket policy is the single most common culprit; the operator must reach the bucket directly. Cited in `docs/related-resources.md` §`trail` → "Trail.S3BucketName — destination bucket."
 - **How discovered**: Read `Trail.S3BucketName` directly from the list response (`AWS SDK Go v2 — cloudtrail/types.Trail § S3BucketName`, `*string`, bucket name — not ARN). Cross-reference the already-loaded `s3` list by bucket name.
 - **Count shown**: yes (single-value field, 0 or 1 — a trail always has an S3 destination but the bucket may live in another account).
 
 ### `sns`
 
-- **Why related**: Delivery notifications topic. If configured, CloudTrail publishes a notification each time a log file lands in S3 — downstream consumers (lambda, sqs fan-out) subscribe here. An operator debugging "my CloudTrail-driven pipeline stopped" pivots from the trail to the topic. Cited in `related-resources.md` §`trail` → "Trail.SnsTopicARN — delivery notifications."
+- **Why related**: Delivery notifications topic. If configured, CloudTrail publishes a notification each time a log file lands in S3 — downstream consumers (lambda, sqs fan-out) subscribe here. An operator debugging "my CloudTrail-driven pipeline stopped" pivots from the trail to the topic. Cited in `docs/related-resources.md` §`trail` → "Trail.SnsTopicARN — delivery notifications."
 - **How discovered**: Read `Trail.SnsTopicARN` directly from the list response (`AWS SDK Go v2 — cloudtrail/types.Trail § SnsTopicARN`, `*string`, SNS topic ARN). If non-empty, cross-reference the already-loaded `sns` list by topic ARN.
 - **Count shown**: yes (single-value field, 0 or 1).
 
 ### `ct-events`
 
-- **Why related**: Universal pivot — applies to every registered type; see `related-resources.md` §Policy. Audit trail for trail config changes (meta!) — `CreateTrail`, `UpdateTrail`, `StartLogging`, `StopLogging`, `DeleteTrail`, `PutEventSelectors`, `PutInsightSelectors`. Particularly valuable here: a trail that "mysteriously stopped" is often a deliberate `StopLogging` call recorded by another trail.
+- **Why related**: Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy. Audit trail for trail config changes (meta!) — `CreateTrail`, `UpdateTrail`, `StartLogging`, `StopLogging`, `DeleteTrail`, `PutEventSelectors`, `PutInsightSelectors`. Particularly valuable here: a trail that "mysteriously stopped" is often a deliberate `StopLogging` call recorded by another trail.
 - **How discovered**: `LookupEvents` with `LookupAttributes=[{AttributeKey:ResourceName, AttributeValue:<trail-name>}]` (or `ResourceType=AWS::CloudTrail::Trail`) in the trail's `HomeRegion`.
 - **Count shown**: yes.
 

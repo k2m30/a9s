@@ -117,7 +117,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ct-events`
 
-- **Why related**: Audit trail for service changes (UpdateService, CreateService, DeleteService, force-new-deployment). Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: Audit trail for service changes (UpdateService, CreateService, DeleteService, force-new-deployment). Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: `LookupEvents(ResourceName=<serviceName>)` or filter by `EventSource=ecs.amazonaws.com` and `Resources[].ResourceName`.
 - **Count shown**: yes.
 

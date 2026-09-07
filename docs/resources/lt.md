@@ -69,11 +69,11 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 
 ### `ct-events`
 
-- **Why related**: audit trail — "who bumped the default version" is the first incident question for a bad rollout. Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: audit trail — "who bumped the default version" is the first incident question for a bad rollout. Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: CloudTrail LookupEvents by LaunchTemplateId.
 - **Count shown**: yes.
 
-Explicitly excluded (per `docs/related-resources.md` §`lt`): `role` (`IamInstanceProfile` is a PROFILE, not a role; profile→role resolution needs `iam:GetInstanceProfile` — a second call — and a name-equality heuristic is dishonest; detail field only), `eks` (the cluster reference lives on the node group; pivot via `ng`).
+Explicitly excluded: `role` and `eks` — `docs/related-resources.md` § `lt`.
 
 ## 3. Attention / Issues Algorithm
 

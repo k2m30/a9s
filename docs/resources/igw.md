@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `rtb`, `
 ### `ct-events`
 
 - **Why related**: Audit trail for attach/detach events and tag changes — universal pivot for "who changed this, and when?". Typical CloudTrail event names to filter on: `AttachInternetGateway`, `DetachInternetGateway`, `CreateInternetGateway`, `DeleteInternetGateway`.
-- **How discovered**: Call CloudTrail `LookupEvents` filtered by `ResourceName == InternetGatewayId` (and/or event-name filter). Universal pivot — applies to every registered type; see `related-resources.md` § Policy.
+- **How discovered**: Call CloudTrail `LookupEvents` filtered by `ResourceName == InternetGatewayId` (and/or event-name filter). Universal pivot — applies to every registered type; see `docs/related-resources.md` § Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

@@ -75,7 +75,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 
 ### `ct-events`
 
-- **Why related**: Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- **Why related**: Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 - **How discovered**: CloudTrail `LookupEvents` with `LookupAttribute=ResourceName` = domain name (and/or `ResourceARN` = `DomainStatus.ARN`).
 - **Count shown**: yes.
 
@@ -180,7 +180,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above): CloudWatch `ClusterStatus.red`/`yellow`, `FreeStorageSpace`, `JVMMemoryPressure`.
-- `role` related-panel entry — explicitly excluded by `docs/related-resources.md` § Explicitly excluded: advanced-security master user is a policy pivot, not a role field. No IAM role is a first-class attribute on a domain.
+- `role` related-panel entry — `docs/related-resources.md` § Explicitly excluded.
 - Per-node runtime state (individual shard/node health) — requires OpenSearch data-plane API (not AWS control plane); out of scope for a9s.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
@@ -189,7 +189,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — Per-type related contract for `opensearch` — `docs/related-resources.md` § Per-type contract, row `opensearch`, and `docs/related-resources.md` § `opensearch`.
 - a9s golden doc — the `opensearch` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `opensearch`; the deferred CloudWatch cluster health — `docs/attention-signals.md § Not yet implemented`.
-- a9s golden doc — `role` intentionally excluded — `docs/related-resources.md` § Explicitly excluded ("advanced-security master user is a policy pivot, not a role field").
+- a9s golden doc — `role` intentionally excluded — `docs/related-resources.md` § Explicitly excluded.
 - a9s golden doc — `ct-events` universal pivot — `docs/related-resources.md` § `Policy` point 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.
 - AWS SDK Go v2 — `ListDomainNames` returns only `DomainName` + `EngineType` per entry — `AWS SDK Go v2 — opensearch/types.DomainInfo § DomainName, EngineType`.

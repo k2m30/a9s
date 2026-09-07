@@ -96,7 +96,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 - **Why related**: Universal pivot — CloudTrail audit trail for scaling events and configuration changes to this ASG (who scaled, who changed `MinSize`, who suspended processes).
 - **How discovered**: Call `LookupEvents(LookupAttributes=ResourceName=<ASG name>)`.
 - **Count shown**: yes.
-- Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 
 ## 3. Attention / Issues Algorithm
 

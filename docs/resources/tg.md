@@ -76,7 +76,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for target group config changes (registrations/deregistrations, health-check settings) — universal "who changed what, when" pivot.
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm
@@ -136,11 +136,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (copied above): CloudWatch `UnHealthyHostCount` / `HealthyHostCount` ratio trends per TG.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- `backup` as a related target — a9s-devops: possible=no, worth=no. AWS Backup does not list target groups as a supported resource; TGs are configuration, not stateful data. The contract no longer lists it — `docs/related-resources.md` § Explicitly excluded.
-- `dbc`, `dbi`, `dbi-snap` as related targets — a9s-devops: possible=no, worth=no. TG target types (`instance`, `ip`, `lambda`, `alb` per `types.TargetTypeEnum`) do not include RDS/DocumentDB; no AWS field links a TG to a DB instance, DB cluster, or RDS snapshot.
-- `logs` as a related target — a9s-devops: possible=no, worth=no. Target groups do not emit CloudWatch Logs; ELB access logs go to S3 via `DescribeLoadBalancerAttributes` on the parent `elb`, not to a log group on the TG.
-- `sg` as a related target **at the TG level** — a9s-devops: possible=no, worth=no. `TargetGroup` has no `SecurityGroups` field; the SG pivot belongs to the parent `elb` (ALB `SecurityGroups[]`) or to the registered instances/ENIs.
-- `subnet` as a related target **at the TG level** — a9s-devops: possible=no, worth=no. `TargetGroup` has no subnet field; the subnet pivot belongs to the parent `elb` via `AvailabilityZones[].SubnetId`.
+- `backup`, `dbc`, `dbi`, `dbi-snap`, `logs`, `sg` and `subnet` as related targets — `docs/related-resources.md` § Explicitly excluded.
 
 ## 6. Citations
 
@@ -157,8 +153,6 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `alarm` discovery via CloudWatch `TargetGroup` dimension with ARN-suffix value — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS/ApplicationELB and AWS/NetworkELB publish per-TG metrics with the TargetGroup dimension; standard SRE join.`
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag fetched with `elbv2:DescribeTags` — `a9s-devops (2026-04-20): possible=yes, worth=yes. CFN stamps this tag on every created resource including ELBv2 TGs.`
 - a9s-devops consultation — `lambda` discovery via `DescribeTargetHealth` when `TargetType == lambda`, `Target.Id` is the function ARN — `a9s-devops (2026-04-20): possible=yes, worth=yes. Documented ALB→Lambda path.`
-- a9s-devops consultation — `backup` not a real pivot — `a9s-devops (2026-04-20): possible=no, worth=no. AWS Backup does not support target groups; TGs are configuration, not stateful data.` Budget exclusion recorded at `docs/related-resources.md` § Explicitly excluded.
-- a9s-devops consultation — `dbc` / `dbi` / `dbi-snap` not real pivots — `a9s-devops (2026-04-20): possible=no, worth=no. TG TargetType enum is instance/ip/lambda/alb; databases are not a routable target.`
 - a9s-devops consultation — `logs` not a real pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TGs do not emit CloudWatch Logs; access logs live on the parent ELB in S3 via DescribeLoadBalancerAttributes.`
 - a9s-devops consultation — `sg` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no SecurityGroups field; SG pivot belongs to the parent ALB or the registered instances.`
 - a9s-devops consultation — `subnet` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no subnet field; subnet pivot lives on the parent ELB AvailabilityZones.SubnetId.`

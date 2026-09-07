@@ -51,7 +51,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ct-events`
 
-- **Why related**: universal pivot — applies to every registered type; see related-resources.md §Policy. Audit trail for `CreateFunction`, `UpdateFunctionCode`, `UpdateFunctionConfiguration`, `DeleteFunction`, `Invoke`.
+- **Why related**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Audit trail for `CreateFunction`, `UpdateFunctionCode`, `UpdateFunctionConfiguration`, `DeleteFunction`, `Invoke`.
 - **How discovered**: `LookupEvents` with `ResourceName=<FunctionName>` / `ResourceType=AWS::Lambda::Function`.
 - **Count shown**: yes.
 

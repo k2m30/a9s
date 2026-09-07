@@ -94,7 +94,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for DB config / `ModifyDBInstance`. "Who changed this and when" is the universal incident question.
-- **How discovered**: `LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName,AttributeValue=<DBInstanceIdentifier>}]` — universal pivot, applies to every registered type; see `related-resources.md` §Policy.
+- **How discovered**: `LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName,AttributeValue=<DBInstanceIdentifier>}]` — universal pivot, applies to every registered type; see `docs/related-resources.md` §Policy.
 - **Count shown**: unknown — a9s-devops: CloudTrail `LookupEvents` returns windowed results; the panel typically shows a page rather than a total count, so "N" is misleading.
 
 ## 3. Attention / Issues Algorithm

@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ec2`, `
 ### `ct-events`
 
 - **Why related**: Universal pivot — CloudTrail audit trail scoped to this ENI (`AttachNetworkInterface`, `DetachNetworkInterface`, `CreateNetworkInterface`, `DeleteNetworkInterface`, `ModifyNetworkInterfaceAttribute`). Answers "who changed this, and when?".
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

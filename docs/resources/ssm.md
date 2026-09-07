@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `ct-events`
 
 - **Why related**: Audit trail for parameter reads and writes — `GetParameter` / `PutParameter` / `DeleteParameter` / `GetParametersByPath` events are the forensic record of who touched this parameter and when. Critical for rotating a leaked SecureString or tracing a surprise change.
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

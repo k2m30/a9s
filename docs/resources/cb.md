@@ -27,80 +27,80 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `alarm`
 
-- **Why related**: Build-failure alarms — operators wire CloudWatch alarms on CodeBuild `FailedBuilds` / `Duration` metrics to page on-call when a build goes red (`related-resources.md § cb`: "Build-failure alarms").
+- **Why related**: Build-failure alarms — operators wire CloudWatch alarms on CodeBuild `FailedBuilds` / `Duration` metrics to page on-call when a build goes red (`docs/related-resources.md § cb`: "Build-failure alarms").
 - **How discovered**: cross-reference the already-loaded `alarm` list by `MetricAlarm.Namespace=="AWS/CodeBuild"` AND `Dimensions[]` containing `Name=="ProjectName"` with `Value==<this project name>` — a9s-devops: MetricAlarm carries resource identity in `Dimensions[]`, CodeBuild's metric dimension is `ProjectName`; no extra API call needed when the `alarm` list is cached.
 - **Count shown**: yes.
 
 ### `ecr`
 
-- **Why related**: ECR repos the project pushes to — the build container image (or the artifact the build emits) usually lives in a team-owned ECR repo; operators pivot here when "build is green but the image didn't update" (`related-resources.md § ecr`: "CodeBuild projects that push images").
+- **Why related**: ECR repos the project pushes to — the build container image (or the artifact the build emits) usually lives in a team-owned ECR repo; operators pivot here when "build is green but the image didn't update" (`docs/related-resources.md § ecr`: "CodeBuild projects that push images").
 - **How discovered**: read `Project.Environment.Image` — if the URI matches `<acct>.dkr.ecr.<region>.amazonaws.com/<repo>[:tag]`, the `<repo>` segment resolves against the loaded `ecr` cache — a9s-devops: possible=yes, worth=yes. `Environment.Image` is the only deterministic ECR reference on `Project`; push-target repos live only inside buildspec.yml, which a9s does not fetch. Starting with the build image covers the most common "what container am I building in?" workflow.
 - **Count shown**: yes.
 
 ### `kms`
 
-- **Why related**: Customer-managed key used to encrypt build output artifacts — operators land here when an artifact upload fails with `KMS.AccessDenied` or when auditing which projects touch a sensitive key (`related-resources.md § cb`: "EncryptionKey on artifacts").
+- **Why related**: Customer-managed key used to encrypt build output artifacts — operators land here when an artifact upload fails with `KMS.AccessDenied` or when auditing which projects touch a sensitive key (`docs/related-resources.md § cb`: "EncryptionKey on artifacts").
 - **How discovered**: read `Project.EncryptionKey` — AWS SDK Go v2 — `codebuild/types.Project § EncryptionKey` carries the KMS key ARN or `alias/` reference; resolve against the loaded `kms` cache.
 - **Count shown**: yes.
 
 ### `logs`
 
-- **Why related**: Build log group — first place an operator opens when a build fails, to read the compiler / shell error (`related-resources.md § cb`: "Build log group").
+- **Why related**: Build log group — first place an operator opens when a build fails, to read the compiler / shell error (`docs/related-resources.md § cb`: "Build log group").
 - **How discovered**: read `Project.LogsConfig.CloudWatchLogs.GroupName` if set; otherwise the default is `/aws/codebuild/<projectName>` — a9s-devops: possible=yes, worth=yes. `LogsConfig.CloudWatchLogs` (AWS SDK Go v2 — `codebuild/types.LogsConfig § CloudWatchLogs`) holds the explicit override; when it is nil or `CloudWatchLogsConfig.Status!="ENABLED"`, CodeBuild writes to the conventional default group name.
 - **Count shown**: yes.
 
 ### `pipeline`
 
-- **Why related**: Pipelines consuming this project — when a CodePipeline stage is stuck, knowing which CodeBuild project powers it is the first triage step (`related-resources.md § pipeline`: "CodeBuild projects used as pipeline actions").
+- **Why related**: Pipelines consuming this project — when a CodePipeline stage is stuck, knowing which CodeBuild project powers it is the first triage step (`docs/related-resources.md § pipeline`: "CodeBuild projects used as pipeline actions").
 - **How discovered**: reverse-scan the loaded `pipeline` list for any `stageStates[].actionStates[]` (or `PipelineDeclaration.stages[].actions[]`) with `ActionTypeId.Provider=="CodeBuild"` and `configuration.ProjectName==<this project name>` — a9s-devops: possible=yes, worth=yes. `Project` has no back-pointer to CodePipeline; the relationship is declared only on the pipeline side, so the pivot requires iterating cached pipelines.
 - **Count shown**: yes.
 
 ### `role`
 
-- **Why related**: IAM service role the project assumes to read source, write artifacts, and talk to KMS / Secrets Manager / Parameter Store — every "access denied" during a build starts here (`related-resources.md § cb`: "Project.ServiceRole").
+- **Why related**: IAM service role the project assumes to read source, write artifacts, and talk to KMS / Secrets Manager / Parameter Store — every "access denied" during a build starts here (`docs/related-resources.md § cb`: "Project.ServiceRole").
 - **How discovered**: read `Project.ServiceRole` (AWS SDK Go v2 — `codebuild/types.Project § ServiceRole`); resolve the role ARN against the loaded `role` cache.
 - **Count shown**: yes.
 
 ### `s3`
 
-- **Why related**: Source / artifact buckets — the build pulls source from S3 and/or publishes build artifacts to S3, so operators pivot here to check object versions, ACLs, or retention (`related-resources.md § cb`: "Source/artifact buckets").
+- **Why related**: Source / artifact buckets — the build pulls source from S3 and/or publishes build artifacts to S3, so operators pivot here to check object versions, ACLs, or retention (`docs/related-resources.md § cb`: "Source/artifact buckets").
 - **How discovered**: read `Project.Source.Location` when `Project.Source.Type=="S3"`, `Project.SecondarySources[].Location` for the same, `Project.Artifacts.Location` when `Project.Artifacts.Type=="S3"`, `Project.SecondaryArtifacts[].Location`, and `Project.LogsConfig.S3Logs.Location` — a9s-devops: possible=yes, worth=yes. `ProjectSource.Location` is documented in AWS SDK Go v2 — `codebuild/types.ProjectSource § Type` (S3 case); the Location string for S3 sources/artifacts is `bucket/key`, from which the bucket name is the pivot key.
 - **Count shown**: yes.
 
 ### `secrets`
 
-- **Why related**: Secrets Manager secrets injected as build env variables — operators open these to confirm rotation state, ARN, or value when a build fails on credential resolution (`related-resources.md § secrets`: "Reverse-scan: CodeBuild Project.Environment.EnvironmentVariables where Type=SECRETS_MANAGER and Value==ARN or name prefix").
+- **Why related**: Secrets Manager secrets injected as build env variables — operators open these to confirm rotation state, ARN, or value when a build fails on credential resolution (`docs/related-resources.md § secrets`: "Reverse-scan: CodeBuild Project.Environment.EnvironmentVariables where Type=SECRETS_MANAGER and Value==ARN or name prefix").
 - **How discovered**: read `Project.Environment.EnvironmentVariables[]` — entries with `Type==SECRETS_MANAGER` carry the secret ARN or name in `Value`; resolve against the loaded `secrets` cache (AWS SDK Go v2 — `codebuild/types.EnvironmentVariable § Type, Value`).
 - **Count shown**: yes.
 
 ### `sg`
 
-- **Why related**: Security groups attached to the build's VPC ENI — when a build running in VPC mode cannot reach a private database or internal registry, the SG is the first thing to inspect (`related-resources.md § cb`: "VpcConfig.SecurityGroupIds").
+- **Why related**: Security groups attached to the build's VPC ENI — when a build running in VPC mode cannot reach a private database or internal registry, the SG is the first thing to inspect (`docs/related-resources.md § cb`: "VpcConfig.SecurityGroupIds").
 - **How discovered**: read `Project.VpcConfig.SecurityGroupIds` (AWS SDK Go v2 — `codebuild/types.VpcConfig § SecurityGroupIds`); each SG ID resolves against the loaded `sg` cache.
 - **Count shown**: yes.
 
 ### `ssm`
 
-- **Why related**: SSM Parameter Store values injected as build env variables — operators pivot here to see the current value and last-modified date when a build picks up stale config (`related-resources.md § cb`: "SSM parameters as build env").
+- **Why related**: SSM Parameter Store values injected as build env variables — operators pivot here to see the current value and last-modified date when a build picks up stale config (`docs/related-resources.md § cb`: "SSM parameters as build env").
 - **How discovered**: read `Project.Environment.EnvironmentVariables[]` — entries with `Type==PARAMETER_STORE` carry the parameter name in `Value`; resolve against the loaded `ssm` cache (AWS SDK Go v2 — `codebuild/types.EnvironmentVariable § Type, Value`).
 - **Count shown**: yes.
 
 ### `subnet`
 
-- **Why related**: Subnets the build ENI lands in — IP exhaustion in one of these subnets causes `UNABLE_TO_CREATE_NETWORK_INTERFACE` build failures (`related-resources.md § cb`: "VpcConfig.Subnets").
+- **Why related**: Subnets the build ENI lands in — IP exhaustion in one of these subnets causes `UNABLE_TO_CREATE_NETWORK_INTERFACE` build failures (`docs/related-resources.md § cb`: "VpcConfig.Subnets").
 - **How discovered**: read `Project.VpcConfig.Subnets` (AWS SDK Go v2 — `codebuild/types.VpcConfig § Subnets`); each subnet ID resolves against the loaded `subnet` cache.
 - **Count shown**: yes.
 
 ### `vpc`
 
-- **Why related**: VPC the build runs inside — contextual pivot for flow logs, DNS resolution, and endpoint reachability when the build can't reach AWS APIs (`related-resources.md § cb`: "VpcConfig.VpcId").
+- **Why related**: VPC the build runs inside — contextual pivot for flow logs, DNS resolution, and endpoint reachability when the build can't reach AWS APIs (`docs/related-resources.md § cb`: "VpcConfig.VpcId").
 - **How discovered**: read `Project.VpcConfig.VpcId` (AWS SDK Go v2 — `codebuild/types.VpcConfig § VpcId`); resolve against the loaded `vpc` cache.
 - **Count shown**: yes.
 
 ### `ct-events`
 
-- **Why related**: Audit trail for build events — "who deleted this project?", "when was ServiceRole last changed?" — CloudTrail is the universal answer (`related-resources.md § cb`: "Audit trail for build events").
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: Audit trail for build events — "who deleted this project?", "when was ServiceRole last changed?" — CloudTrail is the universal answer (`docs/related-resources.md § cb`: "Audit trail for build events").
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

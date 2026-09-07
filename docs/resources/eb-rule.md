@@ -72,7 +72,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `kinesis
 - **Why related**: Universal pivot — who created, enabled, disabled, or modified this rule; also captures `PutRule` / `PutTargets` audit history.
 - **How discovered**: pre-built CloudTrail query scoped to the rule ARN as the resource identifier.
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 
 ## 3. Attention / Issues Algorithm
 

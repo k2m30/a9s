@@ -69,11 +69,11 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ct-events`
 
-- **Why related**: audit trail for environment changes ("who ran UpdateEnvironment"). Universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Why related**: audit trail for environment changes ("who ran UpdateEnvironment"). Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **How discovered**: CloudTrail LookupEvents by resource name.
 - **Count shown**: yes.
 
-Explicitly excluded (per `docs/related-resources.md` §`mwaa`): `vpc` (no direct field; one hop via subnet), `sqs` (`CeleryExecutorQueue` lives in an AWS-owned account — pivot dead-ends in AccessDenied; detail-view fact only), `vpce` (`WebserverVpcEndpointService`/`DatabaseVpcEndpointService` are endpoint-service names, not customer `vpce-*` IDs; detail text only).
+Explicitly excluded: `vpc`, `sqs` and `vpce` — `docs/related-resources.md` § `mwaa`.
 
 ## 3. Attention / Issues Algorithm
 

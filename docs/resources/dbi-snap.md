@@ -27,13 +27,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `backup`
 
 ### `dbi`
 
-- **Why related**: the source DB instance this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent instance. Citation: `related-resources.md § dbi-snap` ("Source DB instance").
+- **Why related**: the source DB instance this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent instance. Citation: `docs/related-resources.md § dbi-snap` ("Source DB instance").
 - **How discovered**: read `DBSnapshot.DBInstanceIdentifier` from the list response, then cross-reference the already-loaded `dbi` list by that identifier. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § DBInstanceIdentifier`.
 - **Count shown**: yes (0 or 1 — a snapshot has exactly one source instance; 0 when the parent has been deleted, which is itself the orphan signal in §3.1).
 
 ### `kms`
 
-- **Why related**: the encryption key protecting the snapshot. If the key is disabled or pending deletion, the snapshot cannot be restored — a silent restore-blocker the operator needs to catch early. Citation: `related-resources.md § dbi-snap` ("Encryption key").
+- **Why related**: the encryption key protecting the snapshot. If the key is disabled or pending deletion, the snapshot cannot be restored — a silent restore-blocker the operator needs to catch early. Citation: `docs/related-resources.md § dbi-snap` ("Encryption key").
 - **How discovered**: read `DBSnapshot.KmsKeyId` from the list response, then cross-reference the already-loaded `kms` list by KeyId/KeyArn. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § KmsKeyId`.
 - **Count shown**: yes (0 or 1 — one key per encrypted snapshot; 0 when `Encrypted==false`).
 
@@ -46,14 +46,14 @@ the structural exclusion.
 
 ### `backup`
 
-- **Why related**: AWS Backup can create RDS snapshots on behalf of a backup plan; knowing whether a snapshot was produced by AWS Backup (vs automated by the DB instance or manual) tells the operator which retention policy governs its lifecycle and which audit trail applies. Citation: `related-resources.md § dbi-snap` ("Snapshots covered by AWS Backup").
+- **Why related**: AWS Backup can create RDS snapshots on behalf of a backup plan; knowing whether a snapshot was produced by AWS Backup (vs automated by the DB instance or manual) tells the operator which retention policy governs its lifecycle and which audit trail applies. Citation: `docs/related-resources.md § dbi-snap` ("Snapshots covered by AWS Backup").
 - **How discovered**: a9s-devops persona (2026-04-20): possible=yes, worth=yes (narrow). AWS Backup-created RDS snapshots carry the identifier prefix `awsbackup:job-<uuid>` on `DBSnapshotIdentifier`; AWS Backup records the snapshot ARN on its recovery-point list (`backup:ListRecoveryPointsByResource` with the snapshot or parent-instance ARN). The cheap Wave-1-safe path is a string-prefix match on `DBSnapshotIdentifier` — no extra API call required. Rationale (per `docs/historical/019-related-panel/related-panel-devops-consensus.md § dbi-snap → backup`): AWS Backup tracks the parent DB instance rather than each manual snapshot individually, so a live cross-API call is high-cost for thin value; the identifier prefix is free on the list response and answers the same operator question.
 - **Count shown**: yes (0 or 1 — a snapshot is either a Backup-created recovery point or it is not).
 
 ### `ct-events`
 
-- **Why related**: universal pivot — every registered type carries a CloudTrail pivot for audit. For RDS snapshots the canonical operator questions are "who deleted this snapshot" (only backup lost), "who shared this snapshot" (data exfiltration via `ModifyDBSnapshotAttribute`), and "who copied this snapshot" (`CopyDBSnapshot` — cross-region DR is fine, cross-account needs scrutiny). See `related-resources.md §Policy`.
-- **How discovered**: `LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName,AttributeValue=<DBSnapshotIdentifier>}]` — universal pivot, applies to every registered type; see `related-resources.md §Policy`. Called on demand when the operator opens the pivot, not on list load.
+- **Why related**: universal pivot — every registered type carries a CloudTrail pivot for audit. For RDS snapshots the canonical operator questions are "who deleted this snapshot" (only backup lost), "who shared this snapshot" (data exfiltration via `ModifyDBSnapshotAttribute`), and "who copied this snapshot" (`CopyDBSnapshot` — cross-region DR is fine, cross-account needs scrutiny). See `docs/related-resources.md §Policy`.
+- **How discovered**: `LookupEvents` with `LookupAttributes=[{AttributeKey=ResourceName,AttributeValue=<DBSnapshotIdentifier>}]` — universal pivot, applies to every registered type; see `docs/related-resources.md §Policy`. Called on demand when the operator opens the pivot, not on list load.
 - **Count shown**: unknown — a9s-devops persona (2026-04-20): `LookupEvents` returns windowed results; the panel typically shows a page rather than a total count, so "N" would be misleading.
 
 ## 3. Attention / Issues Algorithm

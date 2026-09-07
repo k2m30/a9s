@@ -78,7 +78,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `ct-events`
 
 - **Why related**: Audit trail for API changes — who created/updated/deleted the API, stages, routes, integrations.
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm
@@ -169,7 +169,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - `apigw` shortName + contract row — `docs/related-resources.md` § `apigw` (table row and "Per-target reasoning" subsection).
-- Related targets (`acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `role`) — `docs/related-resources.md` § `apigw`. `r53`, `sfn`, `sns`, `vpce` and `waf` are budget-excluded and carry no panel row — `docs/related-resources.md` § Explicitly excluded.
+- Related targets (`acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `role`) — `docs/related-resources.md` § `apigw`. `r53`, `sfn`, `sns`, `vpce` and `waf` carry no panel row — `docs/related-resources.md` § Explicitly excluded.
 - Wave 1 = None; Wave 2 = `GetStages` per v2 API, no deployed stage → Warning — `docs/attention-signals.md § Signals § DNS & CDN` row `apigw`. The CloudWatch error rates and the `GetUsagePlans` quota-breach check are deferred — `docs/attention-signals.md § Not yet implemented`.
 - `Api` struct fields (no `Status` field on list response; `ProtocolType`, `ApiId`, `Name`, `CreatedDate`) — `AWS SDK Go v2 — apigatewayv2/types.Api`.
 - `Stage.AccessLogSettings`, `Stage.DeploymentId` (used to detect "no deployed stage") — `AWS SDK Go v2 — apigatewayv2/types.Stage § AccessLogSettings, DeploymentId`.
@@ -180,12 +180,12 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `kms` discovery is transitive via Lambda integration — a9s-devops (2026-04-20): possible=yes, worth=marginal. Keep per golden-doc contract; low-value but cheap since Lambda panel already resolves KMS.
 - `lambda` discovery via `GetIntegrations` parsing Lambda function ARN in `IntegrationUri` — a9s-devops (2026-04-20): possible=yes, worth=yes. Highest-traffic pivot for this resource type.
 - `logs` discovery via `Stage.AccessLogSettings.DestinationArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. Stage access logs are the first log surface an operator wants when an API misbehaves.
-- `r53` budget exclusion — record sets are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); custom-domain alias resolution needs per-zone `ListResourceRecordSets` walks — `docs/related-resources.md` § Policy rule 7.
+- `r53` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - `role` discovery via `GetIntegrations.CredentialsArn` + `GetAuthorizers.AuthorizerCredentialsArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. These are the only two APIGW-assumed-role fields.
-- `sfn` detection via `GetIntegrations` integration URI `arn:aws:apigateway:...:states:action/`; the state-machine ARN itself lives in the route request template, so the target count is budget-excluded — `docs/related-resources.md` § Policy rule 7.
-- `sns` detection via `GetIntegrations` integration URI `arn:aws:apigateway:...:sns:action/Publish`; the topic ARN lives in the route request template, so the target count is budget-excluded — `docs/related-resources.md` § Policy rule 7.
-- `vpce` budget exclusion: v1 uses `RestApi.EndpointConfiguration.VpcEndpointIds` (first-class field) but the v2 list response carries none; v2 resource-policy parse is brittle — a9s-devops (2026-04-20): possible=yes for v1, brittle for v2. `docs/related-resources.md` § Policy rule 7; v2 gap also in §5 Out of Scope.
-- `waf` budget exclusion: v2 APIs carry no Web ACL binding; WAF-side resolution requires `wafv2:ListResourcesForWebACL` per ACL (O(N)) — `docs/related-resources.md` § Policy rule 7.
+- `sfn` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
+- `sns` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
+- `vpce` budget exclusion — `docs/related-resources.md` § Explicitly excluded. The v2 gap is also in §5 Out of Scope.
+- `waf` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
 - `ct-events` universal-pivot policy — `docs/related-resources.md` § Policy.
 - Allowed surfaces S1–S5, Wave→surface mapping, banned-words list, list-text ≤40 chars / detail ≤100 chars — `.claude/skills/a9s-resource-spec/SKILL.md` § "Allowed visualization surfaces" and § "UX rules the spec must enforce" (skill governance, not golden docs).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".

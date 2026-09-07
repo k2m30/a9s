@@ -27,31 +27,31 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `alarm`
 
-- **Why related**: CloudWatch alarms that notify this topic — `MetricAlarm.AlarmActions` / `OKActions` / `InsufficientDataActions` contain SNS topic ARNs. Primary incident pivot: "which alarms route to this channel?" (related-resources.md § `sns`; `docs/related-resources.md` § `alarm`).
+- **Why related**: CloudWatch alarms that notify this topic — `MetricAlarm.AlarmActions` / `OKActions` / `InsufficientDataActions` contain SNS topic ARNs. Primary incident pivot: "which alarms route to this channel?" (docs/related-resources.md § `sns`; `docs/related-resources.md` § `alarm`).
 - **How discovered**: cross-reference the already-loaded `alarm` list by matching the topic's `TopicArn` against any entry in each alarm's `AlarmActions` / `OKActions` / `InsufficientDataActions` — a9s-devops: standard list-scan, no extra API call needed since alarms are loaded in the same sweep.
 - **Count shown**: yes — a9s-devops: number of alarms fanning into the topic is operationally meaningful (noisy channel detection).
 
 ### `ct-events`
 
-- **Why related**: audit trail for topic changes (CreateTopic, SetTopicAttributes, DeleteTopic). Universal pivot — applies to every registered type; see related-resources.md §Policy §4.
+- **Why related**: audit trail for topic changes (CreateTopic, SetTopicAttributes, DeleteTopic). Universal pivot — applies to every registered type; see docs/related-resources.md §Policy §4.
 - **How discovered**: universal — framework-level pivot, no per-type discovery logic.
 - **Count shown**: unknown — `docs/related-resources.md` § `sns` does not specify.
 
 ### `kms`
 
-- **Why related**: SSE-KMS encryption key — `GetTopicAttributes` returns `KmsMasterKeyId` when server-side encryption is enabled (related-resources.md §`sns`; SDK `sns.GetTopicAttributesOutput` § `Attributes["KmsMasterKeyId"]`).
+- **Why related**: SSE-KMS encryption key — `GetTopicAttributes` returns `KmsMasterKeyId` when server-side encryption is enabled (docs/related-resources.md §`sns`; SDK `sns.GetTopicAttributesOutput` § `Attributes["KmsMasterKeyId"]`).
 - **How discovered**: read `Attributes["KmsMasterKeyId"]` on the `GetTopicAttributes` response already fetched in Wave 2; match the returned key ID/ARN against the loaded `kms` list.
 - **Count shown**: unknown — a topic references at most one KMS key, so the count is degenerate (0 or 1).
 
 ### `role`
 
-- **Why related**: IAM principals granted publish/subscribe/manage permissions by the topic's resource policy — `GetTopicAttributes` returns the access-control document in `Attributes["Policy"]` as JSON, whose `Statement[].Principal` commonly lists role ARNs (related-resources.md §`sns`; SDK `sns.GetTopicAttributesOutput` § `Attributes["Policy"]`) — a9s-devops: used during IAM audits to answer "who can publish to this topic?"; the 1/6-audit rationale in the golden doc is weak but the workflow is real.
+- **Why related**: IAM principals granted publish/subscribe/manage permissions by the topic's resource policy — `GetTopicAttributes` returns the access-control document in `Attributes["Policy"]` as JSON, whose `Statement[].Principal` commonly lists role ARNs (docs/related-resources.md §`sns`; SDK `sns.GetTopicAttributesOutput` § `Attributes["Policy"]`) — a9s-devops: used during IAM audits to answer "who can publish to this topic?"; the 1/6-audit rationale in the golden doc is weak but the workflow is real.
 - **How discovered**: parse `Attributes["Policy"]` JSON from `GetTopicAttributes` (Wave 2), extract each `Statement[].Principal.AWS` ARN whose ARN type is `role`, and cross-reference against the loaded `role` list — a9s-devops: JSON parse is cheap; skip silently if policy is absent (no statement → no principals → empty list).
 - **Count shown**: unknown — `docs/related-resources.md` § `sns` does not specify.
 
 ### `sns-sub`
 
-- **Why related**: subscriptions delivering messages off this topic — the core consumer-side pivot. "What's listening on this topic?" is the first question when publish latency or failed-delivery counts spike (related-resources.md §`sns`; §`sns-sub`).
+- **Why related**: subscriptions delivering messages off this topic — the core consumer-side pivot. "What's listening on this topic?" is the first question when publish latency or failed-delivery counts spike (docs/related-resources.md §`sns`; §`sns-sub`).
 - **How discovered**: call `ListSubscriptionsByTopic(TopicArn)` — a9s-devops: this is the dedicated SNS API for the relationship; no cheaper list-scan path exists because `ListSubscriptions` is account-wide and paginated.
 - **Count shown**: yes — a9s-devops: fanout width (number of confirmed subscriptions) is decision-useful at a glance.
 

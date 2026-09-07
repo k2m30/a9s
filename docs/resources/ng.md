@@ -42,7 +42,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 - **Why related**: audit trail for node group lifecycle changes (create, update-config, update-version, delete) and for "who scaled it" during an incident.
 - **How discovered**: `LookupEvents` filtered by `ResourceName==NodegroupName` and/or node group ARN, scoped to the EKS event source — a9s-devops: standard CloudTrail pivot for every registered resource type.
 - **Count shown**: yes.
-- **Note**: universal pivot — applies to every registered type; see related-resources.md §Policy.
+- **Note**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
 
 ### `ebs`
 
@@ -187,7 +187,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (copied above): AMI release drift, `ListUpdates` per node group.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- `ng → kms` — listed in `docs/related-resources.md` § Explicitly excluded: no direct KMS field on a node group.
+- `ng → kms` — `docs/related-resources.md` § Explicitly excluded.
 
 ## 6. Citations
 

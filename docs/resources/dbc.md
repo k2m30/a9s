@@ -102,7 +102,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for cluster changes (CreateDBCluster, ModifyDBCluster, DeleteDBCluster, FailoverDBCluster).
-- **How discovered**: universal pivot — applies to every registered type; see related-resources.md §Policy. Filter CloudTrail `LookupEvents` by `ResourceName=<cluster-id>` or `ResourceType=AWS::RDS::DBCluster`.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Filter CloudTrail `LookupEvents` by `ResourceName=<cluster-id>` or `ResourceType=AWS::RDS::DBCluster`.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

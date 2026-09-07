@@ -93,7 +93,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `sns`
 
 - **Why related**: SNS topic notified by manual-approval actions — `docs/related-resources.md` § Per-type contract `pipeline`.
-- **How discovered**: call `GetPipeline`, walk `PipelineDeclaration.Stages[].Actions[]` and keep actions where `ActionTypeId.Category == Approval` AND `ActionTypeId.Provider == Manual`; read `Configuration["NotificationArn"]`; cross-reference the loaded `sns` list by topic ARN — a9s-devops: the manual-approval action is the only action type that accepts an SNS topic directly (via `NotificationArn`). Pipeline-state change notifications via the Developer Tools notifications service use a separate API (`codestarnotifications:ListNotificationRules`) and are out of scope for this target per the related-resources contract, which only names "Approval SNS topic".
+- **How discovered**: call `GetPipeline`, walk `PipelineDeclaration.Stages[].Actions[]` and keep actions where `ActionTypeId.Category == Approval` AND `ActionTypeId.Provider == Manual`; read `Configuration["NotificationArn"]`; cross-reference the loaded `sns` list by topic ARN — a9s-devops: the manual-approval action is the only action type that accepts an SNS topic directly (via `NotificationArn`). Pipeline-state change notifications via the Developer Tools notifications service use a separate API (`codestarnotifications:ListNotificationRules`) and are out of scope for this target per `docs/related-resources.md` § `pipeline`, which only names "Approval SNS topic".
 - **Count shown**: yes.
 
 ### `ct-events`
@@ -101,7 +101,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 - **Why related**: Universal pivot — audit trail for pipeline state changes (start, stop, approval, role changes) — `docs/related-resources.md` § Per-type contract `pipeline`.
 - **How discovered**: pre-built CloudTrail query scoped to the pipeline `Name` as the resource identifier.
 - **Count shown**: unknown (CloudTrail queries are windowed; a reliable total isn't available without a separate count call).
-- Universal pivot — applies to every registered type; see `related-resources.md` §Policy, rule 4.
+- Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy, rule 4.
 
 ## 3. Attention / Issues Algorithm
 
@@ -186,7 +186,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `lambda` discovery via `Provider==Lambda` invoke actions with `Configuration["FunctionName"]` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Invoke/Lambda is the sole direct pipeline→Lambda contract.`
 - `role` discovery via `PipelineDeclaration.RoleArn` plus per-action overrides — `a9s-devops (2026-04-20): possible=yes, worth=yes. Service role always present; per-action roles common for cross-account deploy.`
 - `s3` discovery via `ArtifactStore.Location` plus `Provider==S3` source/deploy actions — `a9s-devops (2026-04-20): possible=yes, worth=yes. ArtifactStore.Location is the bucket name directly.`
-- `sns` discovery limited to manual-approval `Configuration["NotificationArn"]`; developer-tools notifications are a separate API and out of scope for this target — `a9s-devops (2026-04-20): possible=yes (approval only), worth=yes. The related-resources contract says "Approval SNS topic", so scope is bounded.`
+- `sns` discovery limited to manual-approval `Configuration["NotificationArn"]`; developer-tools notifications are a separate API and out of scope for this target — `a9s-devops (2026-04-20): possible=yes (approval only), worth=yes. docs/related-resources.md § pipeline says "Approval SNS topic", so scope is bounded.`
 - Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/historical/analysis/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
 
 <!-- BEGIN GENERATED: header -->

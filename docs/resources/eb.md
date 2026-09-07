@@ -88,7 +88,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ct-events`
 
 - **Why related**: Audit trail for environment config changes — who triggered the last `UpdateEnvironment`, who terminated, who rebuilt.
-- **How discovered**: Universal pivot — applies to every registered type; see `related-resources.md` §Policy.
+- **How discovered**: Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 - **Count shown**: unknown.
 
 ## 3. Attention / Issues Algorithm

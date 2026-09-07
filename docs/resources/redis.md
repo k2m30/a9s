@@ -39,7 +39,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ct-events`
 
-- **Why related**: universal pivot — applies to every registered type; see related-resources.md §Policy. Audit trail for group changes (MODIFY, FAILOVER, DELETE).
+- **Why related**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Audit trail for group changes (MODIFY, FAILOVER, DELETE).
 - **How discovered**: `LookupEvents` filtered by `ResourceName=ReplicationGroupId` or by `EventSource=elasticache.amazonaws.com`.
 - **Count shown**: yes.
 
