@@ -15,8 +15,7 @@ Four roles, one loop. The orchestrator (the main session) dispatches; it writes 
                                                              └── OFF / LOOP / BLOCKED ──► a9s-facilitator (ruling) ◄─────┘ REJECT
 ```
 
-- **a9s-qa** writes the failing tests from the spec, then verifies every dev round adversarially.
-- **a9s-dev** lands the stubs QA writes against, then makes the tests pass with the smallest correct change and keeps every gate green.
+- **a9s-dev** is the implementer: per spec row, the failing test, then the smallest correct change, then its own edge-case probes (`checked:`); one round per task in the common case, another only after an acceptance REJECT or a facilitator ruling. The separate QA role was retired on 2026-09-07 (the user: its verify round re-ran the suite dev had just run and handed the same findings back).
 - **a9s-facilitator** is called only on `OFF`, `LOOP`, `BLOCKED`, or when a task passes round 3. It rules; it never codes.
 - **a9s-acceptance** is the skeptical end user. It sees the finished tree, not the log, and accepts or rejects with evidence.
 

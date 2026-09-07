@@ -76,7 +76,7 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 
 ## Skills and Subagents — in-session tooling
 
-> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. Work runs as the team loop, whose round order is defined once in `.claude/skills/a9s-team-loop/SKILL.md` — read it there. The main session orchestrates only. The dev/QA write split (dev ≠ tests, QA ≠ production code) is the TDD guardrail; keep it.
+> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. Work runs as the team loop, whose round order is defined once in `.claude/skills/a9s-team-loop/SKILL.md` — read it there. The main session orchestrates only. One implementer (`a9s-dev`) owns a task end to end, red test before each fix; acceptance is the independent check. The separate QA role was retired on 2026-09-07: it re-ran the suite the implementer had just run and handed the same findings back.
 
 ## Skills
 
@@ -94,9 +94,8 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 
 | Agent | Role | Writes to | Rejects without |
 |-------|------|-----------|-----------------|
-| `a9s-dev` | Developer in the team loop — production code, fixtures, fakes, catalog, generated docs; no tests | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, docs it regenerates | `WORKTREE` + `TASKDIR/spec.md` |
-| `a9s-qa` | QA in the team loop — red tests first, adversarial verify, findings or sign-off; no production code | `tests/` | `WORKTREE` + `TASKDIR/spec.md` |
-| `a9s-facilitator` | Rules when dev/qa log `OFF`, `LOOP`, `BLOCKED`, or a task passes round 3 — rewrites the spec or names the fix; no code | `TASKDIR/spec.md`, `TASKDIR/log.md` | A stalled loop |
+| `a9s-dev` | The implementer in the team loop — red test per spec row, then the fix, then its own edge-case probes; production code, tests, fixtures, fakes, catalog, generated docs | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, `tests/`, docs it regenerates | `WORKTREE` + `TASKDIR/spec.md` |
+| `a9s-facilitator` | Rules when dev logs `OFF`, `LOOP`, `BLOCKED`, or a task stalls — rewrites the spec or names the fix; no code | `TASKDIR/spec.md`, `TASKDIR/log.md` | A stalled loop |
 | `a9s-acceptance` | Skeptical end user — final acceptance on rendered surfaces, docs, gates; blind to the log until verdict | `TASKDIR/` only | Criteria + integrated worktree |
 | `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
@@ -107,7 +106,7 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 
 - ALWAYS rebuild binary (`make build`) after ANY code change — version is resolved at build time via `core/buildinfo`
 - Resolve ambiguity from the code and the spec; ask only when different readings lead to materially different work
-- TDD is non-negotiable and sequenced: `a9s-dev` lands compile-clean stubs, `a9s-qa` lands red tests against them, `a9s-dev` makes them pass. One agent in a worktree at a time.
+- TDD is non-negotiable: `a9s-dev` writes the failing test for a spec row, pastes its red output into the log, then makes it pass. One agent in a worktree at a time.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
