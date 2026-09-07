@@ -45,30 +45,22 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 // free addresses") into the Phrase instead of a generic lifecycle label —
 // an operator scanning the Status column needs the cause, not just the
 // state name. issueCodes is the already-humanized list from
-// Health.Issues; when empty (AWS reported the state without an issues[]
-// entry, which happens transiently) fallbackPhrase is used instead. A second
-// and later issue becomes an Attention row rather than widening the Phrase,
-// keeping the Status cell short.
-func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCodes []string) (domain.Finding, []domain.DetailRow) {
-	return healthIssueFindingSev(code, fallbackPhrase, issueCodes, domain.SevBroken)
+// Health.Issues, one Attention row each.
+func healthIssueFinding(code domain.FindingCode, issueCodes []string) (domain.Finding, []domain.DetailRow) {
+	return healthIssueFindingSev(code, issueCodes, domain.SevBroken)
 }
 
-// healthIssueFindingSev returns the finding plus one Attention row per
-// reported issue code, so the phrase names the first and the rows the rest.
-func healthIssueFindingSev(code domain.FindingCode, fallbackPhrase string, issueCodes []string, sev domain.Severity) (domain.Finding, []domain.DetailRow) {
-	f := domain.Finding{Code: code, Phrase: fallbackPhrase, Detail: catalog.Detail(code), Severity: sev, Source: "wave1"}
-	if len(issueCodes) == 0 {
-		return f, nil
-	}
-	f.Phrase = issueCodes[0]
+// healthIssueFindingSev returns the code's own finding plus one Attention row
+// per reported issue code: a node group with three issues has three to read,
+// and promoting the first into the phrase left the others unsayable.
+func healthIssueFindingSev(code domain.FindingCode, issueCodes []string, sev domain.Severity) (domain.Finding, []domain.DetailRow) {
+	f := wave1Finding(code, catalog.Phrase(code), sev)
 	tier := "~"
 	if sev == domain.SevBroken {
 		tier = "!"
 	}
-	// From the second issue on: the first is already the phrase, and a row
-	// repeating it prints the same words one line below itself.
-	rows := make([]domain.DetailRow, 0, len(issueCodes)-1)
-	for _, c := range issueCodes[1:] {
+	rows := make([]domain.DetailRow, 0, len(issueCodes))
+	for _, c := range issueCodes {
 		rows = append(rows, domain.DetailRow{Label: "Issue", Value: c, Tier: tier})
 	}
 	return f, rows
@@ -158,11 +150,11 @@ func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]do
 	case "DELETE_FAILED":
 		return []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Detail: catalog.Detail(CodeNGStateDeleteFailed), Severity: domain.SevBroken, Source: "wave1"}}, nil
 	case "DEGRADED":
-		f, rows := healthIssueFinding(CodeNGStateDegraded, "degraded", issueCodes)
+		f, rows := healthIssueFinding(CodeNGStateDegraded, issueCodes)
 		return []domain.Finding{f}, rows
 	}
 	if healthIssuesCount > 0 {
-		f, rows := healthIssueFindingSev(CodeNGHealthIssue, "health issue", issueCodes, domain.SevWarn)
+		f, rows := healthIssueFindingSev(CodeNGHealthIssue, issueCodes, domain.SevWarn)
 		return []domain.Finding{f}, rows
 	}
 	return nil, nil

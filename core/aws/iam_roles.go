@@ -371,17 +371,11 @@ func enumerateRoleInlinePolicies(
 			continue
 		}
 		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
-			scan.finding = &domain.Finding{
-				Code:     roleCodeInlinePrivEsc,
-				Phrase:   "inline policy allows privilege escalation: " + combos[0],
-				Detail:   catalog.Detail(roleCodeInlinePrivEsc),
-				Severity: domain.SevBroken,
-				Source:   "wave1",
-			}
-			scan.rows = []domain.DetailRow{
-				{Label: "Policy", Value: policyName, Tier: "!"},
-				{Label: "Combo", Value: combos[0], Tier: "!"},
-			}
+			f := wave1Finding(roleCodeInlinePrivEsc, catalog.Phrase(roleCodeInlinePrivEsc), domain.SevBroken)
+			scan.finding = &f
+			scan.rows = append(
+				[]domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "!"}},
+				privEscComboRows(combos)...)
 		}
 	}
 	return strings.Join(allResources, ","), scan

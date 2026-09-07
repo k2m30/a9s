@@ -17,6 +17,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -228,11 +229,15 @@ func TestW4UserAccessKeyNeverUsed(t *testing.T) {
 	}
 	res := w4EnrichUsers(t, fake, []resource.Resource{w4UserResource("acme-batch-user", 400, "Never")})
 
+	// Inverted for spec row "phrase": the idle days were in the phrase, so the
+	// first idle key's number stood for every idle key on the user. They are an
+	// Idle row now. Do not restore the old phrase.
 	w4AssertFinding(t, res.Findings["acme-batch-user"], w4CodeUserKeyUnused,
-		"access key unused for 200 days", domain.SevWarn, w4SourceUserWave2)
+		catalog.Phrase(w4CodeUserKeyUnused), domain.SevWarn, w4SourceUserWave2)
 	w4AssertRows(t, res.AttentionDetails["acme-batch-user"], w4CodeUserKeyUnused, []domain.DetailRow{
 		{Label: "Key", Value: "…MPLE"},
 		{Label: "Last used", Value: "never"},
+		{Label: "Idle", Value: "200 days"},
 	})
 }
 
@@ -251,10 +256,11 @@ func TestW4UserAccessKeyIdleSinceLastUse(t *testing.T) {
 	res := w4EnrichUsers(t, fake, []resource.Resource{w4UserResource("acme-batch-user", 400, "Never")})
 
 	w4AssertFinding(t, res.Findings["acme-batch-user"], w4CodeUserKeyUnused,
-		"access key unused for 120 days", domain.SevWarn, w4SourceUserWave2)
+		catalog.Phrase(w4CodeUserKeyUnused), domain.SevWarn, w4SourceUserWave2)
 	w4AssertRows(t, res.AttentionDetails["acme-batch-user"], w4CodeUserKeyUnused, []domain.DetailRow{
 		{Label: "Key", Value: "…MPLE"},
 		{Label: "Last used", Value: lastUsed.Format("2006-01-02")},
+		{Label: "Idle", Value: "120 days"},
 	})
 }
 
@@ -439,7 +445,9 @@ func TestW4UserFindingDefs(t *testing.T) {
 	}{
 		{w4CodeUserAdminAttached, "has an administrator policy"},
 		{w4CodeUserConsoleNeverUse, w4PhraseUserConsoleNever},
-		{w4CodeUserKeyUnused, "access key unused for <N> days"},
+		// Inverted for spec row "phrase": the idle days moved to a supporting
+		// row, so the declaration no longer carries a placeholder for them.
+		{w4CodeUserKeyUnused, "access key unused"},
 		{w4CodeUserTwoActiveKeys, w4PhraseUserTwoActiveKeys},
 	}
 	for _, tc := range cases {

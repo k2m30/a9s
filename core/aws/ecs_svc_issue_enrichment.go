@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -186,14 +187,8 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					rows = append(rows, domain.DetailRow{Label: "Event", Value: issue, Tier: "!"})
 				}
 
-				summary := "deployment failed"
-				if len(deploymentIssues) == 0 && serviceStuck {
-					summary = fmt.Sprintf("service stuck: running %d / desired %d", svc.RunningCount, svc.DesiredCount)
-				} else if len(deploymentIssues) == 0 && len(eventIssues) > 0 {
-					summary = eventIssues[0]
-				}
-
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows)
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed,
+					catalog.Phrase(ecsSvcCodeDeploymentFailed), "!", "ecs-svc", rows)
 			}
 		}
 	}

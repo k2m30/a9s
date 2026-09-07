@@ -135,7 +135,7 @@ iam-group — SECURITY & IAM. Lifecycle key: none (the list API returns no lifec
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 | This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for. |
+| iam-group.orphan-or-noop | no members or no policies | warn | wave2 | This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for. |
 | iam-group.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 <!-- END GENERATED: findings -->
 

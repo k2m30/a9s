@@ -10,7 +10,6 @@ package unit
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -538,9 +538,10 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 		t.Fatalf("expected finding for capacity-asg, got none")
 	}
 	f := fs[0]
-	// Summary must contain the status message.
-	if !strings.Contains(f.Phrase, statusMsg) {
-		t.Errorf("summary %q must contain status message %q", f.Phrase, statusMsg)
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("asg.scaling-activity-failed"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
 	// Rows must include a "Message" row.
 	var hasMessageRow, hasCauseRow, hasStartedRow bool

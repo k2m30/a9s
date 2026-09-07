@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -108,7 +109,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			key = stackName
 		}
 		setWave2Finding(&result, key, cfnCodeRecentResourceFailure,
-			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows)
+			catalog.Phrase(cfnCodeRecentResourceFailure), "!", "cfn", failedRows)
 
 	})
 	sort.Strings(failures)

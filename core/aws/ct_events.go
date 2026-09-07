@@ -600,50 +600,33 @@ const (
 	ctCauseNone          = ""
 )
 
-// ctEventFindings builds the wave1 Finding for a CT event, carrying the
-// cause computeCTStatus derived so the phrase names WHY the row is flagged
-// instead of restating its severity.
+// ctEventFindings builds the wave1 Finding for a CT event. The cause
+// computeCTStatus derived picks the code, so the phrase the row shows is that
+// code's own registered wording rather than a sentence assembled per event.
 func ctEventFindings(status, cause, errorCode, eventName string) []domain.Finding {
 	switch status {
 	case "ct-danger":
-		return []domain.Finding{{Code: CodeCTEventDanger, Phrase: ctDangerPhrase(cause, errorCode), Detail: catalog.Detail(CodeCTEventDanger), Severity: domain.SevBroken, Source: "wave1"}}
+		if cause == ctCauseError {
+			return []domain.Finding{wave1Finding(CodeCTEventFailedCall,
+				"failed: "+domain.HumanizeStatusPhrase(errorCode), domain.SevBroken)}
+		}
+		return []domain.Finding{wave1Finding(CodeCTEventDanger, catalog.Phrase(CodeCTEventDanger), domain.SevBroken)}
 	case "ct-attention":
-		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: ctAttentionPhrase(cause, eventName), Detail: catalog.Detail(CodeCTEventAttention), Severity: domain.SevWarn, Source: "wave1"}}
+		switch cause {
+		case ctCauseWrite:
+			return []domain.Finding{wave1Finding(CodeCTEventWrite, catalog.Phrase(CodeCTEventWrite), domain.SevWarn)}
+		case ctCauseCrossAccount:
+			return []domain.Finding{wave1Finding(CodeCTEventCrossAccount, catalog.Phrase(CodeCTEventCrossAccount), domain.SevWarn)}
+		case ctCauseSensitiveRead:
+			return []domain.Finding{wave1Finding(CodeCTEventSensitiveRead,
+				"reads sensitive data ("+eventName+")", domain.SevWarn)}
+		}
+		return []domain.Finding{wave1Finding(CodeCTEventAttention, catalog.Phrase(CodeCTEventAttention), domain.SevWarn)}
 	}
 	// ct-info (or any unrecognized tier) — colorCTEvents has no healthy
 	// bucket for events, so the routine/no-signal tier still needs a
 	// Finding to explain its Dim color on the list/detail surfaces.
-	return []domain.Finding{{Code: CodeCTEventInfo, Phrase: "routine event", Severity: domain.SevDim, Source: "wave1"}}
-}
-
-// ctDangerPhrase renders the ct-danger cause as a lowercase operator phrase
-// plus a one-sentence detail. Precedence matches computeCTStatus: error
-// before destructive verb.
-func ctDangerPhrase(cause, errorCode string) string {
-	switch cause {
-	case ctCauseError:
-		return "failed: " + domain.HumanizeStatusPhrase(errorCode)
-	case ctCauseDestructive:
-		return "destructive call"
-	}
-	return "danger"
-}
-
-// ctAttentionPhrase renders the ct-attention cause as a lowercase operator
-// phrase. Precedence matches computeCTStatus:
-// write verb, then root, then cross-account, then sensitive read.
-func ctAttentionPhrase(cause, eventName string) string {
-	switch cause {
-	case ctCauseWrite:
-		return "modifying call"
-	case ctCauseRoot:
-		return "root account activity"
-	case ctCauseCrossAccount:
-		return "cross-account access"
-	case ctCauseSensitiveRead:
-		return "reads sensitive data (" + eventName + ")"
-	}
-	return "attention"
+	return []domain.Finding{wave1Finding(CodeCTEventInfo, catalog.Phrase(CodeCTEventInfo), domain.SevDim)}
 }
 
 // computeCTStatus implements the §1.2 severity ladder, returning the tier

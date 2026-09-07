@@ -18,6 +18,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -152,8 +153,11 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 	if res.TruncatedIDs["acme-ci-user"] {
 		t.Errorf("the sibling user was marked unknown by another user's failure")
 	}
+	// Inverted for spec row "phrase": the idle days were in the phrase, so one
+	// key's number stood for every idle key on the user; they are an Idle row
+	// now. Do not restore the old expectation.
 	w4AssertFinding(t, res.Findings["acme-ci-user"], d3CodeUserKeyUnused,
-		"access key unused for 400 days", domain.SevWarn, "wave2:iam-user")
+		catalog.Phrase(d3CodeUserKeyUnused), domain.SevWarn, "wave2:iam-user")
 }
 
 // TestD3UserRowsDoNotRestateTheirPhrase pins row 2: a supporting row exists to

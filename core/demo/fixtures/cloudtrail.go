@@ -520,6 +520,19 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources:       []cloudtrailtypes.Resource{},
 		},
 		{
+			// The one root-account event that is not also a write: verb wins over
+			// root in the severity ladder, so a root CreateBucket reports as a
+			// modifying call and only a root READ witnesses root activity.
+			EventId:         aws.String("e-e5f6a7b9"),
+			EventName:       aws.String("GetAccountSummary"),
+			EventTime:       aws.Time(tE),
+			EventSource:     aws.String("iam.amazonaws.com"),
+			Username:        nil,
+			ReadOnly:        aws.String("true"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T03:50:11Z","eventSource":"iam.amazonaws.com","eventName":"GetAccountSummary","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.17","userAgent":"signin.amazonaws.com","recipientAccountId":"555555555555","eventID":"e-e5f6a7b9","readOnly":true,"userIdentity":{"type":"Root","principalId":"555555555555","arn":"arn:aws:iam::555555555555:root","accountId":"555555555555"},"requestParameters":null,"responseElements":null}`),
+			Resources:       []cloudtrailtypes.Resource{},
+		},
+		{
 			EventId:         aws.String("e-e5f6a7b8"),
 			EventName:       aws.String("PutBucketPolicy"),
 			EventTime:       aws.Time(tE),
@@ -1063,5 +1076,5 @@ func init() {
 	// healthy: colorCTEvents (core/aws/catalog_monitoring.go) colors only
 	// ct-danger→Broken and ct-attention→Warning and defaults everything else
 	// to Dim, so Healthy is not a return value of this classifier.
-	Register(Pin{ShortName: "ct-events", Rows: 52, Issues: 0, CoverageGaps: []string{"healthy"}})
+	Register(Pin{ShortName: "ct-events", Rows: 53, Issues: 0, CoverageGaps: []string{"healthy"}})
 }

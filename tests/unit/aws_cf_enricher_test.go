@@ -13,6 +13,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -21,6 +22,7 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -218,8 +220,13 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Phrase), "https") {
-		t.Errorf("summary %q must contain \"https\"", f.Phrase)
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("cf.insecure-protocol"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
+	}
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[cfDistroID1]["cf.insecure-protocol"].Rows); !strings.Contains(strings.ToLower(rows), "allow-all") {
+		t.Errorf("no supporting row names the viewer protocol policy: %s", rows)
 	}
 	if _, ok := result.Findings[cfDistroID2]; ok {
 		t.Error("distro-2 must NOT appear in Findings — it has redirect-to-https")
@@ -273,11 +280,13 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Phrase), "origin") {
-		t.Errorf("summary %q must contain \"origin\"", f.Phrase)
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("cf.insecure-protocol"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
-	if !strings.Contains(strings.ToLower(f.Phrase), "tls") {
-		t.Errorf("summary %q must contain \"tls\"", f.Phrase)
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[cfDistroID1]["cf.insecure-protocol"].Rows); !strings.Contains(strings.ToLower(rows), "origin") {
+		t.Errorf("no supporting row names the offending origin: %s", rows)
 	}
 	if _, ok := result.Findings[cfDistroID2]; ok {
 		t.Error("distro-2 must NOT appear in Findings — all its origins use https-only")

@@ -17,6 +17,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -127,8 +128,11 @@ func TestW4PolicyPrivilegeEscalation(t *testing.T) {
 		w4PolicyResource("acme-reports-reader", benignARN),
 	})
 
+	// Inverted for spec row "phrase": the first matched combo was the phrase,
+	// which left every other combo on the policy unsayable. The combos are the
+	// rows and the phrase is the code's. Do not restore the old phrase.
 	w4AssertFinding(t, res.Findings[escARN], w4CodePolicyPrivEsc,
-		"allows privilege escalation: "+w4PolicyPrivEscCombo, domain.SevBroken, w4SourcePolicyWave2)
+		catalog.Phrase(w4CodePolicyPrivEsc), domain.SevBroken, w4SourcePolicyWave2)
 	w4AssertRows(t, res.AttentionDetails[escARN], w4CodePolicyPrivEsc,
 		[]domain.DetailRow{{Label: "Combo", Value: w4PolicyPrivEscCombo}})
 
@@ -177,7 +181,7 @@ func TestW4PolicyPrivEscComboRowsAreCapped(t *testing.T) {
 	res := w4EnrichPolicies(t, fake, []resource.Resource{w4PolicyResource("acme-iam-operator", arn)})
 
 	w4AssertFinding(t, res.Findings[arn], w4CodePolicyPrivEsc,
-		"allows privilege escalation: "+combos[0], domain.SevBroken, w4SourcePolicyWave2)
+		catalog.Phrase(w4CodePolicyPrivEsc), domain.SevBroken, w4SourcePolicyWave2)
 
 	want := make([]domain.DetailRow, 0, 11)
 	for _, combo := range combos[:10] {
@@ -210,7 +214,7 @@ func TestW4PolicyPrivEscDocumentFetchFailureIsUnknown(t *testing.T) {
 	}
 	w4AssertNoCode(t, res.Findings[deniedARN], w4CodePolicyPrivEsc)
 	w4AssertFinding(t, res.Findings[escARN], w4CodePolicyPrivEsc,
-		"allows privilege escalation: "+w4PolicyPrivEscCombo, domain.SevBroken, w4SourcePolicyWave2)
+		catalog.Phrase(w4CodePolicyPrivEsc), domain.SevBroken, w4SourcePolicyWave2)
 }
 
 // TestW4PolicyPrivEscBeyondCap pins the cap semantics for a "!"-severity
@@ -254,11 +258,13 @@ func TestW4PolicyPrivEscNilClient(t *testing.T) {
 // TestW4PolicyFindingDef pins the registry row for the new policy code.
 func TestW4PolicyFindingDef(t *testing.T) {
 	def := w4FindingDef(t, "policy", w4CodePolicyPrivEsc)
-	if !strings.Contains(def.Phrase, "<combo>") {
-		t.Errorf("Phrase = %q; a phrase with a variable part is registered with a <placeholder>", def.Phrase)
+	// Inverted for spec row "phrase": the combo moved into the rows, so the
+	// declaration carries no placeholder for it any more.
+	if strings.Contains(def.Phrase, "<") {
+		t.Errorf("Phrase = %q; the combo is a supporting row, so the declaration needs no placeholder", def.Phrase)
 	}
-	if def.Phrase != "allows privilege escalation: <combo>" {
-		t.Errorf("Phrase = %q, want %q", def.Phrase, "allows privilege escalation: <combo>")
+	if def.Phrase != "allows privilege escalation" {
+		t.Errorf("Phrase = %q, want %q", def.Phrase, "allows privilege escalation")
 	}
 	if def.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", def.Severity)

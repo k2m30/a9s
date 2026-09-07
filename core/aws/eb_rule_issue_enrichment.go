@@ -13,12 +13,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // eb-rule canonical FindingCodes.
 const (
+	ebRuleCodeNoTargets   domain.FindingCode = "eb-rule.no-targets"
 	ebRuleCodeTargetIssue domain.FindingCode = "eb-rule.target-issue"
 )
 
@@ -92,13 +94,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		var rows []domain.DetailRow
 
 		// ENABLED rule with no targets → rule fires but goes nowhere.
-		if state == "ENABLED" && len(targets) == 0 && !targetsTruncated {
-			rows = append(rows, domain.DetailRow{
-				Label: "Targets",
-				Value: "enabled rule has no targets (rule matches but goes nowhere)",
-				Tier:  "!",
-			})
-		}
+		noTargets := state == "ENABLED" && len(targets) == 0 && !targetsTruncated
 
 		// DISABLED rule still has targets → probable drift/oversight.
 		if state == "DISABLED" && len(targets) > 0 {
@@ -135,20 +131,17 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			"target_count": targetCountStr,
 		}
 
+		if noTargets {
+			setWave2Finding(&result, ruleName, ebRuleCodeNoTargets, catalog.Phrase(ebRuleCodeNoTargets), "!", "eb-rule",
+				[]domain.DetailRow{{Label: "Targets", Value: "none", Tier: "!"}})
+
+		}
+
 		if len(rows) == 0 {
 			return
 		}
-
-		// Determine severity: "!" if any row is "!", otherwise "~".
-		severity := "~"
-		for _, row := range rows {
-			if row.Tier == "!" {
-				severity = "!"
-				break
-			}
-		}
-
-		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, rows[0].Value, severity, "eb-rule", rows)
+		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue,
+			catalog.Phrase(ebRuleCodeTargetIssue), "~", "eb-rule", rows)
 	})
 
 	result.Truncated = truncated

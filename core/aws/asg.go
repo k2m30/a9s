@@ -195,17 +195,11 @@ func asgHealthFindings(status string, inServiceCount, unhealthyCount, minSize in
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
 	case inServiceCount < minSize:
-		return []domain.Finding{{
-			Code:     CodeASGUnderprovisioned,
-			Phrase:   fmt.Sprintf("%d of %d instances in service", inServiceCount, minSize),
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeASGUnderprovisioned,
+			fmt.Sprintf("%d of %d instances in service", inServiceCount, minSize), domain.SevBroken)}
 	case unhealthyCount > 0:
-		return []domain.Finding{{
-			Code:     CodeASGUnhealthyInstances,
-			Phrase:   fmt.Sprintf("%d unhealthy instance(s)", unhealthyCount),
-			Severity: domain.SevWarn, Source: "wave1",
-		}}
+		return []domain.Finding{wave1Finding(CodeASGUnhealthyInstances,
+			fmt.Sprintf("%d unhealthy instance(s)", unhealthyCount), domain.SevWarn)}
 	case strings.Contains(suspendedProcesses, "Launch") ||
 		strings.Contains(suspendedProcesses, "Terminate") ||
 		strings.Contains(suspendedProcesses, "HealthCheck"):

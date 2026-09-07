@@ -28,10 +28,10 @@ func cfnEventFindings(status cfntypes.ResourceStatus) []domain.Finding {
 		return []domain.Finding{{Code: CodeCfnEventDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
 	}
 	if strings.HasSuffix(s, "_FAILED") {
-		return []domain.Finding{{Code: CodeCfnEventFailed, Phrase: strings.ToLower(strings.ReplaceAll(s, "_", " ")), Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCfnEventFailed, cfnStatusWords(s), domain.SevBroken)}
 	}
 	if strings.HasSuffix(s, "_IN_PROGRESS") {
-		return []domain.Finding{{Code: CodeCfnEventInProgress, Phrase: strings.ToLower(strings.ReplaceAll(s, "_", " ")), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCfnEventInProgress, cfnStatusWords(s), domain.SevWarn)}
 	}
 	return nil
 }

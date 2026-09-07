@@ -247,7 +247,7 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-task.state.stopped | stopped | dim | wave1 | — |
 | ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 | — |
 | ecs-task.health.unhealthy | unhealthy | broken | wave1 | — |
-| ecs-task.task-failed | <stop code or container> failed | broken | wave2 | — |
+| ecs-task.task-failed | task failed | broken | wave2 | — |
 | ecs-task.privileged | privileged container | broken | wave2 | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |
 | ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |
 | ecs-task.writable-root | writable root filesystem | warn | wave2 | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |

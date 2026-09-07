@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigatewayv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -112,7 +113,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		if stagesTruncated {
 			stagesCountStr = resource.FormatTruncated(len(stages))
 		}
-		var summaries []string
 		var rows []domain.DetailRow
 
 		for _, stage := range stages {
@@ -126,7 +126,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				noThrottle := (drs.ThrottlingBurstLimit != nil && *drs.ThrottlingBurstLimit == 0) ||
 					(drs.ThrottlingRateLimit != nil && *drs.ThrottlingRateLimit == 0)
 				if noThrottle {
-					summaries = append(summaries, "no throttling configured (DoS risk)")
 					rows = append(rows, domain.DetailRow{
 						Label: "Stage",
 						Value: *stageName,
@@ -142,7 +141,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 
 			// Check access log settings.
 			if stage.AccessLogSettings == nil {
-				summaries = append(summaries, "access logs disabled")
 				rows = append(rows, domain.DetailRow{
 					Label: "Stage",
 					Value: *stageName,
@@ -182,19 +180,11 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 
 			return
 		}
-		if len(summaries) == 0 {
+		if len(rows) == 0 {
 			return
 		}
-		// Deduplicate repeated summary messages.
-		seen := make(map[string]bool)
-		var uniqueSummaries []string
-		for _, s := range summaries {
-			if !seen[s] {
-				seen[s] = true
-				uniqueSummaries = append(uniqueSummaries, s)
-			}
-		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows)
+		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues,
+			catalog.Phrase(apigwCodeStageConfigIssues), "~", "apigw", rows)
 	})
 	// apigw.no-authorizer-public and apigw.stage-variable-secret are "!", so
 	// the cap now bounds the issue count and a capped pass must say so rather

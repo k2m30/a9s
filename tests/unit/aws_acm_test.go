@@ -111,13 +111,16 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	// Warning, < 7d -> Broken" — read straight off ListCertificates, zero
 	// extra calls; acm no longer has a Wave 2 IssueEnricher at all). This
 	// fixture's NotAfter (2026-06-15) is already in the past relative to
-	// "now", so it falls in the <7d/expired bucket: exactly 1 Finding,
-	// code "acm.expires-critical", severity SevBroken.
+	// "now", so it falls in the expired bucket: exactly 1 Finding,
+	// code "acm.expired", severity SevBroken.
 	if len(r0.Findings) != 1 {
 		t.Fatalf("resource[0].Findings: expected 1 (expires-critical) for an expired ISSUED cert, got %d: %v", len(r0.Findings), r0.Findings)
 	}
-	if r0.Findings[0].Code != "acm.expires-critical" {
-		t.Errorf("resource[0].Findings[0].Code: expected %q, got %q", "acm.expires-critical", r0.Findings[0].Code)
+	// Inverted for spec row "phrase": a cert past NotAfter carries its own code
+	// now, because "expired" and "expires in 3 days" are different things to do
+	// and one code cannot declare both wordings. Do not restore the old code.
+	if r0.Findings[0].Code != "acm.expired" {
+		t.Errorf("resource[0].Findings[0].Code: expected %q, got %q", "acm.expired", r0.Findings[0].Code)
 	}
 	if r0.Findings[0].Severity != domain.SevBroken {
 		t.Errorf("resource[0].Findings[0].Severity: expected %v, got %v", domain.SevBroken, r0.Findings[0].Severity)

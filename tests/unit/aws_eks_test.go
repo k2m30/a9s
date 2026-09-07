@@ -11,6 +11,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -318,8 +319,12 @@ func TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow(t *testing.T) {
 	if !haveFinding {
 		t.Fatalf("acme-degraded-prod carries no %s finding, got %v", awsclient.CodeEKSHealthIssue, cluster.Findings)
 	}
-	if finding.Phrase != "configuration conflict" {
-		t.Errorf("Phrase = %q, want %q", finding.Phrase, "configuration conflict")
+	// Inverted for spec row "phrase": promoting the first health issue into the
+	// phrase made the wording a property of the issue and left the others
+	// unsayable. The phrase is the code's and EVERY issue is a row now. Do not
+	// restore the old assertion.
+	if want := catalog.Phrase(awsclient.CodeEKSHealthIssue); finding.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", finding.Phrase, want)
 	}
 
 	issueRows := 0
@@ -328,11 +333,8 @@ func TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow(t *testing.T) {
 			continue
 		}
 		issueRows++
-		if row.Value == "configuration conflict" {
-			t.Errorf("row repeats the phrase %q one line below itself", row.Value)
-		}
 	}
-	if issueRows != 1 {
-		t.Errorf("%d \"Issue\" rows, want exactly 1 (the second issue only)", issueRows)
+	if issueRows != 2 {
+		t.Errorf("%d \"Issue\" rows, want one per reported issue (2)", issueRows)
 	}
 }

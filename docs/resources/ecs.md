@@ -202,7 +202,7 @@ ecs — COMPUTE. Lifecycle key: `status`.
 | ecs.state.deprovisioning | deprovisioning | warn | wave1 | — |
 | ecs.state.failed | failed | broken | wave1 | — |
 | ecs.state.inactive | inactive | broken | wave1 | — |
-| ecs.cluster-issue | <N> pending tasks | warn | wave2 | — |
+| ecs.cluster-issue | tasks pending or not running | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -13,6 +13,7 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -22,15 +23,6 @@ const (
 	tgwCodeAttachmentFailed       domain.FindingCode = "tgw.attachment-failed"
 	tgwCodeAttachmentTransitional domain.FindingCode = "tgw.attachment-transitional"
 )
-
-// worstTGWFinding holds the temporary state for tracking the worst attachment finding
-// across all attachments for a single TGW during the enrichment loop.
-type worstTGWFinding struct {
-	code    domain.FindingCode
-	summary string
-	glyph   string
-	rows    []domain.DetailRow
-}
 
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
 // per-TGW pagination up to PerParentPageCap pages) and returns a Finding for any TGW with
@@ -104,9 +96,10 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			}
 			return
 		}
-		// Collect worst finding across all attachments for this TGW.
-		// "!" severity beats "~" severity.
-		var worst *worstTGWFinding
+		// One finding per condition, every attachment in that condition a row:
+		// a gateway with three failed attachments has three to fix, and naming
+		// only the worst of them leaves the other two unsayable.
+		attRows := map[domain.FindingCode][]domain.DetailRow{}
 		issueCount := 0
 		for _, att := range allAttachments {
 			attID := ""
@@ -115,37 +108,20 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			}
 			state := string(att.State)
 			humanState := domain.HumanizeStatusPhrase(state)
-			var candidate *worstTGWFinding
+			code := domain.FindingCode("")
+			tier := ""
 			switch state {
 			case "failed", "failing":
-				issueCount++
-				candidate = &worstTGWFinding{
-					code:    tgwCodeAttachmentFailed,
-					summary: fmt.Sprintf("attachment %s failed", attID),
-					glyph:   "!",
-					rows: []domain.DetailRow{
-						{Label: "Attachment", Value: attID, Tier: "!"},
-						{Label: "State", Value: humanState, Tier: "!"},
-					},
-				}
+				code, tier = tgwCodeAttachmentFailed, "!"
 			case "modifying", "pendingAcceptance", "rollingBack":
-				issueCount++
-				candidate = &worstTGWFinding{
-					code:    tgwCodeAttachmentTransitional,
-					summary: fmt.Sprintf("attachment %s %s", attID, humanState),
-					glyph:   "~",
-					rows: []domain.DetailRow{
-						{Label: "Attachment", Value: attID, Tier: "~"},
-						{Label: "State", Value: humanState, Tier: "~"},
-					},
-				}
-			}
-			if candidate == nil {
+				code, tier = tgwCodeAttachmentTransitional, "~"
+			default:
 				continue
 			}
-			if worst == nil || (worst.glyph != "!" && candidate.glyph == "!") {
-				worst = candidate
-			}
+			issueCount++
+			attRows[code] = append(attRows[code],
+				domain.DetailRow{Label: "Attachment", Value: attID, Tier: tier},
+				domain.DetailRow{Label: "State", Value: humanState, Tier: tier})
 		}
 		attStatusVal := ""
 		if issueCount > 0 {
@@ -157,8 +133,13 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		result.FieldUpdates[tgwID] = map[string]string{
 			"att_status": attStatusVal,
 		}
-		if worst != nil {
-			setWave2Finding(&result, tgwID, worst.code, worst.summary, worst.glyph, "tgw", worst.rows)
+		for _, c := range []struct {
+			code domain.FindingCode
+			tier string
+		}{{tgwCodeAttachmentFailed, "!"}, {tgwCodeAttachmentTransitional, "~"}} {
+			if rows := attRows[c.code]; len(rows) > 0 {
+				setWave2Finding(&result, tgwID, c.code, catalog.Phrase(c.code), c.tier, "tgw", rows)
+			}
 		}
 	})
 	sort.Strings(failures)

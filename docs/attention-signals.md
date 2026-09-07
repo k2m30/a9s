@@ -75,7 +75,7 @@ lines under "Not yet implemented".
 | `ec2` | EC2 Instances | wave2 | `ec2.instance-status-impaired` | impaired: system checks failing | broken | AWS reports this instance is impaired — system or instance status checks are failing. |
 | `ec2` | EC2 Instances | wave2 | `ec2.instance-status.initializing` | initializing: checks in progress | warn | Instance status checks have not yet passed since start. |
 | `ec2` | EC2 Instances | wave2 | `ec2.instance-status.insufficient-data` | status unknown: AWS insufficient-data | warn | AWS cannot determine status — insufficient data from the hypervisor. |
-| `ec2` | EC2 Instances | wave2 | `ec2.scheduled-event` | scheduled event: <code> at <date> | warn | — |
+| `ec2` | EC2 Instances | wave2 | `ec2.scheduled-event` | scheduled event | warn | — |
 | `ec2` | EC2 Instances | wave1 | `ec2.imdsv1-allowed` | IMDSv1 allowed | warn | Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata. |
 | `ec2` | EC2 Instances | wave1 | `ec2.public-ip` | public address | warn | The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly. |
 | `ec2` | EC2 Instances | wave2 | `ec2.internet-exposed` | port(s) <list> reachable from the internet | broken | Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion. |
@@ -84,13 +84,13 @@ lines under "Not yet implemented".
 | `ecs-svc` | ECS Services | wave1 | `ecs-svc.state.draining` | draining | warn | — |
 | `ecs-svc` | ECS Services | wave1 | `ecs-svc.tasks.none-running` | no tasks running | broken | The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes. |
 | `ecs-svc` | ECS Services | wave1 | `ecs-svc.tasks.below-desired` | running below desired count | warn | Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks. |
-| `ecs-svc` | ECS Services | wave2 | `ecs-svc.deployment-failed` | deployment failed | broken | This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them. |
+| `ecs-svc` | ECS Services | wave2 | `ecs-svc.deployment-failed` | not running its desired tasks | broken | This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them. |
 | `ecs-svc` | ECS Services | wave2 | `ecs-svc.public-ip` | tasks get public IPs | warn | Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway. |
 | `ecs` | ECS Clusters | wave1 | `ecs.state.provisioning` | provisioning | warn | — |
 | `ecs` | ECS Clusters | wave1 | `ecs.state.deprovisioning` | deprovisioning | warn | — |
 | `ecs` | ECS Clusters | wave1 | `ecs.state.failed` | failed | broken | — |
 | `ecs` | ECS Clusters | wave1 | `ecs.state.inactive` | inactive | broken | — |
-| `ecs` | ECS Clusters | wave2 | `ecs.cluster-issue` | <N> pending tasks | warn | — |
+| `ecs` | ECS Clusters | wave2 | `ecs.cluster-issue` | tasks pending or not running | warn | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.provisioning` | provisioning | warn | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.pending` | pending | warn | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.activating` | activating | warn | — |
@@ -100,7 +100,7 @@ lines under "Not yet implemented".
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.state.stopped` | stopped | dim | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.stop-code.failed` | stopped: <stop code> | broken | — |
 | `ecs-task` | ECS Tasks | wave1 | `ecs-task.health.unhealthy` | unhealthy | broken | — |
-| `ecs-task` | ECS Tasks | wave2 | `ecs-task.task-failed` | <stop code or container> failed | broken | — |
+| `ecs-task` | ECS Tasks | wave2 | `ecs-task.task-failed` | task failed | broken | — |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.privileged` | privileged container | broken | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.host-namespace` | shares the host network or process namespace | warn | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |
 | `ecs-task` | ECS Tasks | wave2 | `ecs-task.writable-root` | writable root filesystem | warn | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |
@@ -129,7 +129,7 @@ lines under "Not yet implemented".
 | `ebs` | EBS Volumes | wave1 | `ebs.state.creating` | creating | warn | — |
 | `ebs` | EBS Volumes | wave1 | `ebs.state.deleting` | deleting | warn | The volume is being deleted; its data is going with it and nothing else about it is worth reporting until it is gone. |
 | `ebs` | EBS Volumes | wave1 | `ebs.state.error` | error | broken | — |
-| `ebs` | EBS Volumes | wave1 | `ebs.orphan-unattached` | orphan: unattached Nd | warn | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
+| `ebs` | EBS Volumes | wave1 | `ebs.orphan-unattached` | orphan: unattached <N>d | warn | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
 | `ebs` | EBS Volumes | wave1 | `ebs.encryption.disabled` | unencrypted | warn | Volume is not encrypted at rest — re-create from encrypted snapshot. |
 | `ebs` | EBS Volumes | wave2 | `ebs.volume-io-degraded` | volume I/O degraded | broken | — |
 | `ebs` | EBS Volumes | wave2 | `ebs.not-in-backup-plan` | not covered by a backup plan | warn | No backup plan selects this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
@@ -160,8 +160,8 @@ lines under "Not yet implemented".
 | `eks` | EKS Clusters | wave1 | `eks.state.updating` | updating | warn | — |
 | `eks` | EKS Clusters | wave1 | `eks.state.deleting` | deleting | warn | The cluster is being torn down; its workloads are going with it and nothing else about it is worth reporting until it is gone. |
 | `eks` | EKS Clusters | wave1 | `eks.state.pending` | pending | warn | The cluster has been created but its control plane is not serving yet; nothing can be scheduled on it until it becomes active. |
-| `eks` | EKS Clusters | wave1 | `eks.state.failed` | failed | broken | The cluster is in a failed state and will not recover on its own; when AWS reports health issues, the first is the phrase and any others follow as rows. Open a support case or recreate the cluster. |
-| `eks` | EKS Clusters | wave1 | `eks.health-issue` | issue: <health issue code> | warn | The control plane reports at least one health issue; the first code is the phrase, any others follow as rows, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
+| `eks` | EKS Clusters | wave1 | `eks.state.failed` | failed | broken | The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster. |
+| `eks` | EKS Clusters | wave1 | `eks.health-issue` | health issue | warn | The control plane reports at least one health issue; every reported code is a row under this finding, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
 | `eks` | EKS Clusters | wave1 | `eks.public-endpoint` | cluster endpoint reachable from the internet | broken | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |
 | `eks` | EKS Clusters | wave1 | `eks.control-plane-logging-off` | control plane logging incomplete | warn | Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster. |
 | `eks` | EKS Clusters | wave1 | `eks.secrets-not-kms` | secrets not encrypted with KMS | warn | Kubernetes secrets in this cluster are stored in etcd with only the AWS-managed default protection and no envelope encryption of their own. Attach a KMS key to the cluster's secrets encryption configuration so a copy of etcd is useless without that key. |
@@ -173,8 +173,8 @@ lines under "Not yet implemented".
 | `ng` | EKS Node Groups | wave1 | `ng.state.deleting` | deleting | warn | — |
 | `ng` | EKS Node Groups | wave1 | `ng.state.create-failed` | create failed | broken | — |
 | `ng` | EKS Node Groups | wave1 | `ng.state.delete-failed` | delete failed | broken | — |
-| `ng` | EKS Node Groups | wave1 | `ng.state.degraded` | degraded | broken | The node group is degraded, so some nodes are failing or not joining; when AWS reports health issues, the first is the phrase and any others follow as rows. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
-| `ng` | EKS Node Groups | wave1 | `ng.health-issue` | issue: <health issue code> | warn | The node group reports a health issue while its state says nothing is wrong; the first code is the phrase and any others follow as rows. Nodes may be failing to join or to stay healthy until it clears. |
+| `ng` | EKS Node Groups | wave1 | `ng.state.degraded` | degraded | broken | The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
+| `ng` | EKS Node Groups | wave1 | `ng.health-issue` | health issue | warn | The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears. |
 | `ng` | EKS Node Groups | wave1 | `ng.warn.details_denied` | details denied | warn | Access to resource details was denied; only the name is visible. |
 | `ng` | EKS Node Groups | wave1 | `ng.warn.details_unavailable` | details unavailable | warn | Details could not be retrieved; only the name is visible. |
 
@@ -185,12 +185,13 @@ lines under "Not yet implemented".
 | `elb` | Load Balancers | wave1 | `elb.state.provisioning` | provisioning | warn | The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses. |
 | `elb` | Load Balancers | wave1 | `elb.state.active_impaired` | active impaired | warn | The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses. |
 | `elb` | Load Balancers | wave1 | `elb.state.failed` | failed | broken | The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime. |
-| `elb` | Load Balancers | wave2 | `elb.misconfigured` | deletion protection disabled | warn | — |
+| `elb` | Load Balancers | wave2 | `elb.misconfigured` | deletion protection or access logs disabled | warn | — |
 | `elb` | Load Balancers | wave2 | `elb.desync-mitigation-off` | HTTP desync mitigation off | warn | The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest. |
 | `elb` | Load Balancers | wave2 | `elb.invalid-headers-kept` | invalid HTTP headers not dropped | warn | Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields. |
 | `elb` | Load Balancers | wave2 | `elb.plain-http-listener` | <ports> in the clear | warn | A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener. |
 | `elb` | Load Balancers | wave2 | `elb.weak-tls-policy` | weak TLS policy on <ports> | warn | A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later. |
-| `tg` | Target Groups | wave2 | `tg.unhealthy-targets` | unhealthy targets: <N>/<M> | broken | — |
+| `tg` | Target Groups | wave2 | `tg.all-targets-unhealthy` | all <N> targets unhealthy | broken | — |
+| `tg` | Target Groups | wave2 | `tg.unhealthy-targets` | unhealthy targets: <N>/<M> | warn | — |
 | `sg` | Security Groups | wave1 | `sg.ingress.wide-open` | all ports open to 0.0.0.0/0 | broken | One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them. |
 | `sg` | Security Groups | wave1 | `sg.ingress.dangerous-ports` | ports <list> open to 0.0.0.0/0 | broken | An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link. |
 | `sg` | Security Groups | wave1 | `sg.default-with-rules` | default group allows traffic | warn | The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group. |
@@ -226,8 +227,8 @@ lines under "Not yet implemented".
 | `tgw` | Transit Gateways | wave1 | `tgw.state.deleting` | deleting | warn | The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop. |
 | `tgw` | Transit Gateways | wave1 | `tgw.state.failed` | failed | broken | The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path. |
 | `tgw` | Transit Gateways | wave1 | `tgw.state.deleted` | deleted | dim | This gateway is gone. AWS keeps returning it for a while after deletion, so route tables that still point at it are dead references worth cleaning up. |
-| `tgw` | Transit Gateways | wave2 | `tgw.attachment-failed` | attachment <id> failed | broken | The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment. |
-| `tgw` | Transit Gateways | wave2 | `tgw.attachment-transitional` | attachment <id> <state> | warn | The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it. |
+| `tgw` | Transit Gateways | wave2 | `tgw.attachment-failed` | attachment failed | broken | The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment. |
+| `tgw` | Transit Gateways | wave2 | `tgw.attachment-transitional` | attachment between states | warn | The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it. |
 | `tgw` | Transit Gateways | wave1 | `tgw.auto-accept-attachments` | auto-accepts shared attachments | warn | Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly. |
 | `eni` | Network Interfaces | wave1 | `eni.state.attaching` | attaching | warn | — |
 | `eni` | Network Interfaces | wave1 | `eni.state.detaching` | detaching | warn | — |
@@ -266,7 +267,7 @@ lines under "Not yet implemented".
 | `dbi` | DB Instances | wave1 | `dbi.broken.restore_error` | restore-error | broken | — |
 | `dbi` | DB Instances | wave1 | `dbi.broken.encryption_key_unavailable` | encryption key unavailable | broken | — |
 | `dbi` | DB Instances | wave1 | `dbi.broken.stopped` | stopped | broken | — |
-| `dbi` | DB Instances | wave1 | `dbi.warn.transitional` | <status>: <pending field> | warn | — |
+| `dbi` | DB Instances | wave1 | `dbi.warn.transitional` | <transitional status> | warn | — |
 | `dbi` | DB Instances | wave1 | `dbi.warn.no_automated_backups` | no automated backups | warn | — |
 | `dbi` | DB Instances | wave1 | `dbi.warn.publicly_accessible` | publicly accessible | warn | — |
 | `dbi` | DB Instances | wave1 | `dbi.warn.unencrypted_storage` | unencrypted storage | warn | — |
@@ -334,12 +335,12 @@ lines under "Not yet implemented".
 | `opensearch` | OpenSearch Domains | wave1 | `opensearch.node-to-node-tls-off` | node-to-node encryption off | warn | Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive. |
 | `opensearch` | OpenSearch Domains | wave1 | `opensearch.warn.details_denied` | details denied | warn | — |
 | `opensearch` | OpenSearch Domains | wave1 | `opensearch.warn.details_unavailable` | details unavailable | warn | Details could not be retrieved; only the name is visible. |
-| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_hsm` | incompatible-hsm | broken | — |
-| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_network` | incompatible-network | broken | — |
-| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_parameters` | incompatible-parameters | broken | — |
-| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_restore` | incompatible-restore | broken | — |
-| `redshift` | Redshift Clusters | wave1 | `redshift.broken.hardware_failure` | hardware-failure | broken | — |
-| `redshift` | Redshift Clusters | wave1 | `redshift.broken.storage_full` | storage-full | broken | — |
+| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_hsm` | broken: incompatible-hsm | broken | — |
+| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_network` | broken: incompatible-network | broken | — |
+| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_parameters` | broken: incompatible-parameters | broken | — |
+| `redshift` | Redshift Clusters | wave1 | `redshift.broken.incompatible_restore` | broken: incompatible-restore | broken | — |
+| `redshift` | Redshift Clusters | wave1 | `redshift.broken.hardware_failure` | broken: hardware-failure | broken | — |
+| `redshift` | Redshift Clusters | wave1 | `redshift.broken.storage_full` | broken: storage-full | broken | — |
 | `redshift` | Redshift Clusters | wave1 | `redshift.broken.unavailable` | unavailable | broken | — |
 | `redshift` | Redshift Clusters | wave1 | `redshift.broken.failed` | failed | broken | — |
 | `redshift` | Redshift Clusters | wave1 | `redshift.warn.creating` | creating | warn | — |
@@ -403,8 +404,12 @@ lines under "Not yet implemented".
 | `trail` | CloudTrail Trails | wave1 | `trail.no-kms` | log files not KMS-encrypted | warn | Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control. |
 | `trail` | CloudTrail Trails | wave2 | `trail.log-bucket-public` | log bucket is publicly accessible | broken | The bucket holding this trail's log files is publicly accessible, so the account's audit history can be read by anyone. Remove the public grant from that bucket's policy and access control list. |
 | `trail` | CloudTrail Trails | wave2 | `trail.log-bucket-no-access-logging` | log bucket has no access logging | warn | The bucket holding this trail's log files records no access logging, so reads of the audit history leave no trace. Enable server access logging on that bucket. |
-| `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.danger` | destructive call | broken | CloudTrail recorded a call that either failed or was destructive; the event name and error code in this row say which. Verify it was expected and, if not, find out who made it. |
-| `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.attention` | root account activity | warn | CloudTrail recorded a call worth a look: a modifying call, root-account activity, cross-account access, or a read of sensitive data. The status names which; verify the caller was expected. |
+| `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.danger` | destructive call | broken | CloudTrail recorded a call that deletes or tears something down. Verify it was expected and, if not, find out who made it. |
+| `ct-events` | CloudTrail Events | wave1 | `ct_event.danger.failed` | failed: <error> | broken | CloudTrail recorded a call that AWS rejected; the error code is in the phrase. A denied call is either a permission gap or someone probing for one. |
+| `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.attention` | root account activity | warn | CloudTrail recorded a call made by the account root user. Root should not be doing day-to-day work; move the task onto a named principal. |
+| `ct-events` | CloudTrail Events | wave1 | `ct_event.attention.write` | modifying call | warn | CloudTrail recorded a call that changed configuration. Verify the change was expected and that whoever made it meant to. |
+| `ct-events` | CloudTrail Events | wave1 | `ct_event.attention.cross-account` | cross-account access | warn | The caller belongs to a different account than the one that recorded the event, so this is access across an account boundary. Verify the trust it came through is one you meant to grant. |
+| `ct-events` | CloudTrail Events | wave1 | `ct_event.attention.sensitive-read` | reads sensitive data (<event>) | warn | CloudTrail recorded a read of secret or parameter material. Verify the caller was expected: a read leaves the value in the caller's hands with nothing to revoke afterwards. |
 | `ct-events` | CloudTrail Events | wave1 | `ct_event.severity.info` | routine event | dim | — |
 
 ### MESSAGING
@@ -427,12 +432,13 @@ lines under "Not yet implemented".
 | `eb` | Elastic Beanstalk | wave1 | `eb.status.terminated` | terminated | dim | — |
 | `eb` | Elastic Beanstalk | wave1 | `eb.status.launching` | launching | warn | — |
 | `eb` | Elastic Beanstalk | wave1 | `eb.status.terminating` | terminating | dim | — |
-| `eb` | Elastic Beanstalk | wave2 | `eb.environment-causes` | EB causes: <first cause> | warn | — |
+| `eb` | Elastic Beanstalk | wave2 | `eb.environment-causes` | environment reports health causes | warn | — |
 | `eb` | Elastic Beanstalk | wave2 | `eb.managed-updates-off` | managed platform updates off | warn | The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window. |
 | `eb` | Elastic Beanstalk | wave2 | `eb.enhanced-health-off` | enhanced health reporting off | warn | Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced. |
 | `eb` | Elastic Beanstalk | wave2 | `eb.cloudwatch-logs-off` | log streaming to CloudWatch off | warn | Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs. |
 | `eb-rule` | EventBridge Rules | wave1 | `eb-rule.state.disabled` | disabled | dim | — |
-| `eb-rule` | EventBridge Rules | wave2 | `eb-rule.target-issue` | enabled rule has no targets (rule matches but goes nowhere) | broken | — |
+| `eb-rule` | EventBridge Rules | wave2 | `eb-rule.no-targets` | enabled rule has no targets | broken | This rule is enabled and its pattern still matches events, but it has no target to deliver them to, so every match is silently discarded. Attach the target it was created for, or disable the rule. |
+| `eb-rule` | EventBridge Rules | wave2 | `eb-rule.target-issue` | target drift or no dead-letter config | warn | This rule's targets are not configured the way the rule implies: a disabled rule still carries targets, or a target has no dead-letter queue, so a delivery that fails leaves no trace. Remove the stale targets, or attach a dead-letter queue to the ones that matter. |
 | `kinesis` | Kinesis Streams | wave1 | `kinesis.warn.creating` | creating | warn | — |
 | `kinesis` | Kinesis Streams | wave1 | `kinesis.warn.updating` | updating | warn | — |
 | `kinesis` | Kinesis Streams | wave1 | `kinesis.warn.deleting` | deleting | warn | — |
@@ -493,7 +499,7 @@ lines under "Not yet implemented".
 | `r53` | Route 53 Hosted Zones | wave2 | `r53.dangling-record` | record points at a released address | broken | The record still answers with an address the account no longer holds, so whoever claims that address next receives traffic for this name. Delete the record or repoint it at an address you own. |
 | `cf` | CloudFront Distributions | wave1 | `cf.disabled` | disabled (admin-off) | dim | The distribution is switched off, so it serves nothing and the edge locations answer with an error. Nothing here needs fixing unless it was meant to be serving; enable it, or delete it once you are sure. |
 | `cf` | CloudFront Distributions | wave1 | `cf.status.in-progress` | deploying: config propagating | warn | A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution. |
-| `cf` | CloudFront Distributions | wave2 | `cf.insecure-protocol` | no HTTPS redirect (insecure); origin without TLS | warn | — |
+| `cf` | CloudFront Distributions | wave2 | `cf.insecure-protocol` | traffic allowed without TLS | warn | — |
 | `cf` | CloudFront Distributions | wave2 | `cf.origin-bucket-missing` | S3 origin bucket does not exist | broken | The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it. |
 | `cf` | CloudFront Distributions | wave2 | `cf.deprecated-tls` | minimum TLS below 1.2 | warn | Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later. |
 | `cf` | CloudFront Distributions | wave2 | `cf.logging-off` | access logging off | warn | The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination. |
@@ -501,7 +507,8 @@ lines under "Not yet implemented".
 | `cf` | CloudFront Distributions | wave2 | `cf.s3-origin-no-oac` | S3 origin without origin access control | warn | The bucket behind this origin must be open to reach it through CloudFront, so viewers can bypass the distribution and read from the bucket directly. Attach an origin access control and restrict the bucket policy to it. |
 | `cf` | CloudFront Distributions | wave2 | `cf.default-certificate` | uses the default CloudFront certificate | warn | The distribution serves custom domains with the default CloudFront certificate, so viewers reaching those names get a certificate mismatch warning. Attach a certificate that covers the aliases. |
 | `cf` | CloudFront Distributions | wave2 | `cf.no-geo-restriction` | no geo restriction | warn | Content is served to every country, including any the account is not meant to serve. Add a geographic restriction if the distribution should be limited. |
-| `acm` | ACM Certificates | wave1 | `acm.expires-critical` | expires in <N> days | broken | The certificate expires within a week, or already has, and every client reaching a listener that serves it will refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
+| `acm` | ACM Certificates | wave1 | `acm.expired` | expired | broken | The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one. |
+| `acm` | ACM Certificates | wave1 | `acm.expires-critical` | expires in <N> days | broken | The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
 | `acm` | ACM Certificates | wave1 | `acm.expires-soon` | expires in <N> days | warn | The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published. |
 | `acm` | ACM Certificates | wave1 | `acm.orphan` | certificate not in use (orphan) | warn | Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for. |
 | `acm` | ACM Certificates | wave1 | `acm.status.pending-validation` | pending validation | warn | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |
@@ -509,7 +516,7 @@ lines under "Not yet implemented".
 | `acm` | ACM Certificates | wave1 | `acm.status.inactive` | inactive | dim | An imported certificate marked inactive, because nothing is using it to terminate TLS. It costs nothing to keep, so this is a note rather than a fault; delete it once you are sure nothing will need it. |
 | `acm` | ACM Certificates | wave1 | `acm.weak-key` | weak key algorithm | warn | The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key. |
 | `apigw` | API Gateways | wave2 | `apigw.no-deployed-stages` | no deployed stages | warn | — |
-| `apigw` | API Gateways | wave2 | `apigw.stage-config-issues` | no throttling configured (DoS risk); access logs disabled | warn | — |
+| `apigw` | API Gateways | wave2 | `apigw.stage-config-issues` | stage configuration issues | warn | — |
 | `apigw` | API Gateways | wave2 | `apigw.no-authorizer-public` | internet-facing with no authorizer | broken | Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it. |
 | `apigw` | API Gateways | wave2 | `apigw.no-authorizer` | no authorizer | warn | Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer. |
 | `apigw` | API Gateways | wave2 | `apigw.no-access-logs` | no access logs | warn | The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group. |
@@ -527,15 +534,15 @@ lines under "Not yet implemented".
 | `role` | IAM Roles | wave2 | `role.admin-attached` | has an administrator policy | warn | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 | `policy` | IAM Policies | wave1 | `iam-policy.orphan-unattached` | unattached, no roles/users/groups use it | warn | — |
 | `policy` | IAM Policies | wave2 | `iam-policy.admin-star` | `admin star (allows * on *)` | broken | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "*" action and resource with the specific ones its holders need. |
-| `policy` | IAM Policies | wave2 | `policy.privilege-escalation` | allows privilege escalation: <combo> | broken | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions. |
+| `policy` | IAM Policies | wave2 | `policy.privilege-escalation` | allows privilege escalation | broken | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions. |
 | `iam-user` | IAM Users | wave2 | `iam-user.no-mfa` | console user without MFA | broken | This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access. |
-| `iam-user` | IAM Users | wave2 | `iam-user.old-key` | key <keyID> >90d (rotation) | warn | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
+| `iam-user` | IAM Users | wave2 | `iam-user.old-key` | access key past rotation | warn | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
 | `iam-user` | IAM Users | wave2 | `iam-user.admin-attached` | has an administrator policy | warn | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 | `iam-user` | IAM Users | wave2 | `iam-user.console-never-used` | console password never used | warn | This user has a console password that has never been used since the account was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave the user with programmatic access only. |
 | `iam-user` | IAM Users | wave2 | `iam-user.console-dormant` | console sign-in unused for 90 days | warn | Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not. |
-| `iam-user` | IAM Users | wave2 | `iam-user.access-key-unused` | access key unused for <N> days | warn | This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it. |
+| `iam-user` | IAM Users | wave2 | `iam-user.access-key-unused` | access key unused | warn | This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it. |
 | `iam-user` | IAM Users | wave2 | `iam-user.two-active-keys` | two active access keys | warn | This user has both of its access-key slots active at once, which doubles the exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use. |
-| `iam-group` | IAM Groups | wave2 | `iam-group.orphan-or-noop` | group has no members (orphan) | warn | This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for. |
+| `iam-group` | IAM Groups | wave2 | `iam-group.orphan-or-noop` | no members or no policies | warn | This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for. |
 | `iam-group` | IAM Groups | wave2 | `iam-group.admin-attached` | has an administrator policy | warn | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 | `waf` | WAF Web ACLs | wave2 | `waf.no-logging` | no logging configuration | warn | This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group. |
 | `waf` | WAF Web ACLs | wave2 | `waf.no-rules` | web ACL has no rules | warn | This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
@@ -548,11 +555,11 @@ lines under "Not yet implemented".
 | `cfn` | CloudFormation Stacks | wave1 | `cfn.stack.rollback` | <status, in words> | broken | — |
 | `cfn` | CloudFormation Stacks | wave1 | `cfn.stack.in_progress` | <status, in words> | warn | — |
 | `cfn` | CloudFormation Stacks | wave1 | `cfn.stack.deleted` | delete complete | dim | — |
-| `cfn` | CloudFormation Stacks | wave2 | `cfn.recent-resource-failure` | recent resource failure: <ResourceType/LogicalResourceId> | broken | — |
+| `cfn` | CloudFormation Stacks | wave2 | `cfn.recent-resource-failure` | recent resource failure | broken | — |
 | `cfn` | CloudFormation Stacks | wave2 | `cfn.stack-drifted` | stack drifted from template | warn | — |
 | `cfn` | CloudFormation Stacks | wave1 | `cfn.termination-protection-off` | termination protection off | warn | A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted. |
 | `cfn` | CloudFormation Stacks | wave1 | `cfn.output-secret` | credential in stack outputs | broken | A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential. |
-| `pipeline` | CodePipelines | wave2 | `pipeline.stage-failed` | stage <stage> failed | broken | — |
+| `pipeline` | CodePipelines | wave2 | `pipeline.stage-failed` | stage failed | broken | — |
 | `cb` | CodeBuild Projects | wave2 | `cb.latest-build-failed` | latest build <status> (<date>) | broken | — |
 | `cb` | CodeBuild Projects | wave1 | `cb.public-builds` | build results publicly visible | broken | Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed. |
 | `cb` | CodeBuild Projects | wave1 | `cb.buildspec-from-source` | buildspec taken from the source repository | warn | The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches. |
@@ -597,7 +604,7 @@ lines under "Not yet implemented".
 
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
-| `backup` | Backup Plans | wave2 | `backup.job-failed` | <N> jobs failed in last 24h | broken | — |
+| `backup` | Backup Plans | wave2 | `backup.job-failed` | <N jobs> failed in last 24h | broken | — |
 | `backup` | Backup Plans | wave2 | `backup.job-partial` | partial: <N> of <M> resources skipped | warn | — |
 
 ### Other

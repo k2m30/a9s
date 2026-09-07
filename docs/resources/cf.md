@@ -152,7 +152,7 @@ One row per signal from §3:
 | `Enabled == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
 | Weak TLS policy on aliased distribution | 1 | Warning | n/a | S2, S4 | `minimum TLS below 1.2` |
 | `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` |
-| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `no HTTPS redirect (insecure); origin without TLS` |
+| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `traffic allowed without TLS` (the offending policy and origin are supporting rows) |
 | `LoggingConfig.Enabled == false` | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logging off` |
 
 ## 4.1 UX review (two sentences)
@@ -208,7 +208,7 @@ cf — DNS & CDN. Lifecycle key: `status`.
 | --- | --- | --- | --- | --- |
 | cf.disabled | disabled (admin-off) | dim | wave1 | The distribution is switched off, so it serves nothing and the edge locations answer with an error. Nothing here needs fixing unless it was meant to be serving; enable it, or delete it once you are sure. |
 | cf.status.in-progress | deploying: config propagating | warn | wave1 | A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution. |
-| cf.insecure-protocol | no HTTPS redirect (insecure); origin without TLS | warn | wave2 | — |
+| cf.insecure-protocol | traffic allowed without TLS | warn | wave2 | — |
 | cf.origin-bucket-missing | S3 origin bucket does not exist | broken | wave2 | The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it. |
 | cf.deprecated-tls | minimum TLS below 1.2 | warn | wave2 | Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later. |
 | cf.logging-off | access logging off | warn | wave2 | The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination. |

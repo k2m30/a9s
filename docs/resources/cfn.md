@@ -197,7 +197,7 @@ cfn — CI/CD. Lifecycle key: `status`.
 | cfn.stack.rollback | <status, in words> | broken | wave1 | — |
 | cfn.stack.in\_progress | <status, in words> | warn | wave1 | — |
 | cfn.stack.deleted | delete complete | dim | wave1 | — |
-| cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 | — |
+| cfn.recent-resource-failure | recent resource failure | broken | wave2 | — |
 | cfn.stack-drifted | stack drifted from template | warn | wave2 | — |
 | cfn.termination-protection-off | termination protection off | warn | wave1 | A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted. |
 | cfn.output-secret | credential in stack outputs | broken | wave1 | A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential. |

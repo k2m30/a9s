@@ -12,6 +12,7 @@ import (
 
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -95,7 +96,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			// twice would say the same thing in two voices, so admin wins.
 			riskVal = riskPrivEsc
 			setWave2Finding(&result, r.ID, iamPolicyCodePrivEsc,
-				"allows privilege escalation: "+combos[0], "!", "iam-policy",
+				catalog.Phrase(iamPolicyCodePrivEsc), "!", "iam-policy",
 				privEscComboRows(combos))
 
 		}

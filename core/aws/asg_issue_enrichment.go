@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -77,10 +78,6 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if act.StatusMessage != nil {
 			statusMsg = *act.StatusMessage
 		}
-		summary := "latest scaling activity failed"
-		if statusMsg != "" {
-			summary = fmt.Sprintf("latest scaling activity failed: %s", statusMsg)
-		}
 		rows := []domain.DetailRow{
 			{Label: "Status", Value: domain.HumanizeStatusPhrase(string(act.StatusCode)), Tier: "!"},
 		}
@@ -93,7 +90,8 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if act.StartTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
 		}
-		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows)
+		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed,
+			catalog.Phrase(asgCodeScalingActivityFailed), "!", "asg", rows)
 	})
 	sort.Strings(failures)
 	result.Truncated = truncated

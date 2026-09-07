@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -203,12 +204,10 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		}
 		cfg := out.DistributionConfig
 		var rows []domain.DetailRow
-		var summaries []string
 
 		// Check viewer protocol policy on default cache behavior.
 		if cfg.DefaultCacheBehavior != nil &&
 			cfg.DefaultCacheBehavior.ViewerProtocolPolicy == cftypes.ViewerProtocolPolicyAllowAll {
-			summaries = append(summaries, "no HTTPS redirect (insecure)")
 			rows = append(rows, domain.DetailRow{
 				Label: "Viewer protocol policy",
 				Value: "allow-all",
@@ -225,7 +224,6 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 					if origin.Id != nil {
 						originID = *origin.Id
 					}
-					summaries = append(summaries, "origin without TLS")
 					rows = append(rows, domain.DetailRow{
 						Label: "Origin",
 						Value: originID,
@@ -242,11 +240,11 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 
 		cfConfigFindings(&result, distID, cfg, knownBuckets)
 
-		if len(summaries) == 0 {
+		if len(rows) == 0 {
 			return
 		}
-		summary := strings.Join(summaries, "; ")
-		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows)
+		setWave2Finding(&result, distID, cfCodeInsecureProtocol,
+			catalog.Phrase(cfCodeInsecureProtocol), "~", "cf", rows)
 	})
 	// cf.origin-bucket-missing is "!", so the cap now bounds the issue count
 	// and a capped pass must say so rather than under-report the badge.

@@ -148,9 +148,9 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `State == DISABLED` | 1 | Dim | n/a | S2, S4 | `disabled — admin-off` |
-| `ENABLED` rule with `len(Targets)==0` | 2 | Broken | `!` | S1, S2, S4, S5 | `no targets — events dropped` |
-| `DISABLED` rule with `len(Targets)>0` | 2 | Dim + finding | `!` | S1, S4 (dedup), S5 | `disabled but still wired to N targets` |
-| target without `DeadLetterConfig` | 2 | Warning | `~` | S3 (if rule row is green), S4, S5 | `N target(s) have no DLQ` |
+| `ENABLED` rule with `len(Targets)==0` | 2 | Broken | `!` | S1, S2, S4, S5 | `enabled rule has no targets` |
+| `DISABLED` rule with `len(Targets)>0` | 2 | Dim + finding | `~` | S1, S4 (dedup), S5 | `target drift or no dead-letter config` (the drift is a supporting row) |
+| target without `DeadLetterConfig` | 2 | Warning | `~` | S3 (if rule row is green), S4, S5 | `target drift or no dead-letter config` (one row per target without a DLQ) |
 
 Notes on the table above:
 
@@ -195,7 +195,8 @@ eb-rule — MESSAGING. Lifecycle key: `state`.
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | eb-rule.state.disabled | disabled | dim | wave1 | — |
-| eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 | — |
+| eb-rule.no-targets | enabled rule has no targets | broken | wave2 | This rule is enabled and its pattern still matches events, but it has no target to deliver them to, so every match is silently discarded. Attach the target it was created for, or disable the rule. |
+| eb-rule.target-issue | target drift or no dead-letter config | warn | wave2 | This rule's targets are not configured the way the rule implies: a disabled rule still carries targets, or a target has no dead-letter queue, so a delivery that fails leaves no trace. Remove the stale targets, or attach a dead-letter queue to the ones that matter. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

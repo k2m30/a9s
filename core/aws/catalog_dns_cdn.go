@@ -123,7 +123,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Findings: []catalog.FindingDef{
 			{Code: cfCodeDisabled, Phrase: "disabled (admin-off)", Severity: domain.SevDim, Source: "wave1", Detail: "The distribution is switched off, so it serves nothing and the edge locations answer with an error. Nothing here needs fixing unless it was meant to be serving; enable it, or delete it once you are sure."},
 			{Code: cfCodeInProgress, Phrase: "deploying: config propagating", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution."},
-			{Code: cfCodeInsecureProtocol, Phrase: "no HTTPS redirect (insecure); origin without TLS", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: cfCodeInsecureProtocol, Phrase: "traffic allowed without TLS", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: CodeCFOriginBucketMissing, Phrase: "S3 origin bucket does not exist", Severity: domain.SevBroken, Source: "wave2", Detail: "The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it."},
 			{Code: CodeCFDeprecatedTLS, Phrase: "minimum TLS below 1.2", Severity: domain.SevWarn, Source: "wave2", Detail: "Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later."},
 			{Code: CodeCFLoggingOff, Phrase: "access logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination."},
@@ -168,7 +168,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		// No NavigableFields — CertificateSummary has no forward refs to other resource types
 		Findings: []catalog.FindingDef{
-			{Code: acmCodeExpiresCritical, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate expires within a week, or already has, and every client reaching a listener that serves it will refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one."},
+			{Code: acmCodeExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one."},
+			{Code: acmCodeExpiresCritical, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one."},
 			{Code: acmCodeExpiresSoon, Phrase: "expires in <N> days", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published."},
 			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for."},
 			{Code: acmCodeStatusPendingValidation, Phrase: "pending validation", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out."},
@@ -216,7 +217,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		Findings: []catalog.FindingDef{
 			{Code: apigwCodeNoDeployedStages, Phrase: "no deployed stages", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: apigwCodeStageConfigIssues, Phrase: "no throttling configured (DoS risk); access logs disabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: apigwCodeStageConfigIssues, Phrase: "stage configuration issues", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2", Detail: "Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it."},
 			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer."},
 			{Code: CodeAPIGWNoAccessLogs, Phrase: "no access logs", Severity: domain.SevWarn, Source: "wave2", Detail: "The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group."},

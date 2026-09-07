@@ -21,6 +21,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ import (
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -206,8 +208,13 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(f.Phrase, "deployment") {
-		t.Errorf("summary %q should contain %q", f.Phrase, "deployment")
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("ecs-svc.deployment-failed"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
+	}
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[svcName]["ecs-svc.deployment-failed"].Rows); !strings.Contains(rows, "Deployment") {
+		t.Errorf("no supporting row names the failed deployment: %s", rows)
 	}
 }
 
@@ -533,8 +540,13 @@ func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(f.Phrase, "TaskFailedToStart") {
-		t.Errorf("summary %q should contain %q", f.Phrase, "TaskFailedToStart")
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("ecs-task.task-failed"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
+	}
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[taskID]["ecs-task.task-failed"].Rows); !strings.Contains(rows, "TaskFailedToStart") {
+		t.Errorf("no supporting row names the stop code: %s", rows)
 	}
 }
 
@@ -1085,8 +1097,13 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(f.Phrase, "EB causes:") {
-		t.Errorf("summary %q should contain %q", f.Phrase, "EB causes:")
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("eb.environment-causes"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
+	}
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[envID]["eb.environment-causes"].Rows); !strings.Contains(rows, "Cause") {
+		t.Errorf("no supporting row names the reported cause: %s", rows)
 	}
 }
 

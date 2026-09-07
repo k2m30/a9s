@@ -6,11 +6,11 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -82,7 +82,6 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			registered := cluster.RegisteredContainerInstancesCount
 
 			var rows []domain.DetailRow
-			var summaries []string
 
 			if pending > 0 {
 				rows = append(rows, domain.DetailRow{
@@ -90,7 +89,6 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 					Value: fmt.Sprintf("%d tasks pending", pending),
 					Tier:  "~",
 				})
-				summaries = append(summaries, fmt.Sprintf("%d pending tasks", pending))
 			}
 
 			if running == 0 && registered > 0 {
@@ -99,15 +97,14 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 					Value: fmt.Sprintf("no running tasks (%d container instances registered)", registered),
 					Tier:  "~",
 				})
-				summaries = append(summaries, "no running tasks but instances registered")
 			}
 
 			if len(rows) == 0 {
 				continue
 			}
 
-			summary := strings.Join(summaries, "; ")
-			setWave2Finding(&result, name, ecsCodeClusterIssue, summary, "~", "ecs", rows)
+			setWave2Finding(&result, name, ecsCodeClusterIssue,
+				catalog.Phrase(ecsCodeClusterIssue), "~", "ecs", rows)
 		}
 	}
 

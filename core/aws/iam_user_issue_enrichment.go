@@ -179,23 +179,21 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskKeyTooOld
 			}
-			phrase := fmt.Sprintf("key %s >90d (rotation)", lastFourOfKeyID(aws.ToString(key.AccessKeyId)))
-			setWave2Finding(&result, r.ID, iamUserCodeOldKey, phrase, "~", "iam-user",
+			setWave2Finding(&result, r.ID, iamUserCodeOldKey, catalog.Phrase(iamUserCodeOldKey), "~", "iam-user",
 				[]domain.DetailRow{{Label: "Access key", Value: lastFourOfKeyID(aws.ToString(key.AccessKeyId)), Tier: "~"}})
 
-			break
 		}
 
-		if len(unusedKeys) > 0 {
-			k := unusedKeys[0]
+		for _, k := range unusedKeys {
 			if riskLabel == "" {
 				riskLabel = riskKeyUnused
 			}
 			setWave2Finding(&result, r.ID, iamUserCodeKeyUnused,
-				fmt.Sprintf("access key unused for %d days", k.idleDays), "~", "iam-user",
+				catalog.Phrase(iamUserCodeKeyUnused), "~", "iam-user",
 				[]domain.DetailRow{
 					{Label: "Key", Value: k.suffix, Tier: "~"},
 					{Label: "Last used", Value: k.lastUsed, Tier: "~"},
+					{Label: "Idle", Value: fmt.Sprintf("%d days", k.idleDays), Tier: "~"},
 				})
 
 		}

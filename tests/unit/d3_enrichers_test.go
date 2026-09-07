@@ -25,6 +25,7 @@ import (
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -240,8 +241,11 @@ func TestD3ECSRecentEventFoundOutOfOrder(t *testing.T) {
 			Fields: map[string]string{"cluster": "acme-prod", "service_name": svc},
 		}}, nil)
 
+	// Inverted for spec row "phrase": the event text was the phrase, which made
+	// the wording a property of whichever event came first; it is a supporting
+	// row now and the phrase is the code's. Do not restore the old expectation.
 	w4AssertFinding(t, res.Findings[svc], d3CodeECSDeployFailed,
-		"unable to place task", domain.SevBroken, "wave2:ecs-svc")
+		catalog.Phrase(d3CodeECSDeployFailed), domain.SevBroken, "wave2:ecs-svc")
 }
 
 // TestD3ECSQuietServiceReportsNothing pins the negative case: a service whose

@@ -260,13 +260,8 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 		remaining := time.Until(*cert.InactiveDate)
 		if remaining > 0 && remaining <= transferCertExpiringWindow {
 			days := int(remaining.Hours() / 24)
-			return domain.Finding{
-				Code:     transferCodeCertExpiring,
-				Phrase:   fmt.Sprintf("expires in %dd", days),
-				Detail:   catalog.Detail(transferCodeCertExpiring),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			}, true
+			return wave1Finding(transferCodeCertExpiring,
+				fmt.Sprintf("expires in %dd", days), domain.SevWarn), true
 		}
 	}
 	return domain.Finding{}, false

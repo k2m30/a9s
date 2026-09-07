@@ -220,7 +220,7 @@ apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle fiel
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | apigw.no-deployed-stages | no deployed stages | warn | wave2 | — |
-| apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 | — |
+| apigw.stage-config-issues | stage configuration issues | warn | wave2 | — |
 | apigw.no-authorizer-public | internet-facing with no authorizer | broken | wave2 | Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it. |
 | apigw.no-authorizer | no authorizer | warn | wave2 | Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer. |
 | apigw.no-access-logs | no access logs | warn | wave2 | The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group. |

@@ -206,7 +206,7 @@ ebs — COMPUTE. Lifecycle key: `state`.
 | ebs.state.creating | creating | warn | wave1 | — |
 | ebs.state.deleting | deleting | warn | wave1 | The volume is being deleted; its data is going with it and nothing else about it is worth reporting until it is gone. |
 | ebs.state.error | error | broken | wave1 | — |
-| ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
+| ebs.orphan-unattached | orphan: unattached <N>d | warn | wave1 | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
 | ebs.encryption.disabled | unencrypted | warn | wave1 | Volume is not encrypted at rest — re-create from encrypted snapshot. |
 | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 | — |
 | ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |

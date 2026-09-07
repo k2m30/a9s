@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -207,7 +208,8 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows)
+		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop,
+			catalog.Phrase(iamGroupCodeOrphanOrNoop), "~", "iam-group", rows)
 	})
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false

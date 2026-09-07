@@ -26,6 +26,11 @@ type ACMFixtures struct {
 const (
 	ProdACMCertARN1 = "arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111"
 	ProdACMCertARN2 = "arn:aws:acm:us-east-1:123456789012:certificate/b2c3d4e5-6789-01ab-cdef-222222222222"
+
+	// ACMExpiresCritical is the one certificate inside the 7-day critical
+	// window. Every other ISSUED fixture is either already past NotAfter
+	// (acm.expired) or more than 7 days out, so nothing else trips this code.
+	ACMExpiresCritical = "expires-in-days.acme-corp.com"
 )
 
 func mustParseACMTime(s string) time.Time {
@@ -183,7 +188,7 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
-			// Issue: ISSUED but NotAfter in the past → Broken (acm.expires-critical)
+			// Issue: ISSUED with NotAfter already past → Broken (acm.expired)
 			{
 				DomainName:     aws.String("expiring-soon.acme-corp.com"),
 				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/b8c9d0e1-2345-67ab-cdef-888888888888"),
@@ -199,6 +204,25 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 					"expiring-soon.acme-corp.com",
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
+			// Issue: ISSUED, NotAfter 3 days out → Broken (acm.expires-critical).
+			// Relative to time.Now() so the fixture stays inside the 7d window
+			// however long after it was written the demo runs.
+			{
+				DomainName:     aws.String(ACMExpiresCritical),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/d0e1f2a3-4567-89ab-cdef-aaaaaaaaaaaa"),
+				Status:         acmtypes.CertificateStatusIssued,
+				Type:           acmtypes.CertificateTypeAmazonIssued,
+				NotAfter:       aws.Time(time.Now().Add(3 * 24 * time.Hour)),
+				NotBefore:      aws.Time(time.Now().Add(-362 * 24 * time.Hour)),
+				IssuedAt:       aws.Time(time.Now().Add(-362 * 24 * time.Hour)),
+				InUse:          aws.Bool(true),
+				CreatedAt:      aws.Time(time.Now().Add(-362 * 24 * time.Hour)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					ACMExpiresCritical,
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityEligible,
 			},
 			// Issue: ISSUED, NotAfter ~20 days out → Warning (acm.expires-soon —
 			// inside the 30d window, outside the 7d critical threshold). Computed
@@ -278,5 +302,5 @@ func NewACMFixtures() *ACMFixtures {
 const ACMWeakKey = "acme-corp.com"
 
 func init() {
-	Register(Pin{ShortName: "acm", Rows: 12, Issues: 9})
+	Register(Pin{ShortName: "acm", Rows: 13, Issues: 10})
 }

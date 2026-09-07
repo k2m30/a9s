@@ -267,7 +267,7 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi.broken.restore\_error | restore-error | broken | wave1 | — |
 | dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 | — |
 | dbi.broken.stopped | stopped | broken | wave1 | — |
-| dbi.warn.transitional | <status>: <pending field> | warn | wave1 | — |
+| dbi.warn.transitional | <transitional status> | warn | wave1 | — |
 | dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 | — |
 | dbi.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
 | dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 | — |

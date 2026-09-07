@@ -315,7 +315,7 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | AWS reports this instance is impaired — system or instance status checks are failing. |
 | ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | Instance status checks have not yet passed since start. |
 | ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 | AWS cannot determine status — insufficient data from the hypervisor. |
-| ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 | — |
+| ec2.scheduled-event | scheduled event | warn | wave2 | — |
 | ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata. |
 | ec2.public-ip | public address | warn | wave1 | The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly. |
 | ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 | Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion. |

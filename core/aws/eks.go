@@ -387,7 +387,7 @@ func eksClusterFindings(status string, healthIssuesCount int, issueCodes []strin
 	var rows []domain.DetailRow
 	switch status {
 	case string(ekstypes.ClusterStatusFailed):
-		f, r := healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)
+		f, r := healthIssueFinding(CodeEKSStateFailed, issueCodes)
 		findings, rows = []domain.Finding{f}, r
 	case string(ekstypes.ClusterStatusCreating):
 		findings = []domain.Finding{{Code: CodeEKSStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeEKSStateCreating), Severity: domain.SevWarn, Source: "wave1"}}
@@ -399,7 +399,7 @@ func eksClusterFindings(status string, healthIssuesCount int, issueCodes []strin
 		findings = []domain.Finding{{Code: CodeEKSStatePending, Phrase: "pending", Detail: catalog.Detail(CodeEKSStatePending), Severity: domain.SevWarn, Source: "wave1"}}
 	default:
 		if healthIssuesCount > 0 {
-			f, r := healthIssueFindingSev(CodeEKSHealthIssue, "health issue", issueCodes, domain.SevWarn)
+			f, r := healthIssueFindingSev(CodeEKSHealthIssue, issueCodes, domain.SevWarn)
 			findings, rows = []domain.Finding{f}, r
 		}
 	}

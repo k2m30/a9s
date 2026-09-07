@@ -111,7 +111,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | Console password present, `PasswordLastUsed` null AND `CreateDate` >90d | 2 | Warning | `~` | S3, S4, S5 | `console password never used` |
 | Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S3, S4, S5 | `console sign-in unused for 90 days` |
-| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused for 120 days` |
+| Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S3, S4, S5 | `access key unused` (one Key/Last used/Idle row per idle key) |
 | Two Active access keys | 2 | Warning | `~` | S3, S4, S5 | `two active access keys` |
 | `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S3, S4, S5 | `has an administrator policy` |
 | Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console user without MFA` |
@@ -126,7 +126,7 @@ Rules applied:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every row carries a cause in the Status column: never-signed-in rows say `console password never used`, console-without-MFA rows say `console user without MFA` with a `!` glyph, and stale-key rows say `access key unused for 120 days` with a `~` glyph. The operator can triage the whole list (delete dormant users, fix MFA on the flagged users, rotate the aging keys) without opening a single detail view.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every row carries a cause in the Status column: never-signed-in rows say `console password never used`, console-without-MFA rows say `console user without MFA` with a `!` glyph, and stale-key rows say `access key unused` with a `~` glyph. The operator can triage the whole list (delete dormant users, fix MFA on the flagged users, rotate the aging keys) without opening a single detail view.
 
 ## 5. Out of Scope
 
@@ -158,11 +158,11 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | iam-user.no-mfa | console user without MFA | broken | wave2 | This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access. |
-| iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
+| iam-user.old-key | access key past rotation | warn | wave2 | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
 | iam-user.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
 | iam-user.console-never-used | console password never used | warn | wave2 | This user has a console password that has never been used since the account was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave the user with programmatic access only. |
 | iam-user.console-dormant | console sign-in unused for 90 days | warn | wave2 | Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not. |
-| iam-user.access-key-unused | access key unused for <N> days | warn | wave2 | This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it. |
+| iam-user.access-key-unused | access key unused | warn | wave2 | This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it. |
 | iam-user.two-active-keys | two active access keys | warn | wave2 | This user has both of its access-key slots active at once, which doubles the exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use. |
 <!-- END GENERATED: findings -->
 

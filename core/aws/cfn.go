@@ -119,15 +119,15 @@ func cfnStackFindings(status string) []domain.Finding {
 	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
 		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
 		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
-		return []domain.Finding{{Code: CodeCFNStackRollback, Phrase: cfnStatusWords(status), Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCFNStackRollback, cfnStatusWords(status), domain.SevBroken)}
 	case "DELETE_COMPLETE":
-		return []domain.Finding{{Code: CodeCFNStackDeleted, Phrase: cfnStatusWords(status), Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCFNStackDeleted, cfnStatusWords(status), domain.SevDim)}
 	}
 	if strings.HasSuffix(status, "_FAILED") {
-		return []domain.Finding{{Code: CodeCFNStackFailed, Phrase: cfnStatusWords(status), Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCFNStackFailed, cfnStatusWords(status), domain.SevBroken)}
 	}
 	if strings.HasSuffix(status, "_IN_PROGRESS") {
-		return []domain.Finding{{Code: CodeCFNStackInProgress, Phrase: cfnStatusWords(status), Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(CodeCFNStackInProgress, cfnStatusWords(status), domain.SevWarn)}
 	}
 	return nil
 }

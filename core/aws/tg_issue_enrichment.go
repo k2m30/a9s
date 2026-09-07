@@ -19,7 +19,8 @@ import (
 
 // tg canonical FindingCodes.
 const (
-	tgCodeUnhealthyTargets domain.FindingCode = "tg.unhealthy-targets"
+	tgCodeUnhealthyTargets    domain.FindingCode = "tg.unhealthy-targets"
+	tgCodeAllTargetsUnhealthy domain.FindingCode = "tg.all-targets-unhealthy"
 )
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
@@ -110,17 +111,26 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			"health_summary": healthSummary,
 		}
 		if literalUnhealthy > 0 {
-			severity := "~"
-			if literalUnhealthy == targetCount {
-				severity = "!"
+			// Every target down and some targets down are different things to
+			// do about, so they are different codes: one severity per code.
+			allDown := literalUnhealthy == targetCount
+			tier := "~"
+			if allDown {
+				tier = "!"
 			}
 			rows := []domain.DetailRow{
-				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", literalUnhealthy, targetCount), Tier: severity},
+				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", literalUnhealthy, targetCount), Tier: tier},
 			}
 			if firstReason != "" {
 				rows = append(rows, domain.DetailRow{Label: "Reason", Value: firstReason, Tier: "~"})
 			}
-			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", literalUnhealthy, targetCount), severity, "tg", rows)
+			if allDown {
+				setWave2Finding(&result, r.ID, tgCodeAllTargetsUnhealthy,
+					fmt.Sprintf("all %d targets unhealthy", targetCount), "!", "tg", rows)
+			} else {
+				setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets,
+					fmt.Sprintf("unhealthy targets: %d/%d", literalUnhealthy, targetCount), "~", "tg", rows)
+			}
 		}
 	})
 	sort.Strings(failures)

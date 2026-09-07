@@ -14,6 +14,7 @@ import (
 	wafv2svc "github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -154,7 +155,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows)
+		setWave2Finding(&result, r.ID, wafCodeNoLogging, catalog.Phrase(wafCodeNoLogging), "~", "waf", rows)
 	})
 	sort.Strings(failures)
 	// All WAF logging findings are severity "~" (informational).

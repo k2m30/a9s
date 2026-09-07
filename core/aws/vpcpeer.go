@@ -210,13 +210,8 @@ func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []d
 		}
 		rows = []domain.DetailRow{{Label: "Expires", Value: expiration.Format("2006-01-02"), Tier: "~"}}
 	}
-	return domain.Finding{
-		Code:     vpcPeerCodePendingAcceptance,
-		Phrase:   fmt.Sprintf("pending acceptance: expires in %dd", days),
-		Detail:   catalog.Detail(vpcPeerCodePendingAcceptance),
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	}, rows
+	return wave1Finding(vpcPeerCodePendingAcceptance,
+		fmt.Sprintf("pending acceptance: expires in %dd", days), domain.SevWarn), rows
 }
 
 // vpcPeerCIDROverlapDetail reports whether any IPv4 prefix in requester's

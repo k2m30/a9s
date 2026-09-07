@@ -28,13 +28,21 @@ func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.
 	r.AttentionDetails[code] = ad
 }
 
-// addWave1Finding appends a Wave-1 posture Finding, reading the operator
-// sentence from the code's registered definition the way setWave2Finding does,
-// so a finding has exactly one Detail wherever it is emitted from.
-func addWave1Finding(r *resource.Resource, code domain.FindingCode, phrase string, severity domain.Severity) {
-	r.Findings = append(r.Findings, domain.Finding{
+// wave1Finding builds a Wave-1 Finding, reading the operator sentence from the
+// code's registered definition the way setWave2Finding does, so a finding has
+// exactly one Detail wherever it is emitted from. It is the one place a Wave-1
+// Finding is constructed: a fetcher that returns []domain.Finding rather than
+// decorating a Resource calls this, so wave 1 has the seam wave 2 has in
+// setWave2Finding.
+func wave1Finding(code domain.FindingCode, phrase string, severity domain.Severity) domain.Finding {
+	return domain.Finding{
 		Code: code, Phrase: phrase, Detail: catalog.Detail(code), Severity: severity, Source: "wave1",
-	})
+	}
+}
+
+// addWave1Finding appends the Wave-1 posture Finding for code to r.
+func addWave1Finding(r *resource.Resource, code domain.FindingCode, phrase string, severity domain.Severity) {
+	r.Findings = append(r.Findings, wave1Finding(code, phrase, severity))
 }
 
 // secretScanRows and secretScanTextRows scan the two shapes a credential

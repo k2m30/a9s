@@ -377,7 +377,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeEBTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBTerminating, Phrase: "terminating", Severity: domain.SevDim, Source: "wave1"},
-			{Code: ebCodeEnvironmentCauses, Phrase: "EB causes: <first cause>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebCodeEnvironmentCauses, Phrase: "environment reports health causes", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: ebCodeManagedUpdatesOff, Phrase: "managed platform updates off", Severity: domain.SevWarn, Source: "wave2", Detail: "The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window."},
 			{Code: ebCodeEnhancedHealthOff, Phrase: "enhanced health reporting off", Severity: domain.SevWarn, Source: "wave2", Detail: "Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced."},
 			{Code: ebCodeCWLogsOff, Phrase: "log streaming to CloudWatch off", Severity: domain.SevWarn, Source: "wave2", Detail: "Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs."},
@@ -431,7 +431,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeEBRuleDisabled, Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"},
-			{Code: ebRuleCodeTargetIssue, Phrase: "enabled rule has no targets (rule matches but goes nowhere)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ebRuleCodeNoTargets, Phrase: "enabled rule has no targets", Severity: domain.SevBroken, Source: "wave2", Detail: "This rule is enabled and its pattern still matches events, but it has no target to deliver them to, so every match is silently discarded. Attach the target it was created for, or disable the rule."},
+			{Code: ebRuleCodeTargetIssue, Phrase: "target drift or no dead-letter config", Severity: domain.SevWarn, Source: "wave2", Detail: "This rule's targets are not configured the way the rule implies: a disabled rule still carries targets, or a target has no dead-letter queue, so a delivery that fails leaves no trace. Remove the stale targets, or attach a dead-letter queue to the ones that matter."},
 		},
 	},
 	{

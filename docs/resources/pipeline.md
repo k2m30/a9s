@@ -172,20 +172,20 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `latestExecution.status == Failed` | 2 | Broken | `!` | S1, S2, S4, S5 | `failed: <stage>` |
+| `latestExecution.status == Failed` | 2 | Broken | `!` | S1, S2, S4, S5 | `stage failed` |
 | `latestExecution.status == Stopped` | 2 | Broken | `!` | S1, S2, S4, S5 | `stopped: <stage>` |
 | `latestExecution.status == Cancelled` | 2 | Broken | `!` | S1, S2, S4, S5 | `cancelled: <stage>` |
 | `latestExecution.status == InProgress >2h` | 2 | Warning | `!` | S1, S2, S4, S5 | `stuck >2h: <stage>` |
 
 Notes:
 
-- `<stage>` is the first stage whose `latestExecution.status` matches the signal. When multiple stages match, the earliest failing stage (by stage order in the declaration) wins — it is the root failure.
+- The implemented Failed signal (`pipeline.stage-failed`) says `stage failed` in S4 and lists every failed stage as a `Failed Stage` supporting row, in declaration order. The wording belongs to the finding code; naming one stage in S4 would leave a second failed stage unsayable.
 - For `Cancelled`, the SDK comment explicitly says "A status of cancelled means that the pipeline's definition was updated before the stage execution could be completed" (`AWS SDK Go v2 — service/codepipeline/types.StageExecution § Status`). The S5 wording reflects that.
 - Manual-approval stages appear as `InProgress` while waiting; the `>2h` threshold is blunt for those. When `ActionState.LatestExecution.Token` is non-nil on an approval action, a9s may refine S5 to `waiting for manual approval: <action>` — noted as a refinement, not required for the first pass.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for failed/stopped/cancelled pipelines (`failed: <stage>` / `stopped: <stage>` / `cancelled: <stage>` in S4 names the exact stage); for the `stuck >2h` case, the stage name is in S4 but the underlying reason (hung integration? awaiting approval?) still requires detail — consider refining S4 to `awaiting approval: <action>` when an approval token is pending, which the `GetPipelineState` response already carries.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for failed pipelines (S4 reads `stage failed` and the detail lists every failed stage); for the `stuck >2h` case, the stage name is in S4 but the underlying reason (hung integration? awaiting approval?) still requires detail — consider refining S4 to `awaiting approval: <action>` when an approval token is pending, which the `GetPipelineState` response already carries.
 
 ## 5. Out of Scope
 
@@ -230,7 +230,7 @@ pipeline — CI/CD. Lifecycle key: none (the list API returns no lifecycle field
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| pipeline.stage-failed | stage <stage> failed | broken | wave2 | — |
+| pipeline.stage-failed | stage failed | broken | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

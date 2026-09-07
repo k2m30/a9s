@@ -25,6 +25,10 @@ const (
 	acmCodeExpiresCritical domain.FindingCode = "acm.expires-critical"
 	// acmCodeExpiresSoon — ISSUED cert with 7d <= NotAfter - now() < 30d.
 	acmCodeExpiresSoon domain.FindingCode = "acm.expires-soon"
+	// acmCodeExpired — ISSUED cert whose NotAfter has already passed. Its own
+	// code because "expired" and "expires in 3 days" are different things to
+	// do, and one code cannot carry both wordings.
+	acmCodeExpired domain.FindingCode = "acm.expired"
 	// acmCodeOrphan — ISSUED cert with InUse==false and NotAfter outside the
 	// expiry windows above. Expiry takes priority over orphan.
 	acmCodeOrphan domain.FindingCode = "acm.orphan"
@@ -230,19 +234,14 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 		remaining := t.Sub(now)
 		switch {
 		case remaining < 7*24*time.Hour:
-			phrase := "expired"
-			if remaining >= 0 {
-				phrase = fmt.Sprintf("expires in %d days", int(remaining.Hours()/24))
+			if remaining < 0 {
+				return []domain.Finding{wave1Finding(acmCodeExpired, catalog.Phrase(acmCodeExpired), domain.SevBroken)}
 			}
-			return []domain.Finding{{
-				Code: acmCodeExpiresCritical, Phrase: phrase,
-				Detail: catalog.Detail(acmCodeExpiresCritical), Severity: domain.SevBroken, Source: "wave1",
-			}}
+			return []domain.Finding{wave1Finding(acmCodeExpiresCritical,
+				fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)), domain.SevBroken)}
 		case remaining < 30*24*time.Hour:
-			return []domain.Finding{{
-				Code: acmCodeExpiresSoon, Phrase: fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)),
-				Detail: catalog.Detail(acmCodeExpiresSoon), Severity: domain.SevWarn, Source: "wave1",
-			}}
+			return []domain.Finding{wave1Finding(acmCodeExpiresSoon,
+				fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)), domain.SevWarn)}
 		}
 	}
 	if inUse == "false" {

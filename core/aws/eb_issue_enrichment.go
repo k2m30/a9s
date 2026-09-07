@@ -5,13 +5,13 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -74,12 +74,8 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		if len(out.Causes) == 0 {
 			return
 		}
-		firstCause := out.Causes[0]
-		rows := []domain.DetailRow{
-			{Label: "Cause", Value: firstCause, Tier: "~"},
-		}
-		// Record additional causes as extra rows.
-		for _, cause := range out.Causes[1:] {
+		var rows []domain.DetailRow
+		for _, cause := range out.Causes {
 			rows = append(rows, domain.DetailRow{Label: "Cause", Value: cause, Tier: "~"})
 		}
 		// Key on resource ID (environment ID) for registry consistency.
@@ -88,7 +84,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		if key == "" {
 			key = name
 		}
-		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows)
+		setWave2Finding(&result, key, ebCodeEnvironmentCauses, catalog.Phrase(ebCodeEnvironmentCauses), "~", "eb", rows)
 	})
 	ebConfigurationPosture(ctx, clients, &result, resources)
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).

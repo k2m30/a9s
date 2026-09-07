@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -152,7 +153,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 							Value: fmt.Sprintf("%s exited with code %d", name, *container.ExitCode),
 							Tier:  "!",
 						})
-						break // One finding per task is sufficient.
 					}
 				}
 
@@ -160,8 +160,8 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 					continue
 				}
 
-				summary := rows[0].Value
-				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, summary, "!", "ecs-task", rows)
+				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed,
+					catalog.Phrase(ecsTaskCodeTaskFailed), "!", "ecs-task", rows)
 			}
 		}
 	}

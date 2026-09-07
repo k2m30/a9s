@@ -14,6 +14,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -21,6 +22,7 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -228,8 +230,13 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Phrase), "not associated") {
-		t.Errorf("summary %q must contain \"not associated\"", f.Phrase)
+	// Inverted for spec row "phrase": the wording belongs to the code and the
+	// offending item is a supporting row. Do not restore the old assertion.
+	if want := catalog.Phrase("waf.no-logging"); f.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
+	}
+	if rows := fmt.Sprintf("%v", result.AttentionDetails[wafACLARN1]["waf.no-logging"].Rows); !strings.Contains(strings.ToLower(rows), "not associated") {
+		t.Errorf("no supporting row names the orphaned ACL: %s", rows)
 	}
 	if _, ok := result.Findings[wafACLARN2]; ok {
 		t.Error("acl-2 must NOT appear in Findings — it is associated with a resource")

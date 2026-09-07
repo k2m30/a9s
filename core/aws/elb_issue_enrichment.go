@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -158,7 +159,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			return
 		}
 		var rows []domain.DetailRow
-		var phrases []string
 		isALB := r.Fields["type"] == "application"
 		for _, attr := range out.Attributes {
 			if attr.Key == nil || attr.Value == nil {
@@ -168,12 +168,10 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			case "deletion_protection.enabled":
 				if *attr.Value == "false" {
 					rows = append(rows, domain.DetailRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
-					phrases = append(phrases, "deletion protection disabled")
 				}
 			case "access_logs.s3.enabled":
 				if *attr.Value == "false" {
 					rows = append(rows, domain.DetailRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
-					phrases = append(phrases, "access logs disabled")
 				}
 			case "routing.http.desync_mitigation_mode":
 				if isALB && *attr.Value == elbDesyncMonitorMode {
@@ -190,7 +188,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 		if len(rows) > 0 {
-			setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], "~", "elb", rows)
+			setWave2Finding(&result, r.ID, elbCodeMisconfigured, catalog.Phrase(elbCodeMisconfigured), "~", "elb", rows)
 		}
 	})
 	// Listener posture needs a second read per load balancer, so it runs as

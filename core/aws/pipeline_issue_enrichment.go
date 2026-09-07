@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -24,7 +25,7 @@ const (
 
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
 // Returns a Finding for each pipeline with a failed stage.
-// Severity is "!" (broken/degraded). Summary: "stage <Name> failed".
+// Severity is "!" (broken/degraded).
 func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -73,7 +74,9 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			if stage.StageName != nil {
 				stageName = *stage.StageName
 			}
-			lastStatus = stageName
+			if lastStatus == "OK" {
+				lastStatus = stageName
+			}
 			rows := []domain.DetailRow{
 				{Label: "Failed Stage", Value: stageName, Tier: "!"},
 				{Label: "Status", Value: domain.HumanizeStatusPhrase(string(stage.LatestExecution.Status))},
@@ -94,8 +97,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					break
 				}
 			}
-			setWave2Finding(&result, key, pipelineCodeStageFailed, fmt.Sprintf("stage %s failed", stageName), "!", "pipeline", rows)
-			break // first failed stage is sufficient
+			setWave2Finding(&result, key, pipelineCodeStageFailed, catalog.Phrase(pipelineCodeStageFailed), "!", "pipeline", rows)
 		}
 		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	})

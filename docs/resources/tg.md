@@ -181,8 +181,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `LoadBalancerArns == []` | 1 | Warning | n/a | S2, S4 | `orphan: no load balancer` |
-| any target `unhealthy` (not all) | 2 | Warning | n/a | S2, S4, S5 | `unhealthy: <K>/<N> targets` |
-| all targets `unhealthy` | 2 | Broken | n/a | S2, S4, S5 | `all targets unhealthy` |
+| any target `unhealthy` (not all) | 2 | Warning | n/a | S2, S4, S5 | `unhealthy targets: <K>/<N>` |
+| all targets `unhealthy` | 2 | Broken | n/a | S2, S4, S5 | `all <N> targets unhealthy` |
 
 Notes:
 
@@ -191,7 +191,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — an orphan TG reads `orphan: no load balancer` (yellow), a partial outage reads `unhealthy: K/N targets` (yellow), and a total outage reads `all targets unhealthy` (red); the operator knows both the scope (how many) and the next pivot (`elb` for orphan, `ec2`/`lambda` for target failures) without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — an orphan TG reads `orphan: no load balancer` (yellow), a partial outage reads `unhealthy targets: K/N` (yellow), and a total outage reads `all N targets unhealthy` (red); the operator knows both the scope (how many) and the next pivot (`elb` for orphan, `ec2`/`lambda` for target failures) without opening detail.
 
 ## 5. Out of Scope
 
@@ -233,7 +233,8 @@ tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| tg.unhealthy-targets | unhealthy targets: <N>/<M> | broken | wave2 | — |
+| tg.all-targets-unhealthy | all <N> targets unhealthy | broken | wave2 | — |
+| tg.unhealthy-targets | unhealthy targets: <N>/<M> | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -201,7 +201,8 @@ acm — DNS & CDN. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| acm.expires-critical | expires in <N> days | broken | wave1 | The certificate expires within a week, or already has, and every client reaching a listener that serves it will refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
+| acm.expired | expired | broken | wave1 | The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one. |
+| acm.expires-critical | expires in <N> days | broken | wave1 | The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
 | acm.expires-soon | expires in <N> days | warn | wave1 | The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published. |
 | acm.orphan | certificate not in use (orphan) | warn | wave1 | Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for. |
 | acm.status.pending-validation | pending validation | warn | wave1 | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |

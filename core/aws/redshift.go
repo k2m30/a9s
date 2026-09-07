@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -154,16 +155,8 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 		"hardware-failure":        CodeRedshiftHardwareFailure,
 		"storage-full":            CodeRedshiftStorageFull,
 	}
-	brokenPhraseByStatus := map[string]string{
-		"incompatible-hsm":        "broken: incompatible-hsm",
-		"incompatible-network":    "broken: incompatible-network",
-		"incompatible-parameters": "broken: incompatible-parameters",
-		"incompatible-restore":    "broken: incompatible-restore",
-		"hardware-failure":        "broken: hardware-failure",
-		"storage-full":            "broken: storage-full",
-	}
 	if code, ok := brokenByStatus[clusterStatus]; ok {
-		return []domain.Finding{{Code: code, Phrase: brokenPhraseByStatus[clusterStatus], Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{wave1Finding(code, catalog.Phrase(code), domain.SevBroken)}
 	}
 
 	// Broken: ClusterAvailabilityStatus-driven

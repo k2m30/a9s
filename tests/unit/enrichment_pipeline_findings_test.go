@@ -5,7 +5,8 @@ package unit
 // Contract assertions (enricher-contract.md):
 //   - Returns EnricherResult.Findings keyed by resource ID (r.ID), with name fallback when ID is empty.
 //   - Severity "!" for all findings.
-//   - Summary format: "stage <Name> failed".
+//   - Phrase: the catalog's registered phrase for pipeline.stage-failed, with
+//     every failed stage as a supporting row.
 //   - IssueCount = len(Findings).
 //   - Truncated = true when len(resources) > EnrichmentCap.
 //   - Pipelines with no failed stages must NOT appear in Findings.
@@ -14,7 +15,6 @@ package unit
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,6 +22,7 @@ import (
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -89,8 +90,12 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID(t *testing.T) {
 	}
 }
 
-// TestEnrichCodePipelineStatus_SummaryContainsStageName verifies "stage <Name> failed" format.
-func TestEnrichCodePipelineStatus_SummaryContainsStageName(t *testing.T) {
+// TestEnrichCodePipelineStatus_SummaryIsTheCodesPhrase inverts the former
+// TestEnrichCodePipelineStatus_SummaryContainsStageName, which required the
+// stage name inside the phrase. Spec row "phrase" deletes that behaviour: the
+// wording belongs to pipeline.stage-failed and the stage is a Failed Stage row,
+// so a second failed stage can be named too. Do not restore the old assertion.
+func TestEnrichCodePipelineStatus_SummaryIsTheCodesPhrase(t *testing.T) {
 	fake := &pipelineStateFake{
 		states: map[string]*codepipeline.GetPipelineStateOutput{
 			"summary-pipeline": {
@@ -108,12 +113,12 @@ func TestEnrichCodePipelineStatus_SummaryContainsStageName(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	finding := result.Findings["summary-pipeline"][0]
-	summary := finding.Phrase
-	if !strings.Contains(summary, "Integration-Test") {
-		t.Errorf("summary %q must contain stage name %q", summary, "Integration-Test")
+	if want := catalog.Phrase("pipeline.stage-failed"); finding.Phrase != want {
+		t.Errorf("Phrase = %q, want the catalog's %q", finding.Phrase, want)
 	}
-	if !strings.Contains(summary, "failed") {
-		t.Errorf("summary %q must contain %q", summary, "failed")
+	rows := result.AttentionDetails["summary-pipeline"]["pipeline.stage-failed"].Rows
+	if len(rows) == 0 || rows[0].Label != "Failed Stage" || rows[0].Value != "Integration-Test" {
+		t.Errorf("rows = %v, want the stage name in a Failed Stage row", rows)
 	}
 	if got := finding.Severity; got != domain.SevBroken {
 		t.Errorf("Findings[%q].Severity = %v, want SevBroken", "summary-pipeline", got)

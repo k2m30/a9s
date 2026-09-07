@@ -105,7 +105,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: CodeCFNStackRollback, Phrase: "<status, in words>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCFNStackInProgress, Phrase: "<status, in words>", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeCFNStackDeleted, Phrase: "delete complete", Severity: domain.SevDim, Source: "wave1"},
-			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure: <ResourceType/LogicalResourceId>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted."},
 			{Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs", Severity: domain.SevBroken, Source: "wave1", Detail: "A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential."},
@@ -154,7 +154,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("pipeline"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: pipelineCodeStageFailed, Phrase: "stage <stage> failed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: pipelineCodeStageFailed, Phrase: "stage failed", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{

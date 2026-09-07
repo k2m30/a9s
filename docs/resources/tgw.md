@@ -166,8 +166,8 @@ tgw — NETWORKING. Lifecycle key: `state`.
 | tgw.state.deleting | deleting | warn | wave1 | The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop. |
 | tgw.state.failed | failed | broken | wave1 | The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path. |
 | tgw.state.deleted | deleted | dim | wave1 | This gateway is gone. AWS keeps returning it for a while after deletion, so route tables that still point at it are dead references worth cleaning up. |
-| tgw.attachment-failed | attachment <id> failed | broken | wave2 | The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment. |
-| tgw.attachment-transitional | attachment <id> <state> | warn | wave2 | The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it. |
+| tgw.attachment-failed | attachment failed | broken | wave2 | The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment. |
+| tgw.attachment-transitional | attachment between states | warn | wave2 | The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it. |
 | tgw.auto-accept-attachments | auto-accepts shared attachments | warn | wave1 | Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly. |
 <!-- END GENERATED: findings -->
 
