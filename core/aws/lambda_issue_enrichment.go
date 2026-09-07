@@ -61,10 +61,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			targets = append(targets, r)
 		}
 	}
-	if len(targets) > EnrichmentCap {
-		result.Truncated = true
-		targets = targets[:EnrichmentCap]
-	}
+	targets = capAtEnrichmentCap(&result, targets, func(r resource.Resource) []string { return []string{r.ID} })
 
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	const op = "lambda-enrich: GetPolicy/ListFunctionUrlConfigs"

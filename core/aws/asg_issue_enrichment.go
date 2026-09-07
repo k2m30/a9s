@@ -125,15 +125,13 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	if len(names) > EnrichmentCap {
-		result.Truncated = true
-		names = names[:EnrichmentCap]
-	}
+	names = capAtEnrichmentCap(result, names, func(n string) []string { return groupsByLC[n] })
 
 	// DescribeLaunchConfigurations pages: asking for EnrichmentCap names fits
-	// one page only because the API's default page size happens to match, and a
-	// configuration that fell off the page would leave its groups reading
-	// "nothing to report" rather than "not inspected".
+	// one page only because the API's default page size happens to match. Both
+	// ways a configuration can go unread — dropped at the cap above, or left
+	// behind a pending token below — mark the groups that referenced it, so
+	// none of them reads "nothing to report" for a posture nobody looked at.
 	const op = "asg-enrich: DescribeLaunchConfigurations"
 	var configs []asgtypes.LaunchConfiguration
 	var nextToken *string

@@ -46,10 +46,9 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	}
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
-	truncated := len(resources) > EnrichmentCap
-	nNames := min(len(names), EnrichmentCap)
+	names = capAtEnrichmentCap(&result, names, func(n string) []string { return []string{n} })
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, nNames, EnrichmentParallelism, func(i int) {
+	_ = ForEachParallel(ctx, len(names), EnrichmentParallelism, func(i int) {
 		name := names[i]
 		mu.Lock()
 		atCap := len(buildIDs) >= EnrichmentCap
@@ -64,7 +63,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			truncated = true
+			result.Truncated = true
 			result.TruncatedIDs[name] = true
 			return
 		}
@@ -75,7 +74,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 	if len(buildIDs) == 0 {
-		result.Truncated = truncated
 		return result, nil
 	}
 	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
@@ -133,7 +131,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows)
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	result.Truncated = truncated
 	return result, nil
 }
 

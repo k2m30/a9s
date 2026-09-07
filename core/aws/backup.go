@@ -127,7 +127,7 @@ const backupSelectionsPartialField = "selections_partial"
 
 // enumerateBackupPlanResources walks the plan's selections and returns
 // comma-separated lists of resource ARNs, excluded ARNs, and tag-selection
-// conditions covered by the plan, plus whether the walk saw the whole list.
+// conditions covered by the plan, plus whether the plan's reach is fully known.
 //
 // The three lists correspond to BackupSelection.Resources (include list, may
 // contain wildcards), BackupSelection.NotResources (exclude list, same
@@ -136,10 +136,9 @@ const backupSelectionsPartialField = "selections_partial"
 // match directly against a resource's own tags. Tag conditions arrive in two
 // shapes AWS accepts interchangeably: the flat ListOfTags, and the structured
 // Conditions whose StringEquals and StringLike carry the same key and value.
-// Its negative forms are not modelled — an unmodelled exclusion can only widen
-// what the plan appears to cover, which never invents a finding.
 //
-// complete is false when any call failed or the list ran past the page cap.
+// complete is false when any call failed, the list ran past the page cap, or a
+// selection carried a Conditions block the flat list cannot represent.
 // Whatever was read is still returned: a partial list can only match more
 // resources, and the flag is what stops the coverage join from reading a short
 // list as a plan that protects nothing.
@@ -155,6 +154,7 @@ func enumerateBackupPlanResources(
 	var resources, notResources, selectionTags []string
 	var nextToken *string
 	complete := false
+	representable := true
 	for range PerParentPageCap {
 		listOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
 			return selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
@@ -180,33 +180,47 @@ func enumerateBackupPlanResources(
 			}
 			resources = append(resources, selOut.BackupSelection.Resources...)
 			notResources = append(notResources, selOut.BackupSelection.NotResources...)
-			selectionTags = append(selectionTags, backupSelectionTagConditions(*selOut.BackupSelection)...)
+			tags, folded := backupSelectionTagConditions(*selOut.BackupSelection)
+			selectionTags = append(selectionTags, tags...)
+			representable = representable && folded
 		}
 		if nextToken = listOut.NextToken; nextToken == nil || *nextToken == "" {
 			complete = true
 			break
 		}
 	}
-	return strings.Join(resources, ","), strings.Join(notResources, ","), strings.Join(selectionTags, ","), complete
+	return strings.Join(resources, ","), strings.Join(notResources, ","), strings.Join(selectionTags, ","), complete && representable
 }
 
 // backupSelectionTagConditions renders one selection's tag conditions as "k=v"
-// pairs, from both shapes AWS accepts.
-func backupSelectionTagConditions(sel backuptypes.BackupSelection) []string {
-	var out []string
+// pairs, from both shapes AWS accepts, and says whether that rendering keeps
+// the selection's meaning.
+//
+// ListOfTags is an OR of its entries, which is what the flat list is. A
+// Conditions block is an AND across StringEquals, StringLike, StringNotEquals
+// and StringNotLike, so the only block the flat list carries unchanged is one
+// holding a single positive parameter. Anything else — an exclusion, or two
+// parameters that must both hold — reads as wider than the plan really is, and
+// a plan that looks wider hides the "not covered" finding this join exists to
+// report. Such a block is not modelled; the selection is reported unfolded
+// instead, and the caller turns that into an abstention.
+func backupSelectionTagConditions(sel backuptypes.BackupSelection) (tags []string, representable bool) {
 	add := func(key, value *string) {
 		if key == nil || value == nil {
 			return
 		}
-		out = append(out, strings.TrimPrefix(*key, "aws:ResourceTag/")+"="+*value)
+		tags = append(tags, strings.TrimPrefix(*key, "aws:ResourceTag/")+"="+*value)
 	}
 	for _, cond := range sel.ListOfTags {
 		add(cond.ConditionKey, cond.ConditionValue)
 	}
-	if sel.Conditions != nil {
-		for _, cond := range slices.Concat(sel.Conditions.StringEquals, sel.Conditions.StringLike) {
-			add(cond.ConditionKey, cond.ConditionValue)
-		}
+	c := sel.Conditions
+	if c == nil {
+		return tags, true
 	}
-	return out
+	for _, cond := range slices.Concat(c.StringEquals, c.StringLike) {
+		add(cond.ConditionKey, cond.ConditionValue)
+	}
+	return tags, len(c.StringNotEquals)+len(c.StringNotLike) == 0 &&
+		len(c.StringEquals)+len(c.StringLike) <= 1
 }
