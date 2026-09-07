@@ -11,6 +11,7 @@
   trust conditioned on that key being absent is reported unscoped.
 - A condition on a key that scopes the request rather than the caller no
   longer counts as scoping the caller: a function URL pinned to auth type
-  NONE is reported public, KMS keys and SNS topics open to any account
-  through a named service are no longer reported as scoped, and only
-  AWS_IAM on the auth type restricts.
+  NONE is reported public, a KMS key open to any account through a named
+  service and an SNS topic open to any account for a named delivery endpoint
+  are no longer reported as scoped, and only AWS_IAM on the auth type
+  restricts.

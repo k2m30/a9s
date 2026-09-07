@@ -116,7 +116,8 @@ func concreteKeys(names ...string) []scopingKey {
 }
 
 // restrictiveKeys scope a wildcard principal to an account, org, ARN, VPC,
-// caller or address range. Compared with strings.EqualFold.
+// caller or address range, or to a signed caller through the function-URL
+// auth type. Compared with strings.EqualFold.
 var restrictiveKeys = slices.Concat(
 	concreteKeys(
 		"aws:SourceAccount", "aws:SourceOwner", "aws:SourceArn", "aws:SourceVpc", "aws:SourceVpce",
