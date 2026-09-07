@@ -14,10 +14,14 @@ package unit
 // enricher raising one code twice for one resource would.
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigateway/types"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -49,15 +53,7 @@ func TestAPIGWTwoOffendingStages_EveryStageKeepsItsRows(t *testing.T) {
 
 	for _, code := range []string{w6aAPIGWNoAccessLogs, w6aAPIGWTracingOff, w6aAPIGWStageSecret} {
 		t.Run(code, func(t *testing.T) {
-			var raised int
-			for _, f := range res.Findings[apiID] {
-				if string(f.Code) == code {
-					raised++
-				}
-			}
-			if raised != 1 {
-				t.Errorf("%s is raised %d times on %s, want 1 — one resource states one condition once, however many of its stages trip it", code, raised, apiID)
-			}
+			w2AssertFindingRaisedOnce(t, res, apiID, code)
 
 			var stages []string
 			for _, row := range w2Rows(t, res, apiID, code) {
@@ -114,4 +110,78 @@ func TestAPIGWOneOffendingStageOfTwo_NamesOnlyThatStage(t *testing.T) {
 		t.Errorf("%s rows = %+v, want %+v", w6aAPIGWTracingOff, rows, want)
 	}
 	w2AssertNoCode(t, res.Findings[apiID], w6aAPIGWNoAccessLogs)
+}
+
+// The same collapse on two enrichers that have nothing to do with API Gateway
+// or with the secret scanner, because the helper is shared and every Wave-2
+// enricher that walks the parts of one resource reaches it. Route 53 raises
+// one dangling-record finding per record of a zone; CloudFront raises one
+// no-origin-access-control finding per S3 origin of a distribution.
+func TestWave2SameCodeTwice_RowsAccumulateAcrossEnrichers(t *testing.T) {
+	t.Run("r53 zone with two dangling records", func(t *testing.T) {
+		const zoneID = "Z0TWODANGLING0000000"
+
+		res := w6aEnrichR53(t,
+			&w6aR53Fake{logConfigs: 1, records: []r53types.ResourceRecordSet{
+				w6aARecord("old-api.acme-corp.com.", "203.0.113.201"),
+				w6aARecord("old-www.acme-corp.com.", "203.0.113.202"),
+			}},
+			w6aAddressCache(false, []string{"203.0.113.10"}, nil, nil),
+			w6aZoneRes(zoneID, "acme-corp.com."),
+		)
+
+		w2AssertFindingRaisedOnce(t, res, zoneID, w6aR53Dangling)
+		rows := w2Rows(t, res, zoneID, w6aR53Dangling)
+		want := []domain.DetailRow{
+			{Label: "Record", Value: "old-api.acme-corp.com.", Tier: "!"},
+			{Label: "Target", Value: "203.0.113.201", Tier: "!"},
+			{Label: "Record", Value: "old-www.acme-corp.com.", Tier: "!"},
+			{Label: "Target", Value: "203.0.113.202", Tier: "!"},
+		}
+		if !reflect.DeepEqual(rows, want) {
+			t.Errorf("%s rows = %+v, want %+v — every dangling record must be named, not just the last", w6aR53Dangling, rows, want)
+		}
+	})
+
+	t.Run("cf distribution with two unprotected origins", func(t *testing.T) {
+		const distID = "E7TWOORIGINS00"
+		const originA = "acme-assets-origin.s3.us-east-1.amazonaws.com"
+		const originB = "acme-media-origin.s3.us-east-1.amazonaws.com"
+
+		cfg := w6aCFConfig("shop.acme-corp.com", originA)
+		cfg.Origins = &cftypes.Origins{
+			Quantity: aws.Int32(2),
+			Items: []cftypes.Origin{
+				{Id: aws.String("assets"), DomainName: aws.String(originA)},
+				{Id: aws.String("media"), DomainName: aws.String(originB)},
+			},
+		}
+
+		res := w6aCFOne(t, distID, cfg, w6aS3NameCache(false, "acme-assets-origin", "acme-media-origin"))
+
+		w2AssertFindingRaisedOnce(t, res, distID, w6aCFNoOAC)
+		rows := w2Rows(t, res, distID, w6aCFNoOAC)
+		want := []domain.DetailRow{
+			{Label: "Origin", Value: originA, Tier: "~"},
+			{Label: "Origin", Value: originB, Tier: "~"},
+		}
+		if !reflect.DeepEqual(rows, want) {
+			t.Errorf("%s rows = %+v, want %+v — every unprotected origin must be named", w6aCFNoOAC, rows, want)
+		}
+	})
+}
+
+// w2AssertFindingRaisedOnce pins the other half of the collapse: one condition
+// found on several parts of a resource is stated once.
+func w2AssertFindingRaisedOnce(t *testing.T, res awsclient.IssueEnricherResult, id, code string) {
+	t.Helper()
+	var raised int
+	for _, f := range res.Findings[id] {
+		if string(f.Code) == code {
+			raised++
+		}
+	}
+	if raised != 1 {
+		t.Errorf("%s is raised %d times on %s, want 1", code, raised, id)
+	}
 }

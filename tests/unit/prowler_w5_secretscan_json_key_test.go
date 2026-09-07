@@ -1,16 +1,15 @@
 package unit
 
-// prowler_w5_secretscan_json_key_test.go — the shared secret scanner gained
-// an optional quote before the separator so a credential written as a JSON
-// object key matches. That change is in the one engine every caller shares,
-// not at the Step Functions call site, so its blast radius is every caller.
+// prowler_w5_secretscan_json_key_test.go — a credential written as a JSON
+// object key is a hit, and the references that resolve a credential
+// elsewhere still are not. Both rules live in the one engine every caller
+// shares, not at the Step Functions call site, so their blast radius is
+// every caller and the cases below are deliberately NOT state machine
+// definitions.
 //
-// The scanner's own comment states the rule the widening could break: a
-// value that resolves a secret elsewhere is good practice, not a leak, and
+// The rule the quoted-key shapes could break is the scanner's own: a value
+// that resolves a secret elsewhere is good practice, not a leak, and
 // reporting the indirection tells an operator their correct code is wrong.
-// A Secrets Manager reference in JSON is now one optional quote closer to
-// matching than it was, so the cases below are deliberately NOT state
-// machine definitions.
 
 import (
 	"strings"
@@ -30,9 +29,9 @@ func w5HasKeywordHit(hits []secretscan.Hit) bool {
 	return false
 }
 
-// The shape the widening exists to catch, stated once outside Step
-// Functions: a credential inlined as a JSON object key. A task definition,
-// a template parameter block and a plain config file all take this form.
+// A credential inlined as a JSON object key, stated once outside Step
+// Functions. A task definition, a template parameter block and a plain
+// config file all take this form.
 func TestW5SecretScan_JSONObjectKeyIsAHit(t *testing.T) {
 	cases := map[string]string{
 		"task definition environment": `{
