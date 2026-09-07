@@ -387,6 +387,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sorting a list on its Size or Status column now gives the same order whether the list is showing cached rows or freshly fetched ones. The order used to change under the cursor the moment a fetch landed. This affects RDS instances, DocumentDB and Aurora clusters, ElastiCache, Redshift, DynamoDB tables, log groups, ECR images and S3 objects.
 - CloudTrail events sort by their real timestamp again in the column header, and the header arrow now appears on the column being sorted.
 - A sorted column keeps its arrow at any width. A column just wide enough for its title, or squeezed by a narrow terminal, used to lose the arrow to the ellipsis, so the header read as unsorted while the rows below it were sorted.
+- A resource whose posture check ran out of pages before reaching it now says `not inspected` instead of rendering as healthy. On large accounts the checks for EC2 instances, EBS volumes, RDS instances, DocumentDB clusters and backup plans stop after a fixed number of pages, and every row past that point used to look clean.
+- A check that finished its last batch without an error no longer erases the fact that an earlier part of the same check was cut short. The list could report a complete count when it had really seen only part of the account.
+- A supporting line whose own text ends in wording like `+3 more` is no longer swallowed and miscounted when a second batch adds lines to the same finding.
+- The backup-plan coverage check no longer reads tags whose result it then throws away.
+- The `… +K more` line that closes a long finding no longer borrows the label of the line above it. It used to read `State: … +5 more` on a backup plan and `Combo: … +12 more` on an IAM policy, as though it were one more failed job or one more privilege-escalation path.
+- A backup plan with more than five failed jobs in the last day no longer shows five of them and drops the rest without saying so. The detail now lists as many as any other finding does and closes with `… +K more` for the remainder, with the most recent failure and the partial-job count kept at the top where a long list cannot push them off.
 
 ### Added
 
@@ -801,6 +807,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - References to the related-resources contract now name a heading instead of a line number, so a reader following one lands on the section rather than on whatever moved into that line.
 - A check that a role is not allowed to run is now one log line for the whole resource type: the action the role lacks, how many resources it covered, and one example. It used to be one line per resource, each carrying a request id, a host id and an encoded authorization message.
 - View files in `~/.a9s/views/` carry a `generated:` stamp. When a9s ships new columns for a resource type, an existing file gets them added on the next launch, in place: the columns, widths, paths and keys you set are kept, though the file is rewritten from its parsed form, so YAML comments do not survive. Files already at the current stamp are never touched.
+- The demo account now has a target group with more failing targets than one detail view shows, so the closing `… +2 more` line of a long finding is visible in `--demo`.
 
 ### Fixed (security)
 
