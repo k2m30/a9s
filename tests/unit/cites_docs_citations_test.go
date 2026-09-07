@@ -745,7 +745,11 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 	return offenders, true
 }
 
-var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?: [a-z]+)* signals`)
+// Two shapes of the same claim: "no Wave 2 signals" and "there is no Wave 2,".
+// A wave named without a following clause boundary is about an API call rather
+// than a signal — "no Wave 2 per-resource fan-out is needed" is true of a type
+// that ships wave-2 findings from the list response.
+var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?:(?: [a-z]+)* signals|[,.])`)
 
 var reS3Suppressed = regexp.MustCompile(`S3 (is )?suppress`)
 
