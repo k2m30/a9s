@@ -31,19 +31,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 func TestScanDemoBench_NoResourceReportsOneConditionTwice(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
-
-	// The kinds secretscan.Hit can carry. A supporting row whose value is one
-	// of these names a scanner hit, and two such rows under one label are one
-	// leak counted twice.
-	scannerKinds := map[string]bool{
-		"aws-access-key": true, "private-key": true, "jwt": true,
-		"keyword": true, "high-entropy": true,
-	}
 
 	var duplicateFindings, duplicateRows []string
 
@@ -81,7 +74,10 @@ func TestScanDemoBench_NoResourceReportsOneConditionTwice(t *testing.T) {
 			for code, ad := range merged[i].AttentionDetails {
 				count := map[string]int{}
 				for _, row := range ad.Rows {
-					if scannerKinds[row.Value] {
+					// A supporting row whose value is a scanner kind names a
+					// scanner hit, and two such rows under one label are one
+					// leak counted twice.
+					if secretscan.IsKind(row.Value) {
 						count[row.Label]++
 					}
 				}

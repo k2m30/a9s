@@ -6,10 +6,9 @@ package unit
 // Two properties, both inside the one engine every caller shares:
 //
 //   - One key, one hit. A generated credential under a credential-named key
-//     satisfies the keyword rule and the entropy rule at once. Two hits for
-//     one key means every caller renders a near-identical supporting row
-//     pair for a single leak, and the entropy kind carries no information
-//     the keyword kind did not already carry.
+//     answers more than one of the scanner's rules at once, and it is still
+//     one credential. Two hits for one key means every caller renders a
+//     near-identical supporting row pair for a single leak.
 //   - The key match does not depend on how the value is quoted. A quoted key
 //     with a bare value is valid YAML and a real shape in task parameters
 //     and CloudFormation templates; skipping it hides a leak an operator
@@ -33,9 +32,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
-// A Lambda-style environment value that is both credential-named and
-// generated: the keyword rule and the entropy rule both fire on it, and the
-// leak is still one leak.
+// A Lambda-style environment value that is credential-named and looks
+// generated, so more than one of the scanner's rules answers for it.
 const scanGeneratedSecret = "OhbVrpoiVgRV5IfLBcbfnoGMbJmTPS"
 
 func TestScanKV_GeneratedValueUnderCredentialKey_IsOneHit(t *testing.T) {

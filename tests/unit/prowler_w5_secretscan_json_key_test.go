@@ -19,10 +19,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
-// w5HasKeywordHit reports whether any hit is a keyword-class hit.
+// w5HasKeywordHit reports whether any hit came from the keyword rule, as
+// opposed to a structural match on the value itself.
 func w5HasKeywordHit(hits []secretscan.Hit) bool {
 	for _, h := range hits {
-		if h.Kind == "keyword" || h.Kind == "high-entropy" {
+		if h.Kind == secretscan.KindKeyword {
 			return true
 		}
 	}
@@ -145,15 +146,12 @@ func TestW5SecretScan_ProseIsNotAHit(t *testing.T) {
 	}
 }
 
-// A pre-existing false positive, kept separate so it is not read as this
-// batch's doing: BOTH the previous pattern and the widened one report this,
-// verified by running them side by side. A Secrets Manager ARN contains the
-// literal "secret:" followed by the secret's own name, so the match lands
-// INSIDE the ARN and isRealValue only ever sees the tail ("acme/db-AbCdEf")
-// rather than the reference it came from.
-//
-// The scanner's own doc comment names this exact string as the shape that
-// must not be reported, so the intent is settled and only the code disagrees.
+// A Secrets Manager ARN contains the literal "secret:" followed by the
+// secret's own name, so a keyword match lands INSIDE the ARN and would be
+// judged on its tail ("acme/db-AbCdEf") rather than on the reference it came
+// from. The scanner blanks every ARN before the keyword pass for exactly
+// this reason, and an ARN naming where a secret lives is the fix rather than
+// the leak.
 func TestW5SecretScan_SecretsManagerARNIsNotALeak(t *testing.T) {
 	const line = `{"SecretId": "arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/db-AbCdEf"}`
 	if hits := secretscan.ScanText(line); w5HasKeywordHit(hits) {
