@@ -15,3 +15,6 @@
   service and an SNS topic open to any account for a named delivery endpoint
   are no longer reported as scoped, and only AWS_IAM on the auth type
   restricts.
+- A finding's explanation in the detail view now wraps to the panel instead of
+  being cut at its edge, so the sentence that says what to change reaches the
+  reader without turning wrap on.

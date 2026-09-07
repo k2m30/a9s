@@ -66,7 +66,7 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 // attentionPrependCount returns the number of items that injectAttentionSectionDetail
 // would prepend for the given findings and attentionDetails. Mirrors the layout in
 // injectAttentionSectionDetail: 1 section header + per issue-severity finding
-// (1 phrase line + 1 Detail line when Finding.Detail != "" + len(rows)) + a
+// (1 phrase line + one line per wrapped Detail sentence row + len(rows)) + a
 // trailing spacer, UNLESS the last issue-severity finding is "bare" (no Detail,
 // no rows) — injectAttentionSectionDetail omits the spacer in that case so it
 // does not sit directly against a bare Phrase line. Returns 0 when there are no
@@ -79,8 +79,8 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 // unsorted order previously caused a prepend-count mismatch (see
 // tests/unit/app_detail_attention_cursor_test.go), shifting FieldCursor by
 // the wrong delta after a mixed-severity Attention re-sort.
-func attentionPrependCount(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) int {
-	entries := buildAttentionEntries(findings, attentionDetails)
+func attentionPrependCount(ds *DetailState) int {
+	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth)
 	if len(entries) == 0 {
 		return 0
 	}
@@ -88,9 +88,7 @@ func attentionPrependCount(findings []domain.Finding, attentionDetails map[domai
 	lastEntryBare := false
 	for _, e := range entries {
 		entryLineCount++ // phrase line
-		if e.detail != "" {
-			entryLineCount++
-		}
+		entryLineCount += len(e.detailLines)
 		entryLineCount += len(e.rows)
 		lastEntryBare = e.bare()
 	}
@@ -409,7 +407,7 @@ func newlyReportedFindings(current, candidates []domain.Finding) []domain.Findin
 // just-appended entry). Callers must hold c.mu (write).
 func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
 	// Capture old prepend size before stripping, so the cursor delta can be computed.
-	oldPrepend := attentionPrependCount(ds.Findings, ds.AttentionDetails)
+	oldPrepend := attentionPrependCount(ds)
 
 	// Strip prior wave-2 findings (same strip semantics as DetailModel.SetEnrichmentFinding).
 	if len(ds.Findings) > 0 {
@@ -454,7 +452,7 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	//   2. If cursor was in content (>= oldPrepend): shift by delta, but only when
 	//      content items actually exist after injection — mirrors haveSnapshot=false
 	//      for resources with no content fields (empty resource).
-	newPrepend := attentionPrependCount(ds.Findings, ds.AttentionDetails)
+	newPrepend := attentionPrependCount(ds)
 	delta := newPrepend - oldPrepend
 	if delta != 0 {
 		if ds.FieldCursor < oldPrepend {
@@ -572,6 +570,20 @@ func (c *Controller) SetDetailRelatedVisible(visible, hidden bool) {
 	if !visible {
 		ds.RelatedFocus = false
 	}
+}
+
+// SetDetailViewportWidth sets the ViewportWidth on the top detail screen's
+// DetailState to the renderer-supplied field-panel width, so the body builder
+// wraps the Attention sentence to what the reader can actually see. No-op
+// when the top screen is not ScreenDetail.
+func (c *Controller) SetDetailViewportWidth(w int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return
+	}
+	ds.ViewportWidth = w
 }
 
 // SetDetailViewportHeight sets the ViewportHeight on the top detail screen's

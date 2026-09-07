@@ -810,9 +810,10 @@ func Test_DetailController_MoveUp_ClampsAtFirstField(t *testing.T) {
 
 // wave3AttentionRowsForCode returns the Path=="Attention" IndentLevel==1
 // FieldRow(s) for the given finding phrase, in the order buildAttentionEntries
-// / injectAttentionSectionDetail emit them (phrase row, then an optional
-// detail-sentence row). The match is case-insensitive because the phrase row's
-// Value is capitalizeFirstDetail(Phrase), not Phrase verbatim.
+// / injectAttentionSectionDetail emit them: the phrase row, then one row per
+// wrapped line of the Detail sentence. The match is case-insensitive because
+// the phrase row's Value is capitalizeFirstDetail(Phrase), not Phrase
+// verbatim.
 func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.FieldRow {
 	var rows []app.FieldRow
 	collecting := false
@@ -833,14 +834,13 @@ func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.
 			continue
 		}
 		rows = append(rows, f)
-		break // at most phrase + one detail row per entry
 	}
 	return rows
 }
 
 // Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase pins
 // that when Finding.Detail is non-empty, injectAttentionSectionDetail
-// (detail_body.go:330) emits a SECOND Attention sub-row carrying the full S5
+// (detail_body.go:330) emits further Attention sub-rows carrying the full S5
 // operator sentence, in addition to the S4 Phrase row — the live replacement
 // for wave2_risk_text_s4_s5_test.go's
 // TestWave2_DetailAttention_RendersFullDetailSentence_AlongsidePhrase, which
@@ -871,14 +871,24 @@ func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T
 		t.Fatal("Body.Detail is nil")
 	}
 	rows := wave3AttentionRowsForCode(body, "maintenance scheduled")
-	if len(rows) != 2 {
-		t.Fatalf("expected 2 Attention rows (phrase + detail sentence) for a finding with Detail set, got %d: %+v", len(rows), rows)
+	if len(rows) < 2 {
+		t.Fatalf("expected a phrase row plus at least one detail-sentence row for a finding with Detail set, got %d: %+v", len(rows), rows)
 	}
 	if !strings.Contains(strings.ToLower(rows[0].Value), "maintenance scheduled") {
 		t.Errorf("first Attention row must carry the short Phrase; got %+v", rows[0])
 	}
-	if rows[1].Value != wantDetail {
-		t.Errorf("second Attention row must be the full S5 Detail sentence verbatim; got %q, want %q", rows[1].Value, wantDetail)
+	// Inverted for spec row 5 (the Attention sentence wraps to the panel):
+	// the sentence now arrives as successive rows, so "rows[1] equals the
+	// sentence verbatim" is the assertion a one-row sentence made and is not
+	// to be restored — a single row wide enough to hold this sentence is the
+	// row the acceptance capture found cut at the panel edge. What must hold
+	// is that every word survives, in order, across the rows.
+	var sentence []string
+	for _, r := range rows[1:] {
+		sentence = append(sentence, r.Value)
+	}
+	if got := strings.Join(sentence, " "); got != strings.Join(strings.Fields(wantDetail), " ") {
+		t.Errorf("the Attention rows after the phrase must carry the full S5 Detail sentence in order; got %q, want %q", got, wantDetail)
 	}
 }
 

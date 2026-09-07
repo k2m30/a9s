@@ -2,7 +2,11 @@
 ┌───────────────────── detail -- i-0a1b2c3d4e5f60001 (web-prod-01) ──────────────────────┐
 │ Attention (1)                                                                          │
 │     ~ Public address                                                                   │
-│     The instance holds a routable public address, so every port its security groups lea│
+│     The instance holds a routable public address, so                                   │
+│     every port its security groups leave open is                                       │
+│     reachable from the internet. Put it behind a NAT                                   │
+│     gateway or load balancer unless it must be addressed                               │
+│     directly.                                                                          │
 │         Public address: 54.210.33.112                                                  │
 │                                                                                        │
 │ InstanceId:           i-0a1b2c3d4e5f60001                                              │
@@ -23,8 +27,4 @@
 │ SecurityGroups:                                                                        │
 │     - GroupId: sg-0aaa111111111111a                                                    │
 │       GroupName: acme-web-alb-sg                                                       │
-│     - GroupId: sg-0bbb222222222222b                                                    │
-│       GroupName: acme-web-app-sg                                                       │
-│ BlockDeviceMappings:                                                                   │
-│     - DeviceName: /dev/xvda                                                            │
 └───────────────y YAML──J JSON──o Open──t CloudTrail──r Related──ctrl+r Refresh──w Wrap──┘

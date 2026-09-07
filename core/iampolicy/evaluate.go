@@ -206,8 +206,10 @@ func isAnyIP(v string) bool {
 }
 
 // isWildcardValue is true for "*", "arn:aws:*", "arn:*:*:*" and the like:
-// an ARN whose every field after the partition is empty or a wildcard, so
-// it names no resource in particular.
+// an ARN whose every field after the partition is empty or a wildcard, so it
+// names no resource in particular. An ARN whose account is "*" is one too,
+// whatever it names inside that account: that is the same "names everyone"
+// shape isAnyoneARN reads on a principal, and both answer from one parse.
 func isWildcardValue(v string) bool {
 	v = strings.TrimSpace(v)
 	if v == "" || v == "*" {
@@ -216,6 +218,9 @@ func isWildcardValue(v string) bool {
 	fields := strings.Split(v, ":")
 	if len(fields) < 2 || fields[0] != "arn" {
 		return false
+	}
+	if f, ok := arnFields(v); ok && f[4] == "*" {
+		return true
 	}
 	return !slices.ContainsFunc(fields[2:], func(f string) bool { return f != "" && f != "*" })
 }

@@ -227,9 +227,12 @@ func domainItemToFieldItemDetail(it domain.Item, sectionTitle string) fieldpath.
 // bareness, or the FieldCursor delta computed in applyFindingToState drifts
 // from the actual rendered layout (see attentionPrependCount's doc comment).
 type attentionEntry struct {
-	tier          string
-	primary       string
-	detail        string // S5 operator sentence (Finding.Detail); "" ⇒ Phrase-only, no extra line
+	tier    string
+	primary string
+	// detailLines is the S5 operator sentence (Finding.Detail) already
+	// wrapped to the panel, one rendered line per element; empty ⇒
+	// Phrase-only, no extra line.
+	detailLines   []string
 	rows          []domain.DetailRow
 	splitKeyValue bool
 }
@@ -237,7 +240,50 @@ type attentionEntry struct {
 // bare reports whether this entry renders as a Phrase-only line with no
 // Detail sentence and no supporting rows.
 func (e attentionEntry) bare() bool {
-	return e.detail == "" && len(e.rows) == 0
+	return len(e.detailLines) == 0 && len(e.rows) == 0
+}
+
+// defaultAttentionWrapWidth is the panel width assumed when no renderer has
+// reported one (a headless caller with no terminal): the classic 80-column
+// terminal, the narrowest panel in common use, so the sentence is never cut
+// anywhere rather than merely unlikely to be.
+const defaultAttentionWrapWidth = 80
+
+// attentionIndentColumns is the indentation a renderer puts in front of an
+// Attention sub-field line — subFieldIndent(1) in internal/tui/views —
+// which the sentence has to leave room for.
+const attentionIndentColumns = 5
+
+// wrapSentence breaks s into lines of at most width columns, on spaces. A
+// word longer than the line goes on a line of its own rather than being
+// split: the Attention sentence is prose, and a broken word reads worse than
+// a long one. Returns nil for an empty sentence, which is what marks an
+// entry bare.
+func wrapSentence(s string, width int) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	if width <= 0 {
+		width = defaultAttentionWrapWidth
+	}
+	width -= attentionIndentColumns
+	if width < 1 {
+		width = 1
+	}
+	var lines []string
+	line := ""
+	for word := range strings.FieldsSeq(s) {
+		switch {
+		case line == "":
+			line = word
+		case len(line)+1+len(word) <= width:
+			line += " " + word
+		default:
+			lines = append(lines, line)
+			line = word
+		}
+	}
+	return append(lines, line)
 }
 
 // buildAttentionEntries converts issue-severity findings into sorted
@@ -246,7 +292,7 @@ func (e attentionEntry) bare() bool {
 // (warning), stable otherwise — the SAME order both the renderer and the
 // prepend-count calculation must observe, so they extract from this one
 // function rather than deriving the order independently in two places.
-func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) []attentionEntry {
+func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int) []attentionEntry {
 	var entries []attentionEntry
 	for _, f := range findings {
 		if !f.Severity.IsIssue() {
@@ -265,7 +311,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 				rows = det.Rows
 			}
 		}
-		entries = append(entries, attentionEntry{tier: tier, primary: f.Phrase, detail: f.Detail, rows: rows, splitKeyValue: true})
+		entries = append(entries, attentionEntry{tier: tier, primary: f.Phrase, detailLines: wrapSentence(f.Detail, width), rows: rows, splitKeyValue: true})
 	}
 	if len(entries) == 0 {
 		return entries
@@ -279,7 +325,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 // injectAttentionSectionDetail mirrors injectAttentionSection in detail_fields.go,
 // prepending the Attention block when the resource has issue-severity findings.
 func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef) []fieldpath.FieldItem {
-	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails)
+	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth)
 	if len(entries) == 0 {
 		return items
 	}
@@ -329,13 +375,16 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 			Path:        "Attention",
 			ColorTier:   entryColor,
 		})
-		if e.detail != "" {
-			// S5 operator sentence — mirrors injectAttentionSection in detail_fields.go.
+		// S5 operator sentence, one item per wrapped line. The wrap lives here
+		// rather than in the renderer so both the body and the screen carry the
+		// same rows, and detail_fields.go's injectAttentionSection has nothing
+		// to mirror: the sentence it emits is the unwrapped one it always was.
+		for _, dl := range e.detailLines {
 			injected = append(injected, fieldpath.FieldItem{
 				IsSubField:  true,
 				IndentLevel: 1,
-				Key:         e.detail,
-				Value:       e.detail,
+				Key:         dl,
+				Value:       dl,
 				Path:        "Attention",
 				ColorTier:   entryColor,
 			})

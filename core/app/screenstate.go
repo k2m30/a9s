@@ -145,6 +145,12 @@ type DetailState struct {
 	// move actions (ActionMoveUp/Down/Bottom) can reconcile ScrollY without
 	// every call site needing to pass it through Action.N.
 	ViewportHeight int `json:"viewport_height,omitempty"`
+	// ViewportWidth is the renderer-supplied usable field-panel width, set on
+	// resize via Controller.SetDetailViewportWidth. The body builder wraps the
+	// Attention sentence at it so the one line a reader must act on is never
+	// cut at the panel edge; zero means no renderer has reported a width and
+	// the builder falls back to defaultAttentionWrapWidth.
+	ViewportWidth int `json:"viewport_width,omitempty"`
 
 	// Related panel state
 	RelatedVisible bool `json:"related_visible,omitempty"`

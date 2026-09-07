@@ -61,6 +61,10 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.rightCol.SetSize(rightW, h)
 	}
 
+	if m.ctrl != nil {
+		m.ctrl.SetDetailViewportWidth(viewportW)
+	}
+
 	if !m.ready {
 		m.viewport = viewport.New(viewport.WithWidth(viewportW), viewport.WithHeight(h))
 		m.ready = true

@@ -96,20 +96,17 @@ func TestW2GlueFailedRunDetailReachesTheScreen(t *testing.T) {
 					t.Errorf("rendered attention line %q is a bare severity word", l)
 				}
 			}
-			if !containsLine(lines, finding.Detail) {
+			// Inverted for spec row 5 (the Attention sentence wraps to the
+			// panel): the sentence arrives as successive lines now, so
+			// "one rendered line equals the sentence" is the assertion a
+			// one-line sentence made and is not to be restored — such a line
+			// is exactly what the panel edge cut. What must hold is that the
+			// whole sentence reaches the screen.
+			if joined := strings.Join(lines, " "); !strings.Contains(joined, strings.Join(strings.Fields(finding.Detail), " ")) {
 				t.Errorf("the Detail sentence never reached the screen; rendered lines were %q", lines)
 			}
 		})
 	}
-}
-
-func containsLine(lines []string, want string) bool {
-	for _, l := range lines {
-		if strings.TrimSpace(l) == strings.TrimSpace(want) {
-			return true
-		}
-	}
-	return false
 }
 
 func catalogTypeFor(t *testing.T, shortName string) resource.ResourceTypeDef {

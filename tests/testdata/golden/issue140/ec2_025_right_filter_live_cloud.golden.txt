@@ -3,7 +3,9 @@
 │ Attention (1)                                                                       │            RELATED             │
 │     ~ Public address                                                                │  CloudWatch Alarms             │
 │     The instance holds a routable public address, so every port its security groups │  CloudFormation Stacks         │
-│         Public address: 54.210.33.112                                               │  CloudTrail Events             │
+│     leave open is reachable from the internet. Put it behind a NAT gateway or load  │  CloudTrail Events             │
+│     balancer unless it must be addressed directly.                                  │                                │
+│         Public address: 54.210.33.112                                               │                                │
 │                                                                                     │                                │
 │ InstanceId:           i-0a1b2c3d4e5f60001                                           │                                │
 │ State:                running                                                       │                                │
@@ -30,6 +32,4 @@
 │       Ebs:                                                                          │                                │
 │         Status: attached                                                            │                                │
 │         VolumeId: vol-0a1b2c3d4e5f60002                                             │                                │
-│ EbsOptimized:         Yes                                                           │                                │
-│ MetadataOptions:                                                                    │                                │
 └────────────────────────────────────────────────────tab Fields──y YAML──J JSON──o Open──t CloudTrail──ctrl+r Refresh──┘

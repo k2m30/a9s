@@ -140,9 +140,20 @@ func isAnyoneARN(s string) bool {
 	if s == "*" {
 		return true
 	}
-	f := strings.Split(s, ":")
-	return len(f) == 6 && f[0] == "arn" && (f[1] == "aws" || strings.HasPrefix(f[1], "aws-")) &&
+	f, ok := arnFields(s)
+	return ok && (f[1] == "aws" || strings.HasPrefix(f[1], "aws-")) &&
 		f[2] == "iam" && f[4] == "*" && f[5] == "root"
+}
+
+// arnFields splits an ARN into its six fields — arn, partition, service,
+// region, account, resource — reporting false for a value not shaped like
+// one. The resource field keeps any colons of its own.
+func arnFields(v string) ([]string, bool) {
+	f := strings.SplitN(v, ":", 6)
+	if len(f) != 6 || f[0] != "arn" {
+		return nil, false
+	}
+	return f, true
 }
 
 func parseCondition(v any) map[string]map[string][]string {
