@@ -275,28 +275,44 @@ func TestCitesCodeartifactPublicAccessDescribedByTheEngine(t *testing.T) {
 
 // docSignalRow is one row of a resource doc's hand-written §4 table.
 type docSignalRow struct {
-	line       int
-	waveWord   string
-	stateWord  string
-	listText   string
-	rawLineTxt string
+	line      int
+	condition string
+	waveWord  string
+	stateWord string
+	listText  string
+	// deferred is set when the row's condition carries the page's
+	// "not implemented" marker in the one shape the docs spell it.
+	deferred bool
+	// markerOffShape is set when the row says NOT IMPLEMENTED in any other
+	// wording, which no reader and no gate can resolve against the page.
+	markerOffShape bool
 }
 
 var reDocTableSeparator = regexp.MustCompile(`^\|[\s|:-]+\|$`)
 
+// The one shape a deferred row spells its marker in. Every doc that defers a
+// row today writes exactly this, and the gate resolves the row against
+// `docs/attention-signals.md § Not yet implemented` through it, so a second
+// wording is a row nothing can check.
+var reDeferredMarker = regexp.MustCompile(`— NOT IMPLEMENTED \(backlog; no emission in code as of \d{4}-\d{2}-\d{2}\)`)
+
+const deferredMarkerShape = "— NOT IMPLEMENTED (backlog; no emission in code as of <YYYY-MM-DD>)"
+
 // parseDocSignalTable reads the hand-written wave-to-surface table out of a
 // resource doc: the one whose header carries a "State bucket" column and a
-// "List text" column.
-func parseDocSignalTable(t *testing.T, path string) []docSignalRow {
+// "List text" column. The second result is false for a doc that carries no
+// such table — an implementation plan rather than a resource design — which
+// the completeness walk skips rather than fails.
+func parseDocSignalTable(t *testing.T, path string) ([]docSignalRow, bool) {
 	t.Helper()
 	lines := readLines(t, path)
 
-	waveCol, stateCol, textCol := -1, -1, -1
+	waveCol, stateCol, textCol, condCol := -1, -1, -1, 0
 	var rows []docSignalRow
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "|") {
-			waveCol, stateCol, textCol = -1, -1, -1
+			waveCol, stateCol, textCol, condCol = -1, -1, -1, 0
 			continue
 		}
 		cells := splitTableRow(trimmed)
@@ -309,6 +325,8 @@ func parseDocSignalTable(t *testing.T, path string) []docSignalRow {
 					stateCol = c
 				case strings.HasPrefix(cell, "List text"):
 					textCol = c
+				case strings.HasPrefix(cell, "Signal"):
+					condCol = c
 				}
 			}
 			continue
@@ -320,20 +338,21 @@ func parseDocSignalTable(t *testing.T, path string) []docSignalRow {
 			continue
 		}
 		row := docSignalRow{
-			line:       i + 1,
-			stateWord:  cells[stateCol],
-			listText:   strings.Trim(cells[textCol], "`"),
-			rawLineTxt: trimmed,
+			line:      i + 1,
+			stateWord: cells[stateCol],
+			listText:  strings.Trim(cells[textCol], "`"),
 		}
+		if condCol < len(cells) {
+			row.condition = cells[condCol]
+		}
+		row.deferred = reDeferredMarker.MatchString(row.condition)
+		row.markerOffShape = !row.deferred && strings.Contains(row.condition, "NOT IMPLEMENTED")
 		if waveCol >= 0 && waveCol < len(cells) {
 			row.waveWord = cells[waveCol]
 		}
 		rows = append(rows, row)
 	}
-	if len(rows) == 0 {
-		t.Fatalf("%s: no hand-written table with a \"State bucket\" and a \"List text\" column found", relToRoot(t, path))
-	}
-	return rows
+	return rows, len(rows) > 0
 }
 
 func splitTableRow(line string) []string {
@@ -378,15 +397,6 @@ func catalogSignalsByType(t *testing.T) map[string][]catalogSignal {
 	return byType
 }
 
-func catalogSignalsFor(t *testing.T, shortName string) []catalogSignal {
-	t.Helper()
-	signals := catalogSignalsByType(t)[shortName]
-	if len(signals) == 0 {
-		t.Fatalf("docs/attention-signals.md: generated block carries no rows for %q", shortName)
-	}
-	return signals
-}
-
 // catalogSignal is one row of the generated signals table.
 type catalogSignal struct {
 	wave     string
@@ -403,16 +413,122 @@ var severityWordForBucket = map[string]string{
 	"dim":    "Dim",
 }
 
-// assertDocTableMatchesCatalog pins that every list text in a resource doc's
-// hand-written §4 table is a phrase the emitter actually produces, at the
-// severity and in the wave the catalog gives it. A doc row that spells its own
-// wording, bucket or wave is a second definition of the finding, and the reader
-// cannot tell which one ships.
-func assertDocTableMatchesCatalog(t *testing.T, shortName string) {
+// The kinds of contradiction the completeness walk reports. A reader fixing a
+// doc needs to know which cell is wrong, so each row of the failure output
+// names one.
+const (
+	kindPhrase     = "phrase nothing emits"
+	kindMissingRow = "shipped finding without a row"
+	kindSection    = "section mismatch"
+	kindWave       = "wrong wave"
+	kindBucket     = "wrong bucket"
+	kindMarker     = "stale not-implemented marker"
+)
+
+// docOffender is one contradiction between a resource doc and the shipped
+// definitions, at the line a reader opens to fix it.
+type docOffender struct {
+	line int
+	kind string
+	want string
+}
+
+var reConditionWord = regexp.MustCompile(`[a-z0-9]+`)
+
+// Words that carry no identity: they appear in half the conditions on the page
+// and matching on them would resolve a deferred row against any line at all.
+var conditionStopWords = map[string]bool{
+	"with": true, "that": true, "than": true, "from": true, "this": true,
+	"when": true, "which": true, "there": true, "their": true, "have": true,
+	"been": true, "into": true, "over": true, "only": true, "more": true,
+	"some": true, "same": true, "each": true, "also": true, "wave": true,
+	"signal": true, "warning": true, "broken": true, "healthy": true,
+}
+
+// conditionWords reduces a condition to the words that identify it: four
+// letters or more, lowercased, punctuation and markdown dropped.
+func conditionWords(text string) map[string]bool {
+	words := map[string]bool{}
+	for _, w := range reConditionWord.FindAllString(strings.ToLower(text), -1) {
+		if len(w) >= 4 && !conditionStopWords[w] {
+			words[w] = true
+		}
+	}
+	return words
+}
+
+// notYetImplementedConditions parses `docs/attention-signals.md § Not yet
+// implemented` into shortName -> the conditions its line records, one per
+// semicolon-separated clause. That section is the page's register of what the
+// designs describe and no code emits, so it is the only place a doc may point
+// at for a row it renders and the emitter never raises.
+func notYetImplementedConditions(t *testing.T) map[string][]string {
 	t.Helper()
-	path := filepath.Join(projectRoot(t), "docs", "resources", shortName+".md")
-	rel := relToRoot(t, path)
-	signals := catalogSignalsFor(t, shortName)
+	_, handWritten := attentionSignalsDoc(t)
+	idx := strings.Index(handWritten, "## Not yet implemented")
+	if idx == -1 {
+		t.Fatal("docs/attention-signals.md: no `## Not yet implemented` heading")
+	}
+
+	byType := map[string][]string{}
+	for _, line := range strings.Split(handWritten[idx:], "\n") {
+		m := reNotYetImplementedLine.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		for _, clause := range strings.Split(m[2], ";") {
+			byType[m[1]] = append(byType[m[1]], clause)
+		}
+	}
+	if len(byType) == 0 {
+		t.Fatal("docs/attention-signals.md: `## Not yet implemented` records no `- `type`` lines")
+	}
+	return byType
+}
+
+// pageRecordsCondition reports whether one of the page's lines for this type
+// records the doc's deferred row. The two sides never spell a condition
+// identically — one quotes the SDK field, the other the operator's words — so
+// the rule is that they share at least one identifying word, singular and
+// plural counting as one. A row that shares none is pointing at a line the page
+// does not carry, and neither a reader nor this gate can tell which line it
+// meant.
+func pageRecordsCondition(rowCondition string, pageConditions []string) bool {
+	row := conditionWords(reDeferredMarker.ReplaceAllString(rowCondition, ""))
+	for _, page := range pageConditions {
+		for w := range conditionWords(page) {
+			for r := range row {
+				if strings.HasPrefix(r, w) || strings.HasPrefix(w, r) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// docCompletenessOffenders resolves one resource doc against the shipped
+// definitions: every phrase its §4 table promises is one the emitter produces,
+// at the severity and in the wave the catalog gives it; every finding the
+// catalog ships for the type has a row; §3 and §4 describe the same signals;
+// and a row the doc renders for a condition nothing emits is recorded as
+// deferred on the signals page. A doc that spells its own wording, bucket or
+// wave is a second definition of the finding, and the reader cannot tell which
+// one ships.
+//
+// The second result is false when the doc carries no §3/§4 at all, or no type
+// the catalog knows — an implementation plan, not a resource design.
+func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
+	t.Helper()
+	rows, ok := parseDocSignalTable(t, path)
+	if !ok {
+		return nil, false
+	}
+	shortName := strings.TrimSuffix(filepath.Base(path), ".md")
+	signals := catalogSignalsByType(t)[shortName]
+	if len(signals) == 0 {
+		return nil, false
+	}
 
 	known := make([]string, 0, len(signals))
 	for _, sig := range signals {
@@ -420,7 +536,29 @@ func assertDocTableMatchesCatalog(t *testing.T, shortName string) {
 	}
 	sort.Strings(known)
 
-	for _, row := range parseDocSignalTable(t, path) {
+	deferredConditions := notYetImplementedConditions(t)[shortName]
+
+	var offenders []docOffender
+	rendered := map[string]bool{}
+	for _, row := range rows {
+		if row.markerOffShape {
+			offenders = append(offenders, docOffender{row.line, kindMarker, fmt.Sprintf(
+				"the row defers %q in a wording no gate can resolve; the one shape is %q",
+				row.listText, deferredMarkerShape)})
+			continue
+		}
+		if row.deferred {
+			if !pageRecordsCondition(row.condition, deferredConditions) {
+				offenders = append(offenders, docOffender{row.line, kindMarker, fmt.Sprintf(
+					"the row defers %q, and `docs/attention-signals.md § Not yet implemented` records no such "+
+						"condition for `%s` (it records %q); record it there, or delete the row",
+					row.listText, shortName, deferredConditions)})
+			}
+			continue
+		}
+
+		rendered[row.listText] = true
+
 		var matching []catalogSignal
 		for _, sig := range signals {
 			if sig.phrase == row.listText {
@@ -428,49 +566,60 @@ func assertDocTableMatchesCatalog(t *testing.T, shortName string) {
 			}
 		}
 		if len(matching) == 0 {
-			t.Errorf("%s:%d: the table promises list text %q, which no %s finding produces. "+
-				"Say the phrase the catalog carries, or defer to the generated table. Registered phrases: %q\n  %s",
-				rel, row.line, row.listText, shortName, known, row.rawLineTxt)
+			offenders = append(offenders, docOffender{row.line, kindPhrase, fmt.Sprintf(
+				"the row promises list text %q, which no `%s` finding produces; say a phrase the catalog carries: %q",
+				row.listText, shortName, known)})
 			continue
 		}
 
 		if !anySignal(matching, func(sig catalogSignal) bool {
 			return severityWordForBucket[sig.severity] == row.stateWord
 		}) {
-			t.Errorf("%s:%d: the table puts %q in the %s bucket; the catalog ships that phrase as %q\n  %s",
-				rel, row.line, row.listText, row.stateWord, signalWords(matching, func(sig catalogSignal) string {
+			offenders = append(offenders, docOffender{row.line, kindBucket, fmt.Sprintf(
+				"the row puts %q in the %s bucket; the catalog ships that phrase as %q",
+				row.listText, row.stateWord, signalWords(matching, func(sig catalogSignal) string {
 					return severityWordForBucket[sig.severity]
-				}), row.rawLineTxt)
+				}))})
 		}
 
 		if row.waveWord != "" && !anySignal(matching, func(sig catalogSignal) bool {
 			return sig.wave == "wave"+row.waveWord
 		}) {
-			t.Errorf("%s:%d: the table calls %q a wave-%s signal; the catalog ships it as %q\n  %s",
-				rel, row.line, row.listText, row.waveWord, signalWords(matching, func(sig catalogSignal) string {
+			offenders = append(offenders, docOffender{row.line, kindWave, fmt.Sprintf(
+				"the row calls %q a wave-%s signal; the catalog ships it as %q",
+				row.listText, row.waveWord, signalWords(matching, func(sig catalogSignal) string {
 					return sig.wave
-				}), row.rawLineTxt)
+				}))})
 		}
 	}
 
-	rendered := map[string]bool{}
-	for _, row := range parseDocSignalTable(t, path) {
-		rendered[row.listText] = true
-	}
-	var missing []string
 	for _, sig := range signals {
 		if !rendered[sig.phrase] {
-			missing = append(missing, fmt.Sprintf("%s (%s, %s)", sig.phrase, sig.code, sig.severity))
+			offenders = append(offenders, docOffender{rows[0].line, kindMissingRow, fmt.Sprintf(
+				"the §4 table renders no row for the shipped finding %s (%s, %s); the table is one row per signal, "+
+					"so a shipped finding missing from it is a signal the doc tells the reader does not exist",
+				sig.phrase, sig.code, sig.severity)})
 		}
 	}
-	if len(missing) > 0 {
-		sort.Strings(missing)
-		t.Errorf("%s: the §4 table renders no row for %d finding(s) the catalog ships for `%s`: %s. "+
-			"The table is one row per signal, so a shipped finding missing from it is a signal the doc "+
-			"tells the reader does not exist", rel, len(missing), shortName, strings.Join(missing, ", "))
+
+	sectionBuckets, sectionLine := docSectionBuckets(t, path)
+	tableBuckets := map[string]int{}
+	for _, row := range rows {
+		if row.deferred || row.markerOffShape {
+			continue
+		}
+		tableBuckets[row.stateWord]++
+	}
+	if !reflect.DeepEqual(sectionBuckets, tableBuckets) {
+		offenders = append(offenders, docOffender{sectionLine, kindSection, fmt.Sprintf(
+			"§3 describes signals in the buckets %s while the §4 table renders %s; §4 says every signal from §3 "+
+				"lands on a surface, so a bucket in one and not the other is a signal the doc either never renders "+
+				"or renders without describing",
+			formatBucketCounts(sectionBuckets), formatBucketCounts(tableBuckets))})
 	}
 
-	assertDocSignalSectionsAgree(t, path)
+	sort.SliceStable(offenders, func(i, j int) bool { return offenders[i].line < offenders[j].line })
+	return offenders, true
 }
 
 func anySignal(signals []catalogSignal, pred func(catalogSignal) bool) bool {
@@ -497,44 +646,40 @@ func signalWords(signals []catalogSignal, get func(catalogSignal) string) []stri
 
 var reDocSignalBucket = regexp.MustCompile(`\*\*State bucket\*\*:\s*([A-Za-z]+)`)
 
-// assertDocSignalSectionsAgree pins a resource doc's §3 signal list against its
-// own §4 table. §4 says every signal from §3 lands on a surface, so the two
-// describe the same set: a §3 bullet with no §4 row is a signal the doc claims
-// and never renders, and the §4 table is already pinned to the catalog, so a §3
-// list that disagrees with it disagrees with what ships.
-func assertDocSignalSectionsAgree(t *testing.T, path string) {
+// docSectionBuckets counts the buckets a doc's §3 signal bullets describe, and
+// returns the line of the first one so a mismatch points somewhere. A bullet
+// carrying the deferred marker is left out on both sides of the comparison: it
+// describes a signal the doc has already told the reader does not ship.
+func docSectionBuckets(t *testing.T, path string) (map[string]int, int) {
 	t.Helper()
 	lines := readLines(t, path)
 
-	inSection3 := false
-	sectionBuckets := map[string]int{}
-	for _, line := range lines {
+	inSection3, deferred := false, false
+	firstLine := 1
+	buckets := map[string]int{}
+	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if m := reMarkdownHeading.FindStringSubmatch(trimmed); m != nil {
 			inSection3 = strings.HasPrefix(m[1], "3.") || strings.HasPrefix(m[1], "3 ")
+			deferred = false
 		}
 		if !inSection3 {
 			continue
 		}
-		if m := reDocSignalBucket.FindStringSubmatch(trimmed); m != nil {
-			sectionBuckets[m[1]]++
+		// The marker sits on the bullet's own line and the bucket on a
+		// sub-bullet under it, so the flag is carried from one to the other and
+		// dropped at the next top-level bullet.
+		if strings.HasPrefix(line, "- ") {
+			deferred = strings.Contains(line, "NOT IMPLEMENTED")
+		}
+		if m := reDocSignalBucket.FindStringSubmatch(trimmed); m != nil && !deferred {
+			if len(buckets) == 0 {
+				firstLine = i + 1
+			}
+			buckets[m[1]]++
 		}
 	}
-	if len(sectionBuckets) == 0 {
-		t.Fatalf("%s: §3 has no `**State bucket**:` bullets to compare against the §4 table", relToRoot(t, path))
-	}
-
-	tableBuckets := map[string]int{}
-	for _, row := range parseDocSignalTable(t, path) {
-		tableBuckets[row.stateWord]++
-	}
-
-	if !reflect.DeepEqual(sectionBuckets, tableBuckets) {
-		t.Errorf("%s: §3 describes signals in the buckets %s while the §4 table renders %s. "+
-			"§4 says every signal from §3 lands on a surface, so a bucket in one and not the other is a signal "+
-			"the doc either never renders or renders without describing", relToRoot(t, path),
-			formatBucketCounts(sectionBuckets), formatBucketCounts(tableBuckets))
-	}
+	return buckets, firstLine
 }
 
 func formatBucketCounts(counts map[string]int) string {
@@ -550,40 +695,59 @@ func formatBucketCounts(counts map[string]int) string {
 	return "{" + strings.Join(parts, " ") + "}"
 }
 
-// TestCitesEksSignalTableMatchesTheCatalog pins the eks hand-written §4 table
-// against the shipped definitions. Its health-issue row quoted a placeholder
-// wording and called the finding Broken where the definition is warn, and the
-// failed-cluster row promised a sentence the emitter never assembled.
-func TestCitesEksSignalTableMatchesTheCatalog(t *testing.T) {
-	assertDocTableMatchesCatalog(t, "eks")
-}
-
-// TestCitesCtEventsSignalTableMatchesTheCatalog pins the ct-events
-// hand-written §4 table against the shipped definitions, for the same reason.
-func TestCitesCtEventsSignalTableMatchesTheCatalog(t *testing.T) {
-	assertDocTableMatchesCatalog(t, "ct-events")
-}
-
-// TestCitesSignalTablesMatchTheCatalog pins the resource docs that assert what
-// the catalog does not ship: ng §3.2 promises Broken for seventeen named
-// health-issue codes while core/aws/ng.go reads no code list, cb §3.1 says the
-// list response carries no health signal, lambda §3 accounts for one wave, and
-// the two RDS snapshot docs put their cross-reference signals in a wave and a
-// bucket of their own.
-func TestCitesSignalTablesMatchTheCatalog(t *testing.T) {
-	for _, shortName := range []string{"ng", "cb", "lambda", "dbi-snap", "dbc-snap"} {
-		t.Run(shortName, func(t *testing.T) {
-			assertDocTableMatchesCatalog(t, shortName)
-		})
+// TestCompleteResourceDocsListExactlyWhatShips walks every resource design doc
+// and resolves its hand-written signal sections against the shipped
+// definitions. There is no per-doc opt-in: a doc that describes signals is a
+// doc a reader trusts, and one that describes them wrong is a contract the
+// reader follows into a behaviour a9s does not have. Docs with no §3/§4 table,
+// and docs whose name is no type the catalog knows, are skipped by that
+// property — they are implementation plans, not designs.
+func TestCompleteResourceDocsListExactlyWhatShips(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join(projectRoot(t), "docs", "resources", "*.md"))
+	if err != nil {
+		t.Fatal(err)
 	}
-}
+	if len(paths) == 0 {
+		t.Fatal("docs/resources/*.md matched no files")
+	}
+	sort.Strings(paths)
 
-// TestCitesCodeartifactSignalTableMatchesTheCatalog pins the codeartifact
-// hand-written §4 table the same way: it puts the public-access finding on a
-// Healthy row while the catalog ships it Broken, and promises an unused-registry
-// wording nothing emits.
-func TestCitesCodeartifactSignalTableMatchesTheCatalog(t *testing.T) {
-	assertDocTableMatchesCatalog(t, "codeartifact")
+	walked, offending, total := 0, 0, 0
+	byKind := map[string]int{}
+	for _, path := range paths {
+		offenders, ok := docCompletenessOffenders(t, path)
+		if !ok {
+			continue
+		}
+		walked++
+		if len(offenders) == 0 {
+			continue
+		}
+		offending++
+		total += len(offenders)
+
+		rel := relToRoot(t, path)
+		report := make([]string, len(offenders))
+		for i, off := range offenders {
+			byKind[off.kind]++
+			report[i] = fmt.Sprintf("  %s:%d: %s — %s", rel, off.line, off.kind, off.want)
+		}
+		t.Errorf("%s contradicts the shipped definitions in %d place(s):\n%s",
+			rel, len(offenders), strings.Join(report, "\n"))
+	}
+
+	if offending > 0 {
+		kinds := make([]string, 0, len(byKind))
+		for k, n := range byKind {
+			kinds = append(kinds, fmt.Sprintf("%s×%d", k, n))
+		}
+		sort.Strings(kinds)
+		t.Errorf("%d of %d resource docs contradict the shipped definitions, %d offender(s) in all: %s",
+			offending, walked, total, strings.Join(kinds, ", "))
+	}
+	if walked == 0 {
+		t.Fatal("docs/resources/*.md: no doc carried a §4 signal table and a catalog type")
+	}
 }
 
 var (
