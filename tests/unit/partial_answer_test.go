@@ -731,9 +731,16 @@ func (f *partialECRFake) GetLifecyclePolicy(_ context.Context, _ *ecrsvc.GetLife
 
 func partialEnrichECR(t *testing.T, fake *partialECRFake) awsclient.IssueEnricherResult {
 	t.Helper()
+	return partialEnrichECRAPI(t, fake)
+}
+
+// partialEnrichECRAPI drives the enricher against any ECR client shape, so an
+// attack can substitute a client that serves a different subset of the reads.
+func partialEnrichECRAPI(t *testing.T, api awsclient.ECRAPI) awsclient.IssueEnricherResult {
+	t.Helper()
 	store := session.NewIdentityStore()
 	store.Set("123456789012", nil)
-	clients := &awsclient.ServiceClients{ECR: fake}
+	clients := &awsclient.ServiceClients{ECR: api}
 	clients.SetIdentityStore(store)
 	res, _ := awsclient.EnrichECRRepository(context.Background(), clients,
 		[]resource.Resource{{ID: partialECRRepo, Name: partialECRRepo, Fields: map[string]string{}}}, nil)
