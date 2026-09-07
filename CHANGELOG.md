@@ -393,6 +393,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The backup-plan coverage check no longer reads tags whose result it then throws away.
 - The `… +K more` line that closes a long finding no longer borrows the label of the line above it. It used to read `State: … +5 more` on a backup plan and `Combo: … +12 more` on an IAM policy, as though it were one more failed job or one more privilege-escalation path.
 - A backup plan with more than five failed jobs in the last day no longer shows five of them and drops the rest without saying so. The detail now lists as many as any other finding does and closes with `… +K more` for the remainder, with the most recent failure and the partial-job count kept at the top where a long list cannot push them off.
+- The reason a call failed is now read from the error's own fields, so an AWS
+  message that legitimately mentions a request id keeps its words instead of
+  being cut short there, and a failure whose response carries a request id, a
+  host id or an encoded authorization blob never puts any of them on screen.
+- An AWS response that carries no error code is no longer shown as a success:
+  the row says the call failed.
+- A multi-line AWS message no longer breaks the flash and the menu row it is
+  rendered on.
+- A failure reported for a resource type a9s could not name no longer reads
+  with a stray colon, as in "fetch : connection reset".
+- When the last resource type checked at startup is the one that fails, its
+  message stays on screen. Finishing the check used to clear it in the same
+  breath, so that one failure was never seen.
 
 ### Added
 
@@ -732,6 +745,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first screen now says what it is doing. While a9s re-checks which resource types exist, the menu title counts its way through them (`verifying 12/71`), in the same place the enrichment counter already used, and clears when the sweep is done.
 - A resource type whose check was refused now says why. The row keeps its last known count and reads `denied`, `expired`, `throttled` or `error` where its alias sits, so "not checked yet" no longer looks identical to "checked and refused".
 - When every check fails the same way, the title says it once (`session expired`, `sweep: access denied`) instead of marking all 71 rows.
+- A TLS failure, a DNS failure and a refused connection now say which one
+  happened, in the menu row, the sweep title and the error log. They used to
+  share one word, "transport", though the fix for each is different: a
+  certificate is a proxy or a wrong clock, a resolver failure is name
+  resolution, and a refused connection is the network path.
 
 ### Changed
 
@@ -808,6 +826,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A check that a role is not allowed to run is now one log line for the whole resource type: the action the role lacks, how many resources it covered, and one example. It used to be one line per resource, each carrying a request id, a host id and an encoded authorization message.
 - View files in `~/.a9s/views/` carry a `generated:` stamp. When a9s ships new columns for a resource type, an existing file gets them added on the next launch, in place: the columns, widths, paths and keys you set are kept, though the file is rewritten from its parsed form, so YAML comments do not survive. Files already at the current stamp are never touched.
 - The demo account now has a target group with more failing targets than one detail view shows, so the closing `… +2 more` line of a long finding is visible in `--demo`.
+- Every entry in the `!` error log now reads the same way: what was being
+  fetched, then why it failed, with the region named only when the region is
+  the reason. A partial result, a service the region does not offer and a
+  failed connect used to arrive in three different shapes.
+- A failed connect now shows the same sentence in the flash and in the error
+  log instead of the raw error in one and its own phrasing in the other.
+- An AWS error shown on the status bar now says the reason the call failed
+  rather than the raw AWS message, so a denial no longer fills the line with
+  an encoded authorization blob.
+- A probe that fails with nothing to show now names the reason on the status
+  bar. It used to show the internal outcome and class names, as in
+  "probe ec2: failed: transport".
+- A failed list fetch, a failed detail enrichment, a failed related check and
+  a secret that could not be revealed now say the reason on the status bar
+  instead of the raw AWS error, so none of them fills the line with a request
+  id or an encoded authorization blob. A failed enrichment also names the type
+  it was enriching.
+- A service the region does not offer now names the region wherever it is
+  reported, including the related panel, which used to drop it.
 
 ### Fixed (security)
 
