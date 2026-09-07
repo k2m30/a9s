@@ -236,11 +236,10 @@ func domainItemToFieldItemDetail(it domain.Item, sectionTitle string) fieldpath.
 }
 
 // attentionEntry is one rendered Attention-block entry, built and sorted by
-// buildAttentionEntries. Single source of truth for BOTH the rendered layout
-// (injectAttentionSectionDetail) and the prepend-size calculation
-// (attentionPrependCount) — they MUST agree on entry count, order, and
-// bareness, or the FieldCursor delta computed in applyFindingToState drifts
-// from the actual rendered layout (see attentionPrependCount's doc comment).
+// buildAttentionEntries and rendered by injectAttentionSectionDetail, which is
+// also what records the block's size on the DetailState. The FieldCursor delta
+// in applyFindingToState reads that record, so no second walk of these entries
+// can disagree with the layout on screen about count, order or bareness.
 type attentionEntry struct {
 	tier    string
 	primary string
@@ -353,6 +352,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef, notInspected bool) []fieldpath.FieldItem {
 	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, notInspected)
 	if len(entries) == 0 {
+		ds.AttentionPrepend = 0
 		return items
 	}
 	// Resolve S2 color bucket for the cap invariant.
@@ -436,6 +436,7 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 	if !lastEntryBare {
 		injected = append(injected, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
 	}
+	ds.AttentionPrepend = len(injected)
 	return append(injected, items...)
 }
 

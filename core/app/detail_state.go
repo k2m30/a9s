@@ -62,42 +62,6 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 	c.ensureDetailState(res, resourceType)
 }
 
-// attentionPrependCount returns the number of items that injectAttentionSectionDetail
-// would prepend for the given findings and attentionDetails. Mirrors the layout in
-// injectAttentionSectionDetail: 1 section header + per issue-severity finding
-// (1 phrase line + one line per wrapped Detail sentence row + len(rows)) + a
-// trailing spacer, UNLESS the last issue-severity finding is "bare" (no Detail,
-// no rows) — injectAttentionSectionDetail omits the spacer in that case so it
-// does not sit directly against a bare Phrase line. Returns 0 when there are no
-// issue findings.
-//
-// Single source of truth: entries are built via buildAttentionEntries (same
-// helper injectAttentionSectionDetail renders from), so "last entry" here
-// means the same SORTED last entry the renderer actually emits — not the
-// last entry in the original findings order. Deriving lastEntryBare from the
-// unsorted order previously caused a prepend-count mismatch (see
-// tests/unit/app_detail_attention_cursor_test.go), shifting FieldCursor by
-// the wrong delta after a mixed-severity Attention re-sort.
-func (c *Controller) attentionPrependCount(ds *DetailState) int {
-	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, c.detailNotInspected(ds))
-	if len(entries) == 0 {
-		return 0
-	}
-	entryLineCount := 0
-	lastEntryBare := false
-	for _, e := range entries {
-		entryLineCount++ // phrase line
-		entryLineCount += len(e.detailLines)
-		entryLineCount += len(e.rows)
-		lastEntryBare = e.bare()
-	}
-	spacer := 1
-	if lastEntryBare {
-		spacer = 0
-	}
-	return 1 + entryLineCount + spacer // header + entry lines (+ detail + rows) + spacer
-}
-
 // ApplyDetailFinding merges a wave-2 enrichment finding (and its optional
 // AttentionDetail rows) into the top detail screen's DetailState. Strips any
 // prior wave-2 finding for the same resource before appending the new one, so
@@ -405,8 +369,11 @@ func newlyReportedFindings(current, candidates []domain.Finding) []domain.Findin
 // method once per finding (which would strip the previous iteration's
 // just-appended entry). Callers must hold c.mu (write).
 func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
-	// Capture old prepend size before stripping, so the cursor delta can be computed.
-	oldPrepend := c.attentionPrependCount(ds)
+	// The prepend size the LAST BUILD produced — the layout the cursor is
+	// actually positioned against. Recomputing it here would read the session
+	// truncated-ID set as it is NOW, which the runtime already updated before
+	// this intent, and so describe a block the user never saw.
+	oldPrepend := ds.AttentionPrepend
 
 	// Strip prior wave-2 findings (same strip semantics as DetailModel.SetEnrichmentFinding).
 	if len(ds.Findings) > 0 {
@@ -451,9 +418,11 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	//   2. If cursor was in content (>= oldPrepend): shift by delta, but only when
 	//      content items actually exist after injection — mirrors haveSnapshot=false
 	//      for resources with no content fields (empty resource).
-	newPrepend := c.attentionPrependCount(ds)
-	delta := newPrepend - oldPrepend
-	if delta != 0 {
+	// Building the new layout is what re-records ds.AttentionPrepend, so this
+	// one build supplies both the new prepend size and the new item total.
+	newTotalItems := len(c.buildDetailFieldItems(ds))
+	newPrepend := ds.AttentionPrepend
+	if newPrepend != oldPrepend {
 		if ds.FieldCursor < oldPrepend {
 			// Cursor was inside the old attention block — land on new section header.
 			ds.FieldCursor = 0
@@ -461,9 +430,7 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 			// Cursor was pointing at a content item; shift it to track the same item
 			// in the new layout. Skip if no content exists beyond the attention block
 			// (empty resource case), matching SetEnrichmentFinding's haveSnapshot=false.
-			adjusted := ds.FieldCursor - oldPrepend + newPrepend
-			newTotalItems := len(c.buildDetailFieldItems(ds))
-			if adjusted < newTotalItems {
+			if adjusted := ds.FieldCursor - oldPrepend + newPrepend; adjusted < newTotalItems {
 				ds.FieldCursor = adjusted
 			}
 			// else: only attention items, no content — cursor stays at 0.

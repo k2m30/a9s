@@ -179,6 +179,16 @@ type DetailState struct {
 	Findings []domain.Finding `json:"findings,omitempty"`
 	// AttentionDetails holds per-finding detail rows (set by ApplyDetailFinding).
 	AttentionDetails map[domain.FindingCode]domain.AttentionDetail `json:"attention_details,omitempty"`
+	// AttentionPrepend is the number of items the LAST built layout prepended
+	// for the Attention block, written by injectAttentionSectionDetail — the
+	// one place that block is built. The cursor arithmetic in
+	// applyFindingToState reads it rather than recomputing the size, because
+	// the block depends on more than ds.Findings: the "not inspected" entry
+	// comes from the session truncated-ID set, which the runtime writes before
+	// the controller applies the intent. A recomputed size therefore describes
+	// a layout that was never on screen. Not serialised: it is a record of what
+	// the builder emitted, not state a client supplies.
+	AttentionPrepend int `json:"-"`
 }
 
 // DetailRelatedRow is one row in the detail screen's related panel, mirroring

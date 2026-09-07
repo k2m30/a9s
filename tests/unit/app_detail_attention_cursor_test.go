@@ -1,22 +1,16 @@
-// app_detail_attention_cursor_test.go — TDD red-phase pin for Finding A:
-// injectAttentionSectionDetail (core/app/detail_body.go) sorts Attention
-// entries by tier ("!" before "~") before rendering, but attentionPrependCount
-// (core/app/detail_state.go ~line 71, called from applyFindingToState
-// ~line 187) computes lastEntryBare from the ORIGINAL (unsorted) findings
-// order. When a "~" (warning) finding WITH Detail text is followed by a bare
-// "!" (broken) finding appended later:
+// app_detail_attention_cursor_test.go — the cursor must stay on the same
+// logical field when the Attention block changes size under it.
 //
-//   - Unsorted order (what attentionPrependCount walks): [warn(detail), broken(bare)]
-//     -> last iterated = broken(bare) -> lastEntryBare=true -> spacer OMITTED.
-//   - Sorted order (what injectAttentionSectionDetail actually renders):
-//     [broken(bare), warn(detail)] -> last rendered = warn(detail), NOT bare
-//     -> spacer INCLUDED.
-//
-// This mismatch makes attentionPrependCount return a value 1 LOWER than the
-// true prepend size, so applyFindingToState's cursor-delta adjustment
-// (core/app/detail_state.go ~line 231-247) shifts FieldCursor by the wrong
-// amount after a wave-2 enrichment finding arrives, landing the cursor on the
-// wrong logical field row.
+// Both pins here are regressions of the same class: the FieldCursor delta in
+// applyFindingToState (core/app/detail_state.go) needs the size of the block
+// the user is actually looking at. It used to walk the entries a second time
+// to derive that size, and a second walk can disagree with the render —
+// Finding A because it walked them UNSORTED while the renderer sorts "!"
+// before "~" (so it picked the wrong "last entry" and dropped the trailing
+// spacer from its count), Finding B because it read session state the runtime
+// had already moved. injectAttentionSectionDetail now records the size it
+// emitted on the DetailState and the cursor math reads that record, so the
+// class is closed by construction: there is no second walk left to disagree.
 package unit_test
 
 import (
@@ -26,6 +20,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -72,8 +67,7 @@ func fieldRowAt(t *testing.T, body *app.DetailBody, idx int) app.FieldRow {
 //     this is the finding that gets appended LAST in unsorted order but
 //     sorts FIRST ("!" before "~") when rendered.
 //  4. Assert the cursor still points at the SAME logical field row (same Key)
-//     after the enrichment lands — not shifted by the attentionPrependCount
-//     off-by-one.
+//     after the enrichment lands — not shifted by a prepend-size off-by-one.
 func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSort(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -138,12 +132,88 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSo
 			"cursor did not stay on the same logical field after mixed-severity Attention sort:\n"+
 				"  before enrichment: FieldCursor=%d Key=%q Path=%q\n"+
 				"  after  enrichment: FieldCursor=%d Key=%q Path=%q\n"+
-				"attentionPrependCount (core/app/detail_state.go) computed lastEntryBare from "+
-				"the UNSORTED findings order (last appended = bare broken finding -> lastEntryBare=true "+
-				"-> spacer omitted), but injectAttentionSectionDetail (core/app/detail_body.go) "+
-				"sorts \"!\" before \"~\" before rendering, so the ACTUAL last rendered entry is the "+
-				"non-bare warning finding (spacer included). The prepend-count mismatch shifted "+
-				"FieldCursor by the wrong delta.",
+				"the prepend size must be the one injectAttentionSectionDetail actually emitted: "+
+				"it sorts \"!\" before \"~\", so the last RENDERED entry here is the non-bare warning "+
+				"finding (spacer included), not the bare broken one appended last. A size derived "+
+				"from the unsorted order is one lower and shifts FieldCursor by the wrong delta.",
+			preCursor, preRow.Key, preRow.Path,
+			postCursor, postRow.Key, postRow.Path,
+		)
+	}
+}
+
+// TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo
+// pins Finding B. The Attention block's size stopped being a function of
+// ds.Findings alone when the "not inspected" entry landed: it now also depends
+// on the session truncated-ID set, which Core.handleEnrichmentChecked writes
+// BEFORE the controller applies the intent. A prepend size recomputed inside
+// applyFindingToState therefore describes a layout that was never rendered —
+// it already includes the not-inspected entry while ds.Findings is still the
+// pre-enrichment set — so the "was the cursor inside the old block?" test
+// wrongly says yes and resets the cursor to the Attention header.
+//
+// Repro (from the round-2 probe): open a detail on a clean row, move the
+// cursor onto a content field, then deliver ONE EnrichmentChecked carrying
+// both a finding and a TruncatedIDs entry for that row. The cursor must still
+// point at the same logical field.
+func TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo(t *testing.T) {
+	c, core := newTestControllerAndCore(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+
+	row := resource.Resource{
+		ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
+		Fields: map[string]string{
+			"instance_id": "i-0aaa111111111111a",
+			"name":        "web-server",
+			"state":       "running",
+		},
+	}
+	c.ApplyResourcesLoaded("ec2", []resource.Resource{row}, nil, false)
+	core.ObserveRows("ec2", []resource.Resource{row}, nil, session.OriginFetch, false)
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenDetail,
+		Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: row.ID},
+	}})
+	c.EnsureDetailState(row, "ec2")
+	c.SetDetailViewportHeight(40)
+	c.SetDetailViewportWidth(80)
+
+	for range 3 {
+		c.Apply(app.Action{Kind: app.ActionMoveDown})
+	}
+	before := c.Snapshot().Body.Detail
+	preCursor := before.FieldCursor
+	preRow := fieldRowAt(t, before, preCursor)
+	if preRow.Key == "" || preRow.IsSection {
+		t.Fatalf("precondition: cursor should sit on a real content field, got %+v", preRow)
+	}
+
+	// ONE event, exactly as the sweep delivers it: the finding and the
+	// truncation mark for the same row.
+	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]bool{row.ID: true},
+		Findings: map[string][]domain.Finding{row.ID: {{
+			Code:     "ec2.impaired",
+			Phrase:   "system check failed",
+			Detail:   "The instance failed its system status check.",
+			Severity: domain.SevBroken,
+			Source:   "wave2:ec2",
+		}}},
+	})
+	c.ApplyIntents(intents)
+
+	after := c.Snapshot().Body.Detail
+	postCursor := after.FieldCursor
+	postRow := fieldRowAt(t, after, postCursor)
+
+	if postRow.Key != preRow.Key || postRow.Path != preRow.Path {
+		t.Errorf(
+			"cursor did not stay on the same logical field when the not-inspected mark arrived with the finding:\n"+
+				"  before enrichment: FieldCursor=%d Key=%q Path=%q\n"+
+				"  after  enrichment: FieldCursor=%d Key=%q Path=%q\n"+
+				"the old prepend size must be the one the LAST BUILD produced, not one "+
+				"recomputed from a session set that has already moved.",
 			preCursor, preRow.Key, preRow.Path,
 			postCursor, postRow.Key, postRow.Path,
 		)
