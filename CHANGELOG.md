@@ -241,6 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and node groups.
 - A cluster or node group whose details could not be read keeps its warning
   colour when the row is rebuilt from fields alone.
+- A list column no longer shows the row's own name just because its heading or its field path contains "name". On a row restored from the cache, or one whose fetch degraded, an alarm's Metric, a CodeArtifact Domain, a Redshift Database, an EventBridge target Resource and a CodePipeline Action now read blank instead of repeating the row's name under a foreign heading. The name still fills the column that names the row.
+- On an EC2 list the attention marker now sits on the instance's Name instead of its Status, and the Status column gives back the space it reserved for the marker, so the Instance ID column is no longer cut off.
 
 ### Added
 
