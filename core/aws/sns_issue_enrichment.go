@@ -103,7 +103,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			setWave2Finding(&result, r.ID, snsCodeAllPending, "all pending confirmation", "~", "sns", nil)
 		}
 	})
-	return result, AggregateFailures("sns-enrich: topic posture and subscriptions", failures, n)
+	return result, AggregateFailures("topic posture and subscriptions", failures, n)
 }
 
 // snsTopicPosture reads the topic's own attributes — the access policy and

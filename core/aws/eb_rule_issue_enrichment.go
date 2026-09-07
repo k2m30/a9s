@@ -152,5 +152,5 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("eb-rule-enrich: ListTargetsByRule", failures, n)
+	return result, AggregateFailures("ListTargetsByRule", failures, n)
 }

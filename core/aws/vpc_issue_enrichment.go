@@ -104,5 +104,5 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("vpc-enrich: DescribeFlowLogs", failures, n)
+	return result, AggregateFailures("DescribeFlowLogs", failures, n)
 }

@@ -69,7 +69,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			buildIDToProject[id] = name
 		}
 	})
-	listErr := AggregateFailures("cb-enrich: ListBuildsForProject", failures, len(names))
+	listErr := AggregateFailures("ListBuildsForProject", failures, len(names))
 	if len(buildIDs) == 0 {
 		return result, listErr
 	}

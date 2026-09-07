@@ -309,7 +309,7 @@ func enrichSnapshotPublicShare(
 			[]domain.DetailRow{{Label: "Restore", Value: "all", Tier: "!"}})
 
 	})
-	return Finish(result, failures, n, cfg.ShortName+"-enrich: snapshot share attributes")
+	return Finish(result, failures, n, "snapshot share attributes")
 }
 
 // glyphToSeverity maps a legacy "!" / "~" / "" severity glyph to the canonical

@@ -412,8 +412,12 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-nil composite error when GetPublicAccessBlock returns generic error; got nil")
 	}
-	if !strings.Contains(err.Error(), "s3-enrich: bucket posture") {
-		t.Errorf("err must contain \"s3-enrich: bucket posture\"; got %q", err.Error())
+	// INVERTED for the "skipped" spec row 6: the label carried the type, so
+	// the rendered line said it twice ("enrich s3: s3-enrich: ..."). The type
+	// comes from the registry key at the surface; the aggregate names the
+	// call. Do not restore the type in the label.
+	if !strings.Contains(err.Error(), "bucket posture") {
+		t.Errorf("err must name the pass, \"bucket posture\"; got %q", err.Error())
 	}
 	if !strings.Contains(err.Error(), "error-bucket") {
 		t.Errorf("err must name the failing bucket \"error-bucket\"; got %q", err.Error())

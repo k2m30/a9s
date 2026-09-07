@@ -70,7 +70,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 	truncated := false
 	var failures []Failure
 	total := 0
-	const op = "ecs-svc-enrich: DescribeServices"
+	const op = "DescribeServices"
 
 	for clusterName, svcNames := range clusterServices {
 		// ECS DescribeServices accepts up to 10 services per call.

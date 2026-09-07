@@ -94,7 +94,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 	})
 
 	SetTruncated(&result, truncated)
-	activitiesErr := AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
+	activitiesErr := AggregateFailures("DescribeScalingActivities", failures, total)
 	lcErr := asgLaunchConfigurationPosture(ctx, clients, &result, resources)
 	return result, errors.Join(activitiesErr, lcErr)
 }
@@ -131,7 +131,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 	// ways a configuration can go unread — dropped at the cap above, or left
 	// behind a pending token below — mark the groups that referenced it, so
 	// none of them reads "nothing to report" for a posture nobody looked at.
-	const op = "asg-enrich: DescribeLaunchConfigurations"
+	const op = "DescribeLaunchConfigurations"
 	var configs []asgtypes.LaunchConfiguration
 	var nextToken *string
 	for range PerParentPageCap {

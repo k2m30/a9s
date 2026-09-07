@@ -121,8 +121,12 @@ func TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError(t *testing.
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "efs-enrich:") {
-		t.Errorf("composite error must contain \"efs-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "efs-enrich:", which
+	// made the rendered line say the type twice ("enrich efs: DescribeMountTargets ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeMountTargets") {
+		t.Errorf("composite error must name the call, %q, got: %q", "DescribeMountTargets", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, "fs-00000001") {
 		t.Errorf("composite error must contain the failing file system ID \"fs-00000001\", got: %q", errStr)

@@ -113,7 +113,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
+	return result, AggregateFailures("DescribeStackEvents", failures, total)
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
@@ -232,5 +232,5 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
+	return result, AggregateFailures("DescribeStacks", failures, total)
 }

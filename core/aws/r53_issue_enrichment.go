@@ -206,7 +206,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	})
 
 	return result,
-		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
+		AggregateFailures("GetHostedZone", failures, total)
 }
 
 // r53PublicZoneFindings evaluates the two public-zone rows: query logging, and

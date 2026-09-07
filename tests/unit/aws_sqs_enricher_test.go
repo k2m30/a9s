@@ -229,8 +229,12 @@ func TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "sqs-enrich:") {
-		t.Errorf("composite error must contain \"sqs-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "sqs-enrich:", which
+	// made the rendered line say the type twice ("enrich sqs: GetQueueAttributes ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "GetQueueAttributes") {
+		t.Errorf("composite error must name the call, %q, got: %q", "GetQueueAttributes", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, "my-queue-1") {
 		t.Errorf("composite error must contain the failing queue ID \"my-queue-1\", got: %q", errStr)

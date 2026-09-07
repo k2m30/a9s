@@ -91,7 +91,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 	})
 	settingsErr := ebConfigurationPosture(ctx, clients, &result, resources)
 	MarkInformationalOnly(&result)
-	return result, errors.Join(AggregateFailures("eb-enrich: DescribeEnvironmentHealth", failures, n), settingsErr)
+	return result, errors.Join(AggregateFailures("DescribeEnvironmentHealth", failures, n), settingsErr)
 }
 
 // ebConfigurationPosture reads DescribeConfigurationSettings once per
@@ -156,7 +156,7 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 			setWave2Finding(result, key, ebCodeCWLogsOff, "log streaming to CloudWatch off", "~", "eb", nil)
 		}
 	})
-	return AggregateFailures("eb-enrich: DescribeConfigurationSettings", failures, n)
+	return AggregateFailures("DescribeConfigurationSettings", failures, n)
 }
 
 // ebOptionValue finds one option by namespace AND name, reporting whether

@@ -222,8 +222,12 @@ func TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when at least one stack API call failed")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "cfn-enrich:") {
-		t.Errorf("composite error must contain \"cfn-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "cfn-enrich:", which
+	// made the rendered line say the type twice ("enrich cfn: DescribeStacks ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeStacks") {
+		t.Errorf("composite error must name the call, %q, got: %q", "DescribeStacks", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, cfnDriftStack1) {
 		t.Errorf("composite error must contain the failing stack ID %q, got: %q", cfnDriftStack1, errStr)

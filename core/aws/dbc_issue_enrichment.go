@@ -154,7 +154,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	SetTruncated(&result, cut)
-	return result, errors.Join(tagErr, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages))
+	return result, errors.Join(tagErr, AggregateFailures("DescribePendingMaintenanceActions", failures, pages))
 }
 
 // isClusterARN returns true when the ARN's resource-type segment is "cluster".

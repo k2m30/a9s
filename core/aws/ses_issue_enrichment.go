@@ -107,7 +107,7 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		setWave2Finding(result, r.ID, sesCodeDKIMOff, "DKIM not enabled", "~", "ses",
 			[]domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: "~"}})
 	})
-	return AggregateFailures("ses-enrich: GetEmailIdentity", failures, n)
+	return AggregateFailures("GetEmailIdentity", failures, n)
 }
 
 // sesAccountFinding derives the single account-level finding from GetAccount output.

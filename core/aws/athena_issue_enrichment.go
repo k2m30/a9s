@@ -93,7 +93,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("athena-enrich: GetWorkGroup", failures, n)
+	return result, AggregateFailures("GetWorkGroup", failures, n)
 }
 
 // resultOutputLocation returns the workgroup's configured result location, or

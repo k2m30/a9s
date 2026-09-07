@@ -93,3 +93,25 @@ func TestFailureLine_SubjectSaidOnce(t *testing.T) {
 		t.Errorf("failure line = %q, want %q", plain, "connect: connection reset")
 	}
 }
+
+// TestFailureLine_OneLine pins that the sentence stays one line. An enricher
+// that runs two passes joins their aggregates with errors.Join, whose text
+// carries a newline; the status bar is one line, and a line break in it drops
+// the second pass off the screen.
+func TestFailureLine_OneLine(t *testing.T) {
+	joined := errors.Join(
+		awsclient.AggregateFailures("DescribeContinuousBackups",
+			[]awsclient.Failure{awsclient.FailedCall("acme-orders", errors.New("connection reset"))}, 2),
+		awsclient.AggregateFailures("GetResourcePolicy",
+			[]awsclient.Failure{awsclient.FailedCall("acme-orders", errors.New("connection reset"))}, 2),
+	)
+	line := failureLine("enrich ddb", joined, "us-east-1")
+	if strings.Contains(line, "\n") {
+		t.Errorf("failure line spans more than one line:\n%s", line)
+	}
+	for _, want := range []string{"DescribeContinuousBackups", "GetResourcePolicy"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("failure line %q lost %q", line, want)
+		}
+	}
+}

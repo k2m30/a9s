@@ -7,6 +7,7 @@ package unit_test
 // error-history line is built by one formatter.
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -499,5 +501,104 @@ func TestFailureLine_EmptySubjectLeavesNoDanglingSeparator(t *testing.T) {
 
 	if got := c.Snapshot().Header.Flash.Text; strings.Contains(got, " :") {
 		t.Errorf("flash = %q — a subject that is nothing but its prefix must not leave a dangling separator", got)
+	}
+}
+
+// ddbDeniedBackupsFake fails DescribeContinuousBackups for every table, so the
+// error the status bar renders is the one the real enricher built.
+type ddbDeniedBackupsFake struct {
+	awsclient.DynamoDBAPI
+}
+
+func (f *ddbDeniedBackupsFake) DescribeContinuousBackups(
+	_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options),
+) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+	return nil, errors.New("connection reset")
+}
+
+func (f *ddbDeniedBackupsFake) GetResourcePolicy(
+	_ context.Context, _ *dynamodb.GetResourcePolicyInput, _ ...func(*dynamodb.Options),
+) (*dynamodb.GetResourcePolicyOutput, error) {
+	return &dynamodb.GetResourcePolicyOutput{}, nil
+}
+
+// enrichDDBError runs the real Wave 2 DynamoDB enricher against a failing
+// client and returns the error it built, so the pin below reads the label
+// production writes rather than one the test made up.
+func enrichDDBError(t *testing.T) error {
+	t.Helper()
+	_, err := awsclient.EnrichDynamoDBPITR(context.Background(),
+		&awsclient.ServiceClients{DynamoDB: &ddbDeniedBackupsFake{}},
+		[]resource.Resource{
+			{ID: "acme-orders", Name: "acme-orders", Type: "ddb"},
+			{ID: "acme-sessions", Name: "acme-sessions", Type: "ddb"},
+		}, nil)
+	if err == nil {
+		t.Fatal("the enricher reported no failure to render")
+	}
+	return err
+}
+
+// TestStatusBar_SubjectSaidOnce_BothLanes pins the "skipped" spec row 6 on the
+// rendered surface: the status bar names the lane and the type once, then the
+// cause. The type comes from the event's registry key; nothing the enricher or
+// the fetcher writes into its aggregate's label repeats it.
+func TestStatusBar_SubjectSaidOnce_BothLanes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		want  string
+		event any
+	}{
+		{
+			name: "enrich lane",
+			want: "enrich ddb: DescribeContinuousBackups failed for 2 of 2 IDs",
+			event: messages.EnrichmentChecked{
+				ResourceType: "ddb",
+				Err:          enrichDDBError(t),
+			},
+		},
+		{
+			name: "availability lane",
+			want: "availability ddb: DescribeTable failed for 1 of 2 IDs",
+			event: messages.AvailabilityChecked{
+				ResourceType: "ddb",
+				Err: awsclient.AggregateFailures("ddb: DescribeTable",
+					[]awsclient.Failure{awsclient.FailedCall("acme-orders", errors.New("connection reset"))}, 2),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, core := newTestControllerAndCore(t)
+			var intents []runtime.UIIntent
+			switch ev := tc.event.(type) {
+			case messages.EnrichmentChecked:
+				intents, _ = core.HandleEvent(ev)
+			case messages.AvailabilityChecked:
+				ev.Gen = core.Session().AvailabilityGen
+				intents, _ = core.HandleEvent(ev)
+			}
+			c.ApplyIntents(intents)
+
+			// The enrich lane writes the flash only; the availability lane
+			// writes both. Whichever surfaces exist must read the same.
+			surfaces := []string{c.Snapshot().Header.Flash.Text}
+			surfaces = append(surfaces, c.ErrorHistoryLines()...)
+			checked := 0
+			for _, surface := range surfaces {
+				if surface == "" {
+					continue
+				}
+				checked++
+				if !strings.Contains(surface, tc.want) {
+					t.Errorf("surface %q does not read %q", surface, tc.want)
+				}
+				if n := strings.Count(surface, "ddb"); n != 1 {
+					t.Errorf("surface %q says the type %d times, want 1", surface, n)
+				}
+			}
+			if checked == 0 {
+				t.Fatal("the failure reached no surface at all")
+			}
+		})
 	}
 }

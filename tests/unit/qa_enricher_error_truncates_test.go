@@ -81,8 +81,12 @@ func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeTargetHealth fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "tg-enrich:") {
-		t.Errorf("composite error must contain \"tg-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label carried the type, so
+	// the rendered line said it twice ("enrich tg: tg-enrich: ..."). The type
+	// comes from the registry key at the surface; the aggregate names the
+	// call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeTargetHealth") {
+		t.Errorf("composite error must name the call, DescribeTargetHealth, got: %q", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, tgName) {
 		t.Errorf("composite error must contain the failing target group ID %q, got: %q", tgName, errStr)
@@ -109,8 +113,12 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when GetPipelineState fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "pipeline-enrich:") {
-		t.Errorf("composite error must contain \"pipeline-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label carried the type, so
+	// the rendered line said it twice ("enrich pipeline: pipeline-enrich: ..."). The type
+	// comes from the registry key at the surface; the aggregate names the
+	// call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "GetPipelineState") {
+		t.Errorf("composite error must name the call, GetPipelineState, got: %q", errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when GetPipelineState fails — was the per-resource error handling reverted?")
@@ -136,8 +144,12 @@ func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when ListExecutions fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "sfn-enrich:") {
-		t.Errorf("composite error must contain \"sfn-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label carried the type, so
+	// the rendered line said it twice ("enrich sfn: sfn-enrich: ..."). The type
+	// comes from the registry key at the surface; the aggregate names the
+	// call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "ListExecutions") {
+		t.Errorf("composite error must name the call, ListExecutions, got: %q", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, smName) {
 		t.Errorf("composite error must contain the failing state machine ID %q, got: %q", smName, errStr)

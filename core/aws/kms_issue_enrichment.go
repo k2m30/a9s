@@ -84,7 +84,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil)
 		}
 	})
-	return result, AggregateFailures("kms-enrich: key policy and rotation", failures, n)
+	return result, AggregateFailures("key policy and rotation", failures, n)
 }
 
 // kmsKeyPolicyIsPublic reads a key's default policy and returns the exposure

@@ -192,7 +192,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues,
 			catalog.Phrase(apigwCodeStageConfigIssues), "~", "apigw", rows)
 	})
-	return result, AggregateFailures("apigw-enrich: authorizers and stages", failures, n)
+	return result, AggregateFailures("authorizers and stages", failures, n)
 }
 
 // apigwV1API is the pair of REST calls the enricher needs. It is reached by

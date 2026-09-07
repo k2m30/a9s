@@ -104,7 +104,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 
-	err := Finish(&result, failures, n, "redshift-enrich: cluster posture")
+	err := Finish(&result, failures, n, "cluster posture")
 	return result, err
 }
 

@@ -6,3 +6,4 @@
 - A DynamoDB table whose backup setting could not be read says so in the error log, instead of only showing "?" with no reason.
 - A check that could not read a resource now says so in the error log, everywhere it happens. Rows that show "?" because a call was refused no longer leave the reason out.
 - The status bar no longer repeats the resource type when a partial failure is reported.
+- A failed check names its resource type once: "enrich ddb: DescribeContinuousBackups failed for 2 of 2 IDs", not the type twice. Failures from a check that makes two passes stay on one line.

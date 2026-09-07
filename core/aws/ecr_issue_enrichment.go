@@ -189,7 +189,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("ecr-enrich: DescribeImages", failures, total)
+	return result, AggregateFailures("DescribeImages", failures, total)
 }
 
 // ecrRepositoryExposure evaluates a repository's resource policy through the

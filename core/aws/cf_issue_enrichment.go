@@ -257,5 +257,5 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		setWave2Finding(&result, distID, cfCodeInsecureProtocol,
 			catalog.Phrase(cfCodeInsecureProtocol), "~", "cf", rows)
 	})
-	return result, AggregateFailures("cf-enrich: GetDistributionConfig", failures, n)
+	return result, AggregateFailures("GetDistributionConfig", failures, n)
 }

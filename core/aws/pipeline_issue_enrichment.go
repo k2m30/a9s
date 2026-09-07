@@ -102,5 +102,5 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 
 	SetTruncated(&result, truncated)
 	return result,
-		AggregateFailures("pipeline-enrich: GetPipelineState", failures, total)
+		AggregateFailures("GetPipelineState", failures, total)
 }

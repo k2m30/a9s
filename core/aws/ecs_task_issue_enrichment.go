@@ -88,7 +88,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	truncated := false
 	var failures []Failure
 	total := 0
-	const op = "ecs-task-enrich: DescribeTasks"
+	const op = "DescribeTasks"
 
 	// DescribeTasks accepts up to 100 task ARNs per call.
 	const descBatch = 100
@@ -195,7 +195,7 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 	sort.Strings(defARNs)
 	defARNs = capAtEnrichmentCap(result, defARNs, func(arn string) []string { return tasksByDef[arn] })
 
-	const op = "ecs-task-enrich: DescribeTaskDefinition"
+	const op = "DescribeTaskDefinition"
 	var mu sync.Mutex
 	var failures []Failure
 	_ = ForEachParallel(ctx, len(defARNs), EnrichmentParallelism, func(i int) {

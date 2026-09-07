@@ -283,8 +283,12 @@ func TestEnrichMSKCluster_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "msk-enrich:") {
-		t.Errorf("composite error must contain \"msk-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "msk-enrich:", which
+	// made the rendered line say the type twice ("enrich msk: DescribeClusterV2 ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeClusterV2") {
+		t.Errorf("composite error must name the call, %q, got: %q", "DescribeClusterV2", errStr)
 	}
 	// Composite error reports the failing resource's ID (bare cluster name
 	// set by the msk fetcher), not the ARN, because that's what operators

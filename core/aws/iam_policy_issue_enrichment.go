@@ -104,7 +104,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("iam-policy-enrich: GetPolicyVersion", failures, n)
+	return result, AggregateFailures("GetPolicyVersion", failures, n)
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy

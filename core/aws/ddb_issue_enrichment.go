@@ -93,7 +93,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	// table it could not read is a coverage gap on that row, never a lower
 	// bound on the issue count the badge shows.
 
-	pitrErr := AggregateFailures("ddb-enrich: DescribeContinuousBackups", pitrFailures, n)
+	pitrErr := AggregateFailures("DescribeContinuousBackups", pitrFailures, n)
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
 	return result, errors.Join(tagErr, pitrErr, err)
 }
@@ -134,6 +134,12 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
+		if out == nil || aws.ToString(out.Policy) == "" {
+			// No document is the same answer as PolicyNotFoundException above,
+			// and reading it as a parse failure would report a check that
+			// never failed.
+			return
+		}
 		doc, parseErr := iampolicy.Parse(aws.ToString(out.Policy))
 		if parseErr != nil {
 			MarkSkipped(result, r.ID, &failures, parseErr)
@@ -157,7 +163,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 
 		}
 	})
-	return Finish(result, failures, n, "ddb-enrich: GetResourcePolicy")
+	return Finish(result, failures, n, "GetResourcePolicy")
 }
 
 // isDDBPolicyAbsent reports whether err is DynamoDB's way of saying the table

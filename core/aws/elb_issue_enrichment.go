@@ -251,7 +251,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	})
 
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
+	return result, AggregateFailures("DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
 }
 
 // allELBListeners reads a balancer's listeners to the end. DescribeListeners

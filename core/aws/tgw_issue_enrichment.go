@@ -147,5 +147,5 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 
 	SetTruncated(&result, truncated)
 	return result,
-		AggregateFailures("tgw-enrich: DescribeTransitGatewayAttachments", failures, total)
+		AggregateFailures("DescribeTransitGatewayAttachments", failures, total)
 }

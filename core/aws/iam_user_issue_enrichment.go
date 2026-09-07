@@ -222,7 +222,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("iam-user-enrich: user credentials", failures, n)
+	return result, AggregateFailures("user credentials", failures, n)
 }
 
 // isNoSuchEntity reports the IAM "this entity does not exist" error, which

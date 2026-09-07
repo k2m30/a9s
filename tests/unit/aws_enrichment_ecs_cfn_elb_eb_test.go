@@ -241,8 +241,12 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeServices fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "ecs-svc-enrich:") {
-		t.Errorf("composite error must contain \"ecs-svc-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "ecs-svc-enrich:", which
+	// made the rendered line say the type twice ("enrich ecs-svc: DescribeServices ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeServices") {
+		t.Errorf("composite error must name the call, %q, got: %q", "DescribeServices", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, "svc-err") {
 		t.Errorf("composite error must contain the failing service ID \"svc-err\", got: %q", errStr)
@@ -822,8 +826,12 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeStackEvents fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "cfn-enrich:") {
-		t.Errorf("composite error must contain \"cfn-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "cfn-enrich:", which
+	// made the rendered line say the type twice ("enrich cfn: DescribeStackEvents ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeStackEvents") {
+		t.Errorf("composite error must name the call, %q, got: %q", "DescribeStackEvents", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, stackID) {
 		t.Errorf("composite error must contain the failing stack ID %q, got: %q", stackID, errStr)

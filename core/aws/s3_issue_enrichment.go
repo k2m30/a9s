@@ -132,7 +132,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("s3-enrich: bucket posture", failures, total)
+	return result, AggregateFailures("bucket posture", failures, total)
 }
 
 // s3PostureFinding is one emitted condition, held until the shared result

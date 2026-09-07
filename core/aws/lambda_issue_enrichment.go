@@ -63,7 +63,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 	targets = capAtEnrichmentCap(&result, targets, resourceIDsOf)
 
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	const op = "lambda-enrich: GetPolicy/ListFunctionUrlConfigs"
+	const op = "GetPolicy/ListFunctionUrlConfigs"
 	var mu sync.Mutex
 	var failures []Failure
 	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {

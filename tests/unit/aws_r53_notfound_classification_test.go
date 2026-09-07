@@ -89,8 +89,12 @@ func TestEnrichRoute53Zone_AccessDenied_StillAggregates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-nil composite error for AccessDenied; NoSuchHostedZone silent-truncation must not swallow other errors")
 	}
-	if !strings.Contains(err.Error(), "r53-enrich:") {
-		t.Errorf("composite error must contain \"r53-enrich:\", got: %q", err.Error())
+	// INVERTED for the "skipped" spec row 6: the label carried the type, so
+	// the rendered line said it twice ("enrich r53: r53-enrich: ..."). The type
+	// comes from the registry key at the surface; the aggregate names the
+	// call. Do not restore the type in the label.
+	if !strings.Contains(err.Error(), "GetHostedZone") {
+		t.Errorf("composite error must name the call, GetHostedZone, got: %q", err.Error())
 	}
 	if !strings.Contains(err.Error(), r53ZoneID1) {
 		t.Errorf("composite error must name the failing zone %q, got: %q", r53ZoneID1, err.Error())

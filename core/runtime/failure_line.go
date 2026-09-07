@@ -17,7 +17,10 @@ import (
 // cause read from the error's class and fields, with the region named when the
 // class is about the region.
 func failureLine(subject string, err error, region string) string {
-	cause := awsclient.CauseInRegion(err, region)
+	// An enricher that runs two passes joins their aggregates, and errors.Join
+	// writes a newline between them. This is one line — a flash, a status bar,
+	// a log entry — so the passes are separated the way causes are.
+	cause := strings.ReplaceAll(awsclient.CauseInRegion(err, region), "\n", "; ")
 	// Three callers build the subject as a prefix plus a resource type, and
 	// the type can be empty: an unregistered fetch, a detail enrichment whose
 	// event carries none, a related result with no target.

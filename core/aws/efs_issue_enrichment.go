@@ -162,8 +162,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	// N file systems it could not answer for, and folding them into one
 	// tally would report more failures than there were file systems.
 	return result, errors.Join(
-		AggregateFailures("efs-enrich: DescribeMountTargets", failures, total),
-		AggregateFailures("efs-enrich: file system and backup policy", policyFailures, total),
+		AggregateFailures("DescribeMountTargets", failures, total),
+		AggregateFailures("file system and backup policy", policyFailures, total),
 	)
 }
 

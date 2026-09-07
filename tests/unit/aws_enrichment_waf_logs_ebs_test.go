@@ -316,8 +316,12 @@ func TestEnrichWAFLogging_ListResourcesErrorMarksRowTruncatedIDNotBadge(t *testi
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when ListResourcesForWebACL fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "waf-enrich") {
-		t.Errorf("composite error must contain \"waf-enrich\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "waf-enrich", which
+	// made the rendered line say the type twice ("enrich waf: GetLoggingConfiguration ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "GetLoggingConfiguration") {
+		t.Errorf("composite error must name the call, %q, got: %q", "GetLoggingConfiguration", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, wafACLARN1) {
 		t.Errorf("composite error must contain failing ARN %q, got: %q", wafACLARN1, errStr)
@@ -573,8 +577,12 @@ func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorMarksRowNotBadge(t *t
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeMetricFilters fails")
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, "logs-enrich:") {
-		t.Errorf("composite error must contain \"logs-enrich:\", got: %q", errStr)
+	// INVERTED for the "skipped" spec row 6: the label was "logs-enrich:", which
+	// made the rendered line say the type twice ("enrich logs: DescribeMetricFilters ..."). The
+	// type comes from the registry key at the surface; the aggregate names
+	// the call. Do not restore the type in the label.
+	if errStr := err.Error(); !strings.Contains(errStr, "DescribeMetricFilters") {
+		t.Errorf("composite error must name the call, %q, got: %q", "DescribeMetricFilters", errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, auditGroup) {
 		t.Errorf("composite error must contain the failing log group ID %q, got: %q", auditGroup, errStr)

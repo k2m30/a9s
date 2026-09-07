@@ -313,7 +313,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 	}
 	targets = capAtEnrichmentCap(result, targets, resourceIDsOf)
 
-	const op = "ec2-enrich: DescribeInstanceAttribute(userData)"
+	const op = "DescribeInstanceAttribute(userData)"
 	var mu sync.Mutex
 	var failures []Failure
 	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {

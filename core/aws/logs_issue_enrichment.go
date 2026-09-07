@@ -128,7 +128,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 
 	MarkInformationalOnly(&result)
 	return result,
-		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)
+		AggregateFailures("DescribeMetricFilters", failures, total)
 }
 
 // safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic

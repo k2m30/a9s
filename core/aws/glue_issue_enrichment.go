@@ -79,5 +79,5 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("glue-enrich: GetJobRuns", failures, n)
+	return result, AggregateFailures("GetJobRuns", failures, n)
 }

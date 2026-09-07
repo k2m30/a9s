@@ -367,3 +367,46 @@ func TestEnricher_UninspectedUser_SaysWhy(t *testing.T) {
 		}
 	}
 }
+
+// TestEnricher_TableWithNoPolicy_IsNotAFailure pins that an empty policy
+// response is an answer, not a refusal: DynamoDB reports "no resource policy"
+// as PolicyNotFoundException, but a response carrying no document at all must
+// not be recorded as a parse failure — the row would say a check failed when
+// nothing did. Found by driving the status-bar pin's fake.
+func TestEnricher_TableWithNoPolicy_IsNotAFailure(t *testing.T) {
+	clients := &awsclient.ServiceClients{DynamoDB: &ddbEmptyPolicyFake{}}
+	resources := []resource.Resource{
+		{ID: "acme-orders", Name: "acme-orders", Type: "ddb", Fields: map[string]string{"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders"}},
+	}
+
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Errorf("a table with no resource policy reported a failure: %v", err)
+	}
+	if result.TruncatedIDs["acme-orders"] {
+		t.Error("a table with no resource policy was marked uninspected")
+	}
+}
+
+// ddbEmptyPolicyFake answers every call, with no resource policy document.
+type ddbEmptyPolicyFake struct {
+	awsclient.DynamoDBAPI
+}
+
+func (f *ddbEmptyPolicyFake) DescribeContinuousBackups(
+	_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options),
+) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+	return &dynamodb.DescribeContinuousBackupsOutput{
+		ContinuousBackupsDescription: &ddbtypes.ContinuousBackupsDescription{
+			PointInTimeRecoveryDescription: &ddbtypes.PointInTimeRecoveryDescription{
+				PointInTimeRecoveryStatus: ddbtypes.PointInTimeRecoveryStatusEnabled,
+			},
+		},
+	}, nil
+}
+
+func (f *ddbEmptyPolicyFake) GetResourcePolicy(
+	_ context.Context, _ *dynamodb.GetResourcePolicyInput, _ ...func(*dynamodb.Options),
+) (*dynamodb.GetResourcePolicyOutput, error) {
+	return &dynamodb.GetResourcePolicyOutput{}, nil
+}

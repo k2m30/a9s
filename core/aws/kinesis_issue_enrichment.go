@@ -108,7 +108,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 	})
 
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("kinesis-enrich: DescribeStreamSummary", failures, total)
+	return result, AggregateFailures("DescribeStreamSummary", failures, total)
 }
 
 // isKinesisStreamGone reports whether err is Kinesis saying the stream no

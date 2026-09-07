@@ -114,7 +114,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	})
 
 	return result,
-		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
+		AggregateFailures("DescribeClusterV2", failures, total)
 }
 
 // mskPublicAccessOn is the one PublicAccess.Type value that means the brokers

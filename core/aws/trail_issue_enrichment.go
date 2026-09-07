@@ -94,5 +94,5 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 				[]domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "~"}})
 		}
 	})
-	return result, AggregateFailures("trail-enrich: log bucket posture", failures, n)
+	return result, AggregateFailures("log bucket posture", failures, n)
 }

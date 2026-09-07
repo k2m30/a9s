@@ -138,5 +138,5 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("codeartifact-enrich: GetRepositoryPermissionsPolicy", failures, n)
+	return result, AggregateFailures("GetRepositoryPermissionsPolicy", failures, n)
 }

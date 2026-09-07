@@ -146,5 +146,5 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 
 	SetTruncated(&result, truncated)
 	return result,
-		AggregateFailures("tg-enrich: DescribeTargetHealth", failures, total)
+		AggregateFailures("DescribeTargetHealth", failures, total)
 }

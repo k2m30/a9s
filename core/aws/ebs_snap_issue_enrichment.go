@@ -66,7 +66,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 		}
 	}
 
-	const op = "ebs-snap-enrich: DescribeSnapshots(RestorableByUserIds=all)"
+	const op = "DescribeSnapshots(RestorableByUserIds=all)"
 	var nextToken *string
 	for range PerParentPageCap {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeSnapshotsOutput, error) {

@@ -166,7 +166,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 	}
 
 	SetTruncated(&result, cut)
-	return result, AggregateFailures("backup-enrich: ListBackupJobs", failures, pages)
+	return result, AggregateFailures("ListBackupJobs", failures, pages)
 }
 
 // plural returns "s" when n != 1, "" otherwise.
