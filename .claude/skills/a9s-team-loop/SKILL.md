@@ -149,4 +149,4 @@ The orchestrator dispatches, integrates, and writes nothing else — with one fa
 
 ## Ending a round
 
-The last thing a round does is append its log entry. The agent's final message to the orchestrator is a copy of that entry — nothing else.
+The last thing a round does is append its log entry. The agent's final output is a copy of that entry — nothing else, and it is not also sent as a message: the harness delivers the final output to the orchestrator when the agent goes idle, so a `SendMessage` of the same report arrives twice (the user asked why every agent reports twice, 2026-09-07). A message mid-round is for a question only the orchestrator can answer, never for the report.
