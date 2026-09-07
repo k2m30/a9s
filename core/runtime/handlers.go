@@ -148,19 +148,14 @@ func (c *Core) HandleClearFlash(ev ClearFlashEvent) ([]UIIntent, []TaskRequest) 
 	return intents, nil
 }
 
-// HandleAPIError classifies the AWS error, builds a "[code] message" flash
-// text, records the error to history, clears the active list's loading
-// indicator, and schedules the longer 5 s clear tick used for AWS errors.
+// HandleAPIError phrases the AWS error through the one formatter, records it
+// to history, clears the active list's loading indicator, and schedules the
+// longer 5 s clear tick used for AWS errors.
 func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
-	code, message, _ := awsclient.ClassifyAWSError(ev.Err)
-	var text string
-	switch {
-	case code != "" && code != "Unknown":
-		text = fmt.Sprintf("[%s] %s", code, message)
-	case ev.Err != nil:
-		text = ev.Err.Error()
-	default:
-		text = "unknown API error"
+	text := "unknown API error"
+	if ev.Err != nil {
+		_, region := c.session.CurrentPair()
+		text = failureLine("", ev.Err, region)
 	}
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},

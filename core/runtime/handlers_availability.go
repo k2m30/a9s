@@ -18,11 +18,9 @@ package runtime
 //	unifiedIssueCount             → cross-wave de-duped issue count for S1 badge.
 
 import (
-	"fmt"
 	"maps"
 	"time"
 
-	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/logging"
@@ -281,10 +279,10 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 	enrichIntents, enrichTasks := c.startEnrichment()
 	intents = append(intents, enrichIntents...)
 
+	_, region := c.session.CurrentPair()
 	if msg.PrefetchErr != nil {
-		err := msg.PrefetchErr
 		intents = append(intents, FlashIntent{
-			Text:    "availability: " + err.Error(),
+			Text:    failureLine("availability", msg.PrefetchErr, region),
 			IsError: true,
 		})
 	}
@@ -292,7 +290,6 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 	// rows already render with their degraded-state findings; a blocking
 	// banner would double-shout what the list is honestly showing.
 	if msg.PrefetchSoftErr != nil {
-		_, region := c.session.CurrentPair()
 		intents = append(intents, appendErrorHistory(failureLine("availability", msg.PrefetchSoftErr, region)))
 	}
 
@@ -311,6 +308,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 
 	var intents []UIIntent
 	var tasks []TaskRequest
+	raisedBanner := false
 
 	// The row says why it has no fresh answer. A partial result is not a
 	// refusal — its rows are on screen — so only a hard failure marks the row,
@@ -385,14 +383,13 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		c.session.ScanHealthLogged[msg.ResourceType] = true
 		logging.L().Warn("scan probe failed", "type", msg.ResourceType, "outcome", string(outcome), "detail", errClass)
 
+		_, region := c.session.CurrentPair()
+		line := failureLine("availability "+msg.ResourceType, msg.Err, region)
 		if softFailure(msg.Err, len(msg.Resources) > 0) {
-			_, region := c.session.CurrentPair()
-			intents = append(intents, appendErrorHistory(failureLine("availability "+msg.ResourceType, msg.Err, region)))
+			intents = append(intents, appendErrorHistory(line))
 		} else {
-			intents = append(intents, FlashIntent{
-				Text:    fmt.Sprintf("probe %s: %s: %s", msg.ResourceType, outcome, errClass),
-				IsError: true,
-			})
+			intents = append(intents, FlashIntent{Text: line, IsError: true})
+			raisedBanner = true
 		}
 	}
 
@@ -425,9 +422,14 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		return intents, tasks
 	}
 
-	// All checks done — clear progress indicator and save cache.
+	// All checks done — clear progress indicator and save cache. The clear is
+	// for the sweep's own progress message; when this last probe is the one
+	// that failed, its banner is three intents old and would never reach the
+	// screen.
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // 0,0 = done
-	intents = append(intents, ClearFlash{})
+	if !raisedBanner {
+		intents = append(intents, ClearFlash{})
+	}
 
 	// The current profile/region pair's Wave-1 sweep has now genuinely
 	// completed (not just interrupted by a mid-sweep pair switch) — memoize
@@ -686,8 +688,9 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 	// Surface enrichment failures as flash.
 	if msg.Err != nil {
+		_, region := c.session.CurrentPair()
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("enrich %s: %s", originalType, awsclient.CauseOf(msg.Err)),
+			Text:    failureLine("enrich "+originalType, msg.Err, region),
 			IsError: true,
 		})
 	}

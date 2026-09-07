@@ -14,6 +14,12 @@
   failed connect used to arrive in three different shapes.
 - A failed connect now shows the same sentence in the flash and in the error
   log instead of the raw error in one and its own phrasing in the other.
+- An AWS error shown on the status bar now says the reason the call failed
+  rather than the raw AWS message, so a denial no longer fills the line with
+  an encoded authorization blob.
+- A probe that fails with nothing to show now names the reason on the status
+  bar. It used to show the internal outcome and class names, as in
+  "probe ec2: failed: transport".
 
 ## Fixed
 
@@ -25,3 +31,6 @@
   the row says the call failed.
 - A multi-line AWS message no longer breaks the flash and the menu row it is
   rendered on.
+- When the last resource type checked at startup is the one that fails, its
+  message stays on screen. Finishing the check used to clear it in the same
+  breath, so that one failure was never seen.

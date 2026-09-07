@@ -75,13 +75,17 @@ func TestHandleAPIError_NilErr_NoPanic(t *testing.T) {
 }
 
 // TestHandleAPIError_MessageSelectionTable pins the full three-way text
-// selection: nil Err -> fixed fallback; a non-nil error that ClassifyAWSError
-// cannot classify as a smithy.APIError -> Err.Error() verbatim; a matched
-// smithy.APIError -> "[code] message". A matched APIError with an empty
-// code (Code:"") is included as the boundary row: ClassifyAWSError only
-// special-cases a FAILED errors.As match ("Unknown"), so a successful match
-// with a genuinely empty ErrorCode() must still fall through to Err.Error(),
-// exactly like the unclassified-error row.
+// selection: nil Err -> fixed fallback; a non-nil error no API error backs ->
+// its own words; a modeled API error -> the cause awsclient.CauseOf reads off
+// its fields. A matched APIError with an empty code (Code:"") is the boundary
+// row: the code contributes nothing, so the message stands alone.
+//
+// INVERTED by the acceptance ruling on pass 1 of the "errors" task (spec row
+// 3): the classified row required "[code] message" built from the
+// classifier's RAW message, which put an encoded authorization blob on the
+// flash for a denial while every other surface showed the cause. Do not
+// restore the bracketed shape — it is a second phrasing of two fields the one
+// formatter already renders.
 func TestHandleAPIError_MessageSelectionTable(t *testing.T) {
 	tests := []struct {
 		name string
@@ -99,9 +103,9 @@ func TestHandleAPIError_MessageSelectionTable(t *testing.T) {
 			want: "boom",
 		},
 		{
-			name: "classified smithy.APIError uses [code] message",
+			name: "classified smithy.APIError reads the cause off its fields",
 			err:  &MockAPIError{Code: "AccessDenied", Message: "nope"},
-			want: "[AccessDenied] nope",
+			want: "AccessDenied: nope",
 		},
 		{
 			name: "matched APIError with an empty code falls back to Err.Error()",

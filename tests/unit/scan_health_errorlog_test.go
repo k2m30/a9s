@@ -6,15 +6,14 @@
 // promised per-type scan health to hosts since #462; nothing has ever
 // surfaced it there).
 //
-// RED today, but not via a compile failure: handleAvailabilityChecked's
-// failure branch (core/runtime/handlers_availability.go ~L352-370) already
-// flashes an error-log entry for a failed/timed-out probe today, in the
-// shape "availability <type>: <err>" — never in the "probe <type>:
-// <outcome>: <detail>" shape this contract pins (<outcome>/<detail> being
-// the literal ProbeOutcome/classifyProbeErr strings from
-// core/runtime/scan_status.go, e.g. "failed"/"timeout"), and with no guard
-// against a duplicate delivery for the same type re-adding an entry within
-// one sweep.
+// INVERTED by the acceptance ruling on pass 1 of the "errors" task (spec row
+// 3): the entry was pinned in the "probe <type>: <outcome>: <detail>" shape,
+// whose <outcome> and <detail> are the internal ProbeOutcome and class names
+// from core/runtime/scan_status.go. That put "probe ec2: failed: transport"
+// on the banner beside "availability ec2: <cause>" in the log for the same
+// event. The shape is now the one sentence every failed call gets. Do not
+// restore the internal names — what the contract is about is that exactly one
+// entry appears per type per sweep, which the assertions below still pin.
 package unit
 
 import (
@@ -124,8 +123,8 @@ func newProbeWindowModel(t *testing.T) tui.Model {
 }
 
 // -----------------------------------------------------------------------
-// (a) A failed/timed-out probe adds a "probe <type>: <outcome>: <detail>"
-// entry to the error log.
+// (a) A failed/timed-out probe adds an "availability <type>: <cause>" entry
+// to the error log.
 // -----------------------------------------------------------------------
 
 func TestScanHealthErrorLog_FailedProbe_AddsEntry(t *testing.T) {
@@ -140,7 +139,7 @@ func TestScanHealthErrorLog_FailedProbe_AddsEntry(t *testing.T) {
 	m = openErrorLog(m)
 	plain := stripANSI(rootViewContent(m))
 
-	want := "probe " + target + ": failed: timeout"
+	want := "availability " + target + ": timeout"
 	if !strings.Contains(plain, want) {
 		t.Errorf("error log missing scan-health entry: want substring %q, got:\n%s", want, plain)
 	}
@@ -162,7 +161,7 @@ func TestScanHealthErrorLog_SuccessfulProbe_AddsNoEntry(t *testing.T) {
 	m = openErrorLog(m)
 	plain := stripANSI(rootViewContent(m))
 
-	if strings.Contains(plain, "probe "+target+":") {
+	if strings.Contains(plain, "availability "+target+":") {
 		t.Errorf("successful probe must add no scan-health entry, but found one in:\n%s", plain)
 	}
 }
@@ -205,7 +204,7 @@ func TestScanHealthErrorLog_DuplicateDeliveryInSameSweep_DoesNotDuplicateEntry(t
 	m = openErrorLog(m)
 	plain := stripANSI(rootViewContent(m))
 
-	want := "probe " + target + ": failed: timeout"
+	want := "availability " + target + ": timeout"
 	if n := strings.Count(plain, want); n != 1 {
 		t.Errorf("want exactly 1 occurrence of %q after a same-sweep duplicate delivery, got %d in:\n%s", want, n, plain)
 	}

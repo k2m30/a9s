@@ -16,7 +16,11 @@ import (
 // cause read from the error's class and fields, with the region named when the
 // class is about the region.
 func failureLine(subject string, err error, region string) string {
-	return subject + ": " + awsclient.CauseInRegion(err, region)
+	cause := awsclient.CauseInRegion(err, region)
+	if subject == "" {
+		return cause
+	}
+	return subject + ": " + cause
 }
 
 // appendErrorHistory is the only construction of an error-history entry. A

@@ -261,3 +261,108 @@ func TestCostsDrillRefusalNote_ReadsTheSharedMessage(t *testing.T) {
 		t.Errorf("MessageOf(nil) = %q, want empty", got)
 	}
 }
+
+// TestAPIErrorHandler_SpeaksTheCause pins the acceptance reject on spec row 3:
+// the API error handler built "[code] message" out of the classifier's raw
+// message, so a denial put the encoded authorization blob on the flash and in
+// the error log while the same denial through any other path read the cause.
+// One formatter, one sentence, both surfaces.
+func TestAPIErrorHandler_SpeaksTheCause(t *testing.T) {
+	c, core := newTestControllerAndCore(t)
+	denial := apiErrWithMessage("UnauthorizedOperation",
+		"You are not authorized to perform: ec2:DescribeSnapshotAttribute. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg")
+
+	intents, _ := core.HandleEvent(messages.APIError{ResourceType: "ec2", Err: denial})
+	c.ApplyIntents(intents)
+
+	want := awsclient.CauseOf(denial)
+	flash := c.Snapshot().Header.Flash.Text
+	if flash != want {
+		t.Errorf("flash = %q, want the cause %q", flash, want)
+	}
+	lines := c.ErrorHistoryLines()
+	if len(lines) == 0 {
+		t.Fatal("an API error logged nothing")
+	}
+	if !strings.Contains(lines[0], want) {
+		t.Errorf("error-history line %q does not carry the cause %q the flash shows", lines[0], want)
+	}
+	for _, banned := range []string{"Encoded authorization failure message", "bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg", "RequestID", "11111111-2222-3333-4444-555555555555"} {
+		for _, surface := range []string{flash, lines[0]} {
+			if strings.Contains(surface, banned) {
+				t.Errorf("%q carries %q — per-call noise no operator can act on", surface, banned)
+			}
+		}
+	}
+}
+
+// TestProbeBanner_SpeaksTheCauseNotTheClass pins the other half of the
+// acceptance reject: a row-less probe failure banner read "probe ec2: failed:
+// transport", the internal outcome and class names, beside "availability ec2:
+// <cause>" for the same event on the soft path.
+func TestProbeBanner_SpeaksTheCauseNotTheClass(t *testing.T) {
+	denial := apiErrWithMessage("UnauthorizedOperation",
+		"You are not authorized to perform: ec2:DescribeSnapshotAttribute")
+
+	c, core := newTestControllerAndCore(t)
+	probeAllTypes(t, c, core, denial, []string{"ec2"})
+
+	flash := c.Snapshot().Header.Flash.Text
+	want := "availability ec2: " + awsclient.CauseOf(denial)
+	if flash != want {
+		t.Errorf("probe banner = %q, want %q — the same sentence the soft path logs", flash, want)
+	}
+	for _, banned := range []string{"failed:", "UnauthorizedOperation:"} {
+		if strings.Contains(flash, banned) {
+			t.Errorf("probe banner %q carries %q — an internal outcome or class name is not a cause", flash, banned)
+		}
+	}
+}
+
+// TestPrefetchBanner_SpeaksTheCause pins the third shape the widened sweep
+// found in the same file: the hard prefetch failure flashed the error's raw
+// text while the soft one, six lines below, went through the formatter.
+func TestPrefetchBanner_SpeaksTheCause(t *testing.T) {
+	denial := apiErrWithMessage("UnauthorizedOperation",
+		"You are not authorized to perform: ec2:DescribeInstances. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg")
+
+	c, core := newTestControllerAndCore(t)
+	intents, _ := core.HandleEvent(messages.AvailabilityPrefetched{
+		PrefetchErr: denial,
+		Gen:         core.Session().AvailabilityGen,
+	})
+	c.ApplyIntents(intents)
+
+	flash := c.Snapshot().Header.Flash.Text
+	if want := "availability: " + awsclient.CauseOf(denial); flash != want {
+		t.Errorf("prefetch banner = %q, want %q", flash, want)
+	}
+	for _, banned := range []string{"Encoded authorization failure message", "RequestID", "operation error"} {
+		if strings.Contains(flash, banned) {
+			t.Errorf("prefetch banner %q carries %q", flash, banned)
+		}
+	}
+}
+
+// TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear pins what acceptance
+// observed: the probe that completes the sweep raises its failure banner and,
+// three intents later in the same batch, the completion appends a ClearFlash
+// meant for the progress message. The last type to fail was the one type whose
+// failure never reached the screen.
+func TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear(t *testing.T) {
+	denial := apiErrWithMessage("UnauthorizedOperation",
+		"You are not authorized to perform: ec2:DescribeInstances")
+
+	c, core := newTestControllerAndCore(t)
+	core.Session().AvailTotal = 1
+	intents, _ := core.HandleEvent(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		Err:          denial,
+		Gen:          core.Session().AvailabilityGen,
+	})
+	c.ApplyIntents(intents)
+
+	if got := c.Snapshot().Header.Flash.Text; !strings.Contains(got, awsclient.CauseOf(denial)) {
+		t.Errorf("flash = %q — the completing probe's failure banner was wiped by its own batch's clear", got)
+	}
+}
