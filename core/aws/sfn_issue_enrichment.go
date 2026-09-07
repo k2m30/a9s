@@ -16,7 +16,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // sfn canonical FindingCodes.
@@ -156,12 +155,7 @@ func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, resul
 		setWave2Finding(result, id, sfnCodeNoCMK, "not encrypted with a customer key", "~", "sfn",
 			[]domain.DetailRow{{Label: "Key owner", Value: "amazon", Tier: "~"}})
 	}
-	// Rule 7: the rows carry Where and Kind, never the value itself.
-	var rows []domain.DetailRow
-	for _, hit := range secretscan.ScanText(aws.ToString(out.Definition)) {
-		rows = append(rows, domain.DetailRow{Label: hit.Where, Value: hit.Kind, Tier: "!"})
-	}
-	if len(rows) > 0 {
+	if rows := secretScanTextRows(aws.ToString(out.Definition)); len(rows) > 0 {
 		setWave2Finding(result, id, sfnCodeDefinitionSecret, "credential in state machine definition", "!", "sfn", rows)
 	}
 }

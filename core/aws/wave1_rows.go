@@ -37,18 +37,29 @@ func addWave1Finding(r *resource.Resource, code domain.FindingCode, phrase strin
 	})
 }
 
-// secretScanRows scans kv and returns one supporting row per credential
-// found, in key order. Rows carry Where and Kind only — the value never
-// reaches a rendered surface, which is the property worth having in one place
-// rather than repeated at each caller. Every hit is a credential in the
-// clear, so every row is one tier.
+// secretScanRows and secretScanTextRows scan the two shapes a credential
+// arrives in — an environment-style map, and free text such as user data or a
+// state-machine definition — and return one supporting row per credential
+// found. Rows carry Where and Kind only: the value never reaches a rendered
+// surface, which is the property worth having in one place rather than
+// repeated at each caller. Every hit is a credential in the clear, so every
+// row is one tier.
 //
-// Wave-2 enrichers call this directly and pack the rows into their own
+// Wave-2 enrichers call these directly and pack the rows into their own
 // setWave2Finding call, because what precedes the hit rows differs per
-// enricher: a Stage row per stage, a Container row per container.
+// enricher: a Stage row per stage, a Container row per container, a Version
+// row per launch template.
 func secretScanRows(kv map[string]string) []domain.DetailRow {
+	return secretScanHitRows(secretscan.ScanKV(kv))
+}
+
+func secretScanTextRows(text string) []domain.DetailRow {
+	return secretScanHitRows(secretscan.ScanText(text))
+}
+
+func secretScanHitRows(hits []secretscan.Hit) []domain.DetailRow {
 	var rows []domain.DetailRow
-	for _, h := range secretscan.ScanKV(kv) {
+	for _, h := range hits {
 		rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
 	}
 	return rows

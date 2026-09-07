@@ -16,7 +16,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // asg canonical FindingCodes.
@@ -221,14 +220,9 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 
 	}
 	if userData := aws.ToString(lc.UserData); userData != "" {
-		if hits := secretscan.ScanText(decodeUserData(userData)); len(hits) > 0 {
-			rows := make([]domain.DetailRow, 0, len(hits))
-			for _, h := range hits {
-				rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
-			}
+		if rows := secretScanTextRows(decodeUserData(userData)); len(rows) > 0 {
 			setWave2Finding(result, groupID, asgCodeLaunchConfigSecret, "credential in launch configuration user data", "!", "asg",
 				rows)
-
 		}
 	}
 }

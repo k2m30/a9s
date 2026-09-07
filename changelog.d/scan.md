@@ -11,3 +11,7 @@
 - An API Gateway stage with more than one leaking variable now lists them all.
   The stage reported one issue per leaking variable, and each report replaced
   the previous one's supporting rows, so only the last variable was named.
+- An issue found on more than one part of a resource now names every part it
+  was found on, and is stated once. An API with two stages missing access logs
+  raised the issue twice and named only the last stage, leaving nothing to say
+  the first had been inspected.

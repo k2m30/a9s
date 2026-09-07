@@ -20,7 +20,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // ec2 canonical FindingCodes. Each condition gets its OWN code so
@@ -368,13 +367,9 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		if out == nil || out.UserData == nil || aws.ToString(out.UserData.Value) == "" {
 			return
 		}
-		hits := secretscan.ScanText(decodeUserData(*out.UserData.Value))
-		if len(hits) == 0 {
+		rows := secretScanTextRows(decodeUserData(*out.UserData.Value))
+		if len(rows) == 0 {
 			return
-		}
-		rows := make([]domain.DetailRow, 0, len(hits))
-		for _, h := range hits {
-			rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
 		}
 		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "credential in user data", "!", "ec2",
 			rows)

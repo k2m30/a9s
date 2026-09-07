@@ -13,6 +13,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -108,24 +109,31 @@ func formatDate(t interface{ Format(string) string }) string {
 // shortName stamps Source = "wave2:<shortName>" on the emitted Finding. It is
 // the resource short name the enricher serves (e.g. "acm", "dbi", "tg").
 //
-// Append-style: calling this a second time for the same resourceID (an
-// enricher with two independently-evaluated conditions on the same resource,
-// e.g. opensearch's update-forced + encryption-off) appends the new Finding
-// to r.Findings[resourceID] rather than overwriting it — every
-// independently-evaluated condition survives as its own Finding, with its
-// own Phrase/Detail/Code, never demoted into another finding's supporting
-// row. ApplyWave2ToRow (core/runtime/helpers.go) folds the whole slice
-// onto domain.Resource.Findings, and colorFromAnyFinding/buildAttentionEntries/
-// domain.StatusPhrase already reads the whole slice for worst-severity
-// color, one Attention entry per issue-severity finding, and the stacked
-// "<top> (+N)" list phrase respectively.
+// Append-style: calling this a second time for the same resourceID with a
+// DIFFERENT code (an enricher with two independently-evaluated conditions on
+// the same resource, e.g. opensearch's update-forced + encryption-off)
+// appends the new Finding to r.Findings[resourceID] rather than overwriting
+// it — every independently-evaluated condition survives as its own Finding,
+// with its own Phrase/Detail/Code, never demoted into another finding's
+// supporting row. ApplyWave2ToRow (core/runtime/helpers.go) folds the whole
+// slice onto domain.Resource.Findings, and colorFromAnyFinding/
+// buildAttentionEntries/domain.StatusPhrase already reads the whole slice for
+// worst-severity color, one Attention entry per issue-severity finding, and
+// the stacked "<top> (+N)" list phrase respectively.
 //
-// rows, when non-empty, become this (resourceID, code) pair's AttentionDetail
-// entry — keyed by the Finding's own Code, so a second independently-evaluated
-// condition on the same resourceID (its own Code) records its own rows
-// without disturbing the first condition's entry. ApplyWave2ToRow looks up
-// each appended Finding's AttentionDetail by (resourceID, Code), so every
-// independently-evaluated condition keeps its own supporting rows.
+// Calling it again with the SAME code is one condition found on a second item
+// of the same resource — a second stage of one API, a second container of one
+// task. The resource states that condition once, so the Finding is not
+// repeated, and the new rows are appended to the (resourceID, code) entry, the
+// way addWave1Rows appends. Assigning instead would leave the reader told
+// about the last offending item with nothing to say the others were inspected.
+//
+// rows, when non-empty, accumulate on this (resourceID, code) pair's
+// AttentionDetail entry — keyed by the Finding's own Code, so a second
+// independently-evaluated condition on the same resourceID (its own Code)
+// records its own rows without disturbing the first condition's entry.
+// ApplyWave2ToRow looks up each appended Finding's AttentionDetail by
+// (resourceID, Code), so every condition keeps its own supporting rows.
 //
 // The caller is responsible for initialising r.Findings and (when emitting
 // rows) r.AttentionDetails before calling this helper. The IssueEnricherResult
@@ -139,14 +147,15 @@ func setWave2Finding(
 	shortName string,
 	rows []domain.DetailRow,
 ) {
-	f := domain.Finding{
-		Code:     code,
-		Phrase:   phrase,
-		Detail:   catalog.Detail(code),
-		Severity: glyphToSeverity(severityGlyph),
-		Source:   "wave2:" + shortName,
+	if !slices.ContainsFunc(r.Findings[resourceID], func(f domain.Finding) bool { return f.Code == code }) {
+		r.Findings[resourceID] = append(r.Findings[resourceID], domain.Finding{
+			Code:     code,
+			Phrase:   phrase,
+			Detail:   catalog.Detail(code),
+			Severity: glyphToSeverity(severityGlyph),
+			Source:   "wave2:" + shortName,
+		})
 	}
-	r.Findings[resourceID] = append(r.Findings[resourceID], f)
 
 	if len(rows) > 0 {
 		if r.AttentionDetails == nil {
@@ -155,7 +164,9 @@ func setWave2Finding(
 		if r.AttentionDetails[resourceID] == nil {
 			r.AttentionDetails[resourceID] = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 		}
-		r.AttentionDetails[resourceID][code] = domain.AttentionDetail{Rows: rows}
+		ad := r.AttentionDetails[resourceID][code]
+		ad.Rows = append(ad.Rows, rows...)
+		r.AttentionDetails[resourceID][code] = ad
 	}
 }
 

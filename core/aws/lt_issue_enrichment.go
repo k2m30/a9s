@@ -32,7 +32,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // EnrichLTDeprecatedAMI cross-references each Launch Template's "$Default"
@@ -59,18 +58,15 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 		if userData == "" {
 			continue
 		}
-		hits := secretscan.ScanText(decodeUserData(userData))
-		if len(hits) == 0 {
+		hitRows := secretScanTextRows(decodeUserData(userData))
+		if len(hitRows) == 0 {
 			continue
 		}
-		rows := []domain.DetailRow{{
+		rows := append([]domain.DetailRow{{
 			Label: "Version",
 			Value: strconv.FormatInt(aws.ToInt64(raw.DefaultVersion.VersionNumber), 10),
 			Tier:  "!",
-		}}
-		for _, h := range hits {
-			rows = append(rows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
-		}
+		}}, hitRows...)
 		setWave2Finding(&result, res.ID, ltCodeUserDataSecret, "credential in user data", "!", "lt",
 			rows)
 

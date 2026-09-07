@@ -268,9 +268,7 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 			emit(CodeAPIGWTracingOff, "X-Ray tracing off", "~",
 				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
 		}
-		// One stage is one finding however many of its variables leak: a
-		// second emit for the same code replaces the first's rows, so a
-		// per-hit emit costs a leak rather than reporting one.
+		// Rows carry where and what kind, never the value itself.
 		if rows := secretScanRows(st.Variables); len(rows) > 0 {
 			emit(CodeAPIGWStageVariableSecret, "credential in stage variables", "!",
 				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
