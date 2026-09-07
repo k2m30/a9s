@@ -456,8 +456,8 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 // on every call, returning a fresh listBodyMemo stamped with the input key
 // that produced it. Callers must hold c.mu (write).
 func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyMemo {
-	// Resolve column definitions mirroring resolveColumns() in table_render.go,
-	// using the already-resolved fallback td (not the catalog) for the superset
+	// Resolve column definitions using the already-resolved fallback td (not
+	// the catalog) for the superset
 	// first-column-title check. This ensures test typeDefs with non-standard
 	// first columns (e.g. rlTestTypeDef starts with "Instance ID" not "Name")
 	// are not silently switched to the 9-column built-in defaults.
@@ -520,8 +520,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		})
 	}
 
-	// Resolve the identity column index (full column list, before hscroll),
-	// mirroring resolveIdentityColumn in table_render.go.
+	// Resolve the identity column index (full column list, before hscroll).
 	markerCol := IdentityColumnIndex(columns, td)
 
 	return listBodyMemo{

@@ -129,8 +129,8 @@ func listSortResources(vc *config.ViewsConfig, ls *ListState, typeName string, r
 		return resources
 	}
 
-	// Resolve columns from viewConfig first (same priority as buildListBody /
-	// resolveColumns in table_render.go) so custom sort_key / sort_path columns
+	// Resolve columns from viewConfig first (same priority as buildListBody)
+	// so custom sort_key / sort_path columns
 	// are found even when they are not in the built-in defaults.
 	vd := config.GetViewDef(vc, typeName)
 	if len(vd.List) == 0 {

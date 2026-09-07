@@ -311,7 +311,7 @@ type ResourceTypeDef struct {
     CostExplorerServiceName string // Cost Explorer SERVICE dimension for the cost drill-down; empty = unsupported
     Columns     []domain.Column  // table columns for list view
     LifecycleKey string          // Fields key holding lifecycle state; defaults to "state"
-    IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
+    IdentityKey string           // column key for enrichment row-marker placement; empty = use the IdentityColumnIndex cascade
     CellDecorators map[string]func(domain.Resource, string) string // transforms cell values per column before render
     CopyField   string           // overrides which Fields key `c` copies; empty = copy ID
     ConsoleURL  func(domain.Resource, string, string) string // AWS console deep link for a row (region, accountID); "" = no page / missing input, Resolve falls back to Fields["arn"] via /go/view
@@ -501,12 +501,13 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 
 **`TierColorStyle`** (`styles.TierColorStyle(tier string) lipgloss.Style`): Maps detail-view tier strings to palette foreground styles. Tiers: `"ok"`, `"!"` (broken), `"~"` (warning/scheduled), `"impaired"`, `"initializing"`, `"ct-danger"`, `"ct-attention"`, `"ct-info"`.
 
-**`IdentityKey` and `resolveIdentityColumn`**: The enrichment row-marker dot is placed in the "identity column" — the column that most clearly names the resource. `ResourceTypeDef.IdentityKey` pins the column by key. When empty, `resolveIdentityColumn(cols, td)` applies a 5-step cascade:
+**`IdentityKey` and `IdentityColumnIndex`**: The enrichment row-marker dot is placed in the "identity column" — the column that most clearly names the resource. `ResourceTypeDef.IdentityKey` pins the column by key. When empty, `app.IdentityColumnIndex(cols, td)` (`core/app/list_columns.go`) applies a 4-step cascade:
 1. `td.IdentityKey` matches a column's `Key`
 2. column `Key == "name"`
-3. column `Path` contains `"Name"` or `"Identifier"`
-4. column `Title` equals `"Name"` (case-insensitive) or equals `td.Name`
-5. fall back to column index 0
+3. column `Title` equals `"Name"` (case-insensitive) or equals `td.Name`
+4. fall back to column index 0
+
+A column's field path is never consulted: a path that merely contains `Name` names a field of something else, and only the identity column may fall back to the row's own `Name` when its cell resolves to nothing (`ExtractCellValue`).
 
 **`CellDecorators` and `lookupDecorator`**: `ResourceTypeDef.CellDecorators` is a `map[string]func(Resource, string) string` that transforms a cell's display value before render. `lookupDecorator(decs, col)` resolves the right decorator via a fallback chain: column `Key` → column `Path` → `Path`'s final segment (lowercased) → column `Title` (lowercased). Only EC2 currently uses this (to prefix state with `"! "` for impaired or `"~ "` for degraded-but-running).
 

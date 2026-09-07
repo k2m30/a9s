@@ -78,8 +78,8 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 	return cols
 }
 
-// extractListCells builds the cell value slice for one row, mirroring
-// extractCellValue + CellDecorators application in table_render.go. DATA only — no Lipgloss styling.
+// extractListCells builds the cell value slice for one row: ExtractCellValue
+// plus CellDecorators. DATA only — no Lipgloss styling.
 // td must already be resolved (fallback-first) by the caller so that CellDecorators
 // from the model's typeDef are applied (e.g. EC2 state impaired/initializing prefix).
 func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.ResourceTypeDef) []string {
@@ -96,8 +96,7 @@ func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.Res
 	return cells
 }
 
-// lookupListDecorator mirrors lookupDecorator in table_render.go but operates on
-// ColumnDef (Key+Title+Path) instead of listCol. Tries key, path, path last segment
+// lookupListDecorator resolves a ColumnDef's decorator. Tries key, path, path last segment
 // (lowercased), and lowercased title — in that order.
 //
 // A status-qualifying column (same predicate as ExtractCellValue's isStatusCol)
@@ -413,9 +412,9 @@ func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 }
 
 // ResolveColumnsForType resolves the column set for typeName using this
-// controller's viewConfig and fallbackTypeDefs. Mirrors resolveColumns in
-// table_render.go so that handleSortByCol and buildListBody always agree on
-// the column set — and therefore on what key "N" maps to.
+// controller's viewConfig and fallbackTypeDefs, so that handleSortByCol and
+// buildListBody always agree on the column set — and therefore on what key
+// "N" maps to.
 func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
