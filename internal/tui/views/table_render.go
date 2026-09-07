@@ -10,6 +10,14 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
+// The header's sort indicators. applySortKeyPrefixWidths reserves room for
+// whichever is wider, so the width reservation and the glyph that has to fit
+// in it can never drift apart.
+const (
+	sortAscGlyph  = "\u2191"
+	sortDescGlyph = "\u2193"
+)
+
 // listCol is a resolved column definition for rendering.
 type listCol struct {
 	title string
@@ -23,11 +31,15 @@ type listCol struct {
 }
 
 // applySortKeyPrefixWidths auto-grows the first 10 columns' widths to fit the
-// "N:Title" sort-key prefix produced by colHeaderTitle. Without this, columns
-// declared with Width < len("N:Title") would truncate the header (e.g.
-// "5:Instanc…" at width=10) and hide the sort hint. The architectural rule:
-// any sortable column (positions 0-9) MUST reserve enough room for its prefix.
-// Columns beyond position 9 have no prefix and keep their declared width.
+// "N:Title↑" header colHeaderTitle produces. Without this, columns declared
+// narrower would truncate the header (e.g. "5:Instanc…" at width=10) and hide
+// the sort hint. The architectural rule: any sortable column (positions 0-9)
+// MUST reserve enough room for its prefix and for the arrow — a column wide
+// enough for the title alone loses the arrow to the ellipsis and reads as
+// unsorted while its rows are in sorted order. The rune is reserved on every
+// sortable column, not only the sorted one, so the header does not shift
+// sideways under the operator when they press a sort key. Columns beyond
+// position 9 have no prefix, no sort binding and keep their declared width.
 func applySortKeyPrefixWidths(cols []listCol) []listCol {
 	for i := range cols {
 		if i >= 10 {
@@ -38,7 +50,8 @@ func applySortKeyPrefixWidths(cols []listCol) []listCol {
 			displayNum = 0
 		}
 		prefix := fmt.Sprintf("%d:", displayNum)
-		minWidth := len([]rune(prefix)) + len([]rune(cols[i].title))
+		glyph := max(len([]rune(sortAscGlyph)), len([]rune(sortDescGlyph)))
+		minWidth := len([]rune(prefix)) + len([]rune(cols[i].title)) + glyph
 		if cols[i].width < minWidth {
 			cols[i].width = minWidth
 		}
@@ -98,9 +111,9 @@ func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 	// Append sort glyph if this is the active sort column.
 	if m.sortColKey != "" && c.sortKey == m.sortColKey {
 		if m.sortAsc {
-			title += "\u2191"
+			title += sortAscGlyph
 		} else {
-			title += "\u2193"
+			title += sortDescGlyph
 		}
 	}
 	// Add position number prefix (1-based, max 10 columns for sort).
