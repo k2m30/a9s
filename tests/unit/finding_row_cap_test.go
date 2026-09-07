@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -437,4 +438,135 @@ func TestFindingRowCap_StatedInAttentionSignalsS5(t *testing.T) {
 		t.Errorf("S5 mechanism cell does not state the supporting-row cap of %s and the \"+K more\" closing row.\nS5 cell: %s",
 			num, s5)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Accumulation: a code emitted once per item still shows one closing row.
+// ---------------------------------------------------------------------------
+
+// capKeyRows returns the rows of the entry whose first row is an access key,
+// which is the "key too old" finding's own entry. The user also carries a
+// two-active-keys finding with rows of its own.
+func capKeyRows(t *testing.T, result awsclient.IssueEnricherResult, user string) []domain.DetailRow {
+	t.Helper()
+	for _, ad := range result.AttentionDetails[user] {
+		if len(ad.Rows) > 0 && ad.Rows[0].Label == "Access key" {
+			return ad.Rows
+		}
+	}
+	t.Fatalf("no finding with \"Access key\" rows for %q; AttentionDetails=%+v", user, result.AttentionDetails[user])
+	return nil
+}
+
+func capEnrichUser(t *testing.T, user string, keys int) awsclient.IssueEnricherResult {
+	t.Helper()
+	// Every key is old enough for the "key too old" condition, which emits
+	// one row per key through a separate call for the same finding code —
+	// the accumulating shape the cap has to survive.
+	created := time.Now().Add(-400 * 24 * time.Hour)
+	keyMeta := make([]iamtypes.AccessKeyMetadata, 0, keys)
+	for i := range keys {
+		keyMeta = append(keyMeta, iamtypes.AccessKeyMetadata{
+			UserName:    aws.String(user),
+			AccessKeyId: aws.String(fmt.Sprintf("AKIAEXAMPLEKEY%06d", i)),
+			Status:      iamtypes.StatusTypeActive,
+			CreateDate:  &created,
+		})
+	}
+	fake := &iamUserMFAFake{
+		mfaDevicesByUser: map[string][]iamtypes.MFADevice{
+			user: {{SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/" + user)}},
+		},
+		accessKeysByUser: map[string][]iamtypes.AccessKeyMetadata{user: keyMeta},
+	}
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(),
+		&awsclient.ServiceClients{IAM: fake}, iamUserResources(user), nil)
+	if err != nil {
+		t.Fatalf("EnrichIAMUserMFA: unexpected error: %v", err)
+	}
+	return result
+}
+
+// TestFindingRowCap_RepeatedEmissionForOneCodeKeepsOneClosingRow drives the
+// iam-user enricher, which emits the "key too old" code once per key. The cap
+// holds over the combined rows, not per call: one closing row, K counting
+// every key not shown, kept rows in call order.
+//
+// It is also the pin that a stored row whose value merely starts with the
+// ellipsis — a masked key ID reads "…0009" — is content and not the stored
+// count. lastFourOfKeyID is the only production row value that begins that
+// way, so if the closing-row parse could misfire on real output it would
+// misfire here, dropping the tenth key.
+func TestFindingRowCap_RepeatedEmissionForOneCodeKeepsOneClosingRow(t *testing.T) {
+	const user = "cap-many-keys"
+	hidden := 2
+	keys := awsclient.FindingRowCap + hidden
+
+	rows := capKeyRows(t, capEnrichUser(t, user, keys), user)
+	assertCappedRows(t, rows, keys)
+
+	for i, r := range rows[:awsclient.FindingRowCap] {
+		want := fmt.Sprintf("…%04d", i)
+		if r.Value != want {
+			t.Errorf("kept row %d Value = %q, want %q — kept rows are the first %d keys, in call order",
+				i, r.Value, want, awsclient.FindingRowCap)
+		}
+	}
+}
+
+// TestFindingRowCap_RepeatedEmissionsReachingExactlyTheCapHaveNoClosingRow is
+// the accumulating negative case: ten separate calls of one row each land on
+// the cap and nothing is hidden, so nothing closes the list.
+func TestFindingRowCap_RepeatedEmissionsReachingExactlyTheCapHaveNoClosingRow(t *testing.T) {
+	const user = "cap-exact-keys"
+	keys := awsclient.FindingRowCap
+
+	rows := capKeyRows(t, capEnrichUser(t, user, keys), user)
+	if len(rows) != keys {
+		t.Fatalf("%d separate emissions of one row rendered %d rows, want %d and no closing row; rows=%+v",
+			keys, len(rows), keys, rows)
+	}
+	for i, r := range rows {
+		if strings.Contains(r.Value, "more") {
+			t.Errorf("row %d (%q) closes the list, but nothing was hidden", i, r.Value)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The class: every finding that lists combos, not only the policy one.
+// ---------------------------------------------------------------------------
+
+// TestFindingRowCap_RoleInlinePrivEscRowsAreCapped pins the second caller of
+// privEscComboRows. A role with an inline policy that matches the same
+// escalation combinations lists them on the role row, and that list is as
+// unbounded as the policy one — the builder no longer caps, so whatever the
+// role's rows pass through has to.
+func TestFindingRowCap_RoleInlinePrivEscRowsAreCapped(t *testing.T) {
+	const roleName = "acme-inline-escalate-many"
+	doc := privEscCapPolicyDocument()
+
+	parsed, err := iampolicy.Parse(doc)
+	if err != nil {
+		t.Fatalf("fixture self-check: iampolicy.Parse: %v", err)
+	}
+	combos := parsed.PrivilegeEscalation()
+	if len(combos) <= awsclient.FindingRowCap {
+		t.Fatalf("fixture defect: %d combos does not exceed the cap of %d", len(combos), awsclient.FindingRowCap)
+	}
+
+	r := w4FetchRole(t, &w4RoleListFake{
+		roles: []iamtypes.Role{w4Role(roleName, "/", w4TrustEC2Only)},
+		inline: map[string]map[string]string{
+			roleName: {"acme-break-glass": doc},
+		},
+	}, roleName)
+
+	ad, ok := r.AttentionDetails[w4CodeRoleInlinePrivEsc]
+	if !ok {
+		t.Fatalf("role %q carries no inline privilege-escalation rows; AttentionDetails=%+v", roleName, r.AttentionDetails)
+	}
+	// One Policy row precedes the combos, so the list the cap sees is one
+	// longer than the combo count.
+	assertCappedRows(t, ad.Rows, len(combos)+1)
 }
