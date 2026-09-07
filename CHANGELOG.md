@@ -710,6 +710,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   implemented" list on the same page.
 - Each resource type's demo row count, issue badge and state-coverage
   allowlist now live beside its fixtures instead of in two shared test files.
+- A finding in the detail Attention section now lists at most 10 supporting rows and closes with `… +K more`, so a target group with hundreds of unhealthy targets no longer pushes the rest of a resource's posture off the screen.
 
 ### Fixed (security)
 
