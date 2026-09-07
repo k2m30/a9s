@@ -532,6 +532,10 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 		cursor = len(visible) - 1
 	}
 
+	// One owner for the account-wide verdict: when the whole sweep failed the
+	// same way, the title carries it and no row repeats it.
+	sweepCause := menuSweepCause(ms)
+
 	entries := make([]MenuEntry, 0, len(visible))
 	for _, item := range visible {
 		// Resolve the key under which intent data was stored for this type.
@@ -554,6 +558,10 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 		if ms.Origin != nil {
 			origin = ms.Origin[activeKey]
 		}
+		cause := ""
+		if sweepCause == "" && ms.ProbeCause != nil {
+			cause = menuCauseWord(ms.ProbeCause[activeKey])
+		}
 
 		badge := IssueBadge{}
 		if ms.IssueKnown != nil && ms.IssueKnown[activeKey] {
@@ -575,6 +583,7 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 			AvailKnown:     availKnown,
 			AvailTruncated: availTruncated,
 			Origin:         origin,
+			Cause:          cause,
 		})
 	}
 
@@ -605,23 +614,84 @@ func menuFrameTitle(ms *MenuState) string {
 	if ms.AttentionOnly {
 		title += " [!]"
 	}
-	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
-		title += " [enriching " + strconv.Itoa(ms.EnrichChecked) + "/" + strconv.Itoa(ms.EnrichTotal) + "]"
+	if p := menuProgressIndicator(ms); p != "" {
+		title += " " + p
+	}
+	if cause := menuSweepCause(ms); cause != "" {
+		title += " [" + cause + "]"
 	}
 	return title
 }
 
 // menuProgressIndicator returns the scan/enrichment progress suffix only —
-// empty when no scan is active. This is what MenuBody.Progress carries;
-// menuFrameTitle() carries the full frame title string (base + suffix).
+// empty when no scan is active. Both the frame title (menuFrameTitle) and
+// MenuBody.Progress read it, so the headless body and the TUI cannot describe
+// the same sweep differently. The Wave-1 sweep and the Wave-2 enrichment share
+// the slot: enrichment only starts once the sweep is done, so at most one of
+// them is ever in flight.
 func menuProgressIndicator(ms *MenuState) string {
 	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
 		return "[enriching " + strconv.Itoa(ms.EnrichChecked) + "/" + strconv.Itoa(ms.EnrichTotal) + "]"
 	}
 	if ms.AvailTotal > 0 && ms.AvailChecked < ms.AvailTotal {
-		return "[checking " + strconv.Itoa(ms.AvailChecked) + "/" + strconv.Itoa(ms.AvailTotal) + "]"
+		return "[verifying " + strconv.Itoa(ms.AvailChecked) + "/" + strconv.Itoa(ms.AvailTotal) + "]"
 	}
 	return ""
+}
+
+// menuCauseWord maps the probe error class the runtime already recorded
+// (classifyProbeErr) to the word a row shows in its alias column. Anything the
+// operator cannot act on differently reads as a plain "error".
+func menuCauseWord(errClass string) string {
+	switch errClass {
+	case "access-denied":
+		return "denied"
+	case "expired":
+		return "expired"
+	case "throttled":
+		return "throttled"
+	case "":
+		return ""
+	default:
+		return "error"
+	}
+}
+
+// menuSweepTitles is the account-wide phrasing of a cause: what the title says
+// when EVERY probe in the sweep failed the same way, in place of one mark per
+// row.
+var menuSweepTitles = map[string]string{
+	"denied":    "sweep: access denied",
+	"expired":   "session expired",
+	"throttled": "sweep: throttled",
+	"error":     "sweep: error",
+}
+
+// menuSweepCause returns the account-wide failure phrase when every probe in
+// the sweep failed for the same cause — an expired session or a role denied
+// everywhere is one fact about the session, not 71 facts about resource types.
+// Empty while any type was verified this session, or while any probe has yet
+// to answer: a single early failure is a row mark, not a verdict on the sweep.
+func menuSweepCause(ms *MenuState) string {
+	if len(ms.ProbeCause) == 0 || len(ms.ProbeCause) < len(resource.AllShortNames()) {
+		return ""
+	}
+	for _, origin := range ms.Origin {
+		if origin == runtime.OriginVerified {
+			return ""
+		}
+	}
+	word := ""
+	for _, errClass := range ms.ProbeCause {
+		w := menuCauseWord(errClass)
+		if word == "" {
+			word = w
+		}
+		if w != word {
+			return ""
+		}
+	}
+	return menuSweepTitles[word]
 }
 
 // menuPageSize is the default cursor jump for PageUp/PageDown when the renderer

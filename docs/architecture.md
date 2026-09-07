@@ -531,6 +531,18 @@ A column's field path is never consulted: a path that merely contains `Name` nam
 
 `ExcludeFromIssueBadge` types (e.g. ct-events) are unconditionally hidden under ctrl+z — severity is event-level, not resource-health.
 
+### What the first screen says about itself
+
+A menu row seeded from the disk cache looks exactly like a freshly probed one unless the menu says otherwise. Three signals do that, all derived from state the sweep already records:
+
+- **Sweep progress in the frame title.** `menuProgressIndicator` (`core/app/menu.go`) is the single formatter for the title's progress slot: `[verifying N/M]` while the Wave-1 availability sweep runs, `[enriching N/M]` while Wave-2 enrichment runs, empty otherwise. `menuFrameTitle` appends it and `MenuBody.Progress` carries it, so the headless body and the TUI cannot describe the same sweep differently.
+- **Per-row cause.** A probe that hard-fails emits `PatchMenuProbeCause` carrying the class `classifyProbeErr` already assigned (`access-denied`, `expired`, `throttled`, `timeout`, or a raw AWS code); the row keeps its cached count and shows the cause word (`denied`, `expired`, `throttled`, `error`) in the alias column. A partial result is not a refusal and clears the mark, as does any successful probe. The error text is classified once, in `classifyProbeErr`, and never parsed again.
+- **Account-wide cause.** When every probed type failed the same way and none was verified this session, `menuSweepCause` puts one phrase in the title (`sweep: access denied`, `session expired`) and every row drops its mark — an expired session is one fact about the session, not one per resource type.
+
+Origin has two writers, and both mean the same thing: a live `AvailabilityChecked` (`PatchMenuAvailability{Origin: OriginVerified}`) and a live list fetch, which marks the type verified inside `syncExactTotalToMenu` (`core/app/handle.go`) alongside the count it already syncs. A type the operator opened and fetched is not "not yet verified".
+
+Partial-batch failures are phrased in exactly one place, `AggregateFailures` (`core/aws/partial_errors.go`): failures are grouped by cause, and each cause is stated once with how many resources it covered and one example id. A role denied one action fails on every resource of the type at once, so the aggregate names the action the role lacks rather than repeating one AWS error per resource with its request id, host id and encoded authorization message.
+
 ---
 
 ## Key Handling

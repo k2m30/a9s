@@ -260,6 +260,13 @@ type MenuState struct {
 	// is disk-cache-seeded ("cache") or confirmed by a live probe this
 	// session ("verified") — C3.
 	Origin map[string]string `json:"origin,omitempty"`
+	// ProbeCause tracks, per resource type, the error class of the last
+	// availability probe that FAILED for it (classifyProbeErr's vocabulary:
+	// "access-denied", "expired", "throttled", a raw AWS code), cleared the
+	// moment a probe answers successfully. A cached count on a row whose probe
+	// was refused is not the same fact as a cached count nobody has re-checked
+	// yet, and this is what tells them apart.
+	ProbeCause map[string]string `json:"probe_cause,omitempty"`
 
 	// Progress fields for FrameTitle indicator (DERIVED at Snapshot, stored here
 	// so intents can update them without re-computing from task state).

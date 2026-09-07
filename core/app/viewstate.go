@@ -390,6 +390,13 @@ type MenuEntry struct {
 	// session), or "" when no availability data has landed at all — C3.
 	// Drives the dimmed stale style; renderers read it, never compute it.
 	Origin string `json:"origin,omitempty"`
+	// Cause is the short reason this type's last availability probe failed
+	// ("denied", "expired", "throttled", "error"), empty when the probe
+	// succeeded or has not run. Rendered in the alias column so a refused
+	// probe is distinguishable from one that has not run yet. Empty on every
+	// row when the whole sweep failed for one cause — the frame title says it
+	// once instead (menuSweepCause).
+	Cause string `json:"cause,omitempty"`
 }
 
 // MenuBody is the body of the main-menu screen.

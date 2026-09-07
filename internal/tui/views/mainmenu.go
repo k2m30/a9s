@@ -166,7 +166,13 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		}
 
 		item := body.Entries[rl.itemIndex]
-		aliasPadded := text.PadOrTrunc(item.Alias, aliasW)
+		// A refused probe replaces the alias with its cause: the alias is
+		// recoverable from the type name, the reason the count is stale is not.
+		aliasText := item.Alias
+		if item.Cause != "" {
+			aliasText = item.Cause
+		}
+		aliasPadded := text.PadOrTrunc(aliasText, aliasW)
 		nameFieldW := max(m.width-4-aliasW-3, 10)
 
 		nameStr := item.Display

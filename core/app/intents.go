@@ -133,6 +133,18 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				ms.AvailTotal = v.Total
 			}
 
+		case runtime.PatchMenuProbeCause:
+			if ms := c.rootMenuState(); ms != nil {
+				if v.Cause == "" {
+					delete(ms.ProbeCause, v.ResourceType)
+					break
+				}
+				if ms.ProbeCause == nil {
+					ms.ProbeCause = make(map[string]string)
+				}
+				ms.ProbeCause[v.ResourceType] = v.Cause
+			}
+
 		case runtime.PatchMenuEnrichProgress:
 			if ms := c.rootMenuState(); ms != nil {
 				ms.EnrichChecked = v.Checked
@@ -143,6 +155,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			if ms := c.rootMenuState(); ms != nil {
 				ms.Availability = nil
 				ms.Truncated = nil
+				ms.ProbeCause = nil
 				ms.AvailChecked = 0
 				ms.AvailTotal = 0
 				ms.IssueCounts = nil

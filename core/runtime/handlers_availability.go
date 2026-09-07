@@ -314,6 +314,15 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	var intents []UIIntent
 	var tasks []TaskRequest
 
+	// The row says why it has no fresh answer. A partial result is not a
+	// refusal — its rows are on screen — so only a hard failure marks the row,
+	// and any other outcome clears a mark an earlier sweep left.
+	cause := ""
+	if outcome == ProbeFailed {
+		cause = errClass
+	}
+	intents = append(intents, PatchMenuProbeCause{ResourceType: msg.ResourceType, Cause: cause})
+
 	// Update menu availability on full success or partial-success.
 	if msg.Err == nil || len(msg.Resources) > 0 {
 		intents = append(intents, PatchMenuAvailability{

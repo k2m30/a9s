@@ -45,6 +45,21 @@ trap cleanup EXIT
 tmux new-session -d -s "$SESSION" -x 220 -y 90 \
 	"$BIN --profile $PROFILE --region $REGION"
 
+# The first screen must say what it is doing while it does it: catch the
+# title's sweep counter before the sweep settles. Polled fast (0.5s) because
+# on a small account the whole sweep can finish inside one 5s step.
+SAW_VERIFYING=0
+i=0
+while [ $i -lt 60 ]; do
+	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/menu_sweep.txt"
+	if grep -qE 'verifying [0-9]+/[0-9]+' "$CAPDIR/menu_sweep.txt"; then
+		SAW_VERIFYING=1
+		break
+	fi
+	sleep 0.5
+	i=$((i + 1))
+done
+
 # The sweep needs real time: poll the menu until most rows leave the dim
 # "cache" origin, up to 90s.
 i=0
@@ -97,6 +112,19 @@ forbid() {
 # 71 = 70 resource types + the Cost Explorer entry.
 expect menu.txt 'resource-types\(71\)' "menu shows the full catalog"
 expect menu.txt 'issues:[0-9]+' "sweep produced at least one issue badge"
+
+# First screen: the sweep announces itself while it runs and stops saying so
+# when it is done; a healthy read-only role leaves no row marked with a cause
+# and no account-wide failure in the title.
+if [ "$SAW_VERIFYING" = 1 ]; then
+	echo "PASS  menu title carried the sweep counter while the sweep ran"
+else
+	echo "FAIL  menu title never showed /verifying N\/M/ during the sweep — see $CAPDIR/menu_sweep.txt"
+	FAILURES=$((FAILURES + 1))
+fi
+forbid menu.txt 'verifying [0-9]+/[0-9]+' "sweep counter clears once the sweep is done"
+forbid menu.txt '[[:space:]](denied|expired|throttled)[[:space:]]' "no row carries a failure cause on a healthy read-only role"
+forbid menu.txt 'sweep: access denied|session expired' "no account-wide probe failure on a healthy read-only role"
 
 # Whole-cell raw enums must not survive rendering anywhere we look.
 for cap in ec2.txt sg.txt lambda.txt menu.txt; do

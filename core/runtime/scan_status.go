@@ -35,8 +35,9 @@ type ProbeStatus struct {
 	// not tracked separately, so this is total probe time for the type's
 	// most recent scan, not either probe's individual duration.
 	Duration time.Duration
-	// Err is "throttled" | "timeout" | "access-denied" | a raw AWS error
-	// code, classified via classifyProbeErr. Empty for ok/skipped-no-rules.
+	// Err is "throttled" | "timeout" | "access-denied" | "expired" | a raw
+	// AWS error code, classified via classifyProbeErr. Empty for
+	// ok/skipped-no-rules.
 	Err string
 	// At is the completion time of the most recent contributing probe —
 	// the enrichment probe's completion time when one ran for this type
@@ -70,6 +71,10 @@ func (c *Core) ScanStatus() []ProbeStatus {
 // checked before ClassifyAWSError because a context error is never a
 // smithy.APIError and would otherwise fall through to ClassifyAWSError's
 // "Unknown" bucket.
+//
+// This is the ONE place a probe error becomes a class; every surface that
+// phrases the failure (ScanStatus.Err, the menu row's cause word, the
+// account-wide title) reads the class, never the error text again.
 func classifyProbeErr(err error) string {
 	if err == nil {
 		return ""
@@ -83,6 +88,8 @@ func classifyProbeErr(err error) string {
 		return "throttled"
 	case "AccessDenied", "AccessDeniedException":
 		return "access-denied"
+	case "ExpiredToken", "ExpiredTokenException", "RequestExpired":
+		return "expired"
 	default:
 		return code
 	}

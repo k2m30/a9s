@@ -195,6 +195,17 @@ type PatchMenuCheckProgress struct {
 
 func (PatchMenuCheckProgress) isIntent() {}
 
+// PatchMenuProbeCause records why one resource type's availability probe
+// failed, so its menu row can say so while keeping its cached count. Cause is
+// the class the probe already recorded (classifyProbeErr); empty clears the
+// mark, which is what a probe that answered emits.
+type PatchMenuProbeCause struct {
+	ResourceType string
+	Cause        string
+}
+
+func (PatchMenuProbeCause) isIntent() {}
+
 // PatchMenuEnrichProgress updates the Wave-2 enrichment progress indicator.
 // Total=0 signals "enrichment complete" (clear the indicator).
 type PatchMenuEnrichProgress struct {

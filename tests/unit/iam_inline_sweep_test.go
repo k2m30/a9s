@@ -576,15 +576,20 @@ func syntheticGroupFailures(n, startIdx int) []string {
 	return failures
 }
 
-// TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep reproduces the
-// exact reported scenario (49 groups, 36 failing) and pins that the
-// composite error names at most 5 IDs and summarizes the remainder, instead
-// of joining all 36 into one unbounded line. RED today — AggregateFailures
-// (core/aws/partial_errors.go:33) joins every failure with no cap.
-func TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep(t *testing.T) {
+// TestAggregateFailures_GroupsByCause_36of49GroupSweep reproduces the exact
+// reported scenario (49 groups, 36 failing) against the CURRENT contract.
+//
+// INVERTED for the "firstscreen" spec row 3 (a denied enrichment logs one line
+// per type per cause). This test was
+// TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep and asserted
+// that 5 failures are named verbatim and the rest summarized as "and 31 more".
+// That shape is gone: 36 resources failing the SAME way is one fact, so the
+// aggregate now states the cause once with a count and one example. Do not
+// restore the per-ID enumeration or the "and N more" suffix — a wall of
+// per-resource lines carrying request ids is exactly what row 3 removed.
+func TestAggregateFailures_GroupsByCause_36of49GroupSweep(t *testing.T) {
 	const total = 49
 	const failCount = 36
-	const capLimit = 5
 	failures := syntheticGroupFailures(failCount, total-failCount)
 
 	err := awsclient.AggregateFailures("ListGroupPolicies", failures, total)
@@ -596,40 +601,37 @@ func TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep(t *testing.T) {
 	if !strings.HasPrefix(msg, fmt.Sprintf("ListGroupPolicies failed for %d of %d IDs", failCount, total)) {
 		t.Errorf("composite error dropped its header shape; got: %s", msg)
 	}
+	if !strings.Contains(msg, "context deadline exceeded") {
+		t.Errorf("composite error dropped the shared cause; got: %s", msg)
+	}
 
 	named := 0
-	for _, f := range failures {
-		if strings.Contains(msg, f) {
+	for i := 0; i < failCount; i++ {
+		if strings.Contains(msg, inlineSweepGroupName(total-failCount+i)) {
 			named++
 		}
 	}
-	if named > capLimit {
-		t.Errorf("composite error names %d of %d failing IDs verbatim, want at most %d; "+
-			"AggregateFailures (core/aws/partial_errors.go:33) must cap per-ID "+
-			"enumeration and summarize the remainder (e.g. \"and %d more\") — a "+
-			"36-of-49 IAM group sweep currently produces one unbounded log line\ngot: %s",
-			named, failCount, capLimit, failCount-capLimit, msg)
+	if named != 1 {
+		t.Errorf("composite error names %d of %d failing IDs, want exactly 1 example for the shared cause; got: %s",
+			named, failCount, msg)
 	}
 
-	wantRemainder := fmt.Sprintf("and %d more", failCount-capLimit)
-	if !strings.Contains(msg, wantRemainder) {
-		t.Errorf("composite error does not summarize the elided failures; want it to contain %q, got: %s",
-			wantRemainder, msg)
-	}
-
-	const maxLen = 450
+	const maxLen = 200
 	if len(msg) > maxLen {
-		t.Errorf("composite error is %d bytes, want <= %d; unbounded per-ID enumeration "+
-			"makes a single flash/log line grow without limit on wide profiles\ngot: %s",
+		t.Errorf("composite error is %d bytes, want <= %d — one cause is one line\ngot: %s",
 			len(msg), maxLen, msg)
 	}
 }
 
-// TestAggregateFailures_NoCapWhenFailureCountIsSmall pins that the cap does
-// not kick in below the threshold: a 3-of-49 failure set must still name all
-// 3 IDs verbatim and must NOT carry an "and N more" suffix. This guards
-// against an overzealous fix that always truncates regardless of count.
-func TestAggregateFailures_NoCapWhenFailureCountIsSmall(t *testing.T) {
+// TestAggregateFailures_SmallFailureSet_StillOneLinePerCause pins that a small
+// failure set is phrased by the same rule as a large one.
+//
+// INVERTED for the "firstscreen" spec row 3. This test was
+// TestAggregateFailures_NoCapWhenFailureCountIsSmall and required all 3 IDs
+// verbatim below the enumeration cap. Enumeration is gone; three resources
+// refused for one reason is still one cause with one example. Do not restore
+// the per-ID enumeration.
+func TestAggregateFailures_SmallFailureSet_StillOneLinePerCause(t *testing.T) {
 	const total = 49
 	const failCount = 3
 	failures := syntheticGroupFailures(failCount, 0)
@@ -640,46 +642,46 @@ func TestAggregateFailures_NoCapWhenFailureCountIsSmall(t *testing.T) {
 	}
 	msg := err.Error()
 
-	for _, f := range failures {
-		if !strings.Contains(msg, f) {
-			t.Errorf("small failure set must name every ID verbatim; %q missing from: %s", f, msg)
-		}
-	}
-	if strings.Contains(msg, "more") {
-		t.Errorf("small (%d) failure set should not be truncated with an \"and N more\" suffix; got: %s", failCount, msg)
-	}
-}
-
-// TestAggregateFailures_CapsEnumeration_AllIDsFailing is the edge case where
-// every attempted ID fails (49 of 49) — the cap must still apply rather than
-// only kicking in for partial failure.
-func TestAggregateFailures_CapsEnumeration_AllIDsFailing(t *testing.T) {
-	const total = 49
-	const failCount = 49
-	const capLimit = 5
-	failures := syntheticGroupFailures(failCount, 0)
-
-	err := awsclient.AggregateFailures("ListGroupPolicies", failures, total)
-	if err == nil {
-		t.Fatal("AggregateFailures with 49/49 failures returned nil, want a composite error")
-	}
-	msg := err.Error()
-
 	named := 0
-	for _, f := range failures {
-		if strings.Contains(msg, f) {
+	for i := 0; i < failCount; i++ {
+		if strings.Contains(msg, inlineSweepGroupName(i)) {
 			named++
 		}
 	}
-	if named > capLimit {
-		t.Errorf("composite error names %d of %d failing IDs verbatim, want at most %d even "+
-			"when every ID fails; got: %s", named, failCount, capLimit, msg)
+	if named != 1 {
+		t.Errorf("composite error names %d IDs, want exactly 1 example; got: %s", named, msg)
 	}
+	if !strings.Contains(msg, fmt.Sprintf("failed for %d of %d IDs", failCount, total)) {
+		t.Errorf("composite error dropped the count; got: %s", msg)
+	}
+}
 
-	wantRemainder := fmt.Sprintf("and %d more", failCount-capLimit)
-	if !strings.Contains(msg, wantRemainder) {
-		t.Errorf("composite error does not summarize the elided failures; want it to contain %q, got: %s",
-			wantRemainder, msg)
+// TestAggregateFailures_DistinctCauses_EachNamedOnce pins that grouping is per
+// cause: two different reasons in one batch each keep their own count and
+// example, so a genuinely mixed failure set is not collapsed into one.
+//
+// INVERTED for the "firstscreen" spec row 3. This test was
+// TestAggregateFailures_CapsEnumeration_AllIDsFailing and required the
+// "and 44 more" suffix on an all-failing batch. Do not restore it.
+func TestAggregateFailures_DistinctCauses_EachNamedOnce(t *testing.T) {
+	const total = 49
+	failures := append(syntheticGroupFailures(4, 0),
+		inlineSweepGroupName(90)+": no metadata")
+
+	err := awsclient.AggregateFailures("ListGroupPolicies", failures, total)
+	if err == nil {
+		t.Fatal("AggregateFailures returned nil, want a composite error")
+	}
+	msg := err.Error()
+
+	for _, want := range []string{
+		fmt.Sprintf("failed for %d of %d IDs", len(failures), total),
+		"context deadline exceeded (4, e.g. " + inlineSweepGroupName(0) + ")",
+		"no metadata (1, e.g. " + inlineSweepGroupName(90) + ")",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("composite error missing %q; got: %s", want, msg)
+		}
 	}
 }
 

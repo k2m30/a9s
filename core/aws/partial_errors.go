@@ -69,10 +69,10 @@ func IsNotFoundErr(err error) bool {
 	}
 }
 
-// aggregateFailuresCap is the maximum number of per-ID failures
-// AggregateFailures enumerates verbatim before summarizing the remainder —
-// a wide partial-failure set (e.g. an IAM sweep failing on 36 of 49 groups)
-// must not grow one flash/log line without bound.
+// aggregateFailuresCap is the maximum number of distinct causes
+// AggregateFailures names before summarizing the rest. Failures are grouped by
+// cause, so this bounds the line by how many DIFFERENT things went wrong, not
+// by how many resources they happened to.
 const aggregateFailuresCap = 5
 
 // AggregateFailures builds the canonical composite error for a partial-batch
@@ -85,26 +85,105 @@ const aggregateFailuresCap = 5
 //
 //	return resources, AggregateFailures(op, failures, total)
 //
-// without an extra conditional. Composite shape, at or below the cap:
+// without an extra conditional.
 //
-//	"<op> failed for N of M IDs: <f1>; <f2>; ..."
+// This is the one place a partial-batch failure is phrased. A role denied one
+// action fails on every resource of the type at once, so the failures are
+// grouped by cause and each cause is stated once, with how many resources it
+// covered and one example:
 //
-// Above aggregateFailuresCap, only the first cap failures are named
-// verbatim and the rest are summarized:
+//	"<op> failed for 46 of 46 IDs: not authorized to perform ec2:DescribeSnapshotAttribute (e.g. snap-0abc)"
+//	"<op> failed for 3 of 9 IDs: context deadline exceeded (2, e.g. snap-1); no metadata (1, e.g. snap-3)"
 //
-//	"<op> failed for N of M IDs: <f1>; <f2>; <f3>; <f4>; <f5>; and N-5 more"
+// Above aggregateFailuresCap distinct causes the rest are summarized as
+// "; and N more causes".
 func AggregateFailures(opName string, failures []string, total int) error {
 	if len(failures) == 0 {
 		return nil
 	}
-	shown := failures
-	suffix := ""
-	if len(failures) > aggregateFailuresCap {
-		shown = failures[:aggregateFailuresCap]
-		suffix = fmt.Sprintf("; and %d more", len(failures)-aggregateFailuresCap)
+
+	type group struct {
+		cause   string
+		example string
+		n       int
 	}
+	var groups []*group
+	byCause := map[string]*group{}
+	for _, f := range failures {
+		// AggregateFailures' documented input shape is "<id>: <reason>"; an
+		// entry with no separator is all reason and contributes no example.
+		id, reason, ok := strings.Cut(f, ": ")
+		if !ok {
+			id, reason = "", f
+		}
+		cause := causeOf(reason)
+		g, ok := byCause[cause]
+		if !ok {
+			g = &group{cause: cause, example: id}
+			byCause[cause] = g
+			groups = append(groups, g)
+		}
+		g.n++
+	}
+
+	suffix := ""
+	if len(groups) > aggregateFailuresCap {
+		suffix = fmt.Sprintf("; and %d more causes", len(groups)-aggregateFailuresCap)
+		groups = groups[:aggregateFailuresCap]
+	}
+
+	parts := make([]string, 0, len(groups))
+	for _, g := range groups {
+		part := g.cause
+		switch {
+		case len(byCause) == 1 && g.example != "":
+			part += fmt.Sprintf(" (e.g. %s)", g.example)
+		case g.example != "":
+			part += fmt.Sprintf(" (%d, e.g. %s)", g.n, g.example)
+		case len(byCause) > 1:
+			part += fmt.Sprintf(" (%d)", g.n)
+		}
+		parts = append(parts, part)
+	}
+
 	return fmt.Errorf("%s failed for %d of %d IDs: %s%s",
-		opName, len(failures), total, strings.Join(shown, "; "), suffix)
+		opName, len(failures), total, strings.Join(parts, "; "), suffix)
+}
+
+// causeOf reduces one failure reason to what an operator can act on. An AWS
+// authorization failure becomes the action the role lacks; anything else keeps
+// its own words with the per-call transport noise removed — a request id, a
+// host id and an encoded authorization message differ on every resource, so
+// carrying them would defeat the grouping and fill the log with tokens nobody
+// can use.
+func causeOf(reason string) string {
+	const notAuthorized = "not authorized to perform: "
+	if i := strings.Index(reason, notAuthorized); i >= 0 {
+		action := reason[i+len(notAuthorized):]
+		if j := strings.IndexAny(action, " ,;"); j >= 0 {
+			action = action[:j]
+		}
+		return "not authorized to perform " + action
+	}
+	stripped := reason
+	if i := strings.Index(stripped, "api error "); i >= 0 {
+		stripped = stripped[i+len("api error "):]
+	}
+	for _, noise := range []string{"Encoded authorization failure message:", "RequestID:", "HostID:", "\n"} {
+		if i := strings.Index(stripped, noise); i >= 0 {
+			stripped = stripped[:i]
+		}
+	}
+	stripped = strings.TrimRight(strings.TrimSpace(stripped), " ,.")
+	if stripped != "" {
+		return stripped
+	}
+	// A reason that was nothing but per-call noise still has to say something:
+	// an empty cause would read as a failure with no reason at all.
+	if reason = strings.TrimSpace(reason); reason != "" {
+		return reason
+	}
+	return "no reason given"
 }
 
 // AggregateMissing is the narrower variant used when the operation is a

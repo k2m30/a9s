@@ -308,7 +308,13 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		// upward" behavior popRS also provided: the only-increase guard inside
 		// syncExactTotalToMenu makes this safe to call unconditionally — a
 		// truncated or smaller result never regresses a larger known count.
-		c.syncExactTotalToMenu(s, canon)
+		// A fetch that came back refused, with nothing to show, observed
+		// nothing: syncing it would overwrite the type's cached count with a
+		// zero and call the type verified. Partial success (rows alongside a
+		// per-item error) IS an observation and still syncs.
+		if msg.Err == nil || len(msg.Resources) > 0 {
+			c.syncExactTotalToMenu(s, canon)
+		}
 		// C6 — a filtered related drill's result is a session view; persisted
 		// under (type + filter) so the next entry into the same drill seeds
 		// instantly (SeedFilteredListFromCache) instead of a bare Loading.
@@ -351,6 +357,14 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 		return
 	}
 	applyAvailabilityObservation(ms, canon, newCount, newTrunc)
+	// A list the operator opened and fetched live IS a live check of that
+	// type — the same fact the sweep's probe would record — so the menu stops
+	// showing it as unverified without waiting for the probe to reach it.
+	if ms.Origin == nil {
+		ms.Origin = make(map[string]string)
+	}
+	ms.Origin[canon] = runtime.OriginVerified
+	delete(ms.ProbeCause, canon)
 
 	// authoritative=false: newIssues here is derived from bare list rows, not
 	// a confirmed Wave-2 enrichment result, so a zero must not be treated as
