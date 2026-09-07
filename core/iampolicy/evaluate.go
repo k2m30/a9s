@@ -37,7 +37,7 @@ func EvaluateTrust(doc Document, ownAccount string) Exposure {
 	return evaluate(doc, ownAccount, trustRestrictiveKeys)
 }
 
-func evaluate(doc Document, ownAccount string, keys []string) Exposure {
+func evaluate(doc Document, ownAccount string, keys []scopingKey) Exposure {
 	var ex Exposure
 	var conditioned bool
 	accounts := map[string]struct{}{}
@@ -95,15 +95,52 @@ func isAccountID(s string) bool {
 	return true
 }
 
-// restrictiveKeys scope a wildcard principal to an account, org, ARN, VPC
-// or caller. Compared with strings.EqualFold.
-var restrictiveKeys = []string{
-	"aws:SourceAccount", "aws:SourceOwner", "aws:SourceArn", "aws:SourceVpc", "aws:SourceVpce",
-	"aws:PrincipalAccount", "aws:PrincipalArn", "aws:PrincipalOrgID", "aws:PrincipalOrgPaths",
-	"aws:ResourceAccount", "aws:ResourceOrgID", "aws:userid", "aws:username", "s3:ResourceAccount",
-	"kms:CallerAccount", "kms:ViaService", "lambda:FunctionUrlAuthType", "sns:Endpoint",
-	"elasticfilesystem:AccessPointArn", "aws:SourceOrgID",
+// scopingKey is a condition key that can narrow a wildcard principal,
+// paired with the test its value must pass to actually do so. Most keys
+// name the caller and need only a concrete value; a key that scopes the
+// request path rather than the caller narrows nobody at its permissive
+// value, and aws:SourceIp is a range only the IpAddress operator compares.
+type scopingKey struct {
+	key     string
+	narrows func(op, val string) bool
 }
+
+func concreteValue(_, val string) bool { return !isWildcardValue(val) }
+
+func concreteKeys(names ...string) []scopingKey {
+	out := make([]scopingKey, len(names))
+	for i, n := range names {
+		out[i] = scopingKey{n, concreteValue}
+	}
+	return out
+}
+
+// restrictiveKeys scope a wildcard principal to an account, org, ARN, VPC,
+// caller or address range. Compared with strings.EqualFold.
+var restrictiveKeys = slices.Concat(
+	concreteKeys(
+		"aws:SourceAccount", "aws:SourceOwner", "aws:SourceArn", "aws:SourceVpc", "aws:SourceVpce",
+		"aws:PrincipalAccount", "aws:PrincipalArn", "aws:PrincipalOrgID", "aws:PrincipalOrgPaths",
+		"aws:ResourceAccount", "aws:ResourceOrgID", "aws:userid", "aws:username", "s3:ResourceAccount",
+		"kms:CallerAccount", "aws:SourceOrgID", "elasticfilesystem:AccessPointArn",
+	),
+	[]scopingKey{
+		{"aws:SourceIp", func(op, val string) bool {
+			return strings.EqualFold(bareOperator(op), "IpAddress") && !isAnyIP(val)
+		}},
+		// AWS_IAM is the only value that forces a signed caller; NONE is
+		// what a public function URL is configured with.
+		{"lambda:FunctionUrlAuthType", func(_, val string) bool { return strings.EqualFold(val, "AWS_IAM") }},
+	},
+)
+
+// sourceScopeKeys, a subset of restrictiveKeys, name the account or resource
+// on whose behalf a service acts. They answer the confused-deputy question,
+// which an address range does not: an AWS service calls a role from
+// AWS-owned addresses whoever asked it to.
+var sourceScopeKeys = slices.DeleteFunc(slices.Clone(restrictiveKeys), func(k scopingKey) bool {
+	return !slices.Contains([]string{"aws:SourceAccount", "aws:SourceArn", "aws:SourceOrgID"}, k.key)
+})
 
 // positiveOperators assert that a key equals or matches a listed value, and
 // so are the only operators that can narrow who may call. Null asserts the
@@ -121,42 +158,38 @@ func isPositiveOperator(op string) bool {
 
 // bareOperator drops the ForAllValues: / ForAnyValue: set prefix, which
 // selects how many values of a multi-valued key must match rather than what
-// the comparison is.
+// the comparison is. IAM defines no other prefix, so an operator carrying
+// one is an operator nothing is known about and keeps its full name.
 func bareOperator(op string) string {
-	if _, rest, found := strings.Cut(op, ":"); found {
-		return rest
+	for _, prefix := range []string{"ForAllValues:", "ForAnyValue:"} {
+		if rest, found := strings.CutPrefix(op, prefix); found {
+			return rest
+		}
 	}
 	return op
 }
 
 // trustRestrictiveKeys is restrictiveKeys plus the trust-policy-only
 // sts:ExternalId. Used by EvaluateTrust.
-var trustRestrictiveKeys = slices.Concat([]string{"sts:ExternalId"}, restrictiveKeys)
+var trustRestrictiveKeys = slices.Concat(concreteKeys("sts:ExternalId"), restrictiveKeys)
 
 // isRestrictive mirrors Prowler's is_condition_block_restrictive with
 // is_cross_account_allowed=True: a positive operator carrying one of the
-// scoping keys, whose every value is concrete. The operator decides first, so a key named
-// under Null, a Not operator, IfExists or an unknown operator narrows
-// nothing. aws:SourceIp is reached only through IpAddress, the operator
-// that compares an address against a range.
-func isRestrictive(cond map[string]map[string][]string, keys []string) bool {
+// caller's scoping keys, every value of which narrows who may call. The operator decides first, so
+// a key named under Null, a Not operator, IfExists or an unknown operator
+// narrows nothing whatever its value.
+func isRestrictive(cond map[string]map[string][]string, keys []scopingKey) bool {
 	for op, block := range cond {
 		if !isPositiveOperator(op) {
 			continue
 		}
 		for key, vals := range block {
-			if len(vals) == 0 {
+			i := slices.IndexFunc(keys, func(k scopingKey) bool { return strings.EqualFold(k.key, key) })
+			if i < 0 || len(vals) == 0 {
 				continue
 			}
-			switch {
-			case strings.EqualFold(key, "aws:SourceIp"):
-				if strings.EqualFold(bareOperator(op), "IpAddress") && !slices.ContainsFunc(vals, isAnyIP) {
-					return true
-				}
-			case slices.ContainsFunc(keys, func(k string) bool { return strings.EqualFold(k, key) }):
-				if !slices.ContainsFunc(vals, isWildcardValue) {
-					return true
-				}
+			if !slices.ContainsFunc(vals, func(v string) bool { return !keys[i].narrows(op, v) }) {
+				return true
 			}
 		}
 	}
@@ -180,7 +213,7 @@ func isWildcardValue(v string) bool {
 		return true
 	}
 	fields := strings.Split(v, ":")
-	if len(fields) < 3 || fields[0] != "arn" {
+	if len(fields) < 2 || fields[0] != "arn" {
 		return false
 	}
 	return !slices.ContainsFunc(fields[2:], func(f string) bool { return f != "" && f != "*" })

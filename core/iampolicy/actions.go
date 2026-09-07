@@ -103,8 +103,6 @@ var confusedDeputyServices = []string{
 	"elasticmapreduce", "firehose", "kinesis", "opensearchservice", "es", "transfer", "ses", "iot", "rds",
 }
 
-var sourceScopeKeys = []string{"aws:SourceAccount", "aws:SourceArn", "aws:SourceOrgID"}
-
 // HasServicePrincipalWithoutSourceScope returns the sorted confused-deputy
 // service prefixes trusted by Allow statements that carry no source scoping
 // condition.

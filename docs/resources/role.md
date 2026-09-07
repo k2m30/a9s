@@ -91,7 +91,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
   - **State bucket**: Broken.
   - **How obtained**: URL-decode and JSON-parse `Role.AssumeRolePolicyDocument` from the `ListRoles` response; search for a `Statement` whose `Effect==Allow` and `Principal.AWS=="*"` with no matching `Condition.StringEquals["sts:ExternalId"]`.
 
-- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping.
+- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping — a condition scopes the trust only when a positive operator (`StringEquals`, `ArnLike` and their `ForAllValues:` / `ForAnyValue:` forms) compares one of those keys against a concrete value; `Null`, a negated operator and an `IfExists` variant leave the trust unscoped.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
@@ -128,7 +128,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `anyone can assume this role` |
-| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `service can assume without source scoping` |
+| an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping compared against a concrete value | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `service can assume without source scoping` |
 | an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inline policy allows privilege escalation` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S2, S3, S4, S5 | `dormant role (>90d)` |
 | `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
@@ -175,7 +175,7 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition. |
-| role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition to the trust statement. |
+| role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition that requires the key to equal the account or ARN you expect; a condition that only says whether the key is set, or that lists what it must not be, scopes nothing. |
 | role.inline-privilege-escalation | inline policy allows privilege escalation | broken | wave1 | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |
 | role.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
