@@ -144,6 +144,19 @@ var operatorTable = []condCase{
 		cond:      `{"StringEquals":{"lambda:FunctionUrlAuthType":"AWS_IAM"}}`,
 		restricts: true,
 	},
+	{
+		name: "ViaService names the service the request comes through, not the account behind it",
+		cond: `{"StringEquals":{"kms:ViaService":"s3.us-east-1.amazonaws.com"}}`,
+	},
+	{
+		name: "Endpoint names where a notification is delivered, not who may subscribe",
+		cond: `{"StringEquals":{"sns:Endpoint":"https://hooks.example.com/sns"}}`,
+	},
+	{
+		name:      "the default KMS key policy pairs ViaService with CallerAccount, which does scope",
+		cond:      `{"StringEquals":{"kms:CallerAccount":"123456789012","kms:ViaService":"s3.us-east-1.amazonaws.com"}}`,
+		restricts: true,
+	},
 }
 
 // A wildcard-principal Allow is public unless its condition positively
@@ -187,17 +200,30 @@ func TestHasServicePrincipalWithoutSourceScope_OperatorTableDecidesScoping(t *te
 	}
 }
 
-// A source-IP range says where the caller connects from, not which account
-// it acts for. AWS services call a trusted role from AWS-owned addresses, so
-// an IP condition leaves the confused-deputy hole wide open even though the
-// same condition genuinely narrows a wildcard principal on a resource policy.
-// This is the one case where the two lanes must answer differently, which is
-// why it cannot be a row of the shared table.
-func TestHasServicePrincipalWithoutSourceScope_SourceIPIsNotConfusedDeputyScoping(t *testing.T) {
-	doc := `{"Statement":{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"IpAddress":{"aws:SourceIp":"203.0.113.0/24"}}}}`
-	got := mustParse(t, doc).HasServicePrincipalWithoutSourceScope()
-	if !strSliceEqual(got, []string{"lambda"}) {
-		t.Errorf("HasServicePrincipalWithoutSourceScope() = %v, want [lambda]: aws:SourceIp is not one of the source-scope keys", got)
+// The source-scope keys are the ones naming the account or resource a
+// service acts on behalf of. Other keys narrow a wildcard principal on a
+// resource policy without answering the confused-deputy question at all: a
+// service calls the role from AWS-owned addresses whoever asked it to, and
+// an organisation ID says nothing about which of that organisation's
+// resources triggered the call. These are the cases where the two lanes must
+// answer differently, which is why they cannot be rows of the shared table.
+//
+// Together with the shared table's three source-key rows, which pin that
+// each source key scopes on both lanes, this fixes the membership of the
+// derived source list from outside the package in both directions.
+func TestHasServicePrincipalWithoutSourceScope_CallerKeysAreNotSourceScoping(t *testing.T) {
+	conds := []string{
+		`{"IpAddress":{"aws:SourceIp":"203.0.113.0/24"}}`,
+		`{"StringEquals":{"aws:PrincipalOrgID":"o-abc123"}}`,
+	}
+	for _, cond := range conds {
+		t.Run(cond, func(t *testing.T) {
+			doc := `{"Statement":{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole","Condition":` + cond + `}}`
+			got := mustParse(t, doc).HasServicePrincipalWithoutSourceScope()
+			if !strSliceEqual(got, []string{"lambda"}) {
+				t.Errorf("HasServicePrincipalWithoutSourceScope() = %v, want [lambda] for %s", got, cond)
+			}
+		})
 	}
 }
 
