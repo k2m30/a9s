@@ -88,8 +88,11 @@ func checkMWAAS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if env.SourceBucketArn == nil || *env.SourceBucketArn == "" {
 		return resource.KnownRelated("s3", nil, false)
 	}
-	bucket := strings.TrimPrefix(*env.SourceBucketArn, "arn:aws:s3:::")
-	return relatedResult("s3", []string{bucket})
+	a, ok := ARNForService(*env.SourceBucketArn, "s3")
+	if !ok || a.Resource == "" {
+		return resource.KnownRelated("s3", nil, false)
+	}
+	return relatedResult("s3", []string{a.Resource})
 }
 
 // checkMWAASG reads NetworkConfiguration.SecurityGroupIds directly

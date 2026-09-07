@@ -63,9 +63,11 @@ func isWeakTLSPolicy(policy string) bool {
 // caller's: both codes name every offending port of the balancer at once, so
 // no single listener knows what it will say.
 //
-// An ALB listener speaking plain HTTP exposes traffic unless its default
-// action redirects to HTTPS; an NLB listener speaking TCP on 443 is a TLS
-// port with no TLS termination, which is the same exposure a level down.
+// A listener carrying traffic in the clear exposes it unless its default
+// action redirects to HTTPS. The balancer type is not consulted: an
+// Application Load Balancer speaks only HTTP and HTTPS and a Network one only
+// TCP, TLS and the datagram protocols, so the listener protocol already says
+// which kind of balancer this is.
 func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.FindingCode, domain.DetailRow, bool) {
 	port := int32(0)
 	if listener.Port != nil {
@@ -78,13 +80,8 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 			return elbCodeWeakTLSPolicy,
 				domain.DetailRow{Label: "Security policy", Value: fmt.Sprintf("%d: %s", port, aws.ToString(listener.SslPolicy)), Tier: "~"}, true
 		}
-	case elbtypes.ProtocolEnumHttp:
-		if lbType == "application" && !redirectsToHTTPS(listener) {
-			return elbCodePlainHTTPListener,
-				domain.DetailRow{Label: "Listener", Value: fmt.Sprintf("%d/%s", port, protocol), Tier: "~"}, true
-		}
-	case elbtypes.ProtocolEnumTcp:
-		if lbType == "network" && port == 443 {
+	case elbtypes.ProtocolEnumHttp, elbtypes.ProtocolEnumTcp:
+		if ELBListenerIsPlaintext(listener.Protocol, port) && !redirectsToHTTPS(listener) {
 			return elbCodePlainHTTPListener,
 				domain.DetailRow{Label: "Listener", Value: fmt.Sprintf("%d/%s", port, protocol), Tier: "~"}, true
 		}
@@ -103,8 +100,14 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 // speaks only HTTP and HTTPS, a Network one only TCP, TLS, UDP and the rest,
 // so the protocol already says which kind of balancer it is on.
 func ELBListenerIsPlaintext(protocol elbtypes.ProtocolEnum, port int32) bool {
-	return protocol == elbtypes.ProtocolEnumHttp ||
-		(protocol == elbtypes.ProtocolEnumTcp && port == 443)
+	switch protocol {
+	case elbtypes.ProtocolEnumHttp:
+		return true
+	case elbtypes.ProtocolEnumTcp:
+		return port == 80 || port == 8080
+	default:
+		return false
+	}
 }
 
 // redirectsToHTTPS reports whether every default action of the listener sends

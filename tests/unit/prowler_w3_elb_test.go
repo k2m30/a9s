@@ -386,32 +386,48 @@ func TestW3ELBPlainHTTP_RedirectToHTTPSIsHealthy(t *testing.T) {
 	}
 }
 
-// TestW3ELBPlainHTTP_NLBPort443WithoutTLS pins the network-balancer half: a
-// TCP listener on 443 passes encrypted-looking traffic straight through with
-// no TLS termination or policy of its own.
-func TestW3ELBPlainHTTP_NLBPort443WithoutTLS(t *testing.T) {
+// TestW3ELBPlainHTTP_NLBPortDecidesWhetherTCPIsInTheClear pins the
+// network-balancer half. Row 8 of the parse spec inverted the 443 case: a
+// network balancer forwarding TCP never reads what it forwards, so a listener
+// on 443 is TLS passthrough with the session terminating on the target, not
+// traffic in the clear. Warning about it was a false positive on every
+// passthrough balancer, and the old "443 is an exposure" assertion is not to
+// be restored. A TCP listener on a port nothing encrypts by convention is
+// still an exposure, which is what the 8080 half pins.
+func TestW3ELBPlainHTTP_NLBPortDecidesWhetherTCPIsInTheClear(t *testing.T) {
 	r := w3ELBRes("acme-public-nlb", "network")
-	fake := w3NewELBFake()
-	arn := r.Fields["load_balancer_arn"]
-	fake.attrs[arn] = []elbtypes.LoadBalancerAttribute{
+	attrs := []elbtypes.LoadBalancerAttribute{
 		{Key: aws.String("deletion_protection.enabled"), Value: aws.String("true")},
 		{Key: aws.String("access_logs.s3.enabled"), Value: aws.String("true")},
 	}
-	fake.listeners[arn] = []elbtypes.Listener{
+	arn := r.Fields["load_balancer_arn"]
+
+	passthrough := w3NewELBFake()
+	passthrough.attrs[arn] = attrs
+	passthrough.listeners[arn] = []elbtypes.Listener{
 		w3Listener("tcp443", 443, elbtypes.ProtocolEnumTcp, "", w3ForwardAction()),
+	}
+	if res := w3RunELBEnrich(t, passthrough, r); len(res.Findings[r.ID]) != 0 {
+		t.Errorf("TLS passthrough on 443 produced %+v, want no findings", res.Findings[r.ID])
+	}
+
+	fake := w3NewELBFake()
+	fake.attrs[arn] = attrs
+	fake.listeners[arn] = []elbtypes.Listener{
+		w3Listener("tcp8080", 8080, elbtypes.ProtocolEnumTcp, "", w3ForwardAction()),
 	}
 
 	res := w3RunELBEnrich(t, fake, r)
 	f, ok := w3FindingByCode(res.Findings[r.ID], w3CodeELBPlainHTTP)
 	if !ok {
-		t.Fatalf("NLB TCP listener on 443 produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
+		t.Fatalf("NLB TCP listener on 8080 produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
 	// d4 row 26: one listener, so "port". Do not restore the plural.
-	if want := "port 443 in the clear"; f.Phrase != want {
+	if want := "port 8080 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 	w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBPlainHTTP].Rows, [][2]string{
-		{"Listener", "443/TCP"},
+		{"Listener", "8080/TCP"},
 	})
 }
 

@@ -221,9 +221,10 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, _ reso
 		if f.DestinationArn == nil {
 			continue
 		}
-		arn := *f.DestinationArn
-		// S3 bucket ARN: arn:aws:s3:::bucket-name
-		if name, ok := strings.CutPrefix(arn, "arn:aws:s3:::"); ok {
+		// An S3 ARN's resource is the bucket, optionally followed by a key
+		// prefix: arn:<partition>:s3:::bucket-name/prefix.
+		if a, ok := ARNForService(*f.DestinationArn, "s3"); ok {
+			name := a.Resource
 			if before, _, hasSep := strings.Cut(name, "/"); hasSep {
 				name = before
 			}

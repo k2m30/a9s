@@ -243,6 +243,34 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 				Comment:          aws.String("New product launch distribution — propagating config changes"),
 				LastModifiedTime: aws.Time(time.Date(2026, 4, 25, 15, 0, 0, 0, time.UTC)),
 			},
+			// A distribution serving a bucket in ANOTHER account, which is
+			// how a shared asset bucket is normally fronted. Its name is
+			// absent from this account's bucket list, so the origin check
+			// must ask HeadBucket rather than read absence as deletion. It
+			// carries no finding: that is the whole point of the witness.
+			{
+				Id:         aws.String("E9I0J1K2L3M4N5"),
+				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E9I0J1K2L3M4N5"),
+				DomainName: aws.String("d999999ijklmn6.cloudfront.net"),
+				Status:     aws.String("Deployed"),
+				Enabled:    aws.Bool(true),
+				Aliases: &cftypes.Aliases{
+					Quantity: aws.Int32(1),
+					Items:    []string{"partner.acme-corp.com"},
+				},
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(1),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("s3-partner-shared"),
+							DomainName: aws.String(CFCrossAccountOriginDomain),
+						},
+					},
+				},
+				PriceClass:       cftypes.PriceClassPriceClass100,
+				Comment:          aws.String("Partner asset distribution — origin bucket lives in the partner account"),
+				LastModifiedTime: aws.Time(time.Date(2026, 5, 2, 11, 0, 0, 0, time.UTC)),
+			},
 			// Distribution fronting the PAB-issue buckets — realistic
 			// scenario: a CDN points at an origin bucket whose access
 			// policy is misconfigured. Operator pivoting from the `!`
@@ -307,6 +335,16 @@ const (
 	// CFOriginBucketMissingDomain is that origin's domain name, built on a
 	// bucket absent from the s3 fixtures.
 	CFOriginBucketMissingDomain = "acme-new-launch-assets.s3.amazonaws.com"
+
+	// CFCrossAccountOrigin is the distribution whose S3 origin bucket exists
+	// in another account. It must carry NO finding: this account's bucket
+	// list cannot see it, and absence from that list is not deletion.
+	CFCrossAccountOrigin = "E9I0J1K2L3M4N5"
+
+	// CFCrossAccountOriginDomain is that origin's domain name. Its bucket is
+	// absent from the s3 fixtures and present in CrossAccountBuckets, so
+	// HeadBucket answers that it exists.
+	CFCrossAccountOriginDomain = PartnerSharedBucketName + ".s3.us-east-1.amazonaws.com"
 
 	// CFDeprecatedTLS is the distribution whose minimum protocol version is
 	// below TLS 1.2.
@@ -389,6 +427,7 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 		CFNoGeoRestriction:    cfHealthyConfig("s3-demo-healthy", HealthyBucketName+".s3.us-east-1.amazonaws.com", "demo.acme-corp.com"),
 		CFS3OriginNoOAC:       cfHealthyConfig("s3-nopab", "a9s-demo-nopab.s3.amazonaws.com", "pab.acme-corp.com"),
 		CFOriginBucketMissing: cfHealthyConfig("s3-new-launch", CFOriginBucketMissingDomain, "new-launch.acme-corp.com"),
+		CFCrossAccountOrigin:  cfHealthyConfig("s3-partner-shared", CFCrossAccountOriginDomain, "partner.acme-corp.com"),
 	}
 
 	cfgs[CFDeprecatedTLS].ViewerCertificate.MinimumProtocolVersion = cftypes.MinimumProtocolVersionTLSv12016
@@ -415,5 +454,5 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 }
 
 func init() {
-	Register(Pin{ShortName: "cf", Rows: 8, Issues: 1})
+	Register(Pin{ShortName: "cf", Rows: 9, Issues: 1})
 }

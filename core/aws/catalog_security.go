@@ -190,7 +190,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			if c.IAMPolicies() == nil {
 				return nil, fmt.Errorf("IAMPolicies store not initialized on ServiceClients")
 			}
-			return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies())
+			return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies(), PartitionForRegion(c.Region))
 		}),
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPolicyRole, NeedsTargetCache: false},

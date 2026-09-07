@@ -182,7 +182,7 @@ func TestW4bPowerUserResolvesThroughGroupPolicyPivot(t *testing.T) {
 
 	store := session.NewPolicyStore()
 	resolved, _ := awsclient.FetchIAMPoliciesByIDsFull(
-		context.Background(), clients.IAM, []string{"PowerUserAccess"}, store)
+		context.Background(), clients.IAM, []string{"PowerUserAccess"}, store, "aws")
 	if len(resolved) == 0 {
 		t.Fatal("PowerUserAccess did not resolve to a policy resource")
 	}

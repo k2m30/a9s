@@ -53,6 +53,30 @@ func S3OriginBucket(host string) (string, bool) {
 	return "", false
 }
 
+// awsManagedPolicyAccount is the account segment AWS puts on its own managed
+// policy ARNs, in every partition.
+const awsManagedPolicyAccount = "aws"
+
+// isSecret reports whether a value is a Secrets Manager ARN. Task definitions
+// and function environments carry secret references beside plain values, and
+// three sites ask the same question of them.
+func isSecret(v string) bool {
+	_, ok := ARNForService(v, "secretsmanager")
+	return ok
+}
+
+// awsManagedPolicy parses a policy ARN and reports whether it is one of AWS's
+// own rather than an account's. AWS publishes them in every partition under
+// the same account segment and the same resource path, so the answer is in
+// those two fields and never in the partition.
+func awsManagedPolicy(policyARN string) (arn.ARN, bool) {
+	a, ok := ARNForService(policyARN, "iam")
+	if !ok || a.AccountID != awsManagedPolicyAccount || !strings.HasPrefix(a.Resource, "policy/") {
+		return arn.ARN{}, false
+	}
+	return a, true
+}
+
 // PartitionForRegion returns the ARN partition a region belongs to: "aws-cn"
 // for the China regions, "aws-us-gov" for GovCloud, "aws" otherwise. The
 // prefix is a whole segment, so us-west-2 is commercial and only us-gov- is
@@ -79,9 +103,9 @@ func PartitionForRegion(region string) string {
 // partition — a filter that renders as a proven zero rather than an error.
 // A malformed or non-ARN string is not a match.
 func ARNForService(s, service string) (arn.ARN, bool) {
-	if !strings.HasPrefix(s, "arn:aws:"+service+":") {
+	a, err := arn.Parse(s)
+	if err != nil || a.Service != service {
 		return arn.ARN{}, false
 	}
-	a, err := arn.Parse(s)
-	return a, err == nil
+	return a, true
 }

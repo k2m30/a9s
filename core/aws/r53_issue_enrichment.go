@@ -27,22 +27,23 @@ const (
 	CodeR53QueryLoggingOff domain.FindingCode = "r53.query-logging-off"
 
 	// CodeR53DanglingRecord — an A record in a public zone whose address is
-	// held by no elastic IP, instance or network interface in the account.
+	// an elastic IP this account holds with nothing attached to it.
 	CodeR53DanglingRecord domain.FindingCode = "r53.dangling-record"
 )
 
 // The four answers R53AddressOwnership gives about one address. They are a
-// closed vocabulary: a record is only dangling when the address was provably
-// this account's and provably is not now, and every other answer renders as
-// something other than broken.
+// closed vocabulary: a record is only dangling when the account can prove the
+// address reaches nothing, and every other answer renders as something other
+// than broken.
 const (
-	// R53AddrHeld — an elastic IP, instance or network interface in this
-	// account holds the address right now.
+	// R53AddrHeld — an instance in this account carries the address, or an
+	// elastic IP this account holds is attached to something.
 	R53AddrHeld = "held"
-	// R53AddrReleased — the account's inventory proves the address was this
-	// account's and has been given up. This is the dangling case.
-	R53AddrReleased = "released"
-	// R53AddrOutside — nothing in this account has ever accounted for the
+	// R53AddrUnattached — an elastic IP this account holds carries the
+	// address and has nothing behind it. This is the only dangling case the
+	// account's own inventory can prove.
+	R53AddrUnattached = "unattached"
+	// R53AddrOutside — nothing in this account's inventory carries the
 	// address, so it belongs to another account, another provider or
 	// somewhere off AWS entirely, and this account cannot judge it.
 	R53AddrOutside = "outside"
@@ -63,38 +64,57 @@ func R53AddressOwnership(addr string, cache resource.ResourceCache) string {
 	if held == nil {
 		return R53AddrUnknown
 	}
-	if held[addr] {
-		return R53AddrHeld
+	if word, ours := held[addr]; ours {
+		return word
 	}
-	return R53AddrReleased
+	return R53AddrOutside
 }
 
-// heldPublicAddresses returns every public address the account holds, or nil
-// when any of the three caches is absent or truncated — in which case an
-// address missing from them may simply be on a page nobody loaded.
-func heldPublicAddresses(cache resource.ResourceCache) map[string]bool {
-	held := make(map[string]bool)
-	// All three must be present and whole: together they hold every public
-	// address the account controls.
-	for _, name := range []string{"eip", "ec2", "eni"} {
+// heldPublicAddresses maps every public address this account holds to what the
+// inventory says about it: R53AddrHeld when something is behind it,
+// R53AddrUnattached for an elastic IP with nothing behind it. It returns nil
+// when either cache is absent or truncated, in which case an address missing
+// from them may simply be on a page nobody loaded.
+//
+// An instance address is always held: it exists because the instance does.
+// Only an elastic IP can outlive what it pointed at, and eip.go writes that
+// state into Fields["status"] rather than making every reader re-derive it.
+// The ec2 cache is read last for that reason: should both inventories claim
+// one address, being attached to a running instance is the stronger evidence
+// and must not be overwritten by an idle-elastic-IP verdict.
+//
+// The eni cache is deliberately not consulted: the eni fetcher writes no
+// public_ip, so requiring it voided the verdict without contributing a single
+// address. An address carried only by a network interface therefore reads as
+// outside the account, which under this rule emits nothing.
+func heldPublicAddresses(cache resource.ResourceCache) map[string]string {
+	held := make(map[string]string)
+	for _, name := range []string{"eip", "ec2"} {
 		entry, ok := cache[name]
 		if !ok || entry.IsTruncated {
 			return nil
 		}
 		for _, r := range entry.Resources {
-			if ip := r.Fields["public_ip"]; ip != "" {
-				held[ip] = true
+			ip := r.Fields["public_ip"]
+			if ip == "" {
+				continue
 			}
+			word := R53AddrHeld
+			if name == "eip" && r.Fields["status"] == eipStatusUnattached {
+				word = R53AddrUnattached
+			}
+			held[ip] = word
 		}
 	}
 	return held
 }
 
-// r53DanglingRecords returns the records whose address no longer resolves to
-// anything the account holds. Only plain A records carry a comparable
-// address: an alias target names a resource rather than an address, AAAA and
-// CNAME are outside this check, and a private address cannot be claimed.
-func r53DanglingRecords(records []r53types.ResourceRecordSet, held map[string]bool) []r53types.ResourceRecordSet {
+// r53DanglingRecords returns the records pointing at an elastic IP this
+// account holds with nothing behind it — the one unreachable target the
+// inventory proves. Only plain A records carry a comparable address: an alias
+// target names a resource rather than an address, AAAA and CNAME are outside
+// this check, and a private address cannot be claimed.
+func r53DanglingRecords(records []r53types.ResourceRecordSet, held map[string]string) []r53types.ResourceRecordSet {
 	var out []r53types.ResourceRecordSet
 	for _, rec := range records {
 		if rec.Type != r53types.RRTypeA || rec.AliasTarget != nil {
@@ -105,7 +125,7 @@ func r53DanglingRecords(records []r53types.ResourceRecordSet, held map[string]bo
 			if err != nil || !ip.Is4() || !ip.IsGlobalUnicast() || ip.IsPrivate() {
 				continue
 			}
-			if !held[ip.String()] {
+			if held[ip.String()] == R53AddrUnattached {
 				out = append(out, rec)
 				break
 			}
@@ -200,7 +220,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 // and calling that a takeover sends an operator chasing a healthy record. A
 // zone whose records cannot be listed is marked truncated rather than reported
 // clean.
-func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, r resource.Resource, zoneID string, held map[string]bool) {
+func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, r resource.Resource, zoneID string, held map[string]string) {
 	r53QueryLoggingFinding(ctx, clients, result, r, zoneID)
 
 	if held == nil {
@@ -216,7 +236,7 @@ func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result 
 		if len(rec.ResourceRecords) > 0 {
 			target = aws.ToString(rec.ResourceRecords[0].Value)
 		}
-		setWave2Finding(result, r.ID, CodeR53DanglingRecord, "record points at a released address", "!", "r53",
+		setWave2Finding(result, r.ID, CodeR53DanglingRecord, "record points at an unassociated elastic IP", "!", "r53",
 			[]domain.DetailRow{
 				{Label: "Record", Value: name, Tier: "!"},
 				{Label: "Target", Value: target, Tier: "!"},

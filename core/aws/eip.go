@@ -12,6 +12,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// The two words Fields["status"] carries for an elastic IP. They are the
+// single source: the r53 dangling check reads UNATTACHED out of the eip cache
+// rather than re-deriving the association state from the raw address.
+const (
+	eipStatusAttached   = "ATTACHED"
+	eipStatusUnattached = "UNATTACHED"
+)
+
 // FetchElasticIPs calls the EC2 DescribeAddresses API and converts the
 // response into a slice of generic Resource structs.
 func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resource.Resource, error) {
@@ -56,10 +64,10 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 		addrDomain := string(addr.Domain)
 
 		// Compute attachment status: UNATTACHED if no association/instance/NIC.
-		eipStatus := "ATTACHED"
+		eipStatus := eipStatusAttached
 		unassociated := addr.AssociationId == nil && addr.InstanceId == nil && addr.NetworkInterfaceId == nil
 		if unassociated {
-			eipStatus = "UNATTACHED"
+			eipStatus = eipStatusUnattached
 		}
 
 		r := resource.Resource{

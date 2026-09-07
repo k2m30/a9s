@@ -76,7 +76,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: r53CodeOrphanPrivateZone, Phrase: "private zone with no VPC associations (orphan)", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: CodeR53QueryLoggingOff, Phrase: "query logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing records who resolves names in this public zone, so a subdomain being probed or abused leaves no evidence. Create a query logging configuration for the zone."},
-			{Code: CodeR53DanglingRecord, Phrase: "record points at a released address", Severity: domain.SevBroken, Source: "wave2", Detail: "The record still answers with an address the account no longer holds, so whoever claims that address next receives traffic for this name. Delete the record or repoint it at an address you own."},
+			{Code: CodeR53DanglingRecord, Phrase: "record points at an unassociated elastic IP", Severity: domain.SevBroken, Source: "wave2", Detail: "The record answers with an elastic IP this account holds but has attached to nothing, so every request for this name reaches an address that serves no traffic. Attach the address to the instance or load balancer meant to answer, or repoint the record."},
 		},
 	},
 	{

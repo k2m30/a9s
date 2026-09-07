@@ -64,8 +64,9 @@ const (
 	// ELBPlainHTTP serves an HTTP listener that does not redirect to HTTPS.
 	ELBPlainHTTP = "auth-service-alb"
 	// ELBPlainTCPListener is the network-load-balancer half of the same
-	// signal: a TCP listener on 443, where the port promises TLS and the
-	// protocol never terminates it.
+	// signal: a TCP listener on a port nothing encrypts by convention. Port
+	// 443 is NOT that port — a TCP listener there is TLS passthrough, and the
+	// session terminates on the target.
 	ELBPlainTCPListener = "data-pipeline-nlb"
 	// ELBWeakTLS terminates TLS on a pre-TLS-1.2 security policy.
 	ELBWeakTLS = "events-alb"
@@ -408,7 +409,7 @@ func buildListeners(f *ELBFixtures) {
 		{
 			ListenerArn:     aws.String(plainTCPARN + "/listener/cccc3333"),
 			LoadBalancerArn: aws.String(plainTCPARN),
-			Port:            aws.Int32(443),
+			Port:            aws.Int32(8080),
 			Protocol:        elbv2types.ProtocolEnumTcp,
 			DefaultActions: []elbv2types.Action{
 				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdAPITGARN)},

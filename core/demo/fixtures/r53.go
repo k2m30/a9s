@@ -101,15 +101,27 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 		RecordSets: map[string][]r53types.ResourceRecordSet{
 			"/hostedzone/Z0123456789ABCDEFGHIJ": {
 				{
-					// R53DanglingA: the one record pointing at an address no
-					// elastic IP, instance or network interface fixture holds.
-					// Every other A record here resolves to a held address or
-					// is an alias, so nothing else trips r53.dangling-record.
+					// R53DanglingA: the one record pointing at an elastic IP
+					// the account holds with nothing behind it. Every other A
+					// record here points at an attached address, at something
+					// outside the account, or is an alias, so nothing else
+					// trips r53.dangling-record.
 					Name: aws.String(R53DanglingA),
 					Type: r53types.RRTypeA,
 					TTL:  aws.Int64(300),
 					ResourceRecords: []r53types.ResourceRecord{
 						{Value: aws.String(R53DanglingATarget)},
+					},
+				},
+				{
+					// R53ForeignA: the falsifier. Its address belongs to no
+					// inventory this account can read, which is the ordinary
+					// case for a name served by a CDN. It must stay clean.
+					Name: aws.String(R53ForeignA),
+					Type: r53types.RRTypeA,
+					TTL:  aws.Int64(300),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String(R53ForeignATarget)},
 					},
 				},
 				{
@@ -322,13 +334,24 @@ const (
 	// R53QueryLoggingOff is the public zone with no query-logging config.
 	R53QueryLoggingOff = "unused-zone.example.com."
 
-	// R53DanglingA is the A record whose address is held by no EIP, instance
-	// or network interface in the demo account.
+	// R53DanglingA is the A record pointing at an elastic IP the demo account
+	// holds with nothing attached to it — the one target the inventory proves
+	// unreachable.
 	R53DanglingA = "dangling.acme-corp.com."
 
-	// R53DanglingATarget is that record's address. It must stay absent from
-	// the eip, ec2 and eni fixtures for the finding to hold.
-	R53DanglingATarget = "203.0.113.201"
+	// R53DanglingATarget is that record's address. It must stay an
+	// UNATTACHED elastic IP in the ec2 fixture for the finding to hold.
+	R53DanglingATarget = "203.0.113.10"
+
+	// R53ForeignA is the A record pointing outside the account entirely, the
+	// way a name delegated to a CDN or a partner does. Nothing in the
+	// account's inventory carries the address, and absence of evidence is
+	// not evidence of a dangling record, so this row carries no finding.
+	R53ForeignA = "cdn.acme-corp.com."
+
+	// R53ForeignATarget is that record's address (RFC 5737 TEST-NET-2). It
+	// must stay absent from every inventory fixture.
+	R53ForeignATarget = "198.51.100.50"
 )
 
 func init() {

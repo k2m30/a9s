@@ -18,6 +18,11 @@ const (
 	HealthyBucketName = "a9s-demo-healthy"
 	// HealthyBucketARN is the ARN for the healthy bucket.
 	HealthyBucketARN = "arn:aws:s3:::a9s-demo-healthy"
+	// PartnerSharedBucketName is a bucket in ANOTHER account. It is
+	// deliberately absent from Buckets — ListBuckets returns only this
+	// account's — and present in CrossAccountBuckets, so HeadBucket confirms
+	// it exists. It is the witness that absence from the list is not deletion.
+	PartnerSharedBucketName = "partner-shared-assets"
 	// LogsBucketName is the access-log target bucket for the healthy bucket.
 	LogsBucketName = "a9s-demo-logs"
 	// S3NotifierLambdaName is the Lambda function notified by the healthy bucket.
@@ -111,6 +116,11 @@ type S3Fixtures struct {
 	Objects map[string]map[string][]s3types.Object
 	// CommonPrefixes maps bucket name → prefix → slice of common prefixes (folders).
 	CommonPrefixes map[string]map[string][]s3types.CommonPrefix
+	// CrossAccountBuckets names buckets that exist in another account. They
+	// are absent from Buckets, because ListBuckets returns only this
+	// account's, but HeadBucket still confirms them: AWS answers about the
+	// bucket's existence before it answers about this caller's access.
+	CrossAccountBuckets map[string]bool
 }
 
 // mustTime parses an RFC3339 timestamp or panics.
@@ -137,6 +147,7 @@ var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
 		ObjectLockConfigs:        buildS3ObjectLockConfigs(),
 		Objects:                  buildS3Objects(),
 		CommonPrefixes:           buildS3CommonPrefixes(),
+		CrossAccountBuckets:      map[string]bool{PartnerSharedBucketName: true},
 	}
 	f.Buckets = buildS3Buckets()
 	// Access logging and lifecycle rules are healthy for every bucket except

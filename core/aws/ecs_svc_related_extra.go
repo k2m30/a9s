@@ -337,14 +337,14 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 				continue
 			}
 			v := *s.ValueFrom
-			if strings.HasPrefix(v, "arn:aws:secretsmanager:") {
+			if isSecret(v) {
 				seen[v] = struct{}{}
 			}
 		}
 		// RepositoryCredentials.CredentialsParameter — may be a Secrets Manager ARN
 		if cd.RepositoryCredentials != nil && cd.RepositoryCredentials.CredentialsParameter != nil {
 			cp := *cd.RepositoryCredentials.CredentialsParameter
-			if strings.HasPrefix(cp, "arn:aws:secretsmanager:") {
+			if isSecret(cp) {
 				seen[cp] = struct{}{}
 			}
 		}
@@ -450,7 +450,7 @@ func sfnASLHasECSFamily(definition, taskDefFamily string) bool {
 		}
 		// Check if this node is an ECS runTask state
 		if res, ok := m["Resource"].(string); ok {
-			if strings.HasPrefix(res, "arn:aws:states:::ecs:runTask") {
+			if a, ok := ARNForService(res, "states"); ok && strings.HasPrefix(a.Resource, "ecs:runTask") {
 				// Check Parameters.TaskDefinition
 				if params, ok := m["Parameters"].(map[string]any); ok {
 					if td, ok := params["TaskDefinition"].(string); ok {

@@ -4,10 +4,12 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -19,7 +21,8 @@ import (
 // else, so reading it as absence reports every cross-account bucket deleted.
 // A nil error is not a missing bucket either.
 func S3HeadBucketSaysMissing(err error) bool {
-	return err != nil
+	var notFound *s3types.NotFound
+	return errors.As(err, &notFound)
 }
 
 // FetchS3BucketsPageWithNotifications returns one page of buckets and, when

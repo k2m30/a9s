@@ -544,7 +544,7 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 
 // checkLambdaSecrets scans this Lambda's environment-variable values for
 // references to secrets-manager secret ARNs. FunctionConfiguration.Environment.Variables
-// is a map[string]string; we search values for an "arn:aws:secretsmanager:" prefix.
+// is a map[string]string; we search values for a Secrets Manager ARN.
 func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
@@ -558,7 +558,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 	}
 	arnSet := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
-		if strings.HasPrefix(v, "arn:aws:secretsmanager:") {
+		if _, isSecret := ARNForService(v, "secretsmanager"); isSecret {
 			arnSet[v] = struct{}{}
 		}
 	}

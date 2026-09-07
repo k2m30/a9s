@@ -131,7 +131,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	//   - Managed policy is found (buildAllManagedPolicies succeeds).
 	//   - Inline fetch fails → composite error returned alongside partial results.
 	//   - store.InlineBuilt() must remain false.
-	results1, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{managedPolicyID}, store)
+	results1, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{managedPolicyID}, store, "aws")
 
 	// Managed policy should be found even with inline failure.
 	if len(results1) == 0 {
@@ -156,7 +156,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	// Now remove the inline error so retry can succeed.
 	fake.listGroupPoliciesErr = nil
 
-	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyName}, store)
+	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyName}, store, "aws")
 
 	if err2 != nil {
 		t.Errorf("call 2: expected no error after inline retry; got %v", err2)
@@ -207,7 +207,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	// Call 1: inline fetch succeeds → should call ListGroupPolicies.
-	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store)
+	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store, "aws")
 	if err1 != nil {
 		t.Errorf("call 1: unexpected error: %v", err1)
 	}
@@ -217,7 +217,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 	callsAfterFirst := listGroupPoliciesCallCount
 
 	// Call 2: inline cache should be warm — ListGroupPolicies must NOT be called again.
-	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store)
+	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store, "aws")
 	if err2 != nil {
 		t.Errorf("call 2: unexpected error: %v", err2)
 	}

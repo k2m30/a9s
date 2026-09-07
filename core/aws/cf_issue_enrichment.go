@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -66,6 +67,20 @@ func cfTLSBelow12Word(v cftypes.MinimumProtocolVersion) string {
 	}
 }
 
+// cfBucketGoneFunc returns the authoritative "does this bucket exist" check,
+// or nil when the session has no S3 client to ask with. HeadBucket is the
+// only read-only call that answers for a bucket outside this account.
+func cfBucketGoneFunc(clients *ServiceClients) func(context.Context, string) bool {
+	api, ok := clients.S3.(S3HeadBucketAPI)
+	if !ok || api == nil {
+		return nil
+	}
+	return func(ctx context.Context, bucket string) bool {
+		_, err := api.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)})
+		return S3HeadBucketSaysMissing(err)
+	}
+}
+
 // cfConfigFindings evaluates every config-derived posture row for one
 // distribution. Each condition is independent: a distribution failing all of
 // them carries one finding per condition, with its own supporting rows.
@@ -73,7 +88,11 @@ func cfTLSBelow12Word(v cftypes.MinimumProtocolVersion) string {
 // knownBuckets is nil when the s3 cache is absent or truncated, which means
 // the origin-bucket join cannot tell a deleted bucket from an unloaded page
 // and is skipped rather than guessed.
-func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig, knownBuckets map[string]bool) {
+//
+// bucketGone answers whether a bucket the cache does not list is genuinely
+// absent. It is nil when the session has no S3 client to ask, and an
+// unanswerable question raises nothing.
+func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig, knownBuckets map[string]bool, bucketGone func(context.Context, string) bool) {
 	emit := func(code domain.FindingCode, phrase, tier string, rows ...domain.DetailRow) {
 		setWave2Finding(result, distID, code, phrase, tier, "cf", rows)
 	}
@@ -88,7 +107,13 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 		if !isS3 {
 			continue
 		}
-		if knownBuckets != nil && !knownBuckets[bucket] {
+		// The cache lists this account's buckets, so it can confirm a bucket
+		// exists but never that one does not: an origin in another account is
+		// absent from it while working perfectly. Only HeadBucket can say
+		// gone, and only when it says not-found — a denial is AWS answering
+		// about this session's access, which it can only do after finding the
+		// bucket.
+		if knownBuckets != nil && !knownBuckets[bucket] && bucketGone != nil && bucketGone(ctx, bucket) {
 			emit(CodeCFOriginBucketMissing, "S3 origin bucket does not exist", "!",
 				domain.DetailRow{Label: "Origin", Value: domainName, Tier: "!"})
 		}
@@ -165,6 +190,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 	knownBuckets := cachedBucketNames(cache)
+	bucketGone := cfBucketGoneFunc(clients)
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -221,7 +247,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			}
 		}
 
-		cfConfigFindings(&result, distID, cfg, knownBuckets)
+		cfConfigFindings(ctx, &result, distID, cfg, knownBuckets, bucketGone)
 
 		if len(rows) == 0 {
 			return

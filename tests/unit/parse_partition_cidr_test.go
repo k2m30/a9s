@@ -373,7 +373,15 @@ func TestCloudFrontS3Origin_DottedAndChinaOriginsReachBothChecks(t *testing.T) {
 					},
 				},
 			}}
-			clients := &awsclient.ServiceClients{CloudFront: fake}
+			// Row 7 of this spec made HeadBucket the authority for "gone",
+			// so the session needs one; here every bucket outside the cache
+			// is genuinely absent, which is what the table's
+			// does-not-exist rows mean.
+			head := &w6aHeadBucketFake{exists: map[string]bool{}}
+			for _, b := range buckets {
+				head.exists[b.ID] = true
+			}
+			clients := &awsclient.ServiceClients{CloudFront: fake, S3: head}
 			res, err := awsclient.EnrichCloudFrontDistribution(
 				context.Background(), clients, cfDistroResources(distID), cache)
 			if err != nil {

@@ -126,7 +126,7 @@ func TestWave2SameCodeTwice_RowsAccumulateAcrossEnrichers(t *testing.T) {
 				w6aARecord("old-api.acme-corp.com.", "203.0.113.201"),
 				w6aARecord("old-www.acme-corp.com.", "203.0.113.202"),
 			}},
-			w6aAddressCache(false, []string{"203.0.113.10"}, nil, nil),
+			w6aAddressCache(false, []string{"203.0.113.201", "203.0.113.202"}, nil, nil),
 			w6aZoneRes(zoneID, "acme-corp.com."),
 		)
 

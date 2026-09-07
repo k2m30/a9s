@@ -22,6 +22,8 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -162,60 +164,81 @@ func TestW6AR53QueryLoggingOff_PrivateZoneIsExempt(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["Z0PRIV00000000000000"], w6aR53QueryLoggingOff)
 }
 
-// w6aAddressCache builds the eip/ec2/eni caches the dangling-record join reads.
-func w6aAddressCache(truncated bool, eips, instanceIPs, eniIPs []string) resource.ResourceCache {
-	mk := func(ips []string, field string) domain.ResourceCacheEntry {
+// w6aAddressCache builds the eip/ec2 caches the dangling-record join reads.
+// Row 6 of the parse spec: the verdict now reads the elastic IP's association
+// state, so an eip fixture carries Fields["status"], and the eni cache is no
+// longer consulted at all — the eni fetcher writes no public_ip, so requiring
+// it voided the verdict without contributing an address.
+func w6aAddressCache(truncated bool, unattachedEIPs, attachedEIPs, instanceIPs []string) resource.ResourceCache {
+	mk := func(ips []string, status string) domain.ResourceCacheEntry {
 		e := domain.ResourceCacheEntry{IsTruncated: truncated}
 		for i, ip := range ips {
+			fields := map[string]string{"public_ip": ip}
+			if status != "" {
+				fields["status"] = status
+			}
 			e.Resources = append(e.Resources, domain.Resource{
-				ID:     field + "-fixture-" + string(rune('a'+i)),
+				ID:     "fixture-" + status + "-" + string(rune('a'+i)),
 				Name:   ip,
-				Fields: map[string]string{field: ip},
+				Fields: fields,
 			})
 		}
 		return e
 	}
+	eip := mk(unattachedEIPs, "UNATTACHED")
+	eip.Resources = append(eip.Resources, mk(attachedEIPs, "ATTACHED").Resources...)
 	return resource.ResourceCache{
-		"eip": mk(eips, "public_ip"),
-		"ec2": mk(instanceIPs, "public_ip"),
-		"eni": mk(eniIPs, "public_ip"),
+		"eip": eip,
+		"ec2": mk(instanceIPs, ""),
 	}
 }
 
-// TestW6AR53DanglingRecord pins row 9. An A record left pointing at an address
-// the account released is a subdomain takeover: whoever claims that address
-// next serves traffic under the zone's name.
+// TestW6AR53DanglingRecord pins row 9, as rewritten by row 6 of the parse
+// spec. The finding is no longer "the address is absent from my inventory" —
+// nothing read-only proves an absent address was ever this account's, and a
+// name delegated to a CDN is absent for a perfectly good reason. What the
+// inventory does prove is an elastic IP this account holds with nothing
+// attached to it: every request for the name reaches an address that answers
+// nobody. The old assertion is not to be restored.
 func TestW6AR53DanglingRecord(t *testing.T) {
 	fake := &w6aR53Fake{
 		logConfigs: 1,
 		records: []r53types.ResourceRecordSet{
-			w6aARecord("dangling.acme-corp.com.", "203.0.113.201"),
+			w6aARecord("dangling.acme-corp.com.", "203.0.113.11"),
 			w6aARecord("live.acme-corp.com.", "203.0.113.10"),
+			w6aARecord("cdn.acme-corp.com.", "198.51.100.50"),
 		},
 	}
-	cache := w6aAddressCache(false, []string{"203.0.113.10"}, []string{"203.0.113.11"}, []string{"203.0.113.12"})
+	cache := w6aAddressCache(false, []string{"203.0.113.11"}, []string{"203.0.113.10"}, []string{"203.0.113.12"})
 
 	res := w6aEnrichR53(t, fake, cache, w6aZoneRes("Z0DANGLING0000000000", "acme-corp.com."))
 
 	w2AssertFinding(t, res.Findings["Z0DANGLING0000000000"], w6aR53Dangling,
-		"record points at a released address", domain.SevBroken, "wave2:r53")
+		"record points at an unassociated elastic IP", domain.SevBroken, "wave2:r53")
 	rows := w2Rows(t, res, "Z0DANGLING0000000000", w6aR53Dangling)
 	w2AssertRow(t, rows, "Record", "dangling.acme-corp.com.")
-	w2AssertRow(t, rows, "Target", "203.0.113.201")
+	w2AssertRow(t, rows, "Target", "203.0.113.11")
 }
 
-// TestW6AR53DanglingRecord_AddressHeldByAnyOfTheThreeCachesIsLive pins that
-// each of the three address sources closes the finding on its own. An address
-// on an ENI is held just as firmly as one on an elastic IP.
-func TestW6AR53DanglingRecord_AddressHeldByAnyOfTheThreeCachesIsLive(t *testing.T) {
+// TestW6AR53DanglingRecord_AnythingButAnIdleElasticIPIsClean pins the other
+// side of row 6 of the parse spec. Three quite different situations all
+// render clean, and only one of them is "the address is fine": an attached
+// elastic IP and an instance address are reachable, while an address outside
+// the account is simply not something this account can judge. The old
+// version of this test asserted that an ENI address closes the finding; the
+// eni fetcher writes no public_ip, so that leg never held an address and its
+// assertion is not to be restored.
+func TestW6AR53DanglingRecord_AnythingButAnIdleElasticIPIsClean(t *testing.T) {
+	const addr = "203.0.113.201"
 	for name, cache := range map[string]resource.ResourceCache{
-		"eip": w6aAddressCache(false, []string{"203.0.113.201"}, nil, nil),
-		"ec2": w6aAddressCache(false, nil, []string{"203.0.113.201"}, nil),
-		"eni": w6aAddressCache(false, nil, nil, []string{"203.0.113.201"}),
+		"an attached elastic IP":                w6aAddressCache(false, nil, []string{addr}, nil),
+		"an instance address":                   w6aAddressCache(false, nil, nil, []string{addr}),
+		"an address outside this account":       w6aAddressCache(false, nil, []string{"203.0.113.10"}, nil),
+		"an idle elastic IP at another address": w6aAddressCache(false, []string{"203.0.113.99"}, nil, nil),
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := &w6aR53Fake{logConfigs: 1, records: []r53types.ResourceRecordSet{
-				w6aARecord("held.acme-corp.com.", "203.0.113.201"),
+				w6aARecord("held.acme-corp.com.", addr),
 			}}
 			res := w6aEnrichR53(t, fake, cache, w6aZoneRes("Z0HELD00000000000000", "acme-corp.com."))
 			w2AssertNoCode(t, res.Findings["Z0HELD00000000000000"], w6aR53Dangling)
@@ -228,18 +251,17 @@ func TestW6AR53DanglingRecord_AddressHeldByAnyOfTheThreeCachesIsLive(t *testing.
 // held on a page nobody loaded, and calling that a takeover would send an
 // operator chasing a record that is fine.
 func TestW6AR53DanglingRecord_IncompleteAddressCacheEmitsNothing(t *testing.T) {
-	full := w6aAddressCache(false, []string{"203.0.113.10"}, nil, nil)
+	full := w6aAddressCache(false, []string{"203.0.113.11"}, nil, nil)
 	cases := map[string]resource.ResourceCache{
-		"absent eip":    {"ec2": full["ec2"], "eni": full["eni"]},
-		"absent ec2":    {"eip": full["eip"], "eni": full["eni"]},
-		"absent eni":    {"eip": full["eip"], "ec2": full["ec2"]},
+		"absent eip":    {"ec2": full["ec2"]},
+		"absent ec2":    {"eip": full["eip"]},
 		"all absent":    {},
-		"truncated eip": w6aAddressCache(true, []string{"203.0.113.10"}, nil, nil),
+		"truncated eip": w6aAddressCache(true, []string{"203.0.113.11"}, nil, nil),
 	}
 	for name, cache := range cases {
 		t.Run(name, func(t *testing.T) {
 			fake := &w6aR53Fake{logConfigs: 1, records: []r53types.ResourceRecordSet{
-				w6aARecord("dangling.acme-corp.com.", "203.0.113.201"),
+				w6aARecord("dangling.acme-corp.com.", "203.0.113.11"),
 			}}
 			res := w6aEnrichR53(t, fake, cache, w6aZoneRes("Z0SKIP00000000000000", "acme-corp.com."))
 			w2AssertNoCode(t, res.Findings["Z0SKIP00000000000000"], w6aR53Dangling)
@@ -292,7 +314,7 @@ func TestW6AR53_RecordListingFailureTruncatesTheZone(t *testing.T) {
 // TestW6AR53_CatalogDefs pins the catalog rows for both r53 codes.
 func TestW6AR53_CatalogDefs(t *testing.T) {
 	w2AssertFindingDef(t, "r53", w6aR53QueryLoggingOff, "query logging off", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "r53", w6aR53Dangling, "record points at a released address", domain.SevBroken, "wave2")
+	w2AssertFindingDef(t, "r53", w6aR53Dangling, "record points at an unassociated elastic IP", domain.SevBroken, "wave2")
 }
 
 // ---------------------------------------------------------------------------
@@ -363,13 +385,35 @@ func w6aCFConfig(alias, originDomain string) *cftypes.DistributionConfig {
 	}
 }
 
+// w6aHeadBucketFake answers HeadBucket the way AWS answers for an account
+// whose bucket list is exactly the s3 cache: a name outside it does not
+// exist. Row 7 of the parse spec made this call the authority for "gone",
+// because a cache listing only this account's buckets cannot speak for a
+// bucket in another one.
+type w6aHeadBucketFake struct {
+	awsclient.S3API
+	exists map[string]bool
+}
+
+func (f *w6aHeadBucketFake) HeadBucket(_ context.Context, in *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	if f.exists[aws.ToString(in.Bucket)] {
+		return &s3.HeadBucketOutput{}, nil
+	}
+	return nil, &s3types.NotFound{}
+}
+
 func w6aEnrichCF(t *testing.T, fake *w6aCFFake, cache resource.ResourceCache, ids ...string) awsclient.IssueEnricherResult {
 	t.Helper()
 	rs := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
 		rs = append(rs, w2Res(id, nil))
 	}
-	res, err := w2Enricher(t, "cf")(context.Background(), &awsclient.ServiceClients{CloudFront: fake}, rs, cache)
+	head := &w6aHeadBucketFake{exists: map[string]bool{}}
+	for _, r := range cache["s3"].Resources {
+		head.exists[r.ID] = true
+	}
+	res, err := w2Enricher(t, "cf")(context.Background(),
+		&awsclient.ServiceClients{CloudFront: fake, S3: head}, rs, cache)
 	w2AssertEnricherShape(t, res)
 	_ = err
 	return res
@@ -712,10 +756,10 @@ func TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo(t *testing.T) {
 		logConfigs:  1,
 		recordPages: true,
 		records: []r53types.ResourceRecordSet{
-			w6aARecord("dangling.acme-corp.com.", "203.0.113.201"),
+			w6aARecord("dangling.acme-corp.com.", "203.0.113.11"),
 		},
 	}
-	res := w6aEnrichR53(t, fake, w6aAddressCache(false, []string{"203.0.113.10"}, nil, nil),
+	res := w6aEnrichR53(t, fake, w6aAddressCache(false, []string{"203.0.113.11"}, nil, nil),
 		w6aZoneRes("Z0LONGZONE0000000000", "acme-corp.com."))
 
 	if fake.recordCalls != awsclient.PerParentPageCap {
@@ -726,7 +770,7 @@ func TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo(t *testing.T) {
 		t.Error("a zone longer than the page cap was not marked truncated")
 	}
 	w2AssertFinding(t, res.Findings["Z0LONGZONE0000000000"], w6aR53Dangling,
-		"record points at a released address", domain.SevBroken, "wave2:r53")
+		"record points at an unassociated elastic IP", domain.SevBroken, "wave2:r53")
 }
 
 // TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig pins the other half: the

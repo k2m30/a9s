@@ -61,7 +61,7 @@ func TestFetchIAMPoliciesByIDsFull_ResolvesServiceLinkedRolePolicyPrefix(t *test
 	}
 	store := session.NewPolicyStore()
 
-	results, _ := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), fake, []string{name}, store)
+	results, _ := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), fake, []string{name}, store, "aws")
 
 	found := false
 	for _, r := range results {
@@ -85,7 +85,7 @@ func TestFetchIAMPoliciesByIDsFull_AWSManagedPolicyTypeIsAWSManaged(t *testing.T
 	}
 	store := session.NewPolicyStore()
 
-	results, _ := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), fake, []string{name}, store)
+	results, _ := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), fake, []string{name}, store, "aws")
 
 	var policyType string
 	found := false

@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
@@ -20,19 +19,11 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	}
 
 	arnSet := map[string]bool{}
-	for _, arn := range raw.AlarmActions {
-		if strings.HasPrefix(arn, "arn:aws:sns:") {
-			arnSet[arn] = true
-		}
-	}
-	for _, arn := range raw.OKActions {
-		if strings.HasPrefix(arn, "arn:aws:sns:") {
-			arnSet[arn] = true
-		}
-	}
-	for _, arn := range raw.InsufficientDataActions {
-		if strings.HasPrefix(arn, "arn:aws:sns:") {
-			arnSet[arn] = true
+	for _, actions := range [][]string{raw.AlarmActions, raw.OKActions, raw.InsufficientDataActions} {
+		for _, action := range actions {
+			if _, ok := ARNForService(action, "sns"); ok {
+				arnSet[action] = true
+			}
 		}
 	}
 

@@ -22,9 +22,12 @@ import (
 
 // adminManagedPolicyARNs are the AWS-managed policies whose attachment makes
 // the principal effectively an account administrator.
-var adminManagedPolicyARNs = []string{ //nolint:gochecknoglobals // static AWS-managed ARN set
-	"arn:aws:iam::aws:policy/AdministratorAccess",
-	"arn:aws:iam::aws:policy/PowerUserAccess",
+// They are named by their resource path rather than their full ARN: AWS
+// returns the ARN in the partition the session is connected to, so a literal
+// commercial ARN reports every China and GovCloud administrator unprivileged.
+var adminManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
+	"policy/AdministratorAccess",
+	"policy/PowerUserAccess",
 }
 
 // listAttachedRolePolicies walks every page of a role's attached managed
@@ -76,11 +79,20 @@ func listAttachedUserPolicies(ctx context.Context, api IAMListAttachedUserPolici
 	return all, nil
 }
 
+// AdminAttachedPolicyNameForTest is an exported test-only wrapper for the
+// unexported adminAttachedPolicyName — production code does not call it.
+// Lives outside _test.go because tests in tests/unit/ are package unit and
+// can't see same-package test helpers.
+func AdminAttachedPolicyNameForTest(attached []iamtypes.AttachedPolicy) string {
+	return adminAttachedPolicyName(attached)
+}
+
 // adminAttachedPolicyName returns the name of the first admin-equivalent
 // managed policy in the attachment list, or "" when none is attached.
 func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 	for _, p := range attached {
-		if slices.Contains(adminManagedPolicyARNs, aws.ToString(p.PolicyArn)) {
+		if a, awsOwned := awsManagedPolicy(aws.ToString(p.PolicyArn)); awsOwned &&
+			slices.Contains(adminManagedPolicyResources, a.Resource) {
 			name := aws.ToString(p.PolicyName)
 			if name == "" {
 				name = aws.ToString(p.PolicyArn)
@@ -92,7 +104,7 @@ func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 }
 
 // adminAttachedPhrase is the S4 cause for every admin-attached finding. It
-// names the class rather than one policy, because adminManagedPolicyARNs
+// names the class rather than one policy, because adminManagedPolicyResources
 // holds both AdministratorAccess and PowerUserAccess; the Policy row says
 // which one is attached.
 const adminAttachedPhrase = "has an administrator policy"

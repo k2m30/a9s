@@ -148,21 +148,21 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 // a path that the bare policy name does not reveal, so getAWSManagedPolicyByName
 // tries each in turn — a handful of GetPolicy calls, still bounded and vastly
 // cheaper than listing the whole ~1000+ AWS-managed catalog.
-var awsManagedPolicyPathPrefixes = []string{
-	"arn:aws:iam::aws:policy/",
-	"arn:aws:iam::aws:policy/service-role/",
-	"arn:aws:iam::aws:policy/job-function/",
-	"arn:aws:iam::aws:policy/aws-service-role/",
+var awsManagedPolicyPaths = []string{ //nolint:gochecknoglobals // static AWS-managed path set
+	"policy/",
+	"policy/service-role/",
+	"policy/job-function/",
+	"policy/aws-service-role/",
 }
 
 // getAWSManagedPolicyByName resolves ONE AWS-managed policy by name via GetPolicy
 // on the well-known ARN(s) arn:aws:iam::aws:policy[/<path>]/<name>. This is how
 // the lazy-add resolves the handful of AWS-managed policy names a checker emitted,
 // WITHOUT listing the whole ~1000+ AWS-managed catalog.
-func getAWSManagedPolicyByName(ctx context.Context, api IAMGetPolicyAPI, name string) (resource.Resource, error) {
+func getAWSManagedPolicyByName(ctx context.Context, api IAMGetPolicyAPI, partition, name string) (resource.Resource, error) {
 	var lastErr error
-	for _, prefix := range awsManagedPolicyPathPrefixes {
-		arn := prefix + name
+	for _, path := range awsManagedPolicyPaths {
+		arn := "arn:" + partition + ":iam::aws:" + path + name
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetPolicyOutput, error) {
 			return api.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: aws.String(arn)})
 		})
@@ -209,7 +209,7 @@ func getAWSManagedPolicyByName(ctx context.Context, api IAMGetPolicyAPI, name st
 // (c) introducing a sync.Once or
 // build-in-progress flag would re-couple the transport layer to a session
 // concern the transport layer should not own. Same applies to InlineBuilt.
-func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
+func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore, partition string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -280,7 +280,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 		// Not customer-managed or inline — resolve as an AWS-managed policy by
 		// name via a single GetPolicy (arn:aws:iam::aws:policy/<name>), rather
 		// than having listed the whole AWS-managed catalog. Cache the hit.
-		if r, err := getAWSManagedPolicyByName(ctx, api, id); err == nil {
+		if r, err := getAWSManagedPolicyByName(ctx, api, partition, id); err == nil {
 			store.Set(id, r)
 			resources = append(resources, r)
 		} else {

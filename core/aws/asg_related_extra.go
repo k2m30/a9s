@@ -191,7 +191,10 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("sns", err)
 	}
 	for _, h := range hookOut.LifecycleHooks {
-		if h.NotificationTargetARN != nil && strings.HasPrefix(*h.NotificationTargetARN, "arn:aws:sns:") {
+		if h.NotificationTargetARN == nil {
+			continue
+		}
+		if _, isTopic := ARNForService(*h.NotificationTargetARN, "sns"); isTopic {
 			ids = append(ids, *h.NotificationTargetARN)
 		}
 	}

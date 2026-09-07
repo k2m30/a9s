@@ -29,7 +29,7 @@ const (
 // Findings:
 //   - Policy document contains Statement with Effect=Allow, Action=*, Resource=* → "!" finding "admin star (allows * on *)"
 //
-// AWS-managed policies (ARN starts with "arn:aws:iam::aws:policy/") are skipped.
+// AWS-managed policies (account "aws", resource under "policy/") are skipped.
 // Skip when clients.IAM == nil.
 func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -61,8 +61,10 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		if policyARN == "" {
 			return
 		}
-		// Skip AWS-managed policies.
-		if strings.HasPrefix(policyARN, "arn:aws:iam::aws:policy/") {
+		// An AWS-managed policy is not editable by the account, so reading
+		// its document for permission findings tells an operator nothing
+		// they can act on.
+		if _, awsOwned := awsManagedPolicy(policyARN); awsOwned {
 			return
 		}
 		doc, err := FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, policyARN)

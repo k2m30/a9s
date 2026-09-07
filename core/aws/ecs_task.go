@@ -283,24 +283,24 @@ func ecsJoinTaskDefinition(
 
 	secretsSeen := make(map[string]struct{})
 	ssmSeen := make(map[string]struct{})
-	const ssmPrefix = "arn:aws:ssm:"
-	const ssmParamPart = ":parameter/"
+	const ssmParamPrefix = "parameter/"
 	for _, c := range td.ContainerDefinitions {
 		for _, s := range c.Secrets {
 			if s.ValueFrom == nil || *s.ValueFrom == "" {
 				continue
 			}
 			v := *s.ValueFrom
+			ssmARN, isSSM := ARNForService(v, "ssm")
 			switch {
-			case strings.HasPrefix(v, "arn:aws:secretsmanager:"):
+			case isSecret(v):
 				secretsSeen[v] = struct{}{}
-			case strings.HasPrefix(v, ssmPrefix):
-				// ARN form: arn:aws:ssm:region:account:parameter/name — the
-				// parameter's real Name (as returned by DescribeParameters)
-				// keeps its own leading "/", which the "parameter/" ARN
-				// separator absorbs; re-add it so the extracted name matches
-				// the ssm cache's canonical Resource.ID.
-				if _, after, found := strings.Cut(v, ssmParamPart); found && after != "" {
+			case isSSM:
+				// The parameter's real Name (as returned by
+				// DescribeParameters) keeps its own leading "/", which the
+				// "parameter/" resource prefix absorbs; re-add it so the
+				// extracted name matches the ssm cache's canonical
+				// Resource.ID.
+				if after, found := strings.CutPrefix(ssmARN.Resource, ssmParamPrefix); found && after != "" {
 					ssmSeen["/"+after] = struct{}{}
 				}
 			case strings.HasPrefix(v, "/"):

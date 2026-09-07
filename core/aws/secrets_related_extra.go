@@ -457,7 +457,7 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 	if dlc == nil || dlc.TargetArn == nil || *dlc.TargetArn == "" {
 		return resource.KnownRelated("sns", nil, false)
 	}
-	if !strings.HasPrefix(*dlc.TargetArn, "arn:aws:sns:") {
+	if _, isTopic := ARNForService(*dlc.TargetArn, "sns"); !isTopic {
 		return resource.KnownRelated("sns", nil, false)
 	}
 	return relatedResult("sns", []string{*dlc.TargetArn})
