@@ -404,7 +404,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		case len(msg.Resources) > 0:
 			intents = append(intents, AppendErrorHistoryIntent{
 				Time:    time.Now(),
-				Message: fmt.Sprintf("availability %s: %v", msg.ResourceType, msg.Err),
+				Message: fmt.Sprintf("availability %s: %s", msg.ResourceType, awsclient.CauseOf(msg.Err)),
 			})
 		case awsclient.IsEndpointNotFound(msg.Err):
 			_, region := c.session.CurrentPair()
@@ -711,7 +711,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// Surface enrichment failures as flash.
 	if msg.Err != nil {
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("enrich %s: %v", originalType, msg.Err),
+			Text:    fmt.Sprintf("enrich %s: %s", originalType, awsclient.CauseOf(msg.Err)),
 			IsError: true,
 		})
 	}

@@ -15,6 +15,7 @@
 package aws
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -165,6 +166,19 @@ func causeOf(reason string) string {
 		}
 		return "not authorized to perform " + action
 	}
+	// The SDK's "operation error <Service>: <Op>, " preamble goes for every
+	// error class, not only for the API errors whose "api error " marker used
+	// to hide it — a timeout and a transport failure carry the same preamble,
+	// and the operation is already named by the caller's op label. The head
+	// must look like "<Service>: <Op>" so prose that merely mentions an
+	// operation error keeps its words.
+	const opMarker = "operation error "
+	if i := strings.Index(reason, opMarker); i >= 0 {
+		head, rest, ok := strings.Cut(reason[i+len(opMarker):], ", ")
+		if ok && strings.Contains(head, ": ") {
+			reason = rest
+		}
+	}
 	stripped := reason
 	if i := strings.Index(stripped, "api error "); i >= 0 {
 		stripped = stripped[i+len("api error "):]
@@ -184,6 +198,49 @@ func causeOf(reason string) string {
 		return reason
 	}
 	return "no reason given"
+}
+
+// ErrClass maps an error to the short class word every surface that phrases a
+// failure reads — the menu row's cause mark, ScanStatus.Err, the account-wide
+// title, and CauseOf below. context.DeadlineExceeded is checked before
+// ClassifyAWSError because a context error is never a smithy.APIError and
+// would otherwise land in the "Unknown" bucket.
+func ErrClass(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	code, _, _ := ClassifyAWSError(err)
+	switch code {
+	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
+		return "throttled"
+	case "AccessDenied", "AccessDeniedException":
+		return "access-denied"
+	case "ExpiredToken", "ExpiredTokenException", "RequestExpired":
+		return "expired"
+	default:
+		return code
+	}
+}
+
+// CauseOf is the error-level entry to the same reduction AggregateFailures
+// applies per failure: what an operator can act on, with the per-call
+// transport noise removed. Every surface that renders a failure — a flash, a
+// log line, an aggregated batch error — phrases it through here.
+func CauseOf(err error) string {
+	if err == nil {
+		return ""
+	}
+	// A timed-out call is the one class whose message text says nothing the
+	// class word does not: it is the SDK's retry bookkeeping, an attempt count
+	// and a zero status code. Every other class carries its own words — the
+	// action a role lacks, the API message — and keeps them.
+	if ErrClass(err) == "timeout" {
+		return "timeout"
+	}
+	return causeOf(err.Error())
 }
 
 // AggregateMissing is the narrower variant used when the operation is a

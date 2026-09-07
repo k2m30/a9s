@@ -385,13 +385,13 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 
 	if ev.LazyAddError != nil {
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("related-fetch: %v", ev.LazyAddError),
+			Text:    fmt.Sprintf("related-fetch: %s", awsclient.CauseOf(ev.LazyAddError)),
 			IsError: true,
 		})
 	}
 	if err := ev.Result.Err(); err != nil {
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("related %s: %v", ev.Result.TargetType(), err),
+			Text:    fmt.Sprintf("related %s: %s", ev.Result.TargetType(), awsclient.CauseOf(err)),
 			IsError: true,
 		})
 	}

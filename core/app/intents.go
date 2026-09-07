@@ -153,16 +153,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 
 		case runtime.MenuClearAvailabilityIntent:
 			if ms := c.rootMenuState(); ms != nil {
-				ms.Availability = nil
-				ms.Truncated = nil
-				ms.ProbeCause = nil
-				ms.AvailChecked = 0
-				ms.AvailTotal = 0
-				ms.IssueCounts = nil
-				ms.IssueKnown = nil
-				ms.IssueTruncated = nil
-				ms.EnrichChecked = 0
-				ms.EnrichTotal = 0
+				ms.ClearAvailability()
 			}
 			// C9: this intent is the only rotation-visible chokepoint on the
 			// Controller — fired by both HandleProfileSelected and

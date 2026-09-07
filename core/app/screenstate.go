@@ -275,3 +275,23 @@ type MenuState struct {
 	EnrichChecked int `json:"enrich_checked,omitempty"`
 	EnrichTotal   int `json:"enrich_total,omitempty"`
 }
+
+// ClearAvailability drops every fact this session's probes established about
+// individual resource types. It is the one clear point a profile/region
+// rotation goes through: what a type's count was, where it came from, and why
+// its probe failed are all facts about the OLD profile/region pair, and none
+// of them may describe a row under the new one.
+func (ms *MenuState) ClearAvailability() {
+	ms.Availability = nil
+	ms.Truncated = nil
+	ms.ProbeCause = nil
+	ms.Origin = nil
+	ms.IssueTruncAuthoritative = nil
+	ms.IssueCounts = nil
+	ms.IssueKnown = nil
+	ms.IssueTruncated = nil
+	ms.AvailChecked = 0
+	ms.AvailTotal = 0
+	ms.EnrichChecked = 0
+	ms.EnrichTotal = 0
+}

@@ -3,8 +3,6 @@
 package runtime
 
 import (
-	"context"
-	"errors"
 	"sort"
 	"time"
 
@@ -67,32 +65,14 @@ func (c *Core) ScanStatus() []ProbeStatus {
 }
 
 // classifyProbeErr maps a probe error to the short machine-readable
-// classification ProbeStatus.Err carries. context.DeadlineExceeded is
-// checked before ClassifyAWSError because a context error is never a
-// smithy.APIError and would otherwise fall through to ClassifyAWSError's
-// "Unknown" bucket.
-//
-// This is the ONE place a probe error becomes a class; every surface that
-// phrases the failure (ScanStatus.Err, the menu row's cause word, the
-// account-wide title) reads the class, never the error text again.
+// classification ProbeStatus.Err carries. The class table itself lives with
+// the other AWS error classification in core/aws, so the cause a failure
+// renders as (aws.CauseOf) and the class a probe records here can never drift
+// apart; every surface that phrases the failure (ScanStatus.Err, the menu
+// row's cause word, the account-wide title) reads the class, never the error
+// text again.
 func classifyProbeErr(err error) string {
-	if err == nil {
-		return ""
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return "timeout"
-	}
-	code, _, _ := awsclient.ClassifyAWSError(err)
-	switch code {
-	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
-		return "throttled"
-	case "AccessDenied", "AccessDeniedException":
-		return "access-denied"
-	case "ExpiredToken", "ExpiredTokenException", "RequestExpired":
-		return "expired"
-	default:
-		return code
-	}
+	return awsclient.ErrClass(err)
 }
 
 // probeHasNoRules reports whether shortName has neither a declarative
