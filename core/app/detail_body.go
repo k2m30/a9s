@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
@@ -119,7 +121,7 @@ func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
 }
 
 // buildDetailFieldItems runs the same projector pipeline as
-// DetailModel.buildFieldList + injectAttentionSection and returns the
+// DetailModel.buildFieldList and returns the
 // []fieldpath.FieldItem that both the TUI renderer and buildDetailBody consume.
 // vc may be nil; projection.GenericWithConfig(nil) uses built-in defaults.
 func buildDetailFieldItems(ds *DetailState, vc *config.ViewsConfig) []fieldpath.FieldItem {
@@ -249,16 +251,18 @@ func (e attentionEntry) bare() bool {
 // anywhere rather than merely unlikely to be.
 const defaultAttentionWrapWidth = 80
 
-// attentionIndentColumns is the indentation a renderer puts in front of an
-// Attention sub-field line — subFieldIndent(1) in internal/tui/views —
-// which the sentence has to leave room for.
-const attentionIndentColumns = 5
+// AttentionIndentColumns is the left margin a renderer puts in front of a
+// level-1 sub-field line, and so the room the wrapped Attention sentence has
+// to leave. The renderer derives its own indent from this constant, which is
+// why the two cannot drift.
+const AttentionIndentColumns = 5
 
-// wrapSentence breaks s into lines of at most width columns, on spaces. A
-// word longer than the line goes on a line of its own rather than being
-// split: the Attention sentence is prose, and a broken word reads worse than
-// a long one. Returns nil for an empty sentence, which is what marks an
-// entry bare.
+// wrapSentence breaks s into lines of at most width columns, on spaces, and
+// measures in columns rather than bytes so a sentence carrying wide runes
+// wraps where it is actually painted. A word longer than the line goes on a
+// line of its own rather than being split: the Attention sentence is prose,
+// and a broken word reads worse than a long one. Returns nil for an empty
+// sentence, which is what marks an entry bare.
 func wrapSentence(s string, width int) []string {
 	if strings.TrimSpace(s) == "" {
 		return nil
@@ -266,7 +270,7 @@ func wrapSentence(s string, width int) []string {
 	if width <= 0 {
 		width = defaultAttentionWrapWidth
 	}
-	width -= attentionIndentColumns
+	width -= AttentionIndentColumns
 	if width < 1 {
 		width = 1
 	}
@@ -276,7 +280,7 @@ func wrapSentence(s string, width int) []string {
 		switch {
 		case line == "":
 			line = word
-		case len(line)+1+len(word) <= width:
+		case ansi.StringWidth(line)+1+ansi.StringWidth(word) <= width:
 			line += " " + word
 		default:
 			lines = append(lines, line)
@@ -322,8 +326,9 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 	return entries
 }
 
-// injectAttentionSectionDetail mirrors injectAttentionSection in detail_fields.go,
-// prepending the Attention block when the resource has issue-severity findings.
+// injectAttentionSectionDetail prepends the Attention block when the resource
+// has issue-severity findings. It is the only place the block is built: the
+// renderer paints the rows it emits.
 func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef) []fieldpath.FieldItem {
 	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth)
 	if len(entries) == 0 {
@@ -350,8 +355,11 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 		Path:      "Attention",
 		ColorTier: capTierToRowBucketDetail(headerTier, rowBucket),
 	})
-	// lastEntryBare mirrors injectAttentionSection in detail_fields.go — see
-	// that function's comment for the rationale. Both must stay in lockstep.
+	// lastEntryBare tracks whether the final entry rendered no Detail sentence
+	// and no AttentionDetail rows — its Phrase line is then the last line of
+	// the block, and the trailing spacer below would read as a stray blank
+	// Detail placeholder against it. Richer entries keep the spacer as the
+	// separator from the identity fields that follow.
 	lastEntryBare := false
 	for _, e := range entries {
 		glyph := e.tier
@@ -376,9 +384,8 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 			ColorTier:   entryColor,
 		})
 		// S5 operator sentence, one item per wrapped line. The wrap lives here
-		// rather than in the renderer so both the body and the screen carry the
-		// same rows, and detail_fields.go's injectAttentionSection has nothing
-		// to mirror: the sentence it emits is the unwrapped one it always was.
+		// rather than in the renderer so the body and the screen carry the same
+		// rows.
 		for _, dl := range e.detailLines {
 			injected = append(injected, fieldpath.FieldItem{
 				IsSubField:  true,
@@ -411,7 +418,10 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 	return append(injected, items...)
 }
 
-// capTierToRowBucketDetail mirrors capTierToRowBucket in detail_fields.go.
+// capTierToRowBucketDetail returns the effective color tier for an Attention
+// entry: "!" is permitted only on a row whose own S2 bucket is Broken, so the
+// detail view never shows severity the list row did not. The glyph still
+// carries severity; only the colour is capped.
 func capTierToRowBucketDetail(tier string, rowBucket resource.Color) string {
 	if tier == "!" && rowBucket != resource.ColorBroken {
 		return "~"
@@ -419,7 +429,8 @@ func capTierToRowBucketDetail(tier string, rowBucket resource.Color) string {
 	return tier
 }
 
-// capitalizeFirstDetail mirrors capitalizeFirst in detail_fields.go.
+// capitalizeFirstDetail uppercases the first rune for presentation; the
+// underlying Finding.Phrase stays canonical lowercase.
 func capitalizeFirstDetail(s string) string {
 	if s == "" {
 		return s

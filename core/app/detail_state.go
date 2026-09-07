@@ -41,8 +41,7 @@ func (c *Controller) ensureDetailState(res resource.Resource, resourceType strin
 			Resource:     res,
 			ResourceType: resourceType,
 			// Seed Findings with the resource's own (wave-1, fetcher-emitted)
-			// findings so the Attention section shows them — mirrors the legacy
-			// detail, whose injectAttentionSection read m.res.Findings. Wave-2
+			// findings so the Attention section shows them. Wave-2
 			// enrichment findings are merged in later by applyFindingToState,
 			// which strips only prior wave-2 entries and preserves these.
 			Findings: append([]domain.Finding(nil), res.Findings...),

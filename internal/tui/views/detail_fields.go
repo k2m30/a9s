@@ -5,13 +5,11 @@
 package views
 
 import (
-	"fmt"
-	"sort"
 	"strings"
-	"unicode"
 
 	lipgloss "charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -62,7 +60,6 @@ func (m *DetailModel) buildFieldList() {
 		sections = td.Augment(r, sections)
 	}
 	m.fieldList = sectionsToFieldItems(sections)
-	m.injectAttentionSection()
 }
 
 // sectionsToFieldItems converts []domain.Section to []fieldpath.FieldItem for
@@ -134,223 +131,15 @@ func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldI
 	return fi
 }
 
-// injectAttentionSection prepends a unified "Attention" section to the field
-// list when the resource has one or more active signals in m.res.Findings.
-// Spec §4 universal rule 7: every finding must remain individually visible
-// across S2–S5. The list view's Status column shows only the top phrase (with
-// optional `(+N)` suffix for multi-finding rows); this section surfaces the
-// full set so the operator sees everything at a 3am glance without hunting
-// through raw SDK fields.
-//
-// Per-entry rows come from m.res.AttentionDetails keyed by Finding.Code.
-//
-// Entry order: "!" (broken) first, then "~" and others.
-//
-// Section header: "Attention (N)" where N is the total entry count. Omitted
-// when N == 0 (truly healthy rows).
-//
-// Color-cap invariant: the glyph (`!`/`~`) carries severity, the color carries
-// state. An Attention entry's rendered color must not exceed the row's S2
-// color bucket — a Healthy (green) row with a `!` Wave-2 finding keeps the
-// `!` glyph but renders in `~` yellow, never red. Otherwise the detail view
-// contradicts the list: row-green in S2 and entry-red in S5 tells the operator
-// conflicting things about the same resource. The cap applies uniformly
-// across resource types (dbc, ec2, ecr, …) — no per-type branching.
-func (m *DetailModel) injectAttentionSection() {
-	type entry struct {
-		tier          string
-		primary       string
-		detail        string // S5 operator sentence (Finding.Detail); "" ⇒ Phrase-only, no extra line
-		rows          []domain.DetailRow
-		splitKeyValue bool // when true: Key=primary (raw phrase), Value=glyph+capitalizedPhrase (display)
-	}
-	var entries []entry
-	for _, f := range m.res.Findings {
-		// Only surface issue-severity findings in the Attention section.
-		// SevOK / SevDim findings represent healthy / informational states
-		// that carry no actionable signal — including them would create a
-		// spurious "Attention (1)" block on every healthy resource whose
-		// fetcher emitted a SevOK / SevDim lifecycle finding.
-		if !f.Severity.IsIssue() {
-			continue
-		}
-		var tier string
-		switch f.Severity {
-		case domain.SevBroken:
-			tier = "!"
-		default:
-			tier = "~"
-		}
-		var rows []domain.DetailRow
-		if m.res.AttentionDetails != nil {
-			if det, ok := m.res.AttentionDetails[f.Code]; ok {
-				rows = det.Rows
-			}
-		}
-		// splitKeyValue=true: Key holds the raw phrase (for search and clipboard),
-		// Value holds the glyph+capitalized phrase (for TUI display). PlainContent
-		// renders "raw phrase: ! Capitalized phrase" so callers can match against
-		// the original lowercase text; the TUI viewport renders only the Value to
-		// keep the line short enough to fit the viewport.
-		entries = append(entries, entry{tier: tier, primary: f.Phrase, detail: f.Detail, rows: rows, splitKeyValue: true})
-	}
-	if len(entries) == 0 {
-		return
-	}
-	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].tier == "!" && entries[j].tier != "!"
-	})
-	// Resolve the row's S2 color bucket once; used to cap entry colors below.
-	rowBucket := resolveRowColorBucket(m.resourceType, m.res)
-	headerTier := "~"
-	for _, e := range entries {
-		if e.tier == "!" {
-			headerTier = "!"
-			break
-		}
-	}
-	items := make([]fieldpath.FieldItem, 0, 1+len(entries)*2)
-	items = append(items, fieldpath.FieldItem{
-		IsSection: true,
-		Key:       fmt.Sprintf("Attention (%d)", len(entries)),
-		Path:      "Attention",
-		ColorTier: capTierToRowBucket(headerTier, rowBucket),
-	})
-	// lastEntryBare tracks whether the final entry rendered no Detail line and
-	// no AttentionDetail rows — i.e. its Phrase sub-field is the very last
-	// Attention-block line. In that case the trailing spacer below would sit
-	// directly against the bare Phrase line, reading as a stray blank Detail
-	// placeholder; omit it there and let the next real field follow directly.
-	// Richer entries (Detail present, or rows present) keep the spacer as the
-	// visual separator from subsequent identity/AWS fields.
-	//
-	// Mirrored in core/app/detail_body.go injectAttentionSectionDetail —
-	// keep both in lockstep (TestDetailRenderParity requires byte-identical
-	// output between View() and RenderDetail()).
-	lastEntryBare := false
-	for _, e := range entries {
-		glyph := e.tier
-		if glyph != "!" && glyph != "~" {
-			glyph = "~"
-		}
-		displayPhrase := capitalizeFirst(e.primary)
-		line := glyph + " " + displayPhrase
-		entryColor := capTierToRowBucket(e.tier, rowBucket)
-		itemKey := line
-		itemValue := line
-		if e.splitKeyValue {
-			// Findings path: Key = raw phrase (for search/clipboard),
-			// Value = glyph + capitalized phrase (for TUI display).
-			// TUI rendering uses only Value (short, fits viewport) when
-			// Path=="Attention" and not in plainMode. PlainContent
-			// (plainMode=true) renders "Key: Value" so the raw lowercase
-			// phrase is present alongside the capitalized display form.
-			itemKey = e.primary
-			itemValue = line
-		}
-		items = append(items, fieldpath.FieldItem{
-			IsSubField:  true,
-			IndentLevel: 1,
-			Key:         itemKey,
-			Value:       itemValue,
-			Path:        "Attention",
-			ColorTier:   entryColor,
-		})
-		if e.detail != "" {
-			// S5 operator sentence: its own line alongside the S4 Phrase above.
-			// Key==Value (general sub-field path) so it always renders as the
-			// plain sentence in both TUI and plainMode, tier-colored to match
-			// the Phrase line. Omitted entirely when Detail=="" — no stray
-			// blank line, Phrase-only fallback.
-			items = append(items, fieldpath.FieldItem{
-				IsSubField:  true,
-				IndentLevel: 1,
-				Key:         e.detail,
-				Value:       e.detail,
-				Path:        "Attention",
-				ColorTier:   entryColor,
-			})
-		}
-		for _, row := range e.rows {
-			tier := row.Tier
-			if tier == "" {
-				tier = e.tier
-			}
-			items = append(items, fieldpath.FieldItem{
-				IsSubField:  true,
-				IndentLevel: 3,
-				Key:         row.Label,
-				Value:       row.Value,
-				Path:        "Attention",
-				ColorTier:   capTierToRowBucket(tier, rowBucket),
-			})
-		}
-		lastEntryBare = e.detail == "" && len(e.rows) == 0
-	}
-	// Blank line below the Attention block so the section is visually separated
-	// from identity / AWS fields that follow. Omitted when the last entry is a
-	// bare Phrase-only line (no Detail, no rows) — see lastEntryBare above.
-	if !lastEntryBare {
-		items = append(items, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
-	}
-	m.fieldList = append(items, m.fieldList...)
-}
-
-// capitalizeFirst returns s with its first rune uppercased. Used for
-// presentation in the Attention section — the underlying Finding.Phrase stays
-// canonical lowercase to match §4 spec vocabulary; only the rendered entry is
-// capitalized for readability.
-func capitalizeFirst(s string) string {
-	if s == "" {
-		return s
-	}
-	r := []rune(s)
-	r[0] = unicode.ToUpper(r[0])
-	return string(r)
-}
-
-// resolveRowColorBucket returns the row's S2 color bucket for the given
-// resource. Used by the Attention renderer to cap per-entry colors so the
-// detail view never shows severity beyond what the list row already signaled.
-// Falls back to ColorHealthy when the resource type is unregistered — an
-// unregistered type is by definition "we don't know how to classify", which
-// means the safest default is to cap any entry to `~`.
-func resolveRowColorBucket(resourceType string, r resource.Resource) resource.Color {
-	td := resource.FindResourceType(resourceType)
-	if td == nil {
-		return resource.ColorHealthy
-	}
-	return td.ResolveColor(r)
-}
-
-// capTierToRowBucket returns the effective color-tier string for an Attention
-// entry given its severity tier and the row's S2 color bucket.
-//
-// Rule: `!` (red) is only permitted when the row itself is Broken. On any
-// other row (Healthy / Warning / Dim), a `!` severity tier is capped to `~`
-// (yellow) for COLOR purposes only — the glyph in front of the phrase still
-// shows `!` so the operator sees "important to open" vs "informational".
-// The glyph carries severity, the color carries state; this function is the
-// seam between them.
-//
-// Non-`!` tiers are passed through unchanged — `~`, `ok`, `ct-danger`,
-// `ct-attention`, `ct-info`, and unknown tiers remain as-is. Unknown tiers
-// render as neutral via TierColorStyle's default branch.
-func capTierToRowBucket(tier string, rowBucket resource.Color) string {
-	if tier == "!" && rowBucket != resource.ColorBroken {
-		return "~"
-	}
-	return tier
-}
-
-// subFieldIndent returns the left margin for a sub-field at the given indent level.
-// Level 1 = 5 spaces, level 2 = 7 spaces, level 3 = 9 spaces, etc.
-// This preserves hierarchical YAML indentation in the detail view.
+// subFieldIndent returns the left margin for a sub-field at the given indent
+// level: level 1 is app.AttentionIndentColumns, each level below it two more.
+// The controller wraps the Attention sentence against that same constant, so
+// the sentence is measured against the margin it is actually painted at.
 func subFieldIndent(level int) string {
 	if level < 1 {
 		level = 1
 	}
-	return " " + strings.Repeat("  ", level+1)
+	return strings.Repeat(" ", app.AttentionIndentColumns+2*(level-1))
 }
 
 // colorizeDetailLine applies detail view key/value styling to a raw YAML line.
