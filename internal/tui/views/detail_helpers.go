@@ -15,7 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
-	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // SetSize initializes or resizes the viewport. Must be called before View().
@@ -357,9 +356,3 @@ func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
 	tmp.rightCol.SetFocused(!leftFocused)
 	return tmp.renderFromFieldList()
 }
-
-// ensure the viewport import is used (it is used by SetSize / other methods —
-// this blank assignment guards against an "imported and not used" error if the
-// compiler's unused-import analysis sees only the new imports through the file).
-var _ = viewport.New
-var _ = text.PadOrTrunc
