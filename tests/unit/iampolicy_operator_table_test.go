@@ -157,6 +157,26 @@ var operatorTable = []condCase{
 		cond:      `{"StringEquals":{"kms:CallerAccount":"123456789012","kms:ViaService":"s3.us-east-1.amazonaws.com"}}`,
 		restricts: true,
 	},
+	// An ARN condition value whose account field is "*" matches a principal in
+	// every account, exactly as the principal "arn:aws:iam::*:root" does. The
+	// value side has to read that ARN the way the principal side now does.
+	{
+		name: "PrincipalArn with a wildcard account and a wildcard resource",
+		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::*:*"}}`,
+	},
+	{
+		name: "PrincipalArn with a wildcard account and a named role",
+		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::*:role/x"}}`,
+	},
+	{
+		name: "PrincipalArn naming every account's root user",
+		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::*:root"}}`,
+	},
+	{
+		name:      "PrincipalArn with a concrete account still scopes, whatever the resource",
+		cond:      `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::123456789012:role/*"}}`,
+		restricts: true,
+	},
 }
 
 // A wildcard-principal Allow is public unless its condition positively
