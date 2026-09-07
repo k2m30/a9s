@@ -373,6 +373,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A DNS record pointing outside the account no longer reports a broken record. Nothing a read-only session can read proves that an address it has never seen was once yours, so a name served by a content delivery network, a partner account or your own hardware is left alone. What is still reported, and now says so, is a record pointing at an elastic IP you hold with nothing attached to it.
 - A CloudFront origin bucket in another account is no longer reported as deleted. Absence from your own bucket list says nothing about a bucket you do not own, so a9s now asks AWS directly and reports the bucket missing only when AWS says it is not there.
 - A network load balancer passing TLS through on port 443 is no longer reported as carrying traffic in the clear. The connection is encrypted end to end and terminates on the target. Plain traffic on ports 80 and 8080 is still reported.
+- The main menu no longer dims every type whose count came from the cache
+  while the live sweep re-checks it. A cached count is a real count and its
+  list opens on Enter, so the row renders like any other; only a type the
+  sweep confirmed empty is dimmed.
 
 ### Added
 
@@ -707,6 +711,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A CloudTrail event says why it is flagged under its own finding: a failed
   call, a destructive call, a modifying call, root activity, cross-account
   access, or a read of sensitive data.
+- A row a9s could not inspect now says so. Its Status cell reads `not inspected` instead of a lifecycle word, and its detail view carries an Attention entry reading `Not inspected`, saying the checks for that row did not answer because of a cap or an API error. Its colour is unchanged: an unknown posture is not an issue, it is just not a clean bill of health.
+- Types with more resources than one sweep inspects now mark the whole tail. Past the 50th row a list no longer shows rows that look inspected and healthy when nothing looked at them.
 
 ### Changed
 
@@ -789,6 +795,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identity fetch on the new account also left the old ARN in the header
   indefinitely. Both are closed, with regression coverage for identity,
   revealed values and costs.
+
+### Removed
+
+- The `!` / `~` glyph on a list row. A row carrying a finding is already coloured for it, so the glyph could never appear.
 
 ## [3.56.0] - 2026-07-21
 
