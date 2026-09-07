@@ -317,15 +317,7 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 	if len(resources) == 0 {
 		return resources
 	}
-	var tdVal resource.ResourceTypeDef
-	var td *resource.ResourceTypeDef
-	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
-		tdVal = ftd
-		td = &tdVal
-	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
-		td = catalogTD
-	}
-	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
+	columns := resolveListColumnsForBuild(c.viewConfig, typeName, c.typeDefForLocked(typeName))
 	if len(columns) == 0 {
 		return resources
 	}
@@ -379,20 +371,7 @@ type listBodyMemo struct {
 func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *ListBody {
 	typeName := ctx.ResourceType
 
-	// Resolve typeDef: prefer the fallback (registered via RegisterFallbackTypeDef
-	// from the model constructor) over the catalog. The model's typeDef is the
-	// authoritative Color classifier and column layout source. For test typeDefs
-	// that share a ShortName with a catalog type but have a different Color func
-	// or column set, the fallback must win. The catalog is consulted only as a
-	// last resort when no fallback is registered.
-	var tdVal resource.ResourceTypeDef
-	var td *resource.ResourceTypeDef
-	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
-		tdVal = ftd
-		td = &tdVal
-	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
-		td = catalogTD
-	}
+	td := c.typeDefForLocked(typeName)
 
 	memo := &ls.bodyMemo
 	fallbackRowsGen := domain.Gen(0)
@@ -470,9 +449,10 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 	// Apply filters (relatedIDSet → text → attention).
 	visible := c.applyListFilters(ls, typeName, allResources)
 
-	// Apply sort using viewConfig so user-configured sort_key/sort_path columns
-	// resolve correctly (Bug 3 fix).
-	visible = listSortResources(c.viewConfig, ls, typeName, visible)
+	// Sort over the same resolved set the cells come from, so a user-configured
+	// sort_key/sort_path column resolves correctly (Bug 3 fix) and the
+	// comparator sees the identity election.
+	visible = listSortResources(columns, td, ls, visible)
 
 	// Enrichment data.
 	findings := c.listEnrichmentFindings(typeName)
@@ -662,7 +642,8 @@ func (c *Controller) listSelected() (resource.Resource, bool) {
 
 	allResources := c.listScreenResources(ls, typeName)
 	visible := c.applyListFilters(ls, typeName, allResources)
-	visible = listSortResources(c.viewConfig, ls, typeName, visible)
+	td := c.typeDefForLocked(typeName)
+	visible = listSortResources(resolveListColumnsForBuild(c.viewConfig, typeName, td), td, ls, visible)
 
 	if len(visible) == 0 {
 		return resource.Resource{}, false
@@ -765,7 +746,8 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 	typeName := top.Ctx.ResourceType
 	all := c.listScreenResources(ls, typeName)
 	visible := c.applyListFilters(ls, typeName, all)
-	return listSortResources(c.viewConfig, ls, typeName, visible)
+	td := c.typeDefForLocked(typeName)
+	return listSortResources(resolveListColumnsForBuild(c.viewConfig, typeName, td), td, ls, visible)
 }
 
 // ApplyListFieldUpdates merges Wave-2 field updates into the cached resource

@@ -63,28 +63,30 @@ func MaterializeListFields(r resource.Resource, columns []ColumnDef) resource.Re
 }
 
 // resolveListColumnsForBuild resolves the column set for typeName via the
-// shared config.ResolveListColumnCascade, using the caller-supplied td
+// shared resource.ResolveListColumnCascade, using the caller-supplied td
 // (already resolved fallback-first) for the superset first-column-title
 // check. This ensures that custom test typeDefs sharing a ShortName with a
 // catalog type but having a different column layout (e.g. rlTestTypeDef
 // starts with "Instance ID" not "Name") do not get silently switched to the
 // built-in 9-column defaults.
+//
+// The identity election runs here and nowhere else, so it runs over the set
+// that will actually be rendered and travels with it on ColumnDef.Identity —
+// the cell extractor, the marker column and the sort comparator all read this
+// one election instead of re-deriving it from a set they cannot see.
 func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *resource.ResourceTypeDef) []ColumnDef {
 	lcs := resource.ResolveListColumnCascade(vc, typeName, td)
+	if len(lcs) == 0 {
+		return nil
+	}
 	cols := make([]ColumnDef, len(lcs))
 	for i, lc := range lcs {
-		cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
+		cols[i] = ColumnDef{
+			Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,
+			Humanize: lc.Humanize, SortKey: lc.SortKey, SortPath: lc.SortPath,
+		}
 	}
-	return electIdentityColumn(cols, td)
-}
-
-// electIdentityColumn marks the type's identity column on a freshly resolved
-// column set. Every resolver returns through here, so the election runs once
-// over the set that will actually be rendered and travels with it.
-func electIdentityColumn(cols []ColumnDef, td *resource.ResourceTypeDef) []ColumnDef {
-	if len(cols) > 0 {
-		cols[IdentityColumnIndex(cols, td)].Identity = true
-	}
+	cols[IdentityColumnIndex(cols, td)].Identity = true
 	return cols
 }
 
@@ -251,28 +253,11 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 	// row, and nowhere else. A struct-less row (a warm-cache replay, a
 	// degraded fetch) leaves every other path-only column with nothing to
 	// say, and blank is what it has to say.
-	if r.Name != "" && isIdentityColumn(col, td) {
+	if r.Name != "" && col.Identity {
 		return r.Name
 	}
 
 	return ""
-}
-
-// isIdentityColumn reports whether col is the column that names a row of
-// td's type.
-//
-// The election runs over the type's built-in column set, and the match is on
-// the title: the extractor has no session view config to resolve against, and
-// a column read back from a view file carries only what the YAML stores — the
-// title is that file's map key, while a Key equal to the snake-cased title is
-// omitted as redundant, so Key and Title do not survive the round trip alike.
-func isIdentityColumn(col ColumnDef, td *resource.ResourceTypeDef) bool {
-	if td == nil {
-		return false
-	}
-	cols := resolveListColumnsForBuild(nil, td.ShortName, td)
-	i := IdentityColumnIndex(cols, td)
-	return i >= 0 && i < len(cols) && cols[i].Title == col.Title
 }
 
 // humanizeListCell applies domain.HumanizeStatusPhrase when col.Humanize is
@@ -428,55 +413,30 @@ func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	// The fallback typeDef is resolved first: it decides the superset guard
-	// below AND the identity election on every branch, including the
-	// viewConfig one, whose columns name rows of the same type.
-	var ftd *resource.ResourceTypeDef
-	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
-		ftd = &fv
-	} else if ct := resource.FindResourceType(typeName); ct != nil {
-		ftd = ct
-	}
+	return c.resolveColumnsLocked(typeName)
+}
 
-	// viewConfig takes highest priority (same as resolveColumns).
-	if c.viewConfig != nil {
-		vd := config.GetViewDef(c.viewConfig, typeName)
-		if len(vd.List) > 0 {
-			cols := make([]ColumnDef, len(vd.List))
-			for i, lc := range vd.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
-			}
-			return electIdentityColumn(cols, ftd)
-		}
-	}
+// resolveColumnsLocked is the lock-free core of ResolveColumnsForType, and the
+// controller's single answer to "what are this type's list columns". Callers
+// MUST already hold c.mu — SaveColumnsForType runs under the caller's write
+// lock, and Go's RWMutex is not reentrant.
+func (c *Controller) resolveColumnsLocked(typeName string) []ColumnDef {
+	return resolveListColumnsForBuild(c.viewConfig, typeName, c.typeDefForLocked(typeName))
+}
 
-	// Apply the same superset + first-column-title guard as resolveColumns:
-	// use built-in defaults only when they are strictly larger AND the first
-	// column title matches — this ensures custom test typeDefs that share a
-	// ShortName but have different column layouts (e.g. pgTestTypeDef uses
-	// ShortName="ec2" with first col "Instance ID" vs defaults' "Name") are
-	// not silently switched to the defaults.
-	defaultVD := config.GetViewDef(nil, typeName)
-	if ftd != nil && len(defaultVD.List) > len(ftd.Columns) {
-		firstMatch := len(ftd.Columns) == 0 ||
-			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == ftd.Columns[0].Title)
-		if firstMatch {
-			cols := make([]ColumnDef, len(defaultVD.List))
-			for i, lc := range defaultVD.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
-			}
-			return electIdentityColumn(cols, ftd)
-		}
+// typeDefForLocked resolves the typeDef behind a short name: a registered
+// fallback first (a test or a host may override a catalog type), then the
+// catalog parent, then the registered child. The child rung is load-bearing —
+// internal/tui's app_stack and views/resourcelist both reach the column
+// resolver with a ShortName that may be a child's, and a child that resolves
+// no typeDef resolves no columns, so the column a sort names is never found.
+// Callers MUST already hold c.mu.
+func (c *Controller) typeDefForLocked(shortName string) *resource.ResourceTypeDef {
+	if fv, ok := c.fallbackTypeDefs[shortName]; ok {
+		return &fv
 	}
-
-	// Fall back to typeDef columns (covers test typeDefs with non-matching first title).
-	if ftd != nil && len(ftd.Columns) > 0 {
-		cols := make([]ColumnDef, len(ftd.Columns))
-		for i, col := range ftd.Columns {
-			cols[i] = ColumnDef{Key: col.Key, Title: col.Title, Width: col.Width}
-		}
-		return electIdentityColumn(cols, ftd)
+	if td := resource.FindResourceType(shortName); td != nil {
+		return td
 	}
-
-	return nil
+	return resource.GetChildType(shortName)
 }

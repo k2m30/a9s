@@ -196,17 +196,22 @@ func New(core *runtime.Core) *Controller {
 		availSaveCh:   make(chan availabilitySavePayload, 1),
 		availSaveStop: make(chan struct{}),
 	}
-	core.SetSaveColumns(c.resolveSaveColumns)
+	core.SetSaveColumns(c.SaveColumnsForType)
 	return c
 }
 
-// resolveSaveColumns is the runtime.Core.saveColumns implementation
-// registered by New. It mirrors resolveListColumnsForBuild's cascade (the
-// same one buildListBody/materializeListFieldsForType use at render time)
-// so a save persists exactly the columns the render path would show,
-// including any per-session view-config override — then narrows the result
-// to the config.ListColumn shape SaveTypeRows shares with the built-in-only
-// fallback (resolveSaveColumns in core/runtime/probes.go).
+// SaveColumnsForType is the runtime.Core.saveColumns implementation
+// registered by New: a projection of resolveColumnsLocked's answer — the one
+// the render path shows, per-session view-config override included — onto the
+// config.ListColumn shape SaveTypeRows shares with the built-in-only fallback
+// (resolveSaveColumns in core/runtime/probes.go). A projection, not a second
+// resolution, so a save can never persist a column set the render path would
+// not show. Humanize is dropped deliberately: the render lane applies it from
+// its own resolved column, so carrying it on the persisted shape would give a
+// replayed cell a second, staler source for the same decision.
+//
+// Exported so the save lane's answer is readable beside the render lane's; it
+// is lock-free by contract (below), so a caller outside the lock is safe.
 //
 // Reads c.viewConfig/c.fallbackTypeDefs live (not a value captured at
 // construction time) since SetViewConfig/RegisterFallbackTypeDef are called
@@ -227,16 +232,8 @@ func New(core *runtime.Core) *Controller {
 // under the caller's already-held write lock — cannot happen either: both of
 // those setters also require c.mu, so they cannot run concurrently with any
 // other Controller method. No additional lock is taken here.
-func (c *Controller) resolveSaveColumns(shortName string) []config.ListColumn {
-	var tdVal resource.ResourceTypeDef
-	var td *resource.ResourceTypeDef
-	if ftd, ok := c.fallbackTypeDefs[shortName]; ok {
-		tdVal = ftd
-		td = &tdVal
-	} else if catalogTD := resource.FindResourceType(shortName); catalogTD != nil {
-		td = catalogTD
-	}
-	cols := resolveListColumnsForBuild(c.viewConfig, shortName, td)
+func (c *Controller) SaveColumnsForType(shortName string) []config.ListColumn {
+	cols := c.resolveColumnsLocked(shortName)
 	out := make([]config.ListColumn, len(cols))
 	for i, cd := range cols {
 		out[i] = config.ListColumn{Key: cd.Key, Title: cd.Title, Width: cd.Width, Path: cd.Path}
@@ -356,7 +353,7 @@ func (c *Controller) RegisterFallbackTypeDef(td resource.ResourceTypeDef) {
 // calls (handleActionChildView registers the web lane's child typeDef fallback
 // this way; calling the locking RegisterFallbackTypeDef from there would
 // self-deadlock on the already-held write lock, the same hazard documented on
-// resolveSaveColumns above).
+// SaveColumnsForType above).
 func (c *Controller) registerFallbackTypeDefLocked(td resource.ResourceTypeDef) {
 	if c.fallbackTypeDefs == nil {
 		c.fallbackTypeDefs = make(map[string]resource.ResourceTypeDef, 1)

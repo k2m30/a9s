@@ -141,6 +141,14 @@ type ColumnDef struct {
 	// fallback — the isStatusCol branch and identity-column RawStruct
 	// precedence (e.g. EC2 InstanceType) are unaffected.
 	Humanize bool `json:"humanize,omitempty"`
+	// SortKey and SortPath are the view definition's optional sort overrides:
+	// the Fields key to compare when the display value sorts wrongly, and the
+	// RawStruct path to compare numerically or chronologically. Carried on the
+	// resolved column so the sort comparator reads the same column set the
+	// cells are extracted from. Not serialized: sorting is decided controller
+	// side and renderers receive rows already ordered.
+	SortKey  string `json:"-"`
+	SortPath string `json:"-"`
 	// Identity marks the one column that names the row, elected by
 	// IdentityColumnIndex over the resolved (rendered) column set at the
 	// moment that set is built. Carrying the election on the column means a

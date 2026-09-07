@@ -34,12 +34,25 @@ import (
 // core/app's resolveListColumnsForBuild and core/runtime's resolveSaveColumns
 // both delegate to. A nil vc is the column set a fresh install renders; a
 // loaded one is what a user with view files on disk sees.
+//
+// The election is marked here because core/app's resolver marks it: per the
+// cols spec row 2, the identity column is elected once over the resolved set
+// and travels on ColumnDef.Identity, and ExtractCellValue reads that flag
+// instead of re-electing from the type's built-in set. A column set assembled
+// without the election is a set no resolver produces, so asserting the
+// extractor's behaviour on one would test nothing. The old assertion (the
+// extractor finds the identity column from the typeDef alone) is not to be
+// restored: it is what made a loaded view file's identity cell render blank.
 func w45Columns(vc *config.ViewsConfig, td resource.ResourceTypeDef) []app.ColumnDef {
 	lcs := resource.ResolveListColumnCascade(vc, td.ShortName, &td)
+	if len(lcs) == 0 {
+		return nil
+	}
 	cols := make([]app.ColumnDef, len(lcs))
 	for i, lc := range lcs {
 		cols[i] = app.ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 	}
+	cols[app.IdentityColumnIndex(cols, &td)].Identity = true
 	return cols
 }
 

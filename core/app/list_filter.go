@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -120,33 +119,23 @@ func listHasIssueFinding(r resource.Resource) bool {
 
 // listSortResources sorts resources by ls.SortCol/SortDir, mirroring
 // sortFiltered in views/sort.go. No-op when SortCol is empty.
-// vc is the per-session view config (nil = built-in defaults only); passing
-// the controller's viewConfig ensures user-configured sort_key / sort_path
-// columns resolve correctly — matching what buildListBody and resourcelist.go
-// do (Bug 3 fix).
-func listSortResources(vc *config.ViewsConfig, ls *ListState, typeName string, resources []resource.Resource) []resource.Resource {
+//
+// columns is the resolved set the list is rendering, so the comparator reads
+// the same Path, SortKey, SortPath and identity election the cells were
+// extracted with. A set resolved separately here would sort by a column the
+// list does not show, and would compare every row that only the identity
+// column can distinguish — a warm-cache replay, a degraded fetch — as equal.
+func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *ListState, resources []resource.Resource) []resource.Resource {
 	if ls.SortCol == "" || len(resources) == 0 {
 		return resources
 	}
 
-	// Resolve columns from viewConfig first (same priority as buildListBody)
-	// so custom sort_key / sort_path columns
-	// are found even when they are not in the built-in defaults.
-	vd := config.GetViewDef(vc, typeName)
-	if len(vd.List) == 0 {
-		vd = config.GetViewDef(nil, typeName)
-	}
-	var col *config.ListColumn
+	col := ColumnDef{Key: ls.SortCol}
 	sortColLower := strings.ToLower(ls.SortCol)
-	for i := range vd.List {
-		lc := &vd.List[i]
-		if lc.Key == ls.SortCol || lc.Path == ls.SortCol {
-			col = lc
-			break
-		}
-		titleUnder := strings.ToLower(strings.ReplaceAll(lc.Title, " ", "_"))
-		if titleUnder == sortColLower {
-			col = lc
+	for _, c := range columns {
+		titleUnder := strings.ToLower(strings.ReplaceAll(c.Title, " ", "_"))
+		if c.Key == ls.SortCol || c.Path == ls.SortCol || titleUnder == sortColLower {
+			col = c
 			break
 		}
 	}
@@ -160,12 +149,9 @@ func listSortResources(vc *config.ViewsConfig, ls *ListState, typeName string, r
 		b := out[j]
 
 		// Raw struct comparison (numeric/time) when a sortPath or path is present.
-		rawPath := ""
-		if col != nil {
-			rawPath = col.SortPath
-			if rawPath == "" {
-				rawPath = col.Path
-			}
+		rawPath := col.SortPath
+		if rawPath == "" {
+			rawPath = col.Path
 		}
 		if rawPath != "" && a.RawStruct != nil && b.RawStruct != nil {
 			if cmp, ok := listCompareRaw(a.RawStruct, b.RawStruct, rawPath); ok {
@@ -178,17 +164,12 @@ func listSortResources(vc *config.ViewsConfig, ls *ListState, typeName string, r
 
 		// Display-value fallback.
 		var va, vb string
-		if col != nil && col.SortKey != "" {
+		if col.SortKey != "" {
 			va = a.Fields[col.SortKey]
 			vb = b.Fields[col.SortKey]
 		} else {
-			sortColDef := ColumnDef{Key: ls.SortCol}
-			if col != nil {
-				sortColDef = ColumnDef{Key: col.Key, Title: col.Title, Path: col.Path}
-			}
-			td := resource.FindResourceType(typeName)
-			va = ExtractCellValue(sortColDef, td, a)
-			vb = ExtractCellValue(sortColDef, td, b)
+			va = ExtractCellValue(col, td, a)
+			vb = ExtractCellValue(col, td, b)
 		}
 		if fa, err := strconv.ParseFloat(va, 64); err == nil {
 			if fb, err := strconv.ParseFloat(vb, 64); err == nil {
