@@ -6,6 +6,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"sort"
@@ -35,6 +36,10 @@ const (
 // ResourceNotFoundException — that is the healthy answer, not a failure and
 // not a coverage gap, so it is neither recorded in TruncatedIDs nor folded
 // into the composite error.
+//
+// The two reads answer two independent questions. Losing one says nothing
+// about the other, so each check's finding stands on its own and only the
+// check that failed leaves the row uninspected.
 func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
@@ -72,18 +77,6 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 
 		mu.Lock()
 		defer mu.Unlock()
-		if policyErr != nil || urlErr != nil {
-			err := policyErr
-			if err == nil {
-				err = urlErr
-			}
-			if IsNotFoundErr(err) {
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
-			MarkSkipped(&result, r.ID, &failures, op, err)
-			return
-		}
 		if policyPublic {
 			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, "invokable by anyone", "!", "lambda",
 				policyRows)
@@ -93,6 +86,13 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, "function endpoint open without authentication", "!", "lambda",
 				urlRows)
 
+		}
+		if err := cmp.Or(policyErr, urlErr); err != nil {
+			if IsNotFoundErr(err) {
+				result.TruncatedIDs[r.ID] = true
+				return
+			}
+			MarkSkipped(&result, r.ID, &failures, op, err)
 		}
 	})
 	sort.Strings(failures)

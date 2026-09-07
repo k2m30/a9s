@@ -213,6 +213,28 @@ func markAllUninspected(result *IssueEnricherResult, resources []resource.Resour
 	}
 }
 
+// capAtEnrichmentCap trims a per-item work list to EnrichmentCap and records
+// every row the dropped items would have answered for as uninspected. A cap is
+// a limit on what a9s looked at, so the rows past it are "?" and never clean.
+//
+// idsOf maps one work item to the resource IDs its inspection decides, which is
+// the item's own ID for a list of resources and every task on a definition for
+// a list grouped by a shared key.
+func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf func(T) []string) []T {
+	if len(items) <= EnrichmentCap {
+		return items
+	}
+	for _, item := range items[EnrichmentCap:] {
+		for _, id := range idsOf(item) {
+			if id != "" {
+				result.TruncatedIDs[id] = true
+			}
+		}
+	}
+	result.Truncated = true
+	return items[:EnrichmentCap]
+}
+
 // Finish folds a Wave 2 enricher's accumulated per-batch failures into result
 // and returns the composite error via AggregateFailures. Truncated is only
 // ever set to true here, never reset to false, so a call with zero failures

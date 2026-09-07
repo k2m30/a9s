@@ -24,9 +24,14 @@ import (
 // plans covers nothing, and that is knowledge rather than a gap.
 //
 // arnAndTags gives the resource's ARN and the tags a selection may condition
-// on. Its third value is false when those tags could not be read, and a
-// resource whose tags are unknown is reported on by nobody: a selection the
-// join cannot evaluate would make the finding a guess.
+// on. Its third value is false when those tags could not be read. Unknown tags
+// only silence the finding where they could change it — when some plan selects
+// by tag; where every selection names ARNs, tags decide nothing and the
+// verdict stands.
+//
+// A plan whose own selection list could not be read to the end is the same
+// gap one level up: it may select anything, so nothing in the account can be
+// called uncovered while it is in the cache.
 func addBackupCoverage(
 	cache resource.ResourceCache,
 	shortName string,
@@ -36,9 +41,10 @@ func addBackupCoverage(
 	result *IssueEnricherResult,
 ) {
 	entry, ok := cache["backup"]
-	if !ok || entry.IsTruncated {
+	if !ok || entry.IsTruncated || backupPlansIncomplete(entry.Resources) {
 		return
 	}
+	tagsDecide := backupPlansSelectByTag(entry.Resources)
 	for _, r := range resources {
 		if r.ID == "" {
 			continue
@@ -46,7 +52,7 @@ func addBackupCoverage(
 		arn, tags, known := arnAndTags(r)
 		// A row the fetcher gave no ARN cannot be matched against a selection,
 		// so it is not evidence either way.
-		if arn == "" || !known || backupPlansCover(entry.Resources, arn, tags) {
+		if arn == "" || (!known && tagsDecide) || backupPlansCover(entry.Resources, arn, tags) {
 			continue
 		}
 		setWave2Finding(result, r.ID, code, "not covered by a backup plan", "~", shortName, []domain.DetailRow{{Label: "Backup plans", Value: "0"}})
@@ -113,6 +119,19 @@ func backupTagsAccessor(
 		t, known := tags[r.ID]
 		return r.Fields["arn"], t, known
 	}, errors.Join(walkErr, AggregateFailures(op, failures, n))
+}
+
+// backupPlansIncomplete reports whether any plan's selection enumeration
+// stopped short of the whole list. The plan row then names some of what the
+// plan protects and no way to tell how much is missing, so it cannot support
+// "not covered" for anything.
+func backupPlansIncomplete(plans []resource.Resource) bool {
+	for _, plan := range plans {
+		if plan.Fields[backupSelectionsPartialField] != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // backupPlansSelectByTag reports whether any plan chooses resources by tag.

@@ -5,10 +5,12 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -63,10 +65,10 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 
 		// Enumerate the plan's selection resource ARNs and tag-based
 		// conditions so sibling pivots (s3, ddb, efs, dbi, ec2, ebs, …) can
-		// match via cache scan. One ListBackupSelections + one
-		// GetBackupSelection per selection — bounded by plan count;
-		// selections per plan typically ≤3.
-		resourcesCSV, notResourcesCSV, selectionTagsCSV := enumerateBackupPlanResources(ctx, selectionAPI, getSelectionAPI, planID)
+		// match via cache scan. One ListBackupSelections page walk plus one
+		// GetBackupSelection per selection — bounded by plan count; selections
+		// per plan typically ≤3.
+		resourcesCSV, notResourcesCSV, selectionTagsCSV, complete := enumerateBackupPlanResources(ctx, selectionAPI, getSelectionAPI, planID)
 
 		r := resource.Resource{
 			ID:   planID,
@@ -85,6 +87,12 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 				"selection_tags": selectionTagsCSV,
 			},
 			RawStruct: plan,
+		}
+		if !complete {
+			// The coverage join reads this as "this plan may select anything",
+			// which is the difference between a plan that protects nothing and
+			// a plan nobody could finish reading.
+			r.Fields[backupSelectionsPartialField] = "true"
 		}
 
 		resources = append(resources, r)
@@ -113,59 +121,92 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 	}, nil
 }
 
+// backupSelectionsPartialField marks a plan row whose selection enumeration
+// did not reach the end of the list.
+const backupSelectionsPartialField = "selections_partial"
+
 // enumerateBackupPlanResources walks the plan's selections and returns
 // comma-separated lists of resource ARNs, excluded ARNs, and tag-selection
-// conditions covered by the plan. Returns ("", "", "") when the plan has no
-// selections, the API shape is unavailable, or any enumeration call fails.
-// The three return values correspond to BackupSelection.Resources (include
-// list, may contain wildcards), BackupSelection.NotResources (exclude list,
-// same wildcard semantics), and BackupSelection.ListOfTags (tag-based
-// selection conditions, OR logic across entries) rendered as "k=v" pairs
+// conditions covered by the plan, plus whether the walk saw the whole list.
+//
+// The three lists correspond to BackupSelection.Resources (include list, may
+// contain wildcards), BackupSelection.NotResources (exclude list, same
+// wildcard semantics), and the plan's tag conditions rendered as "k=v" pairs
 // with the "aws:ResourceTag/" ConditionKey prefix stripped so callers can
-// match directly against a resource's own Tags.
+// match directly against a resource's own tags. Tag conditions arrive in two
+// shapes AWS accepts interchangeably: the flat ListOfTags, and the structured
+// Conditions whose StringEquals and StringLike carry the same key and value.
+// Its negative forms are not modelled — an unmodelled exclusion can only widen
+// what the plan appears to cover, which never invents a finding.
+//
+// complete is false when any call failed or the list ran past the page cap.
+// Whatever was read is still returned: a partial list can only match more
+// resources, and the flag is what stops the coverage join from reading a short
+// list as a plan that protects nothing.
 func enumerateBackupPlanResources(
 	ctx context.Context,
 	selectionAPI BackupListBackupSelectionsAPI,
 	getSelectionAPI BackupGetBackupSelectionAPI,
 	planID string,
-) (string, string, string) {
+) (string, string, string, bool) {
 	if selectionAPI == nil || getSelectionAPI == nil || planID == "" {
-		return "", "", ""
-	}
-	listOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
-		return selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
-			BackupPlanId: aws.String(planID),
-		})
-	})
-	if err != nil || listOut == nil {
-		return "", "", ""
+		return "", "", "", false
 	}
 	var resources, notResources, selectionTags []string
-	for _, sel := range listOut.BackupSelectionsList {
-		if sel.SelectionId == nil {
-			continue
-		}
-		selOut, selErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupSelectionOutput, error) {
-			return getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
+	var nextToken *string
+	complete := false
+	for range PerParentPageCap {
+		listOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
+			return selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
 				BackupPlanId: aws.String(planID),
-				SelectionId:  sel.SelectionId,
+				NextToken:    nextToken,
 			})
 		})
-		if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
-			// fail closed — partial enumeration would drop NotResources exclusions,
-			// causing false-positive backup coverage. Return empty triple so the
-			// caller degrades cleanly rather than claiming incorrect coverage.
-			return "", "", ""
+		if err != nil || listOut == nil {
+			break
 		}
-		resources = append(resources, selOut.BackupSelection.Resources...)
-		notResources = append(notResources, selOut.BackupSelection.NotResources...)
-		for _, cond := range selOut.BackupSelection.ListOfTags {
-			if cond.ConditionKey == nil || cond.ConditionValue == nil {
+		for _, sel := range listOut.BackupSelectionsList {
+			if sel.SelectionId == nil {
 				continue
 			}
-			key := strings.TrimPrefix(*cond.ConditionKey, "aws:ResourceTag/")
-			selectionTags = append(selectionTags, key+"="+*cond.ConditionValue)
+			selOut, selErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupSelectionOutput, error) {
+				return getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
+					BackupPlanId: aws.String(planID),
+					SelectionId:  sel.SelectionId,
+				})
+			})
+			if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
+				return strings.Join(resources, ","), strings.Join(notResources, ","), strings.Join(selectionTags, ","), false
+			}
+			resources = append(resources, selOut.BackupSelection.Resources...)
+			notResources = append(notResources, selOut.BackupSelection.NotResources...)
+			selectionTags = append(selectionTags, backupSelectionTagConditions(*selOut.BackupSelection)...)
+		}
+		if nextToken = listOut.NextToken; nextToken == nil || *nextToken == "" {
+			complete = true
+			break
 		}
 	}
-	return strings.Join(resources, ","), strings.Join(notResources, ","), strings.Join(selectionTags, ",")
+	return strings.Join(resources, ","), strings.Join(notResources, ","), strings.Join(selectionTags, ","), complete
+}
+
+// backupSelectionTagConditions renders one selection's tag conditions as "k=v"
+// pairs, from both shapes AWS accepts.
+func backupSelectionTagConditions(sel backuptypes.BackupSelection) []string {
+	var out []string
+	add := func(key, value *string) {
+		if key == nil || value == nil {
+			return
+		}
+		out = append(out, strings.TrimPrefix(*key, "aws:ResourceTag/")+"="+*value)
+	}
+	for _, cond := range sel.ListOfTags {
+		add(cond.ConditionKey, cond.ConditionValue)
+	}
+	if sel.Conditions != nil {
+		for _, cond := range slices.Concat(sel.Conditions.StringEquals, sel.Conditions.StringLike) {
+			add(cond.ConditionKey, cond.ConditionValue)
+		}
+	}
+	return out
 }

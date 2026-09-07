@@ -178,7 +178,9 @@ func backupSelectionTagsMatch(selectionTagsCSV string, resourceTags map[string]s
 		if !ok {
 			continue
 		}
-		if v, present := resourceTags[key]; present && v == value {
+		// StringLike conditions carry `*`, and backupARNPatternMatches is the
+		// same glob the ARN selection lists are read with.
+		if v, present := resourceTags[key]; present && backupARNPatternMatches(value, v) {
 			return true
 		}
 	}

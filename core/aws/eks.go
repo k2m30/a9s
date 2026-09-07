@@ -224,21 +224,23 @@ const (
 
 	eksSupportStandard = "standard"
 	eksSupportEnded    = "out of standard support"
+	eksSupportUnknown  = "unknown"
 )
 
 // eksPosture is the four config verdicts, each a word the fetcher derives from
 // the DescribeCluster struct and writes into Fields so the classifier can read
 // back what the fetcher decided instead of deciding again.
 //
-// VersionSupport carries one bit, which is the one the finding reports: a
-// version off standard support is broken whether AWS calls that extended,
-// unsupported, or something it has not published yet. Which of those it is
-// belongs in the supporting row, where eksSupportWords renders it.
+// VersionSupport carries the finding's bit plus the third word the closed
+// vocabulary needs: a version off standard support is broken whether AWS calls
+// that extended, unsupported, or something it has not published yet, and a
+// version no catalogue entry covers is unknown rather than either. Which of
+// those it is belongs in the supporting row, where eksSupportWords renders it.
 type eksPosture struct {
 	PublicEndpoint      string // no | restricted | open
 	ControlPlaneLogging string // complete | incomplete
 	SecretsEncryption   string // kms | none
-	VersionSupport      string // standard | out of standard support
+	VersionSupport      string // unknown | standard | out of standard support
 }
 
 func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) eksPosture {
@@ -246,7 +248,7 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 		PublicEndpoint:      eksEndpointPrivate,
 		ControlPlaneLogging: eksLoggingComplete,
 		SecretsEncryption:   eksSecretsNone,
-		VersionSupport:      eksSupportStandard,
+		VersionSupport:      eksSupportUnknown,
 	}
 
 	if vpc := cluster.ResourcesVpcConfig; vpc != nil && vpc.EndpointPublicAccess {
@@ -275,11 +277,15 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 		}
 	}
 
-	// A version absent from the catalogue, or a catalogue that could not be
-	// read at all, is unknown — not old.
-	if info, known := versions[aws.ToString(cluster.Version)]; known &&
-		info.VersionStatus != ekstypes.VersionStatusStandardSupport && info.VersionStatus != "" {
-		p.VersionSupport = eksSupportEnded
+	// The verdict is only ever read out of a catalogue entry. A version absent
+	// from the catalogue, an entry AWS gave no status, or a catalogue that
+	// could not be read at all leaves it unknown — "standard" is a claim about
+	// what AWS says and needs an answer AWS gave.
+	if info, known := versions[aws.ToString(cluster.Version)]; known && info.VersionStatus != "" {
+		p.VersionSupport = eksSupportStandard
+		if info.VersionStatus != ekstypes.VersionStatusStandardSupport {
+			p.VersionSupport = eksSupportEnded
+		}
 	}
 	return p
 }

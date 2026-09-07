@@ -114,7 +114,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		// across a network call would serialise the whole page behind one
 		// repository and undo ForEachParallel.
 		exposure, policyUnreadable := ecrRepositoryExposure(ctx, clients.ECR, repoName, ownAccount)
-		noLifecyclePolicy := ecrLifecyclePolicyMissing(ctx, clients.ECR, repoName)
+		noLifecyclePolicy, lifecycleUnreadable := ecrLifecyclePolicyMissing(ctx, clients.ECR, repoName)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -128,7 +128,11 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		case exposure.Public:
 			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "repository policy open to anyone", "!", "ecr", publicPolicyRows(exposure))
 		}
-		if noLifecyclePolicy {
+		switch {
+		case lifecycleUnreadable:
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+		case noLifecyclePolicy:
 			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "no lifecycle policy", "~", "ecr", nil)
 		}
 
@@ -223,19 +227,26 @@ func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount
 // through its own standalone interface rather than the aggregate: a client
 // that predates the call degrades to "nothing to say" instead of reporting
 // every repository as unpolicied.
-func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string) bool {
+//
+// The read gives three answers and they stay apart: NotFound is the finding,
+// success is the healthy case, and anything else — a denial, a transient
+// failure — is a read that did not happen. The second return says so, and a
+// repository nobody could read is not a repository with a policy.
+func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string) (missing, unreadable bool) {
 	lifecycleAPI, ok := api.(ECRGetLifecyclePolicyAPI)
 	if !ok {
-		return false
+		return false, false
 	}
 	_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetLifecyclePolicyOutput, error) {
 		return lifecycleAPI.GetLifecyclePolicy(ctx, &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)})
 	})
 	if err == nil {
-		return false
+		return false, false
 	}
-	_, notFound := errors.AsType[*ecrtypes.LifecyclePolicyNotFoundException](err)
-	return notFound
+	if _, notFound := errors.AsType[*ecrtypes.LifecyclePolicyNotFoundException](err); notFound {
+		return true, false
+	}
+	return false, true
 }
 
 // S5 operator sentences for the two policy findings.

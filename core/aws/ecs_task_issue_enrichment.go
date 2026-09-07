@@ -192,10 +192,7 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 		defARNs = append(defARNs, arn)
 	}
 	sort.Strings(defARNs)
-	if len(defARNs) > EnrichmentCap {
-		result.Truncated = true
-		defARNs = defARNs[:EnrichmentCap]
-	}
+	defARNs = capAtEnrichmentCap(result, defARNs, func(arn string) []string { return tasksByDef[arn] })
 
 	const op = "ecs-task-enrich: DescribeTaskDefinition"
 	var mu sync.Mutex

@@ -33,7 +33,8 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 	// snapshot of it exists.
 	account := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	addBackupCoverage(cache, "ebs", CodeEBSNotInBackupPlan, resources, func(r resource.Resource) (string, map[string]string, bool) {
-		return ebsVolumeARN(r, account), ebsVolumeTags(r), true
+		tags, known := ebsVolumeTags(r)
+		return ebsVolumeARN(r, account), tags, known
 	}, &result)
 	addEBSSnapshotCoverage(cache, resources, &result)
 
@@ -61,7 +62,11 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
+			// The cache-only joins above already answered; only the status
+			// question is now unknown, so their findings stay and every row
+			// is marked uninspected for this check alone.
+			markAllUninspected(&result, resources)
+			return result, err
 		}
 		allVolumeStatuses = append(allVolumeStatuses, out.VolumeStatuses...)
 		if out.NextToken == nil {
@@ -131,10 +136,16 @@ func ebsVolumeARN(r resource.Resource, account string) string {
 
 // ebsVolumeTags reads the volume's own tags, which a backup selection may
 // choose it by. ebs is the only type in this batch whose row carries them.
-func ebsVolumeTags(r resource.Resource) map[string]string {
+//
+// They live on RawStruct, which the disk cache does not persist, so a row
+// replayed from disk has no tags to read. The second return says whether they
+// were read at all: nil tags and "unknown" are different answers, and reading
+// the second as the first turns a tag-selected volume into a warning the next
+// time the app starts.
+func ebsVolumeTags(r resource.Resource) (map[string]string, bool) {
 	vol, ok := assertStruct[ec2types.Volume](r.RawStruct)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	tags := make(map[string]string, len(vol.Tags))
 	for _, t := range vol.Tags {
@@ -142,7 +153,7 @@ func ebsVolumeTags(r resource.Resource) map[string]string {
 			tags[*t.Key] = *t.Value
 		}
 	}
-	return tags
+	return tags, true
 }
 
 // addEBSSnapshotCoverage reports every attached volume the snapshot list holds

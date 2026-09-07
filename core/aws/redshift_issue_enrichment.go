@@ -7,6 +7,8 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -103,6 +105,12 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 	return result, err
 }
 
+// errRedshiftParamsCutShort is the answer a parameter walk gives when it ran
+// out of pages before require_ssl appeared: the setting is unread, which the
+// caller marks as a coverage gap on the cluster rather than a value.
+var errRedshiftParamsCutShort = errors.New("require_ssl not found within " +
+	strconv.Itoa(PerParentPageCap) + " pages of parameters")
+
 // redshiftParamGroupCache reads each parameter group at most once per run.
 // singleflight collapses the clusters that share a group into one call
 // without any of them waiting on a cluster that shares nothing with them,
@@ -180,10 +188,17 @@ func (g *redshiftParamGroupCache) requireSSL(ctx context.Context, clients *Servi
 					value = aws.ToString(param.ParameterValue)
 				}
 			}
-			if value != "" || out.Marker == nil || *out.Marker == "" {
+			marker = out.Marker
+			if value != "" || marker == nil || *marker == "" {
+				marker = nil
 				break
 			}
-			marker = out.Marker
+		}
+		if marker != nil {
+			// The cap is a limit on what a9s read, not evidence the parameter
+			// is unset. Failing here keeps the empty value out of the cache,
+			// so the next cluster sharing the group does not inherit it.
+			return "", errRedshiftParamsCutShort
 		}
 		g.values.Store(name, value)
 		return value, nil
