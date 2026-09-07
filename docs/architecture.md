@@ -597,7 +597,7 @@ The critical insight: steps 2-3 mean `q` only quits in normal mode. During filte
 
 ### Sorting
 
-Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth column). `SortByCol [10]key.Binding` in `keys.Map` maps the digit keys to column indices; pressing a key sorts ascending and pressing it again toggles to descending, with a ▲/▼ indicator in the column header. Column position is the only sort model: the `SortField` alias and the `SortName` / `SortID` / `SortAge` sentinels were removed in #283.
+Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth column). `SortByCol [10]key.Binding` in `keys.Map` maps the digit keys to column indices; pressing a key sorts ascending and pressing it again toggles to descending, with a ↑/↓ indicator in the column header. Column position is the only sort model: the `SortField` alias and the `SortName` / `SortID` / `SortAge` sentinels were removed in #283.
 
 **One key names a column.** The controller holds the sort as a column key plus a direction, and that key comes from `app.ColumnDef.SortColKey` — the column's `Key`, or its `Title` when it has none — and from nowhere else. `app.SortColIndex` is the only way back from a key to a column. Both directions of the list-view cache round trip go through the pair: leaving a list stores the sort column's index on the cache entry, and re-entering turns the index back into a key. A second spelling on either side drops the operator's sort silently on re-entry, which is why the header-arrow lookup and the comparator's column lookup ask the same two functions. `Path` is deliberately not in the formula: two columns of one view may read the same RawStruct path, so a path names a column ambiguously.
 
