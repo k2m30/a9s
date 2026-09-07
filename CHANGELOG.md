@@ -845,6 +845,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it was enriching.
 - A service the region does not offer now names the region wherever it is
   reported, including the related panel, which used to drop it.
+- A check a9s could not run reads the same way everywhere: one line naming what was refused, how many resources it covered and one example, with no request ids or SDK preamble.
+- A batch refused for one reason is recognised as a refusal on the main menu, instead of showing as an unclassified error.
+- A failed check now names the call it was making, so a batch that makes two different calls says which one refused.
+- A DynamoDB table whose backup setting could not be read says so in the error log, instead of only showing "?" with no reason.
+- A check that could not read a resource now says so in the error log, everywhere it happens. Rows that show "?" because a call was refused no longer leave the reason out.
+- The status bar no longer repeats the resource type when a partial failure is reported.
+- A failed check names its resource type once: "enrich ddb: DescribeContinuousBackups failed for 2 of 2 IDs", not the type twice. Failures from a check that makes two passes stay on one line.
 
 ### Fixed (security)
 
