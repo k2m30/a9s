@@ -30,7 +30,7 @@ definition; `docs/resources/<shortName>.md` §4 transcribes it verbatim.
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` tier in the detail-view Attention section | One entry per finding, `!` at Broken and `~` at Warning — `internal/tui/views/detail_fields.go`. A finding that is neither, such as a Dim lifecycle state, is skipped there and has no tier. **Not a list-row marker**: a list row's colour is the worst finding over both waves (`tests/unit/qa_color_findings_conformance_test.go`, empty divergence allowlist), so a row carrying a finding is never green for a glyph to annotate. |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. A finding shows at most 10 supporting rows, then one closing row reading `… +K more` for the rest. |
 
 ### Wave → surface mapping
 

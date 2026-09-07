@@ -179,7 +179,7 @@ func setWave2Finding(
 			r.AttentionDetails[resourceID] = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 		}
 		ad := r.AttentionDetails[resourceID][code]
-		ad.Rows = append(ad.Rows, rows...)
+		ad.Rows = capRows(ad.Rows, rows)
 		r.AttentionDetails[resourceID][code] = ad
 	}
 }
@@ -307,3 +307,48 @@ type IssueEnricherResult struct {
 // who need to derive a mutable view should append([]Resource{}, slice...) into
 // a local slice first.
 type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error)
+
+// FindingRowCap bounds the supporting rows one finding shows in the detail
+// Attention section. A target group can report hundreds of unhealthy targets
+// and a node group dozens of health issues; without a bound one noisy
+// condition pushes the rest of the resource's posture off the section.
+const FindingRowCap = 10
+
+// overflowRowFormat renders the count of rows a capped finding did not show.
+const overflowRowFormat = "… +%d more"
+
+// capRows appends incoming to the rows a finding already carries, holding the
+// result at FindingRowCap rows of content plus one closing "… +K more" row
+// wearing the last kept row's label and tier, so it reads as one more line of
+// the same list. It is the one place the bound is applied: both sinks call it
+// and no builder caps on its own.
+//
+// A second call for the same (resource, code) — a second pipeline stage, a
+// second container of one task — reads K back out of the closing row, which
+// is where the count already lives, so the cap holds over the combined rows
+// and K keeps counting everything not shown.
+func capRows(kept, incoming []domain.DetailRow) []domain.DetailRow {
+	hidden := 0
+	if n := len(kept); n > 0 {
+		var k int
+		if _, err := fmt.Sscanf(kept[n-1].Value, overflowRowFormat, &k); err == nil {
+			hidden, kept = k, kept[:n-1]
+		}
+	}
+	for _, row := range incoming {
+		if len(kept) < FindingRowCap {
+			kept = append(kept, row)
+			continue
+		}
+		hidden++
+	}
+	if hidden == 0 {
+		return kept
+	}
+	last := kept[len(kept)-1]
+	return append(kept, domain.DetailRow{
+		Label: last.Label,
+		Value: fmt.Sprintf(overflowRowFormat, hidden),
+		Tier:  last.Tier,
+	})
+}

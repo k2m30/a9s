@@ -24,7 +24,7 @@ func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.
 		r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 	}
 	ad := r.AttentionDetails[code]
-	ad.Rows = append(ad.Rows, rows...)
+	ad.Rows = capRows(ad.Rows, rows)
 	r.AttentionDetails[code] = ad
 }
 

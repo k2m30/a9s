@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -22,10 +21,6 @@ import (
 const (
 	iamPolicyCodeAdminStar domain.FindingCode = "iam-policy.admin-star"
 	iamPolicyCodePrivEsc   domain.FindingCode = "policy.privilege-escalation"
-
-	// privEscComboRowCap bounds the Combo rows listed on one finding; the
-	// remainder is summarised in a trailing row.
-	privEscComboRowCap = 10
 )
 
 // EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
@@ -204,21 +199,11 @@ func policyPrivEscCombos(doc any) []string {
 	return parsed.PrivilegeEscalation()
 }
 
-// privEscComboRows lists the matched combinations, capped so a policy that
-// matches dozens does not push the rest of the Attention section off screen.
+// privEscComboRows lists the matched combinations. The sink bounds the list.
 func privEscComboRows(combos []string) []domain.DetailRow {
-	shown := combos
-	var overflow int
-	if len(shown) > privEscComboRowCap {
-		overflow = len(shown) - privEscComboRowCap
-		shown = shown[:privEscComboRowCap]
-	}
-	rows := make([]domain.DetailRow, 0, len(shown)+1)
-	for _, c := range shown {
+	rows := make([]domain.DetailRow, 0, len(combos))
+	for _, c := range combos {
 		rows = append(rows, domain.DetailRow{Label: "Combo", Value: c, Tier: "!"})
-	}
-	if overflow > 0 {
-		rows = append(rows, domain.DetailRow{Label: "Combo", Value: fmt.Sprintf("… +%d more", overflow), Tier: "!"})
 	}
 	return rows
 }
