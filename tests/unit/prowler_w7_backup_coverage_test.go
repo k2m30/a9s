@@ -315,23 +315,25 @@ func w7Volume(state string) resource.Resource {
 	}
 }
 
-// w7EnrichEBS drives the ebs enricher with an account id already resolved, so
-// the ARN it builds needs no STS call.
+// w7EnrichEBS drives the ebs enricher with an account id already resolved and
+// the session pinned to the region the fixtures name, so the ARN it builds
+// needs no STS call and no ambient AWS config.
 func w7EnrichEBS(t *testing.T, rows []resource.Resource, cache resource.ResourceCache) awsclient.IssueEnricherResult {
 	t.Helper()
-	clients := &awsclient.ServiceClients{}
+	clients := &awsclient.ServiceClients{Region: w7Region}
 	store := session.NewIdentityStore()
 	store.Set(w7Account, nil)
 	clients.SetIdentityStore(store)
 	return w7Enrich(t, awsclient.EnrichEBSVolumeStatus, clients, rows, cache)
 }
 
-// TestW7EBS_ARNIsBuiltFromTheAccountAndTheZone pins the one type whose row
-// carries no ARN. The volume id and the availability zone are on the row; the
-// account id comes from the clients, and the region is the zone without its
-// trailing letter. Matching an exact ARN proves all three parts, because any
-// one of them wrong yields a different string and the plan stops matching.
-func TestW7EBS_ARNIsBuiltFromTheAccountAndTheZone(t *testing.T) {
+// TestW7EBS_ARNIsBuiltFromTheAccountAndTheRegion pins the one type whose row
+// carries no ARN. The volume id is on the row; the account id and the region
+// both come from the clients. Matching an exact ARN proves all three parts,
+// because any one of them wrong yields a different string and the plan stops
+// matching. Which partition and which region the ARN names is pinned
+// separately, against a session outside the commercial partition.
+func TestW7EBS_ARNIsBuiltFromTheAccountAndTheRegion(t *testing.T) {
 	volume := w7Volume("in-use")
 
 	covered := w7EnrichEBS(t, []resource.Resource{volume}, w7CacheWith(w7Plan(w7VolumeARN, "", "")))
