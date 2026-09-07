@@ -899,10 +899,17 @@ func partialRow10Param(key, value string) backuptypes.ConditionParameter {
 // conditions, and returns the plan row alongside the cache the join reads.
 func partialRow10Plan(t *testing.T, conditions *backuptypes.Conditions) (resource.Resource, resource.ResourceCache) {
 	t.Helper()
+	return partialSelectionPlan(t, partialBackupSelection(nil, conditions))
+}
+
+// partialSelectionPlan runs the real plans fetcher over one selection and
+// returns the plan row alongside the cache the join and the related panel read.
+func partialSelectionPlan(t *testing.T, sel backuptypes.BackupSelection) (resource.Resource, resource.ResourceCache) {
+	t.Helper()
 	cacheEntry := partialBackupCache(t, &partialBackupFake{
 		selections: [][]backuptypes.BackupSelectionsListMember{{partialBackupSelectionMember("sel-conditions")}},
 		selectionByID: map[string]backuptypes.BackupSelection{
-			"sel-conditions": partialBackupSelection(nil, conditions),
+			"sel-conditions": sel,
 		},
 	})
 	plans := cacheEntry["backup"].Resources
