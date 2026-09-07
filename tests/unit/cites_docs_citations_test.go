@@ -8,8 +8,9 @@ package unit
 // and nothing else per type: there are no Wave 1/2/3 cells, no Source cells and
 // no stable line numbers to point at. A citation that names one of those is a
 // pointer into a page that no longer exists, and a reader who follows it lands
-// nowhere. One shape, resolved against the page itself, is the only kind of
-// citation that can still be checked after the next regeneration.
+// nowhere. Two shapes, both resolved against the page itself, are the only
+// citations that can still be checked after the next regeneration: one names a
+// signal row, one names a hand-written section.
 //
 // The hand-written §4 tables are the other half: a doc that spells a list text
 // or a severity the emitter never produces reads as the contract while the code
@@ -25,10 +26,17 @@ import (
 	"testing"
 )
 
-// The one citation shape a resource doc may use, e.g.
+// A citation of one signal row, e.g.
 // `docs/attention-signals.md § Signals § NETWORKING` row `vpce`.
 var reCanonicalSignalsCitation = regexp.MustCompile(
 	"`docs/attention-signals\\.md § Signals § ([^`]+)` row `([^`]+)`")
+
+// A citation of a hand-written section of the page, e.g.
+// `docs/attention-signals.md § Visualization Surfaces`. Only headings outside
+// the generated block can be cited this way; a category heading inside it
+// carries rows, so a citation of it names one.
+var reSectionSignalsCitation = regexp.MustCompile(
+	"`docs/attention-signals\\.md § ([^`]+)`")
 
 // A generated table row: the first cell is the shortName in a code span.
 var reGeneratedSignalRow = regexp.MustCompile("^\\|\\s*`([^`]+)`\\s*\\|")
@@ -63,6 +71,36 @@ func signalsCategories(t *testing.T) map[string]map[string]bool {
 		t.Fatal("docs/attention-signals.md: generated signals block has no `### <CATEGORY>` headings")
 	}
 	return categories
+}
+
+var reMarkdownHeading = regexp.MustCompile(`^#{2,3} (.+)$`)
+
+// signalsSections parses the headings of docs/attention-signals.md that live
+// outside the generated block — the page's hand-written sections, which are the
+// only ones a doc can cite as a whole.
+func signalsSections(t *testing.T) map[string]bool {
+	t.Helper()
+	_, handWritten := attentionSignalsDoc(t)
+
+	sections := map[string]bool{}
+	for _, line := range strings.Split(handWritten, "\n") {
+		m := reMarkdownHeading.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		heading := strings.TrimSpace(m[1])
+		// `## Signals` is the heading the generated block hangs under. Citing it
+		// whole would name every signal of every type, which is no citation at
+		// all — a signal is cited by its category and row.
+		if heading == "Signals" {
+			continue
+		}
+		sections[heading] = true
+	}
+	if len(sections) == 0 {
+		t.Fatal("docs/attention-signals.md: no hand-written `##`/`###` headings outside the generated block")
+	}
+	return sections
 }
 
 // signalsCitingFiles returns every file the citation shape governs: the
@@ -101,19 +139,22 @@ func relToRoot(t *testing.T, path string) string {
 }
 
 // TestCitesSignalsCitationShape walks every mention of the signals page in
-// docs/resources/*.md and in core/aws/eks.go, and requires the canonical
-// shape, a category the page actually has a heading for, and a type registered
-// under that category.
+// docs/resources/*.md and in core/aws/eks.go and resolves it against the page:
+// a signal citation must name a category the generated block has a heading for
+// and a type registered under it, a section citation must name a heading the
+// page carries outside that block.
 //
 // The `generatedFrom:` list in the YAML front matter is a list of source files,
 // not a citation into a heading; it is the one exempt shape.
 func TestCitesSignalsCitationShape(t *testing.T) {
 	categories := signalsCategories(t)
+	sections := signalsSections(t)
 
 	var (
 		badShape   []string
 		badCategry []string
 		badType    []string
+		badSection []string
 	)
 
 	for _, path := range signalsCitingFiles(t) {
@@ -142,6 +183,15 @@ func TestCitesSignalsCitationShape(t *testing.T) {
 			}
 
 			residue := reCanonicalSignalsCitation.ReplaceAllString(line, "")
+
+			for _, m := range reSectionSignalsCitation.FindAllStringSubmatch(residue, -1) {
+				if !sections[m[1]] {
+					badSection = append(badSection, fmt.Sprintf(
+						"%s:%d: cites section %q, which is not a hand-written `##`/`###` heading of the page", rel, i+1, m[1]))
+				}
+			}
+			residue = reSectionSignalsCitation.ReplaceAllString(residue, "")
+
 			if inFrontMatter && strings.TrimSpace(residue) == "- docs/attention-signals.md" {
 				continue
 			}
@@ -152,11 +202,16 @@ func TestCitesSignalsCitationShape(t *testing.T) {
 	}
 
 	if len(badShape) > 0 {
-		t.Errorf("%d mention(s) of docs/attention-signals.md are not the one citation shape "+
-			"`docs/attention-signals.md § Signals § <CATEGORY>` row `<type>` — no line numbers, no `Wave N cell`, "+
+		t.Errorf("%d mention(s) of docs/attention-signals.md are neither of the two citation shapes — "+
+			"`docs/attention-signals.md § Signals § <CATEGORY>` row `<type>` for a signal, "+
+			"`docs/attention-signals.md § <heading>` for a hand-written section. No line numbers, no `Wave N cell`, "+
 			"no `Source cell`, no quoted cell text the generated table does not carry. Where the old citation carried a "+
-			"fact the table no longer has, the fact belongs in the doc's own sentence under its real source:\n%s",
+			"fact the page no longer has, the fact belongs in the doc's own sentence under its real source:\n%s",
 			len(badShape), strings.Join(badShape, "\n"))
+	}
+	if len(badSection) > 0 {
+		t.Errorf("%d citation(s) name a section docs/attention-signals.md does not have outside its generated block:\n%s",
+			len(badSection), strings.Join(badSection, "\n"))
 	}
 	if len(badCategry) > 0 {
 		t.Errorf("%d citation(s) name a category docs/attention-signals.md does not have:\n%s",
