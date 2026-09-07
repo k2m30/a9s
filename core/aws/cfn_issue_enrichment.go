@@ -63,9 +63,8 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, FailedCall(r.ID, err))
+			MarkSkipped(&result, r.ID, &failures, err)
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			return
 		}
 		// Scan events from the first page for any resource with a _FAILED status.
@@ -205,9 +204,8 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, FailedCall(r.ID, err))
+			MarkSkipped(&result, r.ID, &failures, err)
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			return
 		}
 		if len(out.Stacks) == 0 {

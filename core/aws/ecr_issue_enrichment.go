@@ -103,9 +103,8 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		})
 		if err != nil {
 			mu.Lock()
-			failures = append(failures, FailedCall(r.ID, err))
+			MarkSkipped(&result, r.ID, &failures, err)
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			mu.Unlock()
 			return
 		}

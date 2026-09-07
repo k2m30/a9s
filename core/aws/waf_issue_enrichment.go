@@ -78,8 +78,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			} else {
 				// Unexpected error — skip this ACL.
 				mu.Lock()
-				failures = append(failures, FailedCall(r.ID, err))
-				result.TruncatedIDs[r.ID] = true
+				MarkSkipped(&result, r.ID, &failures, err)
 				mu.Unlock()
 				return
 			}
@@ -93,8 +92,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		})
 		if err != nil {
 			mu.Lock()
-			failures = append(failures, FailedCall(r.ID, err))
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			mu.Unlock()
 			return
 		}

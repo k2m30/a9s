@@ -68,9 +68,8 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, FailedCall(r.ID, err))
+			MarkSkipped(&result, r.ID, &failures, err)
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			return
 		}
 		targetCount := len(out.TargetHealthDescriptions)

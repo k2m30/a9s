@@ -53,6 +53,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	}
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var pitrFailures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -69,8 +70,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			// sub-call error: skip this table, mark truncated to signal incomplete data
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &pitrFailures, err)
 			return
 		}
 		if out.ContinuousBackupsDescription == nil {
@@ -89,8 +89,13 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			setWave2Finding(&result, r.ID, ddbCodePITROff, "point-in-time recovery disabled", "~", "ddb", nil)
 		}
 	})
+	// AggregateFailures rather than Finish: this pass emits only "~", so a
+	// table it could not read is a coverage gap on that row, never a lower
+	// bound on the issue count the badge shows.
+	SortFailures(pitrFailures)
+	pitrErr := AggregateFailures("ddb-enrich: DescribeContinuousBackups", pitrFailures, n)
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
-	return result, errors.Join(tagErr, err)
+	return result, errors.Join(tagErr, pitrErr, err)
 }
 
 // enrichDDBResourcePolicies reads each table's resource policy (cap

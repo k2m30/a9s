@@ -83,6 +83,15 @@ func FailedCallInRegion(id string, err error, region string) Failure {
 		// cause would read as a failure with no reason at all.
 		cause = "no reason given"
 	}
+	// One aggregate can cover several calls — a related walk resolves a name
+	// and then reads what it points at — and the id alone does not say which
+	// of them refused. The SDK names the operation in the error's own fields.
+	// A denied call's cause already names the action, so it is not decorated
+	// twice.
+	if opErr, ok := errors.AsType[*smithy.OperationError](err); ok &&
+		opErr.OperationName != "" && !strings.Contains(cause, opErr.OperationName) {
+		cause = opErr.OperationName + ": " + cause
+	}
 	return Failure{ID: id, Class: ErrClass(err), Cause: cause}
 }
 

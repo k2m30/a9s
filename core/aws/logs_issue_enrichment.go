@@ -111,8 +111,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			failures = append(failures, FailedCall(r.ID, err))
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 

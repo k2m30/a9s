@@ -88,9 +88,8 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			if ErrCodeIs(err, "StateMachineTypeNotSupported") {
 				return
 			}
-			failures = append(failures, FailedCall(r.ID, err))
+			MarkSkipped(&result, r.ID, &failures, err)
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			return
 		}
 		if len(out.Executions) > 0 {

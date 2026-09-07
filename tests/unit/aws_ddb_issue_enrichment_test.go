@@ -277,8 +277,15 @@ func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	resources := []resource.Resource{makeDDBResource(errorTableID, "")}
 
 	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
+	// INVERTED for the "skipped" spec row 4: this asserted err == nil, which
+	// is what a silent skip looks like — the row was marked uninspected and
+	// the reason was dropped on the floor. The failed call is recorded now.
+	// Do not restore the error-free assertion.
+	if err == nil {
+		t.Fatal("a failed DescribeContinuousBackups returned no error — the reason never reaches the log")
+	}
+	if !strings.Contains(err.Error(), errorTableID) {
+		t.Errorf("failure line %q does not name the table it could not read", err)
 	}
 
 	if result.Truncated {

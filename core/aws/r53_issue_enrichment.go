@@ -180,8 +180,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
-			failures = append(failures, FailedCall(r.ID, err))
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if out.HostedZone == nil {
