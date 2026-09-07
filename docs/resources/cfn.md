@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns`.
 
 ### `cfn`
 
@@ -142,7 +142,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — `StackStatus` values like `UPDATE_FAILED` paired with the `StackStatusReason` excerpt in S4 are self-explanatory, and the `rollback: failed create, delete required` phrasing for `ROLLBACK_COMPLETE` removes the ambiguity of a bare status word. The one gap: the stuck `*_IN_PROGRESS > 1h` row must show the elapsed age (`stuck: in progress 2h`) in S4 — the status alone (`UPDATE_IN_PROGRESS`) is indistinguishable from a normal in-flight deploy, so implementations MUST compute and render the age on that row.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the Status column spells the stack's own state as `<status, in words>`, so a stack that reports `UPDATE_FAILED` reads as words rather than as an API constant, and `recent resource failure`, `stack drifted from template` and `termination protection off` name a posture miss outright. The one gap: a stack stuck in `*_IN_PROGRESS > 1h` reads exactly like a normal in-flight deploy, because the elapsed age is not part of the phrase.
 
 ## 4.2 On-Demand Detail Enrichment
 

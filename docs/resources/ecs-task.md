@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet`.
 
 ### `alarm`
 
@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 ### `secrets`
 
 - **Why related**: Task definitions inject Secrets Manager secrets as environment variables via `ContainerDefinitions[].Secrets[].ValueFrom`. When a task fails to start with "unable to pull secret", the secret itself is the next click — a9s-devops: secret-injection failures are a common Fargate startup failure mode, and the link is deterministic from the task definition.
-- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].Secrets[]` and `ContainerDefinitions[].RepositoryCredentials.CredentialsParameter`, filter `ValueFrom` values whose ARN service prefix is `secretsmanager`, and cross-reference the already-loaded `secrets` list. Also covered by the reverse-scan documented under `secrets` in related-resources.md (`TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom==ARN`).
+- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].Secrets[]` and `ContainerDefinitions[].RepositoryCredentials.CredentialsParameter`, filter `ValueFrom` values whose ARN service prefix is `secretsmanager`, and cross-reference the already-loaded `secrets` list. Also covered by the reverse-scan documented in `docs/related-resources.md` § `secrets` (`TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom==ARN`).
 - **Count shown**: yes.
 
 ### `sg`
@@ -240,7 +240,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every non-healthy state: every red / yellow row in §4 carries the StopCode translated into plain words in S4 (`stopped: essential container exited`, `stopped: failed to start`, `stopped: spot reclaimed`), so the operator can triage from the list alone; detail is only needed when they want the specific container name and `Reason` text. The one UX gap to enforce in the implementation: never show a bare `STOPPED` / `PENDING` word without its cause — `list-attention-coverage.md` grades this resource "A-" and calls for adding a `Stop Code` column, which S4 delivers by concatenating the translated cause into the existing Status column rather than adding a second column.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every non-healthy state: a red row carries the stop code translated into plain words as `stopped: <stop code>`, or reads `task failed` or `unhealthy`, so the operator can triage from the list alone; detail is only needed when they want the specific container name and its `Reason` text. A task stopped for no fault greys out to `stopped`, and the transitional words (`provisioning`, `pending`, `activating`, `deactivating`, `stopping`, `deprovisioning`) stand on their own — the implementation never shows a bare state word without its cause where a cause exists.
 
 ## 5. Out of Scope
 
@@ -263,7 +263,7 @@ One bullet per claim in §§2–4.1.
 - a9s golden doc — the `ecs-task` signals — `docs/attention-signals.md § Signals § COMPUTE` row `ecs-task`; the deferred cross-cluster outlier detection — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — related-panel contract for `ecs-task` (`alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet`) — `docs/related-resources.md` § Per-type contract and § `ecs-task`.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` § Policy item 4.
-- a9s golden doc — `ecs-task → kms` is explicitly out of the contract (no direct KMS reference on a task) — `docs/related-resources.md` § Unanimous `sometimes` entries.
+- a9s golden doc — `ecs-task → kms` is explicitly out of the contract (no direct KMS reference on a task) — `docs/related-resources.md` § Explicitly excluded.
 - a9s golden doc — read-only invariant cited in §5 — `docs/architecture.md` § "What is a9s?".
 - a9s golden doc — `list-attention-coverage.md` grades `ecs-task` "A-" and recommends adding `Stop Code` / `Health Status` information to the list, satisfied here via S4 — `docs/historical/analysis/list-attention-coverage.md` § `ecs-task` row.
 - a9s-devops persona (2026-04-20) — `alarm` pivot discovery via `ClusterName`/`ServiceName` alarm dimensions: possible=yes, worth=yes. Rationale: on-call uses CloudWatch alarm dimensions to scope cluster/service-level saturation alerts; the reverse join is zero-cost against the already-loaded alarm list. (Falling back to persona: agent dispatch unavailable in this session.)

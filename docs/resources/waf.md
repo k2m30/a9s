@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`.
 
 ### `alarm`
 
@@ -104,7 +104,7 @@ One row per signal from §3 that has operator-readable surface text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — both WAF findings carry the cause in the Status column (`no rules — ACL inert`, `allow-all: no rules, default Allow`), so the row colour and that text tell the operator exactly which configuration gap exists without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — both WAF findings carry the cause in the Status column (`web ACL has no rules`, `no logging configuration`), so the row colour and that text tell the operator exactly which configuration gap exists without opening detail.
 
 ## 5. Out of Scope
 

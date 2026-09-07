@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `apigw`, `ecs-task`, `kinesis`, `kms`, `lambda`, `s3`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `apigw`, `ecs-task`, `kinesis`, `kms`, `lambda`, `s3`, `ct-events`.
 
 ### `alarm`
 

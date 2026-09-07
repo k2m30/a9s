@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `ecr`, `kms`, `logs`, `pipeline`, `role`, `s3`, `secrets`, `sg`, `ssm`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ecr`, `kms`, `logs`, `pipeline`, `role`, `s3`, `secrets`, `sg`, `ssm`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -180,7 +180,7 @@ Rules for filling list and detail text:
 
 ### 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row for a failing project carries `last build failed: <CurrentPhase>` in S4, which names both the outcome and the build phase; the operator knows whether this is a runtime failure, a pre-build environment failure, or a post-build artifact-push failure, and can triage the team to investigate without first opening the detail view.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row for a failing project carries `latest build <status> (<date>)` in S4, which names both the outcome and when it happened; the operator knows whether the failure is fresh or stale and can triage the team to investigate without first opening the detail view.
 
 ## 5. Out of Scope
 

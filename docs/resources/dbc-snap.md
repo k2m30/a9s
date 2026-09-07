@@ -45,7 +45,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `dbc`, `kms`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `backup`, `dbc`, `kms`, `vpc`, `ct-events`.
 
 ### `dbc`
 

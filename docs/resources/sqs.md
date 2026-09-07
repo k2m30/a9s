@@ -23,53 +23,53 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract (line 102): `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `sns`, `sns-sub`, `sqs`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `sns`, `sns-sub`, `sqs`.
 
 ### `alarm`
 
-- **Why related**: CloudWatch alarms watching queue-depth / consumer-lag — SQS alarms carry `Namespace="AWS/SQS"` and `Dimensions[{Name: "QueueName", Value: <queue-name>}]`. Primary incident pivot: "why is my queue alerting on backlog?" (related-resources.md §`sqs` line 938 — "ApproximateAgeOfOldestMessage / MessagesVisible alarms").
+- **Why related**: CloudWatch alarms watching queue-depth / consumer-lag — SQS alarms carry `Namespace="AWS/SQS"` and `Dimensions[{Name: "QueueName", Value: <queue-name>}]`. Primary incident pivot: "why is my queue alerting on backlog?" (related-resources.md §`sqs` — "ApproximateAgeOfOldestMessage / MessagesVisible alarms").
 - **How discovered**: cross-reference the already-loaded `alarm` list by matching the queue's name (last path segment of the `QueueUrl`, or `Attributes["QueueArn"]`) against `Dimensions[].Value` where `Dimensions[].Name=="QueueName"` — a9s-devops (2026-04-21): standard list-scan, zero extra API calls because alarms are loaded in the same sweep.
 - **Count shown**: yes — a9s-devops (2026-04-21): number of alarms on a queue is operationally meaningful (a noisy queue usually has multiple alarms on depth, age, DLQ receive count).
 
 ### `ct-events`
 
-- **Why related**: audit trail for queue attribute changes (CreateQueue, SetQueueAttributes, TagQueue, DeleteQueue). Universal pivot — applies to every registered type; see related-resources.md §Policy §4 (line 34) and §`sqs` line 939.
+- **Why related**: audit trail for queue attribute changes (CreateQueue, SetQueueAttributes, TagQueue, DeleteQueue). Universal pivot — applies to every registered type; see related-resources.md §Policy §4 and §`sqs`.
 - **How discovered**: universal — framework-level pivot, no per-type discovery logic (`ct-events` looks up events whose `Resources[].ResourceName` matches the queue ARN/name).
-- **Count shown**: unknown — not specified in related-resources.md.
+- **Count shown**: unknown — `docs/related-resources.md` § `sqs` does not specify.
 
 ### `eb-rule`
 
-- **Why related**: EventBridge rules whose targets deliver events into this queue — an EB-rule target's `Arn` is the queue's ARN (related-resources.md §`sqs` line 940; §`eb-rule` contract row line 62 lists `sqs` as an expected target).
+- **Why related**: EventBridge rules whose targets deliver events into this queue — an EB-rule target's `Arn` is the queue's ARN (related-resources.md § `sqs`; `docs/related-resources.md` § Per-type contract, row `eb-rule`, lists `sqs` as an expected target).
 - **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. The authoritative mapping lives on `ListTargetsByRule` (per-rule fan-out, Wave 2) — but the `eb-rule` resource already calls `ListTargetsByRule` as part of its own Wave 2 enrichment, so a9s can piggy-back: for each loaded `eb-rule`, scan its cached targets for `Arn == <queue-arn>` and collect matching rule IDs. No additional API calls. Operator workflow: "what's producing traffic into this queue?" is a standard messaging-triage question.
 - **Count shown**: yes — a9s-devops (2026-04-21): number of rules feeding a queue is meaningful (e.g. fan-in from multiple scheduled rules vs a single event-driven rule).
 
 ### `kms`
 
-- **Why related**: SSE-KMS customer-managed key — `GetQueueAttributes` returns `Attributes["KmsMasterKeyId"]` when SSE-KMS is enabled (related-resources.md §`sqs` line 941; SDK `sqs/types.QueueAttributeName § KmsMasterKeyId`).
+- **Why related**: SSE-KMS customer-managed key — `GetQueueAttributes` returns `Attributes["KmsMasterKeyId"]` when SSE-KMS is enabled (related-resources.md §`sqs`; SDK `sqs/types.QueueAttributeName § KmsMasterKeyId`).
 - **How discovered**: read `Attributes["KmsMasterKeyId"]` on the `GetQueueAttributes` response already fetched in Wave 2; cross-reference the returned key ID/ARN against the loaded `kms` list.
 - **Count shown**: unknown — a queue references at most one KMS key, so the count is degenerate (0 or 1).
 
 ### `lambda`
 
-- **Why related**: Lambda functions that either (a) consume this queue via event-source mapping, or (b) route failures to this queue via DLQ. Both are core "who owns this queue?" pivots (related-resources.md §`sqs` line 942 — "Lambda event-source mappings consuming this queue").
+- **Why related**: Lambda functions that either (a) consume this queue via event-source mapping, or (b) route failures to this queue via DLQ. Both are core "who owns this queue?" pivots (related-resources.md §`sqs` — "Lambda event-source mappings consuming this queue").
 - **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. Two discovery paths, both cross-referencing the already-loaded `lambda` list: (1) DLQ path — scan each function's `DeadLetterConfig.TargetArn` field from `FunctionConfiguration` (already on the Wave 1 response) for a match on the queue's ARN; (2) consumer path — Lambda event-source mappings are NOT on `FunctionConfiguration` and require `ListEventSourceMappings(EventSourceArn=<queue-arn>)` as a dedicated call. The consumer path is a Wave 2 fan-out; the DLQ path is zero extra cost. Operator workflow: during an incident on a Lambda, "is this the DLQ?" and "who's reading this queue?" are the two first questions.
 - **Count shown**: yes for the combined set — a9s-devops (2026-04-21): the operator cares about the total number of Lambda associations (consumers + DLQ users), so a single count is decision-useful at a glance.
 
 ### `sns`
 
-- **Why related**: SNS topics that fan out into this queue via an SNS→SQS subscription — the producer side of pub/sub (related-resources.md §`sqs` line 943 — "SQS subscribed to SNS topic"; mirror of `sns-sub` line 932 which lists `sqs` as the endpoint).
+- **Why related**: SNS topics that fan out into this queue via an SNS→SQS subscription — the producer side of pub/sub (related-resources.md §`sqs` — "SQS subscribed to SNS topic"; mirrored in `docs/related-resources.md` § `sns-sub`, which lists `sqs` as the endpoint).
 - **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. Cross-reference the already-loaded `sns-sub` list, filtering by `Protocol=="sqs" && Endpoint==<queue-arn>`, then group by `TopicArn` — the resulting set of topic ARNs is the list to cross-match against the loaded `sns` list. Alternative: parse `Attributes["Policy"]` JSON (SQS queue policy) for statements whose `Principal.Service=="sns.amazonaws.com"` and extract `Condition.ArnLike."aws:SourceArn"` topic ARNs; this is a fallback when the subscription list wasn't loaded in this sweep. Operator workflow: "who is publishing into this queue?" during fan-out debugging.
 - **Count shown**: yes — a9s-devops (2026-04-21): number of SNS topics feeding a queue is a primary pub/sub topology signal.
 
 ### `sns-sub`
 
-- **Why related**: the individual SNS subscription records that bind a topic to this queue — the granular per-subscription attributes (RawMessageDelivery, FilterPolicy, DeadLetterConfig) live on the subscription, not the topic (related-resources.md §`sqs` line 944 — "SNS subscriptions delivering to this queue"; §`sns-sub` line 932 — "SQS endpoint subscriber").
+- **Why related**: the individual SNS subscription records that bind a topic to this queue — the granular per-subscription attributes (RawMessageDelivery, FilterPolicy, DeadLetterConfig) live on the subscription, not the topic (related-resources.md §`sqs` — "SNS subscriptions delivering to this queue"; §`sns-sub` — "SQS endpoint subscriber").
 - **How discovered**: cross-reference the already-loaded `sns-sub` list filtered by `Protocol=="sqs" && Endpoint==<queue-arn>` — a9s-devops (2026-04-21): standard list-scan, same filter as §`sns` above but surfacing the subscription records directly rather than grouping.
 - **Count shown**: yes — a9s-devops (2026-04-21): the subscription count tells the operator how many independent SNS→SQS bindings exist (same topic can have multiple subscriptions with different filter policies).
 
 ### `sqs`
 
-- **Why related**: this queue's DLQ (outbound RedrivePolicy) and/or the queues for which this queue is the DLQ (inbound RedriveAllowPolicy / ListDeadLetterSourceQueues). Self-referential pivot for DLQ inspection — a messaging operator's first move on a failing queue (related-resources.md §`sqs` line 945 — "DLQ reference / RedriveTarget"; SDK `sqs/types.QueueAttributeName § RedrivePolicy § RedriveAllowPolicy`).
+- **Why related**: this queue's DLQ (outbound RedrivePolicy) and/or the queues for which this queue is the DLQ (inbound RedriveAllowPolicy / ListDeadLetterSourceQueues). Self-referential pivot for DLQ inspection — a messaging operator's first move on a failing queue (related-resources.md §`sqs` — "DLQ reference / RedriveTarget"; SDK `sqs/types.QueueAttributeName § RedrivePolicy § RedriveAllowPolicy`).
 - **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. Two directions: (1) outbound — parse `Attributes["RedrivePolicy"]` JSON (already on Wave 2 response), extract `deadLetterTargetArn`, cross-reference against the loaded `sqs` list by ARN; (2) inbound — scan the loaded `sqs` list for any queue whose parsed `RedrivePolicy.deadLetterTargetArn` equals this queue's ARN. Both directions are zero extra API calls — the attribute map is already fetched. The dedicated `ListDeadLetterSourceQueues` API is an alternative for (2) but is redundant when the sibling list is in memory.
 - **Count shown**: yes — a9s-devops (2026-04-21): the combined count (own DLQ + queues I am DLQ for) is decision-useful; a "DLQ for 12 queues" cell is an immediate signal about centralized failure routing.
 
@@ -148,7 +148,7 @@ One row per signal from §3:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §4 row — `backlog: 50k msgs`, `oldest msg age: 3h`, `DLQ has 12 msgs`, `no DLQ configured`, and `backlog growing: 120k msgs` are all self-explanatory at a glance and let the operator prioritize which queue to drill into first. The only latent gap is that the backlog and rising-unbounded thresholds are undefined — implementers must choose sensible defaults (see §5) or the signals cannot ship; without that choice, every queue either looks fine or every queue looks broken.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §4 row — a yellow row reads `no DLQ configured` or `not encrypted with KMS`, and a red row reads `queue policy open to anyone`; each names the configuration gap outright and lets the operator prioritise which queue to fix first. Depth and message age are not findings: they are CloudWatch metrics rather than queue attributes, so the list says nothing about backlog and the `alarm` pivot is the designed route to it.
 
 ## 5. Out of Scope
 
@@ -163,27 +163,27 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Identity — List API `ListQueues` returns URLs only — `AWS SDK Go v2 — sqs.ListQueuesOutput § QueueUrls`.
 - Identity — Describe API `GetQueueAttributes` returns attribute map — `AWS SDK Go v2 — sqs.GetQueueAttributesOutput § Attributes`.
 - Identity — attribute-name enum (Policy, VisibilityTimeout, ApproximateNumberOfMessages, ApproximateAgeOfOldestMessage, RedrivePolicy, RedriveAllowPolicy, KmsMasterKeyId, QueueArn, …) — `AWS SDK Go v2 — sqs/types.QueueAttributeName`.
-- §2 related targets — contract row — `docs/related-resources.md` § Per-type contract § `sqs` (line 102) and § `sqs` section (lines 934-945).
-- §2 `alarm` why related — `docs/related-resources.md` § `sqs` (line 938 — "ApproximateAgeOfOldestMessage / MessagesVisible alarms").
+- §2 related targets — contract row — `docs/related-resources.md` § Per-type contract, row `sqs`, and `docs/related-resources.md` § `sqs`.
+- §2 `alarm` why related — `docs/related-resources.md` § `sqs` ("ApproximateAgeOfOldestMessage / MessagesVisible alarms").
 - §2 `alarm` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. Alarms loaded in the same sweep carry `Dimensions[QueueName]`; list-scan by queue-name/ARN gives a zero-extra-call cross-reference.
 - §2 `alarm` count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Alarm count per queue is operationally meaningful during backlog triage.
-- §2 `ct-events` universal pivot — `docs/related-resources.md` § Policy §4 (line 34) and §`sqs` (line 939).
+- §2 `ct-events` universal pivot — `docs/related-resources.md` § Policy §4 and §`sqs`.
 - §2 `ct-events` count shown — golden docs silent, marked unknown.
-- §2 `eb-rule` why related — `docs/related-resources.md` § `sqs` (line 940) and § `eb-rule` contract row (line 62).
+- §2 `eb-rule` why related — `docs/related-resources.md` § `sqs` and `docs/related-resources.md` § Per-type contract, row `eb-rule`.
 - §2 `eb-rule` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. `eb-rule` Wave 2 already calls `ListTargetsByRule` per rule; piggy-back on its cached targets and filter by `Target.Arn == queue-arn`. No additional API calls.
 - §2 `eb-rule` count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Number of EB rules feeding a queue is a fan-in topology signal.
-- §2 `kms` why related — `docs/related-resources.md` § `sqs` (line 941) and `AWS SDK Go v2 — sqs/types.QueueAttributeName § KmsMasterKeyId`.
+- §2 `kms` why related — `docs/related-resources.md` § `sqs` and `AWS SDK Go v2 — sqs/types.QueueAttributeName § KmsMasterKeyId`.
 - §2 `kms` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. `KmsMasterKeyId` is a standard key on the Wave 2 attribute map; cross-reference against loaded `kms` list. No extra API call.
-- §2 `lambda` why related — `docs/related-resources.md` § `sqs` (line 942 — "Lambda event-source mappings consuming this queue").
+- §2 `lambda` why related — `docs/related-resources.md` § `sqs` ("Lambda event-source mappings consuming this queue").
 - §2 `lambda` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. DLQ path = scan `FunctionConfiguration.DeadLetterConfig.TargetArn` on loaded `lambda` list (zero cost). Consumer path = `ListEventSourceMappings(EventSourceArn=<queue-arn>)` (one per queue, Wave 2). Both are core "who owns this queue?" pivots.
 - §2 `lambda` count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Combined count (consumers + DLQ users) gives the operator the breadth of Lambda coupling at a glance.
-- §2 `sns` why related — `docs/related-resources.md` § `sqs` (line 943) and § `sns-sub` (line 932).
+- §2 `sns` why related — `docs/related-resources.md` § `sqs` and § `sns-sub`.
 - §2 `sns` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. Cross-reference `sns-sub` list by `Protocol=="sqs" && Endpoint==queue-arn`, group by `TopicArn`, then match against loaded `sns` list. Fallback: parse SQS `Attributes["Policy"]` for `Principal.Service=="sns.amazonaws.com"` statements when the subscription list is absent.
 - §2 `sns` count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Count of producing topics is a primary fan-in topology signal.
-- §2 `sns-sub` why related — `docs/related-resources.md` § `sqs` (line 944) and § `sns-sub` (line 932).
+- §2 `sns-sub` why related — `docs/related-resources.md` § `sqs` and § `sns-sub`.
 - §2 `sns-sub` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. Same cross-reference as `sns` but without the grouping step — returns subscription records directly.
 - §2 `sns-sub` count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Independent subscription count (multiple filter policies on one topic produce multiple subscriptions) is decision-useful.
-- §2 `sqs` (self) why related — `docs/related-resources.md` § `sqs` (line 945 — "DLQ reference / RedriveTarget") and `AWS SDK Go v2 — sqs/types.QueueAttributeName § RedrivePolicy § RedriveAllowPolicy`.
+- §2 `sqs` (self) why related — `docs/related-resources.md` § `sqs` ("DLQ reference / RedriveTarget") and `AWS SDK Go v2 — sqs/types.QueueAttributeName § RedrivePolicy § RedriveAllowPolicy`.
 - §2 `sqs` (self) how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. Outbound: parse `RedrivePolicy.deadLetterTargetArn` from Wave 2 attributes. Inbound: scan sibling queues' `RedrivePolicy` for this queue's ARN. Zero extra API calls; dedicated `ListDeadLetterSourceQueues` is redundant when sibling list is cached.
 - §2 `sqs` (self) count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Combined DLQ count (own DLQ + queues I am DLQ for) is a primary messaging-topology signal.
 - §3.1 no Wave 1 signals — `ListQueues` returns URLs only, `AWS SDK Go v2 — sqs.ListQueuesOutput § QueueUrls`; every `sqs` finding is wave 2, `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.

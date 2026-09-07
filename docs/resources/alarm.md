@@ -18,12 +18,12 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `alarm`
 - **Display name**: CloudWatch Alarms
 - **AWS API reference**: <https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html>
-- **List API**: `DescribeAlarms` — returns `MetricAlarm[]` (and `CompositeAlarm[]`; this spec is scoped to metric alarms, consistent with `related-resources.md`). The SDK confirms `StateValue`, `StateUpdatedTimestamp`, `ActionsEnabled`, `AlarmActions`, `OKActions`, `InsufficientDataActions`, `Dimensions`, `Namespace`, `MetricName`, `Period`, `StateReason` are all on the list shape, so every Wave 1 signal and every related-panel discovery path is reachable with zero extra calls.
+- **List API**: `DescribeAlarms` — returns `MetricAlarm[]` (and `CompositeAlarm[]`; this spec is scoped to metric alarms, consistent with `docs/related-resources.md` § `alarm`). The SDK confirms `StateValue`, `StateUpdatedTimestamp`, `ActionsEnabled`, `AlarmActions`, `OKActions`, `InsufficientDataActions`, `Dimensions`, `Namespace`, `MetricName`, `Period`, `StateReason` are all on the list shape, so every Wave 1 signal and every related-panel discovery path is reachable with zero extra calls.
 - **Describe API (if any)**: not used — `DescribeAlarms` already returns the full `MetricAlarm` shape.
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `apigw`, `asg`, `cb`, `dbi`, `ec2`, `ecs`, `eks`, `kms`, `lambda`, `logs`, `s3`, `sfn`, `sns`, `waf`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `apigw`, `asg`, `cb`, `dbi`, `ec2`, `ecs`, `eks`, `kms`, `lambda`, `logs`, `s3`, `sfn`, `sns`, `waf`, `ct-events`.
 
 All non-action pivots (everything except `sns`, `asg`, and `ct-events`) are discovered the same way: read `MetricAlarm.Namespace` and `MetricAlarm.Dimensions[].Name`/`Value` on the already-loaded alarm, map the AWS namespace + dimension key to the target type, then cross-reference the loaded sibling-type list by the resource ID carried in `Dimensions[].Value`. CloudWatch alarms have no direct ARN field pointing at what they monitor — the namespace/dimensions pair is the canonical pivot path and is how the Wave 1 "zombie alarm" cross-reference already works.
 
@@ -187,12 +187,12 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy alarm carries a specific cause in S4 (`firing: Threshold Crossed`, `no data`, `no actions`, `metric pipeline stale 45m`, `zombie: InstanceId=i-abc`), which is exactly the triage information an on-call engineer needs to decide whether to drill in or move on. The only compression concern is the `firing: <StateReason>` cell — `StateReason` can exceed 40 characters; the list renderer must truncate and the full text must remain available in S5.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy alarm carries a specific cause in S4 (`alarm triggered`, `insufficient data`, `no actions`, `actions disabled`), which is exactly the triage information an on-call engineer needs to decide whether to drill in or move on. The alarm's own `StateReason` is not in the Status column, because it can exceed 40 characters; it is one keypress away in the detail view, where its length costs nothing.
 
 ## 5. Out of Scope
 
 - No Wave 3 signals are defined for this resource.
-- Composite alarms (`DescribeAlarms` `CompositeAlarm[]`) are not covered by this spec — the related-resources.md row scopes `alarm` to `MetricAlarm`.
+- Composite alarms (`DescribeAlarms` `CompositeAlarm[]`) are not covered by this spec — `docs/related-resources.md` § `alarm` scopes `alarm` to `MetricAlarm`.
 - Any UI element not listed in §4 — no new columns, icons, views, or key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` § "What is a9s?").
 

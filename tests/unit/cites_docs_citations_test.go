@@ -25,6 +25,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // A citation of one signal row, e.g.
@@ -431,18 +433,20 @@ var severityWordForBucket = map[string]string{
 // doc needs to know which cell is wrong, so each row of the failure output
 // names one.
 const (
-	kindPhrase     = "phrase nothing emits"
-	kindMissingRow = "shipped finding without a row"
-	kindSection    = "section mismatch"
-	kindWave       = "wrong wave"
-	kindBucket     = "wrong bucket"
-	kindMarker     = "stale not-implemented marker"
-	kindGlyph      = "wrong severity glyph"
-	kindSurfaces   = "wrong surfaces"
-	kindNoSignals  = "claims no signals in a wave that ships one"
-	kindNoFinding  = "claims no finding row for a registered finding"
-	kindSuppressed = "claims a surface is suppressed"
-	kindTierInList = "puts the tier in the list"
+	kindPhrase       = "phrase nothing emits"
+	kindMissingRow   = "shipped finding without a row"
+	kindSection      = "section mismatch"
+	kindWave         = "wrong wave"
+	kindBucket       = "wrong bucket"
+	kindMarker       = "stale not-implemented marker"
+	kindGlyph        = "wrong severity glyph"
+	kindSurfaces     = "wrong surfaces"
+	kindNoSignals    = "claims no signals in a wave that ships one"
+	kindNoFinding    = "claims no finding row for a registered finding"
+	kindSuppressed   = "claims a surface is suppressed"
+	kindTierInList   = "puts the tier in the list"
+	kindQuotedPhrase = "quotes a phrase nothing emits"
+	kindQuotedColour = "quotes a phrase under the wrong colour"
 )
 
 // expectedGlyph derives the Severity cell of a §4 row from the finding alone.
@@ -754,6 +758,67 @@ var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?:(?: [a-z]+)* sig
 
 var reS3Suppressed = regexp.MustCompile(`S3 (is )?suppress`)
 
+// The §4.1 paragraph quotes what the operator reads off the list, so a code
+// span in it is a promise about a Status cell. Resolving those spans against
+// the type's generated table is the same rule the §4 table rows already carry
+// — a phrase spelled here and nowhere in the catalog is a second definition of
+// the finding, and the reader cannot tell which one ships.
+//
+// Not every span on the line is such a promise. Four shapes name something
+// other than list text and are read past: an SDK field or shape
+// (`StateReason`, `CertificateDetail.FailureReason`), an API enum constant
+// (`UPDATE_FAILED`), a resource type the reader can pivot to (`ct-events`),
+// and a comparison, which states a condition rather than a cell
+// (`Status == FAILED`).
+var (
+	reCodeSpan      = regexp.MustCompile("`([^`]+)`")
+	reSDKIdentifier = regexp.MustCompile(`^[a-z]*[A-Z][A-Za-z0-9]*$|^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)+$`)
+	reAPIEnum       = regexp.MustCompile(`^[A-Z][A-Z0-9_*]*$`)
+	reComparison    = regexp.MustCompile(`==| [<>] `)
+	reColourWord    = regexp.MustCompile(`(?i)\b(red|yellow|dim|grey|gray)\b`)
+)
+
+// colourSeverity maps the colour word a §4.1 sentence puts beside a phrase to
+// the severity the catalog registers that phrase under. Green has no entry: a
+// healthy row carries no finding, so a phrase quoted as green is a phrase the
+// list never shows for a reason the catalog knows.
+var colourSeverity = map[string]string{
+	"red": "broken", "yellow": "warn", "dim": "dim", "grey": "dim", "gray": "dim",
+}
+
+// listTextClaim is one code span of a §4.1 paragraph, with the colour word the
+// sentence puts in front of it. The colour is the last one between the end of
+// the previous span and the start of this one, which is where the docs put it
+// ("a red row reading `public access policy`"); a phrase with no colour word in
+// front of it is checked for existence only.
+type listTextClaim struct {
+	text   string
+	colour string
+}
+
+// listTextClaims splits a §4.1 line into the spans that promise list text. A
+// span the type ships as a phrase is a claim whatever else it looks like:
+// `alarm` is both a phrase of `alarm_history` and the short name of another
+// type, and reading it as the short name would drop the row's colour check.
+func listTextClaims(line string, phrases, pivots map[string]bool) []listTextClaim {
+	var claims []listTextClaim
+	prev := 0
+	for _, m := range reCodeSpan.FindAllStringSubmatchIndex(line, -1) {
+		text := line[m[2]:m[3]]
+		colour := ""
+		if c := reColourWord.FindAllString(line[prev:m[0]], -1); len(c) > 0 {
+			colour = strings.ToLower(c[len(c)-1])
+		}
+		prev = m[1]
+		if !phrases[text] && (reSDKIdentifier.MatchString(text) || reAPIEnum.MatchString(text) ||
+			reComparison.MatchString(text) || pivots[text]) {
+			continue
+		}
+		claims = append(claims, listTextClaim{text, colour})
+	}
+	return claims
+}
+
 // The §4.1 paragraph answers one question — what the operator can read off the
 // list without opening detail — so naming the tier in it says the tier is on
 // the list row. It is not: it is an entry in the detail-view Attention section
@@ -774,9 +839,17 @@ var (
 func docSentenceOffenders(t *testing.T, path string, signals []catalogSignal) []docOffender {
 	t.Helper()
 	shipped := map[string]int{}
+	phrases := map[string]bool{}
+	known := make([]string, 0, len(signals))
 	for _, sig := range signals {
 		shipped[sig.wave]++
+		if !phrases[sig.phrase] {
+			phrases[sig.phrase] = true
+			known = append(known, sig.phrase)
+		}
 	}
+	sort.Strings(known)
+	pivots := pivotNames(t)
 
 	var offenders []docOffender
 	for i, line := range readLines(t, path) {
@@ -785,6 +858,26 @@ func docSentenceOffenders(t *testing.T, path string, signals []catalogSignal) []
 				offenders = append(offenders, docOffender{i + 1, kindTierInList, fmt.Sprintf(
 					"the §4.1 paragraph names %s while answering what the list shows without opening detail; "+
 						"the tier is an entry in the detail-view Attention section", tok)})
+			}
+			for _, claim := range listTextClaims(line, phrases, pivots) {
+				matching := signalsWithPhrase(signals, claim.text)
+				if len(matching) == 0 {
+					offenders = append(offenders, docOffender{i + 1, kindQuotedPhrase, fmt.Sprintf(
+						"the §4.1 paragraph quotes %q as what the list shows, and no `%s` finding produces it; "+
+							"quote a phrase the catalog carries: %q", claim.text, shortNameOf(path), known)})
+					continue
+				}
+				want, ok := colourSeverity[claim.colour]
+				if !ok {
+					continue
+				}
+				if !anySignal(matching, func(sig catalogSignal) bool { return sig.severity == want }) {
+					offenders = append(offenders, docOffender{i + 1, kindQuotedColour, fmt.Sprintf(
+						"the §4.1 paragraph calls the row carrying %q %s, and the catalog ships that phrase as %q",
+						claim.text, claim.colour, signalWords(matching, func(sig catalogSignal) string {
+							return sig.severity
+						}))})
+				}
 			}
 		}
 		if reS3Suppressed.MatchString(line) {
@@ -803,6 +896,18 @@ func docSentenceOffenders(t *testing.T, path string, signals []catalogSignal) []
 		}
 	}
 	return offenders
+}
+
+// signalsWithPhrase returns every finding of the type registered under one
+// phrase; a phrase can be shared by two codes at different severities.
+func signalsWithPhrase(signals []catalogSignal, phrase string) []catalogSignal {
+	var matching []catalogSignal
+	for _, sig := range signals {
+		if sig.phrase == phrase {
+			matching = append(matching, sig)
+		}
+	}
+	return matching
 }
 
 func anySignal(signals []catalogSignal, pred func(catalogSignal) bool) bool {
@@ -1058,5 +1163,238 @@ func TestCitesNotYetImplementedCitationsResolveToALine(t *testing.T) {
 		t.Errorf("%d citation(s) of `§ Not yet implemented` come from a type that section carries no line for. "+
 			"Either the deferred signal belongs on the page, or the sentence should say what is deferred without "+
 			"citing a section that does not record it:\n%s", len(offenders), strings.Join(offenders, "\n"))
+	}
+}
+
+// ─── docs/related-resources.md — the related-panel contract ─────────────────
+
+// The related contract page is edited under its own rules and its sections are
+// renumbered whenever a pivot is added, so a line number in a citation is a
+// pointer that rots on the next edit. Headings do not: every per-type block is
+// a `### ` heading named for the type, and the three policy sections are `## `
+// headings. One shape, resolved against the page.
+var (
+	reRelatedMention    = regexp.MustCompile(`related-resources\.md`)
+	reRelatedLineNumber = regexp.MustCompile(`\blines?\s+[0-9]`)
+	reRelatedFrontEntry = regexp.MustCompile(`^\s*-\s+docs/related-resources\.md\s*$`)
+)
+
+// relatedSections parses the headings of docs/related-resources.md, stripped of
+// the backticks the per-type ones are spelled with. The page is the source of
+// truth; a hand list here would let a heading be renamed without the gate
+// noticing.
+func relatedSections(t *testing.T) []string {
+	t.Helper()
+	var sections []string
+	for _, line := range readLines(t, filepath.Join(projectRoot(t), "docs", "related-resources.md")) {
+		if m := reMarkdownHeading.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+			sections = append(sections, strings.TrimSpace(strings.ReplaceAll(m[1], "`", "")))
+		}
+	}
+	if len(sections) == 0 {
+		t.Fatal("docs/related-resources.md: no `##`/`###` headings")
+	}
+	// Longest first, so `sns-sub` is preferred over `sns` where both would fit.
+	sort.SliceStable(sections, func(i, j int) bool { return len(sections[i]) > len(sections[j]) })
+	return sections
+}
+
+// relatedHeadingCited resolves the text that follows a `§` in a citation. The
+// citation names a heading and then narrows it in prose ("§ Per-type contract,
+// row `acm`"), so the heading is a prefix of that text rather than the whole of
+// it, and the character after it must not continue a word — `sns` does not
+// resolve a citation of `sns-sub`.
+func relatedHeadingCited(after string, sections []string) (string, bool) {
+	text := strings.TrimSpace(strings.ReplaceAll(after, "`", ""))
+	for _, heading := range sections {
+		if !strings.HasPrefix(text, heading) {
+			continue
+		}
+		rest := text[len(heading):]
+		if rest == "" || !strings.ContainsAny(rest[:1], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-") {
+			return heading, true
+		}
+	}
+	return "", false
+}
+
+// TestCitesRelatedContractCitedByHeading holds every mention of the related
+// contract page in docs/resources/*.md to one shape: the file name, then `§`,
+// then a heading the page carries. A mention that names a line number, or that
+// names no heading at all, sends the reader to a place they have to search for.
+//
+// The `generatedFrom:` list in the YAML front matter is a list of source files,
+// not a citation into a heading; it is the one exempt shape, the same exemption
+// TestCitesSignalsCitationShape makes.
+func TestCitesRelatedContractCitedByHeading(t *testing.T) {
+	sections := relatedSections(t)
+
+	paths, err := filepath.Glob(filepath.Join(projectRoot(t), "docs", "resources", "*.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("docs/resources/*.md matched no files")
+	}
+	sort.Strings(paths)
+
+	var byLine, byNothing, byUnknown []string
+	for _, path := range paths {
+		rel := relToRoot(t, path)
+		for i, line := range readLines(t, path) {
+			locs := reRelatedMention.FindAllStringIndex(line, -1)
+			if locs == nil || reRelatedFrontEntry.MatchString(line) {
+				continue
+			}
+			if reRelatedLineNumber.MatchString(line) {
+				byLine = append(byLine, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
+				continue
+			}
+			for _, loc := range locs {
+				after := strings.TrimLeft(line[loc[1]:], "` ")
+				if !strings.HasPrefix(after, "§") {
+					byNothing = append(byNothing, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
+					continue
+				}
+				if _, ok := relatedHeadingCited(strings.TrimPrefix(after, "§"), sections); !ok {
+					byUnknown = append(byUnknown, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
+				}
+			}
+		}
+	}
+
+	if len(byLine) > 0 {
+		t.Errorf("%d citation(s) of docs/related-resources.md name a line number. The page is renumbered whenever a "+
+			"pivot is added, so the number points at whatever moved into that line; cite the heading:\n%s",
+			len(byLine), strings.Join(byLine, "\n"))
+	}
+	if len(byNothing) > 0 {
+		t.Errorf("%d mention(s) of docs/related-resources.md name no section — `docs/related-resources.md § <heading>` "+
+			"is the shape, with the heading spelled as the page spells it:\n%s",
+			len(byNothing), strings.Join(byNothing, "\n"))
+	}
+	if len(byUnknown) > 0 {
+		t.Errorf("%d citation(s) of docs/related-resources.md name a heading the page does not carry:\n%s",
+			len(byUnknown), strings.Join(byUnknown, "\n"))
+	}
+}
+
+// pivotNames is every resource type the catalog registers, which is also every
+// heading name the related contract page can carry for a type.
+func pivotNames(t *testing.T) map[string]bool {
+	t.Helper()
+	names := map[string]bool{}
+	for _, sn := range resource.AllShortNames() {
+		names[sn] = true
+	}
+	if len(names) == 0 {
+		t.Fatal("resource.AllShortNames() is empty; aws.Install() did not run")
+	}
+	return names
+}
+
+// A §2 block heading names its pivot and nothing else. The panel renders one
+// row per registered pivot and has no row for a heading that annotates an
+// absence ("`dbc` (intentionally absent)"), so a heading carrying prose is a
+// block the reader cannot match to anything on screen.
+var reRelatedPivotHeading = regexp.MustCompile("^### `([a-z0-9-]+)`$")
+
+// docRelatedPivots reads the `### ` headings of a resource doc's §2 — the
+// related-panel section — which is one block per pivot the doc promises. The
+// second result is false for a doc with no §2 at all.
+func docRelatedPivots(t *testing.T, path string) ([]string, map[string]int, []string, bool) {
+	t.Helper()
+	var order, offShape []string
+	lines := map[string]int{}
+	inSection2, sawHeading := false, false
+	for i, line := range readLines(t, path) {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") {
+			inSection2 = strings.HasPrefix(strings.TrimPrefix(trimmed, "## "), "2.")
+			continue
+		}
+		if !inSection2 || !strings.HasPrefix(trimmed, "### ") {
+			continue
+		}
+		sawHeading = true
+		m := reRelatedPivotHeading.FindStringSubmatch(trimmed)
+		if m == nil {
+			offShape = append(offShape, fmt.Sprintf("  %s:%d: %s", relToRoot(t, path), i+1, trimmed))
+			continue
+		}
+		if _, seen := lines[m[1]]; !seen {
+			order = append(order, m[1])
+			lines[m[1]] = i + 1
+		}
+	}
+	return order, lines, offShape, sawHeading
+}
+
+// TestCitesRelatedPanelSectionMatchesRegistry resolves each resource doc's §2
+// against the pivots the catalog registers for that type. §2 is the reader's
+// answer to "what can I pivot to from here", and the panel is built from the
+// catalog's `Related` entries, so a block for a pivot nothing registers
+// promises a row the panel never renders, and a registered pivot with no block
+// is a row the reader meets with no explanation of what it is or how it was
+// found.
+//
+// Docs for a type the catalog registers no pivots for are implementation plans
+// rather than designs, and are skipped by that property.
+func TestCitesRelatedPanelSectionMatchesRegistry(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join(projectRoot(t), "docs", "resources", "*.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("docs/resources/*.md matched no files")
+	}
+	sort.Strings(paths)
+
+	walked, offending := 0, 0
+	for _, path := range paths {
+		registered := map[string]bool{}
+		var want []string
+		for _, def := range resource.GetRelated(shortNameOf(path)) {
+			if !registered[def.TargetType] {
+				registered[def.TargetType] = true
+				want = append(want, def.TargetType)
+			}
+		}
+		if len(want) == 0 {
+			continue
+		}
+		documented, lines, offShape, ok := docRelatedPivots(t, path)
+		if !ok {
+			continue
+		}
+		walked++
+
+		report := offShape
+		for _, name := range documented {
+			if !registered[name] {
+				report = append(report, fmt.Sprintf("  %s:%d: §2 describes the pivot `%s`, which the catalog does "+
+					"not register for this type", relToRoot(t, path), lines[name], name))
+			}
+		}
+		sort.Strings(want)
+		for _, name := range want {
+			if _, ok := lines[name]; !ok {
+				report = append(report, fmt.Sprintf("  %s: the catalog registers the pivot `%s` and §2 describes "+
+					"no block for it", relToRoot(t, path), name))
+			}
+		}
+		if len(report) == 0 {
+			continue
+		}
+		offending++
+		t.Errorf("%s §2 and the registered pivots disagree in %d place(s):\n%s",
+			relToRoot(t, path), len(report), strings.Join(report, "\n"))
+	}
+
+	if walked == 0 {
+		t.Fatal("docs/resources/*.md: no doc carried a §2 and a type with registered pivots")
+	}
+	if offending > 0 {
+		t.Errorf("%d of %d resource docs describe a related panel the catalog does not build", offending, walked)
 	}
 }

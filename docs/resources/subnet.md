@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn`, `ct-events`, `ec2`, `efs`, `eks`, `elb`, `eni`, `nat`, `rtb`, `vpc`, `vpce`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `cfn`, `ct-events`, `ec2`, `efs`, `eks`, `elb`, `eni`, `nat`, `rtb`, `vpc`, `vpce`.
 
 ### `vpc`
 
@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn
 ### `ec2`
 
 - **Why related**: Operator's most common subnet question is "what is running in here?" — list instances placed in this subnet to triage capacity, ENI allocation, or routing issues.
-- **How discovered**: cross-reference the already-loaded `ec2` list by `Instance.SubnetId == Subnet.SubnetId` (primary ENI). Cited use of `Instance.SubnetId` appears at related-resources.md line 414.
+- **How discovered**: cross-reference the already-loaded `ec2` list by `Instance.SubnetId == Subnet.SubnetId` (primary ENI). Cited use of `Instance.SubnetId` in `docs/related-resources.md` § Per-target reasoning.
 - **Count shown**: yes.
 
 ### `eni`
@@ -179,7 +179,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a red `failed: AZ out of capacity` row tells the operator to move workloads to another AZ, a red `IPs exhausted: 3 free of 256` row tells them the subnet has run out of addresses, and a yellow `auto-assigns public IPs` row tells them anything launched here reaches the internet by default — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a red `failed-insufficient-capacity` row tells the operator to move workloads to another availability zone, a red `failed` or `unavailable` row tells them AWS has taken the subnet out of service, and a yellow `auto-assigns public IPs` row tells them anything launched here reaches the internet by default — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -193,15 +193,15 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Related-panel targets list (`asg, cfn, ct-events, ec2, efs, eks, elb, eni, nat, rtb, vpc, vpce`) — `docs/related-resources.md` § Per-type contract, `subnet` row.
 - Related-panel `vpc` discovery (`Subnet.VpcId`) — `AWS SDK Go v2 — ec2/types.Subnet § VpcId`.
 - Related-panel `rtb` discovery (explicit association via `Associations[].SubnetId`, fallback to VPC main) — `docs/related-resources.md` § `subnet` Wave 1 row ("including the VPC main RTB when subnet has no explicit association"); `AWS SDK Go v2 — ec2/types.RouteTableAssociation § SubnetId, Main`.
-- Related-panel `ec2` discovery (`Instance.SubnetId`) — `docs/related-resources.md` line 414 ("Instance.SubnetId — primary ENI's subnet"); `AWS SDK Go v2 — ec2/types.Instance § SubnetId`.
+- Related-panel `ec2` discovery (`Instance.SubnetId`) — `docs/related-resources.md` § Per-target reasoning ("Instance.SubnetId — primary ENI's subnet"); `AWS SDK Go v2 — ec2/types.Instance § SubnetId`.
 - Related-panel `eni` discovery (`NetworkInterface.SubnetId`) — `AWS SDK Go v2 — ec2/types.NetworkInterface § SubnetId`.
 - Related-panel `nat` discovery (`NatGateway.SubnetId`) — `AWS SDK Go v2 — ec2/types.NatGateway § SubnetId`.
-- Related-panel `elb` discovery (`LoadBalancer.AvailabilityZones[].SubnetId`) — `docs/related-resources.md` line 550 ("AZ subnets the LB listens in"); `AWS SDK Go v2 — elasticloadbalancingv2/types.AvailabilityZone § SubnetId`.
-- Related-panel `eks` discovery (`Cluster.ResourcesVpcConfig.SubnetIds`) — `docs/related-resources.md` line 534 ("Cluster.ResourcesVpcConfig.SubnetIds — cluster subnets"); `AWS SDK Go v2 — eks/types.VpcConfigResponse § SubnetIds`.
-- Related-panel `asg` discovery (parse `VPCZoneIdentifier`) — `docs/related-resources.md` line 191 ("AutoScalingGroup.VPCZoneIdentifier — subnets the ASG launches into"); `AWS SDK Go v2 — autoscaling/types.AutoScalingGroup § VPCZoneIdentifier`.
+- Related-panel `elb` discovery (`LoadBalancer.AvailabilityZones[].SubnetId`) — `docs/related-resources.md` § Per-target reasoning ("AZ subnets the LB listens in"); `AWS SDK Go v2 — elasticloadbalancingv2/types.AvailabilityZone § SubnetId`.
+- Related-panel `eks` discovery (`Cluster.ResourcesVpcConfig.SubnetIds`) — `docs/related-resources.md` § Per-target reasoning ("Cluster.ResourcesVpcConfig.SubnetIds — cluster subnets"); `AWS SDK Go v2 — eks/types.VpcConfigResponse § SubnetIds`.
+- Related-panel `asg` discovery (parse `VPCZoneIdentifier`) — `docs/related-resources.md` § Per-target reasoning ("AutoScalingGroup.VPCZoneIdentifier — subnets the ASG launches into"); `AWS SDK Go v2 — autoscaling/types.AutoScalingGroup § VPCZoneIdentifier`.
 - Related-panel `efs` discovery (mount-target ENI scan of the loaded `eni` list by `NetworkInterface.SubnetId` + EFS mount-target description) — `docs/related-resources.md` § `subnet` (`efs` bullet); `AWS SDK Go v2 — ec2/types.NetworkInterface § SubnetId, Description`.
-- Related-panel `vpce` discovery (Interface endpoints' `VpcEndpoint.SubnetIds`) — `docs/related-resources.md` line 1044 ("Interface endpoint subnets"); `AWS SDK Go v2 — ec2/types.VpcEndpoint § SubnetIds`.
-- Related-panel `cfn` discovery (tag-based, `aws:cloudformation:stack-name`) — `AWS SDK Go v2 — ec2/types.Subnet § Tags`. Tag convention is an AWS-wide CFN behavior cited from related-resources.md's general use of CFN tag-based pivots.
+- Related-panel `vpce` discovery (Interface endpoints' `VpcEndpoint.SubnetIds`) — `docs/related-resources.md` § Per-target reasoning ("Interface endpoint subnets"); `AWS SDK Go v2 — ec2/types.VpcEndpoint § SubnetIds`.
+- Related-panel `cfn` discovery (tag-based, `aws:cloudformation:stack-name`) — `AWS SDK Go v2 — ec2/types.Subnet § Tags`. Tag convention is an AWS-wide CFN behaviour, used for CFN tag-based pivots throughout `docs/related-resources.md` § Per-target reasoning.
 - Related-panel `ct-events` universal pivot — `docs/related-resources.md` § Policy (universal pivot).
 - §3 Wave 1 signals (`State` enum, `AvailableIpAddressCount`, `MapPublicIpOnLaunch`, `rtb` cross-ref) — `docs/attention-signals.md § Signals § NETWORKING` row `subnet`.
 - §3 `State` enum values (`pending`, `available`, `unavailable`, `failed`, `failed-insufficient-capacity`) match exactly — `AWS SDK Go v2 — ec2/types.SubnetState` (const `SubnetStatePending`, `SubnetStateAvailable`, `SubnetStateUnavailable`, `SubnetStateFailed`, `SubnetStateFailedInsufficientCapacity`).

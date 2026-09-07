@@ -25,7 +25,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`, `codeartifact`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `cfn`, `codeartifact`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events`.
 
 ### `cb`
 
@@ -151,7 +151,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for failed pipelines (S4 reads `stage failed` and the detail lists every failed stage); for the `stuck >2h` case, the stage name is in S4 but the underlying reason (hung integration? awaiting approval?) still requires detail — consider refining S4 to `awaiting approval: <action>` when an approval token is pending, which the `GetPipelineState` response already carries.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for failed pipelines — a red row reads `stage failed` and the detail lists every failed stage, so the operator knows which stage to chase before pressing a key. A pipeline stuck mid-execution carries no finding at all, so it reads as healthy on the list; that is the one case where the list is silent and the detail view is the only way in.
 
 ## 5. Out of Scope
 

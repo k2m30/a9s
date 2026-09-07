@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `cfn`, `ct-events`, `ddb`, `kms`, `lambda`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `cfn`, `ct-events`, `ddb`, `kms`, `lambda`.
 
 ### `alarm`
 
@@ -131,7 +131,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, a yellow Kinesis row reads `creating` / `updating: resharding` / `deleting` in the Status column — the operator instantly knows whether the stream is being brought up, reshaped, or torn down without opening detail. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, a yellow Kinesis row reads `creating` / `updating` / `deleting` in the Status column — the operator instantly knows whether the stream is being brought up, reshaped, or torn down without opening detail. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 

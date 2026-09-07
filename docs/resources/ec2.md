@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `ami`, `asg`, `backup`, `cfn`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ami`, `asg`, `backup`, `cfn`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -255,7 +255,7 @@ Notes on list-text construction:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every row above — the Status column always carries either a human cause (`Server.SpotInstanceShutdown`, `retires in 3d`, `impaired: system checks failing`) or a state keyword paired with age (`stopped 42d ago`), never a bare `stopped` / `stopping` / `impaired` alone. The only residual concern is the `stopping` transitional case, which is inherently short-lived and does not need a cause beyond the verb.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every row above — the Status column always carries either a human cause (`impaired: system checks failing`, `scheduled event`, `status unknown: AWS insufficient-data`) or the state keyword itself (`stopped`, `pending`, `terminated`). The only residual concern is the `stopping` transitional case, which is inherently short-lived and does not need a cause beyond the verb.
 
 ## 4.2 On-Demand Detail Enrichment
 

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `backup`, `cfn`, `ct-events`, `ec2`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `backup`, `cfn`, `ct-events`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc`.
 
 ### `alarm`
 
@@ -42,12 +42,6 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 - **Why related**: CloudFormation stack that created the FS — provenance and blast-radius when planning changes.
 - **How discovered**: read the `aws:cloudformation:stack-name` tag on `FileSystemDescription.Tags[]`; cross-reference the loaded `cfn` list by stack name — a9s-devops: EFS tags are returned on the description directly (no extra `ListTagsForResource`); CloudFormation-managed resources always carry this tag. Fall back to "none" if the tag is absent.
 - **Count shown**: yes (typically 1).
-
-### `ec2`
-
-- **Why related**: EC2 instances that mount this file system via NFS — the obvious set of consumers.
-- **How discovered**: `TBD — a9s-devops (2026-04-20): possible=weak, worth=no. There is no direct EFS→EC2 field; the only inference is "instances whose subnet matches a mount-target subnet", which is noisy (every instance in those subnets appears, not just mounters). Daily operators reach EC2 via the`subnet` or `eni`pivots instead, so a9s should not fabricate a consumer list here.` Render the pivot as an empty panel unless a field-backed mechanism is added upstream.
-- **Count shown**: unknown.
 
 ### `ecs-task`
 
@@ -196,7 +190,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — EFS per-type related contract — `docs/related-resources.md` § Per-type contract row `efs`.
-- a9s golden doc — EFS related-target discovery notes (KmsKeyId, mount-target ENIs/SGs/subnets, lambda mounts, ecs-task mounts, backup recovery points, cfn stack, alarm metrics) — `docs/related-resources.md` § `### efs`.
+- a9s golden doc — EFS related-target discovery notes (KmsKeyId, mount-target ENIs/SGs/subnets, lambda mounts, ecs-task mounts, backup recovery points, cfn stack, alarm metrics) — `docs/related-resources.md` § `efs`.
 - a9s golden doc — Universal-pivot policy for `ct-events` — `docs/related-resources.md` § Policy.
 - a9s golden doc — the `efs` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `efs`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — Read-only invariant — `docs/architecture.md` § "What is a9s?".

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `eb-rule`, `lambda`, `r53`, `s3`, `sns`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `eb-rule`, `lambda`, `r53`, `s3`, `sns`.
 
 ### `eb-rule`
 
@@ -141,22 +141,22 @@ Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the accou
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: verification-failure rows show a red row with a short cause (`verification failed`, `verify: temp failure`, `verification not started`), paused identities show a yellow row with `sending disabled`, and account-level incidents show `account PROBATION` / `account SHUTDOWN` on every row — so the operator immediately distinguishes "this identity is broken" from "the whole SES account is in trouble" without navigating.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: verification-failure rows go red with a short cause (`verification failed`, `verify: temp failure`, `verification not started`), a paused identity goes yellow reading `sending disabled`, and an account-level incident reads `account under review (probation)` or `sending paused by AWS (shutdown)` on every row — so the operator immediately distinguishes "this identity is broken" from "the whole SES account is in trouble" without navigating.
 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (per-identity DKIM drift; reputation dashboard via CloudWatch).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- Related targets **deliberately not registered** for `ses` (from `docs/related-resources.md` Out-of-scope list): `acm` (SES uses DKIM, not ACM, for domain identities); `alarm` (general reverse-scan of CloudWatch alarms); `cfn` (tag-heuristic only); `kms` (configuration set / identity encryption is AWS-managed by default); `logs` (event destinations go to Firehose/SNS/EventBridge, not CW Logs directly); `role` (role usage is embedded in receipt-rule actions / Firehose destinations); `trail` (CloudTrail data-events link is indirect).
+- Related targets **deliberately not registered** for `ses` (from `docs/related-resources.md` § Explicitly excluded): `acm` (SES uses DKIM, not ACM, for domain identities); `alarm` (general reverse-scan of CloudWatch alarms); `cfn` (tag-heuristic only); `kms` (configuration set / identity encryption is AWS-managed by default); `logs` (event destinations go to Firehose/SNS/EventBridge, not CW Logs directly); `role` (role usage is embedded in receipt-rule actions / Firehose destinations); `trail` (CloudTrail data-events link is indirect).
 - `kinesis`: SES event destinations use Kinesis Firehose, which is not currently modeled as an a9s resource type. Follow-up: tracked separately.
 
 ## 6. Citations
 
-- `ses` appears in related-resources.md per-type table — `docs/related-resources.md` § row `| ses | API_IdentityInfo | ct-events, eb-rule, lambda, r53, s3, sns |`.
-- Per-target discovery mechanics for `eb-rule`, `lambda`, `r53`, `s3`, `sns` — `docs/related-resources.md` § `### ses`.
+- `ses` appears in the per-type table with targets `ct-events`, `eb-rule`, `lambda`, `r53`, `s3`, `sns` — `docs/related-resources.md` § Per-type contract, row `ses`.
+- Per-target discovery mechanics for `eb-rule`, `lambda`, `r53`, `s3`, `sns` — `docs/related-resources.md` § `ses`.
 - `kinesis` removed: SES event destinations use Kinesis Firehose; `kinesis` in a9s models Kinesis Data Streams — a different service. The pivot was producing dead drill-through results (Firehose ARN format does not match Data Streams IDs). Tracked separately for a potential `firehose` resource type.
-- Out-of-scope related targets (`acm`, `alarm`, `cfn`, `kms`, `logs`, `role`, `trail`) — `docs/related-resources.md` § Out-of-scope bullets for `ses`.
+- Out-of-scope related targets (`acm`, `alarm`, `cfn`, `kms`, `logs`, `role`, `trail`) — `docs/related-resources.md` § Explicitly excluded.
 - `ct-events` is a universal pivot — `docs/related-resources.md` § Policy.
 - Wave 1 and Wave 2 signal list — `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
 - `VerificationStatus` enum values (`PENDING`, `SUCCESS`, `FAILED`, `TEMPORARY_FAILURE`, `NOT_STARTED`) — AWS SDK Go v2 — `sesv2/types.VerificationStatus` (enum constants) and `sesv2/types.IdentityInfo` § `VerificationStatus` (field docstring). They match `docs/attention-signals.md § Signals § MESSAGING` row `ses`.

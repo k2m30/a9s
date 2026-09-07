@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc`.
 
 ### `alarm`
 
@@ -192,7 +192,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every state: the yellow/red/dim row carries a specific cause in S4 (`updating: UPDATING_BROKER_STORAGE`, `rebooting broker`, `healing broker`, `failed: <code>`), and the most dangerous state — `FAILED` — surfaces the `StateInfo.Code` inline so the operator can tell "bad AMI" from "subnet gone" without navigating. The only residual gap is that deeper correctness (partition offline, controller dead, disk 90%) lives in CloudWatch and is intentionally Wave 3 — operators wanting that signal use the `alarm` pivot from the related panel, which is the designed flow.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every state: the row carries a specific cause in S4 — red for `failed`, `brokers reachable from the internet` and `unauthenticated access allowed`, yellow for `updating`, `rebooting broker`, `healing` and `broker software outdated` — so the operator can tell a cluster in flight from a cluster in trouble without navigating. The only residual gap is that deeper correctness (partition offline, controller dead, disk 90%) lives in CloudWatch and is intentionally Wave 3 — operators wanting that signal use the `alarm` pivot from the related panel, which is the designed flow.
 
 ## 5. Out of Scope
 

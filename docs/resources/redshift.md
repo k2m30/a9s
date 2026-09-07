@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `cfn`, `kms`, `logs`, `role`, `s3`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `cfn`, `kms`, `logs`, `role`, `s3`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -235,7 +235,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a short cause in the Status column (`storage-full`, `unavailable`, `publicly accessible`, `pending change queued`, `maintenance deferred`) rather than a bare state keyword; operator can triage without opening detail, and the detail line adds one sentence of context rather than repeating the column.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a short cause in the Status column (`broken: storage-full`, `unavailable`, `publicly accessible`, `pending change queued`, `maintenance deferred`) rather than a bare state keyword; operator can triage without opening detail, and the detail line adds one sentence of context rather than repeating the column.
 
 ## 5. Out of Scope
 

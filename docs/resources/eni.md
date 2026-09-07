@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce`, `ct-events`.
 
 ### `ec2`
 
@@ -138,7 +138,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row with `unattached — billed while idle` or `zombie: owner nat <id> gone` tells the operator exactly which ENI to reclaim and why, no detail press needed; transitional `attaching` / `detaching` rows carry their state word which is enough context because the next refresh will resolve them.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `available` tells the operator the interface is attached to nothing and can be reclaimed, no detail press needed; transitional `attaching` / `detaching` rows carry their state word, which is enough context because the next refresh will resolve them.
 
 ## 5. Out of Scope
 

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`, `ng`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`, `ng`.
 
 ### `asg`
 
@@ -128,7 +128,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows carry a cause next to the AMI name — `failed: <reason>`, `deprecated <Nd> ago`, `backing snapshot missing`, or the explicit `deregistered` / `disabled` keyword — so the operator can triage (re-register, re-create, or rotate to a newer AMI) straight from the list without pressing detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows carry a cause next to the AMI name — `failed`, `deprecated`, `shared with all AWS accounts`, or the dim `deregistered` keyword — so the operator can triage (re-register, re-create, or rotate to a newer AMI) straight from the list without pressing detail.
 
 ## 5. Out of Scope
 

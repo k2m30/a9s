@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `iam-user`, `policy`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `iam-user`, `policy`.
 
 ### `iam-user`
 
@@ -100,10 +100,10 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Related targets list — `docs/related-resources.md` § "`iam-group` ... `ct-events`, `iam-user`, `policy`" (row in Per-type contract table).
-- `iam-user` related rationale (members of group) — `docs/related-resources.md` § "### `iam-group`" bullet "**`iam-user`** — Members of this group."
-- `policy` related rationale (attached managed policies) — `docs/related-resources.md` § "### `iam-group`" bullet "**`policy`** — Attached managed policies."
-- `ct-events` universal pivot — `docs/related-resources.md` § "Policy" item 4 "Universal pivots — `ct-events` (CloudTrail audit trail) is implicitly ...".
+- Related targets list — `docs/related-resources.md` § Per-type contract, row `iam-group` (`ct-events`, `iam-user`, `policy`).
+- `iam-user` related rationale (members of group) — `docs/related-resources.md` § `iam-group`, bullet "**`iam-user`** — Members of this group."
+- `policy` related rationale (attached managed policies) — `docs/related-resources.md` § `iam-group`, bullet "**`policy`** — Attached managed policies."
+- `ct-events` universal pivot — `docs/related-resources.md` § Policy, item 4 "Universal pivots — `ct-events` (CloudTrail audit trail) is implicitly ...".
 - List API = `ListGroups`, config-only — `core/aws/iam_groups.go`.
 - Wave 2 signal (empty group >30d) — `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-group`.
 - Wave 3 deferred — `docs/attention-signals.md § Not yet implemented`.

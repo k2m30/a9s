@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `asg`, `cfn`, `ec2`, `elb`, `logs`, `role`, `s3`, `sg`, `tg`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `asg`, `cfn`, `ec2`, `elb`, `logs`, `role`, `s3`, `sg`, `tg`, `ct-events`.
 
 ### `alarm`
 
@@ -188,7 +188,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-green row carries a plain-English cause in the Status column (`unresponsive: 3+ health checks failed`, `degraded: health checks failing`, `launching: health checks suspended`, `terminated`); the operator knows whether to page, wait, or ignore without opening detail. The only drill-in prompt is when enhanced-health `Causes[]` adds specific sub-reasons (e.g. "Elastic Load Balancer awseb-..-AWSEBLoa-... has zero healthy instances"); those live in the detail view as S5, which is the correct place for them.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a plain-English cause in the Status column (`health: red`, `health: yellow`, `health: grey`, `launching`, `terminated`); the operator knows whether to page, wait, or ignore without opening detail. The specific sub-reasons behind a health colour arrive as `environment reports health causes`, whose full text lives in the detail view as S5, which is the correct place for it.
 
 ## 5. Out of Scope
 
@@ -211,7 +211,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `tg` pivot discovery via LB → listener → target-group forwarding — `docs/related-resources.md` § `eb` (bullet `tg`).
 - `ct-events` universal pivot — `docs/related-resources.md` § Policy (item 4).
 - `alarm` discovery heuristic (match on `Dimensions[EnvironmentName]`) — a9s-devops (2026-04-20): possible=yes, worth=yes. EB-created alarms use `Dimensions=[{Name:EnvironmentName,Value:<env>}]`; non-EB-created alarms referencing the environment use the same dimension if they're useful to the operator. Persona call recorded because no field citation exists in the golden docs for this pivot; adopted because it matches how EB itself tags its own alarms.
-- "Count shown: unknown" for every related target — `docs/related-resources.md` does not pin count-display semantics per pivot; the skill records silence as `unknown` rather than inventing a value.
+- "Count shown: unknown" for every related target — `docs/related-resources.md` § Per-target reasoning does not pin count-display semantics per pivot; the skill records silence as `unknown` rather than inventing a value.
 - Wave 1 signals (`Health` Green/Yellow/Grey/Red → Healthy/Warning/Warning/Broken; `Status==Terminated` → Dim) — `docs/attention-signals.md § Signals § MESSAGING` row `eb`.
 - SDK field names `Health`, `Status`, `HealthStatus`, and the AWS semantics of Green/Yellow/Grey/Red — `AWS SDK Go v2 — elasticbeanstalk/types.EnvironmentDescription § Health` (doc comment) and `§ Status`.
 - `Health` enum values — `AWS SDK Go v2 — elasticbeanstalk/types.EnvironmentHealth`.

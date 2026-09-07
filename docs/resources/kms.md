@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `dbi`, `ebs`, `role`, `s3`, `secrets`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `dbi`, `ebs`, `role`, `secrets`.
 
 KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consumer resources. Every target below is discovered by scanning the already-loaded sibling-type list for entries whose `KmsKeyId` / `KmsKeyArn` / `SseKmsKeyId` / equivalent encryption-key field matches this key's `KeyId` or `Arn`. When the sibling list has not been loaded in the current sweep, the panel shows the target with an unknown count rather than a zero.
 
@@ -39,16 +39,10 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 - **How discovered**: cross-reference the already-loaded `ebs` list by `Volume.KmsKeyId` matching this key's `Arn`.
 - **Count shown**: yes.
 
-### `s3`
-
-- **Why related**: S3 buckets using this key for SSE-KMS default encryption — one of the highest-blast-radius consumers; deleting the key bricks every object encrypted with it.
-- **How discovered**: not resolvable within the checker budget — bucket encryption config (`ServerSideEncryptionConfiguration.Rules[].ApplyServerSideEncryptionByDefault.KMSMasterKeyID`) is not on `ListBuckets` and is not stored in the cached `s3` resources, so the reverse index has nothing to match against; resolving consumers would need `GetBucketEncryption` per bucket. (budget-excluded per related-resources.md Policy rule 7: per-bucket encryption fan-out exceeds the one-call budget.)
-- **Count shown**: unknown.
-
 ### `secrets`
 
 - **Why related**: Secrets Manager secrets encrypted with this key — a customer-managed KMS key protecting credentials is sensitive blast radius.
-- **How discovered**: cross-reference the already-loaded `secrets` list by `SecretListEntry.KmsKeyId` matching this key's `KeyId` (the secrets listing carries only the UUID suffix; related-resources.md notes the "UUID suffix matched against KMS key cache").
+- **How discovered**: cross-reference the already-loaded `secrets` list by `SecretListEntry.KmsKeyId` matching this key's `KeyId` (the secrets listing carries only the UUID suffix; `docs/related-resources.md` § `kms` notes the "UUID suffix matched against KMS key cache").
 - **Count shown**: yes.
 
 ### `role`
@@ -160,7 +154,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: every non-Healthy row carries a short cause in S4 (`pending deletion`, `disabled: admin off`, `unavailable: custom key store offline`) and a key that never rotates goes yellow reading `key rotation disabled` — the operator can triage "which key is about to strand encrypted data?" without pressing detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes: every non-Healthy row carries a short cause in S4 — red for `pending deletion`, `key policy open to anyone` and `access denied (kms:DescribeKey)`, yellow for `disabled` and `key rotation disabled` — so the operator can triage "which key is about to strand encrypted data?" without pressing detail.
 
 ## 5. Out of Scope
 

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `ami`, `asg`, `cfn`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ami`, `asg`, `cfn`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -224,7 +224,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a transitional state renders as `creating` / `updating` / `deleting` / `pending` (color alone is not enough, so the word clarifies which transition), a failed cluster renders `failed: see Health.Issues`, and a health issue renders the issue code directly (`issue: InsufficientFreeAddresses`, `issue: AccessDenied`). The `Message` detail is one keypress away in S5 for the long-form explanation.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a transitional state renders as `creating` / `updating` / `deleting` / `pending` (colour alone is not enough, so the word clarifies which transition), a failed cluster renders `failed`, and a cluster AWS reports a problem on renders `health issue`. The issue's own `Message` is one keypress away in S5 for the long-form explanation.
 
 ## 5. Out of Scope
 

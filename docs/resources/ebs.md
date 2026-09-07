@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `backup`, `cfn`, `ebs-snap`, `ec2`, `kms`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `backup`, `cfn`, `ebs-snap`, `ec2`, `kms`, `ct-events`.
 
 ### `alarm`
 
@@ -149,7 +149,7 @@ Notes on rows omitted:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a cause in S4 (`orphan: unattached 42d`, `impaired: I/O failing`, `unencrypted`) and the color is already the attention signal; the operator can triage "delete me", "AWS broke it", or "security debt" at a glance without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a cause in S4 (`orphan: unattached <N>d`, `volume I/O degraded`, `unencrypted`) and the colour is already the attention signal; the operator can triage "delete me", "AWS broke it", or "security debt" at a glance without opening detail.
 
 ## 5. Out of Scope
 
@@ -161,7 +161,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- a9s golden doc — related targets list (`alarm`, `backup`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`) — `docs/related-resources.md` § Per-type contract, row `ebs` (line 63); long-form §`ebs` (lines 371–381).
+- a9s golden doc — related targets list (`alarm`, `backup`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`) — `docs/related-resources.md` § Per-type contract, row `ebs`; long-form §`ebs`.
 - a9s golden doc — `ec2` pivot via `Volume.Attachments[].InstanceId` — `docs/related-resources.md` §`ebs`, bullet `ec2`.
 - a9s golden doc — `kms` pivot via `Volume.KmsKeyId` — `docs/related-resources.md` §`ebs`, bullet `kms`.
 - a9s golden doc — `ebs-snap` pivot ("Snapshots of this volume") — `docs/related-resources.md` §`ebs`, bullet `ebs-snap`.

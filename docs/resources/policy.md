@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `iam-group`, `iam-user`, `role`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `iam-group`, `iam-user`, `role`.
 
 ### `iam-group`
 
@@ -103,7 +103,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — an orphan policy reads `orphan: 0 attachments` (yellow row) and a wildcard-admin policy reads `admin star (allows * on *)` on a red row the menu count takes; both problems are legible without opening detail, so triage happens on the list page. Operators drill into detail only to see the actual affected users/groups/roles in the related panel.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — an orphan policy shows a yellow row reading `unattached, no roles/users/groups use it`, and a wildcard-admin policy shows a red row reading `admin star (allows * on *)`, which the menu count takes; both problems are legible without opening detail, so triage happens on the list page. Operators drill into detail only to see the actual affected users/groups/roles in the related panel.
 
 ## 5. Out of Scope
 
@@ -117,7 +117,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - `policy` is a registered a9s resource type — `docs/related-resources.md` § Per-type contract row `policy`.
 - Expected related targets `ct-events`, `iam-group`, `iam-user`, `role` — `docs/related-resources.md` § `policy` (line "`policy` | [API_Policy] | `ct-events`, `iam-group`, `iam-user`, `role`").
-- Reasoning for each target pivot — `docs/related-resources.md` § `### policy` subsection (lines 746-753).
+- Reasoning for each target pivot — `docs/related-resources.md` § `policy`.
 - Wave 1 signal `AttachmentCount==0 AND not AWS-managed → Warning (orphan)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
 - Wave 2 signal `GetPolicyVersion` document contains `"Effect":"Allow","Action":"*","Resource":"*" → Broken (wildcard admin)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
 - Wave 3 IAM Access Advisor unused-permission analysis — `docs/attention-signals.md § Not yet implemented`.

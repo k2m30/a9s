@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `apigw`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ecr`, `efs`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `role`, `s3`, `secrets`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `apigw`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ecr`, `efs`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `role`, `s3`, `secrets`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc`.
 
 ### `alarm`
 
@@ -259,7 +259,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for most rows — `failed: <reason-code>`, `update failed: <reason-code>`, `runtime deprecated: <name>`, `no DLQ — async failures dropped`, and `creating` all carry actionable cause in 40 chars. One soft gap: `idle: not invoked recently` for `State==Inactive` is grey-row informational only — the row color already signals "nothing to act on" and this resource may re-activate on next invoke; the text exists so the operator doesn't mistake the dim row for a bug.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for most rows — `failed`, `last update failed to apply`, `runtime is end-of-life`, `no dead-letter queue configured`, and `pending` all carry an actionable cause in 40 characters. One soft gap: `inactive, evicted after extended idle time` is grey-row informational only — the row colour already signals "nothing to act on" and the function may re-activate on the next invoke; the text exists so the operator does not mistake the dim row for a bug.
 
 ## 4.2 On-Demand Detail Enrichment
 
@@ -285,32 +285,32 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - `alarm` discovery (FunctionName dimension on `AWS/Lambda` namespace) — a9s-devops (2026-04-20): possible=yes, worth=yes. Standard CloudWatch schema; no Lambda-side alarm back-reference.
 - `apigw` reasoning (API Gateway integrations) — `docs/related-resources.md` § `lambda` bullet `apigw`.
 - `apigw` discovery (integration Uri match) — a9s-devops (2026-04-20): possible=yes, worth=yes. Integration reference lives on the API Gateway route.
-- `cf` reasoning (Lambda@Edge) — `docs/related-resources.md` § `cf` bullet `lambda` and `docs/related-resources.md` line 241.
+- `cf` reasoning (Lambda@Edge) — `docs/related-resources.md` § `cf` bullet `lambda`.
 - `cf` discovery (`LambdaFunctionAssociations[].LambdaFunctionARN` in distribution config, us-east-1) — a9s-devops (2026-04-20): possible=yes, worth=yes.
 - `cfn` reasoning (stack that created the function) — `docs/related-resources.md` § `lambda` bullet `cfn`.
 - `cfn` discovery (`aws:cloudformation:stack-name` tag) — a9s-devops (2026-04-20): possible=yes, worth=yes. Standard CFN-managed resource tag.
 - `ct-events` universality — `docs/related-resources.md` § Policy §4 ("Universal pivots").
 - `ddb` reasoning (Streams triggers) — `docs/related-resources.md` § `lambda` bullet `ddb`.
 - `ddb` discovery (`ListEventSourceMappings` with dynamodb `EventSourceArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Canonical Lambda↔DDB Streams wiring.
-- `eb-rule` reasoning (rules with this function as a target) — `docs/related-resources.md` § `lambda` bullet `eb-rule` and line 364.
+- `eb-rule` reasoning (rules with this function as a target) — `docs/related-resources.md` § `lambda` bullet `eb-rule`.
 - `eb-rule` discovery (`ListTargetsByRule` for each rule) — a9s-devops (2026-04-20): possible=yes, worth=yes. EventBridge targets are rule-side.
-- `ecr` reasoning (container-image Lambda) — `docs/related-resources.md` § `lambda` bullet `ecr` and line 429.
+- `ecr` reasoning (container-image Lambda) — `docs/related-resources.md` § `lambda` bullet `ecr`.
 - `ecr` discovery (`PackageType==Image` + `GetFunction.Code.ImageUri`) — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `PackageType`; `GetFunction` output carries `Code.ImageUri` (not on `ListFunctions`).
-- `efs` reasoning (FileSystemConfigs) — `docs/related-resources.md` § `lambda` bullet `efs` and line 498.
+- `efs` reasoning (FileSystemConfigs) — `docs/related-resources.md` § `lambda` bullet `efs`.
 - `efs` discovery (`FileSystemConfigs[].Arn`) — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `FileSystemConfigs`; `FileSystemConfig.Arn` is the EFS access-point ARN.
-- `eni` reasoning (Lambda-in-VPC ENIs) — `docs/related-resources.md` § `lambda` bullet `eni` and line 563.
+- `eni` reasoning (Lambda-in-VPC ENIs) — `docs/related-resources.md` § `lambda` bullet `eni`.
 - `eni` discovery (requester-managed ENI with `AWS Lambda VPC ENI` description) — a9s-devops (2026-04-20): possible=yes, worth=yes. Documented ENI description pattern.
-- `kinesis` reasoning (event-source mapping) — `docs/related-resources.md` § `lambda` bullet `kinesis` and line 617.
+- `kinesis` reasoning (event-source mapping) — `docs/related-resources.md` § `lambda` bullet `kinesis`.
 - `kinesis` discovery (`ListEventSourceMappings` with kinesis `EventSourceArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes.
 - `kms` reasoning (env-var encryption key) — `docs/related-resources.md` § `lambda` bullet `kms`.
 - `kms` discovery (`KMSKeyArn` field) — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `KMSKeyArn`.
 - `logs` reasoning (`/aws/lambda/<name>`) — `docs/related-resources.md` § `lambda` bullet `logs`.
 - `logs` discovery (`LoggingConfig.LogGroup` or default name) — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `LoggingConfig`.
-- `msk` reasoning (MSK event-source mapping) — `docs/related-resources.md` § `lambda` bullet `msk` and line 681.
+- `msk` reasoning (MSK event-source mapping) — `docs/related-resources.md` § `lambda` bullet `msk`.
 - `msk` discovery (`ListEventSourceMappings` with kafka `EventSourceArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes.
-- `role` reasoning (execution permissions) — `docs/related-resources.md` § `lambda` bullet `role` and line 819.
+- `role` reasoning (execution permissions) — `docs/related-resources.md` § `lambda` bullet `role`.
 - `role` discovery (`Role` field) — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `Role`.
-- `s3` reasoning (S3 event source) — `docs/related-resources.md` § `lambda` bullet `s3` and line 850.
+- `s3` reasoning (S3 event source) — `docs/related-resources.md` § `lambda` bullet `s3`.
 - `s3` discovery (`GetBucketNotificationConfiguration.LambdaFunctionConfigurations[]`) — a9s-devops (2026-04-20): possible=yes, worth=yes. S3→Lambda wiring is bucket-side.
 - `secrets` reasoning (secrets accessed at runtime) — `docs/related-resources.md` § `lambda` bullet `secrets`.
 - `secrets` discovery (env-var scan + role policy scan) — a9s-devops (2026-04-20): possible=yes (weak heuristic), worth=yes (incident-triage pivot). Expect false negatives on runtime-composed ARNs.
@@ -318,15 +318,15 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - `sg` discovery (`VpcConfig.SecurityGroupIds`) — AWS SDK Go v2 — lambda/types.VpcConfigResponse § `SecurityGroupIds`.
 - `sns` reasoning (SNS event source mapping / DLQ) — `docs/related-resources.md` § `lambda` bullet `sns`.
 - `sns` discovery (`DeadLetterConfig.TargetArn` SNS ARN + topic-side subscription listing) — AWS SDK Go v2 — lambda/types.DeadLetterConfig § `TargetArn`.
-- `sns-sub` reasoning (SNS subscriptions delivering to the function) — `docs/related-resources.md` § `lambda` bullet `sns-sub` and line 928.
+- `sns-sub` reasoning (SNS subscriptions delivering to the function) — `docs/related-resources.md` § `lambda` bullet `sns-sub`.
 - `sns-sub` discovery (`Protocol==lambda` + `Endpoint==FunctionArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Standard SNS subscription attributes.
-- `sqs` reasoning (event source or DLQ) — `docs/related-resources.md` § `lambda` bullet `sqs` and line 940.
+- `sqs` reasoning (event source or DLQ) — `docs/related-resources.md` § `lambda` bullet `sqs`.
 - `sqs` discovery (`DeadLetterConfig.TargetArn` SQS ARN + `ListEventSourceMappings` with sqs `EventSourceArn`) — AWS SDK Go v2 — lambda/types.DeadLetterConfig § `TargetArn`.
 - `ssm` reasoning (parameters as config) — `docs/related-resources.md` § `lambda` bullet `ssm`.
 - `ssm` discovery (env-var scan + role policy scan) — a9s-devops (2026-04-20): possible=yes (weak heuristic), worth=yes (config-pivot for incident triage).
 - `subnet` reasoning (function ENI subnets) — `docs/related-resources.md` § `lambda` bullet `subnet`.
 - `subnet` discovery (`VpcConfig.SubnetIds`) — AWS SDK Go v2 — lambda/types.VpcConfigResponse § `SubnetIds`.
-- `tg` reasoning (TargetGroup registration) — `docs/related-resources.md` § `lambda` bullet `tg` and line 983.
+- `tg` reasoning (TargetGroup registration) — `docs/related-resources.md` § `lambda` bullet `tg`.
 - `tg` discovery (TG `TargetType==lambda` + `DescribeTargetHealth` match on `FunctionArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes. ALB→Lambda wiring is TG-side.
 - `vpc` reasoning (VPC the function runs in) — `docs/related-resources.md` § `lambda` bullet `vpc`.
 - `vpc` discovery (`VpcConfig.VpcId`) — AWS SDK Go v2 — lambda/types.VpcConfigResponse § `VpcId`.

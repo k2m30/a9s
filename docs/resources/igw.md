@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `rtb`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `rtb`, `vpc`, `ct-events`.
 
 ### `rtb`
 
@@ -103,7 +103,7 @@ One row per §3 signal (Healthy case omitted per rule):
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, the operator can distinguish the four Warning modes by the Status column: `attaching` / `detaching` reads as in-flight, `detached` / `unattached` reads as orphan billing, and `attached but unused: no default route` reads as misconfiguration. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, the operator can distinguish the Warning modes by the Status column: `attaching` / `detaching` reads as in-flight, and `no VPC attachments` reads as orphan billing. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -116,13 +116,13 @@ At 3am, glancing at the list, the operator can distinguish the four Warning mode
 ## 6. Citations
 
 - `shortName`, display name and the `igw` signals — `docs/attention-signals.md § Signals § NETWORKING` row `igw`; list API — `core/aws/igw.go`.
-- AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `igw` (line 78) and § `igw` narrative block (lines 600–606).
+- AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `igw` and § `igw` narrative block.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?" (lines 13–15).
 - `Attachments[]`, `Attachments[].State`, `Attachments[].VpcId`, `InternetGatewayId` field names — `AWS SDK Go v2 — service/ec2/types.InternetGateway § Attachments` and `service/ec2/types.InternetGatewayAttachment § State, VpcId`.
 - `AttachmentStatus` enum values (`attaching`, `attached`, `detaching`, `detached`) — `AWS SDK Go v2 — service/ec2/types.AttachmentStatus`.
 - `Routes[].GatewayId`, `Routes[].DestinationCidrBlock` for the `rtb` cross-reference — `AWS SDK Go v2 — service/ec2/types.Route § GatewayId, DestinationCidrBlock`.
 - List API returns full gateway shape, no Describe needed — `AWS SDK Go v2 — service/ec2.DescribeInternetGatewaysOutput § InternetGateways`.
-- `ct-events` as universal pivot — `docs/related-resources.md` § Policy (line 34).
+- `ct-events` as universal pivot — `docs/related-resources.md` § Policy.
 - CloudTrail event-name filter (`AttachInternetGateway`, `DetachInternetGateway`, `CreateInternetGateway`, `DeleteInternetGateway`) — `a9s-devops (2026-04-20): possible=yes (CloudTrail records all IGW management-plane calls), worth=yes. These four event names are the filter operators run when investigating an IGW state change.`
 - `rtb` discovery via reverse-scan of the already-loaded list — `a9s-devops (2026-04-20): possible=yes, worth=yes. The route target lives on the Route object as GatewayId; scanning the already-loaded rtb list avoids any extra AWS call.`
 - `vpc` discovery via `Attachments[0].VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. IGW-to-VPC is a 1:1 relationship carried directly on the list response, no cross-scan needed.`

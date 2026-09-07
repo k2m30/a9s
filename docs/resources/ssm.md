@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `kms`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `kms`.
 
 ### `kms`
 
@@ -87,7 +87,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all three signals — the Status column explicitly names the cause (`stale: not rotated in 365d+`, `plaintext: name looks like a secret`, `advanced: aged 90d+ ($0.05/mo)`) so the operator can triage (rotate / retype / downgrade) without pressing detail. The detail line (S5) is a fuller sentence for operators who want the remediation action spelled out; the list line is the 3am-glance primary.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for both signals — the Status column explicitly names the cause (`not modified in over 365 days`, `plaintext value looks like a credential`) so the operator can triage (rotate or retype) without pressing detail. The detail line (S5) is a fuller sentence for operators who want the remediation action spelled out; the list line is the 3am-glance primary.
 
 ## 5. Out of Scope
 

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `iam-group`, `policy`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `iam-group`, `policy`, `ct-events`.
 
 ### `iam-group`
 
@@ -128,14 +128,14 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (credential report polling flow).
-- `iam-user` → `kms` related panel — no direct key-user attribute on a user. Cited at `docs/related-resources.md` §"Known NOT-related pairs".
-- `iam-user` → `role` related panel — indirect via trust policies across all roles; would require a reverse scan. Cited at `docs/related-resources.md` §"Known NOT-related pairs".
+- `iam-user` → `kms` related panel — no direct key-user attribute on a user. Cited at `docs/related-resources.md` § Explicitly excluded.
+- `iam-user` → `role` related panel — indirect via trust policies across all roles; would require a reverse scan. Cited at `docs/related-resources.md` § Explicitly excluded.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
 ## 6. Citations
 
-- Related targets `iam-group`, `policy`, `ct-events` — `docs/related-resources.md` § "Per-type contract" table row for `iam-user`, and § "`iam-user`" detail block.
+- Related targets `iam-group`, `policy`, `ct-events` — `docs/related-resources.md` § Per-type contract, row `iam-user`, and `docs/related-resources.md` § `iam-user`.
 - `iam-group` discovery via `ListGroupsForUser(UserName)` — `AWS SDK Go v2 — iam.ListGroupsForUserInput § UserName` (required field); output `Groups[].GroupName` keys into `iam-group` list.
 - `policy` discovery via `ListAttachedUserPolicies(UserName)` — `AWS SDK Go v2 — iam.ListAttachedUserPoliciesInput § UserName` (required field); output `AttachedPolicies[].PolicyArn`.
 - `ct-events` discovery by `Username` attribute — `docs/related-resources.md` §`ct-events` ("`userIdentity.userName` (Type=IAMUser)"); `docs/testing-detail-view-coverage.md` §§35, 93 (short-name is the bare user name).
@@ -145,7 +145,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 3 credential report — `docs/attention-signals.md § Not yet implemented`; OUT OF SCOPE per template rule.
 - Severity assignment `!` vs `~` for Wave 2 findings — persona decision: MFA-missing is a security incident (Broken + `!` drives S1 count); stale/never-used keys are hygiene (`~` annotation, no S1 bump). Grounded in skill surface rules (§S1, §S3) and CIS IAM benchmarks' treatment of MFA as mandatory.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
-- `iam-user` NOT-related pairs (`kms`, `role`) — `docs/related-resources.md` §"Known NOT-related pairs" lines 1101–1102.
+- `iam-user` NOT-related pairs (`kms`, `role`) — `docs/related-resources.md` § Explicitly excluded.
 
 <!-- BEGIN GENERATED: header -->
 iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).

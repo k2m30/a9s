@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `ami`, `ec2`, `elb`, `ng`, `role`, `sg`, `sns`, `subnet`, `tg`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ami`, `ec2`, `elb`, `ng`, `role`, `sg`, `sns`, `subnet`, `tg`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -186,7 +186,7 @@ Notes:
 
 ### 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every Warning/Broken row carries a specific cause in the Status column (`deleting`, `unhealthy: N of M instances`, `below min: K of MinSize`, `suspended: <process list>`, `launch failed: <StatusMessage>`), so triage decisions ("which ASG do I open first?") are possible directly from the list.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every Warning/Broken row carries a specific cause in the Status column (`delete in progress`, `<N> unhealthy instance(s)`, `<N> of <M> instances in service`, `scaling suspended`, `latest scaling activity failed`), so triage decisions ("which ASG do I open first?") are possible directly from the list.
 
 ## 5. Out of Scope
 

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `apigw`, `cf`, `elb`, `r53`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `apigw`, `cf`, `elb`, `r53`, `ct-events`.
 
 ### `apigw`
 
@@ -156,7 +156,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy cert carries a specific cause in S4 (`expires in 5d`, `issuance failed`, `validation timed out`, `auto-renewal failed`), and the detail view carries the full sentence for each, one keypress away. The only wording that could be tightened is the generic `issuance failed` for `Status == FAILED` — when `CertificateDetail.FailureReason` is available from a prior describe, the Wave 2 pass may refine S4 to `issuance failed: <FailureReason>`.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy cert carries a specific cause in S4 (`expired`, `expires in <N> days`, `pending validation`, `certificate not in use (orphan)`, `weak key algorithm`), and the detail view carries the full sentence for each, one keypress away. The one generic cell is `<status, in words>`, which spells whatever ACM reports; a Wave 2 refinement would read `CertificateDetail.FailureReason` and say why issuance failed.
 
 ## 5. Out of Scope
 

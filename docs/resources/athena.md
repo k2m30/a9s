@@ -23,13 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `glue`, `kms`, `logs`, `role`, `s3`, `ct-events`.
-
-### `glue`
-
-- **Why related**: Athena queries the account's Glue Data Catalog; when a query fails with a schema or table error, the operator pivots to Glue Jobs that populate those tables.
-- **How discovered**: the WorkGroup shape carries no Glue reference — the Athena↔Glue link is namespace-level (Glue Catalog is account- and region-scoped, one default catalog per region). Cross-reference the already-loaded `glue` (Jobs) list for the current profile/region with no filter. a9s-devops: no per-workgroup Glue field exists on `WorkGroup` or `WorkGroupConfiguration`; showing the full region-local Glue Jobs list is the idiomatic pivot.
-- **Count shown**: yes (total Glue Jobs in region).
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `kms`, `logs`, `role`, `s3`.
 
 ### `kms`
 
@@ -46,7 +40,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `glue`, `km
 ### `role`
 
 - **Why related**: Execution role the workgroup assumes to access user data (Spark sessions and IAM Identity Center enabled workgroups). For SQL-only workgroups the role is user-policy-based and not stored on the workgroup.
-- **How discovered**: call `GetWorkGroup`; read `Configuration.ExecutionRole` (an IAM role ARN). Cross-reference the loaded `role` list by ARN. a9s-devops: `ExecutionRole` is populated only for Spark / IAM IC workgroups; for SQL-only workgroups the pivot is suppressed (count=0) and operators go to CloudTrail events instead. related-resources.md itself flags `role` as a 1/6-audit borderline pivot, consistent with this partial-field reality.
+- **How discovered**: call `GetWorkGroup`; read `Configuration.ExecutionRole` (an IAM role ARN). Cross-reference the loaded `role` list by ARN. a9s-devops: `ExecutionRole` is populated only for Spark / IAM IC workgroups; for SQL-only workgroups the pivot is suppressed (count=0) and operators go to CloudTrail events instead. `docs/related-resources.md` § `athena` itself flags `role` as a 1/6-audit borderline pivot, consistent with this partial-field reality.
 - **Count shown**: yes (0 or 1 depending on workgroup type).
 
 ### `s3`
@@ -119,7 +113,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled: no new queries accepted` tells the operator the workgroup is admin-off, and a yellow row reading `query results stored unencrypted` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still write results in the clear, and a merged cell could name only the first. Operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled` tells the operator the workgroup is admin-off, and a yellow row reading `query results stored unencrypted` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still write results in the clear, and a merged cell could name only the first. Operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -143,7 +137,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `KmsKey` on `EncryptionConfiguration` (populated when `EncryptionOption` is `SSE_KMS` or `CSE_KMS`) — `AWS SDK Go v2 — service/athena/types.EncryptionConfiguration § KmsKey`.
 - AWS Go SDK v2 — `CloudWatchLoggingConfiguration.LogGroup` — `AWS SDK Go v2 — service/athena/types.CloudWatchLoggingConfiguration § LogGroup`.
 - a9s-devops consultation — glue discovery via region-local Glue Jobs list (no per-workgroup field) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Athena↔Glue binding is namespace-level; Glue Data Catalog is account/region-scoped. Operator workflow: failed query → pivot to Glue Jobs that populate the referenced tables.`
-- a9s-devops consultation — role pivot is partial (Spark/IAM IC only) via `Configuration.ExecutionRole` — `a9s-devops (2026-04-20): possible=yes (partial), worth=yes. Spark workgroups have ExecutionRole; SQL-only workgroups fall back to ct-events for audit. Matches related-resources.md 1/6-audit borderline note.`
+- a9s-devops consultation — role pivot is partial (Spark/IAM IC only) via `Configuration.ExecutionRole` — `a9s-devops (2026-04-20): possible=yes (partial), worth=yes. Spark workgroups have ExecutionRole; SQL-only workgroups fall back to ct-events for audit. Matches the 1/6-audit borderline note in related-resources.md § athena.`
 - a9s-devops consultation — count shown = yes for kms/logs/role/s3 (singular fields when set); glue = yes (region count); ct-events = unknown (windowed CloudTrail queries) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Per-target singular or account-wide; consistent with acm/s3/ec2 specs in docs/resources/.`
 
 <!-- BEGIN GENERATED: header -->

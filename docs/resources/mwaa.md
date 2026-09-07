@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `ct-events`, `kms`, `logs`, `role`, `s3`, `sg`, `subnet`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ct-events`, `kms`, `logs`, `role`, `s3`, `sg`, `subnet`.
 
 ### `alarm`
 

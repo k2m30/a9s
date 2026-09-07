@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce`, `ct-events`.
 
 ### `cfn`
 
@@ -146,7 +146,7 @@ One row per §3 signal (Healthy case omitted per rule):
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, a yellow row with `pending: VPC being created` or `empty: no subnets` is already self-explanatory, and a yellow row reading `no active VPC flow logs` tells the operator what's missing without requiring a detail pivot. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, a yellow row reading `pending` says the VPC is still being created, and a yellow row reading `no active VPC flow logs` tells the operator what is missing without requiring a detail pivot. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -161,14 +161,14 @@ At 3am, glancing at the list, a yellow row with `pending: VPC being created` or 
 ## 6. Citations
 
 - `shortName`, display name and the `vpc` signals — `docs/attention-signals.md § Signals § NETWORKING` row `vpc`; list API — `core/aws/vpc.go`.
-- AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpc` (line 108) and § `vpc` narrative block (lines 1013–1028).
+- AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpc` and § `vpc` narrative block.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `Vpc.State`, `VpcId`, `CidrBlock`, `IsDefault`, `OwnerId`, `DhcpOptionsId`, `InstanceTenancy`, `CidrBlockAssociationSet`, `Ipv6CidrBlockAssociationSet`, `Tags`, `BlockPublicAccessStates` field names — `AWS SDK Go v2 — service/ec2/types.Vpc`.
 - `VpcState` enum values (`pending`, `available`) — `AWS SDK Go v2 — service/ec2/types.VpcState` (`VpcStatePending`, `VpcStateAvailable`).
 - `InternetGateway.Attachments[].VpcId` for the `igw` cross-reference — `AWS SDK Go v2 — service/ec2/types.InternetGateway § Attachments` and `service/ec2/types.InternetGatewayAttachment § VpcId`.
 - `TransitGatewayAttachment.ResourceId`, `ResourceType`, `TransitGatewayId` for the `tgw` cross-reference — `AWS SDK Go v2 — service/ec2/types.TransitGatewayAttachment § ResourceId, ResourceType, TransitGatewayId`.
 - `FlowLog.ResourceId` for the Wave 2 cross-reference — `AWS SDK Go v2 — service/ec2/types.FlowLog § ResourceId`.
-- `ct-events` as universal pivot — `docs/related-resources.md` § Policy (line 34).
+- `ct-events` as universal pivot — `docs/related-resources.md` § Policy.
 - CloudTrail event-name filter (`CreateVpc`, `DeleteVpc`, `ModifyVpcAttribute`, `AssociateVpcCidrBlock`, `CreateFlowLogs`, `DeleteFlowLogs`) — `a9s-devops (2026-04-20): possible=yes (CloudTrail records all VPC management-plane calls), worth=yes. These event names are the filter operators run when investigating a VPC state change.`
 - `cfn` discovery via `aws:cloudformation:stack-name` tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every resource it creates; tag-based lookup avoids a per-VPC DescribeStackResources call.`
 - `ec2`, `elb`, `eni`, `nat`, `rtb`, `sg`, `subnet`, `vpce` discovered via reverse-scan of already-loaded lists on `VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Every one of these AWS list responses carries`VpcId`(or an equivalent) directly; scanning already-loaded lists is cheaper than any extra AWS call.`

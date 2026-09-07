@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `athena`, `cfn`, `kms`, `logs`, `role`, `s3`, `secrets`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `athena`, `cfn`, `kms`, `logs`, `role`, `s3`, `secrets`, `ct-events`.
 
 ### `alarm`
 
@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 ### `athena`
 
 - **Why related**: Athena workgroups whose queries consume the Glue Data Catalog that this Glue job populates — when the job fails, downstream Athena dashboards go stale and the operator needs the pivot to know which consumers to warn.
-- **How discovered**: show the full already-loaded `athena` list — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue jobs do not store a per-job list of consuming Athena workgroups (the Catalog is a shared-namespace resource), and there is no cheap inverse index. A9s therefore links `glue` → `athena` as an account-wide pivot rather than a per-job filter; this mirrors the `related-resources.md` rationale that Athena queries Glue Catalog.
+- **How discovered**: show the full already-loaded `athena` list — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue jobs do not store a per-job list of consuming Athena workgroups (the Catalog is a shared-namespace resource), and there is no cheap inverse index. A9s therefore links `glue` → `athena` as an account-wide pivot rather than a per-job filter; this mirrors the rationale in `docs/related-resources.md` § `glue` that Athena queries Glue Catalog.
 - **Count shown**: yes (the full account-wide workgroup count).
 
 ### `cfn`
@@ -164,7 +164,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 - **Inner-script data paths (S3 reads/writes inside the PySpark job code)** — a9s-devops persona (2026-04-20): possible=no, not available in AWS surface. Glue does not expose the datasets a script reads; static analysis of user code is out of scope for a read-only TUI.
-- **Crawlers, triggers, workflows, development endpoints, data-quality rulesets** — a9s-devops persona (2026-04-20): possible=yes (separate Glue APIs), worth=no for now. The `glue` shortName is scoped to Jobs per `related-resources.md`; these sibling Glue object types would warrant their own shortNames (e.g. `glue-crawler`, `glue-trigger`) in a future iteration.
+- **Crawlers, triggers, workflows, development endpoints, data-quality rulesets** — a9s-devops persona (2026-04-20): possible=yes (separate Glue APIs), worth=no for now. The `glue` shortName is scoped to Jobs per `docs/related-resources.md` § `glue`; these sibling Glue object types would warrant their own shortNames (e.g. `glue-crawler`, `glue-trigger`) in a future iteration.
 - **DPU-hours / cost signals** — covered under Wave 3 above; requires CloudWatch metrics and a time-series budget a9s intentionally doesn't spend.
 
 ## 6. Citations
@@ -178,14 +178,14 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — S3 script/temp paths — `AWS SDK Go v2 — glue/types.JobCommand § ScriptLocation` and `glue/types.Job § DefaultArguments`.
 - AWS Go SDK v2 — KMS chain via SecurityConfiguration — `AWS SDK Go v2 — glue/types.Job § SecurityConfiguration` and `glue/types.SecurityConfiguration § EncryptionConfiguration`.
 - a9s-devops consultation — `alarm` pivot uses `AlarmActions`/`Dimensions` filter on loaded alarms — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudWatch alarms for Glue use JobName as the standard dimension; no inverse-index API, so filtering the already-loaded alarm list is the correct pivot.`
-- a9s-devops consultation — `athena` pivot is account-wide (not per-job filterable) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Catalog is shared-namespace; Athena→Glue linkage is one-way only, matching the Athena-queries-Glue-Catalog rationale in related-resources.md.`
+- a9s-devops consultation — `athena` pivot is account-wide (not per-job filterable) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Catalog is shared-namespace; Athena→Glue linkage is one-way only, matching the Athena-queries-Glue-Catalog rationale in related-resources.md § glue.`
 - a9s-devops consultation — `cfn` pivot via `aws:cloudformation:stack-name` tag — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every created resource; reachable via Glue GetTags.`
 - a9s-devops consultation — `kms` pivot walks SecurityConfiguration encryption sub-fields — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. KMS references on Glue jobs live only through the named SecurityConfiguration.`
 - a9s-devops consultation — `logs` pivot combines Glue convention groups + `--continuous-log-logGroup` arg — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Default groups and the continuous-logging argument are the documented log destinations; Job.LogUri is the deprecated S3 path.`
 - a9s-devops consultation — `s3` pivot parses ScriptLocation and Glue Special Parameters (`--TempDir`, `--spark-event-logs-path`, etc.) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. No first-class "buckets this job uses" API; argument parsing is the idiomatic path.`
 - a9s-devops consultation — `secrets` pivot via Connection `SECRET_ID` property — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Connections that wrap Secrets Manager expose the secret ID under this property; this is the only on-resource path.`
 - a9s-devops consultation — inner-script data paths are not discoverable — `a9s-devops persona (2026-04-20): possible=no, not available in AWS surface. Glue exposes no "datasets this script reads" API; static code analysis is out of scope.`
-- a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per related-resources.md.`
+- a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per related-resources.md § glue.`
 
 <!-- BEGIN GENERATED: header -->
 glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycle field).

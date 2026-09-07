@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `sns`, `lambda`, `sqs`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `sns`, `lambda`, `sqs`, `ct-events`.
 
 ### `sns`
 
@@ -100,15 +100,15 @@ One row per signal from §3:
 
 ### 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — the yellow row with `pending confirmation` in the Status column says plainly "the endpoint never acknowledged the subscribe request, no messages are being delivered to this endpoint"; the fix is out of a9s's read-only scope (re-send confirm or re-subscribe) but the diagnosis is complete on the list.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — the yellow row with `endpoint has not confirmed the subscription` in the Status column says plainly that the endpoint never acknowledged the subscribe request, so no messages are being delivered to it; the fix is out of a9s's read-only scope (re-send confirm or re-subscribe) but the diagnosis is complete on the list.
 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
-- Subscription-level `kms` pivot — encryption is topic-level, not subscription-level (`docs/related-resources.md` § "Deliberately NOT registered — rationale").
-- Subscription-level `policy` pivot — subscription policies are attributes, not standalone policies (`docs/related-resources.md` § "Deliberately NOT registered — rationale").
-- `ecs` pivot — SNS subscriptions don't target ECS clusters/services directly (`docs/related-resources.md` § "Deliberately NOT registered — rationale").
+- Subscription-level `kms` pivot — encryption is topic-level, not subscription-level (`docs/related-resources.md` § Explicitly excluded).
+- Subscription-level `policy` pivot — subscription policies are attributes, not standalone policies (`docs/related-resources.md` § Explicitly excluded).
+- `ecs` pivot — SNS subscriptions don't target ECS clusters/services directly (`docs/related-resources.md` § Explicitly excluded).
 - Any write operation. a9s is read-only by design (`docs/architecture.md` § "What is a9s?").
 
 ## 6. Citations
@@ -120,7 +120,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS API reference URL — `docs/related-resources.md` § `sns-sub` (`https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html`).
 - Subscription shape fields (`SubscriptionArn`, `TopicArn`, `Protocol`, `Endpoint`, `Owner`) — `AWS SDK Go v2 — sns/types.Subscription`.
 - `PendingConfirmation` sentinel string on `SubscriptionArn` — `AWS SDK Go v2 — sns/types.Subscription § SubscriptionArn` (documented wire behaviour of `ListSubscriptions` when the endpoint has not yet confirmed).
-- Deliberately-not-registered pivots (`kms`, `policy`, `ecs`) — `docs/related-resources.md` § "Deliberately NOT registered — rationale".
+- Deliberately-not-registered pivots (`kms`, `policy`, `ecs`) — `docs/related-resources.md` § Explicitly excluded.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `sns` discovery via `TopicArn` — `a9s-devops (2026-04-20): possible=yes (SDK field TopicArn on sns/types.Subscription), worth=yes. The very first question an operator asks on any subscription row is "which topic?" — this pivot must exist.`
 - `lambda` discovery via `Endpoint` when `Protocol=="lambda"` — `a9s-devops (2026-04-20): possible=yes (SDK field Endpoint carries the Lambda ARN for Protocol==lambda), worth=yes. Tracing a subscription to the function that runs on each published message is the primary debugging pivot for Lambda-backed fanout.`

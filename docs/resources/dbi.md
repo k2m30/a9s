@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -258,7 +258,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the failure statuses (`storage-full`, `inaccessible-encryption-credentials`) are already self-describing in S4 and the configuration warnings (`no automated backups`, `publicly accessible`, `unencrypted storage`, `deletion protection off`) name the exact policy miss without jargon. The one gap is the transitional bucket: a bare `modifying` tells the operator the instance is busy but not what's being modified — a minor follow-up is to append the first non-empty key of `PendingModifiedValues` (e.g. `modifying: DBInstanceClass`) so the list row explains itself.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the failure statuses (`storage-full`, `encryption key unavailable`) are already self-describing in S4 and the configuration warnings (`no automated backups`, `publicly accessible`, `unencrypted storage`, `deletion protection off`) name the exact policy miss without jargon. The one gap is the transitional bucket: `<transitional status>` tells the operator the instance is busy but not what is being modified, because the first non-empty key of `PendingModifiedValues` is not part of the phrase.
 
 ## 5. Out of Scope
 

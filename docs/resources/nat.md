@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `eip`, `eni`, `rtb`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `eip`, `eni`, `rtb`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -128,7 +128,7 @@ Notes on filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, the operator sees a red row for a failed NAT and immediately reads `failed: InsufficientFreeAddressesInSubnet` in the Status column — enough to know the subnet is full without opening detail. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, the operator sees a red row for a failed NAT reading `failed` in the Status column, and opens detail for the AWS failure code that says why. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -152,7 +152,7 @@ At 3am, glancing at the list, the operator sees a red row for a failed NAT and i
 - `FailureCode` and `FailureMessage` as Broken-detail pair — `docs/attention-signals.md § Signals § NETWORKING` row `nat`; field shapes confirmed by `AWS SDK Go v2 — ec2/types.NatGateway § FailureCode` and `§ FailureMessage`. Documented failure codes `InsufficientFreeAddressesInSubnet`, `Gateway.NotAttached`, `InvalidAllocationID.NotFound`, `Resource.AlreadyAssociated`, `InternalError`, `InvalidSubnetID.NotFound` come from the same SDK comment.
 - Wave 2 is empty for `nat` — `docs/attention-signals.md § Signals § NETWORKING` row `nat`.
 - Wave 3 signals — `docs/attention-signals.md § Not yet implemented`.
-- `Count shown: unknown` for every related target — `docs/related-resources.md` is silent on per-target counts. a9s-devops persona (2026-04-20): possible=no to cite from golden docs, worth=no to guess. Remaining gap is documented, not invented.
+- `Count shown: unknown` for every related target — `docs/related-resources.md` § `nat` is silent on per-target counts. a9s-devops persona (2026-04-20): possible=no to cite from golden docs, worth=no to guess. Remaining gap is documented, not invented.
 - `State==deleted` treated as Dim but not surfaced — `a9s-devops persona (2026-04-20): possible=yes (SDK enum), worth=no for daily-driver use.` Recorded in §5 Out of Scope rather than §4, because `docs/attention-signals.md § Signals § NETWORKING` row `nat` carries no finding for it.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 

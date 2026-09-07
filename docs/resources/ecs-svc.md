@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `cfn`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `cfn`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -219,7 +219,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every red row carries a specific cause in the Status column (`deploy failed`, `running 2/4: no active deploy`, `unable to place`, `ELB health checks failed`, `circuit breaker`), so the on-call engineer can triage (capacity vs. health-check vs. scheduler) directly from the list; the detail pane is only needed to read the full event message and pivot to `tg` / `ecs-task` / `logs`.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every red row carries a specific cause in the Status column (`no tasks running`, `not running its desired tasks`, `inactive`), and a yellow one reads `running below desired count` or `draining`, so the on-call engineer can triage (capacity vs. health-check vs. scheduler) directly from the list; the detail pane is only needed to read the full event message and pivot to `tg` / `ecs-task` / `logs`.
 
 ## 5. Out of Scope
 

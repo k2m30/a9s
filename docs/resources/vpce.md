@@ -23,25 +23,13 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `alarm`, `cf`, `eni`, `logs`, `r53`, `rtb`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf`, `ct-events`.
-
-### `acm`
-
-- **Why related**: The ACM certificate presented by a custom-domain endpoint (interface endpoints that front a private API Gateway, PrivateLink service, or a user-owned service that terminates TLS with a private cert) — operator pivots here when a client is getting a TLS validation error against `*.vpce-svc-...amazonaws.com` or a custom private hostname. — a9s-devops (2026-04-20): possible=yes, worth=yes. PrivateLink-backed interface endpoints that terminate TLS with a customer cert are a real (though narrow) incident path; the related-resources.md row reflects this rather than a generic pivot.
-- **How discovered**: No direct field on `VpcEndpoint` links to an ACM ARN. For `Interface` endpoints where `PrivateDnsEnabled==true` and `ServiceName` begins with `com.amazonaws.vpce.` (private service), open the already-loaded `acm` list and let the operator visually confirm by common name; no automatic cross-reference. Alternative: call `DescribeVpcEndpointServiceConfigurations` and read `PrivateDnsNameConfiguration`, but this is Wave-3-budget. Show the full `acm` list as candidate pivots. — a9s-devops (2026-04-20): possible=partial (no FK field on the endpoint itself), worth=yes for the pivot even when automatic count is unavailable.
-- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: no cert reference on the list response; per-endpoint-service `PrivateDnsNameConfiguration` lookups exceed the checker budget).
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `sg`, `subnet`, `vpc`.
 
 ### `alarm`
 
 - **Why related**: CloudWatch alarms watching interface-endpoint connectivity and data volume (for example `AWS/PrivateLinkEndpoints` namespace: `ActiveConnections`, `BytesProcessed`, `PacketsDropped`). Operator pivots here when an endpoint is marked Available but consumers are getting timeouts, or when auditing what monitoring exists on a critical endpoint. — a9s-devops (2026-04-20): possible=yes, worth=yes. `AWS/PrivateLinkEndpoints` publishes per-endpoint metrics keyed by `VPC Endpoint Id`, and alarms written against that dimension are the standard operational signal.
 - **How discovered**: Filter the already-loaded `alarm` list client-side where any entry in `MetricAlarm.Dimensions[]` has `Name=="VPC Endpoint Id"` (or legacy `VpcEndpointId`) and `Value==this.VpcEndpointId`. For `MetricAlarms` keyed by `Namespace==AWS/PrivateLinkEndpoints`. — a9s-devops (2026-04-20): possible=yes, worth=yes. Dimension-based scan of the already-loaded alarm list is the cheap path and mirrors how engineers actually find endpoint alarms.
 - **Count shown**: yes (0 or more).
-
-### `cf`
-
-- **Why related**: Rare, but real: CloudFront distributions that use a VPC Origin (launched 2024) target an interior resource through a PrivateLink-style attachment backed by a VPC endpoint or endpoint service. Operator pivots here when a VPC-origin distribution is returning `504 ErrorCode: OriginDNSError` and wants to confirm which endpoint CloudFront is reaching. — a9s-devops (2026-04-20): possible=yes, worth=yes for VPC-origin distributions (niche but high-signal when it applies).
-- **How discovered**: No direct FK field on `VpcEndpoint` — CloudFront stores the origin's VPC attachment on the distribution side (`Origin.VpcOriginConfig.VpcOriginId`), which is not on `DistributionSummary`. The pivot shows the full `cf` list; automatic linkage requires a Wave-2 `ListVpcOrigins` call against CloudFront which is out of scope. — a9s-devops (2026-04-20): possible=partial (no FK on vpce), worth=yes for the pivot (operator can scan a small list of VPC-origin distributions).
-- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: the CloudFront→VPCE link lives on VPC Origins, absent from both list responses).
 
 ### `eni`
 
@@ -67,12 +55,6 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 - **How discovered**: Direct field: `VpcEndpoint.RouteTableIds[]` gives the IDs of route tables wired to this gateway endpoint. Filter the already-loaded `rtb` list by `RouteTable.RouteTableId` membership in this set. — a9s-devops (2026-04-20): possible=yes, worth=yes. `RouteTableIds[]` is on every `DescribeVpcEndpoints` response for `Gateway` endpoints.
 - **Count shown**: yes (0 for interface endpoints; 1+ for gateway endpoints).
 
-### `s3`
-
-- **Why related**: The single highest-value real-world use of VPC endpoints: Gateway endpoint for S3 (private-subnet compute reaching S3 without NAT). Operator pivots here when debugging bucket access ("is my bucket policy allowing this VPC endpoint?") — a bucket policy condition on `aws:SourceVpce` is the standard lockdown pattern. — a9s-devops (2026-04-20): possible=yes, worth=yes. `com.amazonaws.<region>.s3` is the most common gateway endpoint in production; pivoting to the bucket list to inspect policies is a daily workflow.
-- **How discovered**: No FK in the endpoint response to individual buckets. When `this.ServiceName` matches `com.amazonaws.<region>.s3`, the pivot opens the full `s3` list so the operator can inspect per-bucket policies that reference `aws:SourceVpce`. — a9s-devops (2026-04-20): possible=partial (no FK, but the pivot is well-defined when `ServiceName` is S3), worth=yes.
-- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: a deterministic count would require interpreting `VpcEndpoint.PolicyDocument` against per-bucket `GetBucketPolicy` calls).
-
 ### `sg`
 
 - **Why related**: For an interface endpoint, the attached security groups govern inbound TLS (typically 443) to the endpoint ENIs. Operator pivots here when a consumer is getting connection-refused or timeouts through the endpoint — the cause is almost always an SG that doesn't allow the consumer's CIDR on 443.
@@ -85,23 +67,11 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 - **How discovered**: Direct field: `VpcEndpoint.SubnetIds[]` gives the subnet IDs for this interface endpoint. Filter the already-loaded `subnet` list by `Subnet.SubnetId` membership in this set. — a9s-devops (2026-04-20): possible=yes, worth=yes. `SubnetIds[]` is on every `DescribeVpcEndpoints` response for interface endpoints.
 - **Count shown**: yes (0 for gateway endpoints; 1+ for interface endpoints).
 
-### `tg`
-
-- **Why related**: A PrivateLink service publisher configures a NLB; the `tg` (target groups) behind that NLB are what actually answer consumer traffic arriving through the endpoint. Operator pivots here on the consumer side when debugging "endpoint is Available, connections timeout" — the real failure is often on the far side (unhealthy targets behind the provider NLB). — a9s-devops (2026-04-20): possible=yes, worth=yes for operator-published PrivateLink services.
-- **How discovered**: No FK from a consumer endpoint to provider target groups (that crosses an account boundary). When `this.VpcEndpointType==Interface` and `this.ServiceName` begins `com.amazonaws.vpce.` (customer PrivateLink), the pivot opens the full `tg` list — useful only when the operator owns both the provider and the consumer account. — a9s-devops (2026-04-20): possible=partial, worth=yes for shops that own both ends (common in platform teams).
-- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: the tg cache carries no registered targets; matching endpoint IPs would require `DescribeTargetHealth` per TG).
-
 ### `vpc`
 
 - **Why related**: The parent VPC this endpoint belongs to — operator pivots up one level to see sibling networking resources (route tables, subnets, flow logs) and to confirm the endpoint is in the VPC they think it is.
 - **How discovered**: Direct field: `VpcEndpoint.VpcId`. Open the matching entry in the already-loaded `vpc` list. — a9s-devops (2026-04-20): possible=yes, worth=yes. `VpcId` is on every `DescribeVpcEndpoints` response.
 - **Count shown**: yes (always 1).
-
-### `waf`
-
-- **Why related**: WAF Web ACLs can be associated with API Gateway REST APIs (regional / private) that are fronted by an interface endpoint. Operator pivots here when a private API is returning 403s that don't appear in API Gateway logs — the block is at the WAF edge. — a9s-devops (2026-04-20): possible=yes, worth=yes for private API Gateway endpoints.
-- **How discovered**: No FK from `VpcEndpoint` to WAF; association lives on the API Gateway side (`waf:GetWebACLForResource` per API). The pivot opens the full `waf` list so the operator can correlate by ACL scope (`REGIONAL`) and protected resource. — a9s-devops (2026-04-20): possible=partial, worth=yes.
-- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: no Web ACL binding on the endpoint list response; WAF-side resolution requires `wafv2:ListResourcesForWebACL` per ACL).
 
 ### `ct-events`
 
@@ -192,7 +162,7 @@ Note: S4 cells pair the state with a cause per the "state keywords are not expla
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreachable` or `failed: <LastError.Message>` tells the operator exactly why the endpoint is down without opening detail; a yellow row with `gateway: no route tables attached` points them straight at the route-table pivot. A yellow `endpoint policy open to anyone` row says the endpoint is still on the open policy AWS supplies by default. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, a red vpce row reading `failed`, `rejected`, `expired` or `partial` tells the operator the endpoint is down, and detail carries the AWS error message that says why; a yellow row reading `pending acceptance` points them at the owner who has not accepted yet. A yellow `endpoint policy open to anyone` row says the endpoint is still on the open policy AWS supplies by default. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -209,7 +179,7 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 ## 6. Citations
 
 - `shortName`, display name and the `vpce` signals (`State` bucket mapping, `LastError`, `NetworkInterfaceIds`, `RouteTableIds` rules) — `docs/attention-signals.md § Signals § NETWORKING` row `vpce`; list API — `core/aws/vpce.go`.
-- AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpce` (line 109) and § `vpce` narrative block (lines 1030–1047).
+- AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpce` and § `vpce` narrative block.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `VpcEndpoint.VpcEndpointId`, `VpcEndpointType`, `State`, `VpcId`, `ServiceName`, `RouteTableIds`, `SubnetIds`, `Groups[].GroupId`, `NetworkInterfaceIds`, `DnsEntries[].{DnsName, HostedZoneId}`, `PrivateDnsEnabled`, `LastError.{Code, Message}`, `FailureReason`, `PolicyDocument`, `CreationTimestamp`, `Tags` field names — `AWS SDK Go v2 — service/ec2/types.VpcEndpoint`.
 - `State` enum values (`PendingAcceptance`, `Pending`, `Available`, `Deleting`, `Deleted`, `Rejected`, `Failed`, `Expired`, `Partial`) — `AWS SDK Go v2 — service/ec2/types.State` (`StatePendingAcceptance`, `StatePending`, `StateAvailable`, `StateDeleting`, `StateDeleted`, `StateRejected`, `StateFailed`, `StateExpired`, `StatePartial`).
@@ -217,17 +187,17 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 - `LastError.{Code, Message}` shape — `AWS SDK Go v2 — service/ec2/types.LastError § Code, Message`.
 - `SecurityGroupIdentifier.GroupId` for the `sg` cross-reference — `AWS SDK Go v2 — service/ec2/types.SecurityGroupIdentifier § GroupId`.
 - `DnsEntry.{DnsName, HostedZoneId}` shape (detail-view field block) — `AWS SDK Go v2 — service/ec2/types.DnsEntry § DnsName, HostedZoneId`.
-- `ct-events` as universal pivot — `docs/related-resources.md` § Policy (line 34).
+- `ct-events` as universal pivot — `docs/related-resources.md` § Policy.
 - CloudTrail event-name filter (`CreateVpcEndpoint`, `DeleteVpcEndpoints`, `ModifyVpcEndpoint`, `AcceptVpcEndpointConnections`, `RejectVpcEndpointConnections`) — `a9s-devops (2026-04-20): possible=yes (CloudTrail records all endpoint management-plane calls), worth=yes. These event names are the filter operators run when investigating endpoint lifecycle and PrivateLink connection decisions.`
-- `acm` discovery is partial (no FK on VpcEndpoint) — `a9s-devops (2026-04-20): possible=partial, worth=yes for PrivateLink TLS-debug. The related-resources.md row reflects the niche-but-real pivot; the panel shows the full`acm`list without a deterministic count.`
+- `acm` budget exclusion — the list response carries no certificate reference, and resolving one needs a `PrivateDnsNameConfiguration` lookup per endpoint service — `docs/related-resources.md` § Explicitly excluded.
 - `alarm` discovery via dimension-scan on `VPC Endpoint Id` — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS/PrivateLinkEndpoints publishes per-endpoint metrics; dimension-based scan of the already-loaded alarm list is the cheap path.`
-- `cf` discovery is partial (FK lives on CloudFront side as VpcOriginConfig) — `a9s-devops (2026-04-20): possible=partial, worth=yes for VPC-origin distributions. Niche but high-signal when the attachment exists.`
+- `cf` budget exclusion — the CloudFront→endpoint link goes through VPC Origins, which are not on `DistributionSummary` — `docs/related-resources.md` § Explicitly excluded.
 - `eni`, `rtb`, `sg`, `subnet`, `vpc` discovered via direct FK fields on `VpcEndpoint` (`NetworkInterfaceIds`, `RouteTableIds`, `Groups[].GroupId`, `SubnetIds`, `VpcId`) — `a9s-devops (2026-04-20): possible=yes, worth=yes. These are first-class FKs on every DescribeVpcEndpoints response and are the standard operator pivots.`
 - `logs` discovery via reuse of the vpc-level `DescribeFlowLogs` cache, matching on `ResourceId == this.VpcId` or subnet IDs — `a9s-devops (2026-04-20): possible=yes, worth=yes. Reuses an existing account-wide Wave 2 call from the vpc spec; no new AWS call for the vpce pivot.`
 - `r53` discovery via `route53:ListHostedZonesByVPC` per endpoint (keyed by `VpcId`) — `a9s-devops (2026-04-20): possible=yes, worth=yes. The VPC-associated private zones are not in the account hosted-zone cache; the dedicated API is one bounded call per endpoint.`
-- `s3` discovery is partial (no FK, but gated on `ServiceName == com.amazonaws.<region>.s3`) — `a9s-devops (2026-04-20): possible=partial, worth=yes. Most common gateway endpoint in production; bucket-policy inspection is a daily workflow.`
-- `tg` discovery is partial (cross-account for PrivateLink producer/consumer) — `a9s-devops (2026-04-20): possible=partial, worth=yes for platform teams that own both ends.`
-- `waf` discovery is partial (FK lives on API Gateway association) — `a9s-devops (2026-04-20): possible=partial, worth=yes for private API Gateway endpoints where WAF is the hidden 403 source.`
+- `s3` budget exclusion — naming the reachable buckets means interpreting `VpcEndpoint.PolicyDocument` against bucket policies, with no deterministic join — `docs/related-resources.md` § Explicitly excluded.
+- `tg` budget exclusion — the target-group cache carries no registered targets, so matching endpoint IPs needs `DescribeTargetHealth` per group — `docs/related-resources.md` § Explicitly excluded.
+- `waf` budget exclusion — the endpoint list response has no Web ACL binding; associations resolve only from the WAF side — `docs/related-resources.md` § Explicitly excluded.
 - Truncation of `LastError.Message` at 40 chars for S4 — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS error messages exceed 40 chars regularly; truncation preserves the identity/state columns and the full message is still in the detail field block.`
 - `PrivateDnsEnabled==false` not a signal — `a9s-devops (2026-04-20): possible=yes, worth=no. Deliberate configuration choice for services with DNS conflicts, not a misconfiguration.`
 - CloudWatch Wave 3 metrics rationale — `a9s-devops (2026-04-20): possible=yes, worth=no for Wave 2. Per-endpoint GetMetricStatistics exceeds the Wave 2 budget; alarm pivot covers the operational path.`

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `asg`, `cfn`, `ec2`, `ecs-svc`, `ecs-task`, `kms`, `logs`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `asg`, `cfn`, `ec2`, `ecs-svc`, `ecs-task`, `kms`, `logs`, `ct-events`.
 
 ### `alarm`
 
@@ -152,7 +152,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 states — `failed: cluster creation failed`, `inactive: deleted (stale ref)`, `provisioning/deprovisioning` — each pairs the keyword with a cause. A cluster whose tasks are not running goes yellow reading `tasks pending or not running`, which separates "known-bad shape" from "transient burst" once the operator knows the cluster; the deeper reason (agent disconnect vs ENI attach failure) needs detail, where the counts are. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 states — `failed`, `inactive`, `provisioning` and `deprovisioning` each name the state outright. A cluster whose tasks are not running goes yellow reading `tasks pending or not running`, which separates "known-bad shape" from "transient burst" once the operator knows the cluster; the deeper reason (agent disconnect vs ENI attach failure) needs detail, where the counts are. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -164,7 +164,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — the `ecs` signal definitions — `docs/attention-signals.md § Signals § COMPUTE` row `ecs`.
-- a9s golden doc — expected related targets `alarm, asg, cfn, ct-events, ec2, ecs-svc, ecs-task, kms, logs` — `docs/related-resources.md` § "Per-type contract" row `ecs` and § `ecs`.
+- a9s golden doc — expected related targets `alarm, asg, cfn, ct-events, ec2, ecs-svc, ecs-task, kms, logs` — `docs/related-resources.md` § Per-type contract, row `ecs`, and `docs/related-resources.md` § `ecs`.
 - a9s golden doc — `ct-events` is the universal pivot — `docs/related-resources.md` § Policy, item 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `Cluster.Status` values `ACTIVE / PROVISIONING / DEPROVISIONING / FAILED / INACTIVE` with grace-period semantics for `INACTIVE` — `AWS SDK Go v2 — ecs/types.Cluster § Status`.

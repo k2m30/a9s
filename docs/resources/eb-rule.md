@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs`, `ct-events`.
 
 ### `kinesis`
 
@@ -136,7 +136,7 @@ Notes on the table above:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a broken enabled rule reads `no targets — events dropped` in red, a stale disabled rule reads `target drift or no dead-letter config` in yellow, and so does a rule whose targets have no dead-letter queue; all three are triageable in the list without navigating to detail, and the detail view separates the two causes.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reads `enabled rule has no targets`, a yellow one reads `target drift or no dead-letter config`, and a switched-off rule dims to `disabled`; all three are triageable in the list without navigating to detail, and the detail view separates the two causes behind the yellow row.
 
 ## 5. Out of Scope
 
@@ -149,7 +149,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — `eb-rule` is in the Per-type contract with targets `ct-events, kinesis, lambda, logs, role, sfn, sns, sqs` — `docs/related-resources.md` § Per-type contract, row `eb-rule`.
-- a9s golden doc — per-target reasoning (`kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs`, `ct-events`) — `docs/related-resources.md` § `eb-rule` (lines 358–369).
+- a9s golden doc — per-target reasoning (`kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs`, `ct-events`) — `docs/related-resources.md` § `eb-rule`.
 - a9s golden doc — the `eb-rule` signals — `docs/attention-signals.md § Signals § MESSAGING` row `eb-rule`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `Rule.State`, `Rule.Name`, `Rule.EventPattern`, `Rule.ScheduleExpression`, `Rule.EventBusName`, `Rule.RoleArn`, `Rule.Arn`, `Rule.Description` all on the `Rule` shape returned by `ListRules` — `AWS SDK Go v2 — eventbridge/types.Rule`.

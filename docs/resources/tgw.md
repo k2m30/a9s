@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `role`, `rtb`, `subnet`, `vpc`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `role`, `rtb`, `subnet`, `vpc`.
 
 ### `vpc`
 
@@ -134,7 +134,7 @@ sentence would restate it. Their S5 cell reads `—`.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 (color + cause word covers `pending`/`modifying`/`deleting`/`deleted`). For Wave 2, the list text `attachment failed` / `attachment rejected` / `attachment awaiting accept` names what to chase in one glance; the operator still presses detail only to find out *which* attachment — that trade (list stays narrow, detail carries the IDs) is acceptable because a TGW typically has few attachments and the next click is always "show me the attachments list". The `auto-accepts shared attachments` row is Wave 1 and needs no detail at all — the phrase is the whole finding.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 (colour plus the state word covers `pending`, `modifying`, `deleting` and `deleted`). For Wave 2, a red row reads `attachment failed` and a yellow one reads `attachment between states`, which names what to chase in one glance; the operator still presses detail only to find out *which* attachment — that trade (list stays narrow, detail carries the IDs) is acceptable because a transit gateway typically has few attachments and the next click is always "show me the attachments list". The `auto-accepts shared attachments` row is Wave 1 and needs no detail at all — the phrase is the whole finding.
 
 ## 5. Out of Scope
 

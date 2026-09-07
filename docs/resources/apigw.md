@@ -25,7 +25,7 @@ The list row identifies the API by `Name` and `ApiId`; protocol (`ProtocolType` 
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `r53`, `role`, `sfn`, `sns`, `vpce`, `waf`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `role`.
 
 ### `acm`
 
@@ -69,41 +69,11 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 - **How discovered**: read `Stage.AccessLogSettings.DestinationArn` on each stage returned by `apigatewayv2:GetStages`; match to the already-loaded `logs` list by log-group ARN — a9s-devops: stage access logs are the single operator-visible log surface; execution logs live on a different per-method path and are rarely what on-call wants first.
 - **Count shown**: yes.
 
-### `r53`
-
-- **Why related**: R53 alias records for the API's custom domains — the DNS surface operators hit in a browser.
-- **How discovered**: not resolvable within the checker budget. Record sets are not cached as joinable structures — the r53 fetcher summarizes each zone's alias targets into one Fields string — so the alias-target reverse-scan this row originally described is not available; resolving the DNS hop would need `apigatewayv2:GetDomainNames` plus per-zone `ListResourceRecordSets` walks. (budget-excluded per related-resources.md Policy rule 7: custom-domain alias resolution requires per-zone record-set scans beyond the one-call budget.)
-- **Count shown**: unknown.
-
 ### `role`
 
 - **Why related**: Invocation/authorizer role — the IAM role APIGW assumes to call the integration target or to run a request authorizer.
 - **How discovered**: `apigatewayv2:GetIntegrations` per API → read `CredentialsArn`; `apigatewayv2:GetAuthorizers` per API → read `AuthorizerCredentialsArn`; match to already-loaded `role` list — a9s-devops: these are the two places APIGW records an assumed role; anything else (e.g. Lambda execution role) belongs under the Lambda pivot, not here.
 - **Count shown**: yes.
-
-### `sfn`
-
-- **Why related**: Step Functions integration target — APIGW can start a state-machine execution directly.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API detects `IntegrationUri` of the form `arn:aws:apigateway:<region>:states:action/StartExecution` — but that URI only says "this API talks to Step Functions". The target state-machine ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri, so naming the specific state machine requires per-route template parsing. (budget-excluded per related-resources.md Policy rule 7: per-route request-template parsing exceeds the one-call budget; the checker detects the integration but cannot count targets.)
-- **Count shown**: unknown.
-
-### `sns`
-
-- **Why related**: APIGW → SNS integration — publish a notification directly from an API request.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API detects `IntegrationUri` of the form `arn:aws:apigateway:<region>:sns:action/Publish` — but the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri, so naming the specific topic requires per-route template parsing — a9s-devops: identical pattern to sfn, different AWS-service slug. (budget-excluded per related-resources.md Policy rule 7: per-route request-template parsing exceeds the one-call budget; the checker detects the integration but cannot count targets.)
-- **Count shown**: unknown.
-
-### `vpce`
-
-- **Why related**: Private APIs expose via VPC endpoint (interface type, `com.amazonaws.<region>.execute-api`).
-- **How discovered**: for REST v1 APIs the IDs sit on `RestApi.EndpointConfiguration.VpcEndpointIds`, but the v2 `GetApis` items this fetcher lists carry no endpoint configuration, and the HTTP v2 path is a brittle resource-policy parse for `aws:SourceVpce` condition keys — a9s-devops: possible=yes for v1 via a first-class field, v2 only via policy parse. (budget-excluded per related-resources.md Policy rule 7: endpoint IDs are absent from the v2 list response and the v2 policy-parse gap has no in-budget resolution.)
-- **Count shown**: unknown.
-
-### `waf`
-
-- **Why related**: WebACL attached to the API stage — the ingress filter that blocks bots, SQLi, rate abuse.
-- **How discovered**: not resolvable within the checker budget — v2 APIs carry no Web ACL binding on `GetApis` (only REST v1 stages associate ACLs via `apigateway:GetWebACL`), and resolving from the WAF side requires `wafv2:ListResourcesForWebACL` per Web ACL, an O(N) fan-out over the target population. (budget-excluded per related-resources.md Policy rule 7: no in-budget lookup exists for v2 APIs.)
-- **Count shown**: unknown.
 
 ### `ct-events`
 
@@ -199,7 +169,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - `apigw` shortName + contract row — `docs/related-resources.md` § `apigw` (table row and "Per-target reasoning" subsection).
-- Related targets (`acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `r53`, `role`, `sfn`, `sns`, `vpce`, `waf`) — `docs/related-resources.md` § `apigw`.
+- Related targets (`acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `role`) — `docs/related-resources.md` § `apigw`. `r53`, `sfn`, `sns`, `vpce` and `waf` are budget-excluded and carry no panel row — `docs/related-resources.md` § Explicitly excluded.
 - Wave 1 = None; Wave 2 = `GetStages` per v2 API, no deployed stage → Warning — `docs/attention-signals.md § Signals § DNS & CDN` row `apigw`. The CloudWatch error rates and the `GetUsagePlans` quota-breach check are deferred — `docs/attention-signals.md § Not yet implemented`.
 - `Api` struct fields (no `Status` field on list response; `ProtocolType`, `ApiId`, `Name`, `CreatedDate`) — `AWS SDK Go v2 — apigatewayv2/types.Api`.
 - `Stage.AccessLogSettings`, `Stage.DeploymentId` (used to detect "no deployed stage") — `AWS SDK Go v2 — apigatewayv2/types.Stage § AccessLogSettings, DeploymentId`.

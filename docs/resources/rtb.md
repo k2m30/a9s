@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `eni`, `igw`, `nat`, `subnet`, `tgw`, `vpc`, `vpce`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `eni`, `igw`, `nat`, `subnet`, `tgw`, `vpc`, `vpce`, `ct-events`.
 
 ### `cfn`
 
@@ -128,7 +128,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row with `blackhole route: target gone` tells the on-call exactly which RTB has a dead hop, and a yellow row with `orphan: no subnet associations` flags an unused table for cleanup; both are self-explanatory in the list and operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row with `blackhole route (target deleted)` tells the on-call exactly which route table has a dead hop, and a yellow row with `no subnet associations` flags an unused table for cleanup; both are self-explanatory in the list and operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -148,10 +148,10 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `Route.State == blackhole` semantics ("the route's target isn't available") — `AWS SDK Go v2 — service/ec2/types.Route § State` (godoc comment) and `AWS SDK Go v2 — service/ec2/types.RouteState` enum (`active`, `blackhole`, `filtered`).
 - `Route.GatewayId`, `Route.NatGatewayId`, `Route.TransitGatewayId`, `Route.NetworkInterfaceId` as target fields for `igw`/`nat`/`tgw`/`eni`/`vpce` discovery — `AWS SDK Go v2 — service/ec2/types.Route § GatewayId, NatGatewayId, TransitGatewayId, NetworkInterfaceId`.
 - `RouteTableAssociation.SubnetId` and `RouteTableAssociation.Main` as the subnet-pivot and main-RTB flag — `AWS SDK Go v2 — service/ec2/types.RouteTableAssociation § SubnetId, Main`.
-- `cfn` discovery via `aws:cloudformation:stack-name` tag — a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation automatically stamps this tag on every managed resource; it is the canonical IaC-provenance pivot used throughout a9s and matches the pattern called out explicitly for `secrets` in `docs/related-resources.md` (`SecretListEntry.Tags["aws:cloudformation:stack-name"]`).
+- `cfn` discovery via `aws:cloudformation:stack-name` tag — a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation automatically stamps this tag on every managed resource; it is the canonical IaC-provenance pivot used throughout a9s and matches the pattern called out for `secrets` in `docs/related-resources.md` § `secrets` (`SecretListEntry.Tags["aws:cloudformation:stack-name"]`).
 - `vpce` discovered via `Routes[].GatewayId` with `vpce-` prefix (gateway endpoints, not interface endpoints) — a9s-devops (2026-04-20): possible=yes, worth=yes. S3 and DynamoDB gateway endpoints install themselves as a route whose target is the `vpce-*` gateway ID; interface endpoints attach via ENI/DNS rather than a route and pivot from elsewhere.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
-- Count-shown values left `unknown` — `docs/related-resources.md` and `docs/historical/analysis/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
+- Count-shown values left `unknown` — `docs/related-resources.md` § `rtb` and `docs/historical/analysis/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
 
 <!-- BEGIN GENERATED: header -->
 rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).

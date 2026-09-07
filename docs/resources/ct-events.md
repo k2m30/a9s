@@ -25,7 +25,7 @@ Note on resource shape: a ct-events row is one CloudTrail **event** (a point-in-
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-events` (self-pivot — 4 facets), `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `ct-events` (self-pivot — four facets), `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce`.
 
 The detail view of a ct-events row is "who did what to which AWS resource?" — so the related panel is the set of principals and target resources extracted from the event payload.
 
@@ -107,9 +107,9 @@ The detail view of a ct-events row is "who did what to which AWS resource?" — 
 - **How discovered**: iterate `Event.Resources[]` and keep entries whose `ResourceType == "AWS::CloudTrail::Trail"`; cross-reference the already-loaded `trail` list.
 - **Count shown**: yes.
 
-### `ct-events` (self-pivot — four facets)
+### `ct-events`
 
-The ct-events self-pivots are convenience filters that re-launch `LookupEvents` with a lookup attribute derived from the current event, letting the operator broaden the query without leaving the panel.
+The self-pivot carries four facets, all convenience filters that re-launch `LookupEvents` with a lookup attribute derived from the current event, letting the operator broaden the query without leaving the panel.
 
 - **By AccessKeyId** — filter by `userIdentity.accessKeyId` to see every call made by the same credential (key-compromise forensics).
 - **By Username** — filter by `userIdentity.userName` to see every call made by the same IAM user across services.
@@ -118,9 +118,7 @@ The ct-events self-pivots are convenience filters that re-launch `LookupEvents` 
 - **Count shown**: yes for each facet.
 - **Discovery**: parse the four fields out of `Event.CloudTrailEvent` JSON on the currently-selected event; no extra AWS call is made until the operator picks a facet.
 
-### Universal pivot note
-
-ct-events is the **universal pivot** referenced by every other registered type (see `related-resources.md` §Policy, rule 4: "`ct-events` is implicitly relevant for every registered type"). The panel on those other types carries a single `ct-events` entry pre-scoped to that resource's ARN; the rich self-pivot structure above only appears when the operator is already *on* a ct-events row.
+**Universal pivot note.** ct-events is the **universal pivot** referenced by every other registered type (see `related-resources.md` §Policy, rule 4: "`ct-events` is implicitly relevant for every registered type"). The panel on those other types carries a single `ct-events` entry pre-scoped to that resource's ARN; the rich self-pivot structure above only appears when the operator is already *on* a ct-events row.
 
 ## 3. Attention / Issues Algorithm
 
@@ -197,7 +195,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at a ct-events list filtered by an anxious operator, can they tell what's wrong with a problem row without opening detail? Yes — a red row reads `destructive call` or `failed: AccessDenied` and a yellow row reads `root account activity` or `cross-account access`, each naming the kind of call by the time the eye crosses the Status column; operator can triage without opening detail. The event name and the caller sit in their own columns, so the cause text never has to repeat them.
+At 3am, glancing at a ct-events list filtered by an anxious operator, can they tell what's wrong with a problem row without opening detail? Yes — a red row reads `destructive call` or `failed: <error>` and a yellow row reads `root account activity` or `cross-account access`, each naming the kind of call by the time the eye crosses the Status column; operator can triage without opening detail. The event name and the caller sit in their own columns, so the cause text never has to repeat them.
 
 ## 5. Out of Scope
 

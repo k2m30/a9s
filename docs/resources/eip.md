@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `asg`, `cfn`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `logs`, `nat`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat`.
 
 ### `alarm`
 
@@ -72,12 +72,6 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 - **Why related**: The network interface the EIP is currently associated with — routing target one level below the instance. Associations to secondary ENIs are the common case a user misses.
 - **How discovered**: read `Address.NetworkInterfaceId`; cross-reference the already-loaded `eni` list by `NetworkInterface.NetworkInterfaceId`.
 - **Count shown**: yes.
-
-### `logs`
-
-- **Why related**: CloudWatch Logs groups receiving VPC Flow Logs that include traffic for this IP — the only log surface that directly references an EIP by value — persona (a9s-devops): flow-log capture is enabled at the VPC/subnet/ENI level, so the operator pivot is to log groups destined from the attached ENI, not from the EIP itself. Value here is narrow; surface it only when an ENI association exists.
-- **How discovered**: not resolvable within the checker budget — EIPs themselves emit no logs, flow-log group names are operator-defined (no reliable naming convention to filter the `logs` cache by), and tying the address's traffic to a log group would need `DescribeFlowLogs` per associated ENI/subnet/VPC. (budget-excluded per related-resources.md Policy rule 7: per-ENI flow-log resolution exceeds the one-call budget.)
-- **Count shown**: unknown.
 
 ### `nat`
 
@@ -141,7 +135,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — both Wave 1 signals render a yellow row with a self-explanatory cause in the Status column (`unattached — billed hourly`, `attached to stopped instance`), so the operator can triage an EIP without pressing detail. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — the one Wave 1 signal renders a yellow row reading `unassociated`, which is the whole triage: the address is billed and nothing is using it. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -154,7 +148,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- a9s golden doc — per-type contract (`alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `logs`, `nat`) — `docs/related-resources.md` § Per-type contract / `eip`.
+- a9s golden doc — per-type contract (`alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat`) — `docs/related-resources.md` § Per-type contract / `eip`.
 - a9s golden doc — `nat` pivot direction (`NatGatewayAddresses[].AllocationId`) — `docs/related-resources.md` § Per-target reasoning / `nat` / `eip`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md` § Policy #4.
 - a9s golden doc — Wave 1 signals (unattached EIP; zombie-billing cross-ref to stopped `ec2`) — `docs/attention-signals.md § Signals § NETWORKING` row `eip`.

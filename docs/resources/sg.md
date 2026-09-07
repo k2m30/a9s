@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `lambda`, `sg`, `vpc`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `lambda`, `sg`, `vpc`.
 
 ### `cfn`
 
@@ -139,7 +139,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `ports 22 open to 0.0.0.0/0` tells the on-call engineer immediately which port and which side of the rule is the problem, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. IPv6 is covered the same way: `isInternetFacing` treats `Ipv6Ranges[].CidrIpv6 == ::/0` as open to the internet, so an IPv6-only exposure on port 22 renders identically.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `ports <list> open to 0.0.0.0/0` tells the on-call engineer immediately which port is the problem, a red `all ports open to 0.0.0.0/0` row says the group is wide open, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. IPv6 is covered the same way: the all-addresses IPv6 range counts as open to the internet, so an IPv6-only exposure on port 22 renders identically.
 
 ## 5. Out of Scope
 
@@ -150,7 +150,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Contract targets `cfn, ct-events, ec2, elb, eni, lambda, sg, vpc` — `docs/related-resources.md` § Per-type contract row `sg` (line 99) and detail block `### \`sg\`` (lines 902–913).
+- Contract targets `cfn, ct-events, ec2, elb, eni, lambda, sg, vpc` — `docs/related-resources.md` § Per-type contract, row `sg`, and `docs/related-resources.md` § `sg`.
 - Wave 1 admin-port signal and port set — `docs/attention-signals.md § Signals § NETWORKING` row `sg`.
 - Wave 2 orphan-SG signal (cross-ref `eni`) — `docs/attention-signals.md § Signals § NETWORKING` row `sg`.
 - Wave 3 SG-referencing-deleted-SG — `docs/attention-signals.md § Not yet implemented`.

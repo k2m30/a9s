@@ -23,12 +23,12 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf`.
 
 ### `acm`
 
 - **Why related**: HTTPS listener certificate — the ACM cert that terminates TLS on this LB's HTTPS/TLS listeners.
-- **How discovered**: call `elbv2:DescribeListeners(LoadBalancerArn=<this>)` and collect `Certificates[].CertificateArn` from each listener; cross-reference against the already-loaded `acm` list by ARN. `TBD — not specified in related-resources.md` whether discovery is at detail-open time or earlier; the contract row does not fix the moment.
+- **How discovered**: call `elbv2:DescribeListeners(LoadBalancerArn=<this>)` and collect `Certificates[].CertificateArn` from each listener; cross-reference against the already-loaded `acm` list by ARN. `docs/related-resources.md` § `elb` does not say whether discovery happens at detail-open time or earlier; the contract row does not fix the moment.
 - **Count shown**: yes.
 
 ### `alarm`
@@ -54,12 +54,6 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 - **Why related**: LB creates ENIs per AZ — the ENIs are the actual IPs clients connect to; they reveal AZ placement and whether the LB is really wired up.
 - **How discovered**: cross-reference the already-loaded `eni` list by `Description` starting with `ELB app/<name>/<id>` (ALB) or `ELB net/<name>/<id>` (NLB) or `ELB <name>` (Classic) and/or `RequesterId` indicating the ELB service. — a9s-devops: possible=yes, worth=yes. ELB-owned ENIs have a well-known Description prefix that references the LB; this is the standard pivot used by SREs today.
 - **Count shown**: yes.
-
-### `r53`
-
-- **Why related**: Route 53 alias/records pointing at this LB — answers "which hostname resolves here?", the #1 question an operator asks when an LB misbehaves.
-- **How discovered**: not resolvable within the checker budget. Record sets are not cached as joinable structures — the r53 fetcher summarizes each zone's alias targets into one Fields string — so the per-record `AliasTarget.DNSName` reverse-scan this row originally described is not available; identifying the aliasing records requires per-zone `route53:ListResourceRecordSets` queries across all zones. (budget-excluded per related-resources.md Policy rule 7: O(N) per-zone record-set fan-out exceeds the one-call budget.)
-- **Count shown**: unknown.
 
 ### `s3`
 
@@ -182,7 +176,7 @@ Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — yellow for `provisioning`/`active_impaired` and red for `failed` are paired with the AWS-provided `State.Reason` in the Status column, so the operator reads the cause inline. The four posture signals read the same way: `HTTP desync mitigation off`, `invalid HTTP headers not dropped`, `ports 80, 8080 in the clear` and `weak TLS policy on ports 443, 8443` each name the setting and every port it applies to — the operator opens detail only for the remedy sentence. One UX gap: when `State.Reason` is empty (common during very early `provisioning`), the Status column falls back to a generic phrase; implementation should take the reason verbatim when non-empty and never show a bare state keyword.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — yellow for `provisioning` and `active impaired` and red for `failed`, so the operator reads the state inline. The four posture signals read the same way: `HTTP desync mitigation off`, `invalid HTTP headers not dropped`, `<ports> in the clear` and `weak TLS policy on <ports>` each name the setting and every port it applies to — the operator opens detail only for the remedy sentence. The AWS-provided `State.Reason` is not part of the phrase; it lives in the detail view, where an empty one costs nothing.
 
 ## 5. Out of Scope
 
@@ -194,8 +188,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- a9s golden doc — related panel contract (13 targets: `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf`) — `docs/related-resources.md` § "Per-type contract" table row for `elb` and § `### elb`.
-- a9s golden doc — universal pivot `ct-events` — `docs/related-resources.md` § "Policy" (universal pivots clause).
+- a9s golden doc — related panel contract (12 targets: `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf`) — `docs/related-resources.md` § Per-type contract, row `elb`, and `docs/related-resources.md` § `elb`.
+- a9s golden doc — universal pivot `ct-events` — `docs/related-resources.md` § Policy (universal pivots clause).
 - a9s golden doc — the `elb` signals — `docs/attention-signals.md § Signals § NETWORKING` row `elb`; the deferred CloudWatch metric — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `LoadBalancer.State.Code` / `State.Reason` field names and the state-machine description (`provisioning` → `active` → `active_impaired` → `failed`) — `AWS SDK Go v2 — elasticloadbalancingv2/types.LoadBalancer § State` and `elasticloadbalancingv2/types.LoadBalancerState § Code, Reason`.

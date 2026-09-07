@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `role`, `sg`, `subnet`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `role`, `sg`, `subnet`.
 
 ### `ami`
 
@@ -187,7 +187,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (copied above): AMI release drift, `ListUpdates` per node group.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- `ng → kms` — listed under Explicitly-excluded pairs in `docs/related-resources.md`: no direct KMS field on a node group.
+- `ng → kms` — listed in `docs/related-resources.md` § Explicitly excluded: no direct KMS field on a node group.
 
 ## 6. Citations
 

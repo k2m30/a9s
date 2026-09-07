@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`, `eb-rule`, `ecs-task`, `kms`, `lambda`, `pipeline`, `role`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `cfn`, `eb-rule`, `ecs-task`, `kms`, `lambda`, `pipeline`, `role`, `ct-events`.
 
 ### `cb`
 
@@ -155,13 +155,13 @@ Rules applied:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every §4 row pairs the state with a concrete cause in the Status column (`scan-on-push off`, `CRITICAL CVEs in latest`, `HIGH CVEs in latest`), so the operator can triage which repo to block without opening detail. The detail view adds the push date and finding count so the follow-up "how bad, how old?" question is one keypress away.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every §4 row pairs the state with a concrete cause in the Status column (`scan on push off`, `<N> critical, <M> high vulnerabilities`, `repository policy open to anyone`), so the operator can triage which repo to block without opening detail. The detail view adds the push date and finding count so the follow-up "how bad, how old?" question is one keypress away.
 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (full per-finding detail, lifecycle policies).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
-- `ecs` as a related target — `ecr` → `ecs` (cluster) has no first-class AWS API linkage; use `ecr` → `ecs-task` for the deterministic image-to-workload pivot. See `docs/related-resources.md` §Non-matches (`ecr → ecs`, `ecr → eks`).
+- `ecs` as a related target — `ecr` → `ecs` (cluster) has no first-class AWS API linkage; use `ecr` → `ecs-task` for the deterministic image-to-workload pivot. See `docs/related-resources.md` § Explicitly excluded (`ecr → ecs`, `ecr → eks`).
 - `eks` as a related target — image resolution lives in Kubernetes, not the EKS API; `ecr` → `ecs-task` covers ECS workloads, and EKS image usage is Wave 3.
 - Any write operation. a9s is read-only by design (`docs/architecture.md` §"What is a9s?").
 
@@ -196,7 +196,7 @@ One bullet per claim in §§2–4.1.
 - `imageScanFindingsSummary.findingSeverityCounts` shape — `AWS SDK Go v2 — ecr/types.ImageScanFindingsSummary § FindingSeverityCounts`; `AWS SDK Go v2 — ecr/types.ImageDetail § ImageScanFindingsSummary, ImagePushedAt`.
 - Severity mapping (`!` for Broken, `~` for Warning on Healthy-baseline row) — `.claude/skills/a9s-resource-spec/SKILL.md` §"Mapping rules for §4".
 - Wave 3 exclusions (per-image findings, lifecycle policy) — `docs/attention-signals.md § Not yet implemented`.
-- Non-matches (`ecr → ecs`, `ecr → eks`) — `docs/related-resources.md` §Non-matches (lines 1092–1093).
+- Non-matches (`ecr → ecs`, `ecr → eks`) — `docs/related-resources.md` § Explicitly excluded.
 - Read-only invariant — `docs/architecture.md` §"What is a9s?".
 - Removed stale `ecs` bullet from detailed `ecr` section — `a9s-resource-spec amendment (2026-04-20): contradicted per-type contract and Non-matches section; reason in HTML comment inline.`
 

@@ -43,7 +43,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `dbi`, `dbc-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `dbi`, `dbc-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -245,7 +245,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — DocumentDB `DescribeDBClusters` is the list operation (not RDS's) — `AWS SDK Go v2 — service/docdb § DescribeDBClusters`.
 - AWS API Reference (fallback) — DocumentDB `DescribeDBClusters` — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html>.
 - AWS API Reference (fallback) — DocumentDB `DescribeDBSubnetGroups` (used to resolve subnets + VPC behind `DBSubnetGroup`) — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBSubnetGroups.html>.
-- amendment — `dbc` was corrected from RDS to DocumentDB: the display name and API reference follow DocumentDB, and the deferred replica-lag metric is `DBInstanceReplicaLag`, not `AuroraReplicaLag` — `docs/attention-signals.md § Not yet implemented`. Rationale: `docs/related-resources.md` anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. The field names (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.
+- amendment — `dbc` was corrected from RDS to DocumentDB: the display name and API reference follow DocumentDB, and the deferred replica-lag metric is `DBInstanceReplicaLag`, not `AuroraReplicaLag` — `docs/attention-signals.md § Not yet implemented`. Rationale: `docs/related-resources.md` § Per-type contract anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. The field names (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.
 
 <!-- BEGIN GENERATED: header -->
 dbc — DATABASES & STORAGE. Lifecycle key: `status`.

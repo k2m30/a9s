@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `kms`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `kms`.
 
 ### `kms`
 
@@ -95,14 +95,14 @@ Note: both findings colour the row, and each carries its tier in the detail view
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red `my-npm-repo` row reading `public access policy` says the repository is reachable by anyone, and a yellow one reading `no permissions policy` says it is open to the domain; both name the exposure in the Status column. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red repository row reading `public access policy` says the repository is reachable by anyone, and a yellow one reading `no permissions policy` says it is open to the domain; both name the exposure in the Status column. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above): `DescribeRepository` encryption check.
 - Empty repository older than 30 days (unused registry) — a9s reads the package count but reports nothing for it; the condition is recorded on `docs/attention-signals.md § Not yet implemented`.
-- CodeArtifact-to-ACM, CodeArtifact-to-Kinesis, CodeArtifact-to-Lambda, CodeArtifact-to-Logs, CodeArtifact-to-R53, CodeArtifact-to-WAF pivots — deliberately excluded in `docs/related-resources.md § Deliberate exclusions` (no direct AWS API integration exists for any of these paths).
-- CodeArtifact-to-CodeBuild and CodeArtifact-to-IAM-Role pivots — excluded as "heuristic-only / indirect" in `docs/related-resources.md § Deliberate exclusions`.
+- CodeArtifact-to-ACM, CodeArtifact-to-Kinesis, CodeArtifact-to-Lambda, CodeArtifact-to-Logs, CodeArtifact-to-R53, CodeArtifact-to-WAF pivots — deliberately excluded in `docs/related-resources.md` § Explicitly excluded (no direct AWS API integration exists for any of these paths).
+- CodeArtifact-to-CodeBuild and CodeArtifact-to-IAM-Role pivots — excluded as "heuristic-only / indirect" in `docs/related-resources.md` § Explicitly excluded.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md § What is a9s?`).
 
@@ -123,7 +123,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `DescribeRepository` deferred — `docs/attention-signals.md § Not yet implemented`.
 - `ct-events` as universal pivot — `docs/related-resources.md § Policy #4`.
 - `ct-events` discovery via `RepositorySummary.Arn` — universal convention in `docs/related-resources.md § Policy #4` (ct-events `resources[].ARN` match).
-- Deliberate exclusions (`codeartifact` → `acm`, `kinesis`, `lambda`, `logs`, `r53`, `waf`, `cb`, `role`) — `docs/related-resources.md § Deliberate exclusions`.
+- Deliberate exclusions (`codeartifact` → `acm`, `kinesis`, `lambda`, `logs`, `r53`, `waf`, `cb`, `role`) — `docs/related-resources.md` § Explicitly excluded.
 - Read-only invariant — `docs/architecture.md § What is a9s?`.
 - Severity choice `~` for unused-repo finding (informational, not urgent) — a9s-devops (2026-04-20): possible=yes, worth=yes; an empty registry is a housekeeping concern discovered during quarterly clean-up, not incident-time breakage. `~` keeps it out of `issues:N` while still carrying its tier in the detail view. Aligns with analogous informational-background-check findings (e.g. RDS maintenance scheduled, EBS snapshot aging) in other specs.
 - List text (S4) wording `empty, created 47d ago` — a9s-devops (2026-04-20): possible=yes, worth=yes; pairs the condition (`empty`) with the cause (`47d ago`) per the "state keywords are not explanations" rule; ≤40 chars. The `47d` digits are illustrative — production implementation computes the actual age from `CreatedTime`.

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `dbi`, `kms`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `backup`, `ct-events`, `dbi`, `kms`.
 
 ### `dbi`
 
@@ -37,9 +37,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `
 - **How discovered**: read `DBSnapshot.KmsKeyId` from the list response, then cross-reference the already-loaded `kms` list by KeyId/KeyArn. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § KmsKeyId`.
 - **Count shown**: yes (0 or 1 — one key per encrypted snapshot; 0 when `Encrypted==false`).
 
-### `dbc` (intentionally absent)
-
-`dbi-snap` does NOT register a `dbc` pivot. Real AWS rejects `CreateDBSnapshot`
+**`dbc` is intentionally absent.** `dbi-snap` does NOT register a `dbc` pivot, so the panel carries no row for it. Real AWS rejects `CreateDBSnapshot`
 on Aurora cluster members — Aurora cluster snapshots live in `dbc-snap`
 (`DBClusterSnapshot`), which has its own pivots. A registered `dbi-snap → dbc`
 pivot would always resolve `Count=0` (an `dbi-snap` is never associated with a
@@ -152,7 +150,7 @@ Notes on the table above:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — `unencrypted`, `orphan: source DB deleted`, and `automated, Nd past retention` are self-describing; `creating: <pct>%` tells the operator progress is in flight; the one gap is `failed` / `incompatible-*`, which carry only the state keyword because AWS exposes no structured failure-reason field on `DBSnapshot` — the operator must open detail and pivot to `ct-events` for the underlying cause, which is an acceptable design limit given the thinness of AWS's own surface here.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — `unencrypted`, `orphan: source DB deleted`, and `automated, <N>d past retention` are self-describing; `creating: <pct>%` tells the operator progress is in flight; the one gap is `failed` / `<incompatible-* status>`, which carry only the state keyword because AWS exposes no structured failure-reason field on `DBSnapshot` — the operator must open detail and pivot to `ct-events` for the underlying cause, which is an acceptable design limit given the thinness of AWS's own surface here.
 
 ## 5. Out of Scope
 
@@ -165,7 +163,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 
-- a9s golden doc — related-panel contract for `dbi-snap` (targets `backup`, `ct-events`, `dbc`, `dbi`, `kms`; per-type contract table row) — `docs/related-resources.md § Per-type contract` (dbi-snap row) and `§ dbi-snap`.
+- a9s golden doc — related-panel contract for `dbi-snap` (targets `backup`, `ct-events`, `dbi`, `kms`) — `docs/related-resources.md` § Per-type contract, row `dbi-snap`, and `docs/related-resources.md` § `dbi-snap`.
 - a9s golden doc — Wave 1 signals (`Status` buckets, `Encrypted==false`, orphan cross-ref `dbi`, automated-past-retention cross-ref `dbi`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`.
 - a9s golden doc — every `dbi-snap` signal reads the list response — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`.
 - The public-snapshot finding and its `DescribeDBSnapshotAttributes` read — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`; `core/aws/dbi_snap_issue_enrichment.go`.

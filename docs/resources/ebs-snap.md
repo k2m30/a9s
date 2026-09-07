@@ -23,37 +23,37 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `backup`, `ct-events`, `ebs`, `ec2`, `kms`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `backup`, `ct-events`, `ebs`, `ec2`, `kms`.
 
 ### `ami`
 
 - **Why related**: AMIs derived from this snapshot. An AMI's `BlockDeviceMappings[].Ebs.SnapshotId` points at one or more `ebs-snap` rows; the operator wants to know which AMIs would break if this snapshot were deleted.
 - **How discovered**: reverse cross-reference — scan the already-loaded `ami` list for any image whose `BlockDeviceMappings[].Ebs.SnapshotId` equals this `Snapshot.SnapshotId`. No extra API call.
-- **Count shown**: unknown — `docs/related-resources.md` does not specify.
+- **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `backup`
 
 - **Why related**: Snapshots covered by AWS Backup. The operator wants to see whether retention and lifecycle for this snapshot are governed by a Backup plan (so "delete this orphan snapshot to save cost" is not safe when Backup still owns it).
-- **How discovered**: no direct field on `Snapshot` points at a Backup plan. AWS Backup-created snapshots typically carry a `Description` beginning `"Created by AWS Backup ..."` and an auto-tag `aws:backup:source-resource`; authoritative resolution is `backup:ListRecoveryPointsByResource(ResourceArn=<snapshot-arn>)`. Golden doc is silent on which route a9s uses — `a9s-devops: not specified in related-resources.md; tag-scan on the already-loaded snapshot is preferred (zero extra calls), fall back to the Backup API when tags are absent`.
-- **Count shown**: unknown — `docs/related-resources.md` does not specify.
+- **How discovered**: no direct field on `Snapshot` points at a Backup plan. AWS Backup-created snapshots typically carry a `Description` beginning `"Created by AWS Backup ..."` and an auto-tag `aws:backup:source-resource`; authoritative resolution is `backup:ListRecoveryPointsByResource(ResourceArn=<snapshot-arn>)`. Golden doc is silent on which route a9s uses — `a9s-devops: not specified in related-resources.md § ebs-snap; tag-scan on the already-loaded snapshot is preferred (zero extra calls), fall back to the Backup API when tags are absent`.
+- **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `ebs`
 
 - **Why related**: source volume. Every snapshot is born from an EBS volume; the operator jumps here to see whether the source still exists (orphan-snapshot workflow) or inspect the live volume's current state.
 - **How discovered**: forward reference on `Snapshot.VolumeId` (AWS SDK Go v2 — `ec2/types.Snapshot § VolumeId`). Cross-reference the already-loaded `ebs` list by `VolumeId`; no extra API call. If the list lacks it, the source volume is deleted — this is exactly the orphan signal in §3.1.
-- **Count shown**: unknown — `docs/related-resources.md` does not specify.
+- **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `ec2`
 
 - **Why related**: instances that could be restored from this snapshot. Rollback / forensic workflow — "which running instance did this snapshot belong to, and could I restore it?"
-- **How discovered**: indirect; `Snapshot` has no direct EC2 field. Two reverse-lookup paths, both against already-loaded lists: (a) find the `ebs` volume where `Volume.SnapshotId == Snapshot.SnapshotId` and then that volume's `Attachments[].InstanceId`; (b) find AMIs derived from the snapshot (see `ami` above), then instances with those AMI IDs. Golden doc is silent on which a9s uses — `a9s-devops: not specified in related-resources.md; path (a) is cheaper and more accurate for the restore workflow`.
-- **Count shown**: unknown — `docs/related-resources.md` does not specify.
+- **How discovered**: indirect; `Snapshot` has no direct EC2 field. Two reverse-lookup paths, both against already-loaded lists: (a) find the `ebs` volume where `Volume.SnapshotId == Snapshot.SnapshotId` and then that volume's `Attachments[].InstanceId`; (b) find AMIs derived from the snapshot (see `ami` above), then instances with those AMI IDs. Golden doc is silent on which a9s uses — `a9s-devops: not specified in related-resources.md § ebs-snap; path (a) is cheaper and more accurate for the restore workflow`.
+- **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `kms`
 
 - **Why related**: snapshot encryption key. When the snapshot is encrypted, operator must confirm the KMS key is Enabled and not `PendingDeletion` before restore will succeed.
 - **How discovered**: forward reference on `Snapshot.KmsKeyId` (AWS SDK Go v2 — `ec2/types.Snapshot § KmsKeyId`); cross-reference the already-loaded `kms` list. No extra API call.
-- **Count shown**: unknown — `docs/related-resources.md` does not specify.
+- **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `ct-events`
 
@@ -128,7 +128,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every problem row carries a named cause in S4 (`error: KMS key disabled`, `orphan: source volume deleted`, `age 420d: automated, review cost`, `unencrypted: CIS EC2.1`), so a red or yellow row never needs a keypress to triage; only the full `StateMessage` text and exact `StartTime` / `VolumeId` require opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every problem row carries a named cause in S4 (`error`, `orphan: source volume deleted`, `automated, <N>d old`, `unencrypted`, `shared with all AWS accounts`), so a red or yellow row never needs a keypress to triage; only the full `StateMessage` text and exact `StartTime` / `VolumeId` require opening detail.
 
 ## 5. Out of Scope
 
@@ -155,7 +155,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `Snapshot.Progress` is available on the list response for S4 detail during `pending` — `AWS SDK Go v2 — ec2/types.Snapshot § Progress`.
 - a9s-devops consultation — discovery mechanism for `backup` target — `a9s-devops (2026-04-20): possible=yes, worth=yes. Golden doc is silent on which path a9s uses; AWS Backup-created snapshots carry a Description beginning "Created by AWS Backup ..." and an aws:backup:source-resource tag, and backup:ListRecoveryPointsByResource(ResourceArn=<snapshot-arn>) is the authoritative API. Tag-scan on already-loaded data is preferred (zero extra calls).`
 - a9s-devops consultation — discovery mechanism for `ec2` target — `a9s-devops (2026-04-20): possible=yes, worth=yes. Golden doc is silent; Snapshot has no direct EC2 field. Reverse path via ebs (Volume.SnapshotId → Volume.Attachments[].InstanceId) is preferred over ami → ec2 for the restore workflow — it is cheaper and more accurate.`
-- a9s-devops consultation — count-shown policy — `a9s-devops (2026-04-20): possible=yes, worth=no as a per-resource override. docs/related-resources.md does not specify per-target count semantics for ebs-snap; leaving as "unknown" until the WHAT doc adds a count column or a9s sets a project-wide rule. No value in guessing per-resource.`
+- a9s-devops consultation — count-shown policy — `a9s-devops (2026-04-20): possible=yes, worth=no as a per-resource override. docs/related-resources.md § ebs-snap does not specify per-target count semantics; leaving as "unknown" until the WHAT doc adds a count column or a9s sets a project-wide rule. No value in guessing per-resource.`
 - UX rewrite — S4 `error: <StateMessage>` vs bare `error` — `user default (2026-04-20): pair the state keyword with StateMessage so a red row is triageable without opening detail; matches the skill's "state keywords are not explanations" rule.`
 
 <!-- BEGIN GENERATED: header -->

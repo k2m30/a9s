@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `logs`, `r53`, `s3`, `waf`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `logs`, `r53`, `s3`, `waf`.
 
 ### `acm`
 
@@ -165,7 +165,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §3 signal: each yellow/red/dim row carries a self-explanatory cause in the Status column (`deploying: config propagating`, `disabled (admin-off)`, `weak TLS: MinimumProtocolVersion=TLSv1`, `no WAF attached`, `access logs off`) so the operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §3 signal: each row carries a self-explanatory cause in the Status column — yellow for `deploying: config propagating`, `minimum TLS below 1.2` and `access logging off`, red for `S3 origin bucket does not exist`, dim for `disabled (admin-off)` — so the operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -178,7 +178,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- a9s golden doc — per-type contract targets for `cf` — `docs/related-resources.md` § "Per-type contract" row `cf`.
+- a9s golden doc — per-type contract targets for `cf` — `docs/related-resources.md` § Per-type contract, row `cf`.
 - a9s golden doc — `acm` reason — `docs/related-resources.md` § `cf` → `acm` ("Distribution.ViewerCertificate.AcmCertificateArn").
 - a9s golden doc — `alarm` reason — `docs/related-resources.md` § `cf` → `alarm` ("Distribution error-rate alarms").
 - a9s golden doc — `ct-events` reason — `docs/related-resources.md` § `cf` → `ct-events`.

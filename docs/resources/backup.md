@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `kms`, `role`, `sns`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `ct-events`, `kms`, `role`, `sns`.
 
 ### `kms`
 
@@ -105,7 +105,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed in last 24h` and knows immediately to open the detail view for the error message and to pivot into the `role` and `kms` related panels. All problem rows are self-explanatory in the list — operator can triage without opening detail; detail adds the exact timestamp of the most recent failure so the operator can correlate with CloudTrail.
+At 3am, glancing at the list, the operator sees a red plan row reading `<N jobs> failed in last 24h` and knows immediately to open the detail view for the error message and to pivot into the `role` and `kms` related panels. All problem rows are self-explanatory in the list — operator can triage without opening detail; detail adds the exact timestamp of the most recent failure so the operator can correlate with CloudTrail.
 
 ## 5. Out of Scope
 
@@ -113,18 +113,18 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings. In particular, the derived list-level `⚠ N issues detected by background checks` banner, the row middle-dot `·` marker, and the `⚠ Background Check` detail header described in `docs/historical/analysis/enrichment-visibility.md` are superseded HOW that this spec does not reuse.
 - Per-rule cadence comparison ("newest completed older than rule cadence × 2") — requires `GetBackupPlan` per plan and is Wave 3 by budget.
 - Write operations. a9s is read-only by design (`docs/architecture.md` — What is a9s?).
-- `backup` → `eb-rule` and `backup` → `logs` linkages. Both are explicitly excluded in `docs/related-resources.md` "Explicitly excluded" — the former is only achievable via reverse-scan of EventBridge rules for `source: aws.backup`, the latter has no direct Backup→Logs API.
+- `backup` → `eb-rule` and `backup` → `logs` linkages. Both are explicitly excluded in `docs/related-resources.md` § Explicitly excluded — the former is only achievable via reverse-scan of EventBridge rules for `source: aws.backup`, the latter has no direct Backup→Logs API.
 
 ## 6. Citations
 
 - Display name `Backup Plans` — `docs/attention-signals.md § Signals § BACKUP` row `backup`.
-- AWS API reference URL — `docs/related-resources.md` § "Per-type contract" row `backup`.
+- AWS API reference URL — `docs/related-resources.md` § Per-type contract, row `backup`.
 - List API is `ListBackupPlans` and is config-only — `core/aws/backup.go`.
 - List-response fields on `BackupPlansListMember` — `AWS SDK Go v2 — service/backup/types.BackupPlansListMember § BackupPlanId, BackupPlanName, CreationDate, DeletionDate, LastExecutionDate, VersionId, CreatorRequestId, AdvancedBackupSettings`.
 - Wave 2 API is `ListBackupJobs(ByCreatedAfter=now-24h)`, account-wide, bucketed by `BackupPlanId` — `core/aws/backup_issue_enrichment.go`.
 - `BackupJob.State` enum values include `FAILED`, `EXPIRED`, `ABORTED`, `PARTIAL` — `AWS SDK Go v2 — service/backup/types.BackupJobState` (`BackupJobStateFailed`, `BackupJobStateExpired`, `BackupJobStateAborted`, `BackupJobStatePartial`).
 - `BackupJob.State` and `BackupJob.StatusMessage` are on the `BackupJob` shape returned by `ListBackupJobs` — `AWS SDK Go v2 — service/backup/types.BackupJob § State, StatusMessage, BackupPlanId (nested in CreatedBy.BackupPlanId)`.
-- `ct-events` is a universal pivot — `docs/related-resources.md` § "Policy".
+- `ct-events` is a universal pivot — `docs/related-resources.md` § Policy.
 - Related target `kms` — `docs/related-resources.md` § `backup` — "Recovery-point encryption key."
 - Related target `role` — `docs/related-resources.md` § `backup` — "Backup service role used for restore jobs."
 - Related target `sns` — `docs/related-resources.md` § `backup` — "Vault notifications."
@@ -134,7 +134,7 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 - `BackupJob.IamRoleArn` is set per job when the job runs — `AWS SDK Go v2 — service/backup/types.BackupJob § IamRoleArn`.
 - `DescribeBackupVault` returns `EncryptionKeyArn` — `AWS API Reference: DescribeBackupVault § EncryptionKeyArn` (<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_DescribeBackupVault.html>).
 - `GetBackupVaultNotifications` returns `SNSTopicArn` and `BackupVaultEvents[]` — `AWS API Reference: GetBackupVaultNotifications § SNSTopicArn, BackupVaultEvents` (<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_GetBackupVaultNotifications.html>).
-- `backup`→`eb-rule` and `backup`→`logs` exclusions — `docs/related-resources.md` § "Explicitly excluded" / "Unanimous sometimes".
+- `backup`→`eb-rule` and `backup`→`logs` exclusions — `docs/related-resources.md` § Explicitly excluded.
 - Wave 3 cadence-comparison deferment — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - Discovery mechanism for `kms` from a BackupPlan — `a9s-devops (2026-04-20): possible=yes, worth=yes. Plan carries no KMS field; traversal is plan→Rules[].TargetBackupVaultName→DescribeBackupVault.EncryptionKeyArn. Justified because KMSKeyNotAccessible is the top non-transient cause of backup failure and the operator needs a one-keypress pivot.`
