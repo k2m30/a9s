@@ -783,6 +783,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Each resource type's demo row count, issue badge and state-coverage
   allowlist now live beside its fixtures instead of in two shared test files.
 - A finding in the detail Attention section now lists at most 10 supporting rows and closes with `… +K more`, so a target group with hundreds of unhealthy targets no longer pushes the rest of a resource's posture off the screen.
+- The per-resource design docs now quote only Status text a9s actually shows. The "At 3am" paragraph in each doc named phrases no finding produces (`issuance failed` for certificates, `no data` for alarms, `CRITICAL CVEs in latest` for repositories); every one is now the phrase the list renders, under the colour the row actually takes.
+- The related-panel section of each design doc now lists exactly the pivots the panel builds. Blocks describing pivots a9s does not register — target groups to backups, endpoints to certificates, buckets to WAF — have been removed, and the reason each is excluded is kept where the other exclusions live.
+- References to the related-resources contract now name a heading instead of a line number, so a reader following one lands on the section rather than on whatever moved into that line.
 
 ### Fixed (security)
 
