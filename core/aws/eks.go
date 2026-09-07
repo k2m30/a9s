@@ -202,31 +202,60 @@ func eksSupportWords(status ekstypes.VersionStatus) string {
 // addEKSPostureFindings evaluates the four w6b posture signals against the
 // DescribeCluster response the fetcher already holds, plus the version
 // catalogue read once for the page.
+// The closed vocabulary of the four posture words. eksPostureFindings matches
+// these and nothing else, so a token the fetcher never wrote — a stale cache, a
+// hand-built row, a later spelling — reports nothing rather than reading as the
+// bad value.
+const (
+	eksEndpointPrivate    = "no"
+	eksEndpointRestricted = "restricted"
+	eksEndpointOpen       = "open"
+
+	eksLoggingComplete   = "complete"
+	eksLoggingIncomplete = "incomplete"
+
+	eksSecretsKMS  = "kms"
+	eksSecretsNone = "none"
+
+	eksSupportStandard = "standard"
+	eksSupportEnded    = "out of standard support"
+)
+
 // eksPosture is the four config verdicts, each a word the fetcher derives from
 // the DescribeCluster struct and writes into Fields so the classifier can read
 // back what the fetcher decided instead of deciding again.
+//
+// VersionSupport carries one bit, which is the one the finding reports: a
+// version off standard support is broken whether AWS calls that extended,
+// unsupported, or something it has not published yet. Which of those it is
+// belongs in the supporting row, where eksSupportWords renders it.
 type eksPosture struct {
-	PublicEndpoint      string // open | restricted | no
+	PublicEndpoint      string // no | restricted | open
 	ControlPlaneLogging string // complete | incomplete
 	SecretsEncryption   string // kms | none
-	VersionSupport      string // standard | the words eksSupportWords derives
+	VersionSupport      string // standard | out of standard support
 }
 
 func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) eksPosture {
-	p := eksPosture{PublicEndpoint: "no", ControlPlaneLogging: "complete", SecretsEncryption: "none", VersionSupport: "standard"}
+	p := eksPosture{
+		PublicEndpoint:      eksEndpointPrivate,
+		ControlPlaneLogging: eksLoggingComplete,
+		SecretsEncryption:   eksSecretsNone,
+		VersionSupport:      eksSupportStandard,
+	}
 
 	if vpc := cluster.ResourcesVpcConfig; vpc != nil && vpc.EndpointPublicAccess {
 		// AWS defaults PublicAccessCidrs to 0.0.0.0/0 and omits it when it was
 		// never narrowed, so an empty list on a public endpoint is the open
 		// case rather than the unknown one.
-		p.PublicEndpoint = "restricted"
+		p.PublicEndpoint = eksEndpointRestricted
 		if len(vpc.PublicAccessCidrs) == 0 || slices.Contains(vpc.PublicAccessCidrs, "0.0.0.0/0") {
-			p.PublicEndpoint = "open"
+			p.PublicEndpoint = eksEndpointOpen
 		}
 	}
 
 	if len(eksMissingLogTypes(cluster)) > 0 {
-		p.ControlPlaneLogging = "incomplete"
+		p.ControlPlaneLogging = eksLoggingIncomplete
 	}
 
 	for _, ec := range cluster.EncryptionConfig {
@@ -237,7 +266,7 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 		// distinguishes a cluster with its own key from one without.
 		//nolint:staticcheck // SA1019: no replacement field carries this fact
 		if slices.Contains(ec.Resources, "secrets") {
-			p.SecretsEncryption = "kms"
+			p.SecretsEncryption = eksSecretsKMS
 		}
 	}
 
@@ -245,7 +274,7 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 	// read at all, is unknown — not old.
 	if info, known := versions[aws.ToString(cluster.Version)]; known &&
 		info.VersionStatus != ekstypes.VersionStatusStandardSupport && info.VersionStatus != "" {
-		p.VersionSupport = eksSupportWords(info.VersionStatus)
+		p.VersionSupport = eksSupportEnded
 	}
 	return p
 }
@@ -285,9 +314,10 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 		return nil
 	}
 	var findings []domain.Finding
-	if p.PublicEndpoint != "no" && p.PublicEndpoint != "" {
+	switch p.PublicEndpoint {
+	case eksEndpointOpen, eksEndpointRestricted:
 		severity := domain.SevWarn
-		if p.PublicEndpoint == "open" {
+		if p.PublicEndpoint == eksEndpointOpen {
 			severity = domain.SevBroken
 		}
 		findings = append(findings, domain.Finding{
@@ -295,19 +325,19 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 			Detail: catalog.Detail(CodeEKSPublicEndpoint), Severity: severity, Source: "wave1",
 		})
 	}
-	if p.ControlPlaneLogging == "incomplete" {
+	if p.ControlPlaneLogging == eksLoggingIncomplete {
 		findings = append(findings, domain.Finding{
 			Code: CodeEKSControlPlaneLoggingOff, Phrase: "control plane logging incomplete",
 			Detail: catalog.Detail(CodeEKSControlPlaneLoggingOff), Severity: domain.SevWarn, Source: "wave1",
 		})
 	}
-	if p.SecretsEncryption == "none" {
+	if p.SecretsEncryption == eksSecretsNone {
 		findings = append(findings, domain.Finding{
 			Code: CodeEKSSecretsNotKMS, Phrase: "secrets not encrypted with KMS",
 			Detail: catalog.Detail(CodeEKSSecretsNotKMS), Severity: domain.SevWarn, Source: "wave1",
 		})
 	}
-	if p.VersionSupport != "standard" && p.VersionSupport != "" {
+	if p.VersionSupport == eksSupportEnded {
 		findings = append(findings, domain.Finding{
 			Code: CodeEKSVersionUnsupported, Phrase: "Kubernetes " + version + " is out of standard support",
 			Detail: catalog.Detail(CodeEKSVersionUnsupported), Severity: domain.SevBroken, Source: "wave1",
