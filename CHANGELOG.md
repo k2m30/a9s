@@ -383,6 +383,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A service the selected region does not offer now says `no service` on its menu row instead of reading like a network failure.
 - A menu row whose probe timed out now says `timeout`, and one that could not reach the service says `transport`, instead of both reading a bare `error` while the log said otherwise.
 - A timed-out or unreachable-endpoint failure reads as its cause; the `operation error <Service>: <Op>` preamble is gone from every error class, not just from API errors.
+- A sort you set on a resource list now survives leaving the list and coming back. For many column layouts the sort was quietly discarded on re-entry, and the list came back in its default order.
+- Sorting a list on its Size or Status column now gives the same order whether the list is showing cached rows or freshly fetched ones. The order used to change under the cursor the moment a fetch landed. This affects RDS instances, DocumentDB and Aurora clusters, ElastiCache, Redshift, DynamoDB tables, log groups, ECR images and S3 objects.
+- CloudTrail events sort by their real timestamp again in the column header, and the header arrow now appears on the column being sorted.
+- A sorted column keeps its arrow at any width. A column just wide enough for its title, or squeezed by a narrow terminal, used to lose the arrow to the ellipsis, so the header read as unsorted while the rows below it were sorted.
 
 ### Added
 
@@ -796,6 +800,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The related-panel section of each design doc now lists exactly the pivots the panel builds. Blocks describing pivots a9s does not register — target groups to backups, endpoints to certificates, buckets to WAF — have been removed, and the reason each is excluded is kept where the other exclusions live.
 - References to the related-resources contract now name a heading instead of a line number, so a reader following one lands on the section rather than on whatever moved into that line.
 - A check that a role is not allowed to run is now one log line for the whole resource type: the action the role lacks, how many resources it covered, and one example. It used to be one line per resource, each carrying a request id, a host id and an encoded authorization message.
+- View files in `~/.a9s/views/` carry a `generated:` stamp. When a9s ships new columns for a resource type, an existing file gets them added on the next launch, in place: the columns, widths, paths and keys you set are kept, though the file is rewritten from its parsed form, so YAML comments do not survive. Files already at the current stamp are never touched.
 
 ### Fixed (security)
 
