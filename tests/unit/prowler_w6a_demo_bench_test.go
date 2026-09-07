@@ -22,45 +22,26 @@ import (
 // w6aBatchTypes are the seven resource types this batch touches.
 var w6aBatchTypes = []string{"trail", "logs", "alarm", "r53", "cf", "acm", "apigw"} //nolint:gochecknoglobals // test-only list
 
-// w6aOffTheSharedFallback are the batch's types whose classifier still picks a
-// colour of its own after the findings lookup, per
-// qa_classifier_fields_source_gate_test.go's burn-down list. The other three
-// hand their raw fields to the type's own findings predicate, which is the
-// sanctioned shared fallback and not a second opinion.
-var w6aOffTheSharedFallback = map[string]bool{ //nolint:gochecknoglobals // test-only lookup
-	"logs": true, // colorLogs
-	"cf":   true, // colorCF
-	"acm":  true, // acmColor
-	"r53":  true, // r53Color
-}
-
 // TestW6AColorDerivesFromFindings pins the classifier ruling for the batch:
-// a type's colour is whatever its findings say, and nothing else.
+// a type's colour is whatever its findings say, and nothing else. The
+// warn-then-broken probe catches a classifier that stops at the first finding
+// rather than the worst.
 //
-// Two probes, because they fail on different defects. The warn-then-broken
-// pair catches a classifier that stops at the first finding rather than the
-// worst, and applies to every type. The findings-free probe catches a
-// classifier that interprets a raw field itself and returns a colour no
-// finding backs, so the row is coloured for a reason the detail view never
-// names and the issue badge never counts; it applies only to the classifiers
-// still off the shared fallback.
+// The findings-free probe that stood beside it is gone. It asserted that a row
+// with unhealthy-looking fields and no findings must be Healthy, which was the
+// right reading while cf, logs, r53 and acm interpreted those fields themselves
+// and returned a colour no finding backed. w29 converted all four: the fields
+// now reach the type's own predicate, which produces the finding, so the row is
+// coloured for a reason the detail view names and the badge counts. Asserting
+// Healthy there would pin a fallback that under-reports by design, which the
+// late-group ruling calls a second truth.
+//
+// What the probe was really guarding — that no classifier reads a raw field on
+// its own — is now said directly and for every type in the repo by
+// TestClassifiersDecideThroughTheSharedFallback, and the colour a converted
+// fallback reaches is pinned against the findings path by
+// TestW29_StrippedRowFallsBackToTheSameColour.
 func TestW6AColorDerivesFromFindings(t *testing.T) {
-	// Values the raw-field branches read as unhealthy: an unset retention, a
-	// zero size on an old group, a trail that is not logging. A classifier
-	// still consulting them colours this resource; one that does not, cannot.
-	unhealthyLookingFields := map[string]string{
-		"stored_bytes":                "0 B",
-		"creation_time":               "2020-01-01 00:00",
-		"is_logging":                  "false",
-		"latest_delivery_error":       "AccessDenied",
-		"log_file_validation_enabled": "false",
-		"actions_count":               "0",
-		"state":                       "INSUFFICIENT_DATA",
-		"status":                      "EXPIRED",
-		"enabled":                     "false",
-		"record_count":                "2",
-	}
-
 	for _, short := range w6aBatchTypes {
 		t.Run(short, func(t *testing.T) {
 			td := resource.FindResourceType(short)
@@ -79,13 +60,6 @@ func TestW6AColorDerivesFromFindings(t *testing.T) {
 				t.Errorf("ResolveColor with a warn and a broken finding = %v, want ColorBroken", got)
 			}
 
-			if !w6aOffTheSharedFallback[short] {
-				return
-			}
-			bare := resource.Resource{ID: short + "-bare", Fields: unhealthyLookingFields}
-			if got := td.ResolveColor(bare); got != resource.ColorHealthy {
-				t.Errorf("ResolveColor with no findings = %v, want ColorHealthy: the classifier still reads a raw field", got)
-			}
 		})
 	}
 }

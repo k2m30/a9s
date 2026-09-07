@@ -28,7 +28,37 @@ var w29PostureWords = []struct { //nolint:gochecknoglobals // test-only table
 	words   map[string]string
 	allBad  map[string]string
 	wantBad resource.Color
+	// openVocabulary are words whose bad set is open by design, so "not the
+	// good value" is the honest arm and an unrecognised token cannot be told
+	// from a real one. They sit outside the unknown-token sweep.
+	openVocabulary map[string]string
 }{
+	{
+		short:   "cfn",
+		healthy: map[string]string{"status": "CREATE_COMPLETE"},
+		words: map[string]string{
+			"termination_protection": "on",
+			"output_secret":          "no",
+		},
+		allBad: map[string]string{
+			"termination_protection": "off",
+			"output_secret":          "yes",
+		},
+		wantBad: resource.ColorBroken,
+	},
+	{
+		short:   "logs",
+		healthy: map[string]string{"stored_bytes": "1024"},
+		words: map[string]string{
+			"retention":  "expires",
+			"encryption": "kms",
+		},
+		allBad: map[string]string{
+			"retention":  "never expire",
+			"encryption": "none",
+		},
+		wantBad: resource.ColorWarning,
+	},
 	{
 		short:   "eks",
 		healthy: map[string]string{"status": "ACTIVE", "health_issues_count": "0"},
@@ -45,6 +75,10 @@ var w29PostureWords = []struct { //nolint:gochecknoglobals // test-only table
 			"version_support":       "extended support",
 		},
 		wantBad: resource.ColorBroken,
+		openVocabulary: map[string]string{
+			"version_support": "the catalogue names every status that is not standard support, " +
+				"so the arm cannot enumerate the bad ones",
+		},
 	},
 }
 
@@ -81,6 +115,27 @@ func TestW29_AbsentWordIsUnknownNotBad(t *testing.T) {
 					t.Errorf("a row with no posture words = %v, want ColorHealthy", got)
 				}
 			})
+
+			// A word the fetcher never writes is unknown too. An arm that
+			// matches "not the good value" reads it as the bad one.
+			for unknown := range tc.words {
+				if _, open := tc.openVocabulary[unknown]; open {
+					continue
+				}
+				t.Run("unknown_"+unknown, func(t *testing.T) {
+					fields := map[string]string{}
+					for k, v := range tc.healthy {
+						fields[k] = v
+					}
+					for k, v := range tc.words {
+						fields[k] = v
+					}
+					fields[unknown] = "not-a-word-the-fetcher-writes"
+					if got := td.ResolveColor(resource.Resource{ID: tc.short + "-probe", Fields: fields}); got != resource.ColorHealthy {
+						t.Errorf("a row whose %q is an unrecognised token = %v, want ColorHealthy", unknown, got)
+					}
+				})
+			}
 
 			// Partially filled: every word present and healthy except one.
 			for absent := range tc.words {

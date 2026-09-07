@@ -4,22 +4,23 @@ package unit
 //
 // Contract assertions:
 //   - retention_days set, stored_bytes>0, recent creation, kms_key_id set → ColorHealthy.
-//   - retention_days empty (no retention policy) → ColorWarning.
+//   - retention_days empty, with no `retention` word → ColorHealthy.
 //   - kms_key_id empty alone (retention set, not orphan) → ColorHealthy per
 //     docs/attention-signals.md (KMS issue only triggers when key is PendingDeletion, a
 //     cross-ref check, not "missing"). Changed from ColorWarning per CodeRabbit PR-273 finding.
 //   - stored_bytes=0 with old creation_time (>90d orphan) → ColorWarning.
-//   - Empty fields → ColorWarning (multiple defaults trigger Warning).
+//   - Empty fields → ColorHealthy: an absent word is unknown, not bad.
 
-// INVERTED for batch w6a. This table used to assert the colours colorLogs
-// picked by reading Fields directly. That branch is gone: colour now derives
-// from findings only, so a resource carrying no findings is Healthy whatever
-// its fields say, and the state each row names is reported by the finding the
-// fetcher emits for it (see prowler_w6a_*_test.go).
+// The raw-field branch this table was written against is gone twice over. w6a
+// removed it, and w29 gave the classifier the type's own predicate over Fields
+// instead — so the states below are reported again, but from the words the
+// fetcher derives (`retention`, `encryption`) rather than the raw keys the old
+// branch read.
 //
-// The table is kept as the enumeration of states that must no longer colour a
-// row on their own. Do not "restore" the old wants — a raw-field branch coming
-// back is exactly what this now catches.
+// The rows naming raw keys therefore want Healthy: a row carrying
+// `retention_days` and no `retention` word says nothing, which is what proves
+// the classifier stopped reading it. The row naming the word wants the colour
+// the word earns.
 
 import (
 	"testing"
@@ -54,13 +55,21 @@ func TestLogsColor(t *testing.T) {
 			want: resource.ColorHealthy,
 		},
 		{
-			name: "no_retention",
+			// The raw key alone, with no derived word beside it: nothing to
+			// report, which is how this table catches the branch coming back.
+			name: "no_retention_raw_key_only",
 			fields: map[string]string{
 				"retention_days": "",
 				"stored_bytes":   "1024",
 				"kms_key_id":     "arn:aws:kms:us-east-1:123456789012:key/aaaabbbb-1111-2222-3333-444455556666",
 			},
-			want: resource.ColorWarning,
+			want: resource.ColorHealthy,
+		},
+		{
+			// The same state in the vocabulary the classifier reads now.
+			name:   "retention_never_expires",
+			fields: map[string]string{"retention": "never expire"},
+			want:   resource.ColorWarning,
 		},
 		{
 			// CodeRabbit PR-273 finding: core/resource/types_monitoring.go:68-69
@@ -101,15 +110,21 @@ func TestLogsColor(t *testing.T) {
 		{
 			name:   "empty",
 			fields: map[string]string{},
-			want:   resource.ColorWarning,
+			want:   resource.ColorHealthy,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Each case asserts its own want again. w6a made the driver demand
+			// Healthy for all of them, on the reading that a colour with no
+			// finding behind it is a colour nobody can explain. w29 converted
+			// this classifier: the fields reach the type's own predicate, which
+			// produces the finding, so the colour the table always named is the
+			// one the row now carries for a reason the detail view shows.
 			got := td.Color(resource.Resource{Fields: tc.fields})
-			if got != resource.ColorHealthy {
-				t.Errorf("Color(%v) = %v, want ColorHealthy; the raw-field branch that returned %v is gone", tc.name, got, tc.want)
+			if got != tc.want {
+				t.Errorf("Color(%v) = %v, want %v", tc.name, got, tc.want)
 			}
 		})
 	}

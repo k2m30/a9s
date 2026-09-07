@@ -28,14 +28,6 @@ import (
 // classifier that still picks a colour of its own after the findings lookup,
 // with the reason "not yet on the shared fallback". Task w29 empties it and
 // deletes this gate.
-var classifiersOffTheSharedFallback = map[string]string{ //nolint:gochecknoglobals // test-only burn-down list
-	"colorCF":   "not yet on the shared fallback",
-	"colorLogs": "not yet on the shared fallback",
-	"colorCFN":  "not yet on the shared fallback: parses a phrase through cfnStackColor",
-	// These two live in catalog_color_helpers.go rather than a catalog_<cat>.go
-	// data file, which is why a sweep of the category files did not see them.
-}
-
 // sharedFallbackCalls are the two helpers a classifier is allowed to hand a
 // raw field to. They take the type's own findings predicate, so the field is
 // read once, by the predicate, and the classifier never interprets it. It also
@@ -180,60 +172,34 @@ func scanClassifiers(t *testing.T) (violates map[string]bool, where map[string]s
 	return violates, where
 }
 
-// TestClassifiersDecideThroughTheSharedFallback is the gate. It fails when an
-// unlisted classifier reads a raw Fields entry, and when a listed one no longer
-// does — the second direction is what stops the list outliving the debt.
-// burnDownDiff compares a scan against the burn-down list. unlisted is a new
-// violation, stale is an entry that has been paid off or names nothing.
-func burnDownDiff(decides map[string]bool, allow map[string]string) (unlisted, stale []string) {
-	for name, bad := range decides {
-		_, listed := allow[name]
-		switch {
-		case bad && !listed:
-			unlisted = append(unlisted, name)
-		case !bad && listed:
-			stale = append(stale, name)
-		}
-	}
-	for name := range allow {
-		if _, exists := decides[name]; !exists {
-			stale = append(stale, name+" (no such classifier)")
-		}
-	}
-	sort.Strings(unlisted)
-	sort.Strings(stale)
-	return unlisted, stale
-}
-
-// TestClassifiersDecideThroughTheSharedFallback is the gate. It fails when an
-// unlisted classifier decides for itself, and when a listed one no longer does
-// — the second direction is what stops the list outliving the debt.
+// TestClassifiersDecideThroughTheSharedFallback is the gate: no catalog
+// classifier picks a colour of its own after the findings lookup. It carried a
+// burn-down list while w29 converted the twenty-one that did; the list reached
+// zero, so the gate now simply says no.
 func TestClassifiersDecideThroughTheSharedFallback(t *testing.T) {
 	decides, where := scanClassifiers(t)
 	if len(decides) < 40 {
 		t.Fatalf("scanned only %d classifiers; the gate is not seeing the catalog", len(decides))
 	}
 
-	unlisted, stale := burnDownDiff(decides, classifiersOffTheSharedFallback)
-	for i, name := range unlisted {
-		unlisted[i] = name + " (" + where[name] + ")"
+	var bad []string
+	for name, isBad := range decides {
+		if isBad {
+			bad = append(bad, name+" ("+where[name]+")")
+		}
 	}
+	sort.Strings(bad)
 
-	if len(unlisted) > 0 {
-		t.Errorf("%d classifier(s) pick a colour of their own after the findings lookup and are not on the burn-down list:\n  %s\n\n"+
+	if len(bad) > 0 {
+		t.Errorf("%d classifier(s) pick a colour of their own after the findings lookup:\n  %s\n\n"+
 			"Hand the type's findings predicate to colorFromFindings and return that, so the classifier and the predicate cannot disagree.",
-			len(unlisted), strings.Join(unlisted, "\n  "))
-	}
-	if len(stale) > 0 {
-		t.Errorf("%d entr(y/ies) on the burn-down list now decide through the shared fallback — delete them:\n  %s",
-			len(stale), strings.Join(stale, "\n  "))
+			len(bad), strings.Join(bad, "\n  "))
 	}
 }
 
 // ---------------------------------------------------------------------------
-// The gate proven in both directions. A gate nobody has seen fail is a gate
-// that might be asserting nothing, so the detector and the comparison are each
-// run against input built to trip them.
+// The detector proven against input built to trip it, because a gate nobody has
+// seen fail is a gate that might be asserting nothing.
 // ---------------------------------------------------------------------------
 
 const mutantClassifiers = `package aws
@@ -314,42 +280,4 @@ func TestClassifierGate_DetectorSeparatesTheTwoShapes(t *testing.T) {
 			t.Errorf("%s was not recognised as a classifier, so the detector never judged it", name)
 		}
 	}
-}
-
-func TestClassifierGate_ErrorsInBothDirections(t *testing.T) {
-	allow := map[string]string{"colorListed": "not yet on the shared fallback"}
-
-	t.Run("unlisted violation is reported", func(t *testing.T) {
-		unlisted, stale := burnDownDiff(map[string]bool{"colorNew": true, "colorListed": true}, allow)
-		if len(unlisted) != 1 || unlisted[0] != "colorNew" {
-			t.Errorf("unlisted = %v, want [colorNew]", unlisted)
-		}
-		if len(stale) != 0 {
-			t.Errorf("stale = %v, want none", stale)
-		}
-	})
-
-	t.Run("listed classifier that now passes is reported", func(t *testing.T) {
-		unlisted, stale := burnDownDiff(map[string]bool{"colorListed": false}, allow)
-		if len(stale) != 1 || stale[0] != "colorListed" {
-			t.Errorf("stale = %v, want [colorListed]", stale)
-		}
-		if len(unlisted) != 0 {
-			t.Errorf("unlisted = %v, want none", unlisted)
-		}
-	})
-
-	t.Run("entry naming nothing is reported", func(t *testing.T) {
-		_, stale := burnDownDiff(map[string]bool{"colorOther": false}, allow)
-		if len(stale) != 1 || !strings.Contains(stale[0], "no such classifier") {
-			t.Errorf("stale = %v, want the missing-name report", stale)
-		}
-	})
-
-	t.Run("a paid-off list is silent", func(t *testing.T) {
-		unlisted, stale := burnDownDiff(map[string]bool{"colorListed": true}, allow)
-		if len(unlisted) != 0 || len(stale) != 0 {
-			t.Errorf("unlisted = %v, stale = %v, want both empty", unlisted, stale)
-		}
-	})
 }

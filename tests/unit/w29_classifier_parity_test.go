@@ -249,3 +249,35 @@ func TestW29_EveryDemoKMSRowHasAState(t *testing.T) {
 		}
 	}
 }
+
+// TestW29_ACMTimedOutCertificateReadsAsWords pins the one user-visible wording
+// change in the late group. The failed-status finding takes its phrase from the
+// status word the fetcher derives, so a certificate whose validation ran out of
+// time says so in words rather than in the SDK's spelling.
+// docs/resources/acm.md:159 promises exactly this text, and nothing else pinned
+// it — the phrase is not a FindingDef literal, it is passed through.
+func TestW29_ACMTimedOutCertificateReadsAsWords(t *testing.T) {
+	rows, _ := w4bBench(t, "acm")
+
+	var found bool
+	for _, r := range rows {
+		if r.Fields["status"] != "validation timed out" {
+			continue
+		}
+		found = true
+		if len(r.Findings) != 1 {
+			t.Errorf("row %q carries %+v, want the one failed-status finding", r.ID, r.Findings)
+			continue
+		}
+		f := r.Findings[0]
+		if f.Phrase != "validation timed out" {
+			t.Errorf("row %q: Phrase = %q, want %q", r.ID, f.Phrase, "validation timed out")
+		}
+		if f.Severity != domain.SevBroken {
+			t.Errorf("row %q: Severity = %v, want SevBroken", r.ID, f.Severity)
+		}
+	}
+	if !found {
+		t.Error("no demo certificate has a timed-out validation; the wording is unwitnessed")
+	}
+}

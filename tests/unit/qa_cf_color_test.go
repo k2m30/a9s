@@ -74,9 +74,15 @@ func TestCloudFrontColor(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Each case asserts its own want again. w6a made the driver demand
+			// Healthy for all of them, on the reading that a colour with no
+			// finding behind it is a colour nobody can explain. w29 converted
+			// this classifier: the fields reach the type's own predicate, which
+			// produces the finding, so the colour the table always named is the
+			// one the row now carries for a reason the detail view shows.
 			got := td.Color(resource.Resource{Fields: tc.fields})
-			if got != resource.ColorHealthy {
-				t.Errorf("Color(fields=%v) = %v, want ColorHealthy; the raw-field branch that returned %v is gone", tc.fields, got, tc.want)
+			if got != tc.want {
+				t.Errorf("Color(fields=%v) = %v, want %v", tc.fields, got, tc.want)
 			}
 		})
 	}
