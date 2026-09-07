@@ -127,6 +127,7 @@ lines under "Not yet implemented".
 | `asg` | Auto Scaling Groups | wave2 | `asg.launch-config.public-ip` | launch configuration assigns public IPs | warn | Every instance this group launches gets a routable public address, so each new instance is reachable from the internet on whatever its security groups leave open. Copy the launch configuration to a launch template with public address assignment off. |
 | `asg` | Auto Scaling Groups | wave2 | `asg.launch-config.secret` | credential in launch configuration user data | broken | A credential is pasted into the launch configuration's user data, so it is readable by anyone who can call autoscaling:DescribeLaunchConfigurations and lands on every instance the group starts. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it. |
 | `ebs` | EBS Volumes | wave1 | `ebs.state.creating` | creating | warn | — |
+| `ebs` | EBS Volumes | wave1 | `ebs.state.deleting` | deleting | warn | — |
 | `ebs` | EBS Volumes | wave1 | `ebs.state.error` | error | broken | — |
 | `ebs` | EBS Volumes | wave1 | `ebs.orphan-unattached` | orphan: unattached Nd | warn | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
 | `ebs` | EBS Volumes | wave1 | `ebs.encryption.disabled` | unencrypted | warn | Volume is not encrypted at rest — re-create from encrypted snapshot. |
@@ -157,6 +158,8 @@ lines under "Not yet implemented".
 | --- | --- | --- | --- | --- | --- | --- |
 | `eks` | EKS Clusters | wave1 | `eks.state.creating` | creating | warn | — |
 | `eks` | EKS Clusters | wave1 | `eks.state.updating` | updating | warn | — |
+| `eks` | EKS Clusters | wave1 | `eks.state.deleting` | deleting | warn | The cluster is being torn down; its workloads are going with it and nothing else about it is worth reporting until it is gone. |
+| `eks` | EKS Clusters | wave1 | `eks.state.pending` | pending | warn | The cluster has been created but its control plane is not serving yet; nothing can be scheduled on it until it becomes active. |
 | `eks` | EKS Clusters | wave1 | `eks.state.failed` | failed | broken | The cluster is in a failed state and will not recover on its own; when AWS reports health issues, the first is the phrase and any others follow as rows. Open a support case or recreate the cluster. |
 | `eks` | EKS Clusters | wave1 | `eks.health-issue` | issue: <health issue code> | warn | The control plane reports at least one health issue; the first code is the phrase, any others follow as rows, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
 | `eks` | EKS Clusters | wave1 | `eks.public-endpoint` | cluster endpoint reachable from the internet | broken | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |
@@ -171,6 +174,7 @@ lines under "Not yet implemented".
 | `ng` | EKS Node Groups | wave1 | `ng.state.create-failed` | create failed | broken | — |
 | `ng` | EKS Node Groups | wave1 | `ng.state.delete-failed` | delete failed | broken | — |
 | `ng` | EKS Node Groups | wave1 | `ng.state.degraded` | degraded | broken | The node group is degraded, so some nodes are failing or not joining; when AWS reports health issues, the first is the phrase and any others follow as rows. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
+| `ng` | EKS Node Groups | wave1 | `ng.health-issue` | issue: <health issue code> | warn | The node group reports a health issue while its state says nothing is wrong; the first code is the phrase and any others follow as rows. Nodes may be failing to join or to stay healthy until it clears. |
 | `ng` | EKS Node Groups | wave1 | `ng.warn.details_denied` | details denied | warn | Access to resource details was denied; only the name is visible. |
 | `ng` | EKS Node Groups | wave1 | `ng.warn.details_unavailable` | details unavailable | warn | Details could not be retrieved; only the name is visible. |
 

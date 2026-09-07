@@ -241,6 +241,8 @@ eks — CONTAINERS. Lifecycle key: `status`.
 | --- | --- | --- | --- | --- |
 | eks.state.creating | creating | warn | wave1 | — |
 | eks.state.updating | updating | warn | wave1 | — |
+| eks.state.deleting | deleting | warn | wave1 | The cluster is being torn down; its workloads are going with it and nothing else about it is worth reporting until it is gone. |
+| eks.state.pending | pending | warn | wave1 | The cluster has been created but its control plane is not serving yet; nothing can be scheduled on it until it becomes active. |
 | eks.state.failed | failed | broken | wave1 | The cluster is in a failed state and will not recover on its own; when AWS reports health issues, the first is the phrase and any others follow as rows. Open a support case or recreate the cluster. |
 | eks.health-issue | issue: <health issue code> | warn | wave1 | The control plane reports at least one health issue; the first code is the phrase, any others follow as rows, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
 | eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |

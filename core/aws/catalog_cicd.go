@@ -13,11 +13,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// colorCFN derives the row colour from the stack's findings, and for a row that
+// carries none from the same predicates the fetcher used: its status, and the
+// two posture words it wrote into Fields. Nothing reads a rendered phrase back.
 func colorCFN(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	return cfnStackColor(r.Fields["status"])
+	findings := cfnStackFindings(r.Fields["status"])
+	findings = append(findings, cfnPostureFindings(
+		r.Fields["termination_protection"], r.Fields["output_secret"])...)
+	return colorFromFindings(findings)
 }
 
 func colorPipeline(r domain.Resource) domain.Color {

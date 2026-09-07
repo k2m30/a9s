@@ -109,6 +109,22 @@ func detailsUnavailableFinding(shortName string) domain.Finding {
 	}
 }
 
+// degradedStatusFindings recovers the degraded row's finding for a row rebuilt
+// from Fields alone. DegradedDetails writes the phrase into "status", so those
+// two words are the closed vocabulary a type's fallback predicate reads them
+// back from — no other status can hold them, and any other value yields
+// nothing. A type whose fetcher builds degraded rows calls this first in its
+// own predicate, before the vocabulary its live status uses.
+func degradedStatusFindings(shortName, status string) []domain.Finding {
+	switch status {
+	case detailsDeniedPhrase:
+		return []domain.Finding{detailsDeniedFinding(shortName)}
+	case detailsUnavailablePhrase:
+		return []domain.Finding{detailsUnavailableFinding(shortName)}
+	}
+	return nil
+}
+
 // degradedAuthDenial reports whether err is an authorization denial, across
 // the SDK's service-specific codes: AccessDenied/AccessDeniedException (most
 // services) and UnauthorizedOperation (EC2 — lt's DescribeLaunchTemplateVersions

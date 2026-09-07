@@ -12,18 +12,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// colorCF classifies a CloudFront distribution. Prefers colorFromAnyFinding
-// so real fetched resources (Findings populated by cfWave1Findings, cf.go,
-// Source: "wave1", and EnrichCloudFrontDistribution, Source: "wave2:cf")
-// color from their own Finding; the raw-field checks below are the
-// identical-precedence fallback for callers that construct a Resource with
-// only Fields set (e.g. qa_cf_color_test.go).
-// colorCF derives the row colour from the distribution's findings alone. The
-// fetcher emits cfCodeDisabled for Enabled==false and cfCodeInProgress for a
-// propagating change, so the two states this classifier used to read out of
-// Fields a second time already arrive as Findings.
+// colorCF derives the row colour from the distribution's findings, and for a
+// row that carries none from the same predicate the fetcher used, over the two
+// fields it wrote there.
 func colorCF(r domain.Resource) domain.Color {
-	return colorAnyFindingOrHealthy(r)
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return colorFromFindings(cfWave1Findings(r.Fields["enabled"], r.Fields["status"]))
 }
 
 // colorAPIGW classifies an API Gateway. All signals are Wave-2-only

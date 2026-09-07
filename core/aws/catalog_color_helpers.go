@@ -4,7 +4,7 @@ package aws
 
 import (
 	"slices"
-	"strings"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 )
@@ -74,51 +74,25 @@ func colorAnyFindingOrHealthy(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-// cfnStackColor maps CloudFormation stack status strings to a Color.
-func cfnStackColor(status string) domain.Color {
-	switch status {
-	case "CREATE_COMPLETE", "UPDATE_COMPLETE", "IMPORT_COMPLETE":
-		return domain.ColorHealthy
-	case "DELETE_COMPLETE":
-		return domain.ColorDim
-	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
-		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
-		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
-		return domain.ColorBroken
-	}
-	if strings.HasSuffix(status, "_IN_PROGRESS") {
-		return domain.ColorWarning
-	}
-	if strings.HasSuffix(status, "_FAILED") {
-		return domain.ColorBroken
-	}
-	return domain.ColorHealthy
-}
-
-// acmColor classifies an ACM certificate resource. Prefers colorFromAnyFinding
-// so real fetched resources (Findings populated by acmStatusFindings, Source:
-// "wave1", and EnrichACMCertificate, Source: "wave2:acm") color from their own
-// Finding; the raw-field switch below is the identical-precedence fallback
-// for callers that construct a Resource with only Fields set (e.g.
-// qa_acm_color_test.go, qa_acm_validation_timed_out_test.go).
-// acmColor derives the row colour from the certificate's findings alone. The
-// fetcher emits one for every state this classifier used to re-derive from
-// Fields: the two expiry windows, the orphan case, and each non-issued status.
+// acmColor derives the row colour from the certificate's findings, and for a
+// row that carries none from the same predicate the fetcher used, over the
+// values it wrote into Fields.
 func acmColor(r domain.Resource) domain.Color {
-	return colorAnyFindingOrHealthy(r)
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return colorFromFindings(acmFindings(
+		r.Fields["status"], r.Fields["not_after"], r.Fields["in_use"],
+		r.Fields["key_algorithm"], time.Now()))
 }
 
-// r53Color classifies a Route53 hosted zone resource. Prefers
-// colorFromAnyFinding so real fetched resources (Findings populated by
-// r53CodeUnusedZone, Source: "wave1", and r53CodeOrphanPrivateZone, Source:
-// "wave2:r53") color from their own Finding; the raw-field check below is the
-// identical-precedence fallback for callers that construct a Resource with
-// only Fields set (e.g. qa_r53_color_test.go).
-// r53Color derives the row colour from the zone's findings alone. The fetcher
-// emits r53CodeUnusedZone for a zone down to its default NS+SOA records and
-// the wave-2 enricher covers the rest, so the record-count branch this
-// classifier used to read was a second opinion on a fact a Finding already
-// carries.
+// r53Color derives the row colour from the zone's findings, and for a row that
+// carries none from the same predicate the fetcher used, over the record count
+// it wrote into Fields. The orphan-private-zone signal is wave 2 and no
+// fallback recovers it.
 func r53Color(r domain.Resource) domain.Color {
-	return colorAnyFindingOrHealthy(r)
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return colorFromFindings(r53ZoneFindings(r.Fields["record_count"]))
 }

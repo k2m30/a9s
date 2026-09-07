@@ -5,11 +5,13 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -17,6 +19,22 @@ import (
 // r53CodeUnusedZone is the canonical FindingCode for a hosted zone with two
 // or fewer record sets (only the default NS+SOA remain) — likely unused.
 const r53CodeUnusedZone domain.FindingCode = "r53.zone.unused"
+
+// r53ZoneFindings is the one predicate for a hosted zone. It reads the record
+// count the fetcher formats into Fields, so a row rebuilt from Fields alone
+// reaches the same verdict. A zone whose count did not come back carries no
+// count to judge and yields nothing.
+func r53ZoneFindings(recordCount string) []domain.Finding {
+	n, err := strconv.Atoi(recordCount)
+	if err != nil || n > 2 {
+		return nil
+	}
+	// Two or fewer records means only the default NS+SOA remain.
+	return []domain.Finding{{
+		Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain",
+		Detail: catalog.Detail(r53CodeUnusedZone), Severity: domain.SevWarn, Source: "wave1",
+	}}
+}
 
 // FetchHostedZonesPage fetches a single page of Route53 hosted zones.
 func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, continuationToken string) (resource.FetchResult, error) {
@@ -84,13 +102,7 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 			RawStruct: zone,
 		}
 
-		// Two or fewer records means only the default NS+SOA remain.
-		if zone.ResourceRecordSetCount != nil && *zone.ResourceRecordSetCount <= 2 {
-			r.Findings = []domain.Finding{{
-				Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		}
+		r.Findings = r53ZoneFindings(recordCount)
 
 		resources = append(resources, r)
 	}

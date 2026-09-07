@@ -139,13 +139,13 @@ func subnetFindings(state, autoPublicIP string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "pending":
-		findings = []domain.Finding{{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeSubnetStatePending, Phrase: "pending", Detail: catalog.Detail(CodeSubnetStatePending), Severity: domain.SevWarn, Source: "wave1"}}
 	case "unavailable":
-		findings = []domain.Finding{{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Detail: catalog.Detail(CodeSubnetStateUnavailable), Severity: domain.SevBroken, Source: "wave1"}}
 	case "failed":
-		findings = []domain.Finding{{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeSubnetStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeSubnetStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
 	case "failed-insufficient-capacity":
-		findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Detail: catalog.Detail(CodeSubnetStateFailedInsufficientCapacity), Severity: domain.SevBroken, Source: "wave1"}}
 	}
 	if autoPublicIP == "yes" {
 		findings = append(findings, domain.Finding{

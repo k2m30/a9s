@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -108,7 +109,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 // nothing. colorVPC runs it over Fields for rows built outside the fetcher.
 func vpcStateFindings(state string) []domain.Finding {
 	if state == "pending" {
-		return []domain.Finding{{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeVPCStatePending, Phrase: "pending", Detail: catalog.Detail(CodeVPCStatePending), Severity: domain.SevWarn, Source: "wave1"}}
 	}
 	return nil
 }

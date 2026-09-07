@@ -11,8 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchCloudFormationStacksPage fetches a single page of CloudFormation stacks.
@@ -57,23 +59,27 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 			arn = *stack.StackId
 		}
 
+		protection, outputSecret := cfnPostureOf(stack)
+
 		r := resource.Resource{
 			ID:       stackName,
 			Name:     stackName,
 			Findings: cfnStackFindings(status),
 
 			Fields: map[string]string{
-				"stack_name":    stackName,
-				"status":        status,
-				"creation_time": creationTime,
-				"last_updated":  lastUpdated,
-				"description":   description,
-				"arn":           arn,
+				"stack_name":             stackName,
+				"status":                 status,
+				"creation_time":          creationTime,
+				"last_updated":           lastUpdated,
+				"description":            description,
+				"arn":                    arn,
+				"termination_protection": protection,
+				"output_secret":          outputSecret,
 			},
 			RawStruct: stack,
 		}
 
-		addCFNPostureFindings(&r, stack)
+		addCFNPostureRows(&r, stack, protection, outputSecret)
 		resources = append(resources, r)
 	}
 
@@ -133,24 +139,75 @@ func cfnStackIsTearingDown(status string) bool {
 	return strings.HasPrefix(status, "DELETE_") || strings.HasSuffix(status, "_FAILED")
 }
 
-// addCFNPostureFindings evaluates the two w6b posture signals against the
-// DescribeStacks response the fetcher already holds. Each is independent of
-// the other and of the lifecycle finding above (contract rule 4).
-func addCFNPostureFindings(r *resource.Resource, stack cfntypes.Stack) {
+// The words the fetcher writes into Fields for the two settings a stack is
+// judged on beyond its status. cfnPostureFindings reads these rather than the
+// DescribeStacks struct, so a row rebuilt from Fields alone reaches the same
+// verdict, and a word from no vocabulary is reported on like an absent one.
+const (
+	cfnProtectionOn  = "on"
+	cfnProtectionOff = "off"
+
+	cfnOutputSecretPresent = "yes"
+	cfnOutputSecretAbsent  = "no"
+)
+
+// cfnPostureOf derives the two words. Both are empty for a stack there is
+// nothing to fix on — one on its way out, one that never built — and the
+// protection word is empty for a nested stack, whose protection
+// CloudFormation refuses to set separately from its root's.
+func cfnPostureOf(stack cfntypes.Stack) (protection, outputSecret string) {
 	if cfnStackIsTearingDown(string(stack.StackStatus)) {
-		return
+		return "", ""
 	}
-
-	// A nested stack cannot hold its own protection: CloudFormation refuses
-	// the setting on a child and deletes it with the root. Reporting it would
-	// name a setting the operator cannot change.
-	if stack.ParentId == nil && !aws.ToBool(stack.EnableTerminationProtection) {
-		addWave1Finding(r, CodeCFNTerminationProtectionOff, "termination protection off", domain.SevWarn)
+	if stack.ParentId == nil {
+		protection = cfnProtectionOn
+		if !aws.ToBool(stack.EnableTerminationProtection) {
+			protection = cfnProtectionOff
+		}
 	}
+	outputSecret = cfnOutputSecretAbsent
+	if len(secretscan.ScanKV(cfnStackOutputs(stack))) > 0 {
+		outputSecret = cfnOutputSecretPresent
+	}
+	return protection, outputSecret
+}
 
+func cfnStackOutputs(stack cfntypes.Stack) map[string]string {
 	outputs := make(map[string]string, len(stack.Outputs))
 	for _, o := range stack.Outputs {
 		outputs[aws.ToString(o.OutputKey)] = aws.ToString(o.OutputValue)
 	}
-	addSecretScanFinding(r, CodeCFNOutputSecret, "credential in stack outputs", outputs)
+	return outputs
+}
+
+// cfnPostureFindings returns the two w6b signals. Each is independent of the
+// other and of the lifecycle finding (contract rule 4).
+func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
+	var out []domain.Finding
+	if protection == cfnProtectionOff {
+		out = append(out, domain.Finding{
+			Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off",
+			Detail: catalog.Detail(CodeCFNTerminationProtectionOff), Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+	if outputSecret == cfnOutputSecretPresent {
+		out = append(out, domain.Finding{
+			Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs",
+			Detail: catalog.Detail(CodeCFNOutputSecret), Severity: domain.SevBroken, Source: "wave1",
+		})
+	}
+	return out
+}
+
+// addCFNPostureRows appends the posture findings and, for the output-secret
+// one, the per-hit rows naming where the credential is and what kind it looks
+// like. The value itself never leaves the scanner.
+func addCFNPostureRows(r *resource.Resource, stack cfntypes.Stack, protection, outputSecret string) {
+	r.Findings = append(r.Findings, cfnPostureFindings(protection, outputSecret)...)
+	if outputSecret != cfnOutputSecretPresent {
+		return
+	}
+	for _, h := range secretscan.ScanKV(cfnStackOutputs(stack)) {
+		addWave1Rows(r, CodeCFNOutputSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+	}
 }

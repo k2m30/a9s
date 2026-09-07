@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -114,13 +115,13 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 func natStateFindings(state string) []domain.Finding {
 	switch state {
 	case "pending":
-		return []domain.Finding{{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeNATStatePending, Phrase: "pending", Detail: catalog.Detail(CodeNATStatePending), Severity: domain.SevWarn, Source: "wave1"}}
 	case "deleting":
-		return []domain.Finding{{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeNATStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeNATStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
 	case "failed":
-		return []domain.Finding{{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeNATStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeNATStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
 	case "deleted":
-		return []domain.Finding{{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeNATStateDeleted, Phrase: "deleted", Detail: catalog.Detail(CodeNATStateDeleted), Severity: domain.SevDim, Source: "wave1"}}
 	}
 	return nil
 }

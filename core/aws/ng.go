@@ -143,6 +143,9 @@ func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource 
 // colorEKSNodeGroup runs it over Fields for rows built outside the fetcher,
 // which have the issue count but not the codes.
 func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]domain.Finding, []domain.DetailRow) {
+	if f := degradedStatusFindings("ng", status); f != nil {
+		return f, nil
+	}
 	switch status {
 	case "CREATING":
 		return []domain.Finding{{Code: CodeNGStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeNGStateCreating), Severity: domain.SevWarn, Source: "wave1"}}, nil

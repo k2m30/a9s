@@ -369,21 +369,20 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 func ebsFindings(state, attachedTo, created, encrypted string) []domain.Finding {
 	switch state {
 	case "creating":
-		return []domain.Finding{{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeEBSStateCreating, Phrase: "creating", Detail: catalog.Detail(CodeEBSStateCreating), Severity: domain.SevWarn, Source: "wave1"}}
 	case "deleting":
-		return []domain.Finding{{Code: CodeEBSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeEBSStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeEBSStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
 	case "error":
-		return []domain.Finding{{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeEBSStateError, Phrase: "error", Detail: catalog.Detail(CodeEBSStateError), Severity: domain.SevBroken, Source: "wave1"}}
 	}
 	if state == "available" && attachedTo == "" {
 		if t, err := time.Parse("2006-01-02 15:04", created); err == nil {
 			if age := time.Since(t); age > ebsOrphanAge {
 				days := int(age.Hours() / 24)
 				return []domain.Finding{{
-					Code:   CodeEBSOrphanUnattached,
-					Phrase: "orphan: unattached " + strconv.Itoa(days) + "d",
-					Detail: "Unattached since creation " + strconv.Itoa(days) +
-						" days ago — billed hourly for no workload.",
+					Code:     CodeEBSOrphanUnattached,
+					Phrase:   "orphan: unattached " + strconv.Itoa(days) + "d",
+					Detail:   catalog.Detail(CodeEBSOrphanUnattached),
 					Severity: domain.SevWarn, Source: "wave1",
 				}}
 			}

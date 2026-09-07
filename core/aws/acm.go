@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -43,14 +44,29 @@ const (
 	CodeACMWeakKey domain.FindingCode = "acm.weak-key"
 )
 
+// The certificate statuses acmStatusFindings reports on, in the words
+// HumanizeStatusPhrase renders and the fetcher writes into Fields. A status
+// outside this vocabulary is reported on like an absent one: nothing.
+const (
+	acmStatusIssued             = "issued"
+	acmStatusPendingValidation  = "pending validation"
+	acmStatusExpired            = "expired"
+	acmStatusRevoked            = "revoked"
+	acmStatusFailed             = "failed"
+	acmStatusValidationTimedOut = "validation timed out"
+	acmStatusInactive           = "inactive"
+)
+
 // acmRSAMinimumBits is the shortest RSA key still considered sound.
 const acmRSAMinimumBits = 2048
 
 // acmKeyIsWeak reports whether the key algorithm is RSA below
-// acmRSAMinimumBits. An empty algorithm is unresolved, not weak, and any
-// elliptic-curve key AWS issues is sound.
-func acmKeyIsWeak(alg string) bool {
-	bits, ok := strings.CutPrefix(alg, "RSA_")
+// acmRSAMinimumBits. It takes the words acmKeyAlgorithmWords renders, which is
+// what the fetcher writes into Fields, so the predicate and the row read one
+// value. An empty algorithm is unresolved, not weak, and any elliptic-curve
+// key AWS issues is sound.
+func acmKeyIsWeak(algWords string) bool {
+	bits, ok := strings.CutPrefix(algWords, "RSA ")
 	if !ok {
 		return false
 	}
@@ -128,32 +144,29 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			id = domainName
 		}
 
+		statusWords := domain.HumanizeStatusPhrase(status)
+		keyAlgorithm := acmKeyAlgorithmWords(string(cert.KeyAlgorithm))
+
 		r := resource.Resource{
 			ID:   id,
 			Name: domainName,
 			Fields: map[string]string{
 				"domain_name":     domainName,
 				"certificate_arn": certARN,
-				"status":          domain.HumanizeStatusPhrase(status),
+				"status":          statusWords,
 				"type":            domain.HumanizeStatusPhrase(certType),
 				"not_after":       notAfter,
 				"in_use":          inUse,
 				"days_left":       daysLeft,
+				"key_algorithm":   keyAlgorithm,
 			},
-			// ISSUED certs get their expiry/orphan Wave 1 Finding
-			// (acmIssuedFindings) read straight off this CertificateSummary;
-			// every other status keeps its own status Finding
-			// (acmStatusFindings), mirroring acmColor's own precedence.
-			Findings:  acmFindings(status, cert.NotAfter, cert.InUse != nil && *cert.InUse, now),
+			Findings:  acmFindings(statusWords, notAfter, inUse, keyAlgorithm, now),
 			RawStruct: cert,
 		}
 
-		// Independent of status and expiry: a certificate can be issued, in
-		// use, valid for a year, and still built on a key worth attacking.
-		if alg := string(cert.KeyAlgorithm); acmKeyIsWeak(alg) {
-			addWave1Finding(&r, CodeACMWeakKey, "weak key algorithm", domain.SevWarn)
+		if acmKeyIsWeak(keyAlgorithm) {
 			addWave1Rows(&r, CodeACMWeakKey, domain.DetailRow{
-				Label: "Key algorithm", Value: acmKeyAlgorithmWords(alg), Tier: "~",
+				Label: "Key algorithm", Value: keyAlgorithm, Tier: "~",
 			})
 		}
 
@@ -183,25 +196,38 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 	}, nil
 }
 
-// acmFindings routes a certificate to its Wave 1 Finding by status: ISSUED
-// certs get the expiry/orphan check (acmIssuedFindings); every other status
-// keeps its own status Finding (acmStatusFindings). acm has no Wave 2
-// IssueEnricher — every signal it carries is readable straight off
-// ListCertificates, zero extra API calls.
-func acmFindings(status string, notAfter *time.Time, inUse bool, now time.Time) []domain.Finding {
-	if status == "ISSUED" {
-		return acmIssuedFindings(notAfter, inUse, now)
+// acmFindings is the one predicate for a certificate. An issued cert gets the
+// expiry/orphan check; every other status carries its own status finding. The
+// key algorithm is independent of both — a cert can be issued, in use, valid
+// for a year, and still built on a key worth attacking.
+//
+// Every argument is a value the fetcher writes into Fields, so a row rebuilt
+// from Fields alone reaches the same verdict. acm has no Wave 2 IssueEnricher:
+// every signal it carries is readable straight off ListCertificates, zero
+// extra API calls.
+func acmFindings(statusWords, notAfter, inUse, keyAlgorithmWords string, now time.Time) []domain.Finding {
+	var out []domain.Finding
+	if statusWords == acmStatusIssued {
+		out = acmIssuedFindings(notAfter, inUse, now)
+	} else {
+		out = acmStatusFindings(statusWords)
 	}
-	return acmStatusFindings(status)
+	if acmKeyIsWeak(keyAlgorithmWords) {
+		out = append(out, domain.Finding{
+			Code: CodeACMWeakKey, Phrase: "weak key algorithm",
+			Detail: catalog.Detail(CodeACMWeakKey), Severity: domain.SevWarn, Source: "wave1",
+		})
+	}
+	return out
 }
 
 // acmIssuedFindings returns the wave1 expiry/orphan Finding for an ISSUED
 // certificate, read straight off ListCertificates' CertificateSummary
 // (NotAfter, InUse). Expiry takes priority over orphan: an expiring orphan
 // cert is still primarily an expiry problem.
-func acmIssuedFindings(notAfter *time.Time, inUse bool, now time.Time) []domain.Finding {
-	if notAfter != nil {
-		remaining := notAfter.Sub(now)
+func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
+	if t, err := time.Parse("2006-01-02 15:04", notAfter); err == nil {
+		remaining := t.Sub(now)
 		switch {
 		case remaining < 7*24*time.Hour:
 			phrase := "expired"
@@ -219,7 +245,7 @@ func acmIssuedFindings(notAfter *time.Time, inUse bool, now time.Time) []domain.
 			}}
 		}
 	}
-	if !inUse {
+	if inUse == "false" {
 		return []domain.Finding{{
 			Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)",
 			Severity: domain.SevWarn, Source: "wave1",
@@ -232,22 +258,22 @@ func acmIssuedFindings(notAfter *time.Time, inUse bool, now time.Time) []domain.
 // status, mirroring acmColor's (catalog_color_helpers.go) own precedence so
 // the Findings list and the row color never disagree. ISSUED certs are
 // routed to acmIssuedFindings by acmFindings instead.
-func acmStatusFindings(status string) []domain.Finding {
-	switch status {
-	case "PENDING_VALIDATION":
+func acmStatusFindings(statusWords string) []domain.Finding {
+	switch statusWords {
+	case acmStatusPendingValidation:
 		return []domain.Finding{{
 			Code: acmCodeStatusPendingValidation, Phrase: "pending validation",
-			Severity: domain.SevWarn, Source: "wave1",
+			Detail: catalog.Detail(acmCodeStatusPendingValidation), Severity: domain.SevWarn, Source: "wave1",
 		}}
-	case "EXPIRED", "REVOKED", "FAILED", "VALIDATION_TIMED_OUT":
+	case acmStatusExpired, acmStatusRevoked, acmStatusFailed, acmStatusValidationTimedOut:
 		return []domain.Finding{{
-			Code: acmCodeStatusFailed, Phrase: strings.ToLower(status),
-			Severity: domain.SevBroken, Source: "wave1",
+			Code: acmCodeStatusFailed, Phrase: statusWords,
+			Detail: catalog.Detail(acmCodeStatusFailed), Severity: domain.SevBroken, Source: "wave1",
 		}}
-	case "INACTIVE":
+	case acmStatusInactive:
 		return []domain.Finding{{
 			Code: acmCodeStatusInactive, Phrase: "inactive",
-			Severity: domain.SevDim, Source: "wave1",
+			Detail: catalog.Detail(acmCodeStatusInactive), Severity: domain.SevDim, Source: "wave1",
 		}}
 	}
 	return nil

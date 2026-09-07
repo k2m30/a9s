@@ -15,10 +15,5 @@ const (
 
 	// CodeSecretStaleValue — secret's value has not changed in over 365
 	// days. Severity: SevWarn.
-	//
-	// Note: colorSecrets also has a "last_accessed > 180d" Warning branch,
-	// but that condition always produces secretStateFindings' DORMANT status
-	// first (same threshold, same source field) — so it can never reach this
-	// structural fallback and has no corresponding FindingCode here.
 	CodeSecretStaleValue domain.FindingCode = "secrets.value.stale"
 )

@@ -3561,7 +3561,7 @@ func buildImages() []ec2types.Image {
 
 func init() {
 	Register(Pin{ShortName: "ec2", Rows: 40, Issues: 15})
-	Register(Pin{ShortName: "ebs", Rows: 8, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs", Rows: 9, Issues: 6, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ebs-snap", Rows: 9, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
 	Register(Pin{ShortName: "eip", Rows: 9, Issues: 4, CoverageGaps: []string{"broken", "dim"}})

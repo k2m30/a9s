@@ -22,13 +22,16 @@ func colorAlarm(r domain.Resource) domain.Color {
 	return colorFromFindings(alarmStateFindings(r.Fields["state"], actionsCount))
 }
 
-// colorLogs derives the row colour from the log group's findings alone. The
-// fetcher emits one for every condition this classifier used to read out of
-// Fields a second time — never-expiring retention, an old empty group, and a
-// group with no KMS key — so a fetched row that is off-healthy always carries
-// a Finding saying why, and a row with none is healthy.
+// colorLogs derives the row colour from the log group's findings, and for a row
+// that carries none from the same predicate the fetcher used, over the words it
+// wrote into Fields for retention and encryption.
 func colorLogs(r domain.Resource) domain.Color {
-	return colorAnyFindingOrHealthy(r)
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return colorFromFindings(logsGroupFindings(
+		r.Fields["retention"], r.Fields["stored_bytes"],
+		r.Fields["creation_time"], r.Fields["encryption"]))
 }
 
 func colorTrail(r domain.Resource) domain.Color {

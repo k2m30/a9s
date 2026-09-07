@@ -159,21 +159,21 @@ func vpceFindings(state, policyExposure string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "PendingAcceptance":
-		findings = []domain.Finding{{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Detail: catalog.Detail(CodeVPCEStatePendingAcceptance), Severity: domain.SevWarn, Source: "wave1"}}
 	case "Pending":
-		findings = []domain.Finding{{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStatePending, Phrase: "pending", Detail: catalog.Detail(CodeVPCEStatePending), Severity: domain.SevWarn, Source: "wave1"}}
 	case "Deleting":
-		findings = []domain.Finding{{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStateDeleting, Phrase: "deleting", Detail: catalog.Detail(CodeVPCEStateDeleting), Severity: domain.SevWarn, Source: "wave1"}}
 	case "Failed":
-		findings = []domain.Finding{{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStateFailed, Phrase: "failed", Detail: catalog.Detail(CodeVPCEStateFailed), Severity: domain.SevBroken, Source: "wave1"}}
 	case "Rejected":
-		findings = []domain.Finding{{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStateRejected, Phrase: "rejected", Detail: catalog.Detail(CodeVPCEStateRejected), Severity: domain.SevBroken, Source: "wave1"}}
 	case "Expired":
-		findings = []domain.Finding{{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStateExpired, Phrase: "expired", Detail: catalog.Detail(CodeVPCEStateExpired), Severity: domain.SevBroken, Source: "wave1"}}
 	case "Partial":
-		findings = []domain.Finding{{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStatePartial, Phrase: "partial", Detail: catalog.Detail(CodeVPCEStatePartial), Severity: domain.SevBroken, Source: "wave1"}}
 	case "Deleted":
-		findings = []domain.Finding{{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+		findings = []domain.Finding{{Code: CodeVPCEStateDeleted, Phrase: "deleted", Detail: catalog.Detail(CodeVPCEStateDeleted), Severity: domain.SevDim, Source: "wave1"}}
 	}
 	if policyExposure == "open" && state != "Deleting" && state != "Deleted" {
 		findings = append(findings, domain.Finding{

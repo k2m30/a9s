@@ -33,6 +33,55 @@ const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
 // group as stale.
 const logsStaleEmptyAge = 90 * 24 * time.Hour
 
+// The words the fetcher writes into Fields for the two settings a log group is
+// judged on. logsGroupFindings reads these rather than the SDK struct, so a row
+// rebuilt from Fields alone reaches the same verdict, and a row carrying
+// neither word — or a word from no vocabulary — is reported on for neither.
+const (
+	logsRetentionNeverExpires = "never expire"
+	logsRetentionExpires      = "expires"
+
+	logsEncryptionKMS  = "kms"
+	logsEncryptionNone = "none"
+)
+
+// logsGroupFindings is the one predicate for a log group. Never-expiring
+// retention wins over the stale-empty check: a group nobody writes to and
+// nobody expires is first a retention problem. Encryption is independent of
+// both — a group can be unencrypted and never-expiring, and fixing one leaves
+// the other.
+func logsGroupFindings(retention, storedBytes, creationTime, encryption string) []domain.Finding {
+	var out []domain.Finding
+	switch {
+	case retention == logsRetentionNeverExpires:
+		out = append(out, domain.Finding{
+			Code:     logsCodeRetentionNeverExpire,
+			Phrase:   "retention: never expire",
+			Detail:   catalog.Detail(logsCodeRetentionNeverExpire),
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		})
+	case storedBytes == "0 B" && olderThan(creationTime, logsStaleEmptyAge):
+		out = append(out, domain.Finding{
+			Code:     logsCodeStaleEmpty,
+			Phrase:   "empty, created over 90 days ago",
+			Detail:   catalog.Detail(logsCodeStaleEmpty),
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		})
+	}
+	if encryption == logsEncryptionNone {
+		out = append(out, domain.Finding{
+			Code:     CodeLogsNoKMS,
+			Phrase:   "not encrypted with KMS",
+			Detail:   catalog.Detail(CodeLogsNoKMS),
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		})
+	}
+	return out
+}
+
 // FetchCloudWatchLogGroupsPage calls the CloudWatchLogs DescribeLogGroups API and returns
 // a single page of log groups. Pass an empty continuationToken for the first page.
 func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGroupsAPI, continuationToken string) (resource.FetchResult, error) {
@@ -75,6 +124,15 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			kmsKeyID = *lg.KmsKeyId
 		}
 
+		retention := logsRetentionExpires
+		if lg.RetentionInDays == nil {
+			retention = logsRetentionNeverExpires
+		}
+		encryption := logsEncryptionNone
+		if kmsKeyID != "" {
+			encryption = logsEncryptionKMS
+		}
+
 		r := resource.Resource{
 			ID:   logGroupName,
 			Name: logGroupName,
@@ -84,36 +142,14 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 				"retention_days": retentionDays,
 				"creation_time":  creationTime,
 				"kms_key_id":     kmsKeyID,
+				"retention":      retention,
+				"encryption":     encryption,
 			},
 			RawStruct: lg,
 		}
 
-		// Wave-1 classification mirrors colorLogs's own precedence:
-		// RetentionInDays == nil (never expires, billed indefinitely) wins
-		// first; only when retention IS set do we flag an empty log group
-		// that has sat unwritten for 90+ days (likely orphaned).
-		switch {
-		case lg.RetentionInDays == nil:
-			r.Findings = []domain.Finding{{
-				Code:     logsCodeRetentionNeverExpire,
-				Phrase:   "retention: never expire",
-				Detail:   catalog.Detail(logsCodeRetentionNeverExpire),
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			}}
-		case lg.StoredBytes != nil && *lg.StoredBytes == 0 && lg.CreationTime != nil && time.Since(time.UnixMilli(*lg.CreationTime)) > logsStaleEmptyAge:
-			r.Findings = []domain.Finding{{
-				Code:     logsCodeStaleEmpty,
-				Phrase:   "empty, created over 90 days ago",
-				Severity: domain.SevWarn,
-				Source:   "wave1",
-			}}
-		}
-
-		// Independent of the retention/stale pair above: a log group can be
-		// both unencrypted and never-expiring, and fixing one leaves the other.
-		if kmsKeyID == "" {
-			addWave1Finding(&r, CodeLogsNoKMS, "not encrypted with KMS", domain.SevWarn)
+		r.Findings = logsGroupFindings(retention, storedBytes, creationTime, encryption)
+		if encryption == logsEncryptionNone {
 			addWave1Rows(&r, CodeLogsNoKMS, domain.DetailRow{
 				Label: "KMS key", Value: "none", Tier: "~",
 			})

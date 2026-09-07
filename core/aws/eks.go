@@ -350,6 +350,9 @@ func addEKSPostureRows(r *resource.Resource, cluster *ekstypes.Cluster, versions
 // is then the fallback wording and the severity, which is what decides the
 // colour, is the same either way.
 func eksClusterFindings(status string, healthIssuesCount int, issueCodes []string, version string, p eksPosture) ([]domain.Finding, []domain.DetailRow) {
+	if f := degradedStatusFindings("eks", status); f != nil {
+		return f, nil
+	}
 	var findings []domain.Finding
 	var rows []domain.DetailRow
 	switch status {
