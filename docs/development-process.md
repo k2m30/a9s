@@ -19,9 +19,8 @@ Surviving subagents and their write boundaries:
 
 | Subagent | Writes to | Use for |
 |---|---|---|
-| `a9s-dev` | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, generated docs | Go production code, fixtures, catalog, doc regeneration — **no tests** |
-| `a9s-qa` | `tests/` | Red tests first, adversarial verify, findings / sign-off — **no production code** |
-| `a9s-facilitator` | `TASKDIR/spec.md`, `TASKDIR/log.md` | Binding ruling when dev/qa log `OFF` / `LOOP` / `BLOCKED` or pass round 3 |
+| `a9s-dev` | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, `tests/`, generated docs | The implementer: red test per spec row, the fix, its own edge-case probes; production code, tests, fixtures, catalog, doc regeneration |
+| `a9s-facilitator` | `TASKDIR/spec.md`, `TASKDIR/log.md` | Binding ruling when dev logs `OFF` / `LOOP` / `BLOCKED` |
 | `a9s-acceptance` | `TASKDIR/` | Skeptical end-user acceptance on rendered surfaces, docs and gates |
 | `a9s-qa-stories` | Nothing (read-only) | Given/when/then stories from the design spec, zero source knowledge |
 | `a9s-consistency-checker` | Nothing (read-only) | Cross-file drift: code ↔ docs ↔ website ↔ config |
@@ -91,18 +90,18 @@ Every unit of work goes through these stages. Stages 2, 4, 6.5 may be **skipped*
 ### Stage 3 — Tests
 
 - **Trigger**: spec published (size ≥ M) or scoped task (`XS`/`S`).
-- **Tools**: `a9s-qa-stories` (given/when/then, zero source knowledge), `a9s-qa` (failing Go tests).
-- **Action**: `a9s-dev` first commits compile-clean zero-value stubs for every symbol the spec pins, then `a9s-qa` translates spec to stories to failing Go tests against those symbols. The tests **fail on assertions**, not on a build error: a test package that does not compile blinds `go vet` for the production code beside it. The QA subagent rejects tasks without an exact file scope.
+- **Tools**: `a9s-qa-stories` (given/when/then, zero source knowledge), `a9s-dev` (the failing Go test per spec row, red output pasted in the round log).
+- **Action**: `a9s-dev` writes the behavioural test for each spec row before its fix, runs it red, and only then implements; both land in the same round and the same commit, test file first in the diff. A separate QA role was retired on 2026-09-07: its verify round re-ran the suite dev had just run.
 - **Exit**: failing tests committed.
-- **Anti-pattern**: "test along with implementation." That is not TDD. Tests precede implementation in time and in commit history.
+- **Anti-pattern**: a test written after the fix and never seen red. The round log carries the red output; a test with no red output proves nothing.
 
 ### Stage 4 — Implementation
 
 - **Trigger**: Stage 3 tests landed and red.
 - **Tools**: `a9s-dev` (Go production code, fixtures via the `a9s-create-demo-fixture` skill, catalog, generated docs).
 - **Action**: make the failing tests pass. Touch only files in scope. Rebuild the binary (`make build`) after every change.
-- **Exit**: tests pass; `make build && make test && make lint && make gofix && make security` green locally.
-- **Anti-pattern**: writing new tests in the dev pass instead of routing back to QA. Editing files outside scope. Skipping `make gofix`. Two agents in one worktree at once.
+- **Exit**: tests pass; `make build`, `make test` and `make lint` green locally from captured output (the long gates are Stage 6's).
+- **Anti-pattern**: a fix without its red test in the same commit. Editing files outside scope. Adding spec rows mid-task for siblings that belong on the backlog. Two agents in one worktree at once.
 
 ### Stage 5 — Review
 
