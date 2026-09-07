@@ -119,6 +119,17 @@ func AllRegions() []AWSRegion {
 // malformed config file cannot loop or recurse unbounded.
 const maxSourceProfileDepth = 5
 
+// sessionRegion is the region a row's ARN belongs to: the one the session was
+// opened with, falling back to the profile's default when the session did not
+// record one. Every site that builds or matches a region-bearing value reads
+// it here, so none of them can disagree about which region a row is in.
+func sessionRegion(clients any) string {
+	if c, ok := clients.(*ServiceClients); ok && c != nil && c.Region != "" {
+		return c.Region
+	}
+	return GetDefaultRegion("", "")
+}
+
 // GetDefaultRegion resolves the effective region for a given profile the same
 // way the AWS SDK's static config chain does (no network calls, no SSO/STS):
 //

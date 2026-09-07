@@ -65,7 +65,7 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 
 // checkGlueCFN calls glue:GetTags(resourceArn) and looks up the
 // aws:cloudformation:stack-name tag in the cfn cache. Pattern C.
-// Job ARN: arn:aws:glue:REGION:ACCOUNT:job/NAME.
+// Job ARN: arn:<partition>:glue:REGION:ACCOUNT:job/NAME.
 func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
@@ -75,10 +75,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok || c == nil || c.Glue == nil {
 		return resource.UnknownRelated("cfn")
 	}
-	region := c.Region
-	if region == "" {
-		region = GetDefaultRegion("", "")
-	}
+	region := sessionRegion(c)
 	account := accountIDFromClients(ctx, c, c.IdentityStore())
 	if account == "" {
 		// Identity unresolved (STS GetCallerIdentity failed or is unavailable):
@@ -86,7 +83,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 		// unknown, not a real zero.
 		return resource.UnknownRelated("cfn")
 	}
-	jobARN := "arn:aws:glue:" + region + ":" + account + ":job/" + jobName
+	jobARN := "arn:" + PartitionForRegion(region) + ":glue:" + region + ":" + account + ":job/" + jobName
 	tagAPI, ok := c.Glue.(GlueGetTagsAPI)
 	if !ok {
 		return resource.UnknownRelated("cfn")

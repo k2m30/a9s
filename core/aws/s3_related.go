@@ -326,7 +326,8 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	if bucket == "" {
 		return resource.KnownRelated("backup", nil, false)
 	}
-	bucketARN := "arn:aws:s3:::" + bucket
+	// An S3 bucket ARN names no region, but it does name a partition.
+	bucketARN := "arn:" + PartitionForRegion(sessionRegion(clients)) + ":s3:::" + bucket
 	bkList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)

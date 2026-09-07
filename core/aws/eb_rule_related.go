@@ -55,7 +55,7 @@ func ebRuleTargetsByService(ctx context.Context, clients any, ruleName string, s
 	if err != nil || out == nil {
 		return nil, false
 	}
-	prefix := "arn:aws:" + service + ":"
+	prefix := "arn:" + PartitionForRegion(sessionRegion(c)) + ":" + service + ":"
 	var ids []string
 	for _, t := range out.Targets {
 		if t.Arn == nil || !strings.HasPrefix(*t.Arn, prefix) {

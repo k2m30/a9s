@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -32,9 +31,10 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 	// no EC2 client still knows whether a plan selects the volume and whether a
 	// snapshot of it exists.
 	account := accountIDFromClients(ctx, clients, clients.IdentityStore())
+	region := sessionRegion(clients)
 	addBackupCoverage(cache, "ebs", CodeEBSNotInBackupPlan, resources, func(r resource.Resource) (string, map[string]string, bool) {
 		tags, known := ebsVolumeTags(r)
-		return ebsVolumeARN(r, account), tags, known
+		return ebsVolumeARN(r, region, account), tags, known
 	}, &result)
 	addEBSSnapshotCoverage(cache, resources, &result)
 
@@ -119,19 +119,20 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 
 // ebsVolumeARN builds the ARN a backup selection matches on. The ebs fetcher
 // writes neither the account nor the region, so the account comes from the
-// session's caller identity and the region is the volume's availability zone
-// without its trailing letter. An unresolved account yields no ARN, which the
-// join reads as "cannot tell" rather than "uncovered".
-func ebsVolumeARN(r resource.Resource, account string) string {
+// session's caller identity and the region and partition from the session
+// itself. The availability zone is not a region and cannot stand in for one:
+// a Local Zone's name carries a segment the region does not. An unresolved
+// account or region yields no ARN, which the join reads as "cannot tell"
+// rather than "uncovered".
+func ebsVolumeARN(r resource.Resource, region, account string) string {
 	volumeID := r.Fields["volume_id"]
 	if volumeID == "" {
 		volumeID = r.ID
 	}
-	az := r.Fields["az"]
-	if account == "" || volumeID == "" || az == "" {
+	if account == "" || volumeID == "" || region == "" {
 		return ""
 	}
-	return "arn:aws:ec2:" + strings.TrimRight(az, "abcdefghijklmnopqrstuvwxyz") + ":" + account + ":volume/" + volumeID
+	return "arn:" + PartitionForRegion(region) + ":ec2:" + region + ":" + account + ":volume/" + volumeID
 }
 
 // ebsVolumeTags reads the volume's own tags, which a backup selection may

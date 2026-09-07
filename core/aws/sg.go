@@ -93,19 +93,18 @@ func coversSensitivePort(p ec2types.IpPermission) bool {
 }
 
 // isInternetFacing reports whether the IpPermission is open to the public
-// internet via 0.0.0.0/0 or ::/0.
+// internet. Both address families are one question, answered by
+// CIDROpenToEveryone: a rule reaching every IPv6 client is internet-facing
+// whether or not it also names an IPv4 range.
 func isInternetFacing(p ec2types.IpPermission) bool {
+	cidrs := make([]string, 0, len(p.IpRanges)+len(p.Ipv6Ranges))
 	for _, r := range p.IpRanges {
-		if aws.ToString(r.CidrIp) == "0.0.0.0/0" {
-			return true
-		}
+		cidrs = append(cidrs, aws.ToString(r.CidrIp))
 	}
 	for _, r := range p.Ipv6Ranges {
-		if aws.ToString(r.CidrIpv6) == "::/0" {
-			return true
-		}
+		cidrs = append(cidrs, aws.ToString(r.CidrIpv6))
 	}
-	return false
+	return CIDROpenToEveryone(cidrs)
 }
 
 // computeSGRiskFields inspects the ingress rules of a security group and

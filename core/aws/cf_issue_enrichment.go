@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -67,22 +66,6 @@ func cfTLSBelow12Word(v cftypes.MinimumProtocolVersion) string {
 	}
 }
 
-// cfS3OriginBucket returns the bucket name an S3 origin domain names, and
-// whether the domain is an S3 one at all. Both the regional
-// (bucket.s3.<region>.amazonaws.com), the legacy global (bucket.s3.amazonaws.com)
-// and the website (bucket.s3-website-<region>.amazonaws.com) forms are S3.
-func cfS3OriginBucket(domainName string) (string, bool) {
-	name, rest, ok := strings.Cut(domainName, ".")
-	if !ok || name == "" || !strings.HasSuffix(rest, ".amazonaws.com") {
-		return "", false
-	}
-	head, _, _ := strings.Cut(rest, ".")
-	if head != "s3" && !strings.HasPrefix(head, "s3-") {
-		return "", false
-	}
-	return name, true
-}
-
 // cfConfigFindings evaluates every config-derived posture row for one
 // distribution. Each condition is independent: a distribution failing all of
 // them carries one finding per condition, with its own supporting rows.
@@ -101,7 +84,7 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 	}
 	for _, origin := range origins {
 		domainName := aws.ToString(origin.DomainName)
-		bucket, isS3 := cfS3OriginBucket(domainName)
+		bucket, isS3 := S3OriginBucket(domainName)
 		if !isS3 {
 			continue
 		}

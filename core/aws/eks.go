@@ -256,7 +256,7 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 		// never narrowed, so an empty list on a public endpoint is the open
 		// case rather than the unknown one.
 		p.PublicEndpoint = eksEndpointRestricted
-		if len(vpc.PublicAccessCidrs) == 0 || slices.Contains(vpc.PublicAccessCidrs, "0.0.0.0/0") {
+		if len(vpc.PublicAccessCidrs) == 0 || CIDROpenToEveryone(vpc.PublicAccessCidrs) {
 			p.PublicEndpoint = eksEndpointOpen
 		}
 	}
