@@ -522,7 +522,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 
 	// Resolve the identity column index (full column list, before hscroll),
 	// mirroring resolveIdentityColumn in table_render.go.
-	markerCol := resolveListMarkerCol(columns, td)
+	markerCol := IdentityColumnIndex(columns, td)
 
 	return listBodyMemo{
 		valid:           true,

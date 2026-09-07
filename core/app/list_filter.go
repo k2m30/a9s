@@ -187,8 +187,8 @@ func listSortResources(vc *config.ViewsConfig, ls *ListState, typeName string, r
 				sortColDef = ColumnDef{Key: col.Key, Title: col.Title, Path: col.Path}
 			}
 			td := resource.FindResourceType(typeName)
-			va = listExtractCellValue(sortColDef, td, a)
-			vb = listExtractCellValue(sortColDef, td, b)
+			va = ExtractCellValue(sortColDef, td, a)
+			vb = ExtractCellValue(sortColDef, td, b)
 		}
 		if fa, err := strconv.ParseFloat(va, 64); err == nil {
 			if fb, err := strconv.ParseFloat(vb, 64); err == nil {

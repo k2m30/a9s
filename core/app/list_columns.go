@@ -85,7 +85,7 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.ResourceTypeDef) []string {
 	cells := make([]string, len(columns))
 	for i, col := range columns {
-		v := listExtractCellValue(col, td, r)
+		v := ExtractCellValue(col, td, r)
 		if td != nil && len(td.CellDecorators) > 0 {
 			if dec := lookupListDecorator(td.CellDecorators, col, td.LifecycleKey); dec != nil {
 				v = dec(r, v)
@@ -100,9 +100,9 @@ func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.Res
 // ColumnDef (Key+Title+Path) instead of listCol. Tries key, path, path last segment
 // (lowercased), and lowercased title — in that order.
 //
-// A status-qualifying column (same predicate as listExtractCellValue's isStatusCol)
+// A status-qualifying column (same predicate as ExtractCellValue's isStatusCol)
 // additionally tries lifecycleKey (the type's LifecycleKey, "" meaning "state" per
-// listExtractCellValue's own default) and the literal "state" as decorator keys,
+// ExtractCellValue's own default) and the literal "state" as decorator keys,
 // after the explicit key/path/title matches above. Config-driven status columns
 // (e.g. ec2's default-view {Title:"Status", Path:"State.Name"}, no Key) carry none
 // of the keys a CellDecorators map is normally registered under (e.g. ec2's
@@ -150,10 +150,11 @@ func lookupListDecorator(decs map[string]func(resource.Resource, string) string,
 	return nil
 }
 
-// listExtractCellValue replicates the full extractCellValue cascade from
-// table_render.go byte-for-byte, using ColumnDef (Key+Title+Path) so that
-// path-only columns (e.g. EC2 Name/State/Type with key="") resolve correctly.
-func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) string {
+// ExtractCellValue resolves the value one column shows for one row. It is the
+// single cascade the list body, the sort comparator and every render path
+// share, and it works from ColumnDef (Key+Title+Path) so that path-only
+// columns (e.g. EC2 Name/State/Type with key="") resolve correctly.
+func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) string {
 	if col.Key == "@id" {
 		return r.ID
 	}
@@ -339,10 +340,11 @@ func colorToTag(c domain.Color) string {
 	return ""
 }
 
-// resolveListMarkerCol mirrors resolveIdentityColumn in table_render.go.
-// Returns the 0-based index in columns of the identity column.
-// Cascade must match resolveIdentityColumn exactly (steps 1-5).
-func resolveListMarkerCol(columns []ColumnDef, td *resource.ResourceTypeDef) int {
+// IdentityColumnIndex returns the 0-based index in columns of the type's
+// identity column — the one column that names the row. It is the only
+// definition of "this is the name column"; nothing may re-derive it from a
+// substring of a key, a title or a path.
+func IdentityColumnIndex(columns []ColumnDef, td *resource.ResourceTypeDef) int {
 	// Step 1: explicit IdentityKey on the type definition.
 	if td != nil && td.IdentityKey != "" {
 		for i, c := range columns {
