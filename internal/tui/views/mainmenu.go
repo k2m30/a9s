@@ -188,13 +188,11 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		}
 
 		dimAlias := styles.DimText.Render(aliasPadded)
-		// Per cache contract C3: a disk-cache-seeded, not-yet-re-verified count (Origin ==
-		// "cache") dims the same as a confirmed-empty entry — both are "not
-		// yet a confirmed answer this session" states the operator should be
-		// able to tell apart from a verified one at a glance.
+		// Only a confirmed-empty type dims. A cache-seeded count is a real
+		// count from the last session and its list opens on Enter, so it
+		// renders like any other row until the live probe replaces it.
 		confirmedEmpty := item.AvailKnown && item.Availability == 0 && !item.AvailTruncated
-		cacheOrigin := item.Origin == "cache"
-		if confirmedEmpty || cacheOrigin {
+		if confirmedEmpty {
 			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + dimAlias)
 		} else {
 			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + dimAlias)
