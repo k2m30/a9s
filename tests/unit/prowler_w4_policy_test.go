@@ -187,8 +187,11 @@ func TestW4PolicyPrivEscComboRowsAreCapped(t *testing.T) {
 	for _, combo := range combos[:10] {
 		want = append(want, domain.DetailRow{Label: "Combo", Value: combo})
 	}
+	// Inverted for the cap batch's spec row 9: the closing row carried the
+	// "Combo" label of the row above it, which painted "Combo: … +12 more" —
+	// a combination named by the count of the ones not shown. The closing row
+	// is that count, not a combination, so it has no label. Do not restore.
 	want = append(want, domain.DetailRow{
-		Label: "Combo",
 		Value: fmt.Sprintf("… +%d more", len(combos)-10),
 	})
 	w4AssertRows(t, res.AttentionDetails[arn], w4CodePolicyPrivEsc, want)

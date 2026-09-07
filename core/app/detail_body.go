@@ -422,10 +422,19 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 			if tier == "" {
 				tier = e.tier
 			}
+			// A row with no label is a whole line rather than a labelled fact
+			// — the "… +K more" row that closes a capped list is the only one
+			// today. Key == Value is how this projection already asks the
+			// renderer for a value-only line; leaving the key empty instead
+			// would paint a bare ":" in front of it.
+			key := row.Label
+			if key == "" {
+				key = row.Value
+			}
 			injected = append(injected, fieldpath.FieldItem{
 				IsSubField:  true,
 				IndentLevel: 3,
-				Key:         row.Label,
+				Key:         key,
 				Value:       row.Value,
 				Path:        "Attention",
 				ColorTier:   capTierToRowBucketDetail(tier, rowBucket),

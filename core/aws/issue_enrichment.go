@@ -368,10 +368,15 @@ const FindingRowCap = 10
 const overflowRowFormat = "… +%d more"
 
 // capRows appends incoming to the rows a finding already carries, holding the
-// result at FindingRowCap rows of content plus one closing "… +K more" row
-// wearing the last kept row's label and tier, so it reads as one more line of
-// the same list. It is the one place the bound is applied: both sinks call it
-// and no builder caps on its own.
+// result at FindingRowCap rows of content plus one closing "… +K more" row. It
+// is the one place the bound is applied: both sinks call it and no builder
+// caps on its own.
+//
+// The closing row carries no label. It is not a supporting row but the
+// statement that there are more of them, and under the label above it — the
+// backup detail's "State", the target group's "Unhealthy target" — it reads
+// as one more member of the list, a job whose state is that text. It keeps
+// the last kept row's tier, so it is coloured with the list it closes.
 //
 // A second call for the same (resource, code) — a second pipeline stage, a
 // second container of one task — reads K back out of the closing row, which
@@ -402,11 +407,9 @@ func capRows(kept, incoming []domain.DetailRow) []domain.DetailRow {
 	if hidden == 0 {
 		return kept
 	}
-	last := kept[len(kept)-1]
 	return append(kept, domain.DetailRow{
-		Label: last.Label,
 		Value: fmt.Sprintf(overflowRowFormat, hidden),
-		Tier:  last.Tier,
+		Tier:  kept[len(kept)-1].Tier,
 	})
 }
 

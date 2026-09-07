@@ -65,8 +65,8 @@ func soleAttentionRows(t *testing.T, result awsclient.IssueEnricherResult, id st
 }
 
 // assertCappedRows pins the whole rendered shape of a capped row list: cap
-// rows of real content, then one overflow row that inherits the last kept
-// row's label and tier.
+// rows of real content, then one unlabelled overflow row that inherits the
+// last kept row's tier.
 func assertCappedRows(t *testing.T, rows []domain.DetailRow, totalItems int) {
 	t.Helper()
 	capN := awsclient.FindingRowCap
@@ -82,8 +82,13 @@ func assertCappedRows(t *testing.T, rows []domain.DetailRow, totalItems int) {
 	if got, want := overflow.Value, capOverflowValue(totalItems-capN); got != want {
 		t.Errorf("overflow row Value = %q, want %q", got, want)
 	}
-	if got, want := overflow.Label, last.Label; got != want {
-		t.Errorf("overflow row Label = %q, want %q (the last kept row's label)", got, want)
+	// Inverted for the cap batch's spec row 9. This asserted that the closing
+	// row wore the last kept row's label, which rendered the backup detail as
+	// "State  … +5 more" — a failed job whose state is that text. The closing
+	// row is the count of what is not shown, not another member of the list,
+	// so it carries no label. Do not restore the inherited form.
+	if overflow.Label != "" {
+		t.Errorf("overflow row Label = %q, want empty — a labelled closing row reads as one more %q row", overflow.Label, last.Label)
 	}
 	if got, want := overflow.Tier, last.Tier; got != want {
 		t.Errorf("overflow row Tier = %q, want %q (the last kept row's tier)", got, want)
@@ -571,14 +576,18 @@ func TestFindingRowCap_RoleInlinePrivEscRowsAreCapped(t *testing.T) {
 	assertCappedRows(t, ad.Rows, len(combos)+1)
 
 	// The role's own list, not a generic one: the Policy row survives at the
-	// head and the closing row wears the Combo label and the "!" tier the
-	// combo rows carry, so it reads as one more line of the same list.
+	// head, and the closing row carries the "!" tier the combo rows carry so
+	// it is coloured with them.
+	//
+	// Inverted for the cap batch's spec row 9: this required the closing row's
+	// label to be "Combo", the label of the row above it. A closing row is the
+	// count of the combos not shown, not another combo. Do not restore.
 	if got, want := ad.Rows[0].Label, "Policy"; got != want {
 		t.Errorf("first kept row Label = %q, want %q", got, want)
 	}
 	closing := ad.Rows[awsclient.FindingRowCap]
-	if got, want := closing.Label, "Combo"; got != want {
-		t.Errorf("closing row Label = %q, want %q", got, want)
+	if closing.Label != "" {
+		t.Errorf("closing row Label = %q, want empty", closing.Label)
 	}
 	if got, want := closing.Tier, "!"; got != want {
 		t.Errorf("closing row Tier = %q, want %q", got, want)

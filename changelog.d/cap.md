@@ -4,6 +4,7 @@
 - A check that finished its last batch without an error no longer erases the fact that an earlier part of the same check was cut short. The list could report a complete count when it had really seen only part of the account.
 - A supporting line whose own text ends in wording like `+3 more` is no longer swallowed and miscounted when a second batch adds lines to the same finding.
 - The backup-plan coverage check no longer reads tags whose result it then throws away.
+- The `… +K more` line that closes a long finding no longer borrows the label of the line above it. It used to read `State: … +5 more` on a backup plan and `Combo: … +12 more` on an IAM policy, as though it were one more failed job or one more privilege-escalation path.
 - A backup plan with more than five failed jobs in the last day no longer shows five of them and drops the rest without saying so. The detail now lists as many as any other finding does and closes with `… +K more` for the remainder, with the most recent failure and the partial-job count kept at the top where a long list cannot push them off.
 
 ## Changed

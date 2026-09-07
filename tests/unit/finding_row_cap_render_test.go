@@ -150,3 +150,75 @@ func TestFindingRowCap_BackupFailedJobRowsCloseWithTheOverflowRow(t *testing.T) 
 		t.Errorf("the \"Most recent\" fact was pushed out by the per-job rows; values=%q", values)
 	}
 }
+
+// TestFindingRowCap_ClosingRowRendersWithNoLabel reads the painted backup
+// detail, because the label column is a rendering decision and the row model
+// alone cannot show it.
+//
+// The closing row is not a supporting row; it is the statement that there are
+// more of them. Wearing the label of the row above turns it into one, so the
+// detail ended with "State: … +5 more" — a failed job whose state is that
+// text. Blanking domain.DetailRow.Label is half the fix: the projection then
+// has to ask for a value-only line, or the renderer paints a bare ":" where
+// the label was.
+func TestFindingRowCap_ClosingRowRendersWithNoLabel(t *testing.T) {
+	const planID = "acme-label-plan-0000-1111-2222-333333333333"
+	const failed = 14
+
+	now := time.Now()
+	jobs := make([]backuptypes.BackupJob, 0, failed)
+	for i := range failed {
+		when := now.Add(-time.Duration(i) * time.Minute)
+		jobs = append(jobs, backuptypes.BackupJob{
+			BackupJobId:  aws.String(fmt.Sprintf("job-%04d", i)),
+			State:        backuptypes.BackupJobStateFailed,
+			CreationDate: &when,
+			CreatedBy:    &backuptypes.RecoveryPointCreator{BackupPlanId: aws.String(planID)},
+		})
+	}
+
+	rows := []resource.Resource{{ID: planID, Name: "acme-label-plan", Type: "backup"}}
+	result, err := awsclient.EnrichBackupJobs(context.Background(),
+		&awsclient.ServiceClients{Backup: &backupJobsFake{jobs: jobs}}, rows, nil)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs: unexpected error: %v", err)
+	}
+
+	var td resource.ResourceTypeDef
+	for _, d := range resource.AllResourceTypes() {
+		if d.ShortName == "backup" {
+			td = d
+			break
+		}
+	}
+	if td.ShortName == "" {
+		t.Fatalf("no registered resource type \"backup\"")
+	}
+
+	row := rows[0]
+	a9sruntime.ApplyWave2ToRow(&row, td, result.Findings, result.AttentionDetails)
+
+	want := fmt.Sprintf("… +%d more", failed+1-awsclient.FindingRowCap)
+	painted := stripAnsi(wave3RenderDetailFor(t, row, "backup", 120, 60))
+
+	var closing string
+	for _, line := range strings.Split(painted, "\n") {
+		if strings.Contains(line, want) {
+			closing = line
+			break
+		}
+	}
+	if closing == "" {
+		t.Fatalf("the closing row %q never painted; detail was:\n%s", want, painted)
+	}
+	if strings.Contains(closing, "State: "+want) {
+		t.Errorf("the closing row paints under the label of the row above it, so it reads as one more failed job:\n%s", closing)
+	}
+	if strings.Contains(closing, ": "+want) {
+		t.Errorf("the closing row paints a bare label separator in front of the count:\n%s", closing)
+	}
+	// The State rows above it are still labelled — only the closing row is not.
+	if !strings.Contains(painted, "State: failed") {
+		t.Errorf("the per-job rows lost their label along with the closing row; detail was:\n%s", painted)
+	}
+}
