@@ -411,7 +411,7 @@ var capBypass = []struct {
 		// bound on supporting rows and it closes with "… +K more". A batch
 		// size the AWS API imposes is named, not a literal, so it does not
 		// match. Added by the cap batch's spec row 8.
-		regexp.MustCompile(`\b(min|max)\([^()]*,\s*\d+\)`),
+		regexp.MustCompile(`\b(min|max)\([^,]*,\s*\d+\)`),
 		"hand every row to setWave2Finding / addWave1Rows and let capRows bound the list",
 	},
 }
