@@ -125,10 +125,7 @@ type RegionSelectedEvent struct {
 func (c *Core) HandleFlash(ev FlashEvent) ([]UIIntent, []TaskRequest) {
 	intents := []UIIntent{FlashIntent{Text: ev.Text, IsError: ev.IsError}}
 	if ev.IsError {
-		intents = append(intents, AppendErrorHistoryIntent{
-			Time:    time.Now(),
-			Message: ev.Text,
-		})
+		intents = append(intents, appendErrorHistory(ev.Text))
 	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},
@@ -167,7 +164,7 @@ func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 	}
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},
-		AppendErrorHistoryIntent{Time: time.Now(), Message: text},
+		appendErrorHistory(text),
 		ClearActiveListLoadingIntent{Err: text},
 	}
 	tasks := []TaskRequest{{
@@ -212,10 +209,11 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	s.PrevRegion = ""
 	s.PendingRefresh = false
 
-	errText := ev.Err.Error()
+	_, region := s.CurrentPair()
+	errText := failureLine("connect", ev.Err, region)
 	intents := []UIIntent{
 		FlashIntent{Text: errText, IsError: true},
-		AppendErrorHistoryIntent{Time: time.Now(), Message: errText},
+		appendErrorHistory(errText),
 	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},

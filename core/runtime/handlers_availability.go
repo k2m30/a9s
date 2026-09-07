@@ -292,10 +292,8 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 	// rows already render with their degraded-state findings; a blocking
 	// banner would double-shout what the list is honestly showing.
 	if msg.PrefetchSoftErr != nil {
-		intents = append(intents, AppendErrorHistoryIntent{
-			Time:    time.Now(),
-			Message: "availability: " + msg.PrefetchSoftErr.Error(),
-		})
+		_, region := c.session.CurrentPair()
+		intents = append(intents, appendErrorHistory(failureLine("availability", msg.PrefetchSoftErr, region)))
 	}
 
 	return intents, enrichTasks
@@ -367,32 +365,19 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		c.ObserveRows(canonType, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
 	}
 
-	// Surface probe failures. Partial success (rows arrived alongside a
-	// composite per-item error — the E5 contract, e.g. a role that can list
-	// but not describe some resources) records into the `!` error log
-	// without a blocking banner: the rows are already on screen carrying
-	// their degraded-state findings. A region gap (the service endpoint's
-	// DNS does not resolve — the service is not offered in this region)
-	// logs a plain-language one-liner instead of transport jargon. Any
-	// other row-less failure banners as before.
+	// Surface probe failures. A soft failure records into the `!` error log
+	// without a blocking banner; any other row-less failure banners.
 	//
 	// #462: exactly one scan-health entry per type per sweep.
 	// c.session.ScanHealthLogged (cleared at sweep start and by Rotate())
 	// guards against a type's AvailabilityChecked message being delivered
 	// more than once within the same sweep — a pre-existing double-delivery
 	// path elsewhere in dispatch — re-adding the entry or re-flashing the
-	// banner on the redundant delivery. The default case's FlashIntent is
-	// the ONLY source of that case's entry (the adapter re-emits it as
+	// banner on the redundant delivery. The banner branch's FlashIntent is
+	// the ONLY source of that branch's entry (the adapter re-emits it as
 	// messages.Flash, which routes through HandleFlash and appends the
 	// history entry there — see runtime_adapter.go's applyIntents), so
 	// gating that emission on the guard is sufficient to gate the entry too.
-	//
-	// The new "probe <type>: <outcome>: <detail>" shape applies only to the
-	// default (row-less hard failure) case below. The partial-success-with-
-	// rows case keeps msg.Err's own composite per-item text verbatim (e.g.
-	// "partial: throttled on 1 of 3 IDs") — classifyProbeErr's single-code
-	// classification cannot represent a composite E5 error, and the
-	// composite text is the more useful diagnostic for that case.
 	if msg.Err != nil && !c.session.ScanHealthLogged[msg.ResourceType] {
 		if c.session.ScanHealthLogged == nil {
 			c.session.ScanHealthLogged = make(map[string]bool)
@@ -400,19 +385,10 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		c.session.ScanHealthLogged[msg.ResourceType] = true
 		logging.L().Warn("scan probe failed", "type", msg.ResourceType, "outcome", string(outcome), "detail", errClass)
 
-		switch {
-		case len(msg.Resources) > 0:
-			intents = append(intents, AppendErrorHistoryIntent{
-				Time:    time.Now(),
-				Message: fmt.Sprintf("availability %s: %s", msg.ResourceType, awsclient.CauseOf(msg.Err)),
-			})
-		case awsclient.IsEndpointNotFound(msg.Err):
+		if softFailure(msg.Err, len(msg.Resources) > 0) {
 			_, region := c.session.CurrentPair()
-			intents = append(intents, AppendErrorHistoryIntent{
-				Time:    time.Now(),
-				Message: fmt.Sprintf("%s: %s (%s)", msg.ResourceType, awsclient.CauseOf(msg.Err), region),
-			})
-		default:
+			intents = append(intents, appendErrorHistory(failureLine("availability "+msg.ResourceType, msg.Err, region)))
+		} else {
 			intents = append(intents, FlashIntent{
 				Text:    fmt.Sprintf("probe %s: %s: %s", msg.ResourceType, outcome, errClass),
 				IsError: true,

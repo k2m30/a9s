@@ -16,6 +16,7 @@ package aws
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"maps"
@@ -25,19 +26,6 @@ import (
 
 	"github.com/aws/smithy-go"
 )
-
-// IsEndpointNotFound reports whether err is a DNS resolution failure for a
-// service endpoint host — the signature of a service that is not offered in
-// the selected region (e.g. CodeArtifact in eu-central-2: dial tcp lookup
-// codeartifact.eu-central-2.amazonaws.com: no such host). Callers use this to
-// render "service not available in region <r>" instead of raw transport
-// jargon, and to log-only rather than banner. Deliberately narrow: only
-// *net.DNSError with IsNotFound qualifies — offline networks and flaky DNS
-// fail differently and must stay loud.
-func IsEndpointNotFound(err error) bool {
-	var dnsErr *net.DNSError
-	return errors.As(err, &dnsErr) && dnsErr.IsNotFound
-}
 
 // IsNotFoundErr reports whether err is the canonical "resource no longer
 // exists" response for a per-ID describe call. This is the classification
@@ -119,7 +107,7 @@ func AggregateFailures(opName string, failures []string, total int) error {
 		if !ok {
 			id, reason = "", f
 		}
-		cause := causeOf(reason)
+		cause := groupCause(reason)
 		g, ok := byCause[cause]
 		if !ok {
 			g = &group{cause: cause, example: id}
@@ -153,27 +141,37 @@ func AggregateFailures(opName string, failures []string, total int) error {
 		opName, len(failures), total, strings.Join(parts, "; "), suffix)
 }
 
-// causeOf reduces one failure reason to what an operator can act on. An AWS
-// authorization failure becomes the action the role lacks; anything else keeps
-// its own words with the per-call transport noise removed — a request id, a
-// host id and an encoded authorization message differ on every resource, so
-// carrying them would defeat the grouping and fill the log with tokens nobody
-// can use.
-func causeOf(reason string) string {
-	const notAuthorized = "not authorized to perform: "
-	if i := strings.Index(reason, notAuthorized); i >= 0 {
-		action := reason[i+len(notAuthorized):]
-		if j := strings.IndexAny(action, " ,;"); j >= 0 {
-			action = action[:j]
-		}
+// deniedAction reads the action a role lacks out of an AWS authorization
+// message. AWS models the action inside the message rather than as a field of
+// its own, so this reads the message field; it never reads the SDK's
+// formatted chain.
+func deniedAction(message string) (string, bool) {
+	const marker = "not authorized to perform: "
+	_, action, ok := strings.Cut(message, marker)
+	if !ok {
+		return "", false
+	}
+	if j := strings.IndexAny(action, " ,;"); j >= 0 {
+		action = action[:j]
+	}
+	action = strings.TrimRight(action, " .,;:")
+	return action, action != ""
+}
+
+// groupCause is AggregateFailures' grouping key over reasons its callers have
+// already rendered to text. It undoes the SDK's own Error() formatting: the
+// operation preamble, the "api error" marker, and the per-call request id,
+// host id and encoded authorization message, which differ on every resource
+// and would otherwise put each failure in a group of its own.
+//
+// ponytail: a text reduction, because AggregateFailures' callers hand it
+// "<id>: <err>" strings and the error's fields are gone by then. Upgrade path
+// is an error-carrying collector, after which this reads CauseOf like every
+// other surface and disappears.
+func groupCause(reason string) string {
+	if action, ok := deniedAction(reason); ok {
 		return "not authorized to perform " + action
 	}
-	// The SDK's "operation error <Service>: <Op>, " preamble goes for every
-	// error class, not only for the API errors whose "api error " marker used
-	// to hide it — a timeout and a transport failure carry the same preamble,
-	// and the operation is already named by the caller's op label. The head
-	// must look like "<Service>: <Op>" so prose that merely mentions an
-	// operation error keeps its words.
 	const opMarker = "operation error "
 	if i := strings.Index(reason, opMarker); i >= 0 {
 		head, rest, ok := strings.Cut(reason[i+len(opMarker):], ", ")
@@ -202,6 +200,12 @@ func causeOf(reason string) string {
 	return "no reason given"
 }
 
+// ClassRegionUnavailable is the class of a service the selected region does
+// not offer: the endpoint host's DNS does not resolve. Named because two
+// surfaces branch on it, and a literal in either would be a second decision
+// that agrees with the class only by luck.
+const ClassRegionUnavailable = "region-unavailable"
+
 // ErrClass maps an error to the short class word every surface that phrases a
 // failure reads — the menu row's cause mark, ScanStatus.Err, the account-wide
 // title, and CauseOf below. context.DeadlineExceeded is checked before
@@ -214,11 +218,25 @@ func ErrClass(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "timeout"
 	}
-	// A service the region does not offer is detected once, by the same
-	// IsEndpointNotFound every surface that phrases it already calls — never
-	// by a second match on the message.
-	if IsEndpointNotFound(err) {
-		return "region-unavailable"
+	// "No such host" for a service endpoint is the signature of a service the
+	// region does not offer (live witness 2026-07-14: CodeArtifact in
+	// eu-central-2). Any other resolver failure is the resolver's own problem
+	// and must stay loud under its own class.
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		if dnsErr.IsNotFound {
+			return ClassRegionUnavailable
+		}
+		return "dns"
+	}
+	// A certificate that does not verify is a proxy or a clock; a record
+	// header the handshake could not read is a proxy answering in plaintext.
+	// Both are checked before net.Error, which the wrapping *url.Error
+	// satisfies for either.
+	var certErr *tls.CertificateVerificationError
+	var recErr tls.RecordHeaderError
+	if errors.As(err, &certErr) || errors.As(err, &recErr) {
+		return "tls"
 	}
 	// A call that never reached a service has no AWS error code to classify;
 	// its own text is a URL and a socket address, which name the endpoint but
@@ -235,6 +253,11 @@ func ErrClass(err error) string {
 		return "access-denied"
 	case "ExpiredToken", "ExpiredTokenException", "RequestExpired":
 		return "expired"
+	case "":
+		// An empty class means no failure at all — the menu row shows its
+		// alias and the operator is told nothing. A response with no modeled
+		// code still failed.
+		return "Unknown"
 	default:
 		return code
 	}
@@ -249,15 +272,21 @@ func ErrClass(err error) string {
 // An empty cause means the error's own words say more than the class does — a
 // denied call names the action the role lacks, an API error carries its
 // message — and CauseOf keeps them.
+//
+// tls, dns and transport are three classes because the operator does three
+// different things: a certificate is a proxy or a clock, a resolver failure
+// is resolution, and a refused or reset connection is the network path.
 var errClassPhrasing = map[string]struct{ cause, row, sweepTitle string }{
 	"timeout": {"timeout", "timeout", "sweep: timeout"},
 	// No sweep title: an account cannot be region-unavailable as a whole, so
 	// this class can never be every type's cause. The completeness gate knows.
-	"region-unavailable": {"service not available in this region", "no service", ""},
-	"transport":          {"transport failure", "transport", "sweep: transport failure"},
-	"access-denied":      {"", "denied", "sweep: access denied"},
-	"expired":            {"", "expired", "session expired"},
-	"throttled":          {"", "throttled", "sweep: throttled"},
+	ClassRegionUnavailable: {"service not available in this region", "no service", ""},
+	"tls":                  {"TLS handshake failed", "tls", "sweep: TLS failure"},
+	"dns":                  {"DNS resolution failed", "dns", "sweep: DNS failure"},
+	"transport":            {"transport failure", "transport", "sweep: transport failure"},
+	"access-denied":        {"", "denied", "sweep: access denied"},
+	"expired":              {"", "expired", "session expired"},
+	"throttled":            {"", "throttled", "sweep: throttled"},
 }
 
 // unmodeledWord is what a row shows for a class a9s does not name itself: a
@@ -275,6 +304,12 @@ func RowWord(class string) string {
 		return p.row
 	}
 	return unmodeledWord
+}
+
+// CauseForClass returns the phrase a class supplies for itself, or empty when
+// the error's own words say more than the class does.
+func CauseForClass(class string) string {
+	return errClassPhrasing[class].cause
 }
 
 // SweepTitleForWord returns the account-wide phrasing for a row word: what the
@@ -298,18 +333,72 @@ func NamedErrClasses() []string {
 	return slices.Sorted(maps.Keys(errClassPhrasing))
 }
 
-// CauseOf is the error-level entry to the same reduction AggregateFailures
-// applies per failure: what an operator can act on, with the per-call
-// transport noise removed. Every surface that renders a failure — a flash, a
-// log line, an aggregated batch error — phrases it through here.
+// MessageOf returns an AWS error's own message field, or the error's words
+// when no API error is in the chain. This is the one extraction of that
+// field; a surface that wants the actionable AWS text asks here rather than
+// %v-ing a chain whose wrapper prefixes consume the line.
+func MessageOf(err error) string {
+	if err == nil {
+		return ""
+	}
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
+		return apiErr.ErrorMessage()
+	}
+	return err.Error()
+}
+
+// CauseOf is what an operator can act on, read from the error's own fields.
+// Every surface that renders a failure — a flash, a log line, a menu row —
+// phrases it through here.
+//
+// The class speaks first where it says more than the error does. Otherwise the
+// cause is the API error's code and message, both fields; the request id, the
+// host id, and the service and operation preamble live in the SDK's formatted
+// text and are never read, so a message whose own words spell one of them
+// keeps them.
 func CauseOf(err error) string {
 	if err == nil {
 		return ""
 	}
-	if p, ok := errClassPhrasing[ErrClass(err)]; ok && p.cause != "" {
-		return p.cause
+	if cause := CauseForClass(ErrClass(err)); cause != "" {
+		return cause
 	}
-	return causeOf(err.Error())
+	apiErr, ok := errors.AsType[smithy.APIError](err)
+	if !ok {
+		return err.Error()
+	}
+	message := strings.TrimSpace(apiErr.ErrorMessage())
+	if action, ok := deniedAction(message); ok {
+		return "not authorized to perform " + action
+	}
+	// AWS appends the encoded authorization message to the message field
+	// itself. It is an opaque per-call token, not a cause, and it is long
+	// enough to push the actionable text off the line.
+	if i := strings.Index(message, "Encoded authorization failure message:"); i >= 0 {
+		message = message[:i]
+	}
+	// A flash and a menu row are one line each; a multi-line message keeps
+	// its first, which is where AWS puts the failure.
+	message, _, _ = strings.Cut(message, "\n")
+	message = strings.TrimRight(strings.TrimSpace(message), " ,.")
+	switch {
+	case message == "":
+		return apiErr.ErrorCode()
+	case apiErr.ErrorCode() == "":
+		return message
+	}
+	return apiErr.ErrorCode() + ": " + message
+}
+
+// CauseInRegion is CauseOf with the region named when — and only when — the
+// class is about the region. A caller that appended the region itself would be
+// deciding a second time what the class already knows.
+func CauseInRegion(err error, region string) string {
+	cause := CauseOf(err)
+	if region == "" || ErrClass(err) != ClassRegionUnavailable {
+		return cause
+	}
+	return cause + " (" + region + ")"
 }
 
 // AggregateMissing is the narrower variant used when the operation is a

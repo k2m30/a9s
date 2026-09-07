@@ -815,19 +815,17 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 		// count the resources so the main menu badge isn't blanked by a single
 		// per-item failure.
 		if err != nil {
-			if len(result.Resources) == 0 {
-				if awsclient.IsEndpointNotFound(err) {
-					// Region gap: the service endpoint's DNS does not resolve
-					// — the service is not offered here. Plain language,
-					// log-only (the operator can't fix DNS jargon).
-					_, region := c.session.CurrentPair()
-					softFailures = append(softFailures, fmt.Sprintf("%s: %s (%s)", shortName, awsclient.CauseOf(err), region))
-					continue
-				}
-				failures = append(failures, fmt.Sprintf("%s: %s", shortName, awsclient.CauseOf(err)))
+			_, region := c.session.CurrentPair()
+			hasRows := len(result.Resources) > 0
+			line := failureLine(shortName, err, region)
+			if softFailure(err, hasRows) {
+				softFailures = append(softFailures, line)
+			} else {
+				failures = append(failures, line)
+			}
+			if !hasRows {
 				continue
 			}
-			softFailures = append(softFailures, fmt.Sprintf("%s: %s", shortName, awsclient.CauseOf(err)))
 		}
 		entries[shortName] = len(result.Resources)
 		// Preserve full pagination meta so the seeded ResourceCache entry's

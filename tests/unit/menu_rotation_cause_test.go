@@ -129,15 +129,24 @@ func menuEntryByShortName(t *testing.T, c *app.Controller, shortName string) app
 	return app.MenuEntry{}
 }
 
-// bareAWSError is an unauthorized-operation error exactly as the SDK returns
-// it: an operation prefix, a request id, a host id and an encoded
-// authorization message, none of which an operator can act on. Values are
-// synthetic.
+// bareAWSError is an unauthorized-operation error as the SDK returns it: an
+// operation prefix and a response error carrying a request id and a host id,
+// wrapping the modeled API error whose code and message are fields of their
+// own. Values are synthetic.
+//
+// The modeled inner error is the correction spec row 2 of the "errors" task
+// required: the fixture used to flatten the whole chain into one fmt.Errorf
+// string, so the only way to reach the cause was to scan that string. A real
+// SDK failure never arrives that way.
 func bareAWSError() error {
 	return &smithy.OperationError{
 		ServiceID:     "EC2",
 		OperationName: "DescribeSnapshotAttribute",
-		Err:           fmt.Errorf("https response error StatusCode: 403, RequestID: 11111111-2222-3333-4444-555555555555, HostID: qUdGZm9ja2VkaG9zdA==, api error UnauthorizedOperation: You are not authorized to perform: ec2:DescribeSnapshotAttribute. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg"),
+		Err: fmt.Errorf("https response error StatusCode: 403, RequestID: 11111111-2222-3333-4444-555555555555, HostID: qUdGZm9ja2VkaG9zdA==, %w",
+			&smithy.GenericAPIError{
+				Code:    "UnauthorizedOperation",
+				Message: "You are not authorized to perform: ec2:DescribeSnapshotAttribute. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg",
+			}),
 	}
 }
 

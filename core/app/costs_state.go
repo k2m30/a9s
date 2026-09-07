@@ -8,8 +8,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/aws/smithy-go"
-
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/costs"
 	"github.com/k2m30/a9s/v3/core/costs/screen"
@@ -925,21 +923,13 @@ func isClassifiedResourceDrillRefusal(err error) bool {
 
 // costsResourceDrillRefusalNote builds the FooterNote text for a classified
 // resource-level opt-in refusal (FR-007-shaped: an honest, human-readable
-// explanation, not a silent no-op). Extracts the underlying API error
-// MESSAGE via errors.As(err, *smithy.APIError) — the same clean
-// extraction core/aws/errors.go's ClassifyAWSError already does —
-// rather than %v-ing the full chain, whose "operation error ..."/"https
-// response error ..." wrapper prefixes would otherwise consume the footer
-// line and truncate the actionable AWS text away before it is ever seen.
-// Falls back to err.Error() only when no APIError is in the chain, so a
-// non-AWS failure still gets an honest (if unclassified) message.
+// explanation, not a silent no-op). The actionable AWS text is the API
+// error's message field, read through awsclient.MessageOf: %v-ing the full
+// chain would let the "operation error ..." / "https response error ..."
+// wrapper prefixes consume the footer line and truncate that text away
+// before it is ever seen.
 func costsResourceDrillRefusalNote(err error) string {
-	msg := err.Error()
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		msg = apiErr.ErrorMessage()
-	}
-	return fmt.Sprintf("resource-level cost data unavailable for this account: %s", msg)
+	return fmt.Sprintf("resource-level cost data unavailable for this account: %s", awsclient.MessageOf(err))
 }
 
 // ApplyCostsLoaded merges one Cost Explorer fetch result into the costs

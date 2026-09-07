@@ -35,22 +35,28 @@ func sdkStyleDNSNotFound() error {
 	return fmt.Errorf("operation error codeartifact: ListRepositories, request send failed, %w", urlErr)
 }
 
-func TestIsEndpointNotFound_Classification(t *testing.T) {
+// INVERTED by spec row 2 (task "errors"): the region gap is decided once, by
+// ErrClass, and the separate IsEndpointNotFound predicate two branches used to
+// call alongside it is gone. The assertions now read the class the branches
+// read. Do not restore a second predicate — a branch and a class that agree
+// only by luck is the defect this row removed. A resolver failure that is not
+// a missing host is its own class now ("dns"), not a plain false.
+func TestRegionGapClassification(t *testing.T) {
 	cases := []struct {
 		name string
 		err  error
-		want bool
+		want string
 	}{
-		{"sdk-style DNS not-found chain", sdkStyleDNSNotFound(), true},
-		{"bare DNSError not-found", &net.DNSError{Err: "no such host", IsNotFound: true}, true},
-		{"DNSError without IsNotFound (flaky DNS)", &net.DNSError{Err: "server misbehaving", IsTemporary: true}, false},
-		{"generic error", errors.New("AccessDeniedException: not authorized"), false},
-		{"nil", nil, false},
+		{"sdk-style DNS not-found chain", sdkStyleDNSNotFound(), awsclient.ClassRegionUnavailable},
+		{"bare DNSError not-found", &net.DNSError{Err: "no such host", IsNotFound: true}, awsclient.ClassRegionUnavailable},
+		{"DNSError without IsNotFound (flaky DNS)", &net.DNSError{Err: "server misbehaving", IsTemporary: true}, "dns"},
+		{"generic error", errors.New("AccessDeniedException: not authorized"), "Unknown"},
+		{"nil", nil, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := awsclient.IsEndpointNotFound(tc.err); got != tc.want {
-				t.Errorf("IsEndpointNotFound(%v) = %v, want %v", tc.err, got, tc.want)
+			if got := awsclient.ErrClass(tc.err); got != tc.want {
+				t.Errorf("ErrClass(%v) = %q, want %q", tc.err, got, tc.want)
 			}
 		})
 	}

@@ -406,8 +406,13 @@ func TestHandleClientsReady_Failure_EmitsErrorIntents(t *testing.T) {
 	if !fi.IsError {
 		t.Error("FlashIntent.IsError = false, want true")
 	}
-	if fi.Text != "no route to host" {
-		t.Errorf("FlashIntent.Text = %q, want %q", fi.Text, "no route to host")
+	// INVERTED by spec row 3 (task "errors"): a failed connect says what
+	// failed and why, in the same sentence its error-history entry gets. The
+	// old assertion required the bare err.Error(), which left the flash and
+	// the log entry free to drift into two shapes for one fact. Do not
+	// restore it.
+	if fi.Text != "connect: no route to host" {
+		t.Errorf("FlashIntent.Text = %q, want %q", fi.Text, "connect: no route to host")
 	}
 	if !findAppendErrorHistory(intents) {
 		t.Error("expected AppendErrorHistoryIntent")
