@@ -233,11 +233,10 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 		}
 	}
 
-	// Title match, as an ordered preference: the underscored spelling — what
-	// fetchers write and the only one the save lane persists under — and then
-	// the spaced one. Accepting either inside a single `range` over Fields
-	// makes the cell depend on map order whenever both are present.
-	for _, want := range [2]string{config.TitleFieldKey(col.Title), strings.ToLower(col.Title)} {
+	// Title match, as an ordered preference (config.TitleFieldKeys states the
+	// order and why). Accepting either spelling inside a single `range` over
+	// Fields makes the cell depend on map order whenever both are present.
+	for _, want := range config.TitleFieldKeys(col.Title) {
 		for k, v := range r.Fields {
 			if strings.EqualFold(k, want) {
 				return humanizeListCell(col, v)

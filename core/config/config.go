@@ -127,6 +127,18 @@ func TitleFieldKey(title string) string {
 	return strings.ReplaceAll(strings.ToLower(title), " ", "_")
 }
 
+// TitleFieldKeys are the spellings a column title answers to when it has to
+// read a value back, most preferred first.
+//
+// The spaced spelling leads because of what is already on disk: a type file
+// an older build wrote carries BOTH, the spaced one holding the value that
+// build's screen showed and the underscored one holding the raw scalar its
+// fetcher stored. A file this build writes carries the underscored key only,
+// so the spaced lookup misses and costs nothing.
+func TitleFieldKeys(title string) [2]string {
+	return [2]string{strings.ToLower(title), TitleFieldKey(title)}
+}
+
 // IsStatusColumn reports whether a list column is the status/lifecycle
 // column, whose cell is derived from Findings first and only then from a
 // stored value. A column whose Title is "Status" or "State" qualifies
