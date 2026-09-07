@@ -72,6 +72,16 @@ while [ $i -lt 18 ]; do
 	i=$((i + 1))
 done
 
+# An issue badge appears while the sweep is still running; the "counter
+# clears" forbid below reads menu.txt, so keep capturing until the counter
+# is gone, up to 120s more.
+i=0
+while [ $i -lt 24 ] && grep -qE 'verifying [0-9]+/[0-9]+' "$CAPDIR/menu.txt"; do
+	sleep 5
+	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/menu.txt"
+	i=$((i + 1))
+done
+
 open_and_capture() {
 	tmux send-keys -t "$SESSION" ":$1" Enter
 	sleep "$3"
