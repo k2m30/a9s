@@ -415,12 +415,13 @@ func athenaGeneratedDocDetails(t *testing.T) map[domain.FindingCode]string {
 // surface of the two workgroup findings.
 //
 // Both codes are Warning, so the bucket cell reads Warning. The surfaces cell
-// lists S3: core/app/list_columns.go resolveListDecoratorFull gives a Wave 2
-// SevWarn finding the `~` glyph whenever the row it lands on is Healthy, and
-// the Severity cell on these rows says `~`. The earlier expectation of
-// "S2, S4, S5" read the demo witness, which renders yellow, as if it were the
-// only row the finding can reach; a row cannot carry a glyph and omit the glyph
-// surface, so it is not to be restored.
+// lists S3 because S3 is the `~` tier of the detail-view Attention section,
+// which internal/tui/views/detail_fields.go renders for every issue-severity
+// finding of either wave, whatever colour the row is. The earlier expectation
+// of "S2, S4, S5" treated S3 as a marker on a green list row; a row carrying a
+// finding is never green (tests/unit/qa_color_findings_conformance_test.go,
+// empty divergence allowlist), so that reading describes a surface no operator
+// reaches and is not to be restored.
 func TestD4Row25_AthenaDocRowsSitInTheWarningBucket(t *testing.T) {
 	b, err := os.ReadFile("../../docs/resources/athena.md")
 	if err != nil {

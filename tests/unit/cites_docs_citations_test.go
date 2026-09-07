@@ -441,6 +441,7 @@ const (
 	kindSurfaces   = "wrong surfaces"
 	kindNoSignals  = "claims no signals in a wave that ships one"
 	kindNoFinding  = "claims no finding row for a registered finding"
+	kindSuppressed = "claims a surface is suppressed"
 )
 
 // expectedGlyph derives the Severity cell of a §4 row from the finding alone.
@@ -478,7 +479,27 @@ func expectedS1(sig catalogSignal) bool {
 	return sig.severity == "broken" || sig.severity == "warn"
 }
 
+func shortNameOf(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), ".md")
+}
+
 var reSurfaceCell = regexp.MustCompile(`S[1-5]`)
+
+// expectedSurfaces derives the whole Surfaces cell from the finding. S2 and S4
+// are the row's colour and its cause text, which every finding with a row has.
+// S3 and S5 are the tier and the sentence of the detail-view Attention section,
+// so they follow that section's own issue-severity test — a Dim finding is
+// skipped there and reaches neither. S1 is expectedS1.
+func expectedSurfaces(sig catalogSignal) string {
+	surfaces := []string{"S2", "S4"}
+	if expectedGlyph(sig) != "n/a" {
+		surfaces = []string{"S2", "S3", "S4", "S5"}
+	}
+	if expectedS1(sig) {
+		surfaces = append([]string{"S1"}, surfaces...)
+	}
+	return strings.Join(surfaces, ", ")
+}
 
 // docGlyphCell normalises the Severity cell: the docs write it as `n/a`, as a
 // code-spanned glyph, and once as "`!` (counted)".
@@ -589,7 +610,7 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 	if !ok {
 		return nil, false
 	}
-	shortName := strings.TrimSuffix(filepath.Base(path), ".md")
+	shortName := shortNameOf(path)
 	signals := catalogSignalsByType(t)[shortName]
 	if len(signals) == 0 {
 		return nil, false
@@ -673,22 +694,11 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 		}
 
 		if row.surfaceTxt != "" {
-			has := map[string]bool{}
-			for _, s := range reSurfaceCell.FindAllString(row.surfaceTxt, -1) {
-				has[s] = true
-			}
-			if !anySignal(matching, func(sig catalogSignal) bool { return has["S1"] == expectedS1(sig) }) {
+			listed := strings.Join(reSurfaceCell.FindAllString(row.surfaceTxt, -1), ", ")
+			if !anySignal(matching, func(sig catalogSignal) bool { return expectedSurfaces(sig) == listed }) {
 				offenders = append(offenders, docOffender{row.line, kindSurfaces, fmt.Sprintf(
-					"the row %s S1 for %q; a %s %s finding %s the menu count",
-					map[bool]string{true: "lists", false: "omits"}[has["S1"]], row.listText, matching[0].wave, matching[0].severity,
-					map[bool]string{true: "bumps", false: "does not bump"}[expectedS1(matching[0])])})
-			}
-			if !anySignal(matching, func(sig catalogSignal) bool {
-				return has["S3"] == (expectedGlyph(sig) != "n/a")
-			}) {
-				offenders = append(offenders, docOffender{row.line, kindSurfaces, fmt.Sprintf(
-					"the row %s S3 for %q, and S3 is the glyph; the renderer gives this finding %q",
-					map[bool]string{true: "lists", false: "omits"}[has["S3"]], row.listText, expectedGlyph(matching[0]))})
+					"the row reaches %q for %q; a %s %s finding reaches %q",
+					listed, row.listText, matching[0].wave, matching[0].severity, expectedSurfaces(matching[0]))})
 			}
 		}
 	}
@@ -713,7 +723,7 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 			rendered[phrase], phrase, len(codes), strings.Join(codes, ", "))})
 	}
 
-	offenders = append(offenders, noSignalClaimOffenders(t, path, signals)...)
+	offenders = append(offenders, docSentenceOffenders(t, path, signals)...)
 
 	sectionBuckets, sectionLine := docSectionBuckets(t, path)
 	tableBuckets := map[string]int{}
@@ -737,11 +747,16 @@ func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 
 var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?: [a-z]+)* signals`)
 
-// noSignalClaimOffenders finds sentences telling the reader a wave carries
-// nothing for this type while the catalog ships a finding in it. The sentence
-// is the first thing a reader takes from §3, and it is read before the table
-// that contradicts it.
-func noSignalClaimOffenders(t *testing.T, path string, signals []catalogSignal) []docOffender {
+var reS3Suppressed = regexp.MustCompile(`S3 (is )?suppress`)
+
+// docSentenceOffenders finds prose that contradicts the table below it: a
+// sentence telling the reader a wave carries nothing for this type while the
+// catalog ships a finding in it, and a sentence saying S3 is suppressed on a
+// coloured row. S3 is the tier of the detail-view Attention section, which
+// renders for every issue-severity finding of either wave and knows nothing
+// about the row's colour — there is no case in which it is suppressed. Both
+// sentences are read before the table that disagrees with them.
+func docSentenceOffenders(t *testing.T, path string, signals []catalogSignal) []docOffender {
 	t.Helper()
 	shipped := map[string]int{}
 	for _, sig := range signals {
@@ -750,6 +765,11 @@ func noSignalClaimOffenders(t *testing.T, path string, signals []catalogSignal) 
 
 	var offenders []docOffender
 	for i, line := range readLines(t, path) {
+		if reS3Suppressed.MatchString(line) {
+			offenders = append(offenders, docOffender{i + 1, kindSuppressed, fmt.Sprintf(
+				"the sentence says S3 is suppressed; S3 is the detail-view Attention tier, which every %s finding "+
+					"of issue severity reaches whatever colour its row is", shortNameOf(path))})
+		}
 		m := reNoWaveSignals.FindStringSubmatch(line)
 		if m == nil {
 			continue
