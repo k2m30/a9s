@@ -101,7 +101,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ec2
 
 **Source API**: [DescribeVpcs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcs.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `vpc`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -178,7 +178,7 @@ At 3am, glancing at the list, a yellow row with `pending: VPC being created` or 
 
 ## 6. Citations
 
-- `shortName`, display name, signal cells, list API — `docs/attention-signals.md` § Networking row for `vpc` (line 51).
+- `shortName`, display name and the `vpc` signals — `docs/attention-signals.md § Signals § NETWORKING` row `vpc`; list API — `core/aws/vpc.go`.
 - AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpc` (line 108) and § `vpc` narrative block (lines 1013–1028).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `Vpc.State`, `VpcId`, `CidrBlock`, `IsDefault`, `OwnerId`, `DhcpOptionsId`, `InstanceTenancy`, `CidrBlockAssociationSet`, `Ipv6CidrBlockAssociationSet`, `Tags`, `BlockPublicAccessStates` field names — `AWS SDK Go v2 — service/ec2/types.Vpc`.
@@ -191,8 +191,8 @@ At 3am, glancing at the list, a yellow row with `pending: VPC being created` or 
 - `cfn` discovery via `aws:cloudformation:stack-name` tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every resource it creates; tag-based lookup avoids a per-VPC DescribeStackResources call.`
 - `ec2`, `elb`, `eni`, `nat`, `rtb`, `sg`, `subnet`, `vpce` discovered via reverse-scan of already-loaded lists on `VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Every one of these AWS list responses carries`VpcId`(or an equivalent) directly; scanning already-loaded lists is cheaper than any extra AWS call.`
 - `tgw` discovery via `DescribeTransitGatewayAttachments` filter — `a9s-devops (2026-04-20): possible=yes, worth=yes. TGW list responses do not carry child VPC IDs, so a single`DescribeTransitGatewayAttachments`call is the only path; most VPCs have ≤1 TGW attachment, so the cost is minimal.`
-- Wave 1 signals (`State`, empty-VPC cross-ref) and Wave 2 signal (`DescribeFlowLogs`) — `docs/attention-signals.md` § Networking row for `vpc`.
-- Wave 3 DNS-attribute probe out-of-scope — `docs/attention-signals.md` § Networking row for `vpc` Wave 3 cell.
+- Wave 1 signals (`State`, empty-VPC cross-ref) and Wave 2 signal (`DescribeFlowLogs`) — `docs/attention-signals.md § Signals § NETWORKING` row `vpc`.
+- Wave 3 DNS-attribute probe out-of-scope — `docs/attention-signals.md § Not yet implemented`.
 - Default-VPC detection out-of-scope rationale — `a9s-devops (2026-04-20): possible=yes (Vpc.IsDefault is on the list response), worth=no. Not a daily-driver signal; belongs in Security Hub / Config, not in the attention column.`
 - `BlockPublicAccessStates` surfacing out-of-scope — `a9s-devops (2026-04-20): possible=yes, worth=no. Account-posture control, not per-row operational attention.`
 - No per-VPC CloudWatch namespace — `a9s-devops (2026-04-20): possible=no, worth=no. AWS publishes flow logs (presence covered in Wave 2) but no per-VPC metric namespace.`

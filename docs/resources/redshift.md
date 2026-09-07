@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: Redshift Clusters
 - **AWS API reference**: <https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html>
 - **List API**: `DescribeClusters` (returns fully-populated `Cluster` shapes in one paged call; no per-resource Describe needed for Wave 1 signals).
-- **Describe API (if any)**: not used — Wave 2 is `None` per `attention-signals.md`. `DescribeLoggingStatus` is only invoked to resolve the `logs` / `s3` related-panel pivots, not for attention signals.
+- **Describe API (if any)**: not used — Wave 2 is `None` per `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `redshift`. `DescribeLoggingStatus` is only invoked to resolve the `logs` / `s3` related-panel pivots, not for attention signals.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -95,7 +95,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [DescribeClusters](https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeClusters.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `redshift`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -204,8 +204,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- `Display name`, `List API`, shape of `ClusterStatus` / `ClusterAvailabilityStatus` / `PendingModifiedValues` / `DeferredMaintenanceWindows` / `PubliclyAccessible` / `Encrypted` — `docs/attention-signals.md` § Databases & Storage / `redshift` row.
-- Wave 2 = `None`, Wave 3 = CloudWatch metrics — `docs/attention-signals.md` § Databases & Storage / `redshift` row.
+- Display name and the `ClusterStatus` / `ClusterAvailabilityStatus` / `PendingModifiedValues` / `DeferredMaintenanceWindows` / `PubliclyAccessible` / `Encrypted` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `redshift`; list API — `core/aws/redshift.go`.
+- The deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - Related-panel target list (`alarm, cfn, ct-events, kms, logs, role, s3, secrets, sg, subnet, vpc`) — `docs/related-resources.md` § Per-type contract / `redshift` row; detail notes in `docs/related-resources.md` § `redshift`.
 - `Cluster.KmsKeyId` — `AWS SDK Go v2 — service/redshift/types.Cluster § KmsKeyId`.
 - `Cluster.IamRoles[].IamRoleArn` — `AWS SDK Go v2 — service/redshift/types.Cluster § IamRoles` + `types.ClusterIamRole § IamRoleArn`.

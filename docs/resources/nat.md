@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `e
 ### `alarm`
 
 - **Why related**: NAT bandwidth/error alarms — operators pivot here when investigating NAT throughput, port exhaustion, or packet-drop incidents.
-- **How discovered**: cross-reference the already-loaded `alarm` list by `MetricAlarm.Dimensions[]` entries where `Name==NatGatewayId` and `Value==<this NatGatewayId>` (CloudWatch `AWS/NATGateway` namespace) — a9s-devops persona: standard CloudWatch cross-ref pattern, same mechanism attention-signals.md uses for alarm zombie detection.
+- **How discovered**: cross-reference the already-loaded `alarm` list by `MetricAlarm.Dimensions[]` entries where `Name==NatGatewayId` and `Value==<this NatGatewayId>` (CloudWatch `AWS/NATGateway` namespace) — a9s-devops persona: standard CloudWatch cross-ref pattern, the same mechanism the zombie-alarm check uses, `docs/attention-signals.md § Signals § MONITORING` row `alarm`.
 - **Count shown**: unknown.
 
 ### `eip`
@@ -71,7 +71,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `e
 
 **Source API**: [DescribeNatGateways](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNatGateways.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `nat`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -91,7 +91,7 @@ Transcribed from `docs/attention-signals.md`.
   - **State bucket**: Broken.
   - **How obtained**: `NatGateway.FailureCode` + `NatGateway.FailureMessage` on the `DescribeNatGateways` response. Codes per SDK: `InsufficientFreeAddressesInSubnet`, `Gateway.NotAttached`, `InvalidAllocationID.NotFound`, `Resource.AlreadyAssociated`, `InternalError`, `InvalidSubnetID.NotFound`.
 
-Note: `State==deleted` is not mentioned in the attention-signals.md row for `nat`. The SDK exposes it; a9s-devops persona treats `deleted` as Dim (terminal tombstone) by analogy with other EC2 terminal states, but since it is not specified in the golden doc it is not included in §4.
+Note: `State==deleted` is not mentioned in the `docs/attention-signals.md § Signals § NETWORKING` row `nat`. The SDK exposes it; a9s-devops persona treats `deleted` as Dim (terminal tombstone) by analogy with other EC2 terminal states, but since it is not specified in the golden doc it is not included in §4.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -150,7 +150,7 @@ At 3am, glancing at the list, the operator sees a red row for a failed NAT and i
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).
-- `State==deleted` terminal-tombstone rendering — not specified in `docs/attention-signals.md` for `nat`. a9s-devops persona: possible=yes (SDK exposes it), worth=low for daily-driver (deleted NAT gateways age out of the list response quickly). Flagged here rather than invented.
+- `State==deleted` terminal-tombstone rendering — not specified in `docs/attention-signals.md § Signals § NETWORKING` row `nat`. a9s-devops persona: possible=yes (SDK exposes it), worth=low for daily-driver (deleted NAT gateways age out of the list response quickly). Flagged here rather than invented.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
@@ -163,14 +163,14 @@ At 3am, glancing at the list, the operator sees a red row for a failed NAT and i
 - `rtb` discovery via `Route.NatGatewayId` — `docs/related-resources.md` § `nat` bullet `rtb`; confirmed by `AWS SDK Go v2 — ec2/types.Route § NatGatewayId`.
 - `subnet` discovery via `NatGateway.SubnetId` — `AWS SDK Go v2 — ec2/types.NatGateway § SubnetId`.
 - `vpc` discovery via `NatGateway.VpcId` — `AWS SDK Go v2 — ec2/types.NatGateway § VpcId`.
-- `alarm` discovery via CloudWatch `AWS/NATGateway` namespace + `NatGatewayId` dimension — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudWatch NAT alarms conventionally carry NatGatewayId dimension; consistent with attention-signals.md § Signals § MONITORING row alarm cross-ref pattern`.
+- `alarm` discovery via CloudWatch `AWS/NATGateway` namespace + `NatGatewayId` dimension — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudWatch NAT alarms conventionally carry NatGatewayId dimension`, which is the cross-reference the zombie-alarm check makes — `docs/attention-signals.md § Signals § MONITORING` row `alarm`.
 - `ct-events` universal pivot — `docs/related-resources.md` § Policy point 4.
-- Wave 1 `State` transitions (`available`/`pending`/`failed`/`deleting`) — `docs/attention-signals.md` § Networking, row `nat`; confirmed by `AWS SDK Go v2 — ec2/types.NatGateway § State` (documented enum values `pending`, `failed`, `available`, `deleting`, `deleted`).
-- `FailureCode` and `FailureMessage` as Broken-detail pair — `docs/attention-signals.md` § Networking, row `nat`; field shapes confirmed by `AWS SDK Go v2 — ec2/types.NatGateway § FailureCode` and `§ FailureMessage`. Documented failure codes `InsufficientFreeAddressesInSubnet`, `Gateway.NotAttached`, `InvalidAllocationID.NotFound`, `Resource.AlreadyAssociated`, `InternalError`, `InvalidSubnetID.NotFound` come from the same SDK comment.
-- Wave 2 is empty for `nat` — `docs/attention-signals.md` § Networking, row `nat` (Wave 2 cell = `None`).
-- Wave 3 signals — `docs/attention-signals.md` § Networking, row `nat` (Wave 3 cell).
+- Wave 1 `State` transitions (`available`/`pending`/`failed`/`deleting`) — `docs/attention-signals.md § Signals § NETWORKING` row `nat`; confirmed by `AWS SDK Go v2 — ec2/types.NatGateway § State` (documented enum values `pending`, `failed`, `available`, `deleting`, `deleted`).
+- `FailureCode` and `FailureMessage` as Broken-detail pair — `docs/attention-signals.md § Signals § NETWORKING` row `nat`; field shapes confirmed by `AWS SDK Go v2 — ec2/types.NatGateway § FailureCode` and `§ FailureMessage`. Documented failure codes `InsufficientFreeAddressesInSubnet`, `Gateway.NotAttached`, `InvalidAllocationID.NotFound`, `Resource.AlreadyAssociated`, `InternalError`, `InvalidSubnetID.NotFound` come from the same SDK comment.
+- Wave 2 is empty for `nat` — `docs/attention-signals.md § Signals § NETWORKING` row `nat`.
+- Wave 3 signals — `docs/attention-signals.md § Not yet implemented`.
 - `Count shown: unknown` for every related target — `docs/related-resources.md` is silent on per-target counts. a9s-devops persona (2026-04-20): possible=no to cite from golden docs, worth=no to guess. Remaining gap is documented, not invented.
-- `State==deleted` treated as Dim but not surfaced — `a9s-devops persona (2026-04-20): possible=yes (SDK enum), worth=no for daily-driver use. Recorded in §5 Out of Scope rather than §4 to avoid inventing behavior outside attention-signals.md`.
+- `State==deleted` treated as Dim but not surfaced — `a9s-devops persona (2026-04-20): possible=yes (SDK enum), worth=no for daily-driver use.` Recorded in §5 Out of Scope rather than §4, because `docs/attention-signals.md § Signals § NETWORKING` row `nat` carries no finding for it.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->

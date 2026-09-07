@@ -83,7 +83,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeClusters](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeClusters.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ecs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -178,7 +178,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- a9s golden doc — ECS Cluster list/describe pattern and Wave 1/Wave 2 signal definitions — `docs/attention-signals.md` § "Compute" row `ecs`.
+- a9s golden doc — the `ecs` signal definitions — `docs/attention-signals.md § Signals § COMPUTE` row `ecs`.
 - a9s golden doc — expected related targets `alarm, asg, cfn, ct-events, ec2, ecs-svc, ecs-task, kms, logs` — `docs/related-resources.md` § "Per-type contract" row `ecs` and § `ecs`.
 - a9s golden doc — `ct-events` is the universal pivot — `docs/related-resources.md` § Policy, item 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".

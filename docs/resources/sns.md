@@ -59,7 +59,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [GetTopicAttributes](https://docs.aws.amazon.com/sns/latest/api/API_GetTopicAttributes.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `sns`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -79,7 +79,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **API call**: `GetTopicAttributes` — one call per topic (same call as above; no added cost).
   - **Cost shape**: per-resource.
-  - **Note**: `attention-signals.md` does not define what makes a topic "sensitive" — the detection heuristic (tag, name pattern, policy content) is unspecified. See §5 Out of Scope. — a9s-devops: there is no reliable AWS-surface field identifying sensitivity from SNS alone; viable heuristics are tag-based (e.g. `sensitive=true`) or name-regex, both of which are per-deployment conventions. Worth=no as a universal default rule.
+  - **Note**: what makes a topic "sensitive" is undefined — the detection heuristic (tag, name pattern, policy content) is unspecified, and `docs/attention-signals.md § Signals § MESSAGING` row `sns` carries no finding for it. See §5 Out of Scope. — a9s-devops: there is no reliable AWS-surface field identifying sensitivity from SNS alone; viable heuristics are tag-based (e.g. `sensitive=true`) or name-regex, both of which are per-deployment conventions. Worth=no as a universal default rule.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -132,7 +132,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).
-- `KmsMasterKeyId absent on sensitive topic` — a9s-devops: not worth it as a universal default. SNS has no reliable AWS-surface field identifying "sensitive"; viable heuristics (tag `sensitive=true`, name regex matching `prod|pii|secret`, policy-content scan) are per-deployment conventions and produce noisy signal at the account level. Recommend deferring until an explicit trigger is specified in `attention-signals.md`.
+- `KmsMasterKeyId absent on sensitive topic` — a9s-devops: not worth it as a universal default. SNS has no reliable AWS-surface field identifying "sensitive"; viable heuristics (tag `sensitive=true`, name regex matching `prod|pii|secret`, policy-content scan) are per-deployment conventions and produce noisy signal at the account level. Recommend deferring until an explicit trigger is specified.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?", line 13).
 
@@ -153,14 +153,14 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - §2 `sns-sub` why related — `docs/related-resources.md` § `sns` (line 923) and § `sns-sub` (line 931).
 - §2 `sns-sub` how discovered — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListSubscriptionsByTopic(TopicArn)` is the dedicated SNS API; no cheaper path — `ListSubscriptions` is account-wide and paginated with no topic filter.
 - §2 `sns-sub` count shown — a9s-devops (2026-04-20): possible=yes, worth=yes. Fanout-width is a primary decision signal for an SNS operator.
-- §3.1 no Wave 1 signals — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 1 cell: "None — `ListTopics` returns ARN only").
-- §3.2 orphan-topic signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 2 cell). Mechanism amended to match the implementation: `ListSubscriptionsByTopic` with pagination and per-subscription `PendingConfirmation` detection (`core/aws/sns_issue_enrichment.go:22-99`), not `GetTopicAttributes` subscription counts; same signal semantics.
+- §3.1 no Wave 1 signals — `ListTopics` returns the topic ARN only, `AWS SDK Go v2 — sns.ListTopicsOutput § Topics`; every `sns` finding is wave 2, `docs/attention-signals.md § Signals § MESSAGING` row `sns`.
+- §3.2 orphan-topic signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns`. Mechanism amended to match the implementation: `ListSubscriptionsByTopic` with pagination and per-subscription `PendingConfirmation` detection (`core/aws/sns_issue_enrichment.go:22-99`), not `GetTopicAttributes` subscription counts; same signal semantics.
 - §3.2 all-pending-confirmation signal — companion finding from the same `ListSubscriptionsByTopic` call (`core/aws/sns_issue_enrichment.go:22-99`): fires when every returned `SubscriptionArn == "PendingConfirmation"`.
-- §3.2 missing-KMS signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 2 cell). Trigger definition for "sensitive topic" not specified.
+- §3.2 missing-KMS signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns`. Trigger definition for "sensitive topic" not specified.
 - §3.2 `SubscriptionsConfirmed`/`SubscriptionsPending`/`KmsMasterKeyId` field names — `AWS SDK Go v2 — sns.GetTopicAttributesOutput § Attributes` doc comment.
-- §3.3 Wave 3 CloudWatch metric — `docs/attention-signals.md § Signals § MESSAGING` row `sns` (line 83, Wave 3 cell).
+- §3.3 deferred CloudWatch metric — `docs/attention-signals.md § Not yet implemented`.
 - §4 orphan-topic S4/S5 wording — a9s-devops (2026-04-20): possible=yes, worth=yes. `no subscribers` on the row lets an operator triage without drilling in; S5 spells out the consequence (messages discarded) for the detail view.
-- §5 missing-KMS deferral — a9s-devops (2026-04-20): possible=yes-via-tags-or-regex, worth=no as a universal default. Without an explicit "sensitive" trigger the rule fires on every unencrypted topic, producing noise. Defer until `attention-signals.md` defines the trigger.
+- §5 missing-KMS deferral — a9s-devops (2026-04-20): possible=yes-via-tags-or-regex, worth=no as a universal default. Without an explicit "sensitive" trigger the rule fires on every unencrypted topic, producing noise. Defer until that trigger is defined.
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?" (line 15).
 
 <!-- BEGIN GENERATED: header -->

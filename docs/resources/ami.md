@@ -71,7 +71,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn
 
 **Source API**: [DescribeImages](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeImages.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ami`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -151,12 +151,12 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- `ami` list API is `DescribeImages` — `docs/attention-signals.md` § Compute table row `ami`.
+- `ami` list API is `DescribeImages` — `core/aws/ami.go`.
 - `DescribeImages` returns `Image.State`, `Image.StateReason`, `Image.DeprecationTime`, `Image.BlockDeviceMappings` — `AWS SDK Go v2 — ec2/types.Image § State, StateReason, DeprecationTime, BlockDeviceMappings`.
-- `State` enum values `available`, `pending`, `transient`, `failed`, `error`, `invalid`, `deregistered`, `disabled` — `AWS SDK Go v2 — ec2/types.ImageState`; buckets Healthy/Warning/Broken/Dim per `docs/attention-signals.md` § Compute table row `ami`.
+- `State` enum values `available`, `pending`, `transient`, `failed`, `error`, `invalid`, `deregistered`, `disabled` — `AWS SDK Go v2 — ec2/types.ImageState`; buckets Healthy/Warning/Broken/Dim per `docs/attention-signals.md § Signals § COMPUTE` row `ami`.
 - `StateReason.Message` carries the failure cause for Broken rows — `AWS SDK Go v2 — ec2/types.StateReason § Message`.
-- `DeprecationTime < now()` → Warning — `docs/attention-signals.md` § Compute table row `ami`.
-- Cross-ref `ebs-snap` via `BlockDeviceMappings[].Ebs.SnapshotId`, skip public/marketplace — `docs/attention-signals.md` § Compute table row `ami`; `AWS SDK Go v2 — ec2/types.EbsBlockDevice § SnapshotId`; `AWS SDK Go v2 — ec2/types.Image § ImageOwnerAlias` identifies owner scope.
+- `DeprecationTime < now()` → Warning — `docs/attention-signals.md § Signals § COMPUTE` row `ami`.
+- Cross-ref `ebs-snap` via `BlockDeviceMappings[].Ebs.SnapshotId`, skip public/marketplace — `docs/attention-signals.md § Signals § COMPUTE` row `ami`; `AWS SDK Go v2 — ec2/types.EbsBlockDevice § SnapshotId`; `AWS SDK Go v2 — ec2/types.Image § ImageOwnerAlias` identifies owner scope.
 - Related targets `asg`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`, `ng` — `docs/related-resources.md` § Per-type contract row `ami`.
 - `ebs-snap` pivot mechanism (read `BlockDeviceMappings[].Ebs.SnapshotId`) — `docs/related-resources.md` § `ami` subsection.
 - `kms` pivot mechanism (read `BlockDeviceMappings[].Ebs.KmsKeyId`) — `docs/related-resources.md` § `ami` subsection.

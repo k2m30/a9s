@@ -108,7 +108,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeCluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeCluster.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CONTAINERS` row `eks`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -155,7 +155,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-Copied verbatim from `docs/attention-signals.md` row `eks`, Wave 3 cell:
+Copied verbatim from `docs/attention-signals.md § Not yet implemented`:
 
 - OUT OF SCOPE: EKS version EOL calendar vs cluster `version`.
 - OUT OF SCOPE: addon health.
@@ -192,14 +192,14 @@ One row per signal from §3. All EKS signals are Wave 2 because `ListClusters` i
 | `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
 | `Status == DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` |
 | `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending` |
-| `Status == FAILED` | 2 | Broken | n/a | S2, S4 | `failed: see Health.Issues` |
-| `Health.Issues[]` non-empty | 2 | Broken | n/a | S2, S4, S5 | `issue: <Issue.Code>` |
+| `Status == FAILED` | 2 | Broken | n/a | S2, S4 | `failed` |
+| `Health.Issues[]` non-empty | 2 | Warning | n/a | S2, S4, S5 | `health issue` |
 
 Notes:
 
-- No `!`-on-green case exists for EKS: every Wave 2 signal moves the row off green (Warning or Broken). S1 count is driven by Broken rows (`Status == FAILED` and `Health.Issues[]` non-empty) under the standard "red rows bump the menu count" rule.
-- `Health.Issues[]` can appear on an `ACTIVE` cluster (health is tracked independently of lifecycle state). When it does, the row moves to Broken — the health issue is the cause, and the `!`-on-green rule does not apply because the color already changed.
-- S4 wording for `Status == FAILED` deliberately points the operator at `Health.Issues` — a bare `failed` keyword is not enough, and `StatusReason`-style fields do not exist on `types.Cluster`.
+- No `!`-on-green case exists for EKS: every Wave 2 signal moves the row off green (Warning or Broken). The S1 count is driven by the Broken rows, `Status == FAILED` among them, under the standard "red rows bump the menu count" rule.
+- `Health.Issues[]` can appear on an `ACTIVE` cluster (health is tracked independently of lifecycle state). When it does, the row moves to Warning — the health issue is the cause, and the `!`-on-green rule does not apply because the color already changed.
+- A failed cluster reads `failed` in the list; every health issue AWS reports for it is a supporting row in the detail view, which is where the codes are read. `types.Cluster` carries no `StatusReason`-style field to name a cause in the list.
 
 ## 4.1 UX review (two sentences)
 
@@ -214,9 +214,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - eks related-panel targets `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` — `docs/related-resources.md` § Per-type contract, row `eks`.
-- eks Wave 1 is `None` (list API is name-only) — `docs/attention-signals.md` § Signals, row `eks` Wave 1 cell.
-- eks Wave 2 status mapping (`ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`/`PENDING`→Warning; `FAILED`→Broken) and `Health.Issues[]` non-empty → Broken — `docs/attention-signals.md` § Signals, row `eks` Wave 2 cell.
-- `ListClusters` returns cluster name strings only — `docs/attention-signals.md` § Signals, row `eks` Wave 1 cell; corroborated by AWS API Reference: `ListClusters` response shape.
+- `ListClusters` is name-only, so every `eks` signal comes from the per-cluster describe — `docs/attention-signals.md § Signals § CONTAINERS` row `eks`.
+- `eks` status mapping (`ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`/`PENDING`→Warning; `FAILED`→Broken) and the health-issue finding — `docs/attention-signals.md § Signals § CONTAINERS` row `eks`.
+- `ListClusters` returns cluster name strings only — `core/aws/eks.go`; corroborated by AWS API Reference: `ListClusters` response shape.
 - `Cluster.Status` exists on the Describe response — `AWS SDK Go v2 — service/eks/types.Cluster § Status` (type `ClusterStatus`).
 - `Cluster.Health.Issues[]` with `Code` (`ClusterIssueCode`), `Message`, `ResourceIds[]` — `AWS SDK Go v2 — service/eks/types.Cluster § Health`, `types.ClusterHealth § Issues`, `types.ClusterIssue § Code, Message, ResourceIds`.
 - `Cluster.RoleArn`, `Cluster.ResourcesVpcConfig.VpcId`, `SubnetIds`, `ClusterSecurityGroupId`, `SecurityGroupIds` — `AWS SDK Go v2 — service/eks/types.Cluster § RoleArn, ResourcesVpcConfig`, `types.VpcConfigResponse § VpcId, SubnetIds, ClusterSecurityGroupId, SecurityGroupIds`.

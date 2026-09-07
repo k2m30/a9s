@@ -59,7 +59,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [DescribeTransitGatewayAttachments](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeTransitGatewayAttachments.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `tgw`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -140,11 +140,11 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- `DescribeTransitGateways` as list API — `docs/attention-signals.md` § Networking → `tgw` row § Source column points to `DescribeTransitGatewayAttachments` (Wave 2); list API is the standard `DescribeTransitGateways` per SDK (`AWS SDK Go v2 — ec2 § DescribeTransitGateways`).
+- `DescribeTransitGateways` as list API — `AWS SDK Go v2 — ec2 § DescribeTransitGateways`.
 - `TransitGateway.State` enum values — `AWS SDK Go v2 — ec2/types.TransitGatewayState` § `pending, available, modifying, deleting, deleted`.
-- Wave 1 state buckets — `docs/attention-signals.md` § Networking → `tgw` Wave 1 cell.
-- Wave 2 attachment-state signals — `docs/attention-signals.md` § Networking → `tgw` Wave 2 cell, and `AWS SDK Go v2 — ec2/types.TransitGatewayAttachmentState` § `failed, failing, rejected, rejecting, pendingAcceptance`.
-- Wave 3 exclusion list — `docs/attention-signals.md` § Networking → `tgw` Wave 3 cell.
+- Wave 1 state buckets — `docs/attention-signals.md § Signals § NETWORKING` row `tgw`.
+- Wave 2 attachment-state signals — `docs/attention-signals.md § Signals § NETWORKING` row `tgw`, and `AWS SDK Go v2 — ec2/types.TransitGatewayAttachmentState` § `failed, failing, rejected, rejecting, pendingAcceptance`.
+- Wave 3 exclusion list — `docs/attention-signals.md § Not yet implemented`.
 - Related targets `ct-events, role, rtb, subnet, vpc` — `docs/related-resources.md` § Per-type contract table, row `tgw`, and § `tgw` subsection.
 - `vpc` discovery via `DescribeTransitGatewayVpcAttachments.VpcId` — `AWS SDK Go v2 — ec2/types.TransitGatewayVpcAttachment § VpcId`. a9s-devops (2026-04-20): possible=yes, worth=yes. Operators follow TGW → attached VPCs constantly during connectivity debugging; the VPC-attachment API returns the IDs in one call.
 - `subnet` discovery via `TransitGatewayVpcAttachment.SubnetIds` — `AWS SDK Go v2 — ec2/types.TransitGatewayVpcAttachment § SubnetIds`. a9s-devops (2026-04-20): possible=yes, worth=yes. TGW subnets pin which AZs are reachable; operators need this when cross-AZ traffic misbehaves.

@@ -144,7 +144,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeInstances](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeInstances.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -260,18 +260,18 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (CloudWatch `StatusCheckFailed`, IMDSv1 detection).
-- `not-applicable` value on `SystemStatus.Status` / `InstanceStatus.Status` — attention-signals.md classifies it as Healthy (informational only, not surfaced).
+- `not-applicable` value on `SystemStatus.Status` / `InstanceStatus.Status` — Healthy, informational only: `docs/attention-signals.md § Signals § COMPUTE` row `ec2` carries no finding for it.
 - Any UI element not listed in §4 — no new columns, no new icons, no new views, no new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
 ## 6. Citations
 
-- a9s golden doc — EC2 Wave 1 state mapping (`running`, `pending`, `stopping`, `stopped`, `terminated`) — `docs/attention-signals.md` § Compute / `ec2` row.
-- a9s golden doc — `StateReason.Code` `Server.*` → Broken on stopped instance — `docs/attention-signals.md` § Compute / `ec2` row.
-- a9s golden doc — `StateTransitionReason` user-initiated >30d → Warning — `docs/attention-signals.md` § Compute / `ec2` row.
-- a9s golden doc — Wave 2 source `DescribeInstanceStatus(IncludeAllInstances=true)` with `impaired`/`initializing`/`insufficient-data`/`not-applicable` bucketing — `docs/attention-signals.md` § Compute / `ec2` row.
-- a9s golden doc — scheduled retirement/reboot `Events[]` within 7 days → Warning — `docs/attention-signals.md` § Compute / `ec2` row.
-- a9s golden doc — Wave 3 `StatusCheckFailed` + IMDSv1 OUT OF SCOPE — `docs/attention-signals.md` § Compute / `ec2` row.
+- a9s golden doc — EC2 Wave 1 state mapping (`running`, `pending`, `stopping`, `stopped`, `terminated`) — `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
+- a9s golden doc — `StateReason.Code` `Server.*` → Broken on stopped instance — `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
+- a9s golden doc — `StateTransitionReason` user-initiated >30d → Warning — `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
+- a9s golden doc — Wave 2 source `DescribeInstanceStatus(IncludeAllInstances=true)` with `impaired`/`initializing`/`insufficient-data`/`not-applicable` bucketing — `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
+- a9s golden doc — scheduled retirement/reboot `Events[]` within 7 days → Warning — `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
+- a9s golden doc — Wave 3 `StatusCheckFailed` + IMDSv1 OUT OF SCOPE — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — related targets contract for `ec2` — `docs/related-resources.md` § Per-type contract / `ec2` row.
 - a9s golden doc — per-target reasoning (`alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc`) — `docs/related-resources.md` § Per-target reasoning / `ec2`.
 - a9s golden doc — `ct-events` as universal pivot — `docs/related-resources.md` § Policy (item 4).

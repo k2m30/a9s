@@ -95,7 +95,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeEnvironments](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_DescribeEnvironments.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `eb`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -206,13 +206,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` universal pivot — `docs/related-resources.md` § Policy (item 4).
 - `alarm` discovery heuristic (match on `Dimensions[EnvironmentName]`) — a9s-devops (2026-04-20): possible=yes, worth=yes. EB-created alarms use `Dimensions=[{Name:EnvironmentName,Value:<env>}]`; non-EB-created alarms referencing the environment use the same dimension if they're useful to the operator. Persona call recorded because no field citation exists in the golden docs for this pivot; adopted because it matches how EB itself tags its own alarms.
 - "Count shown: unknown" for every related target — `docs/related-resources.md` does not pin count-display semantics per pivot; the skill records silence as `unknown` rather than inventing a value.
-- Wave 1 signals (`Health` Green/Yellow/Grey/Red → Healthy/Warning/Warning/Broken; `Status==Terminated` → Dim) — `docs/attention-signals.md` § Compute (row `eb`).
+- Wave 1 signals (`Health` Green/Yellow/Grey/Red → Healthy/Warning/Warning/Broken; `Status==Terminated` → Dim) — `docs/attention-signals.md § Signals § MESSAGING` row `eb`.
 - SDK field names `Health`, `Status`, `HealthStatus`, and the AWS semantics of Green/Yellow/Grey/Red — `AWS SDK Go v2 — elasticbeanstalk/types.EnvironmentDescription § Health` (doc comment) and `§ Status`.
 - `Health` enum values — `AWS SDK Go v2 — elasticbeanstalk/types.EnvironmentHealth`.
 - `Status` enum values — `AWS SDK Go v2 — elasticbeanstalk/types.EnvironmentStatus`.
-- Wave 2 `Causes[]` non-empty → Warning detail — `docs/attention-signals.md` § Compute (row `eb`); AWS SDK Go v2 — `elasticbeanstalk.DescribeEnvironmentHealthOutput § Causes`.
+- Wave 2 `Causes[]` non-empty → Warning detail — `docs/attention-signals.md § Signals § MESSAGING` row `eb`; AWS SDK Go v2 — `elasticbeanstalk.DescribeEnvironmentHealthOutput § Causes`.
 - `Causes[]` populated only under enhanced health — a9s-devops (2026-04-20): possible=yes, worth=yes. Basic health does not populate `Causes`; implementation must tolerate the empty slice without emitting an S5 line. Persona call because the golden docs are silent on the basic-vs-enhanced distinction but the API contract is explicit.
-- Wave 3 items explicitly listed as out of scope — `docs/attention-signals.md` § Compute (row `eb`, Wave 3 cell).
+- Wave 3 items explicitly listed as out of scope — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->

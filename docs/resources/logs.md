@@ -77,7 +77,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeLogStreams](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `logs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -159,8 +159,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- List API and list-response fields — `docs/attention-signals.md` § "Monitoring" table row `logs`; also `AWS SDK Go v2 — cloudwatchlogs/types.LogGroup § LogGroupName, CreationTime, RetentionInDays, StoredBytes, KmsKeyId, MetricFilterCount`.
-- Describe API for Wave 2 — `docs/attention-signals.md` § "Monitoring" table row `logs`; also `AWS SDK Go v2 — cloudwatchlogs/types.LogStream § LastEventTimestamp`.
+- List API and list-response fields — `AWS SDK Go v2 — cloudwatchlogs/types.LogGroup § LogGroupName, CreationTime, RetentionInDays, StoredBytes, KmsKeyId, MetricFilterCount`.
+- Describe API for Wave 2 — `AWS SDK Go v2 — cloudwatchlogs/types.LogStream § LastEventTimestamp`.
 - Related targets (full list) — `docs/related-resources.md` § Per-type contract, row `logs`; detailed reasoning in `docs/related-resources.md` § `logs`.
 - `alarm` via metric-filter bridge — `docs/related-resources.md` § `logs` ("Metric-filter-driven alarms") — a9s-devops (2026-04-20): possible=yes, worth=yes. Log-group → metric-filter → CW metric → alarm is the canonical bridge; DescribeMetricFilters is the read step, then reverse-scan the loaded alarm list.
 - `apigw` via naming convention — `docs/related-resources.md` § `logs` ("APIGW access logs") — a9s-devops (2026-04-20): possible=yes, worth=yes. `API-Gateway-Execution-Logs_<apiId>/<stage>` (REST) and `/aws/http-api/<apiId>` (HTTP v2) are stable naming patterns.
@@ -170,11 +170,11 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `lambda` via naming + subscription filters — `docs/related-resources.md` § `logs` ("Lambdas whose logs land here OR subscription-filter consumers") — a9s-devops (2026-04-20): possible=yes, worth=yes. `/aws/lambda/<name>` convention is stable and unambiguous.
 - `s3` via `DescribeExportTasks` — `docs/related-resources.md` § `logs` ("Export tasks to S3") — a9s-devops (2026-04-20): possible=yes (per-group call), worth=yes (archive/compliance workflow).
 - `ct-events` universal pivot — `docs/related-resources.md` § Policy item 4 ("`ct-events` … is implicitly relevant for every registered type").
-- Wave 1 `retentionInDays` nil → Warning — `docs/attention-signals.md` § Monitoring row `logs`.
-- Wave 1 `storedBytes==0 && creationTime<now()-90d` → Warning — `docs/attention-signals.md` § Monitoring row `logs`.
-- Wave 1 KMS-PendingDeletion cross-ref — `docs/attention-signals.md` § Monitoring row `logs`.
-- Wave 2 `lastEventTimestamp` staleness — `docs/attention-signals.md` § Monitoring row `logs`; `AWS SDK Go v2 — cloudwatchlogs/types.LogStream § LastEventTimestamp` (`*int64`, ms since epoch).
-- Wave 3 metric-filter-count check (OUT OF SCOPE) — `docs/attention-signals.md` § Monitoring row `logs`.
+- Wave 1 `retentionInDays` nil → Warning — `docs/attention-signals.md § Signals § MONITORING` row `logs`.
+- Wave 1 `storedBytes==0 && creationTime<now()-90d` → Warning — `docs/attention-signals.md § Signals § MONITORING` row `logs`.
+- Wave 1 KMS-PendingDeletion cross-ref — `docs/attention-signals.md § Signals § MONITORING` row `logs`.
+- Wave 2 `lastEventTimestamp` staleness — `docs/attention-signals.md § Signals § MONITORING` row `logs`; `AWS SDK Go v2 — cloudwatchlogs/types.LogStream § LastEventTimestamp` (`*int64`, ms since epoch).
+- Wave 3 metric-filter-count check (OUT OF SCOPE) — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `~` severity choice for `lastEventTimestamp` staleness — user decision deferred; defaulted to `~` (informational background check on a green row) because a stale log stream is a lagging signal, not an active break. a9s-devops (2026-04-20): stale-log-group does not itself cause user-facing impact — it flags a silent emitter; worth surfacing but not worth bumping the menu `issues:N` count.
 

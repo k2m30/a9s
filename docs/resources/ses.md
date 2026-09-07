@@ -65,7 +65,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [GetAccount (SESv2)](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_GetAccount.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -167,8 +167,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `kinesis` removed: SES event destinations use Kinesis Firehose; `kinesis` in a9s models Kinesis Data Streams — a different service. The pivot was producing dead drill-through results (Firehose ARN format does not match Data Streams IDs). Tracked separately for a potential `firehose` resource type.
 - Out-of-scope related targets (`acm`, `alarm`, `cfn`, `kms`, `logs`, `role`, `trail`) — `docs/related-resources.md` § Out-of-scope bullets for `ses`.
 - `ct-events` is a universal pivot — `docs/related-resources.md` § Policy.
-- Wave 1 and Wave 2 signal list — `docs/attention-signals.md` § Backup & Email, row `ses`.
-- `VerificationStatus` enum values (`PENDING`, `SUCCESS`, `FAILED`, `TEMPORARY_FAILURE`, `NOT_STARTED`) — AWS SDK Go v2 — `sesv2/types.VerificationStatus` (enum constants) and `sesv2/types.IdentityInfo` § `VerificationStatus` (field docstring). Matches the row after the amendment note in attention-signals.md.
+- Wave 1 and Wave 2 signal list — `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
+- `VerificationStatus` enum values (`PENDING`, `SUCCESS`, `FAILED`, `TEMPORARY_FAILURE`, `NOT_STARTED`) — AWS SDK Go v2 — `sesv2/types.VerificationStatus` (enum constants) and `sesv2/types.IdentityInfo` § `VerificationStatus` (field docstring). They match `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
 - `IdentityInfo.SendingEnabled` field — AWS SDK Go v2 — `sesv2/types.IdentityInfo` § `SendingEnabled`.
 - `IdentityType` values `EMAIL_ADDRESS` / `DOMAIN` used to decide r53 matching — AWS SDK Go v2 — `sesv2/types.IdentityType`.
 - `GetAccount.EnforcementStatus` values (`HEALTHY`, `PROBATION`, `SHUTDOWN`) — AWS SDK Go v2 — `sesv2.GetAccountOutput` § `EnforcementStatus` (field docstring).

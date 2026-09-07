@@ -79,7 +79,7 @@ Explicitly excluded (per `docs/related-resources.md` §`lt`): `role` (`IamInstan
 
 **Source API**: [DescribeLaunchTemplateVersions](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeLaunchTemplateVersions.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `lt`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -120,7 +120,7 @@ All three signals ride the same single call: `DescribeLaunchTemplateVersions(Ver
 
 ## 4. Issue Visualization
 
-Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing — the fleet color invariant ("color derives from findings", the conformance-gate owner rule) applies to the enricher-borne deprecated-AMI check too: its row renders Warning-colored like any other finding. Its `~` class affects only the S1 aggregation (no badge bump — the badge counts state rows and `!`-class checks) and S5 ordering.
+Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave→surface mapping as standard. Every signal is color-bearing — the fleet color invariant ("color derives from findings", the conformance-gate owner rule) applies to the enricher-borne deprecated-AMI check too: its row renders Warning-colored like any other finding. Its `~` class affects only the S1 aggregation (no badge bump — the badge counts state rows and `!`-class checks) and S5 ordering.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
@@ -156,7 +156,7 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 - List shape carries no data fields — `AWS SDK Go v2 — ec2/types.LaunchTemplate` (identity, `DefaultVersionNumber`/`LatestVersionNumber`, `CreatedBy`, `CreateTime`, `Tags` only).
 - IMDSv1 signal — `AWS SDK Go v2 — ec2/types.LaunchTemplateInstanceMetadataOptions § HttpTokens` ("optional — … you receive the IMDSv1 role credentials"); unset-defaults-to-optional per the same doc; `a9s-devops (2026-07-14): possible=yes, worth=yes. dbi-PubliclyAccessible class; SSRF/credential-theft precedent.`
 - Encryption signal — `AWS SDK Go v2 — ec2/types.LaunchTemplateEbsBlockDevice § Encrypted, § KmsKeyId`; nil-is-unknown rule — `a9s-devops (2026-07-14): possible=yes, worth=yes. Default-encryption accounts make nil legitimate; flagging nil is a false positive.`
-- Deprecated-AMI signal — `docs/attention-signals.md` § Compute row `ami` (`DeprecationTime < now()` → Warning) cross-referenced from the loaded cache; `a9s-devops (2026-07-14): possible=yes, worth=yes. Not-in-cache ≠ deregistered — public/marketplace AMIs legitimately absent.`
+- Deprecated-AMI signal — `docs/attention-signals.md § Signals § COMPUTE` row `ami`; `a9s-devops (2026-07-14): possible=yes, worth=yes. Not-in-cache ≠ deregistered — public/marketplace AMIs legitimately absent.`
 - `$Default`-not-`$Latest` read — `a9s-devops (2026-07-14): $Default is what asg/ng/ec2 resolve at launch; $Latest is staging.`
 - default≠latest display-only, no unused-flag — `a9s-devops (2026-07-14): possible=yes, worth=no. Healthy steady state; alarm fatigue; templates free+inert.`
 - references answered by the related panel, not a list column — `user (2026-07-14): reuse common techniques fit to current infrastructure, no resource-specific machinery. A cross-cache computed list column has no house mechanism; the asg/ng/ec2 pivots already carry the counts.`

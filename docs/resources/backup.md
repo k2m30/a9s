@@ -53,7 +53,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [ListBackupJobs](https://docs.aws.amazon.com/aws-backup/latest/devguide/API_ListBackupJobs.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § BACKUP` row `backup`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -75,7 +75,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-Copied verbatim from `docs/attention-signals.md`, prefixed `OUT OF SCOPE:`.
+Copied verbatim from `docs/attention-signals.md § Not yet implemented`, prefixed `OUT OF SCOPE:`.
 
 - OUT OF SCOPE: "Newest completed older than rule cadence × 2" (requires `GetBackupPlan` per plan for rule cadence).
 
@@ -133,11 +133,11 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 
 ## 6. Citations
 
-- Display name `Backup Plans` — `docs/attention-signals.md` § "Backup & Email" table row `backup`.
+- Display name `Backup Plans` — `docs/attention-signals.md § Signals § BACKUP` row `backup`.
 - AWS API reference URL — `docs/related-resources.md` § "Per-type contract" row `backup`.
-- List API is `ListBackupPlans` and is config-only — `docs/attention-signals.md` § "Backup & Email" Wave 1 cell.
+- List API is `ListBackupPlans` and is config-only — `core/aws/backup.go`.
 - List-response fields on `BackupPlansListMember` — `AWS SDK Go v2 — service/backup/types.BackupPlansListMember § BackupPlanId, BackupPlanName, CreationDate, DeletionDate, LastExecutionDate, VersionId, CreatorRequestId, AdvancedBackupSettings`.
-- Wave 2 API is `ListBackupJobs(ByCreatedAfter=now-24h)`, account-wide, bucketed by `BackupPlanId` — `docs/attention-signals.md` § "Backup & Email" Wave 2 cell.
+- Wave 2 API is `ListBackupJobs(ByCreatedAfter=now-24h)`, account-wide, bucketed by `BackupPlanId` — `core/aws/backup_issue_enrichment.go`.
 - `BackupJob.State` enum values include `FAILED`, `EXPIRED`, `ABORTED`, `PARTIAL` — `AWS SDK Go v2 — service/backup/types.BackupJobState` (`BackupJobStateFailed`, `BackupJobStateExpired`, `BackupJobStateAborted`, `BackupJobStatePartial`).
 - `BackupJob.State` and `BackupJob.StatusMessage` are on the `BackupJob` shape returned by `ListBackupJobs` — `AWS SDK Go v2 — service/backup/types.BackupJob § State, StatusMessage, BackupPlanId (nested in CreatedBy.BackupPlanId)`.
 - `ct-events` is a universal pivot — `docs/related-resources.md` § "Policy".
@@ -151,12 +151,12 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 - `DescribeBackupVault` returns `EncryptionKeyArn` — `AWS API Reference: DescribeBackupVault § EncryptionKeyArn` (<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_DescribeBackupVault.html>).
 - `GetBackupVaultNotifications` returns `SNSTopicArn` and `BackupVaultEvents[]` — `AWS API Reference: GetBackupVaultNotifications § SNSTopicArn, BackupVaultEvents` (<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_GetBackupVaultNotifications.html>).
 - `backup`→`eb-rule` and `backup`→`logs` exclusions — `docs/related-resources.md` § "Explicitly excluded" / "Unanimous sometimes".
-- Wave 3 cadence-comparison deferment — `docs/attention-signals.md` § "Backup & Email" Wave 3 cell.
+- Wave 3 cadence-comparison deferment — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - Discovery mechanism for `kms` from a BackupPlan — `a9s-devops (2026-04-20): possible=yes, worth=yes. Plan carries no KMS field; traversal is plan→Rules[].TargetBackupVaultName→DescribeBackupVault.EncryptionKeyArn. Justified because KMSKeyNotAccessible is the top non-transient cause of backup failure and the operator needs a one-keypress pivot.`
 - Discovery mechanism for `role` from a BackupPlan — `a9s-devops (2026-04-20): possible=yes, worth=yes. ListBackupSelections(BackupPlanId).BackupSelectionsList[].IamRoleArn gives the ARN directly; a plan with multiple selections may have multiple roles. Justified because IAM permissions failures are the second top cause of backup failure.`
 - Discovery mechanism for `sns` from a BackupPlan — `a9s-devops (2026-04-20): possible=yes, worth=yes. SNS is per-vault; resolve distinct vault names from Rules[].TargetBackupVaultName, then GetBackupVaultNotifications per vault. Justified because absence-of-SNS on a backup vault is itself a silent-risk signal worth surfacing.`
-- Severity choice: `FAILED/EXPIRED/ABORTED` = `!` (Broken) and `PARTIAL` = `~` (Warning) — `docs/attention-signals.md` § "Backup & Email" Wave 2 cell ("any job State in FAILED/EXPIRED/ABORTED → Broken; PARTIAL → Warning") maps directly to the S1-bumping `!` glyph for Broken and the non-bumping `~` glyph for Warning per the skill's Wave-to-surface rules.
+- Severity choice: `FAILED/EXPIRED/ABORTED` = `!` (Broken) and `PARTIAL` = `~` (Warning) — `docs/attention-signals.md § Signals § BACKUP` row `backup` ships the failed-job finding as Broken and the partial-job finding as Warning, which maps to the S1-bumping `!` glyph and the non-bumping `~` glyph per the skill's Wave-to-surface rules.
 
 <!-- BEGIN GENERATED: header -->
 backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field).

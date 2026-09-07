@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `sfn`
 - **Display name**: Step Functions
 - **AWS API reference**: <https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html>
-- **List API**: `ListStateMachines` — returns `StateMachineListItem[]` with `Name`, `StateMachineArn`, `Type` (STANDARD | EXPRESS), `CreationDate`. Per `attention-signals.md`, this list is config-only: the summary carries no status field, so **no Wave 1 health signal is reachable from the list alone**.
+- **List API**: `ListStateMachines` — returns `StateMachineListItem[]` with `Name`, `StateMachineArn`, `Type` (STANDARD | EXPRESS), `CreationDate` and no status field — `AWS SDK Go v2 — sfn/types.StateMachineListItem`. **No health signal is reachable from the list alone.**
 - **Describe API (if any)**: Two calls, both per-state-machine, used in Wave 2 / related discovery:
   - `ListExecutions(statusFilter=FAILED, maxResults=1)` — the only Wave 2 attention call; returns the most recent failed execution so a9s can flag recent-failure or consecutive-failure state.
   - `DescribeStateMachine` — used **only** to discover related targets (`role`, `kms`, `logs`, `lambda`); never used to produce attention signals. Returns `RoleArn`, `EncryptionConfiguration.KmsKeyId`, `LoggingConfiguration.Destinations[].CloudWatchLogsLogGroup.LogGroupArn`, and the ASL `Definition` string.
@@ -73,7 +73,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `e
 
 **Source API**: [ListExecutions](https://docs.aws.amazon.com/step-functions/latest/apireference/API_ListExecutions.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `sfn`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -172,9 +172,9 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - `lambda discovered by parsing ASL Definition for Task resources` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Both the direct arn:aws:lambda:...:function:... form and the optimized arn:aws:states:::lambda:invoke + Parameters.FunctionName form are documented patterns covering >99% of workflows. No structured integrations field exists on any SFN API.`
 - `logs discovered via DescribeStateMachine.LoggingConfiguration.Destinations[]` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Opt-in per-state-machine; primary debugging channel for STANDARD; required for EXPRESS debugging at all.`
 - `role discovered via DescribeStateMachine.RoleArn` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Required field; count always 0 or 1; single most interrogated attribute during an SFN incident.`
-- `Wave 2 signal: recent failure → Warning, consecutive failures → Broken` — `docs/attention-signals.md` § Messaging row `sfn`.
-- `Wave 3 signals: CloudWatch ExecutionsFailed/ExecutionsTimedOut/ExecutionThrottled trends` — `docs/attention-signals.md` § Messaging row `sfn`.
-- `ListExecutions is the supported API for failure enumeration` — `docs/attention-signals.md` § Messaging row `sfn` Source column: [ListExecutions](https://docs.aws.amazon.com/step-functions/latest/apireference/API_ListExecutions.html).
+- `Wave 2 signal: recent failure → Warning, consecutive failures → Broken` — `docs/attention-signals.md § Signals § MESSAGING` row `sfn`.
+- `Wave 3 signals: CloudWatch ExecutionsFailed/ExecutionsTimedOut/ExecutionThrottled trends` — `docs/attention-signals.md § Not yet implemented`.
+- `ListExecutions` is the supported API for failure enumeration — [ListExecutions](https://docs.aws.amazon.com/step-functions/latest/apireference/API_ListExecutions.html); the findings it feeds are `docs/attention-signals.md § Signals § MESSAGING` row `sfn`.
 - `S4 wording "last run failed" and "failing: consecutive failures", S5 sentences` — `a9s-devops (2026-04-20): possible=yes, worth=yes. State keywords alone violate the skill's "state keywords are not explanations" rule; pairing state with an operator-readable cue ("last run failed", "consecutive failures") plus a detail sentence that hints at the likely class of root cause (IAM / definition / downstream) matches the §4 surface rules and the 3am test.`
 - `Out-of-scope: ASL parse beyond lambda` — `a9s-devops (2026-04-20): possible=yes, worth=no. related-resources.md contract restricts ASL-derived targets to lambda; widening violates the contract and risks combinatorial panel growth.`
 - `Out-of-scope: per-execution drill-down` — `a9s-devops (2026-04-20): possible=yes, worth=no for v1. Belongs in a future execution-browser child view; CloudTrail + Console cover incident workflow today.`

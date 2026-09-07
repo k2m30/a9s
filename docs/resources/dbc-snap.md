@@ -81,7 +81,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `
 
 **Source API**: [DescribeDBClusterSnapshots](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusterSnapshots.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -195,7 +195,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 
 - a9s golden doc — related-panel contract for `dbc-snap` — `docs/related-resources.md § dbc-snap` (targets `backup`, `ct-events`, `dbc`, `kms`, `vpc`; per-type contract table row).
 - a9s golden doc — Wave 1 signals (`Status` buckets, manual-age cost rule, automated cross-ref with `dbc` retention) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap`.
-- a9s golden doc — Wave 3 exclusion (`DescribeDBClusterSnapshotAttributes`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap` Wave 3 cell.
+- a9s golden doc — the deferred `DescribeDBClusterSnapshotAttributes` read — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md § What is a9s?`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md § Policy`.
 - AWS Go SDK v2 — `DBClusterIdentifier`, `KmsKeyId`, `VpcId`, `Status`, `SnapshotType`, `SnapshotCreateTime`, `StorageEncrypted` fields — `AWS SDK Go v2 — docdb/types.DBClusterSnapshot`.

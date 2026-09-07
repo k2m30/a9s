@@ -60,7 +60,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `apigw`, `c
 
 **Source API**: [ListCertificates](https://docs.aws.amazon.com/acm/latest/APIReference/API_ListCertificates.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `acm`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -182,8 +182,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - acm related-panel targets `apigw`, `cf`, `elb`, `r53`, `ct-events` — `docs/related-resources.md` § Per-type contract, row `acm`.
-- acm Wave 1 signal set (`Status` enum mapping, `NotAfter` thresholds, `InUse` orphan) — `docs/attention-signals.md` § Signals, row `acm` Wave 1 cell.
-- acm Wave 2 signals (`RenewalSummary.RenewalStatus`, `DomainValidationOptions[].ValidationStatus`) — `docs/attention-signals.md` § Signals, row `acm` Wave 2 cell.
+- acm Wave 1 signal set (`Status` enum mapping, `NotAfter` thresholds, `InUse` orphan) — `docs/attention-signals.md § Signals § DNS & CDN` row `acm`.
+- acm Wave 2 signals (`RenewalSummary.RenewalStatus`, `DomainValidationOptions[].ValidationStatus`) — `docs/attention-signals.md § Signals § DNS & CDN` row `acm`.
 - `Status`, `NotAfter`, `NotBefore`, `InUse`, `DomainName`, `CertificateArn` present on `ListCertificates` response — `AWS SDK Go v2 — service/acm/types.CertificateSummary § Status, NotAfter, InUse, DomainName, CertificateArn`.
 - `InUseBy []string` field on describe response lists ARNs of consuming resources — `AWS SDK Go v2 — service/acm/types.CertificateDetail § InUseBy`.
 - `RenewalSummary` present only on `AMAZON_ISSUED` certs — `AWS SDK Go v2 — service/acm/types.CertificateDetail § RenewalSummary`.

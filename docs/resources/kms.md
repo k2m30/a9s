@@ -54,7 +54,7 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 ### `role`
 
 - **Why related**: IAM roles that the key policy trusts — answers "who can use this key?" during a permissions audit.
-- **How discovered**: requires `GetKeyPolicy` per key and JSON-parsing the `Principal` / `AWS` entries to extract role ARNs, then cross-reference the already-loaded `role` list. `GetKeyPolicy` is not part of the Wave 2 set in `docs/attention-signals.md` (that document treats key-policy analysis as Wave 3: "Key-policy analysis per key (`Principal:*` detection)"). **Count unknown** until key-policy enrichment is wired; the panel shows the `role` target label with no number rather than hiding it.
+- **How discovered**: requires `GetKeyPolicy` per key and JSON-parsing the `Principal` / `AWS` entries to extract role ARNs, then cross-reference the already-loaded `role` list. No `kms` signal makes that call — key-policy analysis is deferred, `docs/attention-signals.md § Not yet implemented`. **Count unknown** until key-policy enrichment is wired; the panel shows the `role` target label with no number rather than hiding it.
 - **Count shown**: unknown.
 
 ### `ct-events`
@@ -67,7 +67,7 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 
 **Source API**: [DescribeKey](https://docs.aws.amazon.com/kms/latest/APIReference/API_DescribeKey.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -164,13 +164,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- List API returns `KeyId`/`KeyArn` only — `docs/attention-signals.md` § Secrets & Config row `kms` ("None — `ListKeys` returns `{KeyId, KeyArn}` only"). Confirmed: `AWS SDK Go v2 — service/kms/types.KeyListEntry § KeyArn, KeyId`.
-- Wave 2 `DescribeKey` per key for `KeyState` buckets (Enabled / Creating / Updating / Disabled / PendingDeletion / PendingImport / PendingReplicaDeletion / Unavailable) — `docs/attention-signals.md` § Secrets & Config row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms/types.KeyMetadata § KeyState` (`KeyState` enum values match).
-- Wave 2 `GetKeyRotationStatus` per key, `KeyRotationEnabled==false` on CMK → Warning — `docs/attention-signals.md` § Secrets & Config row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms.GetKeyRotationStatusOutput § KeyRotationEnabled`.
+- List API returns `KeyId`/`KeyArn` only — `AWS SDK Go v2 — service/kms/types.KeyListEntry § KeyArn, KeyId`.
+- Wave 2 `DescribeKey` per key for `KeyState` buckets (Enabled / Creating / Updating / Disabled / PendingDeletion / PendingImport / PendingReplicaDeletion / Unavailable) — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms/types.KeyMetadata § KeyState` (`KeyState` enum values match).
+- Wave 2 `GetKeyRotationStatus` per key, `KeyRotationEnabled==false` on CMK → Warning — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms.GetKeyRotationStatusOutput § KeyRotationEnabled`.
 - CMK = customer-managed key (`KeyManager==CUSTOMER`); AWS-managed keys excluded from rotation check because AWS rotates them automatically — `AWS SDK Go v2 — service/kms/types.KeyManagerType § KeyManagerTypeAws, KeyManagerTypeCustomer` (enum values AWS and CUSTOMER). a9s-devops persona (2026-04-20, persona fallback per skill §"Handling gaps"): possible=yes, worth=yes. Rationale: surfacing rotation-off on AWS-managed keys would be noise because the operator cannot change it and AWS has already taken responsibility; the signal is actionable only for keys the account owns.
 - Related target discovery is reverse-index (sibling-list cross-reference on `KmsKeyId`/`KmsKeyArn`) for `dbi`, `ebs`, `secrets` — `docs/related-resources.md` § `kms` reasoning bullets (`StreamDescription.KeyId`, `Volume.KmsKeyId`, `SecretListEntry.KmsKeyId — UUID suffix matched against KMS key cache`). a9s-devops persona (2026-04-20, persona fallback): possible=yes, worth=yes. Rationale: `KeyMetadata` holds no consumer refs, so the pivot must traverse the other direction; these consumer types list their KMS key on the list-response shape, so no extra API call is needed when the sibling list is already loaded.
 - `s3` budget exclusion — bucket encryption config is not on `ListBuckets` and not cached; per-bucket `GetBucketEncryption` fan-out exceeds the checker budget — `docs/related-resources.md` § Policy rule 7.
-- `role` target count is unknown pending key-policy enrichment — `docs/attention-signals.md` § Secrets & Config row `kms` Wave 3 ("Key-policy analysis per key (`Principal:*` detection)"). a9s-devops persona (2026-04-20, persona fallback): possible=yes (via `GetKeyPolicy`), worth=deferred. Rationale: the key-policy JSON parse is the same work Wave 3 already scopes; surfacing the role list requires that enrichment to land first, so the panel shows the target with no count rather than hiding it.
+- `role` target count is unknown pending key-policy enrichment — `docs/attention-signals.md § Not yet implemented`. a9s-devops persona (2026-04-20, persona fallback): possible=yes (via `GetKeyPolicy`), worth=deferred. Rationale: the key-policy JSON parse is the same work the deferred grant-level analysis scopes; surfacing the role list requires that enrichment to land first, so the panel shows the target with no count rather than hiding it.
 - `ct-events` is the universal pivot — `docs/related-resources.md` § Policy (universal cross-reference via `resources[].ARN`).
 - Read-only invariant — `docs/architecture.md` § opening paragraph ("a9s is a read-only terminal UI for AWS").
 - S1–S5 surface rules and glyph constraints — `a9s-resource-spec` skill § "Allowed visualization surfaces (exactly five)".

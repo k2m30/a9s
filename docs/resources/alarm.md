@@ -122,7 +122,7 @@ All non-action pivots (everything except `sns`, `asg`, and `ct-events`) are disc
 
 **Source API**: [DescribeAlarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_DescribeAlarms.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `alarm`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -219,9 +219,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - alarm related-panel targets `apigw`, `asg`, `cb`, `dbi`, `ec2`, `ecs`, `eks`, `kms`, `lambda`, `logs`, `s3`, `sfn`, `sns`, `waf`, `ct-events` — `docs/related-resources.md` § Per-type contract, row `alarm`.
-- alarm Wave 1 signal set (`StateValue` enum mapping, `ActionsEnabled==false`, `AlarmActions==[]`, `INSUFFICIENT_DATA` age vs `2×Period`, `Dimensions` zombie cross-ref) — `docs/attention-signals.md` § Monitoring, row `alarm` Wave 1 cell.
-- alarm has no Wave 2 signals — `docs/attention-signals.md` § Monitoring, row `alarm` Wave 2 cell (`None`).
-- alarm has no Wave 3 signals — `docs/attention-signals.md` § Monitoring, row `alarm` Wave 3 cell (`None`).
+- alarm Wave 1 signal set (`StateValue` enum mapping, `ActionsEnabled==false`, `AlarmActions==[]`, `INSUFFICIENT_DATA` age vs `2×Period`, `Dimensions` zombie cross-ref) — `docs/attention-signals.md § Signals § MONITORING` row `alarm`.
+- alarm has no Wave 2 signals — `docs/attention-signals.md § Signals § MONITORING` row `alarm`.
+- alarm has no Wave 3 signals — `docs/attention-signals.md § Not yet implemented`.
 - `StateValue`, `StateReason`, `StateUpdatedTimestamp`, `ActionsEnabled`, `AlarmActions`, `OKActions`, `InsufficientDataActions`, `Dimensions`, `Namespace`, `MetricName`, `Period`, `AlarmArn`, `AlarmName` all present on `DescribeAlarms` response — `AWS SDK Go v2 — service/cloudwatch/types.MetricAlarm § StateValue, StateReason, StateUpdatedTimestamp, ActionsEnabled, AlarmActions, OKActions, InsufficientDataActions, Dimensions, Namespace, MetricName, Period, AlarmArn, AlarmName`.
 - `Dimension` shape is `{Name, Value}` — `AWS SDK Go v2 — service/cloudwatch/types.Dimension § Name, Value`.
 - SNS topic discovery via `AlarmActions`/`OKActions`/`InsufficientDataActions` ARN prefix `arn:aws:sns:` — `docs/related-resources.md` § Per-target reasoning, row `alarm → sns` ("MetricAlarm.AlarmActions / OKActions — SNS topics notified").

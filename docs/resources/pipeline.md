@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `pipeline`
 - **Display name**: CodePipelines
 - **AWS API reference**: <https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html>
-- **List API**: `ListPipelines` — returns `PipelineSummary[]`. Per `attention-signals.md`, `ListPipelines` is config-only: the summary carries `Name`, `Version`, `Created`, `Updated`, `ExecutionMode`, `PipelineType` and nothing about execution health — so no Wave 1 health signal is reachable from the list alone.
+- **List API**: `ListPipelines` — returns `PipelineSummary[]`, which carries `Name`, `Version`, `Created`, `Updated`, `ExecutionMode`, `PipelineType` and nothing about execution health — `AWS SDK Go v2 — codepipeline/types.PipelineSummary`. No health signal is reachable from the list alone.
 - **Describe API (if any)**: Two calls, both per-pipeline, used in Wave 2:
   - `GetPipelineState` — returns `stageStates[].latestExecution.status` used by every Wave 2 health signal.
   - `GetPipeline` — returns `PipelineDeclaration` with full `Stages[].Actions[]`, `ArtifactStore(s)`, `RoleArn`. Used exclusively to discover related targets; never used for attention signals.
@@ -107,7 +107,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`
 
 **Source API**: [GetPipelineState](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_GetPipelineState.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `pipeline`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -199,9 +199,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - pipeline related-panel targets `cb`, `cfn`, `codeartifact`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events` — `docs/related-resources.md` § Per-type contract, row `pipeline`.
-- pipeline has no Wave 1 signals (`ListPipelines` is config-only) — `docs/attention-signals.md` § CI/CD, row `pipeline` Wave 1 cell.
-- pipeline Wave 2 signals (`Failed` / `Stopped` / `Cancelled` and `InProgress >2h`) use `GetPipelineState` per pipeline — `docs/attention-signals.md` § CI/CD, row `pipeline` Wave 2 cell.
-- pipeline Wave 3 items (`ListPipelineExecutions` trend, dormant-pipeline detection) are out of scope — `docs/attention-signals.md` § CI/CD, row `pipeline` Wave 3 cell.
+- pipeline has no Wave 1 signals (`ListPipelines` is config-only) — `docs/attention-signals.md § Signals § CI/CD` row `pipeline`.
+- pipeline Wave 2 signals (`Failed` / `Stopped` / `Cancelled` and `InProgress >2h`) use `GetPipelineState` per pipeline — `docs/attention-signals.md § Signals § CI/CD` row `pipeline`.
+- pipeline Wave 3 items (`ListPipelineExecutions` trend, dormant-pipeline detection) are out of scope — `docs/attention-signals.md § Not yet implemented`.
 - `PipelineSummary` fields returned by `ListPipelines` are `Name`, `Version`, `Created`, `Updated`, `ExecutionMode`, `PipelineType` (no health fields) — `AWS SDK Go v2 — service/codepipeline/types.PipelineSummary`.
 - `PipelineDeclaration.RoleArn` is required; `PipelineDeclaration.ArtifactStore` / `ArtifactStores` carry encryption and location — `AWS SDK Go v2 — service/codepipeline/types.PipelineDeclaration § RoleArn, ArtifactStore, ArtifactStores`.
 - `ArtifactStore.Location` (bucket name) and `ArtifactStore.EncryptionKey` (optional KMS) drive `s3` and `kms` discovery — `AWS SDK Go v2 — service/codepipeline/types.ArtifactStore § Location, EncryptionKey`; `types.EncryptionKey § Id, Type`.

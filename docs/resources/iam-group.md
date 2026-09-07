@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `iam-group`
 - **Display name**: IAM Groups
 - **AWS API reference**: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html>
-- **List API**: `ListGroups` — returns `Group` entries with `GroupName`, `GroupId`, `Arn`, `Path`, `CreateDate`. No attention-relevant runtime state is carried on the list response (this is what `attention-signals.md` calls "config-only").
+- **List API**: `ListGroups` — returns `Group` entries with `GroupName`, `GroupId`, `Arn`, `Path`, `CreateDate`, and no attention-relevant runtime state — `AWS SDK Go v2 — iam/types.Group`.
 - **Describe API (if any)**: `GetGroup` — used in Wave 2 to read the `Users[]` membership list.
 
 ## 2. Related Resources Panel (detail view, right column)
@@ -47,7 +47,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [GetGroup](https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetGroup.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-group`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -116,9 +116,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `iam-user` related rationale (members of group) — `docs/related-resources.md` § "### `iam-group`" bullet "**`iam-user`** — Members of this group."
 - `policy` related rationale (attached managed policies) — `docs/related-resources.md` § "### `iam-group`" bullet "**`policy`** — Attached managed policies."
 - `ct-events` universal pivot — `docs/related-resources.md` § "Policy" item 4 "Universal pivots — `ct-events` (CloudTrail audit trail) is implicitly ...".
-- List API = `ListGroups`, config-only — `docs/attention-signals.md` § Security & IAM row `iam-group` Wave 1 cell "None — `ListGroups` is config-only".
-- Wave 2 signal (empty group >30d) — `docs/attention-signals.md` § Security & IAM row `iam-group` Wave 2 cell "`GetGroup` per group: `Users==[]` AND group age >30d → Warning (orphan)".
-- Wave 3 deferred — `docs/attention-signals.md` § Security & IAM row `iam-group` Wave 3 cell "`ListAttachedGroupPolicies` per group (admin-access + blast radius)".
+- List API = `ListGroups`, config-only — `core/aws/iam_groups.go`.
+- Wave 2 signal (empty group >30d) — `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-group`.
+- Wave 3 deferred — `docs/attention-signals.md § Not yet implemented`.
 - `Group` fields available on the list response — `AWS SDK Go v2 — service/iam/types.Group § Arn, CreateDate, GroupId, GroupName, Path`.
 - `GetGroup` returns `Users[]` — `AWS SDK Go v2 — service/iam.GetGroupOutput § Users, Group, IsTruncated`.
 - `CreateDate` drives the ">30d" age calculation — `AWS SDK Go v2 — service/iam/types.Group § CreateDate`.

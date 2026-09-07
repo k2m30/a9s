@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: DB Instance Snapshots
 - **AWS API reference**: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html>
 - **List API**: `DescribeDBSnapshots`
-- **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response; Wave 2 is `None` per `attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`.
+- **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response; Wave 2 is `None` per `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -168,7 +168,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above).
 - Per-row `DescribeDBSnapshotAttributes` for public-snapshot or shared-account detection — a9s-devops persona: possible=yes (the API returns `DBSnapshotAttributes` with `AttributeName=="restore"` listing shared account IDs, `all` meaning public), worth=no as a Wave 2 list-row signal because it's a per-snapshot fan-out; the check belongs in a security-posture view, not on every list load.
-- Manual-snapshot cost-drift age rule (> 365d on `SnapshotType=="manual"`) — not present in `attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap` for dbi-snap (it applies to `dbc-snap`); out of scope here until the golden doc adds it.
+- Manual-snapshot cost-drift age rule (> 365d on `SnapshotType=="manual"`) — no such finding on `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`; it belongs to `dbc-snap`. Out of scope here until the golden doc adds it.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
@@ -177,9 +177,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 
 - a9s golden doc — related-panel contract for `dbi-snap` (targets `backup`, `ct-events`, `dbc`, `dbi`, `kms`; per-type contract table row) — `docs/related-resources.md § Per-type contract` (dbi-snap row) and `§ dbi-snap`.
-- a9s golden doc — Wave 1 signals (`Status` buckets, `Encrypted==false`, orphan cross-ref `dbi`, automated-past-retention cross-ref `dbi`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap` (Wave 1 cell).
-- a9s golden doc — Wave 2 cell is `None` — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap` (Wave 2 cell).
-- a9s golden doc — Wave 3 exclusion (`DescribeDBSnapshotAttributes` per snapshot, public-snapshot) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap` (Wave 3 cell).
+- a9s golden doc — Wave 1 signals (`Status` buckets, `Encrypted==false`, orphan cross-ref `dbi`, automated-past-retention cross-ref `dbi`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`.
+- a9s golden doc — every `dbi-snap` signal reads the list response — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi-snap`.
+- a9s golden doc — the deferred `DescribeDBSnapshotAttributes` public-snapshot read — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md § Policy`.
 - a9s golden doc — `dbc` marked weak (1/6 DevOps audits) — `docs/related-resources.md § dbi-snap` ("Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot").
 - a9s golden doc — read-only invariant — `docs/architecture.md § What is a9s?`.

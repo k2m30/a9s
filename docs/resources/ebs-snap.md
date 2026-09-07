@@ -65,7 +65,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `bac
 
 **Source API**: [DescribeSnapshots](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSnapshots.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs-snap`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -160,8 +160,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `ebs-snap` appears in Per-type contract with related targets `ami, backup, ct-events, ebs, ec2, kms` — `docs/related-resources.md` § Per-type contract (row `ebs-snap`).
 - a9s golden doc — Per-target reasoning lines for `ami`, `backup`, `ct-events`, `ebs`, `ec2`, `kms` — `docs/related-resources.md` § `ebs-snap`.
 - a9s golden doc — `ct-events` is the universal pivot — `docs/related-resources.md` § Policy item 4.
-- a9s golden doc — Wave 1 signals: `State` bucketing, age >365d with automated description, `Encrypted==false` CIS EC2.1, orphan via `ebs` cross-ref — `docs/attention-signals.md` § Compute row `ebs-snap`.
-- a9s golden doc — Wave 2 = None, Wave 3 = `DescribeSnapshotAttribute(createVolumePermission)` per snapshot — `docs/attention-signals.md` § Compute row `ebs-snap`.
+- a9s golden doc — Wave 1 signals: `State` bucketing, age >365d with automated description, `Encrypted==false` CIS EC2.1, orphan via `ebs` cross-ref — `docs/attention-signals.md § Signals § COMPUTE` row `ebs-snap`.
+- a9s golden doc — the `ebs-snap` signals — `docs/attention-signals.md § Signals § COMPUTE` row `ebs-snap`; the deferred snapshot-lineage cost attribution — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `Snapshot.State` carries the `SnapshotState` enum with values `pending`, `completed`, `error`, `recoverable`, `recovering` — `AWS SDK Go v2 — ec2/types.Snapshot § State` and `ec2/types.SnapshotState`.
 - AWS Go SDK v2 — `Snapshot.StateMessage` carries the AWS-generated error-diagnostic string for failed snapshot copies — `AWS SDK Go v2 — ec2/types.Snapshot § StateMessage`.

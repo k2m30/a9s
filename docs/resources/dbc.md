@@ -109,7 +109,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `d
 
 **Source API**: [DescribeDBClusters](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -228,15 +228,15 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `subnet` pivot is "DBSubnetGroup subnets" — `docs/related-resources.md` § `dbc`.
 - a9s golden doc — `vpc` pivot is "DBSubnetGroup VPC" — `docs/related-resources.md` § `dbc`.
 - a9s golden doc — `ct-events` pivot is "Audit trail for cluster changes" — `docs/related-resources.md` § `dbc` and § Policy (universal pivot).
-- a9s golden doc — Wave 1 signals (`Status`, `DBClusterMembers`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) — `docs/attention-signals.md` § Databases & Storage, row `dbc`.
-- a9s golden doc — Wave 2 signal (`DescribePendingMaintenanceActions`, shared with `dbi`) — `docs/attention-signals.md` § Databases & Storage, row `dbc`.
+- a9s golden doc — Wave 1 signals (`Status`, `DBClusterMembers`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc`.
+- a9s golden doc — Wave 2 signal (`DescribePendingMaintenanceActions`, shared with `dbi`) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `DBCluster.Status` / `DBClusterMembers[].IsClusterWriter` / `DeletionProtection` / `StorageEncrypted` / `BackupRetentionPeriod` / `KmsKeyId` / `MasterUserSecret.SecretArn` / `EnabledCloudwatchLogsExports` / `VpcSecurityGroups[].VpcSecurityGroupId` / `DBSubnetGroup` all present on the list response shape — `AWS SDK Go v2 — service/docdb/types.DBCluster`.
 - AWS Go SDK v2 — `DBClusterMember.IsClusterWriter *bool` — `AWS SDK Go v2 — service/docdb/types.DBClusterMember § IsClusterWriter`.
 - AWS Go SDK v2 — DocumentDB `DescribeDBClusters` is the list operation (not RDS's) — `AWS SDK Go v2 — service/docdb § DescribeDBClusters`.
 - AWS API Reference (fallback) — DocumentDB `DescribeDBClusters` — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html>.
 - AWS API Reference (fallback) — DocumentDB `DescribeDBSubnetGroups` (used to resolve subnets + VPC behind `DBSubnetGroup`) — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBSubnetGroups.html>.
-- amendment — the Source URL and display name for `dbc` in `docs/attention-signals.md` were corrected from RDS (`API_DescribeDBClusters` under `AmazonRDS`) to DocumentDB (`API_DescribeDBClusters` under `documentdb`), and the Wave 3 CloudWatch metric `AuroraReplicaLag` was replaced with `DBInstanceReplicaLag` to match the DocumentDB namespace. Rationale: `docs/related-resources.md` anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. Field names listed in the Wave 1 cell (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.
+- amendment — `dbc` was corrected from RDS to DocumentDB: the display name and API reference follow DocumentDB, and the deferred replica-lag metric is `DBInstanceReplicaLag`, not `AuroraReplicaLag` — `docs/attention-signals.md § Not yet implemented`. Rationale: `docs/related-resources.md` anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. The field names (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.
 
 <!-- BEGIN GENERATED: header -->
 dbc — DATABASES & STORAGE. Lifecycle key: `status`.

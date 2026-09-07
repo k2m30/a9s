@@ -64,7 +64,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 ### `s3`
 
 - **Why related**: Access-log S3 destination — lets the operator jump to the bucket receiving access logs when debugging.
-- **How discovered**: `TBD — a9s-devops: not available in AWS surface without a per-LB Describe call.` The access-log bucket lives in `DescribeLoadBalancerAttributes` (Wave 3 per `attention-signals.md`), not on the list response. a9s-devops: possible=yes via `DescribeLoadBalancerAttributes` (N+1), worth=no at list time — the related panel would require a bounded fan-out this type has explicitly deferred to Wave 3. Related-panel pivot is still documented as a contract target; discovery is deferred until this resource moves to Wave 2/3.
+- **How discovered**: `TBD — a9s-devops: not available in AWS surface without a per-LB Describe call.` The access-log bucket lives in `DescribeLoadBalancerAttributes`, not on the list response, and that read is deferred — `docs/attention-signals.md § Not yet implemented`. a9s-devops: possible=yes via `DescribeLoadBalancerAttributes` (N+1), worth=no at list time — the related panel would require a bounded fan-out this type has explicitly deferred. Related-panel pivot is still documented as a contract target; discovery is deferred until this resource performs that read.
 - **Count shown**: unknown.
 
 ### `sg`
@@ -107,7 +107,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 **Source API**: [DescribeLoadBalancers](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `elb`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -186,16 +186,16 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 5. Out of Scope
 
 - CloudWatch `HTTPCode_ELB_5XX_Count` (§3.3). The `DescribeLoadBalancerAttributes` and `DescribeListeners` signals listed there now ship as Wave 2 and appear in §4.
-- Target-health signals (healthy/unhealthy target counts) — those live on `tg` per `attention-signals.md`, not on `elb`.
+- Target-health signals (healthy/unhealthy target counts) — those live on `tg`, `docs/attention-signals.md § Signals § NETWORKING` row `tg`.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- `s3` related-panel discovery at list time — a9s-devops: not worth it, requires N+1 `DescribeLoadBalancerAttributes` fan-out that `attention-signals.md` explicitly defers to Wave 3; revisit if/when this resource adopts a Wave 2.
+- `s3` related-panel discovery at list time — a9s-devops: not worth it, requires an N+1 `DescribeLoadBalancerAttributes` fan-out that is still deferred, `docs/attention-signals.md § Not yet implemented`; revisit if/when this resource performs that read.
 
 ## 6. Citations
 
 - a9s golden doc — related panel contract (13 targets: `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf`) — `docs/related-resources.md` § "Per-type contract" table row for `elb` and § `### elb`.
 - a9s golden doc — universal pivot `ct-events` — `docs/related-resources.md` § "Policy" (universal pivots clause).
-- a9s golden doc — Wave 1 / Wave 2 / Wave 3 signals and source API — `docs/attention-signals.md` § "Networking" table row for `elb`.
+- a9s golden doc — the `elb` signals — `docs/attention-signals.md § Signals § NETWORKING` row `elb`; the deferred CloudWatch metric — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `LoadBalancer.State.Code` / `State.Reason` field names and the state-machine description (`provisioning` → `active` → `active_impaired` → `failed`) — `AWS SDK Go v2 — elasticloadbalancingv2/types.LoadBalancer § State` and `elasticloadbalancingv2/types.LoadBalancerState § Code, Reason`.
 - AWS Go SDK v2 — `LoadBalancer.VpcId`, `SecurityGroups[]`, `AvailabilityZones[].SubnetId` field names for related-panel pivots — `AWS SDK Go v2 — elasticloadbalancingv2/types.LoadBalancer § VpcId, SecurityGroups, AvailabilityZones`.
@@ -205,8 +205,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `eni` discovery via Description prefix `ELB app/...` / `ELB net/...` / `ELB <name>` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Canonical SRE pivot for ELB-owned ENIs.`
 - `r53` budget exclusion — record sets are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); the `AliasTarget.DNSName == LB.DNSName` join needs per-zone `ListResourceRecordSets` fan-out — `docs/related-resources.md` § Policy rule 7.
 - a9s-devops consultation — `waf` discovery via `wafv2:ListResourcesForWebACL(ResourceType=APPLICATION_LOAD_BALANCER)` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Documented reverse pivot; matches waf contract row listing elb.`
-- a9s-devops consultation — `s3` (access-log bucket) discovery deferred — `a9s-devops (2026-04-20): possible=yes via DescribeLoadBalancerAttributes, worth=no at list time. Would require N+1 fan-out attention-signals.md explicitly defers to Wave 3.`
-- a9s-devops consultation — Classic (ELBv1) default Healthy bucket when no State field — implicit from attention-signals.md note "Classic (ELBv1) has no State field"; no state signal available, so the row defaults to Healthy and target-health signalling moves to `tg`. No separate devops dispatch.
+- a9s-devops consultation — `s3` (access-log bucket) discovery deferred — `a9s-devops (2026-04-20): possible=yes via DescribeLoadBalancerAttributes, worth=no at list time. Would require an N+1 fan-out.`
+- a9s-devops consultation — Classic (ELBv1) default Healthy bucket when no State field — implicit from `docs/attention-signals.md § Signals § NETWORKING` row `elb`; no state signal available, so the row defaults to Healthy and target-health signalling moves to `tg`. No separate devops dispatch.
 
 <!-- BEGIN GENERATED: header -->
 elb — NETWORKING. Lifecycle key: `state`.

@@ -113,7 +113,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 **Source API**: [DescribeVpcEndpoints](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcEndpoints.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `vpce`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -239,7 +239,7 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 
 ## 6. Citations
 
-- `shortName`, display name, signal cells (`State` bucket mapping, `LastError`, `NetworkInterfaceIds`, `RouteTableIds` Wave 1 rules), list API — `docs/attention-signals.md` § Networking row for `vpce` (line 57).
+- `shortName`, display name and the `vpce` signals (`State` bucket mapping, `LastError`, `NetworkInterfaceIds`, `RouteTableIds` rules) — `docs/attention-signals.md § Signals § NETWORKING` row `vpce`; list API — `core/aws/vpce.go`.
 - AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpce` (line 109) and § `vpce` narrative block (lines 1030–1047).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `VpcEndpoint.VpcEndpointId`, `VpcEndpointType`, `State`, `VpcId`, `ServiceName`, `RouteTableIds`, `SubnetIds`, `Groups[].GroupId`, `NetworkInterfaceIds`, `DnsEntries[].{DnsName, HostedZoneId}`, `PrivateDnsEnabled`, `LastError.{Code, Message}`, `FailureReason`, `PolicyDocument`, `CreationTimestamp`, `Tags` field names — `AWS SDK Go v2 — service/ec2/types.VpcEndpoint`.
@@ -263,8 +263,8 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 - `PrivateDnsEnabled==false` not a signal — `a9s-devops (2026-04-20): possible=yes, worth=no. Deliberate configuration choice for services with DNS conflicts, not a misconfiguration.`
 - CloudWatch Wave 3 metrics rationale — `a9s-devops (2026-04-20): possible=yes, worth=no for Wave 2. Per-endpoint GetMetricStatistics exceeds the Wave 2 budget; alarm pivot covers the operational path.`
 - DNS-probe out-of-scope — `a9s-devops (2026-04-20): possible=no, worth=n/a. a9s does not dial into the VPC.`
-- Wave 1 `State` bucket mapping, `LastError`, `NetworkInterfaceIds==[]`, `RouteTableIds==[]` rules — `docs/attention-signals.md` § Networking row for `vpce` (line 57).
-- Wave 3 endpoint-policy analysis out-of-scope — `docs/attention-signals.md` § Networking row for `vpce` Wave 3 cell (line 57).
+- Wave 1 `State` bucket mapping, `LastError`, `NetworkInterfaceIds==[]`, `RouteTableIds==[]` rules — `docs/attention-signals.md § Signals § NETWORKING` row `vpce`.
+- Wave 3 endpoint-policy analysis out-of-scope — `docs/attention-signals.md § Not yet implemented`.
 
 <!-- BEGIN GENERATED: header -->
 vpce — NETWORKING. Lifecycle key: `state`.

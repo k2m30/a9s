@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: Elastic IPs
 - **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>
 - **List API**: `DescribeAddresses`
-- **Describe API (if any)**: not used — Wave 2 is `None` in `docs/attention-signals.md`. `DescribeAddressesAttribute` (reverse-DNS) is listed but explicitly Wave 3 and out of scope.
+- **Describe API (if any)**: not used — every `eip` signal reads the list response, `docs/attention-signals.md § Signals § NETWORKING` row `eip`. `DescribeAddressesAttribute` (reverse-DNS) is deferred — `docs/attention-signals.md § Not yet implemented`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -95,7 +95,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeAddresses](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeAddresses.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `eip`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -172,8 +172,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — per-type contract (`alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `logs`, `nat`) — `docs/related-resources.md` § Per-type contract / `eip`.
 - a9s golden doc — `nat` pivot direction (`NatGatewayAddresses[].AllocationId`) — `docs/related-resources.md` § Per-target reasoning / `nat` / `eip`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md` § Policy #4.
-- a9s golden doc — Wave 1 signals (unattached EIP; zombie-billing cross-ref to stopped `ec2`) — `docs/attention-signals.md` § Networking / `eip`.
-- a9s golden doc — Wave 2 `None`; Wave 3 `DescribeAddressesAttribute` (reverse-DNS) — `docs/attention-signals.md` § Networking / `eip`.
+- a9s golden doc — Wave 1 signals (unattached EIP; zombie-billing cross-ref to stopped `ec2`) — `docs/attention-signals.md § Signals § NETWORKING` row `eip`.
+- a9s golden doc — Wave 2 `None`; Wave 3 `DescribeAddressesAttribute` (reverse-DNS) — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant used in §5 — `docs/architecture.md` § What is a9s?.
 - AWS Go SDK v2 — `Address.AllocationId`, `Address.AssociationId`, `Address.InstanceId`, `Address.NetworkInterfaceId`, `Address.Tags` — `AWS SDK Go v2 — service/ec2/types.Address § AllocationId, AssociationId, InstanceId, NetworkInterfaceId, Tags`.
 - AWS API Reference — `Address` response shape — `AWS API Reference: API_Address` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>).

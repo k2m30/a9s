@@ -83,7 +83,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 **Source API**: [ListDistributions](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_ListDistributions.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -178,9 +178,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `r53` reason — `docs/related-resources.md` § `cf` → `r53` ("Route 53 alias records pointing here").
 - a9s golden doc — `s3` reason — `docs/related-resources.md` § `cf` → `s3` ("S3 origins").
 - a9s golden doc — `waf` reason — `docs/related-resources.md` § `cf` → `waf` ("Distribution.WebACLId").
-- a9s golden doc — Wave 1 signals for `cf` — `docs/attention-signals.md` § "DNS, CDN, Certs" row `cf` Wave 1.
-- a9s golden doc — Wave 2 signal `Logging.Enabled==false` — `docs/attention-signals.md` § "DNS, CDN, Certs" row `cf` Wave 2.
-- a9s golden doc — Wave 3 exclusions (5xxErrorRate, origin-deleted) — `docs/attention-signals.md` § "DNS, CDN, Certs" row `cf` Wave 3.
+- a9s golden doc — Wave 1 signals for `cf` — `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
+- a9s golden doc — Wave 2 signal `Logging.Enabled==false` — `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
+- a9s golden doc — Wave 3 exclusions (5xxErrorRate, origin-deleted) — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - a9s golden doc — universal pivot policy — `docs/related-resources.md` § Policy.
 - AWS Go SDK v2 — `Status` field on list response — `AWS SDK Go v2 — cloudfront/types.DistributionSummary § Status`.

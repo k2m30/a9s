@@ -49,7 +49,7 @@ Explicitly excluded (per `docs/related-resources.md` §`vpc-peer`): `sg` (no dec
 
 **Source API**: [DescribeVpcPeeringConnections](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcPeeringConnections.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `vpc-peer`.
 
 Load-bearing SDK fact (doc comment on `Requester/AccepterVpcInfo`): "CIDR block information is only returned when describing an active VPC peering connection" — `CidrBlock`/`CidrBlockSet` are nil for every non-active state. Nil-safe rendering mandatory; the overlap check is active-only.
 
@@ -92,7 +92,7 @@ No API-calling Wave 2 exists (no per-connection describe). Two derived zero-API 
 
 ## 4. Issue Visualization
 
-Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing — the fleet color invariant ("color derives from findings", the conformance-gate owner rule) applies to the two cache-scan route checks too: their rows render Warning-colored like any other finding. Their `~` class affects only the S1 aggregation (no badge bump) and S5 ordering.
+Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave→surface mapping as standard. Every signal is color-bearing — the fleet color invariant ("color derives from findings", the conformance-gate owner rule) applies to the two cache-scan route checks too: their rows render Warning-colored like any other finding. Their `~` class affects only the S1 aggregation (no badge bump) and S5 ordering.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
@@ -129,7 +129,7 @@ Every problem row names its cause in the Status column (`pending acceptance: exp
 
 - Pivot set and exclusions — `docs/related-resources.md` § `vpc-peer`.
 - CIDR active-only fact — `AWS SDK Go v2 — ec2/types.VpcPeeringConnection § RequesterVpcInfo/AccepterVpcInfo` (doc comment verbatim).
-- State machine + ExpirationTime — `AWS SDK Go v2 — ec2/types.VpcPeeringConnection § Status, § ExpirationTime`; `docs/attention-signals.md` § Networking row `vpc-peer`.
+- State machine + ExpirationTime — `AWS SDK Go v2 — ec2/types.VpcPeeringConnection § Status, § ExpirationTime`; `docs/attention-signals.md § Signals § NETWORKING` row `vpc-peer`.
 - rtb pivot + missing-route/blackhole signals — `a9s-devops (2026-07-14): possible=yes (Routes[].VpcPeeringConnectionId, Route.State), worth=yes — the pivot that makes the type worth adding.`
 - Cross-account-as-facts — `a9s-devops (2026-07-14): all 7 live rows cross-account; flagging normality is alarm fatigue.` Live witness w_vpcpeer.json.
 - Cache-scan enricher layer — snapshot_cross_ref.go / EnrichLTDeprecatedAMI precedent (fleet mechanism since v3.50.x).

@@ -47,7 +47,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `rtb`, `vpc
 
 **Source API**: [DescribeInternetGateways](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeInternetGateways.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `igw`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -129,7 +129,7 @@ At 3am, glancing at the list, the operator can distinguish the four Warning mode
 
 ## 6. Citations
 
-- `shortName`, display name, signal cells, list API — `docs/attention-signals.md` § Networking row for `igw` (line 55).
+- `shortName`, display name and the `igw` signals — `docs/attention-signals.md § Signals § NETWORKING` row `igw`; list API — `core/aws/igw.go`.
 - AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `igw` (line 78) and § `igw` narrative block (lines 600–606).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?" (lines 13–15).
 - `Attachments[]`, `Attachments[].State`, `Attachments[].VpcId`, `InternetGatewayId` field names — `AWS SDK Go v2 — service/ec2/types.InternetGateway § Attachments` and `service/ec2/types.InternetGatewayAttachment § State, VpcId`.

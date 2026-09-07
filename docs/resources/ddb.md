@@ -77,7 +77,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 
 **Source API**: [DescribeTable](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html)
 
-Transcribed from `docs/attention-signals.md` row `ddb | DynamoDB Tables`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -85,7 +85,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-One bullet per distinct signal. Per `attention-signals.md`: "`DescribeTable` per table (N+1): `TableStatus`: `ACTIVE`→Healthy; `CREATING`/`UPDATING`/`DELETING`/`ARCHIVING`→Warning; `INACCESSIBLE_ENCRYPTION_CREDENTIALS`/`ARCHIVED`→Broken. Plus `DescribeContinuousBackups` per table: PITR disabled → Warning".
+One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` run once per table, and every finding they raise is a row on `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`.
 
 - **Signal**: `TableStatus == ACTIVE`.
   - **State bucket**: Healthy.
@@ -169,7 +169,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (CloudWatch throttling and error-rate metrics).
 - Per-table CloudWatch metric aggregation (`ReadThrottleEvents`, `WriteThrottleEvents`, `SystemErrors`) — out-of-scope for Wave 2 budget.
-- Global table replica health beyond the base table's `TableStatus` — `Replicas[].ReplicaStatus` on multi-region tables would be a useful future Wave 2 signal but is not in `attention-signals.md` today. — a9s-devops: possible=yes (`TableDescription.Replicas[].ReplicaStatus`), worth=yes for multi-region operators but intentionally deferred; recorded here so it isn't lost.
+- Global table replica health beyond the base table's `TableStatus` — `Replicas[].ReplicaStatus` on multi-region tables would be a useful future Wave 2 signal but is not in `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`. — a9s-devops: possible=yes (`TableDescription.Replicas[].ReplicaStatus`), worth=yes for multi-region operators but intentionally deferred; recorded here so it isn't lost.
 - DynamoDB Streams consumer-lag metrics (CloudWatch only).
 - TTL misconfiguration (`DescribeTimeToLive` is a separate per-table call; not currently in the attention contract).
 - `backup` discovery via `ListRecoveryPointsByResource` (per-table call, exceeds Wave 2 budget for the panel).
@@ -180,7 +180,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — `ddb` related targets are `alarm, backup, ct-events, kinesis, kms, lambda, logs, vpce` — `docs/related-resources.md` § Per-type contract row `ddb` and § `ddb` subsection.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` § Policy bullet 4.
-- a9s golden doc — Wave 1/Wave 2/Wave 3 signals for `ddb` — `docs/attention-signals.md` § Databases & Storage row `ddb`.
+- a9s golden doc — the `ddb` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - AWS Go SDK v2 — `TableStatus` enum values and field on `TableDescription` — `AWS SDK Go v2 — dynamodb/types.TableDescription § TableStatus` (`CREATING`/`UPDATING`/`DELETING`/`ACTIVE`/`INACCESSIBLE_ENCRYPTION_CREDENTIALS`/`ARCHIVING`/`ARCHIVED`).
 - AWS Go SDK v2 — `SSEDescription.KMSMasterKeyArn` carries the CMK ARN for `kms` pivot — `AWS SDK Go v2 — dynamodb/types.SSEDescription § KMSMasterKeyArn`.
 - AWS Go SDK v2 — `ArchivalSummary.ArchivalReason` + `ArchivalDateTime` provide S5 cause text for the archived state — `AWS SDK Go v2 — dynamodb/types.ArchivalSummary § ArchivalReason, ArchivalDateTime`.

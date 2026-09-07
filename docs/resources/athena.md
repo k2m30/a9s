@@ -66,7 +66,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `glue`, `km
 
 **Source API**: [GetWorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_GetWorkGroup.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `athena`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -151,9 +151,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — athena contract row (related targets and AWS API URL) — `docs/related-resources.md` § Per-type contract, row `athena`, and § `athena` subsection.
-- a9s golden doc — Wave 1 `State==ENABLED`/`DISABLED` mapping — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 1 cell.
-- a9s golden doc — Wave 2 `EnforceWorkGroupConfiguration==false`, `ResultConfiguration.EncryptionConfiguration==nil` — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 2 cell.
-- a9s golden doc — Wave 3 `ListQueryExecutions`/`BatchGetQueryExecution` is out of scope — `docs/attention-signals.md` § Data & Analytics, row `athena`, Wave 3 cell.
+- a9s golden doc — Wave 1 `State==ENABLED`/`DISABLED` mapping — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `athena`.
+- a9s golden doc — Wave 2 `EnforceWorkGroupConfiguration==false`, `ResultConfiguration.EncryptionConfiguration==nil` — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `athena`.
+- a9s golden doc — Wave 3 `ListQueryExecutions`/`BatchGetQueryExecution` is out of scope — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "a9s is a read-only terminal UI for AWS".
 - AWS Go SDK v2 — `ListWorkGroups` returns `WorkGroupSummary` with `Name`, `State`, `CreationTime`, `Description`, `EngineVersion` — `AWS SDK Go v2 — service/athena/types.WorkGroupSummary § State`.
 - AWS Go SDK v2 — `State` enum values `ENABLED`/`DISABLED` — `AWS SDK Go v2 — service/athena/types.WorkGroupState § WorkGroupStateEnabled`.

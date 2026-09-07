@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: Lambda Functions
 - **AWS API reference**: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html>
 - **List API**: `ListFunctions` (returns `FunctionConfiguration` entries — same shape as `GetFunctionConfiguration`; includes `State`, `LastUpdateStatus`, `Runtime`, `DeadLetterConfig`, `VpcConfig`, `Role`, `KMSKeyArn`, `FileSystemConfigs`).
-- **Describe API (if any)**: not used. All Wave 1 fields are already on the `ListFunctions` response. `attention-signals.md` lists Wave 2 as `None`.
+- **Describe API (if any)**: not used. All Wave 1 fields are already on the `ListFunctions` response — `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -179,7 +179,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [GetFunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_GetFunctionConfiguration.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -336,13 +336,13 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - `tg` discovery (TG `TargetType==lambda` + `DescribeTargetHealth` match on `FunctionArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes. ALB→Lambda wiring is TG-side.
 - `vpc` reasoning (VPC the function runs in) — `docs/related-resources.md` § `lambda` bullet `vpc`.
 - `vpc` discovery (`VpcConfig.VpcId`) — AWS SDK Go v2 — lambda/types.VpcConfigResponse § `VpcId`.
-- Wave 1 signals list — `docs/attention-signals.md` § Compute row `lambda` Wave 1 cell.
+- Wave 1 signals list — `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 - Wave 1 `State` values `Active`/`Pending`/`Inactive`/`Failed` — AWS SDK Go v2 — lambda/types.State § constants.
 - Wave 1 `LastUpdateStatus==Failed` — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `LastUpdateStatus` and lambda/types.LastUpdateStatus § constants.
-- Wave 1 deprecated-runtimes list URL — `docs/attention-signals.md` § Compute row `lambda` Wave 1 cell (links to AWS docs `lambda/latest/dg/lambda-runtimes.html`).
+- Wave 1 deprecated-runtimes list — AWS docs `lambda/latest/dg/lambda-runtimes.html`; the finding it feeds is `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 - Wave 1 `DeadLetterConfig==nil` — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `DeadLetterConfig` and lambda/types.DeadLetterConfig § `TargetArn`.
-- Wave 2 "None" — `docs/attention-signals.md` § Compute row `lambda` Wave 2 cell.
-- Wave 3 OUT OF SCOPE items — `docs/attention-signals.md` § Compute row `lambda` Wave 3 cell.
+- The wave-2 resource-policy and function-URL findings — `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
+- Wave 3 OUT OF SCOPE items — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?" (a9s makes no AWS write calls).
 - S4 list-text wording (`creating`, `idle: not invoked recently`, `failed: <StateReasonCode>`, `update failed: <LastUpdateStatusReasonCode>`, `runtime deprecated: <Runtime>`, `no DLQ — async failures dropped`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Paired state+cause wording per the skill's §4 rules; `StateReasonCode` / `LastUpdateStatusReasonCode` are AWS-provided short codes suitable for a 40-char status cell (AWS SDK Go v2 — lambda/types.StateReasonCode, lambda/types.LastUpdateStatusReasonCode).
 

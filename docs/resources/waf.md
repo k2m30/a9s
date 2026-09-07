@@ -65,7 +65,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [GetWebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_GetWebACL.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `waf`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -130,8 +130,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - Contract row and related targets — `docs/related-resources.md` § `waf` (targets: `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`).
-- Wave 1 = None, Wave 2 signals — `docs/attention-signals.md` § Security & IAM row `waf`.
-- Wave 3 signals — `docs/attention-signals.md` § Security & IAM row `waf` (`ListResourcesForWebACL`, `BlockedRequests` spike, managed-rule-group version drift).
+- Wave 1 = None, Wave 2 signals — `docs/attention-signals.md § Signals § SECURITY & IAM` row `waf`.
+- Wave 3 signals — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `WebACL` shape (`Rules`, `DefaultAction`, `ARN`, `Id`, `Name`, `VisibilityConfig`) — `AWS SDK Go v2 — service/wafv2/types.WebACL`.
 - `WebACLSummary` shape (list-response fields: `ARN`, `Description`, `Id`, `LockToken`, `Name`) — `AWS SDK Go v2 — service/wafv2/types.WebACLSummary`.
@@ -141,7 +141,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `apigw` / `elb` discovery via `ListResourcesForWebACL` per ACL (`ResourceType=API_GATEWAY` | `APPLICATION_LOAD_BALANCER`, Regional scope) — a9s-devops (2026-04-20): possible=yes, worth=yes. This is the only WAF-side API that enumerates protected regional resources; cost is one call per ACL per resource type, bounded and cheap.
 - `cf` discovery via `cloudfront:ListDistributionsByWebACLId` for `Scope=CLOUDFRONT` ACLs (REGIONAL ACLs resolve to 0 without a call) — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListResourcesForWebACL` does not cover the CloudFront scope, so the association is enumerated from the CloudFront side; one bounded call per ACL.
 - `logs` discovery via `GetLoggingConfiguration` per ACL, filtering `LogDestinationConfigs[]` ARNs that begin with `arn:aws:logs:` — a9s-devops (2026-04-20): possible=yes, worth=yes. WAF logging also supports Kinesis Firehose and S3 sinks; only CW Logs destinations bind to the `logs` panel target.
-- `~` severity for `Rules==[]` (empty ACL is a config hygiene concern but no active security regression — the ACL simply does nothing) and `!` severity for `DefaultAction==Allow` + zero rules (allow-all default with no rules is a real protection gap that warrants the menu count bump) — a9s-devops (2026-04-20): possible=yes, worth=yes. Severity split matches the attention-signals.md row (Warning vs Broken) and the S1-S5 mapping rules for Wave 2 background findings on a Healthy row.
+- `~` severity for `Rules==[]` (empty ACL is a config hygiene concern but no active security regression — the ACL simply does nothing) and `!` severity for `DefaultAction==Allow` + zero rules (allow-all default with no rules is a real protection gap that warrants the menu count bump) — a9s-devops (2026-04-20): possible=yes, worth=yes. Severity split matches the `docs/attention-signals.md § Signals § SECURITY & IAM` row `waf`.
 - List text and detail text wording for both Wave 2 signals — generated per the output-template §4 rules (≤40 char S4, no jargon, state + cause).
 
 <!-- BEGIN GENERATED: header -->

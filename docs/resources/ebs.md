@@ -71,7 +71,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 
 **Source API**: [DescribeVolumeStatus](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumeStatus.html)
 
-Transcribed from `docs/attention-signals.md` §Compute row `ebs`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -182,9 +182,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `backup` pivot ("Volumes covered by AWS Backup") — `docs/related-resources.md` §`ebs`, bullet `backup`.
 - a9s golden doc — `cfn` pivot (DevOps-audit mention) — `docs/related-resources.md` §`ebs`, bullet `cfn`.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` §Policy.
-- a9s golden doc — Wave 1 signals (`State` buckets, `CreateTime`>7d on available, `Encrypted==false`) — `docs/attention-signals.md` §Compute, row `ebs`, Wave 1 column.
-- a9s golden doc — Wave 2 signals (`VolumeStatus.Status` impaired/warning, `Events[]` non-empty) — `docs/attention-signals.md` §Compute, row `ebs`, Wave 2 column.
-- a9s golden doc — Wave 3 out-of-scope (`VolumeQueueLength`, `BurstBalance`) — `docs/attention-signals.md` §Compute, row `ebs`, Wave 3 column.
+- a9s golden doc — Wave 1 signals (`State` buckets, `CreateTime`>7d on available, `Encrypted==false`) — `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
+- a9s golden doc — Wave 2 signals (`VolumeStatus.Status` impaired/warning, `Events[]` non-empty) — `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
+- a9s golden doc — Wave 3 out-of-scope (`VolumeQueueLength`, `BurstBalance`) — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` §"What is a9s?" (line 15).
 - AWS SDK Go v2 — `Volume.State`, `Volume.Encrypted`, `Volume.CreateTime`, `Volume.KmsKeyId`, `Volume.Attachments[]` exist on list response — `AWS SDK Go v2 — ec2/types.Volume § State, Encrypted, CreateTime, KmsKeyId, Attachments`.
 - AWS SDK Go v2 — `VolumeAttachment.InstanceId` — `AWS SDK Go v2 — ec2/types.VolumeAttachment § InstanceId`.
@@ -193,7 +193,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation (persona fallback, 2026-04-20) — `alarm` discovery: sibling-list cross-ref via `Dimensions[].Name=="VolumeId"`, same pattern as ec2↔alarm. possible=yes, worth=yes. Rationale: standard CloudWatch-for-EBS namespace pattern.
 - a9s-devops consultation (persona fallback, 2026-04-20) — `backup` discovery: AWS Backup uses tag-based / resource-type selection rather than a per-volume `BackupPlanId` field; practical mechanism is sibling-list cross-ref or cached `ListProtectedResources`. possible=yes (with caveat), worth=yes. Rationale: operators regularly ask "is this volume protected before I delete it?".
 - a9s-devops consultation (persona fallback, 2026-04-20) — `cfn` discovery: `Volume.Tags[]` lookup for `aws:cloudformation:stack-name` / `aws:cloudformation:stack-id` — CFN propagates these automatically. possible=yes, worth=yes. Rationale: IaC-ownership pivot is a standard ops question and requires no extra API.
-- UX decision — `Encrypted==false` on in-use volumes uses `!` severity — governed by `docs/attention-signals.md` Wave 1 entry (Warning), rendered as `!` on Healthy rows per this skill's §4 mapping rule "Wave 2 background finding on a Healthy row, important". Treated as important (`!`) because unencrypted data at rest is a hard security-audit finding, not an informational note.
+- UX decision — `Encrypted==false` on in-use volumes uses `!` severity — governed by `docs/attention-signals.md § Signals § COMPUTE` row `ebs`. Treated as important (`!`) because unencrypted data at rest is a hard security-audit finding, not an informational note.
 - UX decision — `Events[] non-empty` uses `~` severity — informational scheduled/AWS-notification event; does not require immediate action, so does not bump S1 menu count.
 
 <!-- BEGIN GENERATED: header -->

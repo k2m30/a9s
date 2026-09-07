@@ -96,7 +96,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [ListClustersV2](https://docs.aws.amazon.com/msk/1.0/apireference/v2-clusters.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -124,7 +124,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 - **Signal**: `State == HEALING`.
   - **State bucket**: Warning.
-  - **How obtained**: `Cluster.State` from `ListClustersV2`. Amended into `attention-signals.md` during this spec generation — the SDK enum defines `HEALING` (auto-broker-replacement); operator semantics match the other transient-warning states because cluster capacity is degraded while AWS replaces the broker.
+  - **How obtained**: `Cluster.State` from `ListClustersV2`. `HEALING` buckets with the other transient-warning states because cluster capacity is degraded while AWS replaces the broker — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
 
 - **Signal**: `State == DELETING`.
   - **State bucket**: Dim.
@@ -138,7 +138,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 No Wave 2 signals.
 
-The attention-signals row explicitly notes: per-broker runtime state is not on any read-only AWS action; `ListNodes` returns node metadata but no `RUNNING` enum. Deeper broker-level health belongs to CloudWatch and is Wave 3 (see §3.3).
+Per-broker runtime state is not on any read-only AWS action: `ListNodes` returns node metadata but no `RUNNING` enum. Deeper broker-level health belongs to CloudWatch and is deferred (see §3.3).
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -199,7 +199,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (CloudWatch broker-level metrics).
-- Per-broker runtime state — no read-only AWS API returns it today (confirmed by the attention-signals row).
+- Per-broker runtime state — no read-only AWS API returns it today.
 - Any UI element not listed in §4 — no new columns, icons, views, or key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
@@ -207,13 +207,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - msk related-panel targets `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` — `docs/related-resources.md` § Per-type contract, row `msk`.
 - Per-target field citations (`EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId`, `LoggingInfo.BrokerLogs.CloudWatchLogs`, `LoggingInfo.BrokerLogs.S3`, `ClientAuthentication.Sasl.Scram`, `BrokerNodeGroupInfo.SecurityGroups`, `BrokerNodeGroupInfo.ClientSubnets`, `BrokerNodeGroupInfo.ClientVpcIpAddresses → VPC`) — `docs/related-resources.md` § `msk`.
-- msk Wave 1 signal set (`State` enum mapping, `FAILED`→Broken, `DELETING`→Dim) — `docs/attention-signals.md` § Signals, row `msk` Wave 1 cell.
-- msk has no Wave 2 signals; per-broker runtime state not exposed by read-only APIs — `docs/attention-signals.md` § Signals, row `msk` Wave 2 cell.
-- msk Wave 3 CloudWatch metrics (`ActiveControllerCount`, `OfflinePartitionsCount`, `UnderReplicatedPartitions`, `KafkaDataLogsDiskUsed`) — `docs/attention-signals.md` § Signals, row `msk` Wave 3 cell.
+- msk Wave 1 signal set (`State` enum mapping, `FAILED`→Broken, `DELETING`→Dim) — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
+- msk has no Wave 2 signals; per-broker runtime state not exposed by read-only APIs — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
+- msk Wave 3 CloudWatch metrics (`ActiveControllerCount`, `OfflinePartitionsCount`, `UnderReplicatedPartitions`, `KafkaDataLogsDiskUsed`) — `docs/attention-signals.md § Not yet implemented`.
 - `State`, `StateInfo`, `ClusterArn`, `ClusterName`, `ClusterType`, `Provisioned`, `Serverless`, `CreationTime`, `CurrentVersion`, `Tags` present on the list response — `AWS SDK Go v2 — service/kafka/types.Cluster § State, StateInfo, ClusterArn, ClusterName, ClusterType, Provisioned, Serverless, CreationTime, CurrentVersion, Tags`.
 - `StateInfo.Code` / `StateInfo.Message` are the cause fields for S4 / S5 — `AWS SDK Go v2 — service/kafka/types.StateInfo § Code, Message`.
 - `ClusterState` enum values include `ACTIVE, CREATING, DELETING, FAILED, HEALING, MAINTENANCE, REBOOTING_BROKER, UPDATING` — `AWS SDK Go v2 — service/kafka/types.ClusterState § const values`.
-- `HEALING` state is defined in the SDK but was absent from the attention-signals row; amended there with an HTML comment and bucketed Warning — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. HEALING is MSK's auto-broker-replacement; cluster is degraded-but-serving, which matches Warning semantics used for REBOOTING_BROKER and MAINTENANCE.`
+- `HEALING` is defined in the SDK and buckets Warning — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. HEALING is MSK's auto-broker-replacement; cluster is degraded-but-serving, which matches Warning semantics used for REBOOTING_BROKER and MAINTENANCE.`
 - `BrokerNodeGroupInfo.SecurityGroups`, `BrokerNodeGroupInfo.ClientSubnets` are on `Provisioned.BrokerNodeGroupInfo` — `AWS SDK Go v2 — service/kafka/types.BrokerNodeGroupInfo § SecurityGroups, ClientSubnets`.
 - `EncryptionAtRest.DataVolumeKMSKeyId` carries the KMS ARN — `AWS SDK Go v2 — service/kafka/types.EncryptionAtRest § DataVolumeKMSKeyId`.
 - `LoggingInfo.BrokerLogs.CloudWatchLogs` / `LoggingInfo.BrokerLogs.S3` present — `AWS SDK Go v2 — service/kafka/types.BrokerLogs § CloudWatchLogs, S3`.

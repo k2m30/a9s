@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `glue`
 - **Display name**: Glue Jobs
 - **AWS API reference**: <https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html>
-- **List API**: `GetJobs` — returns `Job[]`. Per `attention-signals.md` §Data & Analytics, this is a **configuration-only** shape: it carries the job definition (`Name`, `Role`, `Command`, `Connections`, `DefaultArguments`, `SecurityConfiguration`, `LogUri`, `CreatedOn`, `LastModifiedOn`, etc.) but no runtime state. Every attention signal therefore lives in Wave 2.
+- **List API**: `GetJobs` — returns `Job[]`. This is a **configuration-only** shape: it carries the job definition (`Name`, `Role`, `Command`, `Connections`, `DefaultArguments`, `SecurityConfiguration`, `LogUri`, `CreatedOn`, `LastModifiedOn`, etc.) but no runtime state — `AWS SDK Go v2 — glue/types.Job`. Every attention signal therefore lives in Wave 2.
 - **Describe API (if any)**: `GetJobRuns(JobName, MaxResults=1)` per job — used in Wave 2 to read the latest `JobRun.JobRunState` and `JobRun.ErrorMessage`. The API returns runs ordered by `StartedOn` descending, so `MaxResults=1` yields the most recent execution.
 
 ## 2. Related Resources Panel (detail view, right column)
@@ -84,7 +84,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [GetJobRuns](https://docs.aws.amazon.com/glue/latest/webapi/API_GetJobRuns.html)
 
-Transcribed from `docs/attention-signals.md` §Data & Analytics.
+Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `glue`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -141,7 +141,7 @@ Notes on the S4 text:
 
 - `<ErrorMessage head>` is the first ~28 characters of `JobRun.ErrorMessage`, truncated on a word boundary, to stay within the 40-char S4 budget. The full message goes in S5.
 - When `ErrorMessage` is empty (Glue occasionally omits it for TIMEOUT/EXPIRED), S4 falls back to the state-plus-cause-kind phrasing above (e.g. `last run timed out at 60m`) — never to a bare `FAILED`/`TIMEOUT` keyword.
-- The user-initiated `STOPPED` state is **explicitly not a finding** (per `attention-signals.md`). A Glue job whose latest run is `STOPPED` renders green, blank S4, no glyph — exactly as a never-run or healthy job does.
+- The user-initiated `STOPPED` state is **explicitly not a finding** — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `glue` carries none for it. A Glue job whose latest run is `STOPPED` renders green, blank S4, no glyph — exactly as a never-run or healthy job does.
 
 ## 4.1 UX review (two sentences)
 
@@ -159,7 +159,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — related-targets list for `glue` — `docs/related-resources.md` § Per-type contract row `glue` and § `### glue`.
-- a9s golden doc — Wave 1/Wave 2/Wave 3 contract for `glue` — `docs/attention-signals.md` § Data & Analytics row `glue`.
+- a9s golden doc — the `glue` signals — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `glue`; the deferred DPU-hours trend and bookmark-stuck detection — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?" ("a9s never makes write calls to AWS").
 - AWS Go SDK v2 — `Job` is a config-only shape (no state field) — `AWS SDK Go v2 — glue/types.Job` (fields `Name`, `Role`, `Command`, `Connections`, `DefaultArguments`, `SecurityConfiguration`, `LogUri`, `CreatedOn`, `LastModifiedOn`).
 - AWS Go SDK v2 — Wave 2 signal fields — `AWS SDK Go v2 — glue/types.JobRun § JobRunState`, `§ ErrorMessage`, `§ StartedOn`.

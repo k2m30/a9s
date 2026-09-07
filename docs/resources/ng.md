@@ -84,7 +84,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `asg
 
 **Source API**: [DescribeNodegroup](https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeNodegroup.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CONTAINERS` row `ng`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -187,14 +187,14 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name `EKS Node Groups`, Wave 1/2/3 cells, and Source URL — `docs/attention-signals.md` § Containers → `ng` row.
+- Display name `EKS Node Groups` and the node-group signals — `docs/attention-signals.md § Signals § CONTAINERS` row `ng`.
 - Per-type contract for `ng` (`ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `role`, `sg`, `subnet`) — `docs/related-resources.md` § Per-type contract, `ng` row.
 - Per-target reasoning for every §2 bullet — `docs/related-resources.md` § `ng` (subsection).
 - `ng → kms` exclusion — `docs/related-resources.md` § Explicitly excluded → "Unanimous `sometimes`".
 - Nodegroup shape and field names (`Status`, `Health.Issues[]`, `Resources.AutoScalingGroups[].Name`, `Resources.RemoteAccessSecurityGroup`, `RemoteAccess.SourceSecurityGroups`, `NodeRole`, `ClusterName`, `Subnets`, `ReleaseVersion`, `LaunchTemplate.{Id,Version}`) — `AWS SDK Go v2 — service/eks/types.Nodegroup`.
 - `NodegroupStatus` enum values (`CREATING`, `UPDATING`, `DELETING`, `ACTIVE`, `CREATE_FAILED`, `DELETE_FAILED`, `DEGRADED`) — `AWS SDK Go v2 — service/eks/types.NodegroupStatus`.
 - `health.issues[].Code` enum values and human descriptions used for S4/S5 rewrites — `AWS SDK Go v2 — service/eks/types.Issue § Code` (docstring enumerates all NodegroupIssueCode values with plain-English descriptions).
-- Wave 2 cost shape (one `DescribeNodegroup` per node group) — `docs/attention-signals.md` § `ng` row, Wave 2 cell ("N+1").
+- Wave 2 cost shape (one `DescribeNodegroup` per node group) — `core/aws/ng.go`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `ami` discovery split (`ReleaseVersion` for EKS-optimized, `LaunchTemplate` + `DescribeLaunchTemplateVersions` for custom) — `a9s-devops (2026-04-20): possible=yes, worth=yes. ReleaseVersion identifies the EKS-managed AMI alias; LaunchTemplate fields are populated only when a custom LT was supplied at create time, and resolving to an ImageId needs DescribeLaunchTemplateVersions. Showing the AMI is valuable for patch-level verification and post-drift diagnosis.`
 - `ec2` / `ebs` discovery via ASG → Instances → BlockDeviceMappings — `a9s-devops (2026-04-20): possible=yes, worth=yes. EKS API exposes no direct instance list on a node group; the ASG pivot is the canonical path and is the same one the AWS Console uses. Cheap when ec2 and asg lists are already cached, otherwise fan-out per node group.`

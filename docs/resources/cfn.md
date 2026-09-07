@@ -65,7 +65,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-
 
 **Source API**: [DescribeStacks](https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_DescribeStacks.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -166,10 +166,10 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 
 ## 6. Citations
 
-- `cfn` is in both golden docs — `docs/related-resources.md` § Per-type contract row `cfn` + `docs/attention-signals.md` § CI/CD row `cfn`.
+- `cfn` is in both golden docs — `docs/related-resources.md` § Per-type contract row `cfn` + `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 - AWS API reference URL — `docs/related-resources.md` § `cfn` (`https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html`).
-- List API is `DescribeStacks` — `docs/attention-signals.md` § CI/CD row `cfn` Source column.
-- Wave 2 uses `DescribeStackEvents` per stack, first page only, scanned client-side — `docs/attention-signals.md` § CI/CD row `cfn` Wave 2 cell.
+- List API is `DescribeStacks` — `core/aws/cfn.go`.
+- Wave 2 uses `DescribeStackEvents` per stack, first page only, scanned client-side — `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 - Related targets `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns` — `docs/related-resources.md` § `cfn`.
 - `ct-events` is a universal pivot — `docs/related-resources.md` § Policy item 4.
 - Nested-stack pivot via `ParentId`/`RootId` — `AWS SDK Go v2 — cloudformation/types.Stack § ParentId, RootId`.
@@ -179,7 +179,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - `eb-rule` discovered by reverse scan (no direct stack field) — a9s-devops (2026-04-20): possible=yes via reverse-scan of EventBridge rules for `source: aws.cloudformation`, worth=yes for "where do stack events fan out?" workflow; direct field on Stack would be ideal but does not exist.
 - S3 pivot not directly discoverable from list row — a9s-devops (2026-04-20): possible=partial (requires `GetTemplateSummary` not in Wave 2 budget), worth=yes workflow but not worth the extra per-stack call; treat as "open S3 list" manual pivot, no count.
 - `!` vs `~` severity — not applicable to `cfn`: Wave 2 failures land on rows that are already colored by Wave 1 `*_FAILED`/`ROLLBACK_*`, so S3 glyphs are suppressed by rule (glyphs only on green rows).
-- Wave 1 `StackStatus` buckets — `docs/attention-signals.md` § CI/CD row `cfn` Wave 1 cell (Healthy / Warning / Broken mapping as transcribed in §3.1).
+- Wave 1 `StackStatus` buckets — `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 - `StackStatusReason` carries the cause surfaced in S4 — `AWS SDK Go v2 — cloudformation/types.Stack § StackStatusReason` ("Success/failure message associated with the stack status").
 - `DriftInformation.StackDriftStatus` is the drift field — `AWS SDK Go v2 — cloudformation/types.Stack § DriftInformation` → `cloudformation/types.StackDriftInformation § StackDriftStatus` (values include `DRIFTED`, `IN_SYNC`, `NOT_CHECKED`, `UNKNOWN`).
 - `LastCheckTimestamp` for drift — `AWS SDK Go v2 — cloudformation/types.StackDriftInformation § LastCheckTimestamp`.

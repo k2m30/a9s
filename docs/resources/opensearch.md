@@ -83,7 +83,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 **Source API**: [DescribeDomains](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomains.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `opensearch`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -192,7 +192,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — Per-type related contract for `opensearch` — `docs/related-resources.md` § `Per-type contract` (line 86) and `### opensearch` (line 715).
-- a9s golden doc — Wave 1 / Wave 2 / Wave 3 signal definitions for `opensearch` — `docs/attention-signals.md` § `Databases & Storage` (`opensearch` row).
+- a9s golden doc — the `opensearch` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `opensearch`; the deferred CloudWatch cluster health — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — `role` intentionally excluded — `docs/related-resources.md` § "Majority `no`" (line 1109: "advanced-security master user is a policy pivot, not a role field").
 - a9s golden doc — `ct-events` universal pivot — `docs/related-resources.md` § `Policy` point 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.

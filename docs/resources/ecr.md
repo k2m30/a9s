@@ -83,7 +83,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`
 
 **Source API**: [DescribeImages](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImages.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -161,10 +161,10 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 One bullet per claim in §§2–4.1.
 
-- shortName + display name — `docs/attention-signals.md` §CI/CD, `ecr` row.
+- shortName + display name — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 - AWS API URL — `docs/related-resources.md` §Per-type contract, `ecr` row.
 - List API `DescribeRepositories` and Repository shape — `AWS SDK Go v2 — ecr/types.Repository § RepositoryName, RepositoryArn, RepositoryUri, EncryptionConfiguration, ImageScanningConfiguration`.
-- Wave 2 API `DescribeImages` — `docs/attention-signals.md` §CI/CD, `ecr` row Wave 2 cell.
+- Wave 2 API `DescribeImages` — `core/aws/ecr_issue_enrichment.go`.
 - `cb` related target — `docs/related-resources.md` §`ecr` — "CodeBuild projects that push images."
 - `cb` discovery via `Environment.Image` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Project environment image URI is the cheapest deterministic link;`buildspec`scanning needs artifact reads and is out of scope.`
 - `cfn` related target — `docs/related-resources.md` §`ecr` — "CloudFormation stack that created the repo."
@@ -182,12 +182,12 @@ One bullet per claim in §§2–4.1.
 - `pipeline` discovery via `ActionTypeId.Provider==ECR` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ECR source-provider action is the only first-class pipeline→ECR linkage; push-via-CodeBuild is covered by the`cb`pivot.`
 - `role` related target — `docs/related-resources.md` §`ecr` — "Pull/push IAM roles."
 - `role` discovery via `GetRepositoryPolicy` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Repository policy is the authoritative per-repo principal source; walking the role cache with per-role calls is Wave 3.`
-- Wave 1 signal `scanOnPush==false` — `docs/attention-signals.md` §CI/CD, `ecr` row Wave 1 cell.
+- Wave 1 signal `scanOnPush==false` — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 - `ScanOnPush` field location — `AWS SDK Go v2 — ecr/types.ImageScanningConfiguration § ScanOnPush`.
-- Wave 2 signals `CRITICAL>0` / `HIGH>0` — `docs/attention-signals.md` §CI/CD, `ecr` row Wave 2 cell.
+- Wave 2 signals `CRITICAL>0` / `HIGH>0` — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 - `imageScanFindingsSummary.findingSeverityCounts` shape — `AWS SDK Go v2 — ecr/types.ImageScanFindingsSummary § FindingSeverityCounts`; `AWS SDK Go v2 — ecr/types.ImageDetail § ImageScanFindingsSummary, ImagePushedAt`.
 - Severity mapping (`!` for Broken, `~` for Warning on Healthy-baseline row) — `.claude/skills/a9s-resource-spec/SKILL.md` §"Mapping rules for §4".
-- Wave 3 exclusions (per-image findings, lifecycle policy) — `docs/attention-signals.md` §CI/CD, `ecr` row Wave 3 cell.
+- Wave 3 exclusions (per-image findings, lifecycle policy) — `docs/attention-signals.md § Not yet implemented`.
 - Non-matches (`ecr → ecs`, `ecr → eks`) — `docs/related-resources.md` §Non-matches (lines 1092–1093).
 - Read-only invariant — `docs/architecture.md` §"What is a9s?".
 - Removed stale `ecs` bullet from detailed `ecr` section — `a9s-resource-spec amendment (2026-04-20): contradicted per-type contract and Non-matches section; reason in HTML comment inline.`

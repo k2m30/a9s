@@ -84,7 +84,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `eni
 
 **Source API**: [DescribeRouteTables](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeRouteTables.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `rtb`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -102,7 +102,7 @@ No Wave 2 signals.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-`docs/attention-signals.md` lists Wave 3 for `rtb` as `None`. There are no Wave 3 signals to copy.
+`docs/attention-signals.md § Not yet implemented` lists nothing for `rtb`. There are no out-of-scope signals to copy.
 
 ## 4. Issue Visualization
 
@@ -159,7 +159,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Per-type contract row for `rtb` — `docs/related-resources.md` § Per-type contract table, row `rtb` (targets `cfn`, `ct-events`, `eni`, `igw`, `nat`, `subnet`, `tgw`, `vpc`, `vpce`).
 - Per-target reasoning for `rtb` — `docs/related-resources.md` § `rtb` subsection (one-line rationale per target).
 - `ct-events` as a universal pivot — `docs/related-resources.md` § Policy (applies to every registered type).
-- Wave 1 / Wave 2 / Wave 3 signals for `rtb` — `docs/attention-signals.md` § Networking table, row `rtb`.
+- The `rtb` signals — `docs/attention-signals.md § Signals § NETWORKING` row `rtb`.
 - `RouteTable.Routes[]`, `RouteTable.Associations[]`, `RouteTable.VpcId`, `RouteTable.Tags` — `AWS SDK Go v2 — service/ec2/types.RouteTable § Routes, Associations, VpcId, Tags`.
 - `Route.State == blackhole` semantics ("the route's target isn't available") — `AWS SDK Go v2 — service/ec2/types.Route § State` (godoc comment) and `AWS SDK Go v2 — service/ec2/types.RouteState` enum (`active`, `blackhole`, `filtered`).
 - `Route.GatewayId`, `Route.NatGatewayId`, `Route.TransitGatewayId`, `Route.NetworkInterfaceId` as target fields for `igw`/`nat`/`tgw`/`eni`/`vpce` discovery — `AWS SDK Go v2 — service/ec2/types.Route § GatewayId, NatGatewayId, TransitGatewayId, NetworkInterfaceId`.

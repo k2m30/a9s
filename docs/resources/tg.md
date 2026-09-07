@@ -125,7 +125,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeTargetHealth](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `tg`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -208,7 +208,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — related panel contract (16 targets: `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `dbi-snap`, `sg`, `subnet`, `vpc`) — `docs/related-resources.md` § "Per-type contract" table row for `tg` and § `### tg`.
 - a9s golden doc — universal pivot `ct-events` — `docs/related-resources.md` § "Policy" (universal pivots clause).
-- a9s golden doc — Wave 1 / Wave 2 / Wave 3 signals and source API (`DescribeTargetHealth`) — `docs/attention-signals.md` § "Networking" table row for `tg`.
+- a9s golden doc — the `tg` signals, read from `DescribeTargetHealth` — `docs/attention-signals.md § Signals § NETWORKING` row `tg`; the deferred CloudWatch ratios — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - a9s golden doc — `asg` → `tg` discovery via `AutoScalingGroup.TargetGroupARNs` — `docs/related-resources.md` § `### asg` ("tg — AutoScalingGroup.TargetGroupARNs").
 - a9s golden doc — `ecs-svc` → `tg` discovery via `Service.loadBalancers[].targetGroupArn` — `docs/related-resources.md` § `### ecs-svc` ("tg — Service.LoadBalancers[].TargetGroupArn").
@@ -224,7 +224,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `logs` not a real pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TGs do not emit CloudWatch Logs; access logs live on the parent ELB in S3 via DescribeLoadBalancerAttributes.`
 - a9s-devops consultation — `sg` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no SecurityGroups field; SG pivot belongs to the parent ALB or the registered instances.`
 - a9s-devops consultation — `subnet` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no subnet field; subnet pivot lives on the parent ELB AvailabilityZones.SubnetId.`
-- a9s-devops consultation — Wave 2 severity mapping ("any unhealthy" = Warning, "all unhealthy" = Broken) matches attention-signals.md verbatim — `a9s-devops (2026-04-20): possible=yes, worth=yes. "All targets unhealthy" is the user-facing-outage case and justifies the Broken bucket.`
+- a9s-devops consultation — Wave 2 severity mapping ("any unhealthy" = Warning, "all unhealthy" = Broken) matches `docs/attention-signals.md § Signals § NETWORKING` row `tg` — `a9s-devops (2026-04-20): possible=yes, worth=yes. "All targets unhealthy" is the user-facing-outage case and justifies the Broken bucket.`
 
 <!-- BEGIN GENERATED: header -->
 tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).

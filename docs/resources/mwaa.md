@@ -79,7 +79,7 @@ Explicitly excluded (per `docs/related-resources.md` §`mwaa`): `vpc` (no direct
 
 **Source API**: [GetEnvironment](https://docs.aws.amazon.com/mwaa/latest/API/API_GetEnvironment.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `mwaa`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -198,14 +198,14 @@ At 3am every problem row names its cause in the Status column — `pending: awai
 - `alarm` pivot via `EnvironmentName` dimension — `a9s-devops (2026-07-14): possible=yes, worth=yes. First triage stop; join key is the env name, no ARN field.`
 - `sqs` exclusion — `AWS SDK Go v2 — mwaa/types.Environment § CeleryExecutorQueue` (queue ARN in an AWS-owned account) + `a9s-devops (2026-07-14): possible=no (not drillable), worth=no. Pivot dead-ends in AccessDenied.`
 - `vpce` exclusion — `AWS SDK Go v2 — mwaa/types.Environment § WebserverVpcEndpointService, § DatabaseVpcEndpointService` (endpoint-service names, not endpoint IDs) + `a9s-devops (2026-07-14): possible=no, worth=no.`
-- Wave 1 `None` (names-only list) — `docs/attention-signals.md` § Data & Analytics, row `mwaa`; `AWS SDK Go v2 — mwaa § ListEnvironments`.
-- Status enum and bucket mapping — `docs/attention-signals.md` § Data & Analytics, row `mwaa`; `AWS SDK Go v2 — mwaa/types.Environment § Status` (all twelve values documented on the SDK shape, incl. PENDING "paused until you create the required VPC endpoints", UPDATE_FAILED "restored to its previous state … ready to use", UNAVAILABLE "did not return to its previous state and is not stable").
-- `LastUpdate.Status == FAILED` finding + error surface — `docs/attention-signals.md` § Data & Analytics, row `mwaa`; `AWS SDK Go v2 — mwaa/types.Environment § LastUpdate` (`LastUpdate.Status`, `LastUpdate.Error.ErrorMessage`); `a9s-devops (2026-07-14): possible=yes, worth=yes. "My change didn't take" case; Warning not Broken because the environment still serves.`
-- `WebserverAccessMode` public finding — `docs/attention-signals.md` § Data & Analytics, row `mwaa`; `AWS SDK Go v2 — mwaa/types.Environment § WebserverAccessMode`; `a9s-devops (2026-07-14): possible=yes, worth=yes (low-severity). Analogous to dbi PubliclyAccessible.`
+- Names-only list response — `AWS SDK Go v2 — mwaa § ListEnvironments`.
+- Status enum and bucket mapping — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `mwaa`; `AWS SDK Go v2 — mwaa/types.Environment § Status` (all twelve values documented on the SDK shape, incl. PENDING "paused until you create the required VPC endpoints", UPDATE_FAILED "restored to its previous state … ready to use", UNAVAILABLE "did not return to its previous state and is not stable").
+- `LastUpdate.Status == FAILED` finding + error surface — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `mwaa`; `AWS SDK Go v2 — mwaa/types.Environment § LastUpdate` (`LastUpdate.Status`, `LastUpdate.Error.ErrorMessage`); `a9s-devops (2026-07-14): possible=yes, worth=yes. "My change didn't take" case; Warning not Broken because the environment still serves.`
+- `WebserverAccessMode` public finding — `docs/attention-signals.md § Signals § DATA & ANALYTICS` row `mwaa`; `AWS SDK Go v2 — mwaa/types.Environment § WebserverAccessMode`; `a9s-devops (2026-07-14): possible=yes, worth=yes (low-severity). Analogous to dbi PubliclyAccessible.`
 - Logging-disabled and AirflowVersion-EOL exclusions — `a9s-devops (2026-07-14): possible=yes, worth=no. Majority-fire noise / no stable EOL source.`
 - AccessDenied honest-degradation contract — `a9s-devops (2026-07-14): worth=yes. "0 environments" during an incident misdirects triage; error state, never 0.`
-- Wave 3 metric names — `docs/attention-signals.md` § Data & Analytics, row `mwaa` (`AWS/MWAA` namespace).
-- S1–S5 surface definitions — `docs/attention-signals.md` § Visualization Surfaces.
+- Wave 3 metric names — `docs/attention-signals.md § Not yet implemented`.
+- S1–S5 surface definitions — `docs/attention-signals.md § Visualization Surfaces`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->

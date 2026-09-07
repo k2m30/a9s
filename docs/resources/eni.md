@@ -89,7 +89,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ec2`, `eip
 
 **Source API**: [DescribeNetworkInterfaces](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNetworkInterfaces.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `eni`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -117,7 +117,7 @@ No Wave 2 signals.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-The `Wave 3` cell in `docs/attention-signals.md` for `eni` is `None`. No out-of-scope Wave 3 signals are recorded.
+`docs/attention-signals.md § Not yet implemented` lists nothing deferred for `eni`. No out-of-scope signals are recorded.
 
 ## 4. Issue Visualization
 
@@ -165,8 +165,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — expected related targets (`ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce`, `ct-events`) — `docs/related-resources.md` § Per-type contract row `eni` and § `eni`.
-- a9s golden doc — Wave 1 signals for `eni` (`Status` bucketing, `available` orphan, requester-managed zombie) — `docs/attention-signals.md` § Networking row `eni`.
-- a9s golden doc — Wave 2 and Wave 3 are `None` for `eni` — `docs/attention-signals.md` § Networking row `eni`.
+- a9s golden doc — Wave 1 signals for `eni` (`Status` bucketing, `available` orphan, requester-managed zombie) — `docs/attention-signals.md § Signals § NETWORKING` row `eni`.
+- a9s golden doc — every `eni` signal reads the list response and nothing is deferred — `docs/attention-signals.md § Signals § NETWORKING` row `eni` and `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - a9s golden doc — `ct-events` universal pivot — `docs/related-resources.md` § Policy item 4.
 - AWS SDK Go v2 — `Status` enum values (`available`, `associated`, `attaching`, `in-use`, `detaching`) — `AWS SDK Go v2 — service/ec2/types.NetworkInterfaceStatus`.

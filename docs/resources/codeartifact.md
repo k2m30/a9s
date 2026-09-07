@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: CodeArtifact Repos
 - **AWS API reference**: <https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html>
 - **List API**: `ListRepositories` (returns `RepositorySummary[]`).
-- **Describe API (if any)**: `ListPackages(maxResults=1)` per repo for the Wave 2 "unused-repo" signal; `GetRepositoryPermissionsPolicy` per repo for the Wave 2 public-policy signal; `DescribeDomain` for the `kms` pivot. `DescribeRepository` is Wave 3 (out of scope) per `docs/attention-signals.md`.
+- **Describe API (if any)**: `ListPackages(maxResults=1)` per repo for the Wave 2 "unused-repo" signal; `GetRepositoryPermissionsPolicy` per repo for the Wave 2 public-policy signal; `DescribeDomain` for the `kms` pivot. `DescribeRepository` is Wave 3 (out of scope) per `docs/attention-signals.md § Not yet implemented`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -43,11 +43,11 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [ListPackages](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackages.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- No Wave 1 signals — the list API does not return fields usable for attention. `ListRepositories` returns only configuration (`Name`, `Arn`, `DomainName`, `DomainOwner`, `AdministratorAccount`, `CreatedTime`, `Description`); nothing indicates health, staleness, or package contents. Source: `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 1 cell = `None — ListRepositories is config-only`); confirmed by `AWS SDK Go v2 — codeartifact/types.RepositorySummary`.
+- No Wave 1 signals — the list API does not return fields usable for attention. `ListRepositories` returns only configuration (`Name`, `Arn`, `DomainName`, `DomainOwner`, `AdministratorAccount`, `CreatedTime`, `Description`); nothing indicates health, staleness, or package contents — `AWS SDK Go v2 — codeartifact/types.RepositorySummary`. Every finding on `docs/attention-signals.md § Signals § CI/CD` row `codeartifact` comes from a later read.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -57,9 +57,9 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **API call**: `ListPackages(maxResults=1)` — one call per repository.
   - **Cost shape**: per-resource.
-  - **How obtained**: `ListPackages(repository=Name, domain=DomainName, domainOwner=DomainOwner, maxResults=1)`; if the returned `packages[]` is empty AND `now - RepositorySummary.CreatedTime > 30d`, the repo is classified unused. Citations: `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 2 cell); `AWS SDK Go v2 — codeartifact/types.PackageSummary` and `codeartifact/types.RepositorySummary § CreatedTime`.
+  - **How obtained**: `ListPackages(repository=Name, domain=DomainName, domainOwner=DomainOwner, maxResults=1)`; if the returned `packages[]` is empty AND `now - RepositorySummary.CreatedTime > 30d`, the repo is classified unused. Citations: `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`; `AWS SDK Go v2 — codeartifact/types.PackageSummary` and `codeartifact/types.RepositorySummary § CreatedTime`.
 
-- **Signal**: repository permissions policy grants public access (`"Principal":"*"` in the policy document) → **`!` background concern** ("public access policy").
+- **Signal**: the repository permissions policy has an Allow statement that grants to any principal with no restrictive condition → **`!` background concern** ("public access policy"). The policy is parsed and evaluated, not string-matched, so a wildcard principal written any legal way is caught and one scoped by a condition is not — `core/iampolicy/evaluate.go`.
   - **State bucket**: Healthy + `!` background concern.
   - **API call**: `GetRepositoryPermissionsPolicy` — one call per repository. Implemented: `core/aws/codeartifact_issue_enrichment.go:100-132`.
   - **Cost shape**: per-resource.
@@ -72,7 +72,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-From `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 3 cell); the `GetRepositoryPermissionsPolicy` analysis originally listed there is now an implemented Wave 2 signal (see §3.2).
+From `docs/attention-signals.md § Not yet implemented`; the `GetRepositoryPermissionsPolicy` analysis originally listed there is now an implemented Wave 2 signal (see §3.2).
 
 - OUT OF SCOPE: `DescribeRepository` encryption check.
 
@@ -105,10 +105,10 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | empty repo, age >30d (unused registry) | 2 | Warning | `~` | S3, S4, S5 | `empty, created 47d ago` |
-| policy grants `"Principal":"*"` | 2 | Healthy | `!` | S1, S3, S4, S5 | `public access policy` |
+| policy grants to any principal | 2 | Healthy | `!` | S1, S3, S4, S5 | `public access policy` |
 | no permissions policy | 2 | Healthy | `~` | S3, S4, S5 | `no permissions policy` |
 
-Rationale for severity: an empty-but-configured registry is a housekeeping concern, not an outage — nothing is broken, the operator may simply have provisioned it ahead of an upcoming workload. `~` (informational) matches the "worth knowing, no immediate action" rule and keeps it out of the menu `issues:N` count so the count stays focused on real breakage. Classified per the attention-signals.md "Warning (unused)" label combined with S3/S4/S5 mapping for Healthy-row informational findings. — a9s-devops: possible=yes, worth=yes; an unused private registry is the kind of thing ops notices on a quarterly clean-up pass, not at 3am — informational severity is correct.
+Rationale for severity: an empty-but-configured registry is a housekeeping concern, not an outage — nothing is broken, the operator may simply have provisioned it ahead of an upcoming workload. `~` (informational) matches the "worth knowing, no immediate action" rule and keeps it out of the menu `issues:N` count so the count stays focused on real breakage. Classified per the `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`. — a9s-devops: possible=yes, worth=yes; an unused private registry is the kind of thing ops notices on a quarterly clean-up pass, not at 3am — informational severity is correct.
 
 Note: `~` attaches only to Healthy (green) rows. `codeartifact` has no Wave 1 signals, so every repo's row starts green; the `~` glyph is therefore always applicable when the Wave 2 unused-repo finding fires.
 
@@ -127,19 +127,19 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name `CodeArtifact Repos` — `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Name cell).
+- Display name `CodeArtifact Repos` — `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`.
 - AWS API reference URL — `docs/related-resources.md § Per-type contract` (codeartifact row).
-- List API `ListRepositories` is config-only (no Wave 1 signals) — `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 1 cell).
+- List API `ListRepositories` is config-only — `core/aws/codeartifact.go`.
 - `RepositorySummary` shape (fields returned by `ListRepositories`) — `AWS SDK Go v2 — codeartifact/types.RepositorySummary § Name, Arn, DomainName, DomainOwner, AdministratorAccount, CreatedTime, Description`.
-- Wave 2 signal `empty repo with age >30d → Warning (unused)` — `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 2 cell).
-- `ListPackages(maxResults=1)` as the per-repo call — `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 2 cell and Source cell: [ListPackages](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackages.html)).
+- Wave 2 signal `empty repo with age >30d → Warning (unused)` — `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`.
+- `ListPackages(maxResults=1)` as the per-repo call — `core/aws/codeartifact_issue_enrichment.go`; [ListPackages](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackages.html).
 - `CreatedTime` field used for age computation — `AWS SDK Go v2 — codeartifact/types.RepositorySummary § CreatedTime`.
 - `PackageSummary` shape (emptiness check via `ListPackages` response) — `AWS SDK Go v2 — codeartifact/types.PackageSummary`.
-- Wave 3 item (`DescribeRepository` encryption check) — `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 3 cell). The `GetRepositoryPermissionsPolicy` analysis originally listed there shipped as a Wave 2 signal and was moved to §3.2 during this amendment.
-- Wave 2 public-policy signal (`"Principal":"*"` in the repository permissions policy → `!` "public access policy"; policy absent → `~` "no permissions policy") — implemented `core/aws/codeartifact_issue_enrichment.go:100-132`, one `GetRepositoryPermissionsPolicy` call per repo — a9s-devops (2026-07-05): possible=yes, worth=yes. A public CodeArtifact repository is a live supply-chain exposure (dependency confusion, package poisoning); operators doing an access review must see it without leaving the list.
+- Deferred item (`DescribeRepository` encryption check) — `docs/attention-signals.md § Not yet implemented`. The `GetRepositoryPermissionsPolicy` analysis originally listed there shipped as a Wave 2 signal and was moved to §3.2 during this amendment.
+- Wave 2 public-policy signal — the repository permissions policy is parsed and its Allow statements evaluated for a wildcard principal without a restrictive condition (`core/iampolicy/evaluate.go`); a public verdict raises `!` "public access policy" and a missing policy raises `~` "no permissions policy" — `core/aws/codeartifact_issue_enrichment.go`, one `GetRepositoryPermissionsPolicy` call per repo; phrase and severity on `core/aws/catalog_cicd.go`. a9s-devops (2026-07-05): possible=yes, worth=yes. A public CodeArtifact repository is a live supply-chain exposure (dependency confusion, package poisoning); operators doing an access review must see it without leaving the list.
 - Expected related targets (`ct-events`, `kms`) — `docs/related-resources.md § Per-type contract` and `docs/related-resources.md § codeartifact`.
 - `kms` pivot field citation (domain-level, not repo-level) — `AWS SDK Go v2 — codeartifact/types.DomainDescription § EncryptionKey`; `codeartifact/types.RepositorySummary § DomainName, DomainOwner` provides the lookup keys for `DescribeDomain`. The earlier wording "Repo EncryptionKey" in `docs/related-resources.md § codeartifact` was factually wrong (no such field exists on the Repository shape) and was amended during this spec generation — a9s-devops (2026-04-20): possible=yes, worth=yes; rationale — CodeArtifact encryption is domain-scoped; pivoting from repo to KMS requires a one-hop `DescribeDomain` call, which is cheap (cacheable per domain) and directly serves the "who depends on this CMK?" workflow during key rotation / access-audit reviews.
-- `DescribeRepository` noted as Wave 3 — `docs/attention-signals.md § Signals § CI/CD` (codeartifact row, Wave 3 cell).
+- `DescribeRepository` deferred — `docs/attention-signals.md § Not yet implemented`.
 - `ct-events` as universal pivot — `docs/related-resources.md § Policy #4`.
 - `ct-events` discovery via `RepositorySummary.Arn` — universal convention in `docs/related-resources.md § Policy #4` (ct-events `resources[].ARN` match).
 - Deliberate exclusions (`codeartifact` → `acm`, `kinesis`, `lambda`, `logs`, `r53`, `waf`, `cb`, `role`) — `docs/related-resources.md § Deliberate exclusions`.

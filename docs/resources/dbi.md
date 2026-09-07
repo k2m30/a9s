@@ -101,7 +101,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `d
 
 **Source API**: [DescribeDBInstances](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBInstances.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -231,7 +231,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — dbi Per-type contract row and AWS API URL — `docs/related-resources.md` § `Per-type contract` (dbi row) and § `dbi`.
 - a9s golden doc — dbi reasoning for each related target (`alarm`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`) — `docs/related-resources.md` § `dbi`.
-- a9s golden doc — Wave 1 / Wave 2 / Wave 3 signal cells — `docs/attention-signals.md` § Databases & Storage → `dbi` row.
+- a9s golden doc — the `dbi` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbi`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - AWS API Reference — `DBInstance.DBInstanceStatus`, `.BackupRetentionPeriod`, `.PubliclyAccessible`, `.StorageEncrypted`, `.DeletionProtection`, `.KmsKeyId`, `.VpcSecurityGroups[].VpcSecurityGroupId`, `.DBSubnetGroup.{VpcId,Subnets[].SubnetIdentifier}`, `.DBClusterIdentifier`, `.EnabledCloudwatchLogsExports[]`, `.MonitoringRoleArn`, `.AssociatedRoles[].RoleArn`, `.MasterUserSecret.SecretArn` — `AWS API Reference: API_DBInstance` (<https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html>).
 - AWS API Reference — `DescribePendingMaintenanceActions` (account-wide) — (<https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribePendingMaintenanceActions.html>).
 - AWS API Reference — `DescribeDBSnapshots` with `DBInstanceIdentifier` filter — (<https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html>).

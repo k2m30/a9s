@@ -125,7 +125,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [DescribeServices](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeServices.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ecs-svc`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -153,7 +153,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-> Note: these signals reuse the same `DescribeServices` response body Wave 1 reads (deployments, events are on the Service object) — no additional API call is required. The Wave-1/Wave-2 split here is about *what a9s interprets*, not about extra calls; see attention-signals.md for the canonical classification.
+> Note: these signals reuse the same `DescribeServices` response body Wave 1 reads (deployments, events are on the Service object) — no additional API call is required. The Wave-1/Wave-2 split here is about *what a9s interprets*, not about extra calls; see `docs/attention-signals.md § Signals § COMPUTE` row `ecs-svc`.
 
 - **Signal**: `Service.deployments[].rolloutState == FAILED`.
   - **State bucket**: Broken.
@@ -274,7 +274,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - AWS SDK Go v2 — `Service.ClusterArn`, `Service.TaskDefinition`, `Service.RoleArn` — `AWS SDK Go v2 — service/ecs/types.Service § ClusterArn, TaskDefinition, RoleArn`.
 - AWS SDK Go v2 — `ListServicesOutput.ServiceArns` returns ARNs only (no status fields) — `AWS SDK Go v2 — service/ecs.ListServicesOutput § ServiceArns`. Justifies the §1 note that `DescribeServices` is the effective list API.
 - Read-only invariant — `docs/architecture.md` § `What is a9s?`.
-- Wave classification and ECS signal set — `docs/attention-signals.md` § `Containers / Compute` row `ecs-svc`.
+- Wave classification and ECS signal set — `docs/attention-signals.md § Signals § COMPUTE` row `ecs-svc`.
 
 <!-- BEGIN GENERATED: header -->
 ecs-svc — COMPUTE. Lifecycle key: `status`.

@@ -107,7 +107,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [DescribeTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeTasks.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ecs-task`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -219,7 +219,7 @@ One bullet per claim in §§2–4.1.
 - AWS Go SDK v2 — `Container.ExitCode`, `Container.Reason`, `Container.HealthStatus` — `AWS SDK Go v2 — ecs/types.Container § ExitCode, Reason, HealthStatus`.
 - AWS Go SDK v2 — Attachment details carry `networkInterfaceId` and `subnetId` for ElasticNetworkInterface attachments — `AWS SDK Go v2 — ecs/types.Attachment § Details, Type`.
 - AWS Go SDK v2 — TaskDefinition holds `ExecutionRoleArn`, `TaskRoleArn`, `ContainerDefinitions[].Image`, `ContainerDefinitions[].Secrets[].ValueFrom`, `ContainerDefinitions[].LogConfiguration.Options["awslogs-group"]` — `AWS SDK Go v2 — ecs/types.TaskDefinition § ExecutionRoleArn, TaskRoleArn, ContainerDefinitions`.
-- a9s golden doc — Wave 1 / Wave 2 / Wave 3 signals for `ecs-task` — `docs/attention-signals.md` § Compute → `ecs-task` row.
+- a9s golden doc — the `ecs-task` signals — `docs/attention-signals.md § Signals § COMPUTE` row `ecs-task`; the deferred cross-cluster outlier detection — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — related-panel contract for `ecs-task` (`alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet`) — `docs/related-resources.md` § Per-type contract and § `ecs-task`.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` § Policy item 4.
 - a9s golden doc — `ecs-task → kms` is explicitly out of the contract (no direct KMS reference on a task) — `docs/related-resources.md` § Unanimous `sometimes` entries.

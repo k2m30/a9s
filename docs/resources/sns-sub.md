@@ -53,7 +53,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `sns`, `lam
 
 **Source API**: [ListSubscriptions](https://docs.aws.amazon.com/sns/latest/api/API_ListSubscriptions.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `sns-sub`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -120,9 +120,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name and Wave 1 signal — `docs/attention-signals.md` § Messaging — `sns-sub` row.
-- List API `ListSubscriptions` — `docs/attention-signals.md` § Messaging — `sns-sub` Source column.
-- Wave 3 `GetSubscriptionAttributes` and CloudWatch `NumberOfNotificationsFailed` — `docs/attention-signals.md` § Messaging — `sns-sub` Wave 3 cell.
+- Display name and Wave 1 signal — `docs/attention-signals.md § Signals § MESSAGING` row `sns-sub`.
+- List API `ListSubscriptions` — `core/aws/sns_sub.go`.
+- Wave 3 `GetSubscriptionAttributes` and CloudWatch `NumberOfNotificationsFailed` — `docs/attention-signals.md § Not yet implemented`.
 - Related contract targets `ct-events`, `lambda`, `sns`, `sqs` — `docs/related-resources.md` § Per-type contract — `sns-sub` row, and § `sns-sub`.
 - AWS API reference URL — `docs/related-resources.md` § `sns-sub` (`https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html`).
 - Subscription shape fields (`SubscriptionArn`, `TopicArn`, `Protocol`, `Endpoint`, `Owner`) — `AWS SDK Go v2 — sns/types.Subscription`.

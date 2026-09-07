@@ -101,7 +101,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn
 
 **Source API**: [DescribeSubnets](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSubnets.html)
 
-Transcribed from `docs/attention-signals.md` §Networking — `subnet` row.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `subnet`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -223,13 +223,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Related-panel `vpce` discovery (Interface endpoints' `VpcEndpoint.SubnetIds`) — `docs/related-resources.md` line 1044 ("Interface endpoint subnets"); `AWS SDK Go v2 — ec2/types.VpcEndpoint § SubnetIds`.
 - Related-panel `cfn` discovery (tag-based, `aws:cloudformation:stack-name`) — `AWS SDK Go v2 — ec2/types.Subnet § Tags`. Tag convention is an AWS-wide CFN behavior cited from related-resources.md's general use of CFN tag-based pivots.
 - Related-panel `ct-events` universal pivot — `docs/related-resources.md` § Policy (universal pivot).
-- §3 Wave 1 signals (`State` enum, `AvailableIpAddressCount`, `MapPublicIpOnLaunch`, `rtb` cross-ref) — `docs/attention-signals.md` § Networking, `subnet` row.
+- §3 Wave 1 signals (`State` enum, `AvailableIpAddressCount`, `MapPublicIpOnLaunch`, `rtb` cross-ref) — `docs/attention-signals.md § Signals § NETWORKING` row `subnet`.
 - §3 `State` enum values (`pending`, `available`, `unavailable`, `failed`, `failed-insufficient-capacity`) match exactly — `AWS SDK Go v2 — ec2/types.SubnetState` (const `SubnetStatePending`, `SubnetStateAvailable`, `SubnetStateUnavailable`, `SubnetStateFailed`, `SubnetStateFailedInsufficientCapacity`).
 - §3 Wave 1 `failed-insufficient-capacity` operator meaning — `AWS SDK Go v2 — ec2/types.Subnet § State` (inline comment: "The underlying infrastructure to support the subnet failed to provision due to a shortage of EC2 instance capacity.").
 - §3 Wave 1 `AvailableIpAddressCount` field — `AWS SDK Go v2 — ec2/types.Subnet § AvailableIpAddressCount` ("The number of unused private IPv4 addresses in the subnet. The IPv4 addresses for any stopped instances are considered unavailable.").
 - §3 Wave 1 `MapPublicIpOnLaunch` field — `AWS SDK Go v2 — ec2/types.Subnet § MapPublicIpOnLaunch` ("Indicates whether instances launched in this subnet receive a public IPv4 address.").
-- §3.2 "No Wave 2 signals" — `docs/attention-signals.md` § Networking, `subnet` row (Wave 2 cell = "None").
-- §3.3 "None" (no Wave 3 items listed) — `docs/attention-signals.md` § Networking, `subnet` row (Wave 3 cell = "None").
+- §3.2 "No Wave 2 signals" — `docs/attention-signals.md § Signals § NETWORKING` row `subnet`.
+- §3.3 "None" (no Wave 3 items listed) — `docs/attention-signals.md § Not yet implemented`.
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?" (line 13: "a9s is a read-only terminal UI for AWS.").
 - `efs` count caveat (mount-target data is not on the top-level `efs` list response — it requires `DescribeMountTargets` per FS) — `AWS SDK Go v2 — efs/types.FileSystemDescription` (no subnet field on `FileSystemDescription`; subnet data only on `MountTargetDescription`).
 - `cfn` tag-based discovery is conventional (no direct field on `Subnet`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Real-world subnets that are CFN-managed carry `aws:cloudformation:stack-name`; operator commonly pivots from a subnet to its stack during drift or change investigations. No AWS surface carries a direct Stack reference on `Subnet` itself, so tags are the only read-only discovery path.

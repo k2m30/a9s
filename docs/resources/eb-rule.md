@@ -78,7 +78,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `kinesis`, 
 
 **Source API**: [ListTargetsByRule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListTargetsByRule.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `eb-rule`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -174,7 +174,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - a9s golden doc — `eb-rule` is in the Per-type contract with targets `ct-events, kinesis, lambda, logs, role, sfn, sns, sqs` — `docs/related-resources.md` § Per-type contract, row `eb-rule`.
 - a9s golden doc — per-target reasoning (`kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs`, `ct-events`) — `docs/related-resources.md` § `eb-rule` (lines 358–369).
-- a9s golden doc — Wave 1/2/3 signals for `eb-rule` — `docs/attention-signals.md` § Messaging & Events table, row `eb-rule`.
+- a9s golden doc — the `eb-rule` signals — `docs/attention-signals.md § Signals § MESSAGING` row `eb-rule`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `Rule.State`, `Rule.Name`, `Rule.EventPattern`, `Rule.ScheduleExpression`, `Rule.EventBusName`, `Rule.RoleArn`, `Rule.Arn`, `Rule.Description` all on the `Rule` shape returned by `ListRules` — `AWS SDK Go v2 — eventbridge/types.Rule`.
 - AWS Go SDK v2 — `Target.Arn`, `Target.DeadLetterConfig`, `Target.RoleArn` are on the `Target` shape returned by `ListTargetsByRule` — `AWS SDK Go v2 — eventbridge/types.Target`.

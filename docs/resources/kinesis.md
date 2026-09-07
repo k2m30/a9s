@@ -18,8 +18,8 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `kinesis`
 - **Display name**: Kinesis Streams
 - **AWS API reference**: <https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html>
-- **List API**: `ListStreams` — returns `StreamSummaries []StreamSummary` plus a parallel `StreamNames []string`. `StreamSummary` carries `StreamARN`, `StreamName`, `StreamStatus`, `StreamCreationTimestamp`, `StreamModeDetails` — enough for the one Wave 1 signal (stream status). The SDK shape is authoritative here; the `attention-signals.md` "Source" column cites `DescribeStreamSummary`, which is the per-stream Wave 2 call (see next field).
-- **Describe API (if any)**: `DescribeStreamSummary` per stream — returns `StreamDescriptionSummary`, which is the only shape that carries `KeyId` (the CMK ARN used for server-side encryption) and `EncryptionType`. Not used by any Wave 2 attention signal in `attention-signals.md`, but required for the `kms` related-panel pivot (see §2).
+- **List API**: `ListStreams` — returns `StreamSummaries []StreamSummary` plus a parallel `StreamNames []string`. `StreamSummary` carries `StreamARN`, `StreamName`, `StreamStatus`, `StreamCreationTimestamp`, `StreamModeDetails` — enough for the one Wave 1 signal (stream status). The per-stream `DescribeStreamSummary` call is the next field.
+- **Describe API (if any)**: `DescribeStreamSummary` per stream — returns `StreamDescriptionSummary`, which is the only shape that carries `KeyId` (the CMK ARN used for server-side encryption) and `EncryptionType`. No `kinesis` signal on `docs/attention-signals.md § Signals § MESSAGING` row `kinesis` reads it; it is required for the `kms` related-panel pivot (see §2).
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -66,7 +66,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [DescribeStreamSummary](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_DescribeStreamSummary.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `kinesis`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -94,7 +94,7 @@ No Wave 2 signals.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-Copy from `attention-signals.md` Wave 3 cell:
+Copy from `docs/attention-signals.md § Not yet implemented`:
 
 - OUT OF SCOPE: CloudWatch `GetRecords.IteratorAgeMilliseconds` (consumer lag).
 - OUT OF SCOPE: CloudWatch `WriteProvisionedThroughputExceeded`.
@@ -158,8 +158,8 @@ One bullet per claim in §§2–4.1.
 
 - a9s golden doc — per-type contract row for `kinesis` — `docs/related-resources.md` § Per-type contract (row `kinesis` → `alarm, cfn, ct-events, ddb, kms, lambda`).
 - a9s golden doc — detailed `kinesis` related list — `docs/related-resources.md` § `kinesis` (AWS API: `API_StreamDescription`).
-- a9s golden doc — Wave 1 `StreamStatus` bucketing and absence of Wave 2 signals — `docs/attention-signals.md` § Messaging (row `kinesis`).
-- a9s golden doc — Wave 3 CloudWatch metrics explicitly excluded — `docs/attention-signals.md` § Messaging (row `kinesis`, Wave 3 cell).
+- a9s golden doc — Wave 1 `StreamStatus` bucketing and absence of Wave 2 signals — `docs/attention-signals.md § Signals § MESSAGING` row `kinesis`.
+- a9s golden doc — Wave 3 CloudWatch metrics explicitly excluded — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — universal `ct-events` pivot policy — `docs/related-resources.md` § Policy.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `StreamSummary` carries `StreamStatus` on the list response — `AWS SDK Go v2 — kinesis/types.StreamSummary § StreamStatus`.

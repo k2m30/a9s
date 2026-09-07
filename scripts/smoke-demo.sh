@@ -96,6 +96,18 @@ tmux send-keys -t "$SESSION" 'd'
 sleep 3
 tmux capture-pane -t "$SESSION" -p > "$CAPDIR/s3_attention.txt"
 
+# The node-group health issue is a supporting row, not a state, so the detail
+# body is the only place it can be read.
+tmux send-keys -t "$SESSION" Escape
+sleep 1
+tmux send-keys -t "$SESSION" ':ng' Enter
+sleep 2
+tmux send-keys -t "$SESSION" '/staging-degraded-net-pool' Enter
+sleep 1
+tmux send-keys -t "$SESSION" 'd'
+sleep 3
+tmux capture-pane -t "$SESSION" -p > "$CAPDIR/ng_detail.txt"
+
 expect() {
 	# $1 = capture file, $2 = required substring, $3 = human label
 	if grep -qF -- "$2" "$CAPDIR/$1"; then
@@ -171,6 +183,9 @@ expect_re s3_circular.txt '\[[0-9]+\]' "header shows the depth badge"
 
 # A flagged resource explains itself at the top of its detail.
 expect s3_attention.txt "Attention (" "flagged bucket detail opens with the attention block"
+expect ng_detail.txt "health issue" "ng health issue is readable in the detail body"
+expect ng_detail.txt "~ Health issue" "ng detail carries the health issue as its own row"
+expect ng_detail.txt "insufficient free addresses" "ng detail names the reported health code"
 expect_re s3_attention.txt '[Pp]ublic access block incomplete' "attention names the cause"
 
 if [ "$FAILURES" -gt 0 ]; then

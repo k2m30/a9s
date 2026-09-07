@@ -55,10 +55,9 @@ Every registered finding, by category, generated from the catalog by
 `cmd/catalogen` — run `go run ./cmd/catalogen` after any `FindingDef` change
 and `make check-catalogen` will confirm it. The API each signal reads is cited
 per type in `docs/resources/<shortName>.md` §3, which is where a batch adds its
-citation. Resource docs that cite `docs/attention-signals.md § <Category> §
-<type>` refer to the hand-written per-category tables this block replaced: their
-Wave 1 and Wave 2 cells are rows here, keyed by code, and their Wave 3 cells are
-lines under "Not yet implemented".
+citation. A resource doc cites one signal as `docs/attention-signals.md §
+Signals § <CATEGORY>` row `<type>`, and a section of this page by its heading;
+conditions no code emits are lines under "Not yet implemented".
 
 <!-- BEGIN GENERATED: signals -->
 

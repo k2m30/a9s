@@ -115,7 +115,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 
 **Source API**: [GetStages](https://docs.aws.amazon.com/apigateway/latest/api/API_GetStages.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `apigw`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -191,7 +191,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - `apigw` shortName + contract row — `docs/related-resources.md` § `apigw` (table row and "Per-target reasoning" subsection).
 - Related targets (`acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `r53`, `role`, `sfn`, `sns`, `vpce`, `waf`) — `docs/related-resources.md` § `apigw`.
-- Wave 1 = None; Wave 2 = `GetStages` per v2 API, no deployed stage → Warning; Wave 3 = `5XXError`/`4XXError` + `GetUsagePlans` quota-breach — `docs/attention-signals.md` § DNS, CDN, Certs — `apigw` row.
+- Wave 1 = None; Wave 2 = `GetStages` per v2 API, no deployed stage → Warning — `docs/attention-signals.md § Signals § DNS & CDN` row `apigw`. The CloudWatch error rates and the `GetUsagePlans` quota-breach check are deferred — `docs/attention-signals.md § Not yet implemented`.
 - `Api` struct fields (no `Status` field on list response; `ProtocolType`, `ApiId`, `Name`, `CreatedDate`) — `AWS SDK Go v2 — apigatewayv2/types.Api`.
 - `Stage.AccessLogSettings`, `Stage.DeploymentId` (used to detect "no deployed stage") — `AWS SDK Go v2 — apigatewayv2/types.Stage § AccessLogSettings, DeploymentId`.
 - `acm` discovery via `GetDomainNames` + `GetApiMappings` with `DomainNameConfigurations[].CertificateArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. Cert expiry is a known outage vector for custom-domain APIs and operators want a direct pivot from the API to the cert.

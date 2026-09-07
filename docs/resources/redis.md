@@ -89,7 +89,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `c
 
 **Source API**: [DescribeReplicationGroups](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_DescribeReplicationGroups.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `redis`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -202,9 +202,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Tightened CT-events checker match — review finding P2-2 (2026-04-23): the `ResourceName` match must be exact equality (not substring) to avoid overmatching similarly named groups (`prod-redis` vs `prod-redis-sessions`); the `EventSource == "elasticache.amazonaws.com"` fallback must be removed because it matches ElastiCache activity for every RG on the account.
 - Cache-free KMS and VPC checkers — review finding P3 (2026-04-23): `checkRedisKMS` returns `[KmsKeyId]` directly from the list response; `checkRedisVPC` returns `[VpcId]` directly from the subnet-group chain. Neither reads the target cache, so `NeedsTargetCache` must be `false` — otherwise the detail-view probe pipeline burns two slots on unnecessary KMS / VPC list prefetches.
 - Per-target reasoning (alarm, cfn, ct-events, kms, logs, secrets, sg, sns, subnet, vpc) — `docs/related-resources.md` § `redis`.
-- Wave 1 signals and state buckets — `docs/attention-signals.md` § Databases & Storage row `redis`.
-- Wave 3 out-of-scope metrics — `docs/attention-signals.md` § Databases & Storage row `redis` column "Wave 3".
-- List API `DescribeReplicationGroups` — `docs/attention-signals.md` § Databases & Storage row `redis` column "Source".
+- Wave 1 signals and state buckets — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `redis`.
+- Wave 3 out-of-scope metrics — `docs/attention-signals.md § Not yet implemented`.
+- List API `DescribeReplicationGroups` — `core/aws/redis.go`.
 - `ReplicationGroup.Status` enum values (`available`, `creating`, `modifying`, `deleting`, `snapshotting`, `create-failed`) — AWS SDK Go v2 — `elasticache/types.ReplicationGroup` § `Status`.
 - `ReplicationGroup.KmsKeyId` — AWS SDK Go v2 — `elasticache/types.ReplicationGroup` § `KmsKeyId`.
 - `ReplicationGroup.LogDeliveryConfigurations[]` — AWS SDK Go v2 — `elasticache/types.ReplicationGroup` § `LogDeliveryConfigurations`; `LogDeliveryConfiguration.DestinationDetails` — AWS SDK Go v2 — `elasticache/types.LogDeliveryConfiguration` § `DestinationDetails`.

@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `cb`
 - **Display name**: CodeBuild Projects
 - **AWS API reference**: <https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html>
-- **List API**: `ListProjects` (returns project name strings only — config-only list; see attention-signals.md row `cb`).
+- **List API**: `ListProjects` (returns project name strings only — a config-only list; nothing on it classifies, see `docs/attention-signals.md § Signals § CI/CD` row `cb`).
 - **Describe API (if any)**: `BatchGetProjects` for project config; `ListBuildsForProject(maxResults=1)` + `BatchGetBuilds` for Wave 2 latest-build status.
 
 ## 2. Related Resources Panel (detail view, right column)
@@ -107,11 +107,11 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `e
 
 **Source API**: [BatchGetBuilds](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_BatchGetBuilds.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `cb`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `ListProjects` is config-only; it returns project-name strings (attention-signals.md row `cb` Wave 1 cell: "None — `ListProjects` is config-only").
+No health signal on the list response — `ListProjects` is config-only and returns project-name strings, so build status comes from the per-project read behind `docs/attention-signals.md § Signals § CI/CD` row `cb`.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -124,7 +124,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-Copied verbatim from attention-signals.md row `cb` Wave 3 cell.
+Copied verbatim from `docs/attention-signals.md § Not yet implemented`.
 
 - OUT OF SCOPE: Stale-project (>90d); cache-config + perf signals.
 
@@ -180,7 +180,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name, Wave descriptors, List API — `docs/attention-signals.md § Signals § CI/CD` row `cb`.
+- Display name and the project signals — `docs/attention-signals.md § Signals § CI/CD` row `cb`; list API — `core/aws/cb.go`.
 - AWS API reference URL and per-type related targets — `docs/related-resources.md § Per-type contract` row `cb` and `docs/related-resources.md § cb`.
 - Read-only invariant — `docs/architecture.md § What is a9s?` ("Read-only by design — a9s never makes write calls to AWS").
 - `ct-events` universal-pivot rule — `docs/related-resources.md § Policy` item 4 ("`ct-events` (CloudTrail audit trail) is implicitly relevant for every registered type").
@@ -194,10 +194,10 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `secrets` discovery field — `docs/related-resources.md § secrets` ("Reverse-scan: CodeBuild Project.Environment.EnvironmentVariables where Type=SECRETS_MANAGER and Value==ARN or name prefix"). Plus AWS SDK Go v2 — `codebuild/types.EnvironmentVariable § Type, Value`.
 - `sg` / `subnet` / `vpc` discovery fields — AWS SDK Go v2 — `codebuild/types.VpcConfig § SecurityGroupIds, Subnets, VpcId`.
 - `ssm` discovery field — AWS SDK Go v2 — `codebuild/types.EnvironmentVariable § Type, Value` (Type==PARAMETER_STORE case).
-- Wave 1 "none" claim — `docs/attention-signals.md § Signals § CI/CD` row `cb` Wave 1 cell: "None — `ListProjects` is config-only".
-- Wave 2 signal and API wiring — `docs/attention-signals.md § Signals § CI/CD` row `cb` Wave 2 cell: "Latest build status per project (via `ListBuildsForProject(maxResults=1)` + batched `BatchGetBuilds`): latest `buildStatus` in `FAILED`/`FAULT`/`TIMED_OUT` → Broken (excluding user-initiated `STOPPED`)".
+- `ListProjects` is config-only, so no signal reads the list response alone — `core/aws/cb.go`.
+- Wave 2 signal and API wiring — the latest build per project via `ListBuildsForProject(maxResults=1)` and batched `BatchGetBuilds`, with `FAILED`/`FAULT`/`TIMED_OUT` reading Broken and a user-initiated `STOPPED` reading nothing — `core/aws/cb_issue_enrichment.go`; the finding it raises is `docs/attention-signals.md § Signals § CI/CD` row `cb`.
 - Wave 2 status field semantics — AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, CurrentPhase, EndTime` and `codebuild/types.StatusType` (values `FAILED`, `FAULT`, `IN_PROGRESS`, `STOPPED`, `SUCCEEDED`, `TIMED_OUT`).
-- Wave 3 out-of-scope signals — `docs/attention-signals.md § Signals § CI/CD` row `cb` Wave 3 cell: "Stale-project (>90d); cache-config + perf signals".
+- Deferred signals (stale project >90d, cache configuration and performance) — `docs/attention-signals.md § Not yet implemented`.
 - Buildspec-based ECR discovery exclusion — `a9s-devops (2026-04-20): possible=no, worth=n/a. AWS APIs do not return parsed buildspec content; the buildspec is either inline YAML or a file reference, and neither is exposed as structured references on Project.`
 
 <!-- BEGIN GENERATED: header -->

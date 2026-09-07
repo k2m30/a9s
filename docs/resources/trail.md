@@ -65,7 +65,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [GetTrailStatus](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_GetTrailStatus.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `trail`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -151,8 +151,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- List API and list-response fields — `docs/attention-signals.md` § Monitoring table row `trail`; `AWS SDK Go v2 — cloudtrail/types.Trail § Name, TrailARN, HomeRegion, S3BucketName, SnsTopicARN, KmsKeyId, CloudWatchLogsLogGroupArn, CloudWatchLogsRoleArn, LogFileValidationEnabled, IsMultiRegionTrail, IsOrganizationTrail`.
-- Describe API (Wave 2) and its fields — `docs/attention-signals.md` § Monitoring table row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § IsLogging, LatestDeliveryError, LatestDeliveryTime, StopLoggingTime`.
+- List API and list-response fields — `AWS SDK Go v2 — cloudtrail/types.Trail § Name, TrailARN, HomeRegion, S3BucketName, SnsTopicARN, KmsKeyId, CloudWatchLogsLogGroupArn, CloudWatchLogsRoleArn, LogFileValidationEnabled, IsMultiRegionTrail, IsOrganizationTrail`.
+- Describe API (Wave 2) and its fields — `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § IsLogging, LatestDeliveryError, LatestDeliveryTime, StopLoggingTime`.
 - Related targets (full list) — `docs/related-resources.md` § Per-type contract, row `trail`; detailed reasoning in `docs/related-resources.md` § `trail`.
 - `kms` via `Trail.KmsKeyId` — `AWS SDK Go v2 — cloudtrail/types.Trail § KmsKeyId`; `docs/related-resources.md` § `trail` ("Trail.KmsKeyId — log-file encryption key").
 - `logs` via `Trail.CloudWatchLogsLogGroupArn` — `AWS SDK Go v2 — cloudtrail/types.Trail § CloudWatchLogsLogGroupArn`; `docs/related-resources.md` § `trail` ("Trail.CloudWatchLogsLogGroupArn — associated log group").
@@ -161,11 +161,11 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `sns` via `Trail.SnsTopicARN` — `AWS SDK Go v2 — cloudtrail/types.Trail § SnsTopicARN`; `docs/related-resources.md` § `trail` ("Trail.SnsTopicARN — delivery notifications"). The deprecated `SnsTopicName` is ignored in favor of the ARN per the SDK's own deprecation note.
 - `ct-events` universal pivot — `docs/related-resources.md` § Policy item 4 ("`ct-events` … is implicitly relevant for every registered type"); per-row note in `docs/related-resources.md` § `trail` ("Audit trail for trail config changes (meta!)").
 - Discovery mechanism for every direct-field pivot (read a single `*string` off the `Trail` list-response record) — a9s-devops (2026-04-20): possible=yes, worth=yes. All five non-universal related targets for `trail` are direct fields on the `DescribeTrails` response; no extra API call or enrichment is needed — this is a uniquely cheap related panel.
-- Wave 1 `LogFileValidationEnabled==false` → Warning — `docs/attention-signals.md` § Monitoring row `trail`.
-- Wave 2 `IsLogging==false` → Broken — `docs/attention-signals.md` § Monitoring row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § IsLogging`.
-- Wave 2 `LatestDeliveryError` non-empty → Broken — `docs/attention-signals.md` § Monitoring row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § LatestDeliveryError`.
-- Wave 2 `LatestDeliveryTime` >1h stale while `IsLogging==true` → Broken — `docs/attention-signals.md` § Monitoring row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § LatestDeliveryTime, IsLogging`.
-- Wave 3 `LookupEvents` absence detection (OUT OF SCOPE) — `docs/attention-signals.md` § Monitoring row `trail`.
+- Wave 1 `LogFileValidationEnabled==false` → Warning — `docs/attention-signals.md § Signals § MONITORING` row `trail`.
+- Wave 2 `IsLogging==false` → Broken — `docs/attention-signals.md § Signals § MONITORING` row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § IsLogging`.
+- Wave 2 `LatestDeliveryError` non-empty → Broken — `docs/attention-signals.md § Signals § MONITORING` row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § LatestDeliveryError`.
+- Wave 2 `LatestDeliveryTime` >1h stale while `IsLogging==true` → Broken — `docs/attention-signals.md § Signals § MONITORING` row `trail`; `AWS SDK Go v2 — cloudtrail.GetTrailStatusOutput § LatestDeliveryTime, IsLogging`.
+- Wave 3 `LookupEvents` absence detection (OUT OF SCOPE) — `docs/attention-signals.md § Not yet implemented`.
 - `!` severity for the three Wave 2 Broken signals — a9s-devops (2026-04-20): possible=yes, worth=yes. A stopped trail, a failing S3 delivery, or a silent delivery are all cases where the audit record is actively being lost — this is a compliance/security break and must bump the menu `issues:N` count; `~` would under-sell the risk. S3 is suppressed per the HOW rule because the row is already red.
 - Out-of-scope rationale for `LatestDigestDeliveryError`, `LatestNotificationError`, `LatestCloudWatchLogsDeliveryError` — a9s-devops (2026-04-20): possible=yes, worth=no. The golden-doc signals already cover the actively-losing-data cases; these extra fields surface niche sub-failures whose fix path is the existing `kms` / `logs` / `role` pivots.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".

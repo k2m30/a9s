@@ -41,7 +41,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [DescribeParameters](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_DescribeParameters.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `ssm`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -121,11 +121,11 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `Type`, `Tier`, `LastModifiedDate`, `Name` field presence on `ParameterMetadata` — `AWS SDK Go v2 — service/ssm/types.ParameterMetadata § Type, Tier, LastModifiedDate, Name`.
 - `ParameterType` enum (`String`, `StringList`, `SecureString`) — `AWS SDK Go v2 — service/ssm/types.ParameterType`.
 - `ParameterTier` enum (includes `Standard`, `Advanced`, `Intelligent-Tiering`) — `AWS SDK Go v2 — service/ssm/types.ParameterTier`.
-- Wave 1 / Wave 2 / Wave 3 signal rows — `docs/attention-signals.md` § Secrets & Config, row `ssm`.
-- List API `DescribeParameters` — `docs/attention-signals.md` § Secrets & Config, row `ssm` Source column.
+- The `ssm` signals — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `ssm`; the deferred `GetParameterHistory` read — `docs/attention-signals.md § Not yet implemented`.
+- List API `DescribeParameters` — `core/aws/ssm.go`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - ct-events universal-pivot policy — `docs/related-resources.md` § Policy, item 4.
-- Rephrasing `Tier==Advanced unused >90d` → `Tier==Advanced AND LastModifiedDate >90d` — `a9s-devops (2026-04-20): possible=no for "unused" at Wave 1, possible=yes for "aged". Rationale: DescribeParameters response (ParameterMetadata) exposes LastModifiedDate but not last-access timestamp; true access tracking lives in GetParameterHistory which is Wave 3. The Wave 1 signal as originally worded could not be implemented from the list response. Rephrasing to LastModifiedDate-age preserves the cost-hygiene intent and is achievable at Wave 1.` Amendment recorded in `docs/attention-signals.md` with an HTML comment on the same row.
+- Rephrasing `Tier==Advanced unused >90d` → `Tier==Advanced AND LastModifiedDate >90d` — `a9s-devops (2026-04-20): possible=no for "unused", possible=yes for "aged". Rationale: the DescribeParameters response (ParameterMetadata) exposes LastModifiedDate but not a last-access timestamp; true access tracking lives in GetParameterHistory. The signal as originally worded could not be implemented from the list response. Rephrasing to LastModifiedDate-age preserves the cost-hygiene intent.` The `GetParameterHistory` read stays deferred — `docs/attention-signals.md § Not yet implemented`.
 - `kms` discovery mechanism (cross-reference already-loaded `kms` list by `KeyId` / alias) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Rationale: ParameterMetadata.KeyId is populated only for SecureString; the default key alias alias/aws/ssm is well-known, and customer-managed aliases are resolvable against the kms list when loaded. Operators rotating a customer-managed key need the inverse lookup (which parameters depend on this key) which the related panel delivers.`
 - Policies scope-out — `a9s-devops (2026-04-20): possible=yes (ParameterMetadata.Policies[] is present on the list response), worth=no for the default list view. Rationale: parameter policies (expiration, notification, no-change) are a niche power-user feature; alerting on policy expiry is better served by EventBridge or a dedicated advanced-policies view than by occupying S3/S4 real estate that all SSM rows would otherwise lose to a rarely-used signal.`
 

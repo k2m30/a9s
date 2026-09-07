@@ -48,7 +48,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `iam-group`
 
 **Source API**: [ListUsers](https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListUsers.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-user`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -142,10 +142,10 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `iam-group` discovery via `ListGroupsForUser(UserName)` — `AWS SDK Go v2 — iam.ListGroupsForUserInput § UserName` (required field); output `Groups[].GroupName` keys into `iam-group` list.
 - `policy` discovery via `ListAttachedUserPolicies(UserName)` — `AWS SDK Go v2 — iam.ListAttachedUserPoliciesInput § UserName` (required field); output `AttachedPolicies[].PolicyArn`.
 - `ct-events` discovery by `Username` attribute — `docs/related-resources.md` §`ct-events` ("`userIdentity.userName` (Type=IAMUser)"); `docs/testing-detail-view-coverage.md` §§35, 93 (short-name is the bare user name).
-- Wave 1 `PasswordLastUsed` / `CreateDate` signal — `docs/attention-signals.md` § "Security & IAM" table, `iam-user` row; `AWS SDK Go v2 — iam/types.User § PasswordLastUsed` and `§ CreateDate` (both on `ListUsers` response).
-- Wave 2 access-key age signals — `docs/attention-signals.md` § "Security & IAM" table, `iam-user` row; `AWS SDK Go v2 — iam/types.AccessKeyMetadata § Status, CreateDate` and `iam/types.AccessKeyLastUsed § LastUsedDate`.
-- Wave 2 console-without-MFA signal — `docs/attention-signals.md` § "Security & IAM" table, `iam-user` row ("console login enabled AND no MFA device → Broken"); `AWS SDK Go v2 — iam/types.MFADevice § SerialNumber, EnableDate` (per `ListMFADevices`); `GetLoginProfile` presence indicates console access.
-- Wave 3 credential report — `docs/attention-signals.md` § "Security & IAM" table, `iam-user` row Wave 3 cell; OUT OF SCOPE per template rule.
+- Wave 1 `PasswordLastUsed` / `CreateDate` signal — `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-user`; `AWS SDK Go v2 — iam/types.User § PasswordLastUsed` and `§ CreateDate` (both on `ListUsers` response).
+- Wave 2 access-key age signals — `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-user`; `AWS SDK Go v2 — iam/types.AccessKeyMetadata § Status, CreateDate` and `iam/types.AccessKeyLastUsed § LastUsedDate`.
+- Wave 2 console-without-MFA signal — `docs/attention-signals.md § Signals § SECURITY & IAM` row `iam-user`; `AWS SDK Go v2 — iam/types.MFADevice § SerialNumber, EnableDate` (per `ListMFADevices`); `GetLoginProfile` presence indicates console access.
+- Wave 3 credential report — `docs/attention-signals.md § Not yet implemented`; OUT OF SCOPE per template rule.
 - Severity assignment `!` vs `~` for Wave 2 findings — persona decision: MFA-missing is a security incident (Broken + `!` drives S1 count); stale/never-used keys are hygiene (`~` annotation, no S1 bump). Grounded in skill surface rules (§S1, §S3) and CIS IAM benchmarks' treatment of MFA as mandatory.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `iam-user` NOT-related pairs (`kms`, `role`) — `docs/related-resources.md` §"Known NOT-related pairs" lines 1101–1102.

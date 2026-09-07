@@ -101,7 +101,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cb`, `cfn`
 
 **Source API**: [ListSecrets](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_ListSecrets.html)
 
-Transcribed from `docs/attention-signals.md` § Secrets & Config.
+Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `secrets`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -134,7 +134,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-The attention-signals.md Wave 3 cell for `secrets` is empty. There are no Wave 3 signals defined for this resource.
+`docs/attention-signals.md § Not yet implemented` lists the `DescribeSecret` stuck-`AWSPENDING` read for `secrets`. No further out-of-scope signals are defined for this resource.
 
 ## 4. Issue Visualization
 
@@ -189,11 +189,11 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name and list API `ListSecrets` — `docs/attention-signals.md` § Secrets & Config table row `secrets`.
+- Display name — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `secrets`; list API `ListSecrets` — `core/aws/secrets.go`.
 - AWS API reference URL — `docs/related-resources.md` § Per-type contract row `secrets` and § `secrets` subsection.
-- Wave 1 signals (overdue, failing, dormant, deleted) — `docs/attention-signals.md` § Secrets & Config table, `Wave 1` cell for `secrets`.
-- Wave 2 `AWSPENDING` stuck via `DescribeSecret` — `docs/attention-signals.md` § Secrets & Config table, `Wave 2` cell for `secrets`.
-- Wave 3 empty — `docs/attention-signals.md` § Secrets & Config table, `Wave 3` cell for `secrets` is blank.
+- Wave 1 signals (overdue, failing, dormant, deleted) — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `secrets`.
+- Wave 2 `AWSPENDING` stuck via `DescribeSecret` — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `secrets`.
+- The deferred stuck-`AWSPENDING` read — `docs/attention-signals.md § Not yet implemented`.
 - Field names `RotationEnabled`, `NextRotationDate`, `LastRotatedDate`, `LastAccessedDate`, `DeletedDate`, `KmsKeyId`, `RotationLambdaARN`, `Tags`, `RotationRules.AutomaticallyAfterDays`, `RotationRules.ScheduleExpression` — `AWS SDK Go v2 — service/secretsmanager/types.SecretListEntry` and `AWS SDK Go v2 — service/secretsmanager/types.RotationRulesType`.
 - Field name `VersionIdsToStages` on `DescribeSecret` (distinct from `SecretVersionsToStages` on `SecretListEntry`) — `AWS SDK Go v2 — service/secretsmanager.DescribeSecretOutput § VersionIdsToStages`.
 - Related target `cb` discovery (reverse-scan of `Project.Environment.EnvironmentVariables` with `Type=SECRETS_MANAGER`) — `docs/related-resources.md` § `secrets`, `cb` bullet.
@@ -210,7 +210,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` as universal pivot — `docs/related-resources.md` §Policy bullet 4 ("Universal pivots").
 - Read-only invariant (no write APIs) — `docs/architecture.md` §"What is a9s?".
 - ScheduleExpression gap (Wave 1 "rotation failing" rule misses cron/rate schedules) — a9s-devops (2026-04-20): possible=yes, worth=yes. Rationale: `RotationRules.ScheduleExpression` is set instead of `AutomaticallyAfterDays` for cron/rate-based rotations (confirmed in `AWS SDK Go v2 — service/secretsmanager/types.RotationRulesType § ScheduleExpression`). Daily operators using cron schedules would see silent false-negatives; the fix is a `NextRotationDate`-based fallback, and it belongs as a §4.1 UX gap rather than a change to the golden doc.
-- `DeletedDate set` classified as Warning rather than Dim — `docs/attention-signals.md` § Secrets & Config, `Wave 1` cell for `secrets`. The golden doc explicitly writes `Warning`; this spec honors the classification.
+- `DeletedDate set` classified as Warning rather than Dim — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `secrets`. The golden doc explicitly writes `Warning`; this spec honors the classification.
 
 <!-- BEGIN GENERATED: header -->
 secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifecycle field).

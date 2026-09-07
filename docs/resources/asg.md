@@ -102,7 +102,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 **Source API**: [DescribeAutoScalingGroups](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_DescribeAutoScalingGroups.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `asg`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -189,8 +189,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `asg` contract row — `docs/related-resources.md` § `Per-type contract` line for `asg`.
 - a9s golden doc — per-target reasoning (`alarm`, `ami`, `ct-events`, `ec2`, `elb`, `ng`, `role`, `sg`, `sns`, `subnet`, `tg`, `vpc`) — `docs/related-resources.md` § `asg`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md` § `Policy` item 4.
-- a9s golden doc — Wave 1 and Wave 2 signals for `asg` — `docs/attention-signals.md` § `Compute` row `asg`.
-- a9s golden doc — Wave 3 OUT OF SCOPE signal — `docs/attention-signals.md` § `Compute` row `asg` (Wave 3 cell).
+- a9s golden doc — Wave 1 and Wave 2 signals for `asg` — `docs/attention-signals.md § Signals § COMPUTE` row `asg`.
+- a9s golden doc — Wave 3 OUT OF SCOPE signal — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.
 - AWS Go SDK v2 — ASG list-response shape (`Status`, `Instances[]`, `SuspendedProcesses[]`, `MinSize`, `TargetGroupARNs`, `LoadBalancerNames`, `VPCZoneIdentifier`, `LaunchTemplate`, `LaunchConfigurationName`, `ServiceLinkedRoleARN`) — `AWS SDK Go v2 — autoscaling/types.AutoScalingGroup`.
 - AWS Go SDK v2 — per-instance `HealthStatus` and `LifecycleState` — `AWS SDK Go v2 — autoscaling/types.Instance § HealthStatus`, `§ LifecycleState`.

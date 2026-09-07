@@ -226,9 +226,16 @@ func TestCitesSignalsCitationShape(t *testing.T) {
 // TestCitesCodeartifactPublicAccessDescribedByTheEngine pins that
 // docs/resources/codeartifact.md no longer describes the public-access signal
 // as a string match on the policy document. The policy engine in
-// core/aws/catalog_security.go evaluates the statement; a doc that promises a
+// core/iampolicy/evaluate.go evaluates the statement; a doc that promises a
 // substring search describes a check a9s does not run, and an operator reading
 // it would expect a policy written any other way to go unflagged.
+//
+// The engine file was core/aws/catalog_security.go here until the citation
+// batch: that file holds the SECURITY & IAM catalog literal and its color
+// classifiers and names codeartifact nowhere, while
+// core/aws/codeartifact_issue_enrichment.go calls iampolicy.Evaluate for the
+// verdict. Pinning the old path would have put a false citation in the doc to
+// make this test pass; do not restore it.
 func TestCitesCodeartifactPublicAccessDescribedByTheEngine(t *testing.T) {
 	path := filepath.Join(projectRoot(t), "docs", "resources", "codeartifact.md")
 	lines := readLines(t, path)
@@ -242,11 +249,11 @@ func TestCitesCodeartifactPublicAccessDescribedByTheEngine(t *testing.T) {
 	if len(offenders) > 0 {
 		t.Errorf("%d line(s) in docs/resources/codeartifact.md still describe the public-access signal as a "+
 			"`\"Principal\":\"*\"` string match. Say what the policy engine decides — a statement that grants to any "+
-			"principal — and cite core/aws/catalog_security.go:\n%s", len(offenders), strings.Join(offenders, "\n"))
+			"principal — and cite core/iampolicy/evaluate.go:\n%s", len(offenders), strings.Join(offenders, "\n"))
 	}
 
-	if !strings.Contains(strings.Join(lines, "\n"), "core/aws/catalog_security.go") {
-		t.Errorf("docs/resources/codeartifact.md does not cite core/aws/catalog_security.go, the file that decides " +
+	if !strings.Contains(strings.Join(lines, "\n"), "core/iampolicy/evaluate.go") {
+		t.Errorf("docs/resources/codeartifact.md does not cite core/iampolicy/evaluate.go, the file that decides " +
 			"the public-access signal")
 	}
 }

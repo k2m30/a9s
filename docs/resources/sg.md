@@ -77,7 +77,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `cfn`, `ct-
 
 **Source API**: [DescribeSecurityGroups](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSecurityGroups.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `sg`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -157,9 +157,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - Contract targets `cfn, ct-events, ec2, elb, eni, lambda, sg, vpc` — `docs/related-resources.md` § Per-type contract row `sg` (line 99) and detail block `### \`sg\`` (lines 902–913).
-- Wave 1 admin-port signal and port set — `docs/attention-signals.md` § Networking row `sg` (line 60).
-- Wave 2 orphan-SG signal (cross-ref `eni`) — `docs/attention-signals.md` § Networking row `sg`.
-- Wave 3 SG-referencing-deleted-SG — `docs/attention-signals.md` § Networking row `sg` (line 60).
+- Wave 1 admin-port signal and port set — `docs/attention-signals.md § Signals § NETWORKING` row `sg`.
+- Wave 2 orphan-SG signal (cross-ref `eni`) — `docs/attention-signals.md § Signals § NETWORKING` row `sg`.
+- Wave 3 SG-referencing-deleted-SG — `docs/attention-signals.md § Not yet implemented`.
 - `SecurityGroup` struct has no `State` field (config-only; SGs are always "healthy" unless a rule-level or usage-level signal fires) — `AWS SDK Go v2 — ec2/types.SecurityGroup`.
 - `IpPermissions[].IpRanges[].CidrIp` — `AWS SDK Go v2 — ec2/types.IpPermission § IpRanges` and `ec2/types.IpRange § CidrIp`.
 - `IpPermissions[].UserIdGroupPairs[].GroupId` for SG-to-SG pivot — `AWS SDK Go v2 — ec2/types.IpPermission § UserIdGroupPairs` and `ec2/types.UserIdGroupPair § GroupId`.

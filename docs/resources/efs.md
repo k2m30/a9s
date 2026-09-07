@@ -102,7 +102,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 
 **Source API**: [DescribeMountTargets](https://docs.aws.amazon.com/efs/latest/ug/API_DescribeMountTargets.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `efs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -206,7 +206,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — EFS per-type related contract — `docs/related-resources.md` § Per-type contract row `efs`.
 - a9s golden doc — EFS related-target discovery notes (KmsKeyId, mount-target ENIs/SGs/subnets, lambda mounts, ecs-task mounts, backup recovery points, cfn stack, alarm metrics) — `docs/related-resources.md` § `### efs`.
 - a9s golden doc — Universal-pivot policy for `ct-events` — `docs/related-resources.md` § Policy.
-- a9s golden doc — EFS Wave 1/2/3 signals and Source — `docs/attention-signals.md` § Databases & Storage row `efs`.
+- a9s golden doc — the `efs` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `efs`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS Go SDK v2 — `FileSystemDescription` shape and field names (`LifeCycleState`, `NumberOfMountTargets`, `FileSystemId`, `FileSystemArn`, `KmsKeyId`, `Encrypted`, `Tags`) — `AWS SDK Go v2 — service/efs/types.FileSystemDescription`.
 - AWS Go SDK v2 — `LifeCycleState` enum values (`creating`, `available`, `updating`, `deleting`, `deleted`, `error`) — `AWS SDK Go v2 — service/efs/types.LifeCycleState`.

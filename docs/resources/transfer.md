@@ -91,7 +91,7 @@ Explicitly excluded (per `docs/related-resources.md` §`transfer`): `sg` (`Endpo
 
 **Source API**: [DescribeServer](https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribeServer.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `transfer`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -141,7 +141,7 @@ Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner
 
 ## 4. Issue Visualization
 
-Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing (no glyph-on-green case exists for transfer).
+Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave→surface mapping as standard. Every signal is color-bearing (no glyph-on-green case exists for transfer).
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
@@ -176,7 +176,7 @@ Every problem row names its cause in the Status column (`offline: not accepting 
 
 - Pivot set and exclusions — `docs/related-resources.md` § `transfer`; `AWS SDK Go v2 — transfer/types.DescribedServer § Certificate, § IdentityProviderDetails, § StructuredLogDestinations, § LoggingRole, § EndpointDetails`; sg exclusion per SDK doc on `EndpointDetails § SecurityGroupIds` ("not populated in DescribeServer responses").
 - eip pivot + SubnetIds/AddressAllocationIds navigability — `user (2026-07-14, live acceptance testing): internet-facing server witnessed with EndpointDetails.AddressAllocationIds ×3 — the original AS2 witness had an internal endpoint, which hid this field`; `AWS SDK Go v2 — transfer/types.EndpointDetails § AddressAllocationIds`.
-- Wave-1 State mapping — `docs/attention-signals.md` § Networking row `transfer`; `AWS SDK Go v2 — transfer/types.ListedServer § State`.
+- Wave-1 State mapping — `docs/attention-signals.md § Signals § NETWORKING` row `transfer`; `AWS SDK Go v2 — transfer/types.ListedServer § State`.
 - LoggingRole-nil and UserCount-zero non-signals — `a9s-devops (2026-07-14): possible=yes, worth=no. Structured logging makes nil legitimate; AS2/external-IdP servers legitimately 0 users.`
 - Security-policy denylist — `a9s-devops (2026-07-14): possible=yes, worth=yes. Denylist beats latest-chasing (FIPS/restricted variants).`
 - Logging-gap Wave-2 signal — `a9s-devops (2026-07-14): possible=yes (both fields on DescribedServer), worth=yes. B2B audit gap.`

@@ -83,7 +83,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [GetRole](https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetRole.html)
 
-Transcribed from `docs/attention-signals.md`.
+Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `role`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -156,7 +156,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- Display name, Source API, Wave 1/Wave 2/Wave 3 cells — `docs/attention-signals.md § Signals § SECURITY & IAM` row `role`.
+- Display name and the `role` signals — `docs/attention-signals.md § Signals § SECURITY & IAM` row `role`; the deferred permission-usage audit — `docs/attention-signals.md § Not yet implemented`.
 - AWS API URL and expected related targets — `docs/related-resources.md` § Per-type contract → `role` row.
 - Per-target reasoning (ct-events / ec2 / eks / glue / iam-group / iam-user / lambda / ng / policy) — `docs/related-resources.md` § `role` section.
 - `AssumeRolePolicyDocument` is URL-encoded JSON on the list response — `AWS SDK Go v2 — iam/types.Role § AssumeRolePolicyDocument` (string field on the `Role` struct returned by `ListRoles`).

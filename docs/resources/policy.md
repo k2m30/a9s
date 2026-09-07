@@ -55,7 +55,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 **Source API**: [GetPolicyVersion](https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetPolicyVersion.html)
 
-Transcribed from `docs/attention-signals.md` §Security & IAM row `policy`.
+Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -130,9 +130,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `policy` is a registered a9s resource type — `docs/related-resources.md` § Per-type contract row `policy`.
 - Expected related targets `ct-events`, `iam-group`, `iam-user`, `role` — `docs/related-resources.md` § `policy` (line "`policy` | [API_Policy] | `ct-events`, `iam-group`, `iam-user`, `role`").
 - Reasoning for each target pivot — `docs/related-resources.md` § `### policy` subsection (lines 746-753).
-- Wave 1 signal `AttachmentCount==0 AND not AWS-managed → Warning (orphan)` — `docs/attention-signals.md` § Security & IAM row `policy`.
-- Wave 2 signal `GetPolicyVersion` document contains `"Effect":"Allow","Action":"*","Resource":"*" → Broken (wildcard admin)` — `docs/attention-signals.md` § Security & IAM row `policy`.
-- Wave 3 IAM Access Advisor unused-permission analysis — `docs/attention-signals.md` § Security & IAM row `policy`.
+- Wave 1 signal `AttachmentCount==0 AND not AWS-managed → Warning (orphan)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
+- Wave 2 signal `GetPolicyVersion` document contains `"Effect":"Allow","Action":"*","Resource":"*" → Broken (wildcard admin)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
+- Wave 3 IAM Access Advisor unused-permission analysis — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant (§5) — `docs/architecture.md` § "What is a9s?".
 - AWS SDK Go v2 — `Policy` shape fields `Arn`, `AttachmentCount`, `DefaultVersionId`, `IsAttachable`, `PolicyName`, `PolicyId`, `PermissionsBoundaryUsageCount`, `CreateDate`, `UpdateDate` — `AWS SDK Go v2 — service/iam/types.Policy`.
 - AWS SDK Go v2 — `PolicyVersion.Document` is URL-encoded JSON (must be decoded before parsing) — `AWS SDK Go v2 — service/iam/types.PolicyVersion § Document`.

@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` Per-type contract (line 102): 
 ### `eb-rule`
 
 - **Why related**: EventBridge rules whose targets deliver events into this queue — an EB-rule target's `Arn` is the queue's ARN (related-resources.md §`sqs` line 940; §`eb-rule` contract row line 62 lists `sqs` as an expected target).
-- **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. The authoritative mapping lives on `ListTargetsByRule` (per-rule fan-out, Wave 2) — but the `eb-rule` resource already calls `ListTargetsByRule` as part of its own Wave 2 enrichment (per `attention-signals.md` line 85), so a9s can piggy-back: for each loaded `eb-rule`, scan its cached targets for `Arn == <queue-arn>` and collect matching rule IDs. No additional API calls. Operator workflow: "what's producing traffic into this queue?" is a standard messaging-triage question.
+- **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. The authoritative mapping lives on `ListTargetsByRule` (per-rule fan-out, Wave 2) — but the `eb-rule` resource already calls `ListTargetsByRule` as part of its own Wave 2 enrichment, so a9s can piggy-back: for each loaded `eb-rule`, scan its cached targets for `Arn == <queue-arn>` and collect matching rule IDs. No additional API calls. Operator workflow: "what's producing traffic into this queue?" is a standard messaging-triage question.
 - **Count shown**: yes — a9s-devops (2026-04-21): number of rules feeding a queue is meaningful (e.g. fan-in from multiple scheduled rules vs a single event-driven rule).
 
 ### `kms`
@@ -77,7 +77,7 @@ Expected targets from `docs/related-resources.md` Per-type contract (line 102): 
 
 **Source API**: [GetQueueAttributes](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html)
 
-Transcribed from `docs/attention-signals.md` § Messaging § `sqs` row (line 82).
+Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -89,12 +89,12 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **API call**: `GetQueueAttributes(AttributeNames=[All])` — one call per queue.
   - **Cost shape**: per-resource.
-  - **Note**: the threshold is not specified in `attention-signals.md` — see §5 Out of Scope for deferral rationale.
+  - **Note**: the threshold is unspecified — see §5 Out of Scope for the deferral rationale.
 - **Signal**: `ApproximateNumberOfMessages` rising unbounded → Broken (consumer stopped). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
   - **API call**: `GetQueueAttributes` — same per-queue call (no added cost).
   - **Cost shape**: per-resource.
-  - **Note**: "rising unbounded" requires two-sample trending across sweeps — the sampling cadence and delta-required are unspecified in `attention-signals.md`; see §5.
+  - **Note**: "rising unbounded" requires two-sample trending across sweeps — the sampling cadence and delta-required are unspecified; see §5.
 - **Signal**: `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` → Warning (consumer lag). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **API call**: `GetQueueAttributes` — same per-queue call.
@@ -151,13 +151,13 @@ One row per signal from §3:
 
 ## 4.1 UX review
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §4 row — `backlog: 50k msgs`, `oldest msg age: 3h`, `DLQ has 12 msgs`, `no DLQ configured`, and `backlog growing: 120k msgs` are all self-explanatory at a glance and let the operator prioritize which queue to drill into first. The only latent gap is that the backlog and rising-unbounded thresholds are not defined in `attention-signals.md` — implementers must choose sensible defaults (see §5) or the signals cannot ship; without that choice, every queue either looks fine or every queue looks broken.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every §4 row — `backlog: 50k msgs`, `oldest msg age: 3h`, `DLQ has 12 msgs`, `no DLQ configured`, and `backlog growing: 120k msgs` are all self-explanatory at a glance and let the operator prioritize which queue to drill into first. The only latent gap is that the backlog and rising-unbounded thresholds are undefined — implementers must choose sensible defaults (see §5) or the signals cannot ship; without that choice, every queue either looks fine or every queue looks broken.
 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).
-- **Backlog threshold definition** — `attention-signals.md` line 82 writes `ApproximateNumberOfMessages > threshold` without specifying the threshold. a9s-devops (2026-04-21): possible=yes-via-heuristic, worth=yes-but-decision-deferred. No universal absolute number is correct — a 50k message queue is normal for a batch pipeline, broken for an interactive service. Viable approaches: (a) fixed default (e.g. 1 000 or 10 000), (b) per-queue tag override (`a9s:backlog_threshold=N`), (c) relative-to-VisibilityTimeout heuristic. Recommend deferring until a decision is added to `attention-signals.md`; shipping without a default silently means the signal never fires.
-- **Rising-unbounded trend detection** — a9s-devops (2026-04-21): possible=yes, worth=yes-but-needs-sampling-contract. Requires two samples across sweeps with a defined minimum delta and time window; cache format change may be needed to store the previous sample. Defer until `attention-signals.md` specifies sample cadence and delta threshold.
+- **Backlog threshold definition** — the queue-depth condition is deferred without a threshold, `docs/attention-signals.md § Not yet implemented`. a9s-devops (2026-04-21): possible=yes-via-heuristic, worth=yes-but-decision-deferred. No universal absolute number is correct — a 50k message queue is normal for a batch pipeline, broken for an interactive service. Viable approaches: (a) fixed default (e.g. 1 000 or 10 000), (b) per-queue tag override (`a9s:backlog_threshold=N`), (c) relative-to-VisibilityTimeout heuristic. Shipping without a default silently means the signal never fires.
+- **Rising-unbounded trend detection** — a9s-devops (2026-04-21): possible=yes, worth=yes-but-needs-sampling-contract. Requires two samples across sweeps with a defined minimum delta and time window; cache format change may be needed to store the previous sample. Deferred until that sampling contract exists — `docs/attention-signals.md § Not yet implemented`.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` § "What is a9s?").
 
@@ -173,7 +173,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §2 `ct-events` universal pivot — `docs/related-resources.md` § Policy §4 (line 34) and §`sqs` (line 939).
 - §2 `ct-events` count shown — golden docs silent, marked unknown.
 - §2 `eb-rule` why related — `docs/related-resources.md` § `sqs` (line 940) and § `eb-rule` contract row (line 62).
-- §2 `eb-rule` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. `eb-rule` Wave 2 already calls `ListTargetsByRule` per rule (see `attention-signals.md` line 85); piggy-back on its cached targets and filter by `Target.Arn == queue-arn`. No additional API calls.
+- §2 `eb-rule` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. `eb-rule` Wave 2 already calls `ListTargetsByRule` per rule; piggy-back on its cached targets and filter by `Target.Arn == queue-arn`. No additional API calls.
 - §2 `eb-rule` count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Number of EB rules feeding a queue is a fan-in topology signal.
 - §2 `kms` why related — `docs/related-resources.md` § `sqs` (line 941) and `AWS SDK Go v2 — sqs/types.QueueAttributeName § KmsMasterKeyId`.
 - §2 `kms` how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. `KmsMasterKeyId` is a standard key on the Wave 2 attribute map; cross-reference against loaded `kms` list. No extra API call.
@@ -189,13 +189,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §2 `sqs` (self) why related — `docs/related-resources.md` § `sqs` (line 945 — "DLQ reference / RedriveTarget") and `AWS SDK Go v2 — sqs/types.QueueAttributeName § RedrivePolicy § RedriveAllowPolicy`.
 - §2 `sqs` (self) how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. Outbound: parse `RedrivePolicy.deadLetterTargetArn` from Wave 2 attributes. Inbound: scan sibling queues' `RedrivePolicy` for this queue's ARN. Zero extra API calls; dedicated `ListDeadLetterSourceQueues` is redundant when sibling list is cached.
 - §2 `sqs` (self) count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Combined DLQ count (own DLQ + queues I am DLQ for) is a primary messaging-topology signal.
-- §3.1 no Wave 1 signals — `docs/attention-signals.md` § Messaging § `sqs` row (line 82, Wave 1 cell: "None — `ListQueues` returns URLs only") and `AWS SDK Go v2 — sqs.ListQueuesOutput § QueueUrls`.
-- §3.2 Wave 2 signals (backlog threshold, rising unbounded, oldest-message age, is-DLQ with messages, RedrivePolicy unset) — `docs/attention-signals.md` § Messaging § `sqs` row (line 82, Wave 2 cell).
+- §3.1 no Wave 1 signals — `ListQueues` returns URLs only, `AWS SDK Go v2 — sqs.ListQueuesOutput § QueueUrls`; every `sqs` finding is wave 2, `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
+- §3.2 Wave 2 signals (backlog threshold, rising unbounded, oldest-message age, is-DLQ with messages, RedrivePolicy unset) — `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
 - §3.2 attribute field names (`ApproximateNumberOfMessages`, `ApproximateAgeOfOldestMessage`, `VisibilityTimeout`, `RedrivePolicy`, `RedriveAllowPolicy`) — `AWS SDK Go v2 — sqs/types.QueueAttributeName` enum constants.
-- §3.3 Wave 3 CloudWatch trend — `docs/attention-signals.md` § Messaging § `sqs` row (line 82, Wave 3 cell).
+- §3.3 Wave 3 CloudWatch trend — `docs/attention-signals.md § Not yet implemented`.
 - §4 S4/S5 wording — a9s-devops (2026-04-21): possible=yes, worth=yes. Each row gives the operator a concrete cause in the list (e.g. `backlog: 50k msgs`, `DLQ has 12 msgs`) that can be triaged without opening detail; S5 adds the consequence sentence for the detail view.
-- §5 backlog-threshold deferral — a9s-devops (2026-04-21): possible=yes-via-heuristic, worth=yes-but-decision-deferred. No universal absolute number works across interactive vs batch workloads; recommend deferring to an explicit decision in `attention-signals.md` (fixed default, per-queue tag override, or relative heuristic).
-- §5 rising-unbounded deferral — a9s-devops (2026-04-21): possible=yes, worth=yes-but-needs-sampling-contract. Needs sample-cadence + delta-threshold specification and possibly cache-format change; defer until `attention-signals.md` specifies.
+- §5 backlog-threshold deferral — a9s-devops (2026-04-21): possible=yes-via-heuristic, worth=yes-but-decision-deferred. No universal absolute number works across interactive vs batch workloads; the condition stays deferred until a default, a per-queue tag override or a relative heuristic is chosen — `docs/attention-signals.md § Not yet implemented`.
+- §5 rising-unbounded deferral — a9s-devops (2026-04-21): possible=yes, worth=yes-but-needs-sampling-contract. Needs a sample-cadence and delta-threshold specification and possibly a cache-format change; deferred until then — `docs/attention-signals.md § Not yet implemented`.
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->

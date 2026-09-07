@@ -126,7 +126,7 @@ ct-events is the **universal pivot** referenced by every other registered type (
 
 **Source API**: [LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html)
 
-Transcribed from `docs/attention-signals.md` row `ct-events`.
+Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `ct-events`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -161,7 +161,7 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 | S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `AccessDenied: iam:DeleteUser`). **Healthy rows render blank** — no `OK` / `Success`. Empty means "nothing to see." |
+| S4 | Status / description column text | Short human-readable cause (e.g. `failed: AccessDenied`). **Healthy rows render blank** — no `OK` / `Success`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
 
 <!-- BEGIN GENERATED: badge -->
@@ -170,25 +170,29 @@ Badge aggregation for `ct-events`: Wave 1 issue-colored rows only — this type 
 
 Wave → surface mapping applied here:
 
-- Write success (Healthy, `ReadOnly=="false"` + no `errorCode`) → no §4 row. S2 renders green, S4 renders blank. Silence is the UX.
-- Read success (Healthy, `ReadOnly=="true"` + no `errorCode`) → no §4 row. Same as above.
-- Wave 1 Warning (single `errorCode` on an event) → S2 (yellow) + S4 (cause text). No S1, S3, S5.
-- Wave 1 Broken (AccessDenied-write storm by principal > N/h) → S2 (red) + S4 (cause text). No S1, S3, S5 — consistent with the "Wave 1 Warning/Broken/Dim" rule.
+- A rejected or destructive call → S2 (red) + S4 (cause text). No S1, S3, S5.
+- Root activity, a configuration change, a cross-account caller or a read of secret material → S2 (yellow) + S4 (cause text). No S1, S3, S5 — consistent with the "Wave 1 Warning/Broken/Dim" rule.
+- Every other event → S2 (gray) + S4 `routine event`. Nothing is silent: an event row always says what kind of call it was.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `errorCode` present on event | 1 | Warning | n/a | S2 + S4 | `<errorCode>: <eventSource>:<eventName>` |
-| AccessDenied-write storm by principal > N/h | 1 | Broken | n/a | S2 + S4 | `AccessDenied storm: <principal> Nx in 1h` |
+| destructive call (`ct_event.severity.danger`) | 1 | Broken | n/a | S2 + S4 | `destructive call` |
+| call AWS rejected (`ct_event.danger.failed`) | 1 | Broken | n/a | S2 + S4 | `failed: <error>` |
+| root user made the call (`ct_event.severity.attention`) | 1 | Warning | n/a | S2 + S4 | `root account activity` |
+| call changed configuration (`ct_event.attention.write`) | 1 | Warning | n/a | S2 + S4 | `modifying call` |
+| caller from another account (`ct_event.attention.cross-account`) | 1 | Warning | n/a | S2 + S4 | `cross-account access` |
+| read of secret or parameter material (`ct_event.attention.sensitive-read`) | 1 | Warning | n/a | S2 + S4 | `reads sensitive data (<event>)` |
+| every other event (`ct_event.severity.info`) | 1 | Dim | n/a | S2 + S4 | `routine event` |
 
 Rules for filling list and detail text:
 
 - Banned words: `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`. None appear above.
-- No bare state keyword: `AccessDenied` alone is a state keyword; the S4 text always pairs it with the event source and name (`AccessDenied: iam:DeleteUser`) so the operator can see *what* was denied.
-- The storm row shows `principal` as the short form of `userIdentity.arn` (e.g. last ARN segment or IAM username), `N` as the actual count.
+- No bare state keyword: a rejected call reads `failed: AccessDenied`, naming the error AWS returned rather than the word `failed` alone.
+- `reads sensitive data (<event>)` names the call that read the material, so the operator sees which secret surface was touched without opening the event.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at a ct-events list filtered by an anxious operator, can they tell what's wrong with a problem row without opening detail? Yes — a yellow row reads e.g. `AccessDenied: iam:DeleteUser` and a red row reads e.g. `AccessDenied storm: alice 23x in 1h`, both of which name the principal or the call by the time the eye crosses the Status column; operator can triage without opening detail. The storm row in particular is the highest-signal log-forensics line a9s produces, and it is self-explanatory on the list.
+At 3am, glancing at a ct-events list filtered by an anxious operator, can they tell what's wrong with a problem row without opening detail? Yes — a red row reads `destructive call` or `failed: AccessDenied` and a yellow row reads `root account activity` or `cross-account access`, each naming the kind of call by the time the eye crosses the Status column; operator can triage without opening detail. The event name and the caller sit in their own columns, so the cause text never has to repeat them.
 
 ## 5. Out of Scope
 
@@ -199,12 +203,12 @@ At 3am, glancing at a ct-events list filtered by an anxious operator, can they t
 
 ## 6. Citations
 
-- a9s golden doc — ct-events has an attention-signals row — `docs/attention-signals.md` § `Monitoring` table, row `ct-events`.
+- a9s golden doc — the `ct-events` findings — `docs/attention-signals.md § Signals § MONITORING` row `ct-events`.
 - a9s golden doc — per-type contract lists `cfn, ct-events, dbi, ddb, ec2, iam-user, kms, lambda, role, s3, secrets, sg, trail, vpce` — `docs/related-resources.md` § `Per-type contract`, row `ct-events`.
 - a9s golden doc — four self-pivot facets (AccessKeyId / Username / EventName / SharedEventId) — `docs/related-resources.md` § `Per-target reasoning` → `### ct-events`.
 - a9s golden doc — universal-pivot rule (ct-events applies to every registered type) — `docs/related-resources.md` § `Policy`, rule 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.
-- AWS Go SDK v2 — `Event.ReadOnly` is `*string` (confirms the `=="false"` string comparison in attention-signals) — `AWS SDK Go v2 — cloudtrail/types.Event § ReadOnly`.
+- AWS Go SDK v2 — `Event.ReadOnly` is `*string` (confirms the `=="false"` string comparison the read-only check makes) — `AWS SDK Go v2 — cloudtrail/types.Event § ReadOnly`.
 - AWS Go SDK v2 — `Event.CloudTrailEvent` is a JSON string carrying the full event body — `AWS SDK Go v2 — cloudtrail/types.Event § CloudTrailEvent`.
 - AWS Go SDK v2 — `Event.Resources []Resource` with `Resource.ResourceType` and `Resource.ResourceName` — basis for all non-self related pivots — `AWS SDK Go v2 — cloudtrail/types.Event § Resources`, `AWS SDK Go v2 — cloudtrail/types.Resource § ResourceType`, `AWS SDK Go v2 — cloudtrail/types.Resource § ResourceName`.
 - AWS Go SDK v2 — `Event.Username`, `Event.AccessKeyId`, `Event.EventName`, `Event.EventId`, `Event.EventTime`, `Event.EventSource` present directly on the SDK struct; they are echoed from the JSON but also exposed top-level for cheap access — `AWS SDK Go v2 — cloudtrail/types.Event`.
