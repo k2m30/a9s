@@ -73,6 +73,19 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 			wantWarning: true,
 		},
 		{
+			// The same half-filled condition in the older ListOfTags shape,
+			// where no Conditions block exists to reach the predicate at all.
+			// A dropped entry narrows the OR, so the plan reads as protecting
+			// less than it does — the direction that invents a finding.
+			name: "a ListOfTags entry AWS did not fill",
+			listOfTags: []backuptypes.Condition{
+				{ConditionType: backuptypes.ConditionTypeStringequals, ConditionKey: aws.String("aws:ResourceTag/backup")},
+			},
+			tags:        map[string]string{"backup": "nightly"},
+			wantPartial: true,
+			wantWarning: false,
+		},
+		{
 			// An empty block asks for nothing, so it is representable and the
 			// plan decides on its other selections — here, none.
 			name:        "an empty Conditions block is representable",
