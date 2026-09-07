@@ -21,7 +21,7 @@ The same hook enforces the other line a round cannot end without: `deferred:`.
 When the first team was asked what it had left open it produced 65 items, a
 dozen of them never written anywhere and most of the rest parked under
 "pre-existing" or "out of batch". So a dev or QA entry that ends a round
-(DONE, FINDINGS, SIGN-OFF) must carry a `deferred:` line -- `none`, or one
+(DONE for dev, ACCEPT/REJECT for acceptance) must carry its required lines: a `deferred:` line -- `none`, or one
 item per line with file:line and an owner -- and a `simplified:` line naming
 the ponytail-review pass on the round's own diff and its outcome, and an
 acceptance verdict (ACCEPT, REJECT) must carry an `observed, out of scope:`
@@ -45,12 +45,10 @@ REQUIRED_GATES = ("make test", "make lint")
 # Statuses that end a round, per agent, and the line each such entry must carry.
 ROUND_END = {
     "a9s-dev": ("DONE",),
-    "a9s-qa": ("DONE", "FINDINGS", "SIGN-OFF"),
     "a9s-acceptance": ("ACCEPT", "REJECT"),
 }
 REQUIRED_LINES = {
-    "a9s-dev": ("deferred:", "simplified:"),
-    "a9s-qa": ("deferred:", "simplified:"),
+    "a9s-dev": ("deferred:", "simplified:", "checked:"),
     "a9s-acceptance": ("observed, out of scope:",),
 }
 
@@ -249,6 +247,14 @@ def main():
                 "deletion rule, and write the range reviewed and what was cut or "
                 "refused. A round nobody simplified is not finished.\n"
             )
+        elif required == "checked:":
+            sys.stderr.write(
+                "Round entry ends a round but carries no `checked:` line. For each "
+                "rule the round changed, name the edge cases you probed (the negated "
+                "form, the empty input, the boundary, the other family, the second "
+                "caller) with the input and the observed result. A green suite is "
+                "not a check.\n"
+            )
         else:
             sys.stderr.write(
                 "Round entry ends a round but carries no `%s` line. Add it: `none`, "
@@ -260,7 +266,7 @@ def main():
 
     taskdir, worktree = resolve_paths(message, str(payload.get("cwd") or ""))
 
-    dirty = uncommitted(worktree) if agent in ("a9s-dev", "a9s-qa") else None
+    dirty = uncommitted(worktree) if agent == "a9s-dev" else None
     if dirty:
         sys.stderr.write(
             "Round entry ends a round but the worktree at %s has uncommitted "

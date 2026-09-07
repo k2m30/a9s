@@ -53,6 +53,7 @@ TASKDIR={taskdir}
 WORKTREE=/private/tmp/a9s-wt/w10
 - deferred: none
 - simplified: ponytail-review on 4f1a9c2..HEAD — nothing proposed
+- checked: empty policy → no finding; Deny-only policy → no finding
 
 Landed the enricher and the FindingDef row. Gate captured to gate.txt.
 """
@@ -62,6 +63,7 @@ DONE_NO_SIMPLIFIED = """## a9s-dev · round 1 · DONE
 TASKDIR={taskdir}
 WORKTREE=/private/tmp/a9s-wt/w10
 - deferred: none
+- checked: empty policy → no finding
 
 Landed the enricher and the FindingDef row. Gate captured to gate.txt.
 """
@@ -70,6 +72,8 @@ DONE_NO_DEFERRED = """## a9s-dev · round 1 · DONE
 
 TASKDIR={taskdir}
 WORKTREE=/private/tmp/a9s-wt/w10
+- simplified: ladder on 4f1a9c2..HEAD — nothing proposed
+- checked: empty policy → no finding
 
 Landed the enricher and the FindingDef row. Gate captured to gate.txt.
 """
@@ -78,27 +82,32 @@ DONE_EMPTY_DEFERRED = """## a9s-dev · round 1 · DONE
 
 TASKDIR={taskdir}
 - deferred:
+- simplified: ladder on 4f1a9c2..HEAD — nothing proposed
+- checked: empty policy → no finding
 
 Landed it.
 """
 
-QA_FINDINGS_NO_DEFERRED = """## a9s-qa · round 3 · FINDINGS
+DONE_NO_CHECKED = """## a9s-dev · round 2 · DONE
 - TASKDIR={taskdir}
 - from: 4f1a9c2
-1. core/aws/sqs.go:77 — deleting queues reach the posture pass
+- deferred: none
+- simplified: ladder on 4f1a9c2..HEAD — nothing proposed
 """
 
-QA_SIGNOFF_WITH_DEFERRED = """## a9s-qa · round 4 · SIGN-OFF
+DONE_WITH_DEFERRED = """## a9s-dev · round 2 · DONE
 - TASKDIR={taskdir}
 - from: 9c2d1e0
 - deferred: core/aws/sqs.go:91 — first-match phrase loop — out of batch — owner: d1
 - simplified: ponytail-review on 9c2d1e0..HEAD — merged two one-row tables into the existing bench sweep
+- checked: empty policy → no finding
 """
 
-QA_SIGNOFF_NO_SIMPLIFIED = """## a9s-qa · round 4 · SIGN-OFF
+DONE_R2_NO_SIMPLIFIED = """## a9s-dev · round 2 · DONE
 - TASKDIR={taskdir}
 - from: 9c2d1e0
 - deferred: core/aws/sqs.go:91 — first-match phrase loop — out of batch — owner: d1
+- checked: empty policy → no finding
 """
 
 ACCEPT_NO_OBSERVED = """## a9s-acceptance · round 1 · ACCEPT
@@ -147,12 +156,13 @@ def payload(message, taskdir):
     }
 
 
-QA_SIGNOFF_WITH_WORKTREE = """## a9s-qa · round 2 · SIGN-OFF
+DONE_WITH_WORKTREE = """## a9s-dev · round 2 · DONE
 - TASKDIR={taskdir}
 - WORKTREE={worktree}
 - from: 9c2d1e0
 - simplified: ladder on 9c2d1e0..HEAD — nothing proposed
 - deferred: none
+- checked: empty policy → no finding
 """
 
 
@@ -182,15 +192,15 @@ class GreenGateHookTest(unittest.TestCase):
             os.utime(self.gate, (when, when))
 
     def test_round_end_with_uncommitted_worktree_blocks(self):
-        """QA reported two rounds as done with every test file uncommitted
+        """Two rounds were reported done with every test file uncommitted
         (w27 and w5, 2026-09-06): the next agent's `from:` named a tree that
         did not hold the work. A round ends with its commit."""
         repo = scratch_repo()
         self.addCleanup(shutil.rmtree, repo, True)
         with open(os.path.join(repo, "stray_test.go"), "w") as fh:
             fh.write("package unit\n")
-        p = payload(QA_SIGNOFF_WITH_WORKTREE.replace("{worktree}", repo), self.taskdir)
-        p["agent_type"] = "a9s-qa"
+        p = payload(DONE_WITH_WORKTREE.replace("{worktree}", repo), self.taskdir)
+        p["agent_type"] = "a9s-dev"
         code, reason = run_hook(p)
         self.assertEqual(2, code)
         self.assertIn("uncommitted", reason)
@@ -199,8 +209,9 @@ class GreenGateHookTest(unittest.TestCase):
     def test_round_end_with_clean_worktree_passes(self):
         repo = scratch_repo()
         self.addCleanup(shutil.rmtree, repo, True)
-        p = payload(QA_SIGNOFF_WITH_WORKTREE.replace("{worktree}", repo), self.taskdir)
-        p["agent_type"] = "a9s-qa"
+        self.write_gate(GREEN_GATE)
+        p = payload(DONE_WITH_WORKTREE.replace("{worktree}", repo), self.taskdir)
+        p["agent_type"] = "a9s-dev"
         code, reason = run_hook(p)
         self.assertEqual(0, code, reason)
 
@@ -240,26 +251,29 @@ class GreenGateHookTest(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("simplified:", reason)
 
-    def test_qa_signoff_without_simplified_line_blocks(self):
+    def test_round2_without_simplified_line_blocks(self):
         """QA's own diff gets the same busywork audit before a sign-off."""
-        p = payload(QA_SIGNOFF_NO_SIMPLIFIED, self.taskdir)
-        p["agent_type"] = "a9s-qa"
+        p = payload(DONE_R2_NO_SIMPLIFIED, self.taskdir)
+        p["agent_type"] = "a9s-dev"
         code, reason = run_hook(p)
         self.assertEqual(2, code)
         self.assertIn("simplified:", reason)
 
-    def test_qa_findings_without_deferred_line_blocks(self):
-        """QA rounds end with FINDINGS or SIGN-OFF and carry the same line."""
-        p = payload(QA_FINDINGS_NO_DEFERRED, self.taskdir)
-        p["agent_type"] = "a9s-qa"
+    def test_done_without_checked_line_blocks(self):
+        """A dev round probes its own edge cases; a DONE without the record of
+        them is refused like one without gates."""
+        self.write_gate(GREEN_GATE)
+        p = payload(DONE_NO_CHECKED, self.taskdir)
+        p["agent_type"] = "a9s-dev"
         code, reason = run_hook(p)
         self.assertEqual(2, code)
-        self.assertIn("deferred:", reason)
+        self.assertIn("checked:", reason)
 
-    def test_qa_signoff_with_deferred_line_passes(self):
+    def test_done_with_deferred_line_passes(self):
+        self.write_gate(GREEN_GATE)
         """QA has no gate.txt contract; the deferred line is its whole check."""
-        p = payload(QA_SIGNOFF_WITH_DEFERRED, self.taskdir)
-        p["agent_type"] = "a9s-qa"
+        p = payload(DONE_WITH_DEFERRED, self.taskdir)
+        p["agent_type"] = "a9s-dev"
         code, reason = run_hook(p)
         self.assertEqual(0, code, reason)
 
@@ -317,7 +331,7 @@ class GreenGateHookTest(unittest.TestCase):
         the entry carried no TASKDIR= line), so a red gate.txt was never seen.
         An unlocatable gate is an unproven gate."""
         p = payload(DONE_MESSAGE, self.taskdir)
-        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n- deferred: none\n- simplified: ponytail-review on HEAD~1..HEAD — nothing proposed\n\nno taskdir line here\n"
+        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n- deferred: none\n- checked: empty input → no finding\n- simplified: ponytail-review on HEAD~1..HEAD — nothing proposed\n\nno taskdir line here\n"
         empty = tempfile.mkdtemp(prefix="w10-cwd-")
         self.addCleanup(shutil.rmtree, empty, True)
         # The hook reads the payload's cwd, not the process cwd, for the
@@ -341,7 +355,7 @@ class GreenGateHookTest(unittest.TestCase):
 
         p = payload(DONE_MESSAGE, self.taskdir)
         p["cwd"] = cwd
-        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n- deferred: none\n- simplified: ponytail-review on HEAD~1..HEAD — nothing proposed\n\nlanded it\n"
+        p["last_assistant_message"] = "## a9s-dev · round 1 · DONE\n- deferred: none\n- checked: empty input → no finding\n- simplified: ponytail-review on HEAD~1..HEAD — nothing proposed\n\nlanded it\n"
 
         code, reason = run_hook(p, cwd=cwd)
         self.assertEqual(2, code)

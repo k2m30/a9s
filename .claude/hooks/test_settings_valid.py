@@ -21,7 +21,7 @@ SETTINGS = os.path.join(REPO_ROOT, ".claude", "settings.json")
 CLAUDE_MD_MAX_LINES = 180
 # Retired agents. A prompt naming a subagent that no longer exists produces a
 # dispatch failure, not a warning, so every mention has to go.
-RETIRED_AGENTS = ("a9s-coder", "a9s-fixtures")
+RETIRED_AGENTS = ("a9s-coder", "a9s-fixtures", "a9s-qa\"", "a9s-qa`", "a9s-qa ")
 # The confidence bar that contradicted the autonomy rule: "95%+ confidence ...
 # ask me follow up questions" told the agent to stop where it is told to decide.
 RETIRED_CONFIDENCE_BAR = "95%"
@@ -155,18 +155,17 @@ class ProcessDocsTest(unittest.TestCase):
             self.assertNotIn(remnant, text)
         self.assertNotIn("same worktree concurrently", text)
 
-    def test_dev_documents_the_stub_round(self):
-        """QA cannot commit a test that fails on an assertion until the symbols
-        exist; round 0 is what makes the red phase honest instead of a compile
-        error everyone learns to ignore."""
+    def test_dev_documents_red_first_and_its_own_probes(self):
+        """One implementer: the failing test precedes the fix and its red
+        output is on the record, and the round probes its own edge cases."""
         text = read(".claude", "agents", "a9s-dev.md")
-        self.assertIn("round 0", text.lower())
-        self.assertIn("stub(", text)
+        self.assertIn("red", text.lower())
+        self.assertIn("checked:", text)
 
     def test_finding_discipline_reaches_both_reviewing_roles(self):
         """Same sentence, both roles: a gap tied to neither correctness nor a
         stated requirement is disproved, not filed."""
-        for agent in ("a9s-qa.md", "a9s-acceptance.md"):
+        for agent in ("a9s-acceptance.md",):
             with self.subTest(agent=agent):
                 self.assertIn("disproved, not filed", read(".claude", "agents", agent))
 
