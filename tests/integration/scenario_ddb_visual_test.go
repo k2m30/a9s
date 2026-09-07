@@ -44,8 +44,8 @@ const (
 	ddbPhraseArchivedPlus1 = "archived: kms key lost (+1)"
 
 	// ddbDetailPITROffCapitalize is the Attention-section rendering of
-	// ddbPhrasePITROff — injectAttentionSection capitalizes the first
-	// letter of every finding phrase (capitalizeFirst), so the Status
+	// ddbPhrasePITROff — the Attention block capitalizes the first
+	// letter of every finding phrase, so the Status
 	// column's lowercase phrase and the detail view's capitalized phrase
 	// are two different literal strings for the same finding.
 	ddbDetailPITROffCapitalize = "Point-in-time recovery disabled"
@@ -196,7 +196,7 @@ func TestScenario_DDBVisual(t *testing.T) {
 	t.Log("\n" + view) // 8.4 user-visible sanity render (mandatory)
 
 	// Attention entry for the Wave-2-from-fetcher phrase, capitalized
-	// at render time by injectAttentionSection → capitalizeFirst.
+	// at display time.
 	scenario.ExpectViewContains("Archived: kms key lost")
 	// Attention entry for the Wave-2 PITR finding — the operator phrase,
 	// capitalized at render time, never the retired "PITR off" jargon.

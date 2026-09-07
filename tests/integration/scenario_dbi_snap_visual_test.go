@@ -166,7 +166,7 @@ func TestScenario_DBISnapVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{demofixtures.WarnDBISnapPastRetentionID, []string{"Automated, 23d past retention"}},
 		// U7e — multi-W1 fixture: every entry must appear in the
 		// Attention section. Order is severity-first (`!` tier wins) per
-		// injectAttentionSection's stable sort, so the orphan finding (`!`
+		// the Attention block's stable sort, so the orphan finding (`!`
 		// tier from the cross-ref enricher) precedes the fetcher's
 		// "unencrypted" Wave-1 phrase (`~` tier from phraseTier).
 		{demofixtures.MultiW1DBISnapID, []string{"Orphan: source DB deleted", "Unencrypted"}},

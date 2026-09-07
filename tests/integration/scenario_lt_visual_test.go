@@ -30,7 +30,7 @@ const (
 	// Rule-7 rolled-up form: imdsv1 + unencrypted on one template.
 	ltPhraseMultiP1 = "IMDSv1 allowed (+1)"
 
-	// Detail-view Attention entries (capitalizeFirst applied at render).
+	// Detail-view Attention entries: the first letter is capitalized for display.
 	ltDetailIMDSv1        = "IMDSv1 allowed"
 	ltDetailUnencrypted   = "EBS encryption disabled"
 	ltDetailDeprecatedAMI = "Deprecated AMI"

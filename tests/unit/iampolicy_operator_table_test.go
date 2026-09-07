@@ -177,6 +177,27 @@ var operatorTable = []condCase{
 		cond:      `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::123456789012:role/*"}}`,
 		restricts: true,
 	},
+	{
+		name: "PrincipalArn with a wildcard partition and a wildcard account",
+		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:*:iam::*:root"}}`,
+	},
+	{
+		name:      "PrincipalArn with a wildcard partition but a concrete account still names one account",
+		cond:      `{"ArnLike":{"aws:PrincipalArn":"arn:*:iam::123456789012:root"}}`,
+		restricts: true,
+	},
+	{
+		name:        "a SourceArn naming a bucket keeps its empty account field, which is not a wildcard",
+		cond:        `{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::example-bucket/*"}}`,
+		restricts:   true,
+		sourceScope: true,
+	},
+	{
+		name:        "a SourceArn whose resource field carries its own colons stays whole",
+		cond:        `{"ArnLike":{"aws:SourceArn":"arn:aws:lambda:us-east-1:123456789012:function:acme-fn"}}`,
+		restricts:   true,
+		sourceScope: true,
+	},
 }
 
 // A wildcard-principal Allow is public unless its condition positively

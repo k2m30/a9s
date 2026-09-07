@@ -26,10 +26,10 @@ package unit
 //     glyph prefix on the identity column (today's ONLY effect of
 //     SetEnrichmentState per resolveListDecoratorFull in
 //     core/app/list_columns.go).
-//   - internal/tui/views/detail_fields.go (injectAttentionSection): each
-//     Attention entry must render both the short Phrase line (already does,
-//     via capitalizeFirst) AND — on its own additional line — the full
-//     Detail sentence, falling back to Phrase alone when Detail == "".
+//   - core/app/detail_body.go (injectAttentionSectionDetail): each Attention
+//     entry must render both the short Phrase line (capitalized for display)
+//     AND — on lines of its own below it — the full Detail sentence, wrapped
+//     to the panel, falling back to Phrase alone when Detail == "".
 //
 // RED classification:
 //   - Tests #2 and #3 (detail S5) are COMPILE-RED right now: domain.Finding

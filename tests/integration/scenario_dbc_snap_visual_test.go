@@ -175,8 +175,8 @@ func TestScenario_DBCSnapVisual_FailedPlusManualOldStacks(t *testing.T) {
 
 	// "Failed" (Broken) and the orphan cross-ref appear; "manual, unused" does not.
 	expectAttentionSection(t, detailView, []string{
-		"Failed",                         // Broken phrase (capitalized by injectAttentionSection)
-		"Orphan: source cluster deleted", // cross-ref finding Summary (capitalized by injectAttentionSection)
+		"Failed",                         // Broken phrase, capitalized for display
+		"Orphan: source cluster deleted", // cross-ref finding Summary, capitalized for display
 		"deleted-legacy-cluster",         // orphan parent identifier in the Source Cluster row
 	})
 

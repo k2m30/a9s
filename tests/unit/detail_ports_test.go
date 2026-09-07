@@ -1496,10 +1496,10 @@ func Test_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty(t *testin
 // ---------------------------------------------------------------------------
 // 22. Attention color-cap rule — ported from internal/tui/views/
 // attention_color_cap_test.go (round 5, specs/022-codebase-cleanup, DetailModel
-// core cleanup): capTierToRowBucket/resolveRowColorBucket are dead; the live
-// equivalents are capTierToRowBucketDetail + ResourceTypeDef.ResolveColor
-// (core/app/detail_body.go), unexported/package-app so not directly callable
-// from tests/unit — exercised end-to-end instead via the public
+// core cleanup): the cap is capTierToRowBucketDetail +
+// ResourceTypeDef.ResolveColor (core/app/detail_body.go), unexported so not
+// directly callable from tests/unit — exercised end-to-end instead via the
+// public
 // ApplyDetailFinding + Snapshot().Body.Detail seam. Pins the universal rule: a
 // `!` severity tier caps to `~` unless the row's own S2 color bucket is
 // Broken, so the detail view never contradicts the list row's severity.

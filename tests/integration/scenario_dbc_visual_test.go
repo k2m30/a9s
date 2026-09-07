@@ -228,8 +228,8 @@ func TestScenario_DBCVisual_DetailSurfacesAllIssues(t *testing.T) {
 // green and the detail Attention entry with `!` glyph + Warning (yellow)
 // color — the glyph keeps its severity signal, but the color matches the
 // row's S2 bucket so the detail view doesn't contradict the list. The color
-// itself is unit-tested directly (see capTierToRowBucket in
-// internal/tui/views/attention_color_cap_test.go); the scenario harness
+// itself is unit-tested directly (see the Attention colour-cap tests in
+// tests/unit/detail_ports_test.go); the scenario harness
 // strips ANSI so we only assert the glyph-survival half here.
 func TestScenario_DBCVisual_AttentionGlyphSurvivesColorCap(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)

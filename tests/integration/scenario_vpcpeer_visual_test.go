@@ -35,7 +35,7 @@ const (
 	vpcPeerPhraseNoRoute      = "no local route to peer"
 	vpcPeerPhraseBlackhole    = "route to peer blackholed"
 
-	// Detail-view Attention entries (capitalizeFirst applied at render).
+	// Detail-view Attention entries: the first letter is capitalized for display.
 	vpcPeerDetailOverlap   = "CIDR overlap with peer"
 	vpcPeerDetailRejected  = "Rejected"
 	vpcPeerDetailNoRoute   = "No local route to peer"

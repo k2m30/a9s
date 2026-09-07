@@ -348,8 +348,9 @@ func extractANSIPrefix(s string) string {
 // Attention section renders rows from r.AttentionDetails, NOT from
 // m.enrichmentFinding (which is left nil/unset).
 //
-// Pre-fix: injectAttentionSection reads m.enrichmentFinding (nil) → no Rows.
-// Post-fix: injectAttentionSection reads r.Findings[i] + r.AttentionDetails[code].Rows.
+// The Attention rows come from r.Findings[i] paired with
+// r.AttentionDetails[code].Rows, so a finding's supporting rows reach the
+// detail view without any per-model enrichment field holding them.
 func TestViews_DetailAttention_ReadsAttentionDetails(t *testing.T) {
 	ensureNoColor(t)
 

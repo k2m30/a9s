@@ -157,8 +157,8 @@ func TestScenario_SESVisual(t *testing.T) {
 	t.Log("\n" + view)
 
 	// Both §4 phrases from Resource.Issues must appear in the rendered
-	// Attention section with first letter capitalized (unified renderer
-	// applies capitalizeFirst at display time).
+	// Attention section with first letter capitalized, which the unified
+	// renderer does at display time.
 	scenario.ExpectViewContains(sesDetailPhraseFailed)
 	scenario.ExpectViewContains(sesDetailPhraseSDisabled)
 }

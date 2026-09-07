@@ -41,7 +41,7 @@ const (
 	// Child-row phrase (agreements child view).
 	transferPhraseAgreementInactive = "inactive: partner traffic rejected"
 
-	// Detail-view Attention entries (capitalizeFirst applied at render).
+	// Detail-view Attention entries: the first letter is capitalized for display.
 	transferDetailOffline       = "Offline: not accepting transfers"
 	transferDetailLegacyPolicy  = "Legacy security policy"
 	transferDetailNoLogging     = "No activity logging"

@@ -46,7 +46,7 @@ const (
 	mwaaPhraseRollbackP1    = "rolling back: update failed (+1)"
 	mwaaPhraseStaleUpdateP1 = "last update failed (+1)"
 
-	// Detail-view Attention entries (capitalizeFirst applied at render).
+	// Detail-view Attention entries: the first letter is capitalized for display.
 	mwaaDetailStaleUpdate = "Last update failed"
 	mwaaDetailPublic      = "Webserver public"
 	mwaaDetailRollback    = "Rolling back: update failed"
