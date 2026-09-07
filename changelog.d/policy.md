@@ -15,6 +15,9 @@
   service and an SNS topic open to any account for a named delivery endpoint
   are no longer reported as scoped, and only AWS_IAM on the auth type
   restricts.
+- A condition that compares the caller's ARN against a pattern with a wildcard
+  account no longer counts as scoping, because every account matches it; such
+  a policy is now reported open to anyone.
 - A finding's explanation in the detail view now wraps to the panel instead of
   being cut at its edge, so the sentence that says what to change reaches the
   reader without turning wrap on.
