@@ -569,4 +569,21 @@ func TestFindingRowCap_RoleInlinePrivEscRowsAreCapped(t *testing.T) {
 	// One Policy row precedes the combos, so the list the cap sees is one
 	// longer than the combo count.
 	assertCappedRows(t, ad.Rows, len(combos)+1)
+
+	// The role's own list, not a generic one: the Policy row survives at the
+	// head and the closing row wears the Combo label and the "!" tier the
+	// combo rows carry, so it reads as one more line of the same list.
+	if got, want := ad.Rows[0].Label, "Policy"; got != want {
+		t.Errorf("first kept row Label = %q, want %q", got, want)
+	}
+	closing := ad.Rows[awsclient.FindingRowCap]
+	if got, want := closing.Label, "Combo"; got != want {
+		t.Errorf("closing row Label = %q, want %q", got, want)
+	}
+	if got, want := closing.Tier, "!"; got != want {
+		t.Errorf("closing row Tier = %q, want %q", got, want)
+	}
+	if got, want := closing.Value, capOverflowValue(len(combos)+1-awsclient.FindingRowCap); got != want {
+		t.Errorf("closing row Value = %q, want %q", got, want)
+	}
 }
