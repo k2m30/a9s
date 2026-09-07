@@ -1179,7 +1179,7 @@ func TestCitesNotYetImplementedCitationsResolveToALine(t *testing.T) {
 const relatedPagePrefix = "docs/"
 
 var (
-	reRelatedMention    = regexp.MustCompile(`related-resources(\.md)?`)
+	reRelatedMention    = regexp.MustCompile(`related-resources(-engine)?(\.md)?`)
 	reRelatedLineNumber = regexp.MustCompile(`\blines?\s+[0-9]`)
 	reRelatedFrontEntry = regexp.MustCompile(`^\s*-\s+docs/related-resources\.md\s*$`)
 )
@@ -1256,6 +1256,9 @@ func TestCitesRelatedContractCitedByHeading(t *testing.T) {
 				continue
 			}
 			for _, loc := range locs {
+				if strings.Contains(line[loc[0]:loc[1]], "-engine") {
+					continue
+				}
 				if !strings.HasSuffix(line[:loc[0]], relatedPagePrefix) {
 					byBare = append(byBare, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
 					continue

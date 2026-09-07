@@ -208,7 +208,7 @@ At 3am every problem row names its cause in the Status column — `pending: awai
 
 - All §3.3 Wave 3 signals (copied above).
 - Logging-component-disabled and AirflowVersion-EOL as attention signals — detail-view facts only (a9s-devops 2026-07-14: majority-fire noise / no stable EOL source).
-- `sqs` and `vpce` related pivots (§2 Explicitly excluded — not drillable from customer credentials / no customer endpoint IDs).
+- `sqs` and `vpce` related pivots (§2 Explicitly excluded).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 

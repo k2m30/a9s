@@ -37,12 +37,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `backup`
 - **How discovered**: read `DBSnapshot.KmsKeyId` from the list response, then cross-reference the already-loaded `kms` list by KeyId/KeyArn. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § KmsKeyId`.
 - **Count shown**: yes (0 or 1 — one key per encrypted snapshot; 0 when `Encrypted==false`).
 
-**`dbc` is intentionally absent.** `dbi-snap` does NOT register a `dbc` pivot, so the panel carries no row for it. Real AWS rejects `CreateDBSnapshot`
-on Aurora cluster members — Aurora cluster snapshots live in `dbc-snap`
-(`DBClusterSnapshot`), which has its own pivots. A registered `dbi-snap → dbc`
-pivot would always resolve `Count=0` (an `dbi-snap` is never associated with a
-`DBCluster` in real AWS), which is dead UX. See `core/aws/dbi_snap.go` for
-the structural exclusion.
+Explicitly excluded: `dbc` (Aurora cluster snapshots live in `dbc-snap`) — `docs/related-resources.md` § `dbi-snap`.
 
 ### `backup`
 
