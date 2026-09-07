@@ -14,7 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // FetchCloudFormationStacksPage fetches a single page of CloudFormation stacks.
@@ -59,7 +58,8 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 			arn = *stack.StackId
 		}
 
-		protection, outputSecret := cfnPostureOf(stack)
+		secretRows := secretScanRows(cfnStackOutputs(stack))
+		protection, outputSecret := cfnPostureOf(stack, len(secretRows) > 0)
 
 		r := resource.Resource{
 			ID:       stackName,
@@ -79,7 +79,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 			RawStruct: stack,
 		}
 
-		addCFNPostureRows(&r, stack, protection, outputSecret)
+		addCFNPostureRows(&r, protection, outputSecret, secretRows)
 		resources = append(resources, r)
 	}
 
@@ -155,7 +155,10 @@ const (
 // nothing to fix on — one on its way out, one that never built — and the
 // protection word is empty for a nested stack, whose protection
 // CloudFormation refuses to set separately from its root's.
-func cfnPostureOf(stack cfntypes.Stack) (protection, outputSecret string) {
+//
+// secretInOutputs is the caller's single scan of the stack outputs; the word
+// and the supporting rows are then the same reading of the same outputs.
+func cfnPostureOf(stack cfntypes.Stack, secretInOutputs bool) (protection, outputSecret string) {
 	if cfnStackIsTearingDown(string(stack.StackStatus)) {
 		return "", ""
 	}
@@ -166,7 +169,7 @@ func cfnPostureOf(stack cfntypes.Stack) (protection, outputSecret string) {
 		}
 	}
 	outputSecret = cfnOutputSecretAbsent
-	if len(secretscan.ScanKV(cfnStackOutputs(stack))) > 0 {
+	if secretInOutputs {
 		outputSecret = cfnOutputSecretPresent
 	}
 	return protection, outputSecret
@@ -200,14 +203,11 @@ func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
 }
 
 // addCFNPostureRows appends the posture findings and, for the output-secret
-// one, the per-hit rows naming where the credential is and what kind it looks
-// like. The value itself never leaves the scanner.
-func addCFNPostureRows(r *resource.Resource, stack cfntypes.Stack, protection, outputSecret string) {
+// one, the rows naming where the credential is and what kind it looks like.
+// The value itself never leaves the scanner.
+func addCFNPostureRows(r *resource.Resource, protection, outputSecret string, secretRows []domain.DetailRow) {
 	r.Findings = append(r.Findings, cfnPostureFindings(protection, outputSecret)...)
-	if outputSecret != cfnOutputSecretPresent {
-		return
-	}
-	for _, h := range secretscan.ScanKV(cfnStackOutputs(stack)) {
-		addWave1Rows(r, CodeCFNOutputSecret, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
+	if outputSecret == cfnOutputSecretPresent {
+		addWave1Rows(r, CodeCFNOutputSecret, secretRows...)
 	}
 }

@@ -7,7 +7,6 @@
 package secretscan
 
 import (
-	"math"
 	"net/url"
 	"regexp"
 	"slices"
@@ -15,9 +14,26 @@ import (
 	"strings"
 )
 
-// Hit is one detected secret.
+// The kinds a Hit can carry, strongest first: a structural match names the
+// credential format it recognised, and everything else is the keyword rule.
+// One place names a secret once, by the reason that identifies it.
+const (
+	KindAWSAccessKey = "aws-access-key"
+	KindPrivateKey   = "private-key"
+	KindJWT          = "jwt"
+	KindKeyword      = "keyword"
+)
+
+var kinds = []string{KindAWSAccessKey, KindPrivateKey, KindJWT, KindKeyword}
+
+// IsKind reports whether v is one of the kinds a Hit carries. Callers that
+// need the set read it here rather than mirroring it.
+func IsKind(v string) bool { return slices.Contains(kinds, v) }
+
+// Hit is one detected secret. Each scanned key, and each scanned line,
+// yields at most one.
 type Hit struct {
-	Kind  string // "aws-access-key" | "private-key" | "jwt" | "keyword" | "high-entropy"
+	Kind  string // one of the Kind constants above
 	Where string // the key name (ScanKV) or "line <n>" (ScanText); never the value
 }
 
@@ -27,14 +43,16 @@ var (
 	jwtRe        = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
 	// keywordRe: a credential word, optionally suffixed (SECRET_KEY, DB_PASSWORD_V2),
 	// followed by = or : and a value of 6+ characters. Word boundaries would
-	// reject the underscore-joined names that are the common case.
+	// reject the underscore-joined names that are the common case. Either
+	// side may be quoted, independently: `"password": hunter2` is valid YAML
+	// and a leak an operator reading the file would see.
 	//
-	// Two shapes, and the difference between them is what keeps prose out.
-	// A quoted key is only a hit when its value is quoted too, which is what
-	// makes `"DB_PASSWORD": "..."` match while the sentence `The
-	// "password": rotate it every ninety days` does not — a quoted word
-	// followed by a bare word is English, not a JSON object.
-	keywordRe = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret)(?:[_-][a-z0-9_-]*)?(?:["']\s*[=:]\s*["']|\s*[=:]\s*["']?)([^\s"',;]{6,})`)
+	// What keeps prose out is where the key sits, not how the value is
+	// written. A quoted key is a key when it opens a line or follows a
+	// structural character — `{`, `[`, `,`, a list dash — and is an English
+	// quotation anywhere else, which is why `The "password": rotate it every
+	// ninety days` is a sentence rather than a mapping.
+	keywordRe = regexp.MustCompile(`(?i)(?:(?:^|[{\[,\-])\s*["']?|[^a-z"'])(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|private[_-]?key|access[_-]?key|client[_-]?secret)(?:[_-][a-z0-9_-]*)?["']?\s*[=:]\s*["']?([^\s"',;]{6,})`)
 	// arnRe matches any ARN. A Secrets Manager ARN carries the literal
 	// "secret:" followed by the secret's own name, so a keyword match lands
 	// INSIDE the ARN and the reference guard below only ever sees the tail.
@@ -53,7 +71,8 @@ var (
 )
 
 // ScanKV inspects a name→value map. A credential-named key with a real value
-// is a keyword hit; every value is also scanned as text.
+// is a keyword hit; every value is also scanned as text. Hits come back
+// sorted by key, one per key.
 //
 // A value that is wholly a reference or a placeholder is skipped outright.
 // Scanning inside one is what turns the RECOMMENDED shape into a false
@@ -66,68 +85,54 @@ func ScanKV(kv map[string]string) []Hit {
 		if !isRealValue(value) {
 			continue
 		}
-		kinds := scanValue(value)
-		if len(kinds) == 0 && kvKeyRe.MatchString(key) {
-			kinds = append(kinds, "keyword")
-			if isHighEntropy(value) {
-				kinds = append(kinds, "high-entropy")
-			}
+		kind := scanValue(value)
+		if kind == "" && kvKeyRe.MatchString(key) {
+			kind = KindKeyword
 		}
-		for _, k := range kinds {
-			hits = append(hits, Hit{Kind: k, Where: key})
+		if kind != "" {
+			hits = append(hits, Hit{Kind: kind, Where: key})
 		}
 	}
-	return finish(hits, func(h Hit) string { return h.Where })
+	slices.SortFunc(hits, func(a, b Hit) int { return strings.Compare(a.Where, b.Where) })
+	return hits
 }
 
-// ScanText inspects free text line by line.
+// ScanText inspects free text line by line, one hit per line, in line order.
 func ScanText(text string) []Hit {
 	var hits []Hit
 	for i, line := range strings.Split(text, "\n") {
-		for _, k := range scanValue(line) {
-			hits = append(hits, Hit{Kind: k, Where: "line " + strconv.Itoa(i+1)})
+		if kind := scanValue(line); kind != "" {
+			hits = append(hits, Hit{Kind: kind, Where: "line " + strconv.Itoa(i+1)})
 		}
 	}
-	return finish(hits, func(h Hit) string {
-		n, _ := strconv.Atoi(strings.TrimPrefix(h.Where, "line "))
-		return strconv.Itoa(n + 1_000_000)
-	})
+	return hits
 }
 
-// scanValue returns the de-duplicated kinds found in one value or line.
-// A structured credential (access key, PEM, JWT) beats the keyword match on
-// the same value so a hit is reported once, by its most specific kind.
-func scanValue(s string) []string {
-	var kinds []string
-	if awsKeyRe.MatchString(s) {
-		kinds = append(kinds, "aws-access-key")
-	}
-	if privateKeyRe.MatchString(s) {
-		kinds = append(kinds, "private-key")
-	}
-	if jwtRe.MatchString(s) {
-		kinds = append(kinds, "jwt")
-	}
-	if len(kinds) > 0 {
-		return kinds
+// scanValue returns the kind found in one value or line, or "" for none. A
+// structured credential (access key, PEM, JWT) beats the keyword match on the
+// same text, so a secret is named by its most specific kind and named once.
+func scanValue(s string) string {
+	switch {
+	case awsKeyRe.MatchString(s):
+		return KindAWSAccessKey
+	case privateKeyRe.MatchString(s):
+		return KindPrivateKey
+	case jwtRe.MatchString(s):
+		return KindJWT
 	}
 	// An ARN is a reference, never a value, and a keyword match landing
 	// inside one would be judged on its last segment alone.
 	for _, m := range keywordRe.FindAllStringSubmatch(arnRe.ReplaceAllString(s, " "), -1) {
 		if isRealValue(m[1]) {
-			kinds = append(kinds, "keyword")
-			if isHighEntropy(m[1]) {
-				kinds = append(kinds, "high-entropy")
-			}
+			return KindKeyword
 		}
 	}
 	for _, m := range userinfoRe.FindAllStringSubmatch(s, -1) {
 		if isRealValue(m[1]) {
-			kinds = append(kinds, "keyword")
+			return KindKeyword
 		}
 	}
-	slices.Sort(kinds)
-	return slices.Compact(kinds)
+	return ""
 }
 
 // isRealValue rejects placeholders and references: anything that resolves
@@ -160,43 +165,6 @@ func isRealValue(v string) bool {
 		return false
 	}
 	return true
-}
-
-// isHighEntropy flags a long base64/hex-looking value with Shannon entropy
-// above 3.5 bits per character, the usual signature of a generated token.
-func isHighEntropy(v string) bool {
-	if len(v) < 20 {
-		return false
-	}
-	freq := map[rune]float64{}
-	for _, r := range v {
-		switch {
-		case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '+', r == '/', r == '=', r == '_', r == '-':
-			freq[r]++
-		default:
-			return false
-		}
-	}
-	n := float64(len(v))
-	var h float64
-	for _, c := range freq {
-		p := c / n
-		h -= p * math.Log2(p)
-	}
-	return h > 3.5
-}
-
-func finish(hits []Hit, order func(Hit) string) []Hit {
-	if len(hits) == 0 {
-		return nil
-	}
-	slices.SortFunc(hits, func(a, b Hit) int {
-		if c := strings.Compare(order(a), order(b)); c != 0 {
-			return c
-		}
-		return strings.Compare(a.Kind, b.Kind)
-	})
-	return slices.Compact(hits)
 }
 
 // Redact masks a value for display: the first and last two characters

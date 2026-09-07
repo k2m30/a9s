@@ -17,7 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // apigw canonical FindingCodes.
@@ -269,11 +268,12 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 			emit(CodeAPIGWTracingOff, "X-Ray tracing off", "~",
 				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
 		}
-		// Rows carry where and what kind, never the value itself.
-		for _, hit := range secretscan.ScanKV(st.Variables) {
+		// One stage is one finding however many of its variables leak: a
+		// second emit for the same code replaces the first's rows, so a
+		// per-hit emit costs a leak rather than reporting one.
+		if rows := secretScanRows(st.Variables); len(rows) > 0 {
 			emit(CodeAPIGWStageVariableSecret, "credential in stage variables", "!",
-				domain.DetailRow{Label: "Stage", Value: name, Tier: "!"},
-				domain.DetailRow{Label: hit.Where, Value: hit.Kind, Tier: "!"})
+				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
 		}
 	}
 	return false

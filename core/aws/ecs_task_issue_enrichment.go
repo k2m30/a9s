@@ -16,7 +16,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
 // ecs-task canonical FindingCodes.
@@ -251,11 +250,9 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 				env[*kv.Name] = aws.ToString(kv.Value)
 			}
 		}
-		if hits := secretscan.ScanKV(env); len(hits) > 0 {
+		if rows := secretScanRows(env); len(rows) > 0 {
 			secretRows = append(secretRows, domain.DetailRow{Label: "Container", Value: name, Tier: "!"})
-			for _, h := range hits {
-				secretRows = append(secretRows, domain.DetailRow{Label: h.Where, Value: h.Kind, Tier: "!"})
-			}
+			secretRows = append(secretRows, rows...)
 		}
 	}
 
