@@ -188,10 +188,20 @@ func TestUninspectedRow_DetailAttentionCarriesNotInspected(t *testing.T) {
 	if detail == nil {
 		t.Fatal("no detail body on the snapshot after EnsureDetailState")
 	}
+	// The whole Attention block: the entry line and the sentence lines below
+	// it are separate FieldRows, so a collector keyed on the phrase alone
+	// would never see the sentence it is asserting about.
 	var attention []string
+	inBlock := false
 	for _, f := range detail.Fields {
-		if strings.Contains(strings.ToLower(f.Key), "not inspected") ||
-			strings.Contains(strings.ToLower(f.Value), "not inspected") {
+		switch {
+		case f.IsSection && strings.HasPrefix(f.Key, "Attention"):
+			inBlock = true
+		case f.IsSection:
+			inBlock = false
+		case inBlock && f.IsSpacer:
+			inBlock = false
+		case inBlock:
 			attention = append(attention, f.Key+"="+f.Value)
 		}
 	}
@@ -202,9 +212,64 @@ func TestUninspectedRow_DetailAttentionCarriesNotInspected(t *testing.T) {
 		}
 		t.Fatalf("detail body carries no \"not inspected\" Attention entry for a row the ec2 enricher could not inspect; fields were:\n%s", strings.Join(keys, "\n"))
 	}
-	joined := strings.ToLower(strings.Join(attention, " "))
-	if !strings.Contains(joined, "ec2") {
-		t.Errorf("the not-inspected Attention entry does not name the check that failed to answer: %v", attention)
+	// The entry names no check. The Wave-2 enricher is registered per resource
+	// type, so its "short name" is just the type name — which the operator can
+	// already read from the screen and which names no individual check. The
+	// session set carries no check identity today (backlog w95), so the entry
+	// says only that the attention checks for this row did not answer.
+	joined := strings.Join(attention, " ")
+	if !strings.Contains(strings.ToLower(joined), domain.NotInspectedPhrase) {
+		t.Fatalf("the Attention block carries no %q entry: %v", domain.NotInspectedPhrase, attention)
+	}
+	if strings.Contains(joined, "not inspected:") {
+		t.Errorf("the Attention entry still qualifies the phrase with a name: %v", attention)
+	}
+	if strings.Contains(joined, "ec2 check") {
+		t.Errorf("the Attention entry claims a check called %q, which does not exist: %v", "ec2", attention)
+	}
+	if !strings.Contains(strings.ToLower(joined), "attention checks for this row did not answer") {
+		t.Errorf("the Attention entry does not say the checks did not answer: %v", attention)
+	}
+	if !strings.Contains(strings.ToLower(joined), "unknown rather than clean") {
+		t.Errorf("the Attention entry does not say the posture is unknown rather than clean: %v", attention)
+	}
+}
+
+// TestFindingsOverview_IsGone is the gate for the deletion acceptance asked
+// for: Controller.FindingsOverview aggregated findings per rule for a
+// cross-type cockpit that was never built (issue #461, closed completed
+// 2026-07-17), so nothing in this repo called it. A caller-less 349-line
+// public API is not "wired", and git keeps it if a cockpit ever arrives.
+func TestFindingsOverview_IsGone(t *testing.T) {
+	root, err := filepath.Abs("../../core")
+	if err != nil {
+		t.Fatalf("resolve core: %v", err)
+	}
+	var offenders []string
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for i, line := range strings.Split(string(src), "\n") {
+			if strings.Contains(line, "FindingsOverview") {
+				rel, _ := filepath.Rel(root, path)
+				offenders = append(offenders, fmt.Sprintf("core/%s:%d: %s", rel, i+1, strings.TrimSpace(line)))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk core: %v", err)
+	}
+	if len(offenders) > 0 {
+		t.Errorf("FindingsOverview is back with no caller:\n%s", strings.Join(offenders, "\n"))
 	}
 }
 

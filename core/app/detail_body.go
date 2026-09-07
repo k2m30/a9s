@@ -120,9 +120,9 @@ func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
 	return blocks
 }
 
-// buildDetailFieldItems runs the same projector pipeline as
-// DetailModel.buildFieldList and returns the
-// []fieldpath.FieldItem that both the TUI renderer and buildDetailBody consume.
+// buildDetailFieldItems runs the projector pipeline (projection.buildItems,
+// core/semantics/projection/generic.go) and returns the []fieldpath.FieldItem
+// that both the TUI renderer and buildDetailBody consume.
 // c.viewConfig may be nil; projection.GenericWithConfig(nil) uses built-in
 // defaults.
 func (c *Controller) buildDetailFieldItems(ds *DetailState) []fieldpath.FieldItem {
@@ -167,18 +167,15 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) []fieldpath.FieldIte
 	return items
 }
 
-// detailNotInspected returns the name of the check that could not answer for
-// this detail's row, or "" when the row was inspected. It is the same session
-// set the list's Status cell reads (Controller.listUninspectedIDs), so the two
-// surfaces can never disagree about whether a row's posture is known.
-func (c *Controller) detailNotInspected(ds *DetailState) string {
+// detailNotInspected reports whether this detail's row is one the Wave-2
+// enricher could not inspect. It reads the same session set the list's Status
+// cell reads (Controller.listUninspectedIDs), so the two surfaces can never
+// disagree about whether a row's posture is known.
+func (c *Controller) detailNotInspected(ds *DetailState) bool {
 	if ds == nil || ds.Resource.ID == "" || ds.ResourceType == "" {
-		return ""
+		return false
 	}
-	if !c.listUninspectedIDs(ds.ResourceType)[ds.Resource.ID] {
-		return ""
-	}
-	return ds.ResourceType
+	return c.listUninspectedIDs(ds.ResourceType)[ds.Resource.ID]
 }
 
 // sectionsToFieldItemsDetail converts []domain.Section → []fieldpath.FieldItem,
@@ -312,13 +309,13 @@ func wrapSentence(s string, width int) []string {
 // (warning), stable otherwise — the SAME order both the renderer and the
 // prepend-count calculation must observe, so they extract from this one
 // function rather than deriving the order independently in two places.
-func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int, notInspected string) []attentionEntry {
+func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int, notInspected bool) []attentionEntry {
 	var entries []attentionEntry
-	if notInspected != "" {
+	if notInspected {
 		entries = append(entries, attentionEntry{
 			tier:          "~",
-			primary:       domain.NotInspectedPhrase + ": " + notInspected,
-			detailLines:   wrapSentence("The "+notInspected+" check did not answer for this row, so its posture is unknown rather than clean.", width),
+			primary:       domain.NotInspectedPhrase,
+			detailLines:   wrapSentence("The attention checks for this row did not answer (a cap or an API error), so its posture is unknown rather than clean.", width),
 			splitKeyValue: true,
 		})
 	}
@@ -353,7 +350,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 // injectAttentionSectionDetail prepends the Attention block when the resource
 // has issue-severity findings. It is the only place the block is built: the
 // renderer paints the rows it emits.
-func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef, notInspected string) []fieldpath.FieldItem {
+func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef, notInspected bool) []fieldpath.FieldItem {
 	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, notInspected)
 	if len(entries) == 0 {
 		return items

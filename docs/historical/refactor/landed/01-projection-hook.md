@@ -42,13 +42,13 @@ Before scoping PR-01, the existing detail-view pipeline (`internal/fieldpath/ext
 | Navigability flag (`Underline + Enter → RelatedNavigateMsg`) | `FieldItem.Navigable` | `Item.Navigable bool` |
 | Target type for navigation (`"vpc"`, `"role"`, etc.) | `FieldItem.TargetType` | `Item.TargetType string` |
 | Section / sub-section / spacer tagging | `FieldItem.Kind` (Field, Header, Subfield, Spacer) | `Section.Items[].Kind` enum |
-| Nav ID overrides via `resource.NavIDFromValue` | applied in `buildFieldList` (`detail_fields.go`) | applied in `projection.Generic` and projector wrappers |
+| Nav ID overrides via `resource.NavIDFromValue` | applied in the TUI field-list builder (`detail_fields.go`, since deleted) | applied in `projection.Generic` and projector wrappers |
 | Tag flattening (each tag becomes its own row) | `flattenTags` in `detail_fields.go` | helper in `projection/generic.go` |
 | Embedded JSON expansion (e.g. policy documents) | `expandJSON` branch in `detail_fields.go` | helper in `projection/generic.go` |
 | Wave 2 attention injection (leading "Background Check" section) | `injectAttention` in `detail_fields.go` | rendered separately by detail view; projector returns a "main" `[]Section`, attention is layered above (NOT a section returned by `Project`) |
 | ct-event color tiers (`"!"`, `"~"`, `"impaired"`, `"initializing"`, `"ct-danger"`, `"ct-attention"`, `"ct-info"`) | `FieldItem.Tier` string | `Item.Tier string` (same string vocabulary; `TierColorStyle` already maps to lipgloss) |
 | List-typed scalar extraction (e.g. `Subnets.SubnetId` first element) | `fieldpath.ExtractFirstListScalar` | unchanged; called from `projection.Generic` |
-| Per-type field ordering and inclusion (per `~/.a9s/views/<type>.yaml`) | `ViewsConfig` consulted in `buildFieldList` | `projection.Generic` reads same config |
+| Per-type field ordering and inclusion (per `~/.a9s/views/<type>.yaml`) | `ViewsConfig` consulted in the TUI field-list builder (since deleted) | `projection.Generic` reads same config |
 
 **Out of `Section` / `Item`**: Wave 2 attention rendering remains a separate path. The detail view first renders `r.AttentionDetails` as the "Background Check" section (when present), THEN renders `td.Project(r)` (or `projection.Generic(r)` if nil) below it. The projector is responsible for *core* fields only. This keeps the projector's contract simple — it doesn't need to know about Wave 2 — and matches today's `injectAttention` placement.
 

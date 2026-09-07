@@ -66,7 +66,8 @@ func NewDetailWithCtrl(res resource.Resource, resourceType string, viewConfig *c
 	}
 }
 
-// SetNavProvider overrides the nav field provider used by buildFieldList.
+// SetNavProvider overrides the nav field provider used by the projector
+// (projection.buildItems, core/semantics/projection/generic.go).
 // TUI construction paths call this with resource.GetNavigableFields (merged
 // ACTIVE+DEFAULT) so that prod code sees all registered navigable fields.
 // Test-direct paths retain the ACTIVE-only default to stay isolated from

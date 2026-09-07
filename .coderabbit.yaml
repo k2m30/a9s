@@ -126,7 +126,7 @@ reviews:
         - EnrichDetailResultMsg must check both ResourceType AND ResourceID
         - RelatedCheckResultMsg must check both ResourceType AND SourceResourceID
         - fieldList is rebuilt from RawStruct when set to nil
-        - refreshViewportContent() calls buildFieldList() if fieldList is nil
+        - RenderDetail() renders the field rows the controller body carries
 
     - path: "cmd/**"
       instructions: |

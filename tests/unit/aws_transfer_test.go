@@ -646,7 +646,7 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // Agreement detail — the resolved As2Id must be visible through the SAME
-// config-driven render path DetailModel.buildFieldList actually uses
+// config-driven render path projection.buildItems actually uses
 // (the generic projector + fieldpath.ExtractFieldList), not merely present
 // somewhere on the enricher's return value. defaults_networking.go's
 // transfer_agreements Detail declares {Path: "LocalProfileId"} /
@@ -680,7 +680,7 @@ func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T
 		t.Fatalf("DetailEnrich returned error: %v", err)
 	}
 
-	// buildFieldList (internal/tui/views/detail_fields.go) sets r.Type =
+	// projection.buildItems (core/semantics/projection/generic.go) sets r.Type =
 	// m.resourceType before invoking the projector whenever the resource
 	// itself carries no Type — mirror that exactly so this test exercises
 	// the real config-driven render path rather than a synthetic shortcut.

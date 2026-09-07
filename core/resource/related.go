@@ -620,8 +620,8 @@ func GetNavigableFields(shortName string) []NavigableField {
 // Returns nil when no explicit SetNavigableFieldsForTest call has been made for
 // shortName.
 //
-// Used by DetailModel.buildFieldList so that navigable affordances in the
-// detail view require an explicit registration (from tests or from
+// Used by projection.buildItems (core/semantics/projection/generic.go) so
+// that navigable affordances in the detail view require an explicit registration (from tests or from
 // BootstrapActiveNavFields at app startup). This prevents init-time default
 // entries from being visible in test models that deliberately omit nav fields.
 func GetActiveNavigableFields(shortName string) []NavigableField {

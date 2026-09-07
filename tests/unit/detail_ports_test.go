@@ -29,7 +29,7 @@
 //     projector" — its own docstring).
 //  5. ct-events section headers. PORTED below: catalog_monitoring.go registers
 //     Project: ctevent.Project for "ct-events" (the SAME projector the dead
-//     buildFieldList used), and buildDetailFieldItems (detail_body.go:123)
+//     the TUI field-list builder used), and buildDetailFieldItems
 //     calls td.Project unconditionally — but zero existing controller-path
 //     test asserted the ACTOR/ACTION/CONTEXT section shape survives that
 //     wiring, so this is a real gap, not a duplicate.
@@ -108,7 +108,7 @@ import (
 // raw wrap independent of the lipgloss color styles NO_COLOR disables — this
 // is real, current behavior, not a test artifact.
 //
-// This is the ONE pin required before View() (and the buildFieldList/
+// This is the ONE pin required before View() (and the projection.buildItems/
 // buildLiveBody halves that only exist to reproduce it) can be deleted per
 // wave3-map-detail.md's HARD BLOCKER note: RP/PUR currently only prove
 // RenderDetail == View(), never RenderDetail's own correctness independent
@@ -1354,8 +1354,8 @@ func Test_CTEvents_FrameBorderPresent(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 21. Scalar NavID extraction — ported from internal/tui/views/
 // detail_scalar_navid_test.go (round 5, specs/022-codebase-cleanup, DetailModel
-// core cleanup): buildFieldList is dead; the live equivalent is
-// buildDetailFieldItems (detail_body.go), which populates the same
+// core cleanup): the TUI's own field-list builder is gone; the live path is
+// projection.buildItems via buildDetailFieldItems (detail_body.go), which populates the same
 // NavID-from-value post-processing on app.FieldRow. Regression pin: NavID was
 // only applied to YAML sub-fields (IsSubField=true), not top-level scalar
 // navigable fields, so a Lambda Role ARN's NavID stayed "" and navigation used

@@ -403,7 +403,8 @@ type Session struct {
 
 	// NewFindingPairs is the per-type count of (row, finding-code) pairs
 	// newly observed on the most recent on-disk cache save for that type
-	// (#463 — new-since-previous-scan deltas for FindingsOverview), keyed by
+	// (#463 — new-since-previous-scan deltas, read through
+	// Core.NewFindingPairsSincePrev), keyed by
 	// resource short name then domain.FindingCode. Replaced wholesale per
 	// type on each save (core/runtime.saveResourceListCache), never
 	// accumulated across saves — same access discipline as ProbeStatus:

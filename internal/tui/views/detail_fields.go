@@ -86,7 +86,8 @@ func (m DetailModel) renderFromFieldList() string {
 				line = " " + item.Key + ":"
 			case item.IsSubField:
 				indent := subFieldIndent(item.IndentLevel)
-				// Navigable or injected sub-fields have Key != Value (pre-split by buildFieldList).
+				// Navigable or injected sub-fields have Key != Value (pre-split by
+				// projection.buildItems).
 				// General sub-fields have Key == Value (raw YAML line).
 				if item.Key != item.Value {
 					// Attention phrase rows (IndentLevel == 1) collapse to value-only on
@@ -121,7 +122,7 @@ func (m DetailModel) renderFromFieldList() string {
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
 				indent := subFieldIndent(item.IndentLevel)
-				// Navigable sub-fields have Key != Value (pre-split by buildFieldList).
+				// Navigable sub-fields have Key != Value (pre-split by projection.buildItems).
 				if item.IsNavigable && item.Key != item.Value {
 					line = indent + styles.DetailKey.Render(item.Key+":") + " " + styles.NavigableField.Render(item.Value)
 					break

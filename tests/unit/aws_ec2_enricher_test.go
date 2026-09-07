@@ -20,7 +20,7 @@ package unit
 //
 // Current code stamps every condition under the single
 // "ec2.instance-status-impaired" code (core/aws/ec2_issue_enrichment.go:20-25),
-// which breaks per-rule grouping in FindingsOverview (commit 06c1d646).
+// so all four conditions share one phrase and one severity.
 
 import (
 	"context"
@@ -381,8 +381,8 @@ func TestEnrichEC2InstanceStatus_ImpairedUsesImpairedCode(t *testing.T) {
 // TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode pins that
 // "initializing" gets its OWN FindingCode ("ec2.instance-status.initializing"),
 // distinct from the impaired code. Today both are stamped
-// "ec2.instance-status-impaired", which breaks FindingsOverview's per-rule
-// grouping (commit 06c1d646).
+// "ec2.instance-status-impaired", so an initializing instance borrows the
+// impaired phrase and severity.
 func TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -545,9 +545,9 @@ func TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings(t *
 // TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities pins the
 // catalog-declaration side (core/aws/catalog_compute.go "ec2" entry's
 // Findings []catalog.FindingDef): each of the four Wave 2 conditions must be
-// declared under its OWN code with its real severity, so FindingsOverview
-// (commit 06c1d646, groups findings by rule across types) reports them as
-// four distinct rules instead of one. Today the catalog declares only
+// declared under its OWN code with its real severity, so each renders its own
+// phrase and its own Attention entry instead of one. Today the catalog
+// declares only
 // ec2CodeInstanceStatusImpaired for Wave 2.
 func TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities(t *testing.T) {
 	td := catalog.Find("ec2")

@@ -23,10 +23,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ec2 canonical FindingCodes. Each condition gets its OWN code so
-// FindingsOverview (commit 06c1d646, groups findings by rule across types)
-// reports them as four distinct rules instead of folding every status/event
-// condition under one code.
+// ec2 canonical FindingCodes. Each condition gets its OWN code so it carries
+// its own FindingDef phrase, severity and Attention entry, instead of folding
+// every status/event condition under one code and one phrase.
 const (
 	ec2CodeInstanceStatusImpaired     domain.FindingCode = "ec2.instance-status-impaired"
 	ec2CodeInstanceStatusInitializing domain.FindingCode = "ec2.instance-status.initializing"

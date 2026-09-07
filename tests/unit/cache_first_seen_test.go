@@ -21,7 +21,7 @@ import (
 
 // Issue #463 — per-finding FirstSeen persisted in the availability cache
 // (cache.Row.FindingFirstSeen), plus the new-since-previous-scan deltas
-// surfaced through app.FindingsGroup (OldestFirstSeen / NewSincePrev).
+// surfaced through Core.FindingFirstSeenForType / NewFindingPairsSincePrev.
 //
 // Drives the real save path (newTestControllerAndCore + Controller.Apply +
 // Controller.ApplyResourcesLoaded, the same wiring
@@ -274,19 +274,16 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 	}
 }
 
-func findFindingsGroup(t *testing.T, groups []app.FindingsGroup, code domain.FindingCode) app.FindingsGroup {
-	t.Helper()
-	for _, g := range groups {
-		if g.Code == code {
-			return g
-		}
-	}
-	t.Fatalf("FindingsOverview() has no group for code %q (groups=%+v)", code, groups)
-	return app.FindingsGroup{}
-}
-
-func TestFindingsOverview_FirstSeenAndNewSincePrev(t *testing.T) {
-	ctrl, _ := newTestControllerAndCore(t)
+// TestCacheFirstSeen_NewSincePrevViaControllerSave pins the same #463
+// carry/drop behaviour the deleted Controller.FindingsOverview used to expose:
+// the FIRST non-authoritative save records the (row, code) pair as new and
+// stamps its FirstSeen, and a SECOND save of the same row records no new pair
+// and does not restamp. The probe moved from the aggregate to the two Core
+// accessors that fed it (FindingFirstSeenForType, NewFindingPairsSincePrev),
+// which is where the save path actually writes. Do not restore an aggregate
+// assertion: FindingsOverview was deleted as a caller-less API, not renamed.
+func TestCacheFirstSeen_NewSincePrevViaControllerSave(t *testing.T) {
+	ctrl, core := newTestControllerAndCore(t)
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	finding := domain.Finding{
@@ -305,25 +302,22 @@ func TestFindingsOverview_FirstSeenAndNewSincePrev(t *testing.T) {
 
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{row}, nil, false)
 
-	groups1, _ := ctrl.FindingsOverview()
-	g1 := findFindingsGroup(t, groups1, finding.Code)
-	if g1.NewSincePrev < 1 {
-		t.Errorf("save 1: NewSincePrev = %d, want >= 1 — no previous on-disk generation existed, so this (row, code) pair is new", g1.NewSincePrev)
+	if got := core.NewFindingPairsSincePrev()["s3"][finding.Code]; got < 1 {
+		t.Errorf("save 1: NewFindingPairsSincePrev()[s3][%q] = %d, want >= 1 — no previous on-disk generation existed, so this (row, code) pair is new", finding.Code, got)
 	}
-	if g1.OldestFirstSeen.IsZero() {
-		t.Error("save 1: OldestFirstSeen is zero, want a real timestamp once the finding has been persisted")
+	first := core.FindingFirstSeenForType("s3")[row.ID][finding.Code]
+	if first.IsZero() {
+		t.Fatal("save 1: FirstSeen is zero, want a real timestamp once the finding has been persisted")
 	}
 
 	time.Sleep(5 * time.Millisecond)
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{row}, nil, false)
 
-	groups2, _ := ctrl.FindingsOverview()
-	g2 := findFindingsGroup(t, groups2, finding.Code)
-	if g2.NewSincePrev != 0 {
-		t.Errorf("save 2: NewSincePrev = %d, want 0 — the (row, code) pair already existed in the previous on-disk generation", g2.NewSincePrev)
+	if got := core.NewFindingPairsSincePrev()["s3"][finding.Code]; got != 0 {
+		t.Errorf("save 2: NewFindingPairsSincePrev()[s3][%q] = %d, want 0 — the (row, code) pair already existed in the previous on-disk generation", finding.Code, got)
 	}
-	if !g2.OldestFirstSeen.Equal(g1.OldestFirstSeen) {
-		t.Errorf("save 2: OldestFirstSeen = %v, want unchanged from save 1's %v", g2.OldestFirstSeen, g1.OldestFirstSeen)
+	if second := core.FindingFirstSeenForType("s3")[row.ID][finding.Code]; !second.Equal(first) {
+		t.Errorf("save 2: FirstSeen = %v, want unchanged from save 1's %v", second, first)
 	}
 }
 
@@ -333,7 +327,7 @@ func TestFindingsOverview_FirstSeenAndNewSincePrev(t *testing.T) {
 // wholesale-replacing the type's delta — so a Wave-2-completion save (which
 // diffs against the just-written Wave-1 generation, where the Wave-1 pair
 // already has FirstSeen and is therefore no longer "new") stomped out the
-// Wave-1 sweep's own new-pair record before FindingsOverview ever read it.
+// Wave-1 sweep's own new-pair record before anything could read it.
 //
 // Intended contract: a non-authoritative (Wave-1-style) save REPLACES the
 // type's delta (a fresh one-step scan baseline); a Wave-2-authoritative save
@@ -343,8 +337,8 @@ func TestFindingsOverview_FirstSeenAndNewSincePrev(t *testing.T) {
 // TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation in
 // runtime_savecache_regressions_test.go uses, toggling
 // SaveCachePayload.Wave2Complete for the two save kinds under test — this
-// package's TestFindingsOverview_FirstSeenAndNewSincePrev never exercises a
-// Wave2Complete=true save at all, only saveResourceListCache's non-
+// package's TestCacheFirstSeen_NewSincePrevViaControllerSave never exercises
+// a Wave2Complete=true save at all, only saveResourceListCache's non-
 // authoritative branch via Controller.ApplyResourcesLoaded.
 func TestNewFindingPairs_SurviveWave2CompletionSave(t *testing.T) {
 	const shortName = "ec2"

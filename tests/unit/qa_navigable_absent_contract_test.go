@@ -96,7 +96,7 @@ func TestNavigableAbsent_AbsentFields_NotNavigable(t *testing.T) {
 						t.Errorf("%s.%s: absent value rendered as navigable (dead affordance).\n"+
 							"  TargetType: %s\n"+
 							"  FieldItem:  Path=%q Key=%q Value=%q IsNavigable=%v IsSubField=%v IsHeader=%v\n"+
-							"  Fix: in fieldpath.ExtractFieldList / buildFieldList, only set IsNavigable=true "+
+							"  Fix: in fieldpath.ExtractFieldList / projection.buildItems, only set IsNavigable=true "+
 							"when the resolved value is non-empty and not the absent sentinel \"-\".",
 							shortName, path, target, it.Path, it.Key, it.Value, it.IsNavigable, it.IsSubField, it.IsHeader)
 					}

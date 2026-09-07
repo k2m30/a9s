@@ -78,8 +78,9 @@ func GenericWithConfigAndNavProvider(cfg *config.ViewsConfig, navProvider func(s
 	}
 }
 
-// buildItems produces a []fieldpath.FieldItem using the same logic as
-// DetailModel.buildFieldList for the non-ct-events path.
+// buildItems produces a []fieldpath.FieldItem for the non-ct-events path. It
+// is the one field-list builder: the TUI renders the items the controller
+// derives from it, and no view builds its own.
 // cfg is the view config to use; nil means no detail-path ordering is applied.
 // navProvider is the navigable-fields provider; nil suppresses navigability.
 func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(string) []domain.NavigableField) []fieldpath.FieldItem {
@@ -142,7 +143,7 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	// only meaningful when the operator has a configured detail path that maps
 	// field keys to target types. Without that contract, an Enter press on
 	// a randomly-ordered flat field would be surprising. This preserves
-	// parity with the original buildFieldList nil-config path.
+	// parity with the original TUI field-list builder's nil-config path.
 	if len(detailPaths) == 0 {
 		if len(fields) == 0 {
 			return nil
@@ -194,8 +195,8 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	}
 
 	// ── sub-field navigability post-processing ────────────────────────────
-	// Mirror the logic in buildFieldList: walk the item list and annotate
-	// sub-fields whose composed path matches a navMap entry.
+	// Walk the item list and annotate sub-fields whose composed path matches a
+	// navMap entry.
 	currentPath := ""
 	ancestorByLevel := map[int]string{}
 	for i, item := range items {
@@ -315,7 +316,7 @@ func fieldItemToDomainItem(fi fieldpath.FieldItem) domain.Item {
 	}
 
 	// Strip trailing colon from header labels (ExtractFieldList sets Key to
-	// path, not "path:" — but callers like buildFieldList may set Key="Tags:").
+	// path, not "path:" — but a caller may set Key="Tags:").
 	label := fi.Key
 	if kind == domain.ItemHeader {
 		label = strings.TrimSuffix(label, ":")

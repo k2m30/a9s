@@ -292,7 +292,7 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 }
 
 // TestQA_JSONExpand_CloudTrail_OutOfScope verifies that CloudTrail event detail
-// rendering takes the ctdetail.Parse branch (not the generic buildFieldList path),
+// rendering takes the ctdetail.Parse branch (not the generic projector path),
 // so expandJSONItems never runs on CT events. Uses a real cloudtrailtypes.Event
 // with a CloudTrailEvent JSON payload containing embedded JSON in RequestParameters.
 //
