@@ -1,3 +1,4 @@
+generated: 1
 list:
   Key:
     path: Key
@@ -5,7 +6,7 @@ list:
   Size:
     key: size
     width: 12
-    sort_path: Size
+    sort_key: size_raw
   Storage Class:
     path: StorageClass
     width: 16

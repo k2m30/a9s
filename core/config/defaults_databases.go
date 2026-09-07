@@ -9,7 +9,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "DB Identifier", Path: "DBInstanceIdentifier", Width: 28},
 				{Title: "Engine", Path: "Engine", Width: 12},
 				{Title: "Version", Path: "EngineVersion", Width: 10},
-				{Title: "Status", Key: "status", SortPath: "DBInstanceStatus", Width: 28},
+				{Title: "Status", Key: "status", SortKey: "status_raw", Width: 28},
 				{Title: "Class", Path: "DBInstanceClass", Width: 16},
 				{Title: "Endpoint", Path: "Endpoint.Address", Width: 40},
 				{Title: "Multi-AZ", Path: "MultiAZ", Width: 10},
@@ -52,7 +52,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				// value cannot surface in the UI — matches the dbc / dbi convention.
 				{Title: "Cluster ID", Path: "ReplicationGroupId", Width: 28},
 				{Title: "Node Type", Path: "CacheNodeType", Width: 18},
-				{Title: "Status", Key: "status", SortPath: "Status", Width: 32},
+				{Title: "Status", Key: "status", SortKey: "status_raw", Width: 32},
 				{Title: "Nodes", Key: "nodes", Width: 8},
 				{Title: "Endpoint", Path: "ConfigurationEndpoint.Address", Width: 40},
 			},
@@ -69,7 +69,7 @@ func databasesDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
 				{Title: "Version", Path: "EngineVersion", Width: 10},
-				{Title: "Status", Key: "status", SortPath: "Status", Width: 32},
+				{Title: "Status", Key: "status", SortKey: "status_raw", Width: 32},
 				{Title: "Instances", Path: "DBClusterMembers", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 			},
@@ -86,7 +86,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Table Name", Path: "TableName", Width: 36},
 				{Title: "Status", Key: "status", Width: 32},
 				{Title: "Items", Path: "ItemCount", Width: 12},
-				{Title: "Size", Key: "size_bytes", SortPath: "TableSizeBytes", Width: 14},
+				{Title: "Size", Key: "size_bytes", SortKey: "size_bytes_raw", Width: 14},
 				{Title: "Billing", Key: "billing_mode", Width: 16},
 			},
 			Detail: []DetailField{
@@ -124,9 +124,9 @@ func databasesDefaultViews() map[string]ViewDef {
 				// Status column renders the spec §4 derived phrase from Fields["status"]
 				// (blank on Healthy; `(+N)` suffix on multi-W1). Width 34 fits the longest
 				// §4 phrase ("broken: incompatible-parameters" = 31 chars) plus margin for
-				// future additions. SortPath keeps the raw ClusterStatus sortable by AWS
-				// enum order.
-				{Title: "Status", Key: "status", SortPath: "ClusterStatus", Width: 34},
+				// future additions. The sort key is the raw ClusterStatus the fetcher
+				// stores, so a cache row sorts like a live one.
+				{Title: "Status", Key: "status", SortKey: "cluster_status", Width: 34},
 				{Title: "Pending", Path: "PendingModifiedValues.NodeType", Width: 14},
 				{Title: "Node Type", Path: "NodeType", Width: 16},
 				{Title: "Nodes", Path: "NumberOfNodes", Width: 7},
@@ -219,7 +219,7 @@ func databasesDefaultViews() map[string]ViewDef {
 		"s3_objects": {
 			List: []ListColumn{
 				{Title: "Key", Path: "Key", Width: 36},
-				{Title: "Size", Key: "size", SortPath: "Size", Width: 12},
+				{Title: "Size", Key: "size", SortKey: "size_raw", Width: 12},
 				{Title: "Storage Class", Path: "StorageClass", Width: 16},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},

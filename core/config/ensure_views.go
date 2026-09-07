@@ -14,9 +14,11 @@ import (
 //go:embed views_reference.yaml
 var viewsReferenceData []byte
 
-// GenerateViewYAML returns the YAML bytes for a single ViewDef.
+// GenerateViewYAML returns the YAML bytes for a single ViewDef, stamped with
+// the build that generated it.
 func GenerateViewYAML(v ViewDef) []byte {
 	var b strings.Builder
+	fmt.Fprintf(&b, "generated: %d\n", GeneratedViewsVersion)
 
 	if len(v.List) > 0 {
 		b.WriteString("list:\n")
@@ -31,9 +33,6 @@ func GenerateViewYAML(v ViewDef) []byte {
 			fmt.Fprintf(&b, "    width: %d\n", col.Width)
 			if col.SortKey != "" {
 				fmt.Fprintf(&b, "    sort_key: %s\n", col.SortKey)
-			}
-			if col.SortPath != "" {
-				fmt.Fprintf(&b, "    sort_path: %s\n", col.SortPath)
 			}
 			if col.Humanize {
 				b.WriteString("    humanize: true\n")
@@ -72,8 +71,16 @@ func yamlKey(s string) string {
 	return s
 }
 
-// EnsureViewsDir writes any missing built-in view YAML files to dir.
-// Existing files are never overwritten (user may have edited them).
+// EnsureViewsDir writes any missing built-in view YAML files to dir and brings
+// files written by an older build up to this one's column set.
+//
+// A file already stamped with this build is left byte for byte alone: whatever
+// the operator did to it is theirs. A file with an older stamp (or none, which
+// is every file written before the stamp existed) keeps every column it has,
+// with the widths, paths and keys it has, and gains only the built-in columns
+// whose titles it does not carry — each at the position it holds in the
+// built-in set, so a column added in the middle does not land at the far right
+// of the operator's table.
 func EnsureViewsDir(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -88,15 +95,47 @@ func EnsureViewsDir(dir string) error {
 
 	for _, name := range keys {
 		dest := filepath.Join(dir, name+".yaml")
-		if _, statErr := os.Stat(dest); statErr == nil {
-			continue // file exists, skip
+		data, readErr := os.ReadFile(dest) //nolint:gosec // dest is built from the caller's own config dir
+		switch {
+		case readErr != nil && !os.IsNotExist(readErr):
+			return readErr
+		case readErr != nil:
+			data = GenerateViewYAML(cfg.Views[name])
+		default:
+			merged, changed := mergeGeneratedColumns(data, cfg.Views[name])
+			if !changed {
+				continue
+			}
+			data = merged
 		}
-		data := GenerateViewYAML(cfg.Views[name])
 		if writeErr := os.WriteFile(dest, data, 0644); writeErr != nil { //nolint:gosec // view YAML files are non-sensitive, world-readable is acceptable
 			return writeErr
 		}
 	}
 	return nil
+}
+
+// mergeGeneratedColumns returns the YAML for onDisk with def's missing columns
+// added, and changed=false when there is nothing to do: onDisk already carries
+// this build's stamp, or it does not parse, which is the operator's problem to
+// see and fix rather than this function's to overwrite.
+func mergeGeneratedColumns(onDisk []byte, def ViewDef) ([]byte, bool) {
+	vd, err := ParseSingle(onDisk)
+	if err != nil || vd.Generated >= GeneratedViewsVersion {
+		return nil, false
+	}
+	have := make(map[string]bool, len(vd.List))
+	for _, c := range vd.List {
+		have[c.Title] = true
+	}
+	for i, c := range def.List {
+		if have[c.Title] {
+			continue
+		}
+		at := min(i, len(vd.List))
+		vd.List = append(vd.List[:at], append([]ListColumn{c}, vd.List[at:]...)...)
+	}
+	return GenerateViewYAML(*vd), true
 }
 
 // EnsureViewsReference writes the embedded views_reference.yaml to configDir.

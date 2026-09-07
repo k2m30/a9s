@@ -23,17 +23,7 @@ func (m *ResourceListModel) handleSortByCol(msg tea.KeyMsg) bool {
 			if colIdx >= len(cols) {
 				return true // key pressed but no such column — absorb it
 			}
-			// Derive sort key the same way colSortKey does for listCol:
-			// prefer Key, then Path, then Title.
-			col := cols[colIdx]
-			colKey := col.Key
-			if colKey == "" {
-				colKey = col.Path
-			}
-			if colKey == "" {
-				colKey = col.Title
-			}
-			m.ctrl.Apply(app.Action{Kind: app.ActionSort, Arg: colKey})
+			m.ctrl.Apply(app.Action{Kind: app.ActionSort, Arg: cols[colIdx].SortColKey()})
 			m.styledRowCache = nil
 			return true
 		}

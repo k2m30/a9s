@@ -86,10 +86,21 @@ type ViewsConfig struct {
 	Views map[string]ViewDef `yaml:"views"`
 }
 
+// GeneratedViewsVersion stamps the view files this build generates. Bump it in
+// the same change that adds, removes or renames a built-in column: EnsureViewsDir
+// reads the stamp off a file already on disk and, when it is older, adds the
+// columns this build ships that the file has never heard of. Without the stamp
+// an operator who ran a9s once keeps the column set of that day forever, and
+// every column added since is invisible to them alone.
+const GeneratedViewsVersion = 1
+
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {
 	List   []ListColumn  `yaml:"-"`
 	Detail []DetailField `yaml:"-"`
+	// Generated is the GeneratedViewsVersion the file on disk was written with,
+	// zero for a file written before the stamp existed.
+	Generated int `yaml:"-"`
 }
 
 // DetailStringsForTest returns the canonical string identifiers of all
@@ -105,12 +116,17 @@ func DetailStringsForTest(fields []DetailField) []string {
 
 // ListColumn is a named column with its configuration, preserving YAML map order.
 type ListColumn struct {
-	Title    string `yaml:"-"`
-	Path     string `yaml:"path"`
-	Key      string `yaml:"key"`
-	Width    int    `yaml:"width"`
-	SortKey  string `yaml:"sort_key"`  // optional: Fields key for sorting (when display value differs from sort value)
-	SortPath string `yaml:"sort_path"` // optional: RawStruct path for raw numeric/time sort comparison
+	Title string `yaml:"-"`
+	Path  string `yaml:"path"`
+	Key   string `yaml:"key"`
+	Width int    `yaml:"width"`
+	// SortKey is the Fields key the comparator reads when the displayed value
+	// does not sort the way the value does (a size rendered "900 B", a status
+	// rendered as a finding phrase). It is a stored key and not a RawStruct
+	// path on purpose: the list opens on cache rows that have no RawStruct, so
+	// a path-based comparison would order the warm frame differently from the
+	// frame the fetch lands, and the rows would move under the operator.
+	SortKey string `yaml:"sort_key"`
 	// Humanize marks a Path-based column whose raw RawStruct-extracted enum
 	// value must be routed through domain.HumanizeStatusPhrase before
 	// rendering. See app.ColumnDef.Humanize for the consuming logic.
@@ -183,6 +199,11 @@ func (v *ViewDef) UnmarshalYAML(value *yaml.Node) error {
 				return fmt.Errorf("decoding detail: %w", err)
 			}
 			v.Detail = details
+
+		case "generated":
+			if err := val.Decode(&v.Generated); err != nil {
+				return fmt.Errorf("decoding generated: %w", err)
+			}
 		}
 	}
 	return nil

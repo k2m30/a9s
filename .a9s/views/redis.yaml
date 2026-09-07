@@ -1,3 +1,4 @@
+generated: 1
 list:
   Cluster ID:
     path: ReplicationGroupId
@@ -8,7 +9,7 @@ list:
   Status:
     key: status
     width: 32
-    sort_path: Status
+    sort_key: status_raw
   Nodes:
     key: nodes
     width: 8

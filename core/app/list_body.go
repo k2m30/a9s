@@ -450,7 +450,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 	visible := c.applyListFilters(ls, typeName, allResources)
 
 	// Sort over the same resolved set the cells come from, so a user-configured
-	// sort_key/sort_path column resolves correctly (Bug 3 fix) and the
+	// sort_key column resolves correctly and the
 	// comparator sees the identity election.
 	visible = listSortResources(columns, td, ls, visible)
 

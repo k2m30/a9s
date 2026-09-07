@@ -1,3 +1,4 @@
+generated: 1
 list:
   Tag(s):
     key: image_tags
@@ -11,7 +12,7 @@ list:
   Size:
     key: image_size
     width: 12
-    sort_path: ImageSizeInBytes
+    sort_key: image_size_raw
   Scan Status:
     key: scan_status
     width: 14

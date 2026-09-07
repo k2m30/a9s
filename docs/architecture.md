@@ -597,14 +597,13 @@ The critical insight: steps 2-3 mean `q` only quits in normal mode. During filte
 
 ### Sorting
 
-Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth column). Implementation lives in `internal/tui/views/sort.go`:
+Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth column). `SortByCol [10]key.Binding` in `keys.Map` maps the digit keys to column indices; pressing a key sorts ascending and pressing it again toggles to descending, with a ▲/▼ indicator in the column header. Column position is the only sort model: the `SortField` alias and the `SortName` / `SortID` / `SortAge` sentinels were removed in #283.
 
-- `sortColIdx int` tracks the active sort column index
-- `SortByCol [10]key.Binding` in `keys.Map` maps digit keys to column indices
-- Pressing a sort key sorts ascending; pressing the same key again toggles to descending
-- Sort indicator (▲/▼) appears in the column header
+**One key names a column.** The controller holds the sort as a column key plus a direction, and that key comes from `app.ColumnDef.SortColKey` — the column's `Key`, or its `Title` when it has none — and from nowhere else. `app.SortColIndex` is the only way back from a key to a column. Both directions of the list-view cache round trip go through the pair: leaving a list stores the sort column's index on the cache entry, and re-entering turns the index back into a key. A second spelling on either side drops the operator's sort silently on re-entry, which is why the header-arrow lookup and the comparator's column lookup ask the same two functions. `Path` is deliberately not in the formula: two columns of one view may read the same RawStruct path, so a path names a column ambiguously.
 
-Column-position sorting is the only sort model: the `SortField` alias and the `SortName` / `SortID` / `SortAge` sentinels were removed in #283. Sort state is a column index (`sortColIdx int`) plus a direction flag.
+**A column sorts by a stored value.** When the displayed text does not sort the way the value does — a size rendered `900 B`, a status rendered as a finding phrase — the view declares `sort_key`, a `Fields` key the Wave 1 fetcher writes (conventionally `<key>_raw`). It is a stored key rather than a RawStruct path on purpose: a list opens on cached rows that have no RawStruct, so a path-based comparison orders the warm frame differently from the frame the fetch lands, and the rows move under the cursor. The `sort_path` companion was removed for that reason.
+
+**Generated view files carry a stamp.** `config.GeneratedViewsVersion` is written as a `generated: <n>` header into every file `EnsureViewsDir` produces, and bumped in the same change that adds, removes or renames a built-in column. On launch, a file already at the current stamp is left byte for byte alone; a file with an older stamp (or none) keeps every column it has, with the widths, paths and keys it has, and gains only the built-in columns whose titles it does not carry, each inserted at its built-in position. Without the stamp, an operator who ran a9s once keeps that day's column set forever.
 
 ---
 

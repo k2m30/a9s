@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -110,9 +111,10 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			itemCount = fmt.Sprintf("%d", *table.ItemCount)
 		}
 
-		sizeBytes := ""
+		sizeBytes, sizeBytesRaw := "", ""
 		if table.TableSizeBytes != nil {
 			sizeBytes = formatBytes(*table.TableSizeBytes)
+			sizeBytesRaw = strconv.FormatInt(*table.TableSizeBytes, 10)
 		}
 
 		billingMode := ""
@@ -130,12 +132,13 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			Name:     name,
 			Findings: findings,
 			Fields: map[string]string{
-				"table_name":   name,
-				"status":       statusPhrase,
-				"item_count":   itemCount,
-				"size_bytes":   sizeBytes,
-				"billing_mode": billingMode,
-				"arn":          arn,
+				"table_name":     name,
+				"status":         statusPhrase,
+				"item_count":     itemCount,
+				"size_bytes":     sizeBytes,
+				"size_bytes_raw": sizeBytesRaw,
+				"billing_mode":   billingMode,
+				"arn":            arn,
 			},
 			RawStruct:        table,
 			AttentionDetails: attentionDetails,

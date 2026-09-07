@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -104,9 +105,10 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			logGroupName = *lg.LogGroupName
 		}
 
-		storedBytes := ""
+		storedBytes, storedBytesRaw := "", ""
 		if lg.StoredBytes != nil {
 			storedBytes = formatBytes(*lg.StoredBytes)
+			storedBytesRaw = strconv.FormatInt(*lg.StoredBytes, 10)
 		}
 
 		retentionDays := ""
@@ -137,13 +139,14 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			ID:   logGroupName,
 			Name: logGroupName,
 			Fields: map[string]string{
-				"log_group_name": logGroupName,
-				"stored_bytes":   storedBytes,
-				"retention_days": retentionDays,
-				"creation_time":  creationTime,
-				"kms_key_id":     kmsKeyID,
-				"retention":      retention,
-				"encryption":     encryption,
+				"log_group_name":   logGroupName,
+				"stored_bytes":     storedBytes,
+				"stored_bytes_raw": storedBytesRaw,
+				"retention_days":   retentionDays,
+				"creation_time":    creationTime,
+				"kms_key_id":       kmsKeyID,
+				"retention":        retention,
+				"encryption":       encryption,
 			},
 			RawStruct: lg,
 		}

@@ -1,3 +1,4 @@
+generated: 1
 list:
   Cluster ID:
     path: DBClusterIdentifier
@@ -8,7 +9,7 @@ list:
   Status:
     key: status
     width: 32
-    sort_path: Status
+    sort_key: status_raw
   Instances:
     path: DBClusterMembers
     width: 10

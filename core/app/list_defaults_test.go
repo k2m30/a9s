@@ -10,9 +10,16 @@ import (
 )
 
 // TestEnsureListState_SeedsCTEventsDefaultSort verifies that a freshly-created
-// ct-events list screen is seeded with the event_time DESC default sort by the
+// ct-events list screen is seeded with the newest-first default sort by the
 // controller (applyListDefaults via ensureListState), not by the per-keystroke
 // view constructor. Guards the stack-lift move of the default-sort logic.
+//
+// The seeded value used to be "event_time", which is the Fields key that
+// column sorts by and not a name any column answers to: the sort could
+// therefore never be saved or restored, and the header arrow never appeared.
+// The sort task made a column's name its own — "time" here — with the Fields
+// key it compares carried on the column as its sort_key. Do not restore
+// "event_time" as the seeded column.
 func TestEnsureListState_SeedsCTEventsDefaultSort(t *testing.T) {
 	c := New(runtime.New(session.New(), nil))
 	c.ApplyIntents([]runtime.UIIntent{
@@ -27,8 +34,8 @@ func TestEnsureListState_SeedsCTEventsDefaultSort(t *testing.T) {
 	if ls == nil {
 		t.Fatal("topListState nil after ensureListState")
 	}
-	if ls.SortCol != "event_time" || ls.SortDir != "desc" {
-		t.Errorf("ct-events default sort = %q/%q, want event_time/desc", ls.SortCol, ls.SortDir)
+	if ls.SortCol != "time" || ls.SortDir != "desc" {
+		t.Errorf("ct-events default sort = %q/%q, want time/desc", ls.SortCol, ls.SortDir)
 	}
 }
 

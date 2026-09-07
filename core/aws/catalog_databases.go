@@ -93,7 +93,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		}),
 		Wave2: IssueEnricher{Fn: EnrichDBIMaintenance, Priority: 10},
 		FieldKeys: []string{
-			"db_identifier", "engine", "engine_version", "status", "class", "endpoint",
+			"db_identifier", "engine", "engine_version", "status", "status_raw", "class", "endpoint",
 			"multi_az", "arn", "publicly_accessible", "storage_encrypted",
 			"deletion_protection", "backup_retention_period",
 		},
@@ -231,7 +231,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRedisPage(ctx, c.ElastiCache, continuationToken)
 		}),
-		FieldKeys: []string{"cluster_id", "node_type", "status", "nodes", "endpoint", "arn"},
+		FieldKeys: []string{"cluster_id", "node_type", "status", "status_raw", "nodes", "endpoint", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: true, Truncated: true},
@@ -345,7 +345,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		}),
 		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100},
 		FieldKeys: []string{
-			"cluster_id", "engine", "engine_version", "status", "instances", "endpoint", "arn",
+			"cluster_id", "engine", "engine_version", "status", "status_raw", "instances", "endpoint", "arn",
 			"has_writer", "writer_count", "deletion_protection", "storage_encrypted",
 			"backup_retention_period",
 		},
@@ -409,7 +409,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichDynamoDBPITR, Priority: 100},
-		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"},
+		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "size_bytes_raw", "billing_mode"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true, Truncated: true},

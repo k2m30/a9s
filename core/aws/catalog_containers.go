@@ -428,7 +428,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		CopyField: "image_uri",
 		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{
-			"image_tags", "digest_short", "pushed_at", "image_size",
+			"image_tags", "digest_short", "pushed_at", "image_size", "image_size_raw",
 			"scan_status", "finding_counts", "image_uri", "image_digest",
 			"repository_name",
 		},

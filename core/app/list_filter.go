@@ -117,11 +117,11 @@ func listHasIssueFinding(r resource.Resource) bool {
 	return false
 }
 
-// listSortResources sorts resources by ls.SortCol/SortDir, mirroring
-// sortFiltered in views/sort.go. No-op when SortCol is empty.
+// listSortResources sorts resources by ls.SortCol/SortDir. No-op when SortCol
+// is empty.
 //
 // columns is the resolved set the list is rendering, so the comparator reads
-// the same Path, SortKey, SortPath and identity election the cells were
+// the same Path, SortKey and identity election the cells were
 // extracted with. A set resolved separately here would sort by a column the
 // list does not show, and would compare every row that only the identity
 // column can distinguish — a warm-cache replay, a degraded fetch — as equal.
@@ -131,13 +131,8 @@ func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *Li
 	}
 
 	col := ColumnDef{Key: ls.SortCol}
-	sortColLower := strings.ToLower(ls.SortCol)
-	for _, c := range columns {
-		titleUnder := strings.ToLower(strings.ReplaceAll(c.Title, " ", "_"))
-		if c.Key == ls.SortCol || c.Path == ls.SortCol || titleUnder == sortColLower {
-			col = c
-			break
-		}
+	if i := SortColIndex(columns, ls.SortCol); i >= 0 {
+		col = columns[i]
 	}
 
 	sortAsc := ls.SortDir != "desc"
@@ -148,13 +143,15 @@ func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *Li
 		a := out[i]
 		b := out[j]
 
-		// Raw struct comparison (numeric/time) when a sortPath or path is present.
-		rawPath := col.SortPath
-		if rawPath == "" {
-			rawPath = col.Path
+		// An explicit sort key wins over everything: it is the column's own
+		// statement that its displayed text is not what it sorts by.
+		if col.SortKey != "" {
+			return sortStrings(a.Fields[col.SortKey], b.Fields[col.SortKey], sortAsc)
 		}
-		if rawPath != "" && a.RawStruct != nil && b.RawStruct != nil {
-			if cmp, ok := listCompareRaw(a.RawStruct, b.RawStruct, rawPath); ok {
+
+		// Raw struct comparison (numeric/time) when a path is present.
+		if col.Path != "" && a.RawStruct != nil && b.RawStruct != nil {
+			if cmp, ok := listCompareRaw(a.RawStruct, b.RawStruct, col.Path); ok {
 				if sortAsc {
 					return cmp < 0
 				}
@@ -163,31 +160,31 @@ func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *Li
 		}
 
 		// Display-value fallback.
-		var va, vb string
-		if col.SortKey != "" {
-			va = a.Fields[col.SortKey]
-			vb = b.Fields[col.SortKey]
-		} else {
-			va = ExtractCellValue(col, td, a)
-			vb = ExtractCellValue(col, td, b)
-		}
-		if fa, err := strconv.ParseFloat(va, 64); err == nil {
-			if fb, err := strconv.ParseFloat(vb, 64); err == nil {
-				if sortAsc {
-					return fa < fb
-				}
-				return fa > fb
-			}
-		}
-		if sortAsc {
-			return va < vb
-		}
-		return va > vb
+		return sortStrings(ExtractCellValue(col, td, a), ExtractCellValue(col, td, b), sortAsc)
 	})
 	return out
 }
 
-// listCompareRaw mirrors compareRaw from views/sort.go.
+// sortStrings orders two cell values, numerically when both parse as numbers
+// (a byte count stored as text sorts 900 before 2048, not after it) and
+// lexically otherwise.
+func sortStrings(va, vb string, asc bool) bool {
+	if fa, err := strconv.ParseFloat(va, 64); err == nil {
+		if fb, err := strconv.ParseFloat(vb, 64); err == nil {
+			if asc {
+				return fa < fb
+			}
+			return fa > fb
+		}
+	}
+	if asc {
+		return va < vb
+	}
+	return va > vb
+}
+
+// listCompareRaw compares one RawStruct path across two rows numerically or
+// chronologically, reporting false when either side cannot be read.
 func listCompareRaw(a, b any, path string) (int, bool) {
 	va, errA := fieldpath.ExtractValue(a, path)
 	vb, errB := fieldpath.ExtractValue(b, path)
@@ -226,7 +223,8 @@ func listCompareRaw(a, b any, path string) (int, bool) {
 	return 0, false
 }
 
-// listToFloat mirrors toFloat from views/sort.go.
+// listToFloat reads a reflected value as a float when it is a number, a time
+// or a duration, so listCompareRaw can order it.
 func listToFloat(v reflect.Value) (float64, bool) {
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:

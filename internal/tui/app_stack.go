@@ -153,20 +153,9 @@ func (m *Model) cacheTopLevelResourceList() {
 			}
 		}
 		if td != nil {
-			cols := m.ctrl.ResolveColumnsForType(td.ShortName)
-			for i, c := range cols {
-				effectiveKey := c.Key
-				if effectiveKey == "" {
-					effectiveKey = c.Path
-				}
-				if effectiveKey == "" {
-					effectiveKey = c.Title
-				}
-				if effectiveKey == col {
-					sortColIdx = i
-					sortAsc = dir != "desc"
-					break
-				}
+			if i := app.SortColIndex(m.ctrl.ResolveColumnsForType(td.ShortName), col); i >= 0 {
+				sortColIdx = i
+				sortAsc = dir != "desc"
 			}
 		}
 	}

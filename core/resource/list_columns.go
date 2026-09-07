@@ -2,14 +2,18 @@
 
 package resource
 
-import "github.com/k2m30/a9s/v3/core/config"
+import (
+	"strings"
+
+	"github.com/k2m30/a9s/v3/core/config"
+)
 
 // ResolveListColumnCascade resolves the list column set for typeName: prefer
 // vc's per-session ViewDef.List when non-empty, else the built-in default
 // ViewDef.List when it is a strict superset of td.Columns (guarded by a
 // first-column-title match so a custom td with a different layout is not
 // silently switched to the built-in defaults), else td.Columns (carrying
-// Path/SortKey/SortPath/Humanize from the defaults by title match), else the
+// Path/SortKey/Humanize from the defaults by title match), else the
 // raw built-in defaults.
 //
 // The only resolver of the column-set cascade. core/app's
@@ -36,17 +40,20 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 	}
 
 	if td != nil && len(td.Columns) > 0 {
+		// Keyed case-insensitively: a catalog column and the built-in view
+		// spell the same title differently often enough ("Time" against
+		// "TIME") that an exact match silently drops the sort key, the path
+		// and the humanize flag the default declares for that very column.
 		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
 		for _, lc := range defaultVD.List {
-			defaultByTitle[lc.Title] = lc
+			defaultByTitle[strings.ToLower(lc.Title)] = lc
 		}
 		cols := make([]config.ListColumn, len(td.Columns))
 		for i, c := range td.Columns {
 			cd := config.ListColumn{Key: c.Key, Title: c.Title, Width: c.Width}
-			if def, ok := defaultByTitle[c.Title]; ok {
+			if def, ok := defaultByTitle[strings.ToLower(c.Title)]; ok {
 				cd.Path = def.Path
 				cd.SortKey = def.SortKey
-				cd.SortPath = def.SortPath
 				cd.Humanize = def.Humanize
 			}
 			cols[i] = cd
@@ -59,7 +66,7 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 
 // copyListColumns copies a view definition's columns whole. Every field a
 // column carries decides something downstream — Path and Humanize what the
-// cell shows, SortKey and SortPath what the comparator reads — so a branch
+// cell shows and SortKey what the comparator reads — so a branch
 // that copies field by field is a branch that silently drops one.
 func copyListColumns(src []config.ListColumn) []config.ListColumn {
 	if len(src) == 0 {

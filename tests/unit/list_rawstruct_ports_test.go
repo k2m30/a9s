@@ -1036,13 +1036,17 @@ func TestListRawStruct_ChildViews(t *testing.T) {
 // ===========================================================================
 // 2. TestListRawStruct_S3ObjectSort_UsesNumericByteOrder — port of
 // qa_s3_test.go's TestQA_S3_B10_3_ObjectList_SortBySize_UsesNumericByteOrder.
-// s3_objects's default view config sets {Key:"size", SortPath:"Size"} on the
-// Size column (core/config/defaults_databases.go), routing sort through
-// listCompareRaw's RawStruct-numeric comparison — not the display string
-// ("1 KB" vs "900 B"), which would sort lexicographically wrong ('1' < '9').
+// s3_objects's default view config sets {Key:"size", SortKey:"size_raw"} on
+// the Size column (core/config/defaults_databases.go), so the sort reads the
+// byte count the fetcher stored — not the display string ("1 KB" vs "900 B"),
+// which would sort lexicographically wrong ('1' < '9'). The sort_path this
+// test was written against read the AWS struct instead, which the warm-cache
+// frame does not have, so the same list came back in a different order until
+// the fetch landed; the rows below now carry the stored byte count the way the
+// fetcher writes it. Do not restore a RawStruct-only version of this case.
 // Neither core/app/list_test.go's TestListSort_* (Name-only) nor this file's
 // AllTypes/OverridesFields cases (cell VALUE, not sort ORDER) cover a
-// SortPath-driven numeric sort — this was otherwise unpinned at the
+// sort-key-driven numeric sort — this was otherwise unpinned at the
 // controller level.
 // ===========================================================================
 
@@ -1050,17 +1054,17 @@ func TestListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {
 	objects := []resource.Resource{
 		{
 			ID: "medium.bin", Name: "medium.bin",
-			Fields:    map[string]string{"key": "medium.bin", "size": "1 KB", "last_modified": "2025-01-02"},
+			Fields:    map[string]string{"key": "medium.bin", "size_raw": "1024", "size": "1 KB", "last_modified": "2025-01-02"},
 			RawStruct: s3types.Object{Key: wave3StrPtr("medium.bin"), Size: wave3Int64Ptr(1024)},
 		},
 		{
 			ID: "small.bin", Name: "small.bin",
-			Fields:    map[string]string{"key": "small.bin", "size": "900 B", "last_modified": "2025-01-01"},
+			Fields:    map[string]string{"key": "small.bin", "size_raw": "900", "size": "900 B", "last_modified": "2025-01-01"},
 			RawStruct: s3types.Object{Key: wave3StrPtr("small.bin"), Size: wave3Int64Ptr(900)},
 		},
 		{
 			ID: "large.bin", Name: "large.bin",
-			Fields:    map[string]string{"key": "large.bin", "size": "2 KB", "last_modified": "2025-01-03"},
+			Fields:    map[string]string{"key": "large.bin", "size_raw": "2048", "size": "2 KB", "last_modified": "2025-01-03"},
 			RawStruct: s3types.Object{Key: wave3StrPtr("large.bin"), Size: wave3Int64Ptr(2048)},
 		},
 	}

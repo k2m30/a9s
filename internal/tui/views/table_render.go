@@ -16,18 +16,10 @@ type listCol struct {
 	width int
 	key   string // resource.Fields key (fallback)
 	path  string // config-driven path for ExtractScalar
-}
-
-// colSortKey returns the stable identifier for a column used to match against
-// ResourceListModel.sortColKey. Key is preferred, path fallback, title last resort.
-func colSortKey(c listCol) string {
-	if c.key != "" {
-		return c.key
-	}
-	if c.path != "" {
-		return c.path
-	}
-	return c.title
+	// sortKey is app.ColumnDef.SortColKey carried verbatim from the column the
+	// controller resolved, so the header arrow lands on the column the
+	// controller is actually sorting by. Never re-derived here.
+	sortKey string
 }
 
 // applySortKeyPrefixWidths auto-grows the first 10 columns' widths to fit the
@@ -104,7 +96,7 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 	title := c.title
 	// Append sort glyph if this is the active sort column.
-	if m.sortColKey != "" && colSortKey(c) == m.sortColKey {
+	if m.sortColKey != "" && c.sortKey == m.sortColKey {
 		if m.sortAsc {
 			title += "\u2191"
 		} else {

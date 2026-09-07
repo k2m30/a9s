@@ -132,7 +132,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
-		FieldKeys:              []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"},
+		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention_days", "creation_time", "kms_key_id"},
 		IssueEnricherFieldKeys: []string{"last_event_at"},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true, Truncated: true},

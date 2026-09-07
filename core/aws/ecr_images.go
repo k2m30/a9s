@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -118,9 +119,10 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 	}
 
 	// image_size
-	imageSize := ""
+	imageSize, imageSizeRaw := "", ""
 	if img.ImageSizeInBytes != nil {
 		imageSize = formatBytes(*img.ImageSizeInBytes)
+		imageSizeRaw = strconv.FormatInt(*img.ImageSizeInBytes, 10)
 	}
 
 	// scan_status
@@ -160,6 +162,7 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 			"digest_short":    digestShort,
 			"pushed_at":       pushedAt,
 			"image_size":      imageSize,
+			"image_size_raw":  imageSizeRaw,
 			"scan_status":     scanStatus,
 			"finding_counts":  findingCounts,
 			"image_uri":       imageURI,

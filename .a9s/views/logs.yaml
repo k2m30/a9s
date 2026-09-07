@@ -1,3 +1,4 @@
+generated: 1
 list:
   Log Group Name:
     path: LogGroupName
@@ -7,7 +8,7 @@ list:
   Size:
     key: stored_bytes
     width: 14
-    sort_path: StoredBytes
+    sort_key: stored_bytes_raw
   Retention:
     path: RetentionInDays
     width: 10

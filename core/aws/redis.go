@@ -119,6 +119,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 				"nodes":      nodes,
 				"endpoint":   endpoint,
 				"status":     statusPhrase,
+				"status_raw": status,
 				"arn":        arn,
 			},
 			RawStruct:        rg,

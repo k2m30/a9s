@@ -235,7 +235,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Global(region, "s3/object/"+url.PathEscape(bucket)+"?prefix="+url.QueryEscape(key))
 		},
 		Columns:   resource.S3ObjectColumns(),
-		FieldKeys: []string{"key", "size", "last_modified", "storage_class", "bucket"},
+		FieldKeys: []string{"key", "size", "size_raw", "last_modified", "storage_class", "bucket"},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "s3_objects",
 			Key:            "enter",

@@ -354,11 +354,14 @@ func TestCols_SaveColumnsAreAProjectionOfTheResolvedSet(t *testing.T) {
 	}
 }
 
-// TestCols_SortOverridesSurviveOntoTheResolvedColumn pins the two fields that
-// exist for one purpose: to let a column sort by something other than the text
+// TestCols_SortOverridesSurviveOntoTheResolvedColumn pins the field that
+// exists for one purpose: to let a column sort by something other than the text
 // it shows. A size rendered "1.2 GB" and a timestamp rendered "Mar 28 14:30"
-// sort wrongly as text, so the built-in view declares the raw Fields key or
-// RawStruct path to compare instead. Those declarations have to reach the
+// sort wrongly as text, so the built-in view declares the raw Fields key to
+// compare instead. The sort_path companion this test also covered was removed
+// with the sort task: it read the AWS struct, which a warm-cache row does not
+// have, so it ordered the cached frame differently from the live one. Do not
+// restore that assertion. Those declarations have to reach the
 // column the comparator reads, on the branch a real user's session takes —
 // which is the one with the shipped view files loaded, not the built-in
 // defaults.
@@ -376,7 +379,7 @@ func TestCols_SortOverridesSurviveOntoTheResolvedColumn(t *testing.T) {
 			byTitle[c.Title] = c
 		}
 		for _, def := range defaults {
-			if def.SortKey == "" && def.SortPath == "" {
+			if def.SortKey == "" {
 				continue
 			}
 			checked++
@@ -388,10 +391,6 @@ func TestCols_SortOverridesSurviveOntoTheResolvedColumn(t *testing.T) {
 			if got.SortKey != def.SortKey {
 				t.Errorf("%s: column %q resolves SortKey %q, want %q — the comparator falls back to sorting the displayed text",
 					name, def.Title, got.SortKey, def.SortKey)
-			}
-			if got.SortPath != def.SortPath {
-				t.Errorf("%s: column %q resolves SortPath %q, want %q — the comparator falls back to sorting the displayed text",
-					name, def.Title, got.SortPath, def.SortPath)
 			}
 		}
 	}

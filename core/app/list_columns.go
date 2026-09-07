@@ -83,7 +83,7 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 	for i, lc := range lcs {
 		cols[i] = ColumnDef{
 			Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,
-			Humanize: lc.Humanize, SortKey: lc.SortKey, SortPath: lc.SortPath,
+			Humanize: lc.Humanize, SortKey: lc.SortKey,
 		}
 	}
 	cols[IdentityColumnIndex(cols, td)].Identity = true
@@ -403,4 +403,37 @@ func (c *Controller) typeDefForLocked(shortName string) *resource.ResourceTypeDe
 		return td
 	}
 	return resource.GetChildType(shortName)
+}
+
+// SortColKey is the one identifier a sort names a column by. Both directions
+// of the list-view cache round trip ask here — leaving a list translates the
+// active sort's key into the column's index, re-entering translates the index
+// back into a key — so a key saved on one side always finds the same column on
+// the other. A second spelling anywhere means a sort the operator set is
+// dropped without a word when they come back to the list.
+//
+// The key is the column's Key, or its Title when it has none. Path is not in
+// the formula: two columns of one view legitimately read the same RawStruct
+// path (sns shows a topic's ARN under both "Topic Name" and "Topic ARN"), so a
+// path names a column ambiguously, while a title is a view file's YAML mapping
+// key and is unique by construction.
+func (c ColumnDef) SortColKey() string {
+	if c.Key != "" {
+		return c.Key
+	}
+	return c.Title
+}
+
+// SortColIndex returns the index in columns of the column SortColKey names, or
+// -1 when no column answers to key.
+func SortColIndex(columns []ColumnDef, key string) int {
+	if key == "" {
+		return -1
+	}
+	for i, c := range columns {
+		if c.SortColKey() == key {
+			return i
+		}
+	}
+	return -1
 }

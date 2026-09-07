@@ -194,19 +194,7 @@ func NewResourceListFromCache(
 	if sortColIdx >= 0 {
 		cols := c.ResolveColumnsForType(typeDef.ShortName)
 		if sortColIdx < len(cols) {
-			colKey := cols[sortColIdx].Key
-			// View-config columns (path-based) may have an empty Key. Fall back to
-			// the matching td.Columns entry by title so ActionSort's "Arg != """
-			// guard does not silently drop the sort.
-			if colKey == "" {
-				colTitle := cols[sortColIdx].Title
-				for _, tc := range typeDef.Columns {
-					if tc.Title == colTitle && tc.Key != "" {
-						colKey = tc.Key
-						break
-					}
-				}
-			}
+			colKey := cols[sortColIdx].SortColKey()
 			if colKey != "" {
 				c.Apply(app.Action{Kind: app.ActionSort, Arg: colKey})
 				if !sortAsc {
@@ -524,10 +512,11 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	fullCols := make([]listCol, len(body.Columns))
 	for i, cd := range body.Columns {
 		fullCols[i] = listCol{
-			title: cd.Title,
-			width: cd.Width,
-			key:   cd.Key,
-			path:  cd.Path,
+			title:   cd.Title,
+			width:   cd.Width,
+			key:     cd.Key,
+			path:    cd.Path,
+			sortKey: cd.SortColKey(),
 		}
 	}
 	// Apply sort-key prefix widths so header titles match View() exactly.
@@ -566,7 +555,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	// Populate ephemeral render-time fields from body for header rendering,
 	// then restore after. These fields exist only to satisfy renderHeaderRow's
 	// value-receiver reads; they carry no state between frames.
-	m.sortColKey = renderListSortColKey(body.Sort, fullCols, m.typeDef)
+	m.sortColKey = body.Sort.Col
 	m.sortAsc = body.Sort.Dir != "desc"
 	m.hScrollOffset = scrollX
 	headerLine := m.renderHeaderRow(cols)
@@ -641,45 +630,6 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	}
 
 	return sb.String()
-}
-
-// renderListSortColKey returns the sort column key matching body.Sort.Col against
-// the full resolved column list, mirroring how m.sortColKey is set via updateSortColKey.
-//
-// body.Sort.Col may be a td.Columns key (e.g. "workgroup_name") while fullCols
-// contains path-based view-config columns (e.g. key="" title="Workgroup"). The
-// cross-reference via td.Columns bridges the two: find the td column whose Key
-// matches sort.Col, then find the fullCols column whose Title matches that td
-// column's Title, and return its canonical colSortKey.
-func renderListSortColKey(sort app.SortSpec, fullCols []listCol, td resource.ResourceTypeDef) string {
-	if sort.Col == "" {
-		return ""
-	}
-	sortColLower := strings.ToLower(sort.Col)
-	for _, c := range fullCols {
-		if c.key == sort.Col || c.path == sort.Col || c.title == sort.Col {
-			return colSortKey(c)
-		}
-		// Title-underscore match: "Plan Name" → "plan_name" to bridge td.Columns
-		// key identifiers with view-config path-only columns.
-		titleUnder := strings.ToLower(strings.ReplaceAll(c.title, " ", "_"))
-		if titleUnder == sortColLower {
-			return colSortKey(c)
-		}
-	}
-	// Cross-reference via td.Columns: sort.Col may be a td.Columns key (e.g.
-	// "workgroup_name"). Find the td column with that key, then look up the
-	// fullCols column by matching Title to get the canonical colSortKey.
-	for _, tc := range td.Columns {
-		if tc.Key == sort.Col {
-			for _, c := range fullCols {
-				if c.title == tc.Title {
-					return colSortKey(c)
-				}
-			}
-		}
-	}
-	return sort.Col
 }
 
 // renderListWidenLifecycleColumn widens the status/lifecycle column to the

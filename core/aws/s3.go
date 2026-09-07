@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -199,9 +200,10 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 			objKey = *obj.Key
 		}
 
-		size := ""
+		size, sizeRaw := "", ""
 		if obj.Size != nil {
 			size = formatSize(*obj.Size)
+			sizeRaw = strconv.FormatInt(*obj.Size, 10)
 		}
 
 		lastModified := ""
@@ -217,6 +219,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 			Fields: map[string]string{
 				"key":           objKey,
 				"size":          size,
+				"size_raw":      sizeRaw,
 				"last_modified": lastModified,
 				"storage_class": storageClass,
 				"kind":          "file",

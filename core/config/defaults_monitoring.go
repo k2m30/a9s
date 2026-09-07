@@ -27,7 +27,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
 				{Title: "Status", Width: 12},
-				{Title: "Size", Key: "stored_bytes", SortPath: "StoredBytes", Width: 14},
+				{Title: "Size", Key: "stored_bytes", SortKey: "stored_bytes_raw", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Last Event", Key: "last_event_at", Width: 22},

@@ -1,3 +1,4 @@
+generated: 1
 list:
   Cluster ID:
     path: ClusterIdentifier
@@ -5,7 +6,7 @@ list:
   Status:
     key: status
     width: 34
-    sort_path: ClusterStatus
+    sort_key: cluster_status
   Pending:
     path: PendingModifiedValues.NodeType
     width: 14

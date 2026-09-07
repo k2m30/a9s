@@ -1,3 +1,4 @@
+generated: 1
 list:
   Table Name:
     path: TableName
@@ -11,7 +12,7 @@ list:
   Size:
     key: size_bytes
     width: 14
-    sort_path: TableSizeBytes
+    sort_key: size_bytes_raw
   Billing:
     key: billing_mode
     width: 16

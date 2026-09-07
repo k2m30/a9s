@@ -195,6 +195,7 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 				"engine":                  engine,
 				"engine_version":          engineVersion,
 				"status":                  statusPhrase,
+				"status_raw":              aws.ToString(cluster.Status),
 				"instances":               instances,
 				"endpoint":                endpoint,
 				"arn":                     aws.ToString(cluster.DBClusterArn),
