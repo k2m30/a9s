@@ -442,6 +442,7 @@ const (
 	kindNoSignals  = "claims no signals in a wave that ships one"
 	kindNoFinding  = "claims no finding row for a registered finding"
 	kindSuppressed = "claims a surface is suppressed"
+	kindTierInList = "puts the tier in the list"
 )
 
 // expectedGlyph derives the Severity cell of a §4 row from the finding alone.
@@ -753,6 +754,16 @@ var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?:(?: [a-z]+)* sig
 
 var reS3Suppressed = regexp.MustCompile(`S3 (is )?suppress`)
 
+// The §4.1 paragraph answers one question — what the operator can read off the
+// list without opening detail — so naming the tier in it says the tier is on
+// the list row. It is not: it is an entry in the detail-view Attention section
+// (internal/tui/views/detail_fields.go), which is the thing opening detail
+// shows. A page that wants to say where the tier lives says it in §5.
+var (
+	reUXReviewLine = regexp.MustCompile(`^At 3am`)
+	reTierToken    = regexp.MustCompile("`!`|`~`|glyph")
+)
+
 // docSentenceOffenders finds prose that contradicts the table below it: a
 // sentence telling the reader a wave carries nothing for this type while the
 // catalog ships a finding in it, and a sentence saying S3 is suppressed on a
@@ -769,6 +780,13 @@ func docSentenceOffenders(t *testing.T, path string, signals []catalogSignal) []
 
 	var offenders []docOffender
 	for i, line := range readLines(t, path) {
+		if reUXReviewLine.MatchString(line) {
+			if tok := reTierToken.FindString(line); tok != "" {
+				offenders = append(offenders, docOffender{i + 1, kindTierInList, fmt.Sprintf(
+					"the §4.1 paragraph names %s while answering what the list shows without opening detail; "+
+						"the tier is an entry in the detail-view Attention section", tok)})
+			}
+		}
 		if reS3Suppressed.MatchString(line) {
 			offenders = append(offenders, docOffender{i + 1, kindSuppressed, fmt.Sprintf(
 				"the sentence says S3 is suppressed; S3 is the detail-view Attention tier, which every %s finding "+
