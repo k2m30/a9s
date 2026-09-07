@@ -214,6 +214,12 @@ func ErrClass(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "timeout"
 	}
+	// A service the region does not offer is detected once, by the same
+	// IsEndpointNotFound every surface that phrases it already calls — never
+	// by a second match on the message.
+	if IsEndpointNotFound(err) {
+		return "region-unavailable"
+	}
 	// A call that never reached a service has no AWS error code to classify;
 	// its own text is a URL and a socket address, which name the endpoint but
 	// not the failure.
@@ -244,11 +250,14 @@ func ErrClass(err error) string {
 // denied call names the action the role lacks, an API error carries its
 // message — and CauseOf keeps them.
 var errClassPhrasing = map[string]struct{ cause, row, sweepTitle string }{
-	"timeout":       {"timeout", "timeout", "sweep: timeout"},
-	"transport":     {"transport failure", "transport", "sweep: transport failure"},
-	"access-denied": {"", "denied", "sweep: access denied"},
-	"expired":       {"", "expired", "session expired"},
-	"throttled":     {"", "throttled", "sweep: throttled"},
+	"timeout": {"timeout", "timeout", "sweep: timeout"},
+	// No sweep title: an account cannot be region-unavailable as a whole, so
+	// this class can never be every type's cause. The completeness gate knows.
+	"region-unavailable": {"service not available in this region", "no service", ""},
+	"transport":          {"transport failure", "transport", "sweep: transport failure"},
+	"access-denied":      {"", "denied", "sweep: access denied"},
+	"expired":            {"", "expired", "session expired"},
+	"throttled":          {"", "throttled", "sweep: throttled"},
 }
 
 // unmodeledWord is what a row shows for a class a9s does not name itself: a

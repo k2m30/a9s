@@ -410,7 +410,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			_, region := c.session.CurrentPair()
 			intents = append(intents, AppendErrorHistoryIntent{
 				Time:    time.Now(),
-				Message: fmt.Sprintf("%s: service not available in region %s", msg.ResourceType, region),
+				Message: fmt.Sprintf("%s: %s (%s)", msg.ResourceType, awsclient.CauseOf(msg.Err), region),
 			})
 		default:
 			intents = append(intents, FlashIntent{

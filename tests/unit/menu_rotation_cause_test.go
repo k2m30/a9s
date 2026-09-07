@@ -167,9 +167,10 @@ func TestEnrichmentFailureFlash_CarriesCauseNotRawError(t *testing.T) {
 	}
 }
 
-// timeoutShapedErr / transportShapedErr are the two non-API error classes a
-// probe or enricher hits: a request that ran out of time, and one that never
-// reached a service endpoint.
+// timeoutShapedErr, regionGapErr and refusedTransportErr are the three non-API
+// error shapes a probe or enricher hits: a request that ran out of time, an
+// endpoint whose DNS does not resolve because the region does not offer the
+// service, and one that resolved but refused the connection.
 func timeoutShapedErr() error {
 	return &smithy.OperationError{
 		ServiceID: "EC2", OperationName: "DescribeInstances",
@@ -177,7 +178,7 @@ func timeoutShapedErr() error {
 	}
 }
 
-func transportShapedErr() error {
+func regionGapErr() error {
 	return &smithy.OperationError{
 		ServiceID: "CodeArtifact", OperationName: "ListRepositories",
 		Err: &url.Error{Op: "Post", URL: "https://codeartifact.eu-central-2.amazonaws.com/",
@@ -190,9 +191,10 @@ func transportShapedErr() error {
 // error class is — it was previously stripped only for API errors.
 func TestAggregateFailures_StripsOperationPrefixForEveryClass(t *testing.T) {
 	for name, err := range map[string]error{
-		"timeout":   timeoutShapedErr(),
-		"transport": transportShapedErr(),
-		"api":       bareAWSError(),
+		"timeout":    timeoutShapedErr(),
+		"transport":  refusedTransportErr(),
+		"region-gap": regionGapErr(),
+		"api":        bareAWSError(),
 	} {
 		t.Run(name, func(t *testing.T) {
 			agg := awsclient.AggregateFailures("ec2 FetchByIDs", []string{"i-0abc: " + err.Error()}, 1)
@@ -247,14 +249,14 @@ func TestCauseOf_ClassWordsComeFromTheClassTable(t *testing.T) {
 	// supplies the phrase. The old assertion required "no such host" — the
 	// hostname it arrives with is exactly what must not reach the screen. Do
 	// not restore it.
-	cause := awsclient.CauseOf(transportShapedErr())
+	cause := awsclient.CauseOf(refusedTransportErr())
 	if strings.Contains(cause, "operation error") {
 		t.Errorf("CauseOf(transport) = %q keeps the SDK operation prefix", cause)
 	}
 	if cause != "transport failure" {
 		t.Errorf("CauseOf(transport) = %q, want the transport class's own phrase", cause)
 	}
-	if strings.Contains(cause, "codeartifact.eu-central-2.amazonaws.com") {
+	if strings.Contains(cause, "203.0.113.7") {
 		t.Errorf("CauseOf(transport) = %q carries the endpoint address", cause)
 	}
 	if awsclient.CauseOf(nil) != "" {
@@ -360,7 +362,10 @@ func TestErrClassTable_EveryClassHasARowWordAndASweepTitle(t *testing.T) {
 		if word == "" || word == "error" {
 			t.Errorf("class %q has no row word of its own (got %q) — it would read as a generic error on the menu row", class, word)
 		}
-		if awsclient.SweepTitleForWord(word) == "" {
+		// region-unavailable is the one class with no account-wide phrase: a
+		// whole account cannot be missing from its own region, so "every type
+		// failed this way" is unreachable for it.
+		if title := awsclient.SweepTitleForWord(word); title == "" && class != "region-unavailable" {
 			t.Errorf("class %q (row word %q) has no account-wide sweep title", class, word)
 		}
 	}
@@ -369,5 +374,49 @@ func TestErrClassTable_EveryClassHasARowWordAndASweepTitle(t *testing.T) {
 	}
 	if got := awsclient.RowWord("SomeUnmodeledAWSCode"); got != "error" {
 		t.Errorf("RowWord(unmodeled code) = %q, want %q", got, "error")
+	}
+}
+
+// TestRegionUnavailable_RowAndLogSayTheServiceIsNotHere pins the class a
+// service not offered in the selected region gets: the row says so in the
+// alias column and the error-history line says so in full, from one wording.
+// Before this it classed as a transport failure and the row read "transport"
+// while the log said the service was not available here.
+func TestRegionUnavailable_RowAndLogSayTheServiceIsNotHere(t *testing.T) {
+	err := regionGapErr()
+	if got, want := awsclient.ErrClass(err), "region-unavailable"; got != want {
+		t.Fatalf("ErrClass(region gap) = %q, want %q", got, want)
+	}
+	if got, want := awsclient.RowWord("region-unavailable"), "no service"; got != want {
+		t.Errorf("RowWord(region-unavailable) = %q, want %q", got, want)
+	}
+	cause := awsclient.CauseOf(err)
+	if !strings.Contains(cause, "not available in this region") {
+		t.Errorf("CauseOf(region gap) = %q, want the log line's own words", cause)
+	}
+
+	c, core := newTestControllerAndCore(t)
+	probeAllTypes(t, c, core, err, []string{"ec2"})
+	if got, want := menuEntryByShortName(t, c, "ec2").Cause, "no service"; got != want {
+		t.Errorf("menu row cause word = %q, want %q", got, want)
+	}
+	// The region gap is deliberately log-only — a service the account cannot
+	// use here is not a banner — so the rendered claim is the error-history
+	// line, which must carry the same words as the row's class and the region.
+	lines := c.ErrorHistoryLines()
+	if len(lines) == 0 {
+		t.Fatal("a region gap logged nothing — the operator is told nothing")
+	}
+	line := lines[0]
+	if !strings.Contains(line, cause) {
+		t.Errorf("error-history line %q does not carry the cause %q the row's word stands for", line, cause)
+	}
+	if !strings.Contains(line, "eu-west-1") && !strings.Contains(line, "us-east-1") {
+		t.Errorf("error-history line %q does not name the region", line)
+	}
+	for _, banned := range []string{"https://", "codeartifact.eu-central-2.amazonaws.com", "operation error"} {
+		if strings.Contains(line, banned) {
+			t.Errorf("error-history line %q carries %q", line, banned)
+		}
 	}
 }

@@ -4,8 +4,8 @@ package unit
 // 2026-07-14: CodeArtifact does not exist in eu-central-2; its endpoint DNS
 // does not resolve). The classifier must be narrow — only DNS not-found
 // qualifies — and the availability handler must render the plain-language
-// "service not available in region" line in the `!` error log with NO
-// blocking banner.
+// plain-language "service not available" line in the `!` error log, worded
+// once in the class table, with NO blocking banner.
 
 import (
 	"errors"
@@ -87,8 +87,16 @@ func TestHandleAvailabilityChecked_RegionGapLogsPlainLanguage(t *testing.T) {
 		}
 	}
 	logView := stripANSI(rootViewContent(logModel))
-	if !strings.Contains(logView, "service not available in region") {
-		t.Errorf("`!` error log must carry the plain-language region-gap line; got view:\n%s", logView)
+	// The phrase moved into the class table (task menu row 4: the region gap
+	// is a class of its own, and its cause is worded once so the menu row's
+	// "no service" and this line cannot drift). Read it from the table rather
+	// than restoring the old literal, which would pin the wording in a second
+	// place — the thing the row removed.
+	if want := awsclient.CauseOf(sdkStyleDNSNotFound()); !strings.Contains(logView, want) {
+		t.Errorf("`!` error log must carry the plain-language region-gap line %q; got view:\n%s", want, logView)
+	}
+	if !strings.Contains(logView, "us-east-1") {
+		t.Errorf("`!` error log must still name the region; got view:\n%s", logView)
 	}
 	if strings.Contains(logView, "no such host") {
 		t.Errorf("`!` error log must not carry raw DNS jargon for a region gap; got view:\n%s", logView)

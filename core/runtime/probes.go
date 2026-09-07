@@ -821,7 +821,7 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 					// — the service is not offered here. Plain language,
 					// log-only (the operator can't fix DNS jargon).
 					_, region := c.session.CurrentPair()
-					softFailures = append(softFailures, fmt.Sprintf("%s: service not available in region %s", shortName, region))
+					softFailures = append(softFailures, fmt.Sprintf("%s: %s (%s)", shortName, awsclient.CauseOf(err), region))
 					continue
 				}
 				failures = append(failures, fmt.Sprintf("%s: %s", shortName, awsclient.CauseOf(err)))
