@@ -64,6 +64,22 @@ func newTestController(t *testing.T) *app.Controller {
 	return c
 }
 
+// newTestControllerForProfile is newTestController for a test whose subject is
+// the disk cache. The cache directory is keyed by the profile/region pair, so
+// a test that saves a type file and reads it back needs a pair of its own or
+// it reads a sibling subtest's rows. The registry is seeded with every
+// resource type, since such a test opens a real list.
+//
+// Same TempDir-before-Close ordering as newTestController, and for the same
+// reason — see its doc comment.
+func newTestControllerForProfile(t *testing.T, profile, region string) *app.Controller {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	c := app.New(runtime.Bootstrap(profile, region, resource.AllResourceTypes()))
+	t.Cleanup(c.Close)
+	return c
+}
+
 // =============================================================================
 // 1. ViewState JSON round-trip
 // =============================================================================

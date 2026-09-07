@@ -269,7 +269,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				for key, want := range wantByKey {
 					got, present := row.Fields[key]
 					if !present {
-						t.Errorf("%s: persisted Row.Fields missing key %q (column Path-backed, Key-less) after a FRESH live fetch with a satisfying RawStruct — MaterializeListFields never ran or its output was dropped before persistence", td.ShortName, key)
+						t.Errorf("%s: persisted Row.Fields missing key %q (column Path-backed, Key-less) after a FRESH live fetch with a satisfying RawStruct — neither materializer wrote it (app.MaterializeListFields on the render lane, runtime.saveFieldKey on the save lane) or its output was dropped before persistence", td.ShortName, key)
 						continue
 					}
 					if got != want {

@@ -79,6 +79,7 @@ import (
 // in the correct order — see the file-level doc comment for citations.
 var ccdBlessedHelpers = map[string]bool{
 	"newTestController":                 true,
+	"newTestControllerForProfile":       true, // app_controller_test.go — newTestController for a cache round-trip test, which needs a profile/region pair of its own so its type file is not a sibling's
 	"newTestControllerWithCore":         true,
 	"newTestControllerAndCore":          true,
 	"newRootSizedModel":                 true,

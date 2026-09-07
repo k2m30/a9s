@@ -26,7 +26,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
@@ -48,40 +47,32 @@ func colsReplayRows(shortName string, rows []cache.Row) []resource.Resource {
 	return out
 }
 
-// colsCellsByID indexes a rendered list body's cells by resource ID, so the
-// live frame and the replayed frame can be compared row for row regardless of
-// the order each was sorted into.
-func colsCellsByID(lb *app.ListBody) map[string][]string {
-	out := make(map[string][]string, len(lb.Rows))
+// colsRowsByID indexes a rendered list body by resource ID, so the live frame
+// and the replayed frame can be compared row for row regardless of the order
+// each was sorted into. The whole row, not just its cells: colour, severity
+// and the decorator are derived from Fields and Findings too, so a save that
+// changes what Fields carries can move a row's colour without moving a cell.
+func colsRowsByID(lb *app.ListBody) map[string]app.ListRow {
+	out := make(map[string]app.ListRow, len(lb.Rows))
 	for _, r := range lb.Rows {
-		out[r.ResourceID] = r.Cells
+		out[r.ResourceID] = r
 	}
 	return out
-}
-
-// colsCacheController builds a controller wired to a real per-profile cache
-// directory, so the list-open save lane actually writes a type file.
-func colsCacheController(t *testing.T, profile, region string) *app.Controller {
-	t.Helper()
-	ctrl := app.New(runtime.Bootstrap(profile, region, resource.AllResourceTypes()))
-	t.Cleanup(ctrl.Close)
-	return ctrl
 }
 
 // colsRoundTrip drains a type's demo rows through its own Wave-1 fetcher,
 // renders them, saves them through the controller's real list-open save lane,
 // reads the type file back off disk and renders that. It hands back the two
 // rendered frames indexed by resource ID plus the column titles they share.
-func colsRoundTrip(t *testing.T, td resource.ResourceTypeDef, profilePrefix string) (live, replay map[string][]string, titles []string) {
+func colsRoundTrip(t *testing.T, td resource.ResourceTypeDef, profilePrefix string) (live, replay map[string]app.ListRow, titles []string) {
 	t.Helper()
 	rows, ok := unit.DrainFixtures(t, td, demo.NewServiceClients())
 	if !ok || len(rows) == 0 {
 		t.Skipf("%s: no demo rows to drain", td.ShortName)
 	}
 
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	profile, region := profilePrefix+td.ShortName, "us-east-1"
-	ctrl := colsCacheController(t, profile, region)
+	ctrl := newTestControllerForProfile(t, profile, region)
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 
 	ctrl.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
@@ -104,7 +95,7 @@ func colsRoundTrip(t *testing.T, td resource.ResourceTypeDef, profilePrefix stri
 	for _, col := range replayBody.Columns {
 		titles = append(titles, col.Title)
 	}
-	return colsCellsByID(liveBody), colsCellsByID(replayBody), titles
+	return colsRowsByID(liveBody), colsRowsByID(replayBody), titles
 }
 
 // TestCols_CacheReplayRendersTheSameCellsAsTheLiveFetch closes the loop on the
@@ -118,26 +109,38 @@ func colsRoundTrip(t *testing.T, td resource.ResourceTypeDef, profilePrefix stri
 //
 // Real demo rows are drained through each type's own Wave-1 fetcher, saved
 // through the controller's real list-open save lane, read back off disk, and
-// rendered again through the same controller. Every cell must match.
+// rendered again through the same controller. Every cell must match, and so
+// must the colour, the severity and the decorator: those are derived from
+// Fields and Findings as well, so a save lane that changes which key holds a
+// column's value can repaint a row without moving one of its cells.
 func TestCols_CacheReplayRendersTheSameCellsAsTheLiveFetch(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
 		t.Run(td.ShortName, func(t *testing.T) {
-			liveCells, replayCells, titles := colsRoundTrip(t, td, "cols-replay-")
+			liveRows, replayRows, titles := colsRoundTrip(t, td, "cols-replay-")
 
-			for id, want := range liveCells {
-				got, present := replayCells[id]
+			for id, want := range liveRows {
+				got, present := replayRows[id]
 				if !present {
 					t.Errorf("%s: row %q vanished on the cache replay", td.ShortName, id)
 					continue
 				}
-				if len(got) != len(want) {
-					t.Errorf("%s: row %q renders %d cells live and %d on replay", td.ShortName, id, len(want), len(got))
+				if got.Color != want.Color {
+					t.Errorf("%s: row %q is coloured %q live and %q after a cache round trip", td.ShortName, id, want.Color, got.Color)
+				}
+				if got.Severity != want.Severity {
+					t.Errorf("%s: row %q has severity %q live and %q after a cache round trip", td.ShortName, id, want.Severity, got.Severity)
+				}
+				if got.Decorator != want.Decorator {
+					t.Errorf("%s: row %q is decorated %+v live and %+v after a cache round trip", td.ShortName, id, want.Decorator, got.Decorator)
+				}
+				if len(got.Cells) != len(want.Cells) {
+					t.Errorf("%s: row %q renders %d cells live and %d on replay", td.ShortName, id, len(want.Cells), len(got.Cells))
 					continue
 				}
-				for i := range want {
-					if got[i] != want[i] {
+				for i := range want.Cells {
+					if got.Cells[i] != want.Cells[i] {
 						t.Errorf("%s: row %q col[%d] %q renders %q live and %q after a cache round trip",
-							td.ShortName, id, i, titles[i], want[i], got[i])
+							td.ShortName, id, i, titles[i], want.Cells[i], got.Cells[i])
 					}
 				}
 			}
@@ -214,7 +217,7 @@ func TestReplay_ShadowedColumnKeepsItsLiveWordAfterARestart(t *testing.T) {
 			if td == nil {
 				t.Fatalf("%s is not a registered resource type", shortName)
 			}
-			liveCells, replayCells, titles := colsRoundTrip(t, *td, "replay-shadow-")
+			liveRows, replayRows, titles := colsRoundTrip(t, *td, "replay-shadow-")
 
 			for _, c := range cells {
 				idx := replayColumnIndex(titles, c.column)
@@ -222,17 +225,17 @@ func TestReplay_ShadowedColumnKeepsItsLiveWordAfterARestart(t *testing.T) {
 					t.Errorf("%s: no column titled %q in the rendered list", shortName, c.column)
 					continue
 				}
-				if row, ok := liveCells[c.id]; !ok || idx >= len(row) {
+				if row, ok := liveRows[c.id]; !ok || idx >= len(row.Cells) {
 					t.Errorf("%s: the live frame has no row %q", shortName, c.id)
-				} else if row[idx] != c.want {
+				} else if row.Cells[idx] != c.want {
 					t.Errorf("%s row %q col %q: the live fetch renders %q, want %q",
-						shortName, c.id, c.column, row[idx], c.want)
+						shortName, c.id, c.column, row.Cells[idx], c.want)
 				}
-				if row, ok := replayCells[c.id]; !ok || idx >= len(row) {
+				if row, ok := replayRows[c.id]; !ok || idx >= len(row.Cells) {
 					t.Errorf("%s: the replayed frame has no row %q", shortName, c.id)
-				} else if row[idx] != c.want {
+				} else if row.Cells[idx] != c.want {
 					t.Errorf("%s row %q col %q: after a restart it renders %q, want %q",
-						shortName, c.id, c.column, row[idx], c.want)
+						shortName, c.id, c.column, row.Cells[idx], c.want)
 				}
 			}
 		})
@@ -271,9 +274,8 @@ func TestReplay_SavedRowLeavesOneAnswerForAColumnTitle(t *testing.T) {
 				t.Skipf("%s: no demo rows to drain", td.ShortName)
 			}
 
-			t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 			profile, region := "replay-title-"+td.ShortName, "us-east-1"
-			ctrl := colsCacheController(t, profile, region)
+			ctrl := newTestControllerForProfile(t, profile, region)
 			ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 			ctrl.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
@@ -357,9 +359,8 @@ func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 			rows[0].Fields = fields
 			id := rows[0].ID
 
-			t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 			profile, region := "replay-keyed-"+td.ShortName, "us-east-1"
-			ctrl := colsCacheController(t, profile, region)
+			ctrl := newTestControllerForProfile(t, profile, region)
 			ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 			ctrl.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
@@ -383,5 +384,58 @@ func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 	}
 	if covered == 0 {
 		t.Fatal("no registered type resolves a non-status column with both a Key and a Path; the save lane's overwrite boundary is untested")
+	}
+}
+
+// TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord pins the
+// upgrade path. The disk schema version did not change, so the first start
+// after this fix reads type files the PREVIOUS build wrote, and those rows
+// carry both spellings of a multi-word column's title: the spaced one its save
+// lane materialized (holding the value that build's screen showed) and the
+// underscored one the fetcher wrote (holding the raw scalar).
+//
+// The cold-start paint renders those rows before any fetch lands, so the word
+// on screen has to be the one the previous run showed. Whichever spelling the
+// extraction cascade prefers, it has to prefer the one that survives on both
+// shapes of file: a file this build writes carries the underscored key only,
+// so looking for the spaced key first costs nothing there and is the only
+// reading that is right on a file the last build wrote.
+func TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord(t *testing.T) {
+	const shortName = "secrets"
+	td := resource.FindResourceType(shortName)
+	if td == nil {
+		t.Fatalf("%s is not a registered resource type", shortName)
+	}
+
+	ctrl := newTestControllerForProfile(t, "replay-legacy", "us-east-1")
+	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
+	ctrl.ApplyResourcesLoaded(shortName, []resource.Resource{{
+		ID:   "prod/app/legacy-cache-row",
+		Name: "prod/app/legacy-cache-row",
+		Type: shortName,
+		Fields: map[string]string{
+			"secret_name": "prod/app/legacy-cache-row",
+			// What the previous build's save lane left behind.
+			"last accessed": "2026-04-28 00:00",
+			// What its fetcher left beside it.
+			"last_accessed": "2026-04-28",
+		},
+	}}, nil, false)
+
+	body := ctrl.Snapshot().Body.List
+	if body == nil || len(body.Rows) != 1 {
+		t.Fatalf("the legacy row rendered no list body")
+	}
+	titles := make([]string, 0, len(body.Columns))
+	for _, col := range body.Columns {
+		titles = append(titles, col.Title)
+	}
+	idx := replayColumnIndex(titles, "Last Accessed")
+	if idx < 0 {
+		t.Fatal("no column titled \"Last Accessed\" in the rendered list")
+	}
+	if got := body.Rows[0].Cells[idx]; got != "2026-04-28 00:00" {
+		t.Errorf("a row from the previous build's cache renders Last Accessed as %q, want %q — the value that build's screen showed",
+			got, "2026-04-28 00:00")
 	}
 }
