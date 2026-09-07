@@ -346,6 +346,12 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 
 	// --- Step 5: persisted file must carry every renderable column's field,
 	// findings, and correct count/exact/issues ---
+	//
+	// The keys below are the underscored spelling on purpose. The spec's row 5
+	// leaves exactly one Fields key per column title, written under the
+	// spelling the extraction cascade reads first; the spaced spelling these
+	// assertions used to name was the second, colliding key that made a
+	// replayed cell depend on Go's map order. Do not restore it.
 	tf := readTypeFile(t, profile, region)
 	if !tf.HasResources {
 		t.Error("persisted TypeFile.HasResources = false, want true")
@@ -363,7 +369,7 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	if !ok {
 		t.Fatal("persisted Rows missing bucket-s1-1")
 	}
-	for _, key := range []string{"bucket name", "region", "creation date"} {
+	for _, key := range []string{"bucket_name", "region", "creation_date"} {
 		if v, present := r1.Fields[key]; !present || v == "" {
 			t.Errorf("persisted bucket-s1-1.Fields[%q] = %q (present=%v), want a non-empty materialized value", key, v, present)
 		}
@@ -668,7 +674,7 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	if !ok {
 		t.Fatal("persisted Rows missing bucket-s3-added")
 	}
-	for _, key := range []string{"bucket name", "region", "creation date"} {
+	for _, key := range []string{"bucket_name", "region", "creation_date"} {
 		if v, present := addedRow.Fields[key]; !present || v == "" {
 			t.Errorf("persisted bucket-s3-added.Fields[%q] = %q (present=%v), want a non-empty materialized value", key, v, present)
 		}
@@ -721,8 +727,8 @@ func TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged(t *testing.T) {
 	resource.CleanupPaginatedForTest(lifecycleShortName)
 
 	beforeTF := readTypeFile(t, profile, region)
-	if _, present := beforeTF.Rows[0].Fields["bucket owner"]; present {
-		t.Fatal("fixture assumption broken — 'bucket owner' must not be a field the OLD config ever materialized")
+	if _, present := beforeTF.Rows[0].Fields["bucket_owner"]; present {
+		t.Fatal("fixture assumption broken — 'bucket_owner' must not be a field the OLD config ever materialized")
 	}
 
 	// --- Write a NEW view config: reorder (Status before Bucket Name),
@@ -810,7 +816,7 @@ detail:
 
 	// Step 2: verify fetch lands with fresh RawStruct carrying the new
 	// column's source field (OwnerName) — the new column must fill in and
-	// persist. The old-config gap (no "bucket owner" key on the seeded row)
+	// persist. The old-config gap (no "bucket_owner" key on the seeded row)
 	// heals on this first live re-fetch, exactly like C1's one-cycle-heal
 	// contract for any other Path-backed/Key-less gap.
 	freshWithOwner := []resource.Resource{
@@ -852,11 +858,11 @@ detail:
 		t.Fatalf("persisted TypeFile.Rows = %d after the verify+save, want 1", len(afterTF.Rows))
 	}
 	got := afterTF.Rows[0]
-	if v, present := got.Fields["bucket owner"]; !present || v != "team-platform" {
-		t.Errorf(`persisted bucket-s4-1.Fields["bucket owner"] = %q (present=%v), want "team-platform" — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present)
+	if v, present := got.Fields["bucket_owner"]; !present || v != "team-platform" {
+		t.Errorf(`persisted bucket-s4-1.Fields["bucket_owner"] = %q (present=%v), want "team-platform" — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present)
 	}
-	if v, present := got.Fields["bucket name"]; !present || v == "" {
-		t.Errorf(`persisted bucket-s4-1.Fields["bucket name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
+	if v, present := got.Fields["bucket_name"]; !present || v == "" {
+		t.Errorf(`persisted bucket-s4-1.Fields["bucket_name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
 	}
 }
 

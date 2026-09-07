@@ -42,11 +42,12 @@ const SchemaVersion = 2
 // the type's TypeFile so a cold start can seed the list screen with real
 // cells and issue markers before any live fetch completes.
 //
-// NO RawStruct, color, glyph, or status text is carried on disk (C6): Fields
-// must already contain every value a column needs (see
-// app.MaterializeListFields, which runs before a page is cached), and
+// NO RawStruct, color, glyph, or status text is carried on disk (C6):
 // colors/glyphs/status are derived at render time from Fields + Findings by
-// the same classification rules live data uses.
+// the same classification rules live data uses. What Fields carries for a
+// column is decided by runtime.saveFieldKey, the one place that knows the
+// render cascade's precedence: the value the live cell showed, under the
+// single key the replayed row reads it back from.
 type Row struct {
 	ID       string            `yaml:"id"`
 	Name     string            `yaml:"name,omitempty"`

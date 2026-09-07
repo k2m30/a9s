@@ -238,8 +238,9 @@ func stampFindingFirstSeen(oldRows, newRows []cache.Row, now time.Time) ([]cache
 // baselineWave2FieldKey is always eligible to carry alongside a carried
 // Wave-2 Finding, independent of catalog registration: it is the universal
 // enrichment-derived cell every list/detail render classifies a row's
-// status from (see materializeResourceFields' explicit "status" exclusion —
-// this key is always Wave-2/render-derived, never Wave-1-materialized), so a
+// status from (saveFieldKey only ever fills it from the struct when no
+// Fields key the status cascade reads holds anything, and a Finding still
+// outranks it at render), so a
 // row whose type is not (yet) registered with an IssueEnricherFieldKeys
 // entry — or whose catalog entry simply omits "status" — must still get its
 // carried Finding's accompanying status text, or the carried glyph would

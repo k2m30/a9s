@@ -13,7 +13,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"strings"
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -409,27 +408,20 @@ func (c *Core) SaveAvailabilityCache(
 
 // materializeListFieldsForSave resolves shortName's list column set (via
 // Core.saveColumns when the renderer registered one, else the built-in-
-// defaults-only cascade in resolveSaveColumns) and, for every Path-backed
-// column whose Fields entry is still empty, extracts the scalar from
-// RawStruct and writes it into Fields under the column's resolved key (Key
-// when set, else the lowercased Title). Owner decision: "для всех
-// ресурсов должны быть закешированы все колонки, которые могут меняться" —
-// every renderable list column must be cached, driven by the column CONFIG,
-// no hardcode. Shared by both save lanes via SaveTypeRows (task #17 wave 1
-// stage 4: one materializer for the list-open lane and the sweep lane).
+// defaults-only cascade in resolveSaveColumns) and writes each Path-backed
+// column's RawStruct scalar into Fields per saveFieldKey. Owner decision:
+// "для всех ресурсов должны быть закешированы все колонки, которые могут
+// меняться" — every renderable list column must be cached, driven by the
+// column CONFIG, no hardcode. Shared by both save lanes via SaveTypeRows
+// (task #17 wave 1 stage 4: one materializer for the list-open lane and the
+// sweep lane).
 //
-// Unlike the render-time app.MaterializeListFields (which the render path
-// uses and intentionally skips every Key-based column, since a live
-// Fields-map lookup or a Wave-2 override already covers them while RawStruct
-// is still present), this SAVE-seam pass also materializes a Path-backed
-// column that additionally declares a Key: cache.Row never carries RawStruct,
-// so a Key-based column whose value has so far only ever come from a
-// RawStruct fallback needs the exact same one-time materialization a pure
-// Path-only column needs, or it goes blank once the row is replayed from
-// disk. The status/lifecycle column is always excluded regardless of Path —
-// its cell is derived at render time from Findings, so persisting a
-// RawStruct-derived value for it would be actively wrong once Findings
-// disagree (mirrors app.materializeAllPathFields's exclusion).
+// This is the SAVE seam, so it goes further than the render-time
+// app.MaterializeListFields: cache.Row never carries RawStruct, so a column
+// whose live cell came from the struct has to leave that exact value behind
+// under the key the replayed row reads, or the restart shows something the
+// screen never did. saveFieldKey holds the whole rule, including which
+// columns the save must NOT touch.
 //
 // A resource whose RawStruct is nil (e.g. a cache-replay round-trip) passes
 // through unchanged.
@@ -468,9 +460,9 @@ func resolveSaveColumns(shortName string) []config.ListColumn {
 }
 
 // materializeResourceFields is the single-resource core of
-// materializeListFieldsForSave: every Path-backed column (Key-based or not,
-// excluding the status/lifecycle column) whose resolved Fields key is not
-// already populated gets its RawStruct scalar written in.
+// materializeListFieldsForSave: for every Path-backed column it writes the
+// RawStruct scalar into Fields under the key saveFieldKey names, when
+// saveFieldKey says the save owes that column a value at all.
 func materializeResourceFields(r resource.Resource, columns []config.ListColumn, lifecycleKey string) resource.Resource {
 	if r.RawStruct == nil {
 		return r
@@ -481,17 +473,8 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 		if col.Path == "" {
 			continue
 		}
-		if col.Key == "status" || col.Key == lifecycleKey {
-			continue
-		}
-		key := col.Key
-		if key == "" {
-			key = strings.ToLower(col.Title)
-		}
-		if key == "" {
-			continue
-		}
-		if v, ok := out.Fields[key]; ok && v != "" {
+		key, owed := saveFieldKey(col, out.Fields, lifecycleKey)
+		if !owed || key == "" {
 			continue
 		}
 		val := fieldpath.ExtractScalar(out.RawStruct, col.Path)
@@ -507,6 +490,43 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 		out.Fields[key] = val
 	}
 	return out
+}
+
+// saveFieldKey answers, for one Path-backed column, the two questions the
+// save lane has: under which Fields key does the replayed row read this
+// column, and does the SDK struct owe it a value there.
+//
+// One rule decides both: persist the value the LIVE cascade chose, under the
+// key the replay cascade reads first. app.ExtractCellValue is that cascade,
+// and its precedence differs by column shape:
+//
+//   - Status/lifecycle column: the live cell comes from Findings, then the
+//     lifecycle key, then "status", then the column's own key, and only then
+//     from the struct. So the struct value is owed only when every one of
+//     those Fields keys is empty, and it belongs under the lifecycle key —
+//     the first one read back. Findings still win at render, so persisting
+//     it cannot outrank a later disagreeing finding.
+//   - Keyed non-status column: the live cell is Fields[Key] whenever that is
+//     populated, so a value already there is what the screen showed and the
+//     struct must not replace it. A Wave-2 enrichment result is the everyday
+//     case, and no struct carries it.
+//   - Key-less column: the live cell is the struct scalar, which outranks
+//     anything in Fields. So it overwrites whatever the fetcher left under
+//     the title's key — otherwise the restart renders the fetcher's spelling
+//     of a value the screen never showed.
+func saveFieldKey(col config.ListColumn, fields map[string]string, lifecycleKey string) (string, bool) {
+	if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
+		for _, k := range [3]string{lifecycleKey, "status", col.Key} {
+			if k != "" && fields[k] != "" {
+				return "", false
+			}
+		}
+		return lifecycleKey, true
+	}
+	if col.Key != "" {
+		return col.Key, fields[col.Key] == ""
+	}
+	return config.TitleFieldKey(col.Title), true
 }
 
 // SaveResourceListCache persists rows for one resource type's canonical

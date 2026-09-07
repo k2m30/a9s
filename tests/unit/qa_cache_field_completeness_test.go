@@ -50,6 +50,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -287,7 +288,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				// (gapKey/targets[0]). RawStruct is never persisted (C6), so
 				// this gap is not locally reconstructable — the only way it
 				// can close is a genuine live re-fetch (steps 3-4).
-				gapKey := strings.ToLower(targets[0].Title)
+				gapKey := config.TitleFieldKey(targets[0].Title)
 				fields := map[string]string{"unrelated-preexisting-field": "kept"}
 				seedStore := cache.LoadDirForTest(profile, region)
 				seedStore.Put(td.ShortName, cache.TypeFile{
@@ -411,7 +412,13 @@ func buildMultiColumnRawStruct(cols []app.ColumnDef) (any, map[string]string) {
 			leafByPath[c.Path] = leafValue
 			root.insert(c.Path, leafValue)
 		}
-		key := strings.ToLower(c.Title)
+		// config.TitleFieldKey, not a second copy of the spelling rule:
+		// the spec's row 5 leaves exactly one Fields key per column title,
+		// and the save lane writes it under the spelling the extraction
+		// cascade reads first. Asserting the spaced spelling here pinned the
+		// collision that made a replayed cell depend on map order; do not
+		// restore it.
+		key := config.TitleFieldKey(c.Title)
 		want[key] = leafValue
 	}
 	return root.buildValue().Interface(), want

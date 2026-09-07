@@ -15,8 +15,8 @@ import (
 // MaterializeListFields returns a copy of r with Fields populated for every
 // Path-based, Key-less column in columns, extracting the scalar via
 // fieldpath.ExtractScalar(r.RawStruct, col.Path) and writing it under the
-// column's resolved Fields key (col.Key when non-empty, else the lowercased
-// Title). This is the generic render-sufficiency step Contract B requires:
+// column's title key (config.TitleFieldKey — the one spelling the extraction
+// cascade reads first). This is the generic render-sufficiency step Contract B requires:
 // running it once, before a fetch result is cached or a screen's rows are
 // stored, means a later cache replay with RawStruct stripped renders
 // identical cells (extractListCells's key-based Fields lookup finds the
@@ -40,7 +40,7 @@ func MaterializeListFields(r resource.Resource, columns []ColumnDef) resource.Re
 		if col.Path == "" || col.Key != "" {
 			continue
 		}
-		key := strings.ToLower(col.Title)
+		key := config.TitleFieldKey(col.Title)
 		if key == "" {
 			continue
 		}
@@ -148,9 +148,7 @@ func lookupListDecorator(decs map[string]func(resource.Resource, string) string,
 	if lifecycleKey == "" {
 		lifecycleKey = "state"
 	}
-	isStatusCol := col.Key == "status" || col.Key == lifecycleKey ||
-		strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")
-	if isStatusCol {
+	if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
 		if d, ok := decs[lifecycleKey]; ok {
 			return d
 		}
@@ -182,18 +180,14 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 	// must route through the same domain.StatusPhrase + HumanizeStatusPhrase
 	// chokepoint — otherwise it falls through to the raw fieldpath/Fields
 	// value further down and a raw AWS enum (e.g. "FAILED", "STALE")
-	// reaches the screen. The Key==status/lifecycleKey checks are kept for
-	// defensive parity with columns whose Title doesn't literally say
-	// "Status"/"State". The title check mirrors resolveListStatusCol's own
-	// cascade so the two functions never disagree about which column is
-	// the status column.
+	// reaches the screen. The predicate lives in config.IsStatusColumn, which
+	// the decorator lookup and the cache save lane also ask, so none of them
+	// can disagree about which column this is.
 	lifecycleKey := "state"
 	if td != nil && td.LifecycleKey != "" {
 		lifecycleKey = td.LifecycleKey
 	}
-	isStatusCol := col.Key == "status" || col.Key == lifecycleKey ||
-		strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")
-	if isStatusCol {
+	if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
 		if phrase := domain.StatusPhrase(r.Findings); phrase != "" {
 			return phrase
 		}
@@ -239,13 +233,15 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 		}
 	}
 
-	// Title-match loop: lowercased title and space→underscore variant against Fields keys.
-	titleLower := strings.ToLower(col.Title)
-	titleUnder := strings.ReplaceAll(titleLower, " ", "_")
-	for k, v := range r.Fields {
-		kl := strings.ToLower(k)
-		if kl == titleLower || kl == titleUnder {
-			return humanizeListCell(col, v)
+	// Title match, as an ordered preference: the underscored spelling — what
+	// fetchers write and the only one the save lane persists under — and then
+	// the spaced one. Accepting either inside a single `range` over Fields
+	// makes the cell depend on map order whenever both are present.
+	for _, want := range [2]string{config.TitleFieldKey(col.Title), strings.ToLower(col.Title)} {
+		for k, v := range r.Fields {
+			if strings.EqualFold(k, want) {
+				return humanizeListCell(col, v)
+			}
 		}
 	}
 

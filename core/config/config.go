@@ -117,6 +117,32 @@ type ListColumn struct {
 	Humanize bool `yaml:"humanize,omitempty"`
 }
 
+// TitleFieldKey is the single Fields-map spelling a column title answers to:
+// lowercased, spaces as underscores. Fetchers already write snake_case keys,
+// so a multi-word title resolves to the spelling the fetcher used instead of
+// putting a second one beside it — a row that answers to one title two ways
+// renders whichever key Go's map iteration hands back first, which is a
+// different list on two consecutive starts.
+func TitleFieldKey(title string) string {
+	return strings.ReplaceAll(strings.ToLower(title), " ", "_")
+}
+
+// IsStatusColumn reports whether a list column is the status/lifecycle
+// column, whose cell is derived from Findings first and only then from a
+// stored value. A column whose Title is "Status" or "State" qualifies
+// whatever its Key, because that is how the operator reads it; the Key
+// checks cover the types whose status column is titled something else.
+//
+// The render cascade, its decorator lookup and the cache save lane all ask
+// here, so none of the three can disagree about which column this is.
+func IsStatusColumn(key, title, lifecycleKey string) bool {
+	if lifecycleKey == "" {
+		lifecycleKey = "state"
+	}
+	return key == "status" || key == lifecycleKey ||
+		strings.EqualFold(title, "status") || strings.EqualFold(title, "state")
+}
+
 // UnmarshalYAML implements custom unmarshaling for ViewDef to preserve
 // the ordering of list columns from the YAML map.
 func (v *ViewDef) UnmarshalYAML(value *yaml.Node) error {
