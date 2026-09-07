@@ -162,7 +162,7 @@ No Wave 2 signals.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-The golden doc's Wave 3 cell is `None` for this resource. Nothing to copy.
+Nothing is recorded out of scope for `alarm`. Nothing to copy.
 
 ## 4. Issue Visualization
 

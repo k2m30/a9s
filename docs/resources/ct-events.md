@@ -130,19 +130,38 @@ Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `ct-ev
 
 ### 3.1 Wave 1 — zero extra API calls
 
-One bullet per distinct signal. Keep AWS field names verbatim.
+One bullet per distinct signal, in the order they are tried: the first that
+matches is the one the event reports. Every field comes from the
+`LookupEvents` response or from the `Event.CloudTrailEvent` JSON parsed on it;
+no extra API call is made.
 
-- **Signal**: `Event.ReadOnly == "false"` (field is a string on the SDK `Event` shape) — isolates write-attempts vs read-only calls. On its own this is not a state-bucket verdict, it is a **filter facet** used by the other signals and by the operator's query; for a write-attempt whose `errorCode` is empty the event is Healthy.
-  - **State bucket**: Healthy (write succeeded).
-  - **How obtained**: `Event.ReadOnly` field on the `LookupEvents` response.
-
-- **Signal**: parsed `errorCode` present in `Event.CloudTrailEvent` JSON → a single failed API call.
-  - **State bucket**: Warning.
-  - **How obtained**: parse `Event.CloudTrailEvent` (raw JSON string) on the list response and read the top-level `errorCode` key. No extra API call.
-
-- **Signal**: count of events with `errorCode == "AccessDenied"` AND `ReadOnly == "false"` in the last hour, grouped by principal (`userIdentity.arn`) > N → a credential being brute-force-probed against the write surface.
+- **Signal**: an `errorCode` on the event → AWS rejected the call.
   - **State bucket**: Broken.
-  - **How obtained**: client-side aggregation over the already-loaded `LookupEvents` page. No extra API call. Threshold `N` — see §6 `a9s-devops consultation`.
+  - **How obtained**: the top-level `errorCode` key of the parsed event; the code is humanized into the cause text.
+
+- **Signal**: the call deletes or tears something down.
+  - **State bucket**: Broken.
+  - **How obtained**: the event name classifies as destructive.
+
+- **Signal**: the call changed configuration.
+  - **State bucket**: Warning.
+  - **How obtained**: the event name classifies as a write.
+
+- **Signal**: the account root user made the call.
+  - **State bucket**: Warning.
+  - **How obtained**: `userIdentity.type == "Root"` on the parsed event.
+
+- **Signal**: the caller's account differs from the account that recorded the event.
+  - **State bucket**: Warning.
+  - **How obtained**: `userIdentity.accountId` compared with `recipientAccountId`.
+
+- **Signal**: the call reads secret or parameter material.
+  - **State bucket**: Warning.
+  - **How obtained**: `<service>:<eventName>` matched against the sensitive-read list in `core/aws/ct_events.go`; the event name goes into the cause text.
+
+- **Signal**: anything else.
+  - **State bucket**: Dim.
+  - **How obtained**: no rule above matched, so the event is routine.
 
 ### 3.2 Wave 2 — bounded extra API calls
 

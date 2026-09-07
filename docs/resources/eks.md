@@ -112,16 +112,13 @@ Transcribed from `docs/attention-signals.md § Signals § CONTAINERS` row `eks`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `ListClusters` returns cluster name strings only.
-
-### 3.2 Wave 2 — bounded extra API calls
+`ListClusters` returns cluster name strings only, so the fetcher reads each
+cluster with `DescribeCluster` before it builds the row. Every signal below is
+computed from that response as the row is built, with no second pass — a
+cluster that is `ACTIVE` and reports nothing else raises no signal and renders
+green and blank.
 
 One bullet per distinct signal.
-
-- **Signal**: `Status == ACTIVE`.
-  - **State bucket**: Healthy.
-  - **API call**: `DescribeCluster` per cluster — one call per cluster.
-  - **Cost shape**: per-resource.
 
 - **Signal**: `Status == CREATING`.
   - **State bucket**: Warning.
@@ -149,9 +146,13 @@ One bullet per distinct signal.
   - **Cost shape**: per-resource.
 
 - **Signal**: `Health.Issues[]` non-empty.
-  - **State bucket**: Broken.
-  - **API call**: `DescribeCluster` per cluster (same call — `Health` is on the Describe shape). Each `ClusterIssue` carries `Code` (enum, e.g. `AccessDenied`), `Message` (human sentence), and `ResourceIds[]`.
+  - **State bucket**: Warning.
+  - **API call**: `DescribeCluster` per cluster (same call — `Health` is on the Describe shape). Each `ClusterIssue` carries `Code` (enum, e.g. `AccessDenied`), `Message` (human sentence), and `ResourceIds[]`; every reported code becomes a row under the finding.
   - **Cost shape**: per-resource.
+
+### 3.2 Wave 2 — bounded extra API calls
+
+No Wave 2 signals: no enricher runs a second pass over a cluster.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -184,20 +185,20 @@ Wave → surface mapping:
 - **Wave 2 finding on a Healthy row, informational** → `~` glyph on green row. S3, S4, S5. No S1.
 - **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed, S4 deduplicates with existing cause, S5 carries the full sentence, S1 still counts if `!`.
 
-One row per signal from §3. All EKS signals are Wave 2 because `ListClusters` is opaque; the Describe pass sets the row color, so these behave like Wave 1 colors to the operator (yellow/red is the attention signal, S3 suppressed because the row is not green):
+One row per signal from §3. The fetcher's own `DescribeCluster` sets the row color, so every signal is Wave 1 and S3 is suppressed — the row is never green when one fires:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` |
-| `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
-| `Status == DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` |
-| `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending` |
-| `Status == FAILED` | 2 | Broken | n/a | S2, S4 | `failed` |
-| `Health.Issues[]` non-empty | 2 | Warning | n/a | S2, S4, S5 | `health issue` |
+| `Status == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `Status == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
+| `Status == DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `Status == PENDING` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `Status == FAILED` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `Health.Issues[]` non-empty | 1 | Warning | n/a | S2, S4, S5 | `health issue` |
 
 Notes:
 
-- No `!`-on-green case exists for EKS: every Wave 2 signal moves the row off green (Warning or Broken). The S1 count is driven by the Broken rows, `Status == FAILED` among them, under the standard "red rows bump the menu count" rule.
+- No `!`-on-green case exists for EKS: every signal moves the row off green (Warning or Broken). The S1 count is driven by the Broken rows, `Status == FAILED` among them, under the standard "red rows bump the menu count" rule.
 - `Health.Issues[]` can appear on an `ACTIVE` cluster (health is tracked independently of lifecycle state). When it does, the row moves to Warning — the health issue is the cause, and the `!`-on-green rule does not apply because the color already changed.
 - A failed cluster reads `failed` in the list; every health issue AWS reports for it is a supporting row in the detail view, which is where the codes are read. `types.Cluster` carries no `StatusReason`-style field to name a cause in the list.
 

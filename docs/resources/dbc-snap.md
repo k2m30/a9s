@@ -122,11 +122,15 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals.
+- **Signal**: the snapshot's `restore` attribute lists the `all` group → **Broken** (`shared with all AWS accounts`).
+  - **State bucket**: Broken.
+  - **API call**: `DescribeDBClusterSnapshotAttributes` — one call per snapshot.
+  - **Cost shape**: per-resource.
+  - **How obtained**: `core/aws/dbc_snap_issue_enrichment.go` reads the `restore` attribute and flags the snapshot when the shared list holds `all`.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-- OUT OF SCOPE: `DescribeDBClusterSnapshotAttributes` per snapshot (public-snapshot detection).
+Nothing is recorded out of scope for `dbc-snap`.
 
 ## 4. Issue Visualization
 
@@ -184,7 +188,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 5. Out of Scope
 
-- All §3.3 Wave 3 signals (copied above).
+- Shared-account detail beyond "shared with all AWS accounts" — the `restore` attribute also names individual account IDs a snapshot is shared with; a9s reports only the public case.
 - `vpc` as anything more than orienting context — the snapshot records the source-cluster VPC, but restore-time VPC selection is independent. a9s-devops persona: possible=yes (field is on the SDK shape), worth=weak (marginal pivot). Kept because the field is free on the list response.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
@@ -195,7 +199,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 
 - a9s golden doc — related-panel contract for `dbc-snap` — `docs/related-resources.md § dbc-snap` (targets `backup`, `ct-events`, `dbc`, `kms`, `vpc`; per-type contract table row).
 - a9s golden doc — Wave 1 signals (`Status` buckets, manual-age cost rule, automated cross-ref with `dbc` retention) — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap`.
-- a9s golden doc — the deferred `DescribeDBClusterSnapshotAttributes` read — `docs/attention-signals.md § Not yet implemented`.
+- The public-snapshot finding and its `DescribeDBClusterSnapshotAttributes` read — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `dbc-snap`; `core/aws/dbc_snap_issue_enrichment.go`.
 - a9s golden doc — read-only invariant — `docs/architecture.md § What is a9s?`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md § Policy`.
 - AWS Go SDK v2 — `DBClusterIdentifier`, `KmsKeyId`, `VpcId`, `Status`, `SnapshotType`, `SnapshotCreateTime`, `StorageEncrypted` fields — `AWS SDK Go v2 — docdb/types.DBClusterSnapshot`.

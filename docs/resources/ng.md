@@ -121,7 +121,7 @@ One bullet per distinct signal. Each signal is derived from the `DescribeNodegro
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-Copied verbatim from the `ng` row's Wave 3 cell. Documented so the reader knows what is intentionally excluded from a9s; these are not to be implemented.
+The reads a9s does not make for a node group, listed on `docs/attention-signals.md § Not yet implemented`. They are here so the reader knows what is intentionally excluded; they are not to be implemented.
 
 - OUT OF SCOPE: AMI release drift.
 - OUT OF SCOPE: `ListUpdates` per node group.

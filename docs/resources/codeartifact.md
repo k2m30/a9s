@@ -53,20 +53,18 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `codeartifa
 
 One bullet per distinct signal.
 
-- **Signal**: empty repository (no packages) with age >30 days → **Warning** (unused registry).
-  - **State bucket**: Warning.
-  - **API call**: `ListPackages(maxResults=1)` — one call per repository.
-  - **Cost shape**: per-resource.
-  - **How obtained**: `ListPackages(repository=Name, domain=DomainName, domainOwner=DomainOwner, maxResults=1)`; if the returned `packages[]` is empty AND `now - RepositorySummary.CreatedTime > 30d`, the repo is classified unused. Citations: `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`; `AWS SDK Go v2 — codeartifact/types.PackageSummary` and `codeartifact/types.RepositorySummary § CreatedTime`.
+`ListPackages(repository=Name, domain=DomainName, domainOwner=DomainOwner,
+maxResults=1)` runs once per repository and fills the package count the detail
+view shows. It raises no finding: an empty registry is not reported (see §5).
 
-- **Signal**: the repository permissions policy has an Allow statement that grants to any principal with no restrictive condition → **`!` background concern** ("public access policy"). The policy is parsed and evaluated, not string-matched, so a wildcard principal written any legal way is caught and one scoped by a condition is not — `core/iampolicy/evaluate.go`.
-  - **State bucket**: Healthy + `!` background concern.
+- **Signal**: the repository permissions policy has an Allow statement that grants to any principal with no restrictive condition → **`public access policy`**. The policy is parsed and evaluated, not string-matched, so a wildcard principal written any legal way is caught and one scoped by a condition is not — `core/iampolicy/evaluate.go`.
+  - **State bucket**: Broken.
   - **API call**: `GetRepositoryPermissionsPolicy` — one call per repository. Implemented: `core/aws/codeartifact_issue_enrichment.go:100-132`.
   - **Cost shape**: per-resource.
   - **Why**: a publicly readable/writable CodeArtifact repository is a real supply-chain exposure (dependency-confusion and package-poisoning surface) that operators must see — a9s-devops (2026-07-05): possible=yes, worth=yes.
 
-- **Signal**: repository has no permissions policy at all → informational (`~`, "no permissions policy").
-  - **State bucket**: Healthy + `~` informational.
+- **Signal**: repository has no permissions policy at all → **`no permissions policy`**.
+  - **State bucket**: Warning.
   - **API call**: same `GetRepositoryPermissionsPolicy` call as above (a policy-not-found response yields this finding); no added cost.
   - **Cost shape**: per-resource.
 
@@ -104,21 +102,21 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| empty repo, age >30d (unused registry) | 2 | Warning | `~` | S3, S4, S5 | `empty, created 47d ago` |
-| policy grants to any principal | 2 | Healthy | `!` | S1, S3, S4, S5 | `public access policy` |
-| no permissions policy | 2 | Healthy | `~` | S3, S4, S5 | `no permissions policy` |
+| policy grants to any principal | 2 | Broken | n/a | S1, S2, S4, S5 | `public access policy` |
+| no permissions policy | 2 | Warning | n/a | S2, S4, S5 | `no permissions policy` |
 
-Rationale for severity: an empty-but-configured registry is a housekeeping concern, not an outage — nothing is broken, the operator may simply have provisioned it ahead of an upcoming workload. `~` (informational) matches the "worth knowing, no immediate action" rule and keeps it out of the menu `issues:N` count so the count stays focused on real breakage. Classified per the `docs/attention-signals.md § Signals § CI/CD` row `codeartifact`. — a9s-devops: possible=yes, worth=yes; an unused private registry is the kind of thing ops notices on a quarterly clean-up pass, not at 3am — informational severity is correct.
+Rationale for severity: a repository anyone can reach is a live supply-chain exposure, so it reads Broken and bumps the menu count. A repository with no policy at all is open to its whole domain but no further, which is worth knowing on a review pass rather than at 3am, so it reads Warning.
 
-Note: `~` attaches only to Healthy (green) rows. `codeartifact` has no Wave 1 signals, so every repo's row starts green; the `~` glyph is therefore always applicable when the Wave 2 unused-repo finding fires.
+Note: both findings colour the row, so neither carries a `~` or `!` glyph — the glyph is for a finding that leaves the row green, and `codeartifact` has none.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a `~ my-npm-repo` row with `empty, created 47d ago` in the Status column fully conveys the finding in place; the operator can ignore it during incident triage and revisit during the next clean-up, without ever opening detail. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red `my-npm-repo` row reading `public access policy` says the repository is reachable by anyone, and a yellow one reading `no permissions policy` says it is open to the domain; both name the exposure in the Status column. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above): `DescribeRepository` encryption check.
+- Empty repository older than 30 days (unused registry) — a9s reads the package count but reports nothing for it; the condition is recorded on `docs/attention-signals.md § Not yet implemented`.
 - CodeArtifact-to-ACM, CodeArtifact-to-Kinesis, CodeArtifact-to-Lambda, CodeArtifact-to-Logs, CodeArtifact-to-R53, CodeArtifact-to-WAF pivots — deliberately excluded in `docs/related-resources.md § Deliberate exclusions` (no direct AWS API integration exists for any of these paths).
 - CodeArtifact-to-CodeBuild and CodeArtifact-to-IAM-Role pivots — excluded as "heuristic-only / indirect" in `docs/related-resources.md § Deliberate exclusions`.
 - `~` glyph on yellow/red/dim rows (not applicable here because `codeartifact` has no Wave 1 signals, but noted for completeness).

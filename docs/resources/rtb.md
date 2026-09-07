@@ -102,7 +102,7 @@ No Wave 2 signals.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-`docs/attention-signals.md § Not yet implemented` lists nothing for `rtb`. There are no out-of-scope signals to copy.
+Nothing is recorded out of scope for `rtb`. There is nothing to copy.
 
 ## 4. Issue Visualization
 

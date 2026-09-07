@@ -122,7 +122,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-The golden doc's Wave 3 cell is `None` for this resource. Nothing to copy.
+Nothing is recorded out of scope for `acm`. Nothing to copy.
 
 ## 4. Issue Visualization
 

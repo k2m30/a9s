@@ -754,7 +754,7 @@ Wave 1 and Wave 2 conditions the designs specify and no fetcher or enricher emit
 - `tgw` — attachment `rejected`/`rejecting`.
 - `eni` — requester-managed interface whose description references a deleted service.
 - `sqs` — queue depth over threshold, depth rising unbounded, oldest message older than `VisibilityTimeout` × 5, dead-letter queue holding messages.
-- `secrets` — rotation overdue by more than `AutomaticallyAfterDays` × 2 (rotation failing).
+- `secrets` — telling a secret whose rotation has been failing for more than two full intervals apart from one that has simply passed its next rotation date.
 - `ssm` — `Advanced` tier parameter unmodified for 90 days (cost).
 - `waf` — `DefaultAction==Allow` with zero rules.
 - `r53` — DNSSEC `SIGNING` with an inactive key-signing key on a public zone.

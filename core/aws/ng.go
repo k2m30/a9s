@@ -113,7 +113,13 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		Findings:  findings,
 		RawStruct: ng,
 	}
-	addWave1Rows(&r, CodeNGStateDegraded, issueRows...)
+	if len(issueRows) > 0 {
+		// The rows belong to whichever finding built them — degraded folds
+		// them into its state finding, ACTIVE-with-issues into the
+		// health-issue one. A row filed under a code the resource does not
+		// carry is never read.
+		addWave1Rows(&r, findings[0].Code, issueRows...)
+	}
 	return r
 }
 

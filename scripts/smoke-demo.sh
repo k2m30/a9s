@@ -185,7 +185,7 @@ expect_re s3_circular.txt '\[[0-9]+\]' "header shows the depth badge"
 expect s3_attention.txt "Attention (" "flagged bucket detail opens with the attention block"
 expect ng_detail.txt "health issue" "ng health issue is readable in the detail body"
 expect ng_detail.txt "~ Health issue" "ng detail carries the health issue as its own row"
-expect ng_detail.txt "insufficient free addresses" "ng detail names the reported health code"
+expect ng_detail.txt "Issue: insufficient free addresses" "ng detail carries the reported code as a row under the finding"
 expect_re s3_attention.txt '[Pp]ublic access block incomplete' "attention names the cause"
 
 if [ "$FAILURES" -gt 0 ]; then
