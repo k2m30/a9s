@@ -230,6 +230,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Related-panel counts over truncated target populations render "N+"
   instead of a misleading exact "N", and an empty truncated page no
   longer erases the truncation marker from the cached row store.
+- A CloudFormation stack's colour no longer comes from reading its own status
+  phrase back; stacks, CloudFront distributions, log groups, certificates and
+  hosted zones all take their colour from their findings.
+- A certificate whose validation timed out now says `validation timed out`
+  instead of the SDK's `validation_timed_out`.
+- A row rebuilt from a cache, a search result or a scripted probe now reaches
+  the same colour as the fetched row it came from, for CloudFront
+  distributions, log groups, certificates, hosted zones, stacks, EKS clusters
+  and node groups.
+- A cluster or node group whose details could not be read keeps its warning
+  colour when the row is rebuilt from fields alone.
 
 ### Added
 
