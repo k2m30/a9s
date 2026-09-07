@@ -232,15 +232,13 @@ func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resourc
 	seen := make(map[string]struct{})
 	var ids []string
 	for _, v := range job.DefaultArguments {
-		if !strings.HasPrefix(v, "arn:aws:secretsmanager:") {
+		a, isSecretARN := ARNForService(v, "secretsmanager")
+		if !isSecretARN {
 			continue
 		}
-		// ARN: arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME-suffix
-		_, name, ok := strings.Cut(v, ":secret:")
-		if !ok {
-			continue
-		}
-		if name == "" {
+		// The resource is "secret:NAME-suffix".
+		name, ok := strings.CutPrefix(a.Resource, "secret:")
+		if !ok || name == "" {
 			continue
 		}
 		if _, dup := seen[name]; dup {

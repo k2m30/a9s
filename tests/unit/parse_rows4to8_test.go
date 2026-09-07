@@ -23,6 +23,7 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -690,4 +691,130 @@ func hasCode(fs []domain.Finding, code domain.FindingCode) bool {
 		}
 	}
 	return false
+}
+
+// ── Row 4, the two sites the first sweep missed ───────────────────────────
+
+// parseBucketPolicyFake serves one bucket policy.
+type parseBucketPolicyFake struct {
+	awsclient.S3API
+	policy string
+}
+
+func (f *parseBucketPolicyFake) GetBucketPolicy(_ context.Context, _ *s3.GetBucketPolicyInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
+	return &s3.GetBucketPolicyOutput{Policy: aws.String(f.policy)}, nil
+}
+
+// TestS3BucketPolicyRoles_RolePrincipalsInEveryPartitionAreCounted pins the
+// bucket→roles pivot. The principals come out of a policy document AWS
+// returned, so their partition is the account's own; testing for a literal
+// commercial prefix leaves a China or GovCloud operator looking at a bucket
+// whose cross-account grants render as none.
+func TestS3BucketPolicyRoles_RolePrincipalsInEveryPartitionAreCounted(t *testing.T) {
+	checker := parseCheckerFor(t, "s3", "role")
+	const roleName = "acme-reader"
+	roleCache := resource.ResourceCache{"role": resource.ResourceCacheEntry{
+		Resources: []resource.Resource{{ID: roleName, Name: roleName}},
+	}}
+
+	policy := func(principal string) string {
+		return `{"Version":"2012-10-17","Statement":[{"Effect":"Allow",` +
+			`"Principal":{"AWS":"` + principal + `"},` +
+			`"Action":"s3:GetObject","Resource":"arn:aws:s3:::acme-assets/*"}]}`
+	}
+
+	tests := []struct {
+		name      string
+		principal string
+		wantCount int
+	}{
+		{name: "commercial role", principal: "arn:aws:iam::123456789012:role/" + roleName, wantCount: 1},
+		{name: "China role", principal: "arn:aws-cn:iam::123456789012:role/" + roleName, wantCount: 1},
+		{name: "GovCloud role", principal: "arn:aws-us-gov:iam::123456789012:role/" + roleName, wantCount: 1},
+		{name: "a role under a path", principal: "arn:aws-cn:iam::123456789012:role/service-role/" + roleName, wantCount: 1},
+		// The role pivot surfaces roles. A user, the account root and a
+		// wildcard are principals too, and none of them is one.
+		{name: "a user is not a role", principal: "arn:aws-cn:iam::123456789012:user/" + roleName},
+		{name: "the account root is not a role", principal: "arn:aws-cn:iam::123456789012:root"},
+		{name: "a wildcard is not a role", principal: "*"},
+		{name: "an assumed-role session is not an iam role ARN", principal: "arn:aws-cn:sts::123456789012:assumed-role/" + roleName + "/sess"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clients := parseClients("us-east-1")
+			clients.S3 = &parseBucketPolicyFake{policy: policy(tc.principal)}
+			got := checker(context.Background(), clients,
+				resource.Resource{ID: "acme-assets", Name: "acme-assets"}, roleCache)
+			if got.Count() != tc.wantCount {
+				t.Errorf("Count = %d, want %d (ids %v)", got.Count(), tc.wantCount, got.ResourceIDs())
+			}
+		})
+	}
+}
+
+// TestGlueSecrets_SecretARNsInEveryPartitionAreCounted pins the fourth site of
+// the secret-ARN question, the one the first sweep left behind while
+// converting the other three. A Glue job names its secrets in the job
+// arguments AWS returned.
+func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
+	checker := parseCheckerFor(t, "glue", "secrets")
+	const secretName = "acme/db-AbCdEf"
+
+	tests := []struct {
+		name    string
+		value   string
+		wantIDs []string
+	}{
+		{name: "commercial secret", value: "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + secretName, wantIDs: []string{secretName}},
+		{name: "China secret", value: "arn:aws-cn:secretsmanager:cn-north-1:123456789012:secret:" + secretName, wantIDs: []string{secretName}},
+		{name: "GovCloud secret", value: "arn:aws-us-gov:secretsmanager:us-gov-west-1:123456789012:secret:" + secretName, wantIDs: []string{secretName}},
+		{name: "an ssm parameter is not a secret", value: "arn:aws-cn:ssm:cn-north-1:123456789012:parameter/acme/db"},
+		{name: "a plain argument is not a secret", value: "--enable-metrics"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res := resource.Resource{ID: "acme-etl-job", RawStruct: gluetypes.Job{
+				Name:             aws.String("acme-etl-job"),
+				DefaultArguments: map[string]string{"--db-secret": tc.value},
+			}}
+			got := checker(context.Background(), parseClients("us-east-1"), res, resource.ResourceCache{})
+			if got.Count() != len(tc.wantIDs) {
+				t.Fatalf("Count = %d, want %d (ids %v)", got.Count(), len(tc.wantIDs), got.ResourceIDs())
+			}
+			for i, want := range tc.wantIDs {
+				if got.ResourceIDs()[i] != want {
+					t.Errorf("ResourceIDs()[%d] = %q, want %q", i, got.ResourceIDs()[i], want)
+				}
+			}
+		})
+	}
+}
+
+// TestNavIDFromValue_S3BucketARNResolvesInEveryPartition pins the third site
+// the mechanical sweep found, in core/resource rather than core/aws. It turns
+// a field value into the id Enter navigates to, and an S3 bucket ARN it fails
+// to recognise is passed through whole — so the drill-in looks for a bucket
+// named by its own ARN and lands nowhere.
+func TestNavIDFromValue_S3BucketARNResolvesInEveryPartition(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "commercial bucket ARN", value: "arn:aws:s3:::acme-assets", want: "acme-assets"},
+		{name: "China bucket ARN", value: "arn:aws-cn:s3:::acme-assets", want: "acme-assets"},
+		{name: "GovCloud bucket ARN", value: "arn:aws-us-gov:s3:::acme-assets", want: "acme-assets"},
+		// A bare bucket name is the common case and must pass through.
+		{name: "a bare bucket name", value: "acme-assets", want: "acme-assets"},
+		// Anything that is not an S3 bucket ARN is not a bucket name to
+		// rewrite, so it passes through for the caller to fall back on.
+		{name: "another service's ARN", value: "arn:aws-cn:sqs:cn-north-1:123456789012:acme-queue", want: "arn:aws-cn:sqs:cn-north-1:123456789012:acme-queue"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resource.NavIDFromValue("s3", tc.value); got != tc.want {
+				t.Errorf("NavIDFromValue(s3, %q) = %q, want %q", tc.value, got, tc.want)
+			}
+		})
+	}
 }

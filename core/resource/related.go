@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
@@ -101,13 +103,16 @@ func LambdaNameFromARN(s string) string {
 }
 
 // s3BucketFromARN extracts the bucket name from an S3 bucket ARN.
-// Example: "arn:aws:s3:::my-bucket" → "my-bucket". "arn:aws:s3:::" → "".
-// Input without the "arn:aws:s3:::" prefix is returned unchanged so a bare
-// bucket name (the common case) passes through.
+// Example: "arn:aws:s3:::my-bucket" → "my-bucket". The partition is parsed
+// rather than assumed, so a China or GovCloud ARN yields its bucket too.
+// Anything that is not an S3 ARN is returned unchanged, so a bare bucket
+// name (the common case) passes through.
 func s3BucketFromARN(s string) string {
-	const prefix = "arn:aws:s3:::"
-	if rest, ok := strings.CutPrefix(s, prefix); ok {
-		return rest
+	if a, err := arn.Parse(s); err == nil {
+		if a.Service == "s3" {
+			return a.Resource
+		}
+		return s
 	}
 	return s
 }

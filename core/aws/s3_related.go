@@ -524,12 +524,15 @@ func extractBucketPolicyAWSPrincipals(doc string) []string {
 	return arns
 }
 
-// isIAMRoleARN reports whether s looks like an IAM role ARN
-// (arn:aws:iam::<account>:role/<name>). Rejects wildcards, account-root
-// ARNs, and user ARNs — the role pivot only surfaces role principals.
-// Role name extraction reuses roleNameFromARN from iam_roles_related.go.
+// isIAMRoleARN reports whether s names an IAM role
+// (arn:<partition>:iam::<account>:role/<name>). Rejects wildcards,
+// account-root ARNs, user ARNs and STS assumed-role sessions — the role pivot
+// only surfaces role principals. The partition is the account's own and is
+// never compared. Role name extraction reuses roleNameFromARN from
+// iam_roles_related.go.
 func isIAMRoleARN(s string) bool {
-	return strings.HasPrefix(s, "arn:aws:iam::") && strings.Contains(s, ":role/")
+	a, ok := ARNForService(s, "iam")
+	return ok && strings.HasPrefix(a.Resource, "role/")
 }
 
 // checkS3Trail searches the trail cache for trails whose S3BucketName matches
