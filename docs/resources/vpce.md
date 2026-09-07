@@ -165,27 +165,11 @@ No Wave 2 signals.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
-| S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `vpce`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
-
-Wave → surface mapping for this resource:
-
-- **Wave 1 Healthy** (`Available`, no `LastError`) → no §4 row. S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning** signals (`PendingAcceptance`, `Pending`, `Deleting`, gateway with no route tables) → S2 (yellow) + S4 (cause). No S1, S3, S5.
-- **Wave 1 Broken** signals (`Failed`, `Rejected`, `Expired`, `Partial`, interface with no ENIs, non-empty `LastError`) → S2 (red) + S4 (cause text, preferring `LastError.Message` when present). No S1 (Wave 1 does not produce a finding object), no S3 (red rows don't carry glyphs).
-- **Wave 1 Dim** (`Deleted`) → S2 (gray) + S4 (`deleted`). No S1, no S3, no S5.
-- No Wave 2 findings exist for this resource, so S1 never fires on a `vpce` row under the current contract. The endpoint-policy signal is Wave 1 (the policy document arrives with the list call) and reaches S2/S4/S5.
 
 One row per §3 signal (Healthy case omitted per rule):
 
@@ -194,14 +178,14 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == PendingAcceptance` | 1 | Warning | n/a | S2, S4 | `pending acceptance` |
-| `State == Pending` | 1 | Warning | n/a | S2, S4 | `pending` |
-| `State == Deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
-| `State == Failed` | 1 | Broken | n/a | S2, S4 | `failed` |
-| `State == Rejected` | 1 | Broken | n/a | S2, S4 | `rejected` |
-| `State == Expired` | 1 | Broken | n/a | S2, S4 | `expired` |
-| `State == Partial` | 1 | Broken | n/a | S2, S4 | `partial` |
-| `PolicyDocument` grants a wildcard action — `*` or a service-wide `s3:*` — to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S2, S4, S5 | `endpoint policy open to anyone` |
+| `State == PendingAcceptance` | 1 | Warning | n/a | S1, S2, S4 | `pending acceptance` |
+| `State == Pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
+| `State == Deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| `State == Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
+| `State == Rejected` | 1 | Broken | n/a | S1, S2, S4 | `rejected` |
+| `State == Expired` | 1 | Broken | n/a | S1, S2, S4 | `expired` |
+| `State == Partial` | 1 | Broken | n/a | S1, S2, S4 | `partial` |
+| `PolicyDocument` grants a wildcard action — `*` or a service-wide `s3:*` — to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | n/a | S1, S2, S4, S5 | `endpoint policy open to anyone` |
 | `State == Deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 
 Note: S4 cells pair the state with a cause per the "state keywords are not explanations" rule; bare `Pending` or `Failed` would be insufficient. When `LastError.Message` is present for a `Failed` row, it replaces the generic `failed` cause at render time. Truncate `LastError.Message` at 40 chars for the list view — the full sentence is available in the detail view's field block (which is always rendered for any resource and is not an S5 enrichment line).

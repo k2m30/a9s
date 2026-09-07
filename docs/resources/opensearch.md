@@ -152,40 +152,26 @@ carries every signal in §3.1, so opensearch registers no Wave 2 enricher.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `isolated: cluster quarantined by AWS`). **Healthy rows render blank** — no `OK` / `Active` / `available`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `opensearch`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
-
-Wave → surface mapping applied here:
-
-- The hard states (`Deleted`, `Processing/UpgradeProcessing`, `Isolated`) drive **S2 + S4** (color + cause).
-- The background checks (`UpdateAvailable` past `AutomatedUpdateDate`, `EncryptionAtRestOptions.Enabled==false`) drive **S1 + S2 + S3 + S4 + S5**. `UpdateAvailable` past the auto-update cutoff is a warning (`~`), since a pending forced update is not an outage; missing at-rest encryption is a posture finding (`~`) — see §6 user decision.
-- The network-posture checks (`reachable outside a VPC`, `HTTPS not enforced`, `node-to-node encryption off`) drive **S1 + S2 + S3 + S4 + S5** on the same terms.
 
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `Deleted==true` | 1 | Dim | n/a | S2, S4 | `deleting: removal in progress` |
-| `Processing==true` or `UpgradeProcessing==true` | 1 | Warning | n/a | S2, S4 | `processing: config change in flight` |
-| `DomainProcessingStatus=="Isolated"` | 1 | Broken | n/a | S2, S4 | `isolated: quarantined by AWS` |
-| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` |
-| `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | n/a | S2, S4 | `encryption at rest off` |
-| No `VPCOptions` AND access policy allows any principal | 1 | Broken | n/a | S2, S4 | `reachable outside a VPC` |
-| `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | n/a | S2, S4 | `HTTPS not enforced` |
-| `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | n/a | S2, S4 | `node-to-node encryption off` |
-| `DescribeDomains` was denied for this domain | 1 | Warning | n/a | S2, S4 | `details denied` |
-| the domain is absent from the `DescribeDomains` response | 1 | Warning | n/a | S2, S4 | `details unavailable` |
+| `Processing==true` or `UpgradeProcessing==true` | 1 | Warning | n/a | S1, S2, S4 | `processing: config change in flight` |
+| `DomainProcessingStatus=="Isolated"` | 1 | Broken | n/a | S1, S2, S4 | `isolated: quarantined by AWS` |
+| `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | n/a | S1, S2, S4, S5 | `software update forced soon` |
+| `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | n/a | S1, S2, S4 | `encryption at rest off` |
+| No `VPCOptions` AND access policy allows any principal | 1 | Broken | n/a | S1, S2, S4 | `reachable outside a VPC` |
+| `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | n/a | S1, S2, S4 | `HTTPS not enforced` |
+| `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | n/a | S1, S2, S4 | `node-to-node encryption off` |
+| `DescribeDomains` was denied for this domain | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
+| the domain is absent from the `DescribeDomains` response | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
 
 ## 4.1 UX review
 

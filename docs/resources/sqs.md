@@ -128,32 +128,17 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
-| S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `sqs`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping applied to `sqs`:
-
-- No Wave 1 signals → every queue row starts Healthy (green) with S4 blank until Wave 2 returns.
-- Wave 2 **Warning-bucket** findings land on a yellow row (S2) with short cause in S4 and full sentence in S5. Because the row is yellow, S3 is suppressed (glyphs only appear on green rows). S1 is not bumped (`~`-style informational).
-- Wave 2 **Broken-bucket** finding ("rising unbounded") lands on a red row (S2) with cause in S4 and full sentence in S5. S1 is bumped (`!`-severity).
-- Multiple Wave 2 findings on the same queue (common — e.g. backlog + DLQ unset) deduplicate: S4 shows the most severe cause (Broken > Warning), S5 lists each sentence on its own line.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S4, S5 | `no DLQ configured` |
+| `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S3, S4, S5 | `no DLQ configured` |
 | `KmsMasterKeyId` unset | 2 | Warning | `~` | S3, S4, S5 | `not encrypted with KMS` |
 | access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `queue policy open to anyone` |
 | `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` |

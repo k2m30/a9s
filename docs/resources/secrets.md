@@ -154,35 +154,21 @@ One bullet per distinct signal.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
-| S4 | Status / description column text | Short human-readable cause. Healthy rows render blank — no `OK`, no `available`. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `secrets`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping applied:
-
-- Healthy secret (none of the §3.1 conditions, no §3.2 finding) — no §4 row. S2 renders green, S4 renders blank.
-- Wave 1 Warning / Broken signals — S2 (color) + S4 (cause text). No S1, S3, S5.
-- Wave 2 Broken-style finding (`AWSPENDING` stuck) on an otherwise Healthy row — `!` glyph → S1, S3, S4, S5. If the row is already red (e.g. rotation failing per §3.1) the finding deduplicates with the existing cause; S3 is suppressed on non-green rows, but S1 still counts and S5 still carries the full sentence.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `now > NextRotationDate` | 1 | Warning | n/a | S2, S4 | `rotation overdue` |
-| `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant` |
-| `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deleted` |
-| `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | n/a | S2, S4 | `rotation not enabled` |
-| the secret's value has not changed in over 365 days | 1 | Warning | n/a | S2, S4 | `value unchanged in over 365 days` |
+| `now > NextRotationDate` | 1 | Warning | n/a | S1, S2, S4 | `rotation overdue` |
+| `LastAccessedDate > 180d` | 1 | Warning | n/a | S1, S2, S4 | `dormant` |
+| `DeletedDate set` | 1 | Broken | n/a | S1, S2, S4 | `deleted` |
+| `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | n/a | S1, S2, S4 | `rotation not enabled` |
+| the secret's value has not changed in over 365 days | 1 | Warning | n/a | S1, S2, S4 | `value unchanged in over 365 days` |
 | Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `resource policy open to anyone` |
 | Resource policy names a principal in another account | 2 | Warning | `~` | S3, S4, S5 | `resource policy grants another account` |
 | rotation failing for more than two full intervals, `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |

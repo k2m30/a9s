@@ -172,38 +172,28 @@ No Wave 2 signals.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `redis`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping applied below. `Status == "available"` with `AutomaticFailover == "enabled"` (Healthy) does not produce a §4 row — the row is green and S4 blank, silence is the UX.
-
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating — new group` |
-| `Status == modifying` (single-shard) | 1 | Warning | n/a | S2, S4 | `modifying — config change` |
-| `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S2, S4 | `snapshotting — backup running` |
-| `Status == deleting` | 1 | Warning | n/a | S2, S4 | `deleting — teardown` |
-| `Status == create-failed` | 1 | Broken | n/a | S2, S4 | `create failed — see events` |
-| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <NodeGroupId>: <status>` |
-| `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S2, S4 | `multi-AZ without auto-failover` |
-| `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption at rest off` |
-| `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S2, S4, S5 | `encryption in transit off` |
+| `Status == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating — new group` |
+| `Status == modifying` (single-shard) | 1 | Warning | n/a | S1, S2, S4 | `modifying — config change` |
+| `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S1, S2, S4 | `snapshotting — backup running` |
+| `Status == deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting — teardown` |
+| `Status == create-failed` | 1 | Broken | n/a | S1, S2, S4 | `create failed — see events` |
+| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S1, S2, S4, S5 | `shard <NodeGroupId>: <status>` |
+| `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S1, S2, S4 | `multi-AZ without auto-failover` |
+| `AtRestEncryptionEnabled` not true | 1 | Warning | n/a | S1, S2, S4, S5 | `encryption at rest off` |
+| `TransitEncryptionEnabled` not true | 1 | Warning | n/a | S1, S2, S4, S5 | `encryption in transit off` |
 | `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | n/a | S1, S2, S4, S5 | `no authentication token` |
-| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | n/a | S2, S4, S5 | `automatic backups off` |
+| `SnapshotRetentionLimit` 0 or absent | 1 | Warning | n/a | S1, S2, S4, S5 | `automatic backups off` |
 
 Notes for fillers:
 

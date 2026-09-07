@@ -121,7 +121,11 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `ClusterAvailabilityStatus` in `Maintenance` / `Modifying` → Warning.
+- **Signal**: `ClusterStatus == modifying` → Warning.
+  - **State bucket**: Warning.
+  - **How obtained**: `ClusterStatus` on the `DescribeClusters` list response.
+
+- **Signal**: `ClusterAvailabilityStatus == Maintenance` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Cluster.ClusterAvailabilityStatus` on the `DescribeClusters` response.
 
@@ -196,53 +200,38 @@ One bullet per distinct signal. Each runs on the type's bounded second pass, aft
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `redshift`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4 (short cause), S5 (full sentence).
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4 (short cause), S5 (full sentence). No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → redundant with color; S3 suppressed, S4 deduplicates with existing cause, S5 still carries the full sentence, S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ClusterStatus == incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-parameters` |
-| `ClusterStatus==hardware-failure` | 1 | Broken | n/a | S2, S4 | `broken: hardware-failure` |
-| `ClusterStatus==storage-full` | 1 | Broken | n/a | S2, S4 | `broken: storage-full` |
-| `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` |
-| `ClusterAvailabilityStatus==Failed` | 1 | Broken | n/a | S2, S4 | `failed` |
-| `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | n/a | S2, S4 | `maintenance` |
-| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | n/a | S2, S4 | `modifying` |
-| `PendingModifiedValues` non-empty | 1 | Warning | n/a | S2, S4 | `pending change queued` |
-| `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S2, S4 | `maintenance deferred` |
-| `PubliclyAccessible==true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` |
-| `Encrypted==false` | 1 | Warning | n/a | S2, S4 | `unencrypted at rest` |
-| `ClusterStatus == incompatible-hsm` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-hsm` |
-| `ClusterStatus == incompatible-network` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-network` |
-| `ClusterStatus == incompatible-restore` | 1 | Broken | n/a | S2, S4 | `broken: incompatible-restore` |
-| `ClusterStatus == creating` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `ClusterStatus == resizing` | 1 | Warning | n/a | S2, S4 | `resizing` |
-| `ClusterStatus == rebooting` | 1 | Warning | n/a | S2, S4 | `rebooting` |
-| `ClusterStatus == renaming` | 1 | Warning | n/a | S2, S4 | `renaming` |
-| `ClusterStatus == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` |
-| `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S4, S5 | `audit logging off` |
-| Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S4, S5 | `SSL not required` |
+| `ClusterStatus == incompatible-parameters` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-parameters` |
+| `ClusterStatus==hardware-failure` | 1 | Broken | n/a | S1, S2, S4 | `broken: hardware-failure` |
+| `ClusterStatus==storage-full` | 1 | Broken | n/a | S1, S2, S4 | `broken: storage-full` |
+| `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | n/a | S1, S2, S4 | `unavailable` |
+| `ClusterAvailabilityStatus==Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
+| `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | n/a | S1, S2, S4 | `maintenance` |
+| `ClusterStatus == modifying` | 1 | Warning | n/a | S1, S2, S4 | `modifying` |
+| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | n/a | S1, S2, S4 | `modifying` |
+| `PendingModifiedValues` non-empty | 1 | Warning | n/a | S1, S2, S4 | `pending change queued` |
+| `DeferredMaintenanceWindows[]` active | 1 | Warning | n/a | S1, S2, S4 | `maintenance deferred` |
+| `PubliclyAccessible==true` | 1 | Warning | n/a | S1, S2, S4 | `publicly accessible` |
+| `Encrypted==false` | 1 | Warning | n/a | S1, S2, S4 | `unencrypted at rest` |
+| `ClusterStatus == incompatible-hsm` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-hsm` |
+| `ClusterStatus == incompatible-network` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-network` |
+| `ClusterStatus == incompatible-restore` | 1 | Broken | n/a | S1, S2, S4 | `broken: incompatible-restore` |
+| `ClusterStatus == creating` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
+| `ClusterStatus == resizing` | 1 | Warning | n/a | S1, S2, S4 | `resizing` |
+| `ClusterStatus == rebooting` | 1 | Warning | n/a | S1, S2, S4 | `rebooting` |
+| `ClusterStatus == renaming` | 1 | Warning | n/a | S1, S2, S4 | `renaming` |
+| `ClusterStatus == deleting` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S3, S4, S5 | `audit logging off` |
+| Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S3, S4, S5 | `SSL not required` |
 
 ## 4.1 UX review (two sentences)
 

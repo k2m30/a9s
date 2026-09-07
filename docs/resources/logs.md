@@ -109,35 +109,19 @@ One bullet per distinct signal.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `logs`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph → S1, S3, S4, S5.
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph → S3, S4, S5. No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed; S4 deduplicates; S5 still carries the full sentence; S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `retentionInDays` nil | 1 | Warning | n/a | S2, S4 | `retention: never expire` |
-| `storedBytes==0` + age >90d | 1 | Warning | n/a | S2, S4 | `empty, created over 90 days ago` |
-| `kmsKeyId` empty | 1 | Warning | n/a | S2, S4 | `not encrypted with KMS` |
+| `retentionInDays` nil | 1 | Warning | n/a | S1, S2, S4 | `retention: never expire` |
+| `storedBytes==0` + age >90d | 1 | Warning | n/a | S1, S2, S4 | `empty, created over 90 days ago` |
+| `kmsKeyId` empty | 1 | Warning | n/a | S1, S2, S4 | `not encrypted with KMS` |
 | an audit log group with no metric filter over it | 2 | Warning | `~` | S3, S4, S5 | `audit log group missing metric filters` |
 
 Rules for filling list and detail text:

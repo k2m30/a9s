@@ -77,10 +77,6 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `DefaultAction==Allow` + zero rules.
-  - **State bucket**: Warning.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
-
 - **Signal**: `GetLoggingConfiguration` reports no destination for this web ACL.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
@@ -93,32 +89,17 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `waf`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
-
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank.
-- **Wave 2 background finding on a Healthy row, important** (`DefaultAction==Allow` + zero rules) → `!` on green row → S1, S3, S4, S5.
-- **Wave 2 background finding on a Healthy row, informational** (`Rules==[]`) → `~` on green row → S3, S4, S5. No S1.
 
 One row per signal from §3 that has operator-readable surface text:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S3, S4, S5 | `web ACL has no rules` |
-| `DefaultAction==Allow` + zero rules | 2 | Warning | `!` | S1, S3, S4, S5 | `web ACL has no rules` |
 | `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S3, S4, S5 | `no logging configuration` |
 
 ## 4.1 UX review (two sentences)
@@ -145,7 +126,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `apigw` / `elb` discovery via `ListResourcesForWebACL` per ACL (`ResourceType=API_GATEWAY` | `APPLICATION_LOAD_BALANCER`, Regional scope) — a9s-devops (2026-04-20): possible=yes, worth=yes. This is the only WAF-side API that enumerates protected regional resources; cost is one call per ACL per resource type, bounded and cheap.
 - `cf` discovery via `cloudfront:ListDistributionsByWebACLId` for `Scope=CLOUDFRONT` ACLs (REGIONAL ACLs resolve to 0 without a call) — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListResourcesForWebACL` does not cover the CloudFront scope, so the association is enumerated from the CloudFront side; one bounded call per ACL.
 - `logs` discovery via `GetLoggingConfiguration` per ACL, filtering `LogDestinationConfigs[]` ARNs that begin with `arn:aws:logs:` — a9s-devops (2026-04-20): possible=yes, worth=yes. WAF logging also supports Kinesis Firehose and S3 sinks; only CW Logs destinations bind to the `logs` panel target.
-- `~` severity for `Rules==[]` (empty ACL is a config hygiene concern but no active security regression — the ACL simply does nothing) and `!` severity for `DefaultAction==Allow` + zero rules (allow-all default with no rules is a real protection gap that warrants the menu count bump) — a9s-devops (2026-04-20): possible=yes, worth=yes. Severity split matches the `docs/attention-signals.md § Signals § SECURITY & IAM` row `waf`.
+- `~` severity for `Rules==[]`: an empty ACL is a config hygiene concern, not an active security regression — the ACL simply does nothing — a9s-devops (2026-04-20): possible=yes, worth=yes. The allow-all default with zero rules is a separate condition, recorded under `docs/attention-signals.md § Not yet implemented`.
 - List text and detail text wording for both Wave 2 signals — generated per the output-template §4 rules (≤40 char S4, no jargon, state + cause).
 
 <!-- BEGIN GENERATED: header -->

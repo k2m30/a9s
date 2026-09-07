@@ -26,11 +26,30 @@ definition; `docs/resources/<shortName>.md` §4 transcribes it verbatim.
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | A row counts when its Wave 1 colour is an issue — Warning or Broken, never Dim — and a Wave 2 finding counts only at `!` severity; `~` findings do not bump. `core/runtime/handlers_availability.go` `unifiedIssueCount` and `core/app/list_body.go` are the two callers, and both read the same rule. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
 | S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+
+### Wave → surface mapping
+
+Which surfaces a finding reaches follows from its wave and its severity, and
+`docs/resources/<shortName>.md` §4 names them per signal rather than restating
+the rule:
+
+- **Wave 1, Healthy** — no §4 row. S2 renders green and S4 renders blank.
+- **Wave 1, Warning or Broken** — S2 (colour) and S4 (cause text), and the row
+  counts towards S1. No glyph: `core/app/list_columns.go`
+  `resolveListDecoratorFull` gives one only to a row whose colour is Healthy,
+  and a Wave 1 issue finding has already coloured it. So no S3.
+- **Wave 1, Dim** — S2 and S4. Dim is not an issue colour, so no S1, and no
+  glyph for the same reason as above.
+- **Wave 2 on a Healthy row** — `!` when the finding is Broken, `~` when it is
+  Warning, on S3, with S4 and S5. Only the `!` case reaches S1.
+- **Wave 2 on a row Wave 1 already coloured** — S3 is suppressed, S4
+  deduplicates with the cause already there, S5 carries the full sentence, and
+  S1 still counts the row.
 
 ### S1 — list frame title issue count
 

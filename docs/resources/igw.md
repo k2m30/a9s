@@ -61,7 +61,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `len(Attachments) == 0` → Warning (orphan — never attached or fully detached). — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `len(Attachments) == 0` → Warning (orphan — never attached or fully detached).
   - **State bucket**: Warning.
   - **How obtained**: size of the `Attachments[]` slice on the list-response IGW.
 
@@ -85,33 +85,19 @@ No Wave 2 signals.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
-| S4 | Status / description column text | Short human-readable cause (e.g. `detached`, `attached but unused`). Healthy rows render blank. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `igw`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping for this resource:
-
-- **Wave 1 Healthy** (`attached`) → no §4 row. S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning** signals → S2 (yellow) + S4 (cause). No S1, S3, S5.
-- No Wave 2 signals on this resource, so S1/S3/S5 are unused here.
-
 One row per §3 signal (Healthy case omitted per rule):
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Attachments[0].State == attaching` | 1 | Warning | n/a | S2, S4 | `attaching` |
-| `Attachments[0].State == detaching` | 1 | Warning | n/a | S2, S4 | `detaching` |
-| `len(Attachments) == 0` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no VPC attachments` |
+| `Attachments[0].State == attaching` | 1 | Warning | n/a | S1, S2, S4 | `attaching` |
+| `Attachments[0].State == detaching` | 1 | Warning | n/a | S1, S2, S4 | `detaching` |
+| `len(Attachments) == 0` | 1 | Warning | n/a | S1, S2, S4 | `no VPC attachments` |
 | `Attachments[0].State == detached` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `detached: orphan gateway` |
 | IGW attached but VPC has no `0.0.0.0/0 → igw` route — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached but unused: no default route` |
 

@@ -101,19 +101,19 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `eb`.
 
 One bullet per distinct signal. AWS field names verbatim.
 
-- **Signal**: `Health == Yellow`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Health == Yellow`.
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "something is wrong — two consecutive health-check failures".
 
-- **Signal**: `Health == Grey`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Health == Grey`.
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "new environment not fully launched, or health checks suspended during an `UpdateEnvironment`/`RestartEnvironment` request".
 
-- **Signal**: `Health == Red`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Health == Red`.
   - **State bucket**: Broken.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "environment not responsive — three or more consecutive health-check failures".
 
-- **Signal**: `Status == Terminated`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Status == Terminated`.
   - **State bucket**: Dim.
   - **How obtained**: `EnvironmentDescription.Status` on the list response.
 
@@ -153,39 +153,23 @@ One bullet per distinct signal.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
-| S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `eb`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row. S2 renders green, S4 renders blank.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4, S5.
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4, S5. No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed, S4 deduplicates, S5 carries full sentence, S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Health == Yellow` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `health: yellow` |
-| `Health == Grey` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `health: grey` |
-| `Health == Red` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `health: red` |
-| `Status == Terminated` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `terminated` |
-| `Status` is `Launching` or `Updating` with no health signal | 1 | Warning | n/a | S2, S4 | `launching` |
+| `Health == Yellow` | 1 | Warning | n/a | S1, S2, S4 | `health: yellow` |
+| `Health == Grey` | 1 | Warning | n/a | S1, S2, S4 | `health: grey` |
+| `Health == Red` | 1 | Broken | n/a | S1, S2, S4 | `health: red` |
+| `Status == Terminated` | 1 | Dim | n/a | S2, S4 | `terminated` |
+| `Status` is `Launching` or `Updating` with no health signal | 1 | Warning | n/a | S1, S2, S4 | `launching` |
 | `Status == Terminating` with no health signal | 1 | Dim | n/a | S2, S4 | `terminating` |
-| `Causes[]` non-empty | 2 | Warning | n/a | S4 (dedupe), S5 | `environment reports health causes` |
+| `Causes[]` non-empty | 2 | Warning | `~` | S3, S4, S5 | `environment reports health causes` |
 | managed platform updates not enabled | 2 | Warning | `~` | S3, S4, S5 | `managed platform updates off` |
 | health reporting not `enhanced` | 2 | Warning | `~` | S3, S4, S5 | `enhanced health reporting off` |
 | log streaming to CloudWatch not enabled | 2 | Warning | `~` | S3, S4, S5 | `log streaming to CloudWatch off` |

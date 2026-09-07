@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: KMS Keys
 - **AWS API reference**: <https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html>
 - **List API**: `ListKeys` — returns `KeyListEntry{KeyId, KeyArn}` only (no state, no manager, no rotation info).
-- **Describe API (if any)**: `DescribeKey` per key (returns `KeyMetadata`) plus `GetKeyRotationStatus` per key (returns `KeyRotationEnabled`, `RotationPeriodInDays`, `NextRotationDate`). Both are per-key N+1 calls — all KMS signals are Wave 2.
+- **Describe API (if any)**: `DescribeKey` per key (returns `KeyMetadata`) plus `GetKeyRotationStatus` per key (returns `KeyRotationEnabled`, `RotationPeriodInDays`, `NextRotationDate`). Both are per-key N+1 calls. `DescribeKey` runs as the row is built, so every `KeyState` signal is Wave 1; `GetKeyRotationStatus` and the key policy are the Wave 2 pass.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -78,7 +78,17 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
 
-- **Signal**: `KeyState==PendingDeletion` or `KeyState==PendingImport` or `KeyState==PendingReplicaDeletion`.
+- **Signal**: `KeyState==Creating`.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `KeyState==Updating`.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `KeyState==PendingDeletion`.
   - **State bucket**: Broken.
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
@@ -102,17 +112,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-All KMS attention signals are Wave 2. Two per-key calls are needed: `DescribeKey` (for `KeyState`) and `GetKeyRotationStatus` (for `KeyRotationEnabled`).
-
-- **Signal**: `KeyState==Creating` or `KeyState==Updating`.
-  - **State bucket**: Warning.
-  - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
-
-- **Signal**: `KeyState==Updating`.
-  - **State bucket**: Warning.
-  - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
+`GetKeyRotationStatus` and the key policy read on the second pass; `KeyState` is already on the row by then and its signals are in §3.1.
 
 - **Signal**: `KeyRotationEnabled==false` on CMK.
   - **State bucket**: Warning.
@@ -130,41 +130,25 @@ All KMS attention signals are Wave 2. Two per-key calls are needed: `DescribeKey
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. rotation disabled, maintenance scheduled. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `disabled: admin off`, `pending deletion in 7d`). **Healthy rows render blank** — no `OK` / `Enabled`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `kms`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → n/a (no Wave 1 signals for kms).
-- **Wave 2 Healthy** (`KeyState==Enabled`, rotation on) → omit from §4; S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 2 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5 for the state-bucket row itself.
-- **Wave 2 background finding on a Healthy row, important** (`KeyRotationEnabled==false` on CMK with `KeyState==Enabled`) → `!` glyph on green row. S1, S3, S4, S5.
-- **Wave 2 finding on an already yellow/red row** (e.g. rotation disabled on a `Disabled` key) → redundant with color; S3 suppressed, S4 deduplicates with existing cause, S5 still carries the full sentence, S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `KeyState==Disabled` | 1 | Warning | n/a | S2, S4 | `disabled` |
-| `KeyState==PendingDeletion` | 1 | Broken | n/a | S2, S4 | `pending deletion` |
-| `KeyState==PendingImport` | 1 | Broken | n/a | S2, S4 | `<key state>` |
-| `KeyState==PendingReplicaDeletion` | 1 | Broken | n/a | S2, S4 | `<key state>` |
-| `KeyState==Unavailable` | 1 | Broken | n/a | S2, S4 | `<key state>` |
-| `DescribeKey` was denied for this key | 1 | Broken | n/a | S2, S4 | `access denied (kms:DescribeKey)` |
-| `KeyState==Creating` | 2 | Warning | n/a | S2, S4 | `key rotation disabled` |
-| `KeyState==Updating` | 2 | Warning | n/a | S2, S4 | `key rotation disabled` |
-| `KeyRotationEnabled==false` on CMK | 2 | Warning | `!` | S1, S3, S4, S5 | `key rotation disabled` |
+| `KeyState==Disabled` | 1 | Warning | n/a | S1, S2, S4 | `disabled` |
+| `KeyState==PendingDeletion` | 1 | Broken | n/a | S1, S2, S4 | `pending deletion` |
+| `KeyState==Creating` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
+| `KeyState==Updating` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
+| `KeyState==PendingImport` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
+| `KeyState==PendingReplicaDeletion` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
+| `KeyState==Unavailable` | 1 | Broken | n/a | S1, S2, S4 | `<key state>` |
+| `DescribeKey` was denied for this key | 1 | Broken | n/a | S1, S2, S4 | `access denied (kms:DescribeKey)` |
+| `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S3, S4, S5 | `key rotation disabled` |
 | Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S3, S4, S5 | `key policy open to anyone` |
 
 Rules for filling list and detail text:
@@ -188,7 +172,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - List API returns `KeyId`/`KeyArn` only — `AWS SDK Go v2 — service/kms/types.KeyListEntry § KeyArn, KeyId`.
-- Wave 2 `DescribeKey` per key for `KeyState` buckets (Enabled / Creating / Updating / Disabled / PendingDeletion / PendingImport / PendingReplicaDeletion / Unavailable) — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms/types.KeyMetadata § KeyState` (`KeyState` enum values match).
+- Wave 1 `DescribeKey` per key for `KeyState` buckets (Enabled / Creating / Updating / Disabled / PendingDeletion / PendingImport / PendingReplicaDeletion / Unavailable) — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms/types.KeyMetadata § KeyState` (`KeyState` enum values match).
 - Wave 2 `GetKeyRotationStatus` per key, `KeyRotationEnabled==false` on CMK → Warning — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `kms`. Field confirmed: `AWS SDK Go v2 — service/kms.GetKeyRotationStatusOutput § KeyRotationEnabled`.
 - CMK = customer-managed key (`KeyManager==CUSTOMER`); AWS-managed keys excluded from rotation check because AWS rotates them automatically — `AWS SDK Go v2 — service/kms/types.KeyManagerType § KeyManagerTypeAws, KeyManagerTypeCustomer` (enum values AWS and CUSTOMER). a9s-devops persona (2026-04-20, persona fallback per skill §"Handling gaps"): possible=yes, worth=yes. Rationale: surfacing rotation-off on AWS-managed keys would be noise because the operator cannot change it and AWS has already taken responsibility; the signal is actionable only for keys the account owns.
 - Related target discovery is reverse-index (sibling-list cross-reference on `KmsKeyId`/`KmsKeyArn`) for `dbi`, `ebs`, `secrets` — `docs/related-resources.md` § `kms` reasoning bullets (`StreamDescription.KeyId`, `Volume.KmsKeyId`, `SecretListEntry.KmsKeyId — UUID suffix matched against KMS key cache`). a9s-devops persona (2026-04-20, persona fallback): possible=yes, worth=yes. Rationale: `KeyMetadata` holds no consumer refs, so the pivot must traverse the other direction; these consumer types list their KMS key on the list-response shape, so no extra API call is needed when the sibling list is already loaded.

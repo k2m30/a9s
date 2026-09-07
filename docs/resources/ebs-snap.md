@@ -79,11 +79,11 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response. `StateMessage` carries AWS's human-readable cause (e.g. KMS permission failure on an encrypted copy) and is used for S4/S5 text.
 
-- **Signal**: snapshot age > 365d with automated description — cost concern. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: snapshot age > 365d with automated description — cost concern.
   - **State bucket**: Warning.
   - **How obtained**: `now() - Snapshot.StartTime > 365d` AND `Snapshot.Description` begins with `"Created by ..."` (automated-snapshot tell). Pure computation over the list response.
 
-- **Signal**: `Encrypted == false` (CIS EC2.1 — EBS snapshots should be encrypted at rest). — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Encrypted == false` (CIS EC2.1 — EBS snapshots should be encrypted at rest).
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.Encrypted` on the `DescribeSnapshots` list response.
 
@@ -91,7 +91,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
 
-- **Signal**: source volume deleted — orphan snapshot. Cross-reference `ebs`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: source volume deleted — orphan snapshot. Cross-reference `ebs`.
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.VolumeId` not present in the already-loaded `ebs` list (rule skipped when the `ebs` list was not loaded in this sweep).
 
@@ -105,27 +105,11 @@ One bullet per distinct signal. Each runs on the type's bounded second pass, aft
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. snapshot approaching cost-age threshold, unencrypted snapshot. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `error: KMS key disabled`, `orphan: source volume deleted`). **Healthy rows render blank** — no `OK` / `completed`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `ebs-snap`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
-
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4 (short cause), S5 (full sentence). `ebs-snap` has no Wave 2, so this case does not arise here.
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. Same caveat.
-- **Wave 2 finding on an already yellow/red/dim row** → redundant with color; S3 suppressed, S4 deduplicates, S5 still carries the full sentence, S1 still counts if `!`. Not applicable here.
 
 Note: the Wave 1 signals `age > 365d` and `Encrypted == false` are background-check-style concerns but are Wave 1 (zero extra calls). They apply to rows that would otherwise be Healthy (`State == completed`). Treating them strictly per the mapping rules, they turn a green row yellow (Warning) via S2, and S4 carries the cause. They do not get a `~` glyph because the row is no longer green.
 
@@ -133,11 +117,11 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == pending` | 1 | Warning | n/a | S2, S4 | `pending` |
-| `State == error` | 1 | Broken | n/a | S2, S4 | `error` |
-| age > 365d AND automated description — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `automated, <N>d old` |
-| `Encrypted == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unencrypted` |
-| orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 2 | Warning | `~` | S3, S4, S5 | `orphan: source volume deleted` |
+| `State == pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
+| `State == error` | 1 | Broken | n/a | S1, S2, S4 | `error` |
+| age > 365d AND automated description | 1 | Warning | n/a | S1, S2, S4 | `automated, <N>d old` |
+| `Encrypted == false` | 1 | Warning | n/a | S1, S2, S4 | `unencrypted` |
+| orphan: source volume deleted | 2 | Warning | `~` | S3, S4, S5 | `orphan: source volume deleted` |
 | restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S3, S4, S5 | `shared with all AWS accounts` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)

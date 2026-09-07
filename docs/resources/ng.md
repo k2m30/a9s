@@ -88,7 +88,7 @@ Transcribed from `docs/attention-signals.md § Signals § CONTAINERS` row `ng`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `ListNodegroups` returns node-group name strings only; every attention signal requires `DescribeNodegroup`.
+`ListNodegroups` returns node-group name strings only, so the fetcher reads each node group with `DescribeNodegroup` before it builds the row. Every signal below is computed from that response as the row is built, with no second pass.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -151,15 +151,7 @@ The reads a9s does not make for a node group, listed on `docs/attention-signals.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `ACTIVE`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `ng`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
@@ -169,15 +161,15 @@ One row per signal from §3 that reaches at least one surface. Healthy is omitte
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status==CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `status==UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
-| `status==DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
-| `status==CREATE_FAILED` | 1 | Broken | n/a | S2, S4, S5 | `create failed` |
-| `status==DELETE_FAILED` | 1 | Broken | n/a | S2, S4, S5 | `delete failed` |
-| `status==DEGRADED` | 1 | Broken | n/a | S2, S4, S5 | `degraded` |
-| `health.issues[]` non-empty on an `ACTIVE` group | 1 | Warning | n/a | S2, S4, S5 | `health issue` |
-| describe denied | 1 | Warning | n/a | S2, S4 | `details denied` |
-| describe answered with nothing | 1 | Warning | n/a | S2, S4 | `details unavailable` |
+| `status==CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
+| `status==UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
+| `status==DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| `status==CREATE_FAILED` | 1 | Broken | n/a | S1, S2, S4, S5 | `create failed` |
+| `status==DELETE_FAILED` | 1 | Broken | n/a | S1, S2, S4, S5 | `delete failed` |
+| `status==DEGRADED` | 1 | Broken | n/a | S1, S2, S4, S5 | `degraded` |
+| `health.issues[]` non-empty on an `ACTIVE` group | 1 | Warning | n/a | S1, S2, S4, S5 | `health issue` |
+| describe denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
+| describe answered with nothing | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
 
 The two health rows carry what AWS reported: each code in `health.issues[]` is a
 row under the finding in the detail view, so `insufficient free addresses` is

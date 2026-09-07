@@ -173,35 +173,21 @@ No Wave 2 signals.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing." `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `failed: AccessDenied`). **Healthy rows render blank** — no `OK` / `Success`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `ct-events`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping applied here:
-
-- A rejected or destructive call → S2 (red) + S4 (cause text). No S1, S3, S5.
-- Root activity, a configuration change, a cross-account caller or a read of secret material → S2 (yellow) + S4 (cause text). No S1, S3, S5 — consistent with the "Wave 1 Warning/Broken/Dim" rule.
-- Every other event → S2 (gray) + S4 `routine event`. Nothing is silent: an event row always says what kind of call it was.
-
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| destructive call (`ct_event.severity.danger`) | 1 | Broken | n/a | S2 + S4 | `destructive call` |
-| call AWS rejected (`ct_event.danger.failed`) | 1 | Broken | n/a | S2 + S4 | `failed: <error>` |
-| root user made the call (`ct_event.severity.attention`) | 1 | Warning | n/a | S2 + S4 | `root account activity` |
-| call changed configuration (`ct_event.attention.write`) | 1 | Warning | n/a | S2 + S4 | `modifying call` |
-| caller from another account (`ct_event.attention.cross-account`) | 1 | Warning | n/a | S2 + S4 | `cross-account access` |
-| read of secret or parameter material (`ct_event.attention.sensitive-read`) | 1 | Warning | n/a | S2 + S4 | `reads sensitive data (<event>)` |
-| every other event (`ct_event.severity.info`) | 1 | Dim | n/a | S2 + S4 | `routine event` |
+| destructive call (`ct_event.severity.danger`) | 1 | Broken | n/a | S1, S2, S4 | `destructive call` |
+| call AWS rejected (`ct_event.danger.failed`) | 1 | Broken | n/a | S1, S2, S4 | `failed: <error>` |
+| root user made the call (`ct_event.severity.attention`) | 1 | Warning | n/a | S1, S2, S4 | `root account activity` |
+| call changed configuration (`ct_event.attention.write`) | 1 | Warning | n/a | S1, S2, S4 | `modifying call` |
+| caller from another account (`ct_event.attention.cross-account`) | 1 | Warning | n/a | S1, S2, S4 | `cross-account access` |
+| read of secret or parameter material (`ct_event.attention.sensitive-read`) | 1 | Warning | n/a | S1, S2, S4 | `reads sensitive data (<event>)` |
+| every other event (`ct_event.severity.info`) | 1 | Dim | n/a | S2, S4 | `routine event` |
 
 Rules for filling list and detail text:
 

@@ -161,39 +161,23 @@ Per-broker runtime state is not on any read-only AWS action: `ListNodes` returns
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `msk`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit).
-- **Wave 1 Warning / Broken / Dim** → S2 + S4.
-- **Wave 2 finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4, S5. (No Wave 2 for msk.)
-- **Wave 2 finding on a Healthy row, informational** → `~` glyph on green row. S3, S4, S5. No S1. (No Wave 2 for msk.)
-- **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed, S4 deduplicates with existing cause, S5 carries the full sentence, S1 still counts if `!`. (No Wave 2 for msk.)
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `State == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
-| `State == MAINTENANCE` | 1 | Warning | n/a | S2, S4 | `maintenance` |
-| `State == REBOOTING_BROKER` | 1 | Warning | n/a | S2, S4 | `rebooting broker` |
-| `State == HEALING` | 1 | Warning | n/a | S2, S4 | `healing` |
-| `State == DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
-| `State == FAILED` | 1 | Broken | n/a | S2, S4 | `failed` |
+| `State == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
+| `State == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
+| `State == MAINTENANCE` | 1 | Warning | n/a | S1, S2, S4 | `maintenance` |
+| `State == REBOOTING_BROKER` | 1 | Warning | n/a | S1, S2, S4 | `rebooting broker` |
+| `State == HEALING` | 1 | Warning | n/a | S1, S2, S4 | `healing` |
+| `State == DELETING` | 1 | Warning | n/a | S1, S2, S4 | `deleting` |
+| `State == FAILED` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
 | `PublicAccess.Type` publishes the brokers | 2 | Broken | `!` | S1, S3, S4, S5 | `brokers reachable from the internet` |
 | `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S3, S4, S5 | `unauthenticated access allowed` |
 | the cluster runs a broker version behind the newest AWS offers | 2 | Warning | `~` | S3, S4, S5 | `broker software outdated` |
@@ -222,7 +206,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - msk related-panel targets `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` — `docs/related-resources.md` § Per-type contract, row `msk`.
 - Per-target field citations (`EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId`, `LoggingInfo.BrokerLogs.CloudWatchLogs`, `LoggingInfo.BrokerLogs.S3`, `ClientAuthentication.Sasl.Scram`, `BrokerNodeGroupInfo.SecurityGroups`, `BrokerNodeGroupInfo.ClientSubnets`, `BrokerNodeGroupInfo.ClientVpcIpAddresses → VPC`) — `docs/related-resources.md` § `msk`.
 - msk Wave 1 signal set (`State` enum mapping, `FAILED`→Broken, `DELETING`→Dim) — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
-- msk has no Wave 2 signals; per-broker runtime state not exposed by read-only APIs — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
+- msk Wave 2 signal set (broker software version, client-broker encryption, public broker access, unauthenticated access) — `docs/attention-signals.md § Signals § MESSAGING` row `msk`. Per-broker runtime state is not among them: no read-only API exposes it.
 - msk Wave 3 CloudWatch metrics (`ActiveControllerCount`, `OfflinePartitionsCount`, `UnderReplicatedPartitions`, `KafkaDataLogsDiskUsed`) — `docs/attention-signals.md § Not yet implemented`.
 - `State`, `StateInfo`, `ClusterArn`, `ClusterName`, `ClusterType`, `Provisioned`, `Serverless`, `CreationTime`, `CurrentVersion`, `Tags` present on the list response — `AWS SDK Go v2 — service/kafka/types.Cluster § State, StateInfo, ClusterArn, ClusterName, ClusterType, Provisioned, Serverless, CreationTime, CurrentVersion, Tags`.
 - `StateInfo.Code` / `StateInfo.Message` are the cause fields for S4 / S5 — `AWS SDK Go v2 — service/kafka/types.StateInfo § Code, Message`.

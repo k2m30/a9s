@@ -127,15 +127,7 @@ One bullet per distinct signal.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". Never appears on yellow/red/dim rows. |
-| S4 | Status / description column text | Short human-readable cause. Healthy rows render blank. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `ecr`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
@@ -147,10 +139,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | n/a | S2, S4 | `scan on push off` |
-| `ImageTagMutability == MUTABLE` | 1 | Warning | n/a | S2, S4 | `tags are mutable` |
-| latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `<N> critical, <M> high vulnerabilities` |
-| latest image `HIGH>0` (no CRITICAL) | 2 | Broken | `~` | S2, S4, S5 | `<N> critical, <M> high vulnerabilities` |
+| `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | n/a | S1, S2, S4 | `scan on push off` |
+| `ImageTagMutability == MUTABLE` | 1 | Warning | n/a | S1, S2, S4 | `tags are mutable` |
+| latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
+| latest image `HIGH>0` (no CRITICAL) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
 | the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S3, S4, S5 | `repository policy open to anyone` |
 | `GetLifecyclePolicy` reports no policy | 2 | Warning | `~` | S3, S4, S5 | `no lifecycle policy` |
 
@@ -158,7 +150,7 @@ Rules applied:
 
 - `scanOnPush==false` is a Wave 1 Warning and paints the row yellow; S4 carries the cause. No glyph (S3 is forbidden on yellow rows). No S5 (Wave 1 does not produce a finding object).
 - `CRITICAL>0` is a Wave 2 Broken finding; the row is repainted red and the full cause appears in S4/S5. S1 counts this `!` finding. S3 is suppressed because the row is no longer green.
-- `HIGH>0` is a Wave 2 Warning finding; the row is repainted yellow (if not already) and the cause appears in S4/S5. S3 is suppressed (non-green row); S1 does not count `~` findings.
+- `CRITICAL>0` and `HIGH>0` are the same finding, `ecr.vulnerabilities`, and it is Broken: the phrase counts both severities, so a repository with high findings and no critical ones reaches the menu count like any other.
 - When multiple signals fire on the same repo, the highest-severity bucket wins the row color (Broken > Warning) and S4 shows the Broken cause; secondary causes go to S5.
 
 ## 4.1 UX review (two sentences)

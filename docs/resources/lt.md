@@ -135,11 +135,11 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| IMDSv1 allowed | 1 | Warning | n/a | S2, S4 | `IMDSv1 allowed` |
-| EBS encryption off | 1 | Warning | n/a | S2, S4 | `EBS encryption disabled` |
-| `DescribeLaunchTemplateVersions` denied | 1 | Warning | n/a | S2, S4 | `details denied` |
-| `DescribeLaunchTemplateVersions` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
-| deprecated AMI | 2 | Warning | n/a | S2, S4, S5 | `deprecated AMI` |
+| IMDSv1 allowed | 1 | Warning | n/a | S1, S2, S4 | `IMDSv1 allowed` |
+| EBS encryption off | 1 | Warning | n/a | S1, S2, S4 | `EBS encryption disabled` |
+| `DescribeLaunchTemplateVersions` denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
+| `DescribeLaunchTemplateVersions` answered with nothing usable | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
+| deprecated AMI | 2 | Warning | `~` | S2, S3, S4, S5 | `deprecated AMI` |
 | credential in the `$Default` version's `UserData` | 2 | Broken | `!` | S1, S3, S4, S5 | `credential in user data` |
 
 Notes:

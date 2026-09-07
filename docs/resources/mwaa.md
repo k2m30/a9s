@@ -166,47 +166,31 @@ All signals come from `GetEnvironment` per environment (N+1; accounts run 1–5 
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank.** |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `mwaa`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit).
-- **Wave 1 Warning / Broken / Dim** → S2 + S4.
-- **Wave 2 finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4, S5.
-- **Wave 2 finding on a Healthy row, informational** → `~` glyph on green row. S3, S4, S5. No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed, S4 deduplicates with existing cause, S5 carries the full sentence, S1 still counts if `!`.
-
 One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironments` is opaque; the `GetEnvironment` pass sets the row color, so the state-bucket rows behave like Wave 1 colors to the operator (yellow/red is the attention signal, S3 suppressed because the row is not green):
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Status == CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `Status == CREATING_SNAPSHOT` | 1 | Warning | n/a | S2, S4 | `creating snapshot` |
-| `Status == PENDING` | 1 | Warning | n/a | S2, S4 | `pending: awaiting VPC endpoints` |
-| `Status == UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
-| `Status == ROLLING_BACK` | 1 | Warning | n/a | S2, S4 | `rolling back: update failed` |
-| `Status == MAINTENANCE` | 1 | Warning | n/a | S2, S4 | `maintenance in progress` |
-| `Status == CREATE_FAILED` | 1 | Broken | n/a | S2, S4 | `create failed` |
-| `Status == UPDATE_FAILED` | 1 | Broken | n/a | S2, S4 | `update failed: rolled back` |
-| `Status == UNAVAILABLE` | 1 | Broken | n/a | S2, S4 | `unavailable: not stable` |
+| `Status == CREATING` | 1 | Warning | n/a | S1, S2, S4 | `creating` |
+| `Status == CREATING_SNAPSHOT` | 1 | Warning | n/a | S1, S2, S4 | `creating snapshot` |
+| `Status == PENDING` | 1 | Warning | n/a | S1, S2, S4 | `pending: awaiting VPC endpoints` |
+| `Status == UPDATING` | 1 | Warning | n/a | S1, S2, S4 | `updating` |
+| `Status == ROLLING_BACK` | 1 | Warning | n/a | S1, S2, S4 | `rolling back: update failed` |
+| `Status == MAINTENANCE` | 1 | Warning | n/a | S1, S2, S4 | `maintenance in progress` |
+| `Status == CREATE_FAILED` | 1 | Broken | n/a | S1, S2, S4 | `create failed` |
+| `Status == UPDATE_FAILED` | 1 | Broken | n/a | S1, S2, S4 | `update failed: rolled back` |
+| `Status == UNAVAILABLE` | 1 | Broken | n/a | S1, S2, S4 | `unavailable: not stable` |
 | `Status == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting` |
 | `Status == DELETED` | 1 | Dim | n/a | S2, S4 | `deleted` |
-| `LastUpdate.Status == FAILED` on `AVAILABLE` | 1 | Warning | n/a | S2, S4 | `last update failed` |
-| `WebserverAccessMode` public | 1 | Warning | n/a | S2, S4 | `webserver public` |
-| `GetEnvironment` denied | 1 | Warning | n/a | S2, S4 | `details denied` |
-| `GetEnvironment` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
+| `LastUpdate.Status == FAILED` on `AVAILABLE` | 1 | Warning | n/a | S1, S2, S4 | `last update failed` |
+| `WebserverAccessMode` public | 1 | Warning | n/a | S1, S2, S4 | `webserver public` |
+| `GetEnvironment` denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
+| `GetEnvironment` answered with nothing usable | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
 
 Notes:
 

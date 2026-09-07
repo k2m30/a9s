@@ -117,40 +117,24 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing". **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause. **Healthy rows render blank** — no `OK` / `SUCCESS` / `verified`. |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `ses`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4, S5.
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4, S5. No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → S3 suppressed; S4 deduplicates with the existing per-row cause (prepend account-scope prefix where the finding is account-level); S5 still carries the full sentence; S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `VerificationStatus==PENDING` | 1 | Warning | n/a | S2, S4 | `pending verification` |
-| `VerificationStatus==FAILED` | 1 | Broken | n/a | S2, S4 | `verification failed` |
-| `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | n/a | S2, S4 | `verify: temp failure` |
-| `VerificationStatus==NOT_STARTED` | 1 | Broken | n/a | S2, S4 | `verification not started` |
-| `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S2, S4 | `sending disabled` |
+| `VerificationStatus==PENDING` | 1 | Warning | n/a | S1, S2, S4 | `pending verification` |
+| `VerificationStatus==FAILED` | 1 | Broken | n/a | S1, S2, S4 | `verification failed` |
+| `VerificationStatus==TEMPORARY_FAILURE` | 1 | Broken | n/a | S1, S2, S4 | `verify: temp failure` |
+| `VerificationStatus==NOT_STARTED` | 1 | Broken | n/a | S1, S2, S4 | `verification not started` |
+| `SendingEnabled==false` (on verified identity) | 1 | Warning | n/a | S1, S2, S4 | `sending disabled` |
 | `EnforcementStatus==PROBATION` | 2 | Broken | `!` | S1, S3, S4, S5 | `account under review (probation)` |
 | `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S3, S4, S5 | `sending paused by AWS (shutdown)` |
-| `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S1, S2, S3, S4, S5 | `quota 80%+ used` |
+| `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S2, S3, S4, S5 | `quota 80%+ used` |
 | a domain identity not signing its outbound mail | 2 | Warning | `~` | S3, S4, S5 | `DKIM not enabled` |
 
 Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the account, not any single identity — a9s-devops: surface the finding on **every** identity row's S4 with the compact `account ...:` prefix so a glance at the list correctly attributes the problem to the account, not the identity; S1 counts the account-level finding once, not N times.

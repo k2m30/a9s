@@ -155,15 +155,15 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == OFFLINE` | 1 | Warning | n/a | S2, S4 | `offline: not accepting transfers` |
-| `State == STARTING` | 1 | Warning | n/a | S2, S4 | `starting` |
-| `State == STOPPING` | 1 | Warning | n/a | S2, S4 | `stopping` |
-| `State == START_FAILED` | 1 | Broken | n/a | S2, S4 | `start failed` |
-| `State == STOP_FAILED` | 1 | Warning | n/a | S2, S4 | `stop failed` |
-| legacy security policy | 1 | Warning | n/a | S2, S4 | `legacy security policy` |
-| no activity logging | 1 | Warning | n/a | S2, S4 | `no activity logging` |
-| `DescribeServer` denied | 1 | Warning | n/a | S2, S4 | `details denied` |
-| `DescribeServer` answered with nothing usable | 1 | Warning | n/a | S2, S4 | `details unavailable` |
+| `State == OFFLINE` | 1 | Warning | n/a | S1, S2, S4 | `offline: not accepting transfers` |
+| `State == STARTING` | 1 | Warning | n/a | S1, S2, S4 | `starting` |
+| `State == STOPPING` | 1 | Warning | n/a | S1, S2, S4 | `stopping` |
+| `State == START_FAILED` | 1 | Broken | n/a | S1, S2, S4 | `start failed` |
+| `State == STOP_FAILED` | 1 | Warning | n/a | S1, S2, S4 | `stop failed` |
+| legacy security policy | 1 | Warning | n/a | S1, S2, S4 | `legacy security policy` |
+| no activity logging | 1 | Warning | n/a | S1, S2, S4 | `no activity logging` |
+| `DescribeServer` denied | 1 | Warning | n/a | S1, S2, S4 | `details denied` |
+| `DescribeServer` answered with nothing usable | 1 | Warning | n/a | S1, S2, S4 | `details unavailable` |
 
 Notes:
 

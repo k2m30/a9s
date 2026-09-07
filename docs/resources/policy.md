@@ -59,7 +59,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `p
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `AttachmentCount==0` AND not AWS-managed → Warning (orphan — customer-managed policy attached to nothing, dead weight during IAM cleanup). — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `AttachmentCount==0` AND not AWS-managed → Warning (orphan — customer-managed policy attached to nothing, dead weight during IAM cleanup).
   - **State bucket**: Warning.
   - **How obtained**: `AttachmentCount` field on the `ListPolicies` response. "Not AWS-managed" is derived from the `Arn` — AWS-managed policies live under `arn:aws:iam::aws:policy/...` (the literal account id `aws`); customer-managed policies live under `arn:aws:iam::<account-id>:policy/...`. Orphan detection runs only on the customer-managed subset.
 
@@ -80,35 +80,19 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `p
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `policy`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4 (short cause), S5 (full sentence).
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4 (short cause), S5 (full sentence). No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → redundant with color; S3 suppressed, S4 deduplicates with existing cause, S5 still carries the full sentence, S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `AttachmentCount == 0` on a customer-managed policy | 1 | Warning | n/a | S2, S4 | `unattached, no roles/users/groups use it` |
-| Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `admin star (allows * on *)` |
-| Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `allows privilege escalation` |
+| `AttachmentCount == 0` on a customer-managed policy | 1 | Warning | n/a | S1, S2, S4 | `unattached, no roles/users/groups use it` |
+| Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `admin star (allows * on *)` |
+| Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `allows privilege escalation` |
 
 Rules for filling list and detail text:
 

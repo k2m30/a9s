@@ -411,12 +411,16 @@ func athenaGeneratedDocDetails(t *testing.T) map[domain.FindingCode]string {
 	return out
 }
 
-// TestD4Row25_AthenaDocRowsSitInTheWarningBucket pins the glyph surface of the
-// two workgroup findings.
+// TestD4Row25_AthenaDocRowsSitInTheWarningBucket pins the bucket and the glyph
+// surface of the two workgroup findings.
 //
-// Both codes are Warning and the witness renders yellow, so a §4 row claiming
-// bucket Healthy on S3 promises a glyph on a green row that the operator will
-// never see. §3.2 already said Warning, so the page disagreed with itself.
+// Both codes are Warning, so the bucket cell reads Warning. The surfaces cell
+// lists S3: core/app/list_columns.go resolveListDecoratorFull gives a Wave 2
+// SevWarn finding the `~` glyph whenever the row it lands on is Healthy, and
+// the Severity cell on these rows says `~`. The earlier expectation of
+// "S2, S4, S5" read the demo witness, which renders yellow, as if it were the
+// only row the finding can reach; a row cannot carry a glyph and omit the glyph
+// surface, so it is not to be restored.
 func TestD4Row25_AthenaDocRowsSitInTheWarningBucket(t *testing.T) {
 	b, err := os.ReadFile("../../docs/resources/athena.md")
 	if err != nil {
@@ -444,8 +448,8 @@ func TestD4Row25_AthenaDocRowsSitInTheWarningBucket(t *testing.T) {
 				t.Errorf("%s: state bucket = %q, want Warning — the code is SevWarn and the witness renders yellow",
 					signal, bucket)
 			}
-			if surfaces := strings.TrimSpace(cells[4]); surfaces != "S2, S4, S5" {
-				t.Errorf("%s: surfaces = %q, want %q", signal, surfaces, "S2, S4, S5")
+			if surfaces := strings.TrimSpace(cells[4]); surfaces != "S2, S3, S4, S5" {
+				t.Errorf("%s: surfaces = %q, want %q", signal, surfaces, "S2, S3, S4, S5")
 			}
 		}
 	}

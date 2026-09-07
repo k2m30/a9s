@@ -230,41 +230,25 @@ renders green and blank.
 
 ## 4. Issue Visualization
 
-Every signal from §3.1 and §3.2 must land on one or more of these five existing surfaces. No other UI is allowed.
-
-| # | Surface | Mechanism |
-|---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | Aggregated count of `!`-severity findings. `~` findings do not bump. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge; the generated note under this table says which waves feed it for this type. No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
-| S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
-| S3 | `!` / `~` glyph before the name | Annotates a Healthy (green) row with "no immediate action, but worth knowing" — e.g. maintenance scheduled, certificate expiring soon. `!` = important background concern, `~` = informational. **Never appears on yellow/red/dim rows.** |
-| S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." |
-| S5 | Detail view enrichment line | Short operator-readable sentence rendered inline in the detail view. No ceremonial header. |
+Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
 Badge aggregation for `lambda`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
 <!-- END GENERATED: badge -->
 
-Wave → surface mapping:
-
-- **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
-- **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4 (short cause), S5 (full sentence).
-- **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4 (short cause), S5 (full sentence). No S1.
-- **Wave 2 finding on an already yellow/red/dim row** → redundant with color; S3 suppressed, S4 deduplicates with existing cause, S5 still carries the full sentence, S1 still counts if `!`.
-
 One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==Pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State==Pending` | 1 | Warning | n/a | S1, S2, S4 | `pending` |
 | `State==Inactive` | 1 | Dim | n/a | S2, S4 | `inactive, evicted after extended idle time` |
 | `State==Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
 | `LastUpdateStatus==Failed` | 1 | Broken | n/a | S1, S2, S4 | `last update failed to apply` |
 | `Runtime` deprecated | 1 | Broken | n/a | S1, S2, S4 | `runtime is end-of-life` |
-| `DeadLetterConfig==nil` | 1 | Warning | n/a | S2, S4 | `no dead-letter queue configured` |
+| `DeadLetterConfig==nil` | 1 | Warning | n/a | S1, S2, S4 | `no dead-letter queue configured` |
 | credential in `Environment.Variables` | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in environment variables` |
-| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | n/a | S1, S2, S4, S5 | `invokable by anyone` |
-| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | n/a | S1, S2, S4, S5 | `function endpoint open without authentication` |
+| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `invokable by anyone` |
+| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `function endpoint open without authentication` |
 
 Rules for filling list and detail text:
 
