@@ -150,7 +150,12 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 
 	var issueRows []domain.DetailRow
 	r.Findings, issueRows = eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
-	addWave1Rows(&r, eksIssueRowCode(status), issueRows...)
+	if len(r.Findings) > 0 {
+		// The rows belong to whichever finding built them — the failed state
+		// folds them in, any other state leaves them on the health-issue
+		// finding, and both put that finding first.
+		addWave1Rows(&r, r.Findings[0].Code, issueRows...)
+	}
 	addEKSPostureRows(&r, cluster, versions)
 	return r
 }
@@ -404,14 +409,4 @@ func eksClusterFindings(status string, healthIssuesCount int, issueCodes []strin
 		}
 	}
 	return append(findings, eksPostureFindings(status, version, p)...), rows
-}
-
-// eksIssueRowCode names the finding the Health.Issues[] rows belong to: the
-// failed state folds them in, any other state leaves them on the health-issue
-// finding.
-func eksIssueRowCode(status string) domain.FindingCode {
-	if status == string(ekstypes.ClusterStatusFailed) {
-		return CodeEKSStateFailed
-	}
-	return CodeEKSHealthIssue
 }

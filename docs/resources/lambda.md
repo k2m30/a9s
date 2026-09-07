@@ -185,31 +185,41 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State` in `Active` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `ListFunctions` response field `State` on each `FunctionConfiguration` entry.
-- **Signal**: `State` in `Pending` → Warning.
+A function that is `Active` with nothing else wrong raises no signal and
+renders green and blank.
+
+- **Signal**: `State` in `Pending`.
   - **State bucket**: Warning.
   - **How obtained**: `ListFunctions` response field `State`.
-- **Signal**: `State` in `Inactive` → Dim.
+- **Signal**: `State` in `Inactive`.
   - **State bucket**: Dim.
   - **How obtained**: `ListFunctions` response field `State`. (Inactive means the function has been idle and will re-initialize on next invoke.)
-- **Signal**: `State` in `Failed` → Broken.
+- **Signal**: `State` in `Failed`.
   - **State bucket**: Broken.
   - **How obtained**: `ListFunctions` response field `State`; reason carried on `StateReason` + `StateReasonCode`.
-- **Signal**: `LastUpdateStatus==Failed` → Broken. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `LastUpdateStatus==Failed`.
   - **State bucket**: Broken.
   - **How obtained**: `ListFunctions` response fields `LastUpdateStatus` + `LastUpdateStatusReason` + `LastUpdateStatusReasonCode`.
-- **Signal**: `Runtime` in [deprecated-runtimes list](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html) → Broken. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `Runtime` in the [deprecated-runtimes list](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html).
   - **State bucket**: Broken.
   - **How obtained**: `ListFunctions` response field `Runtime` compared against the AWS-published deprecated-runtimes list baked into the build.
-- **Signal**: `DeadLetterConfig==nil` → Warning. — implemented as a row-color rule, no finding row (as of 2026-07-06)
+- **Signal**: `DeadLetterConfig==nil`.
   - **State bucket**: Warning.
   - **How obtained**: `ListFunctions` response field `DeadLetterConfig` (nil means async-invocation failures are silently dropped after retries).
+- **Signal**: a plaintext environment variable holds what looks like a credential.
+  - **State bucket**: Broken.
+  - **How obtained**: `ListFunctions` response field `Environment.Variables`, scanned for credential-shaped values.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-No Wave 2 signals.
+- **Signal**: the function's resource policy allows a wildcard principal, so any AWS caller can invoke it.
+  - **State bucket**: Broken.
+  - **API call**: `GetPolicy` — one call per function.
+  - **Cost shape**: per-resource.
+- **Signal**: the function has a URL that requires no authentication (`AuthType == NONE`).
+  - **State bucket**: Broken.
+  - **API call**: `ListFunctionUrlConfigs` — one call per function.
+  - **Cost shape**: per-resource.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -246,15 +256,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==Pending` | 1 | Warning | n/a | S2, S4 | `creating` |
-| `State==Inactive` | 1 | Dim | n/a | S2, S4 | `idle: not invoked recently` |
-| `State==Failed` | 1 | Broken | n/a | S2, S4 | `failed: <StateReasonCode>` |
-| `LastUpdateStatus==Failed` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `update failed: <LastUpdateStatusReasonCode>` |
-| `Runtime` deprecated — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `runtime deprecated: <Runtime>` |
-| `DeadLetterConfig==nil` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no DLQ — async failures dropped` |
-| credential in `Environment.Variables` | 1 | Broken | `!` | S2, S4, S5 | `credential in environment variables` |
-| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S3, S4, S5 | `invokable by anyone` |
-| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S3, S4, S5 | `function endpoint open without authentication` |
+| `State==Pending` | 1 | Warning | n/a | S2, S4 | `pending` |
+| `State==Inactive` | 1 | Dim | n/a | S2, S4 | `inactive, evicted after extended idle time` |
+| `State==Failed` | 1 | Broken | n/a | S1, S2, S4 | `failed` |
+| `LastUpdateStatus==Failed` | 1 | Broken | n/a | S1, S2, S4 | `last update failed to apply` |
+| `Runtime` deprecated | 1 | Broken | n/a | S1, S2, S4 | `runtime is end-of-life` |
+| `DeadLetterConfig==nil` | 1 | Warning | n/a | S2, S4 | `no dead-letter queue configured` |
+| credential in `Environment.Variables` | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in environment variables` |
+| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | n/a | S1, S2, S4, S5 | `invokable by anyone` |
+| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | n/a | S1, S2, S4, S5 | `function endpoint open without authentication` |
 
 Rules for filling list and detail text:
 

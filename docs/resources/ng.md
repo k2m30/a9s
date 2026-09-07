@@ -94,29 +94,52 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 One bullet per distinct signal. Each signal is derived from the `DescribeNodegroup` response.
 
-- **Signal**: `status==ACTIVE`.
-  - **State bucket**: Healthy.
-  - **API call**: `DescribeNodegroup` — one call per node group.
-  - **Cost shape**: per-resource.
+An `ACTIVE` node group with nothing else wrong raises no signal and renders
+green and blank.
 
-- **Signal**: `status` in `CREATING` / `UPDATING` / `DELETING`.
+- **Signal**: `status==CREATING`.
   - **State bucket**: Warning.
   - **API call**: `DescribeNodegroup` — one call per node group.
   - **Cost shape**: per-resource.
 
-- **Signal**: `status` in `CREATE_FAILED` / `DELETE_FAILED` / `DEGRADED`.
+- **Signal**: `status==UPDATING`.
+  - **State bucket**: Warning.
+  - **API call**: `DescribeNodegroup` — one call per node group.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `status==DELETING`.
+  - **State bucket**: Warning.
+  - **API call**: `DescribeNodegroup` — one call per node group.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `status==CREATE_FAILED`.
   - **State bucket**: Broken.
   - **API call**: `DescribeNodegroup` — one call per node group.
   - **Cost shape**: per-resource.
 
-- **Signal**: `health.issues[]` is non-empty on a node group whose `status` is not itself a finding (`ACTIVE`) → Warning. Health is tracked independently of the lifecycle state, the same way it is for the cluster.
+- **Signal**: `status==DELETE_FAILED`.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeNodegroup` — one call per node group.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `status==DEGRADED`. Every code in `health.issues[]` becomes a row under the finding, so the detail view names what AWS reported.
+  - **State bucket**: Broken.
+  - **API call**: `DescribeNodegroup` — same call as above; no additional request.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `health.issues[]` is non-empty on a node group whose `status` says nothing is wrong (`ACTIVE`). Health is tracked independently of the lifecycle state, the same way it is for the cluster, and every reported code becomes a row under the finding.
   - **State bucket**: Warning.
   - **API call**: `DescribeNodegroup` — same call as above; no additional request.
   - **Cost shape**: per-resource.
 
-- **Signal**: `health.issues[]` contains a code in the broken set — `InsufficientFreeAddresses`, `Ec2LaunchTemplateVersionMismatch`, `AutoScalingGroupInvalidConfiguration`, `AccessDenied`, `Ec2SecurityGroupDeletionFailure`, `Ec2SecurityGroupNotFound`, `IamInstanceProfileNotFound`, `IamNodeRoleNotFound`, `InstanceLimitExceeded`, `NodeCreationFailure`, `ClusterUnreachable`, `Ec2LaunchTemplateNotFound`, `AsgInstanceLaunchFailures`, `AutoScalingGroupNotFound`, `Ec2SubnetInvalidConfiguration`, `Ec2InstanceTypeDoesNotExist`, `InternalFailure`.
-  - **State bucket**: Broken.
-  - **API call**: `DescribeNodegroup` — same call as above; no additional request.
+- **Signal**: `DescribeNodegroup` was denied for this node group.
+  - **State bucket**: Warning.
+  - **API call**: the same describe; only the node-group name is visible after it.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `DescribeNodegroup` answered with nothing usable.
+  - **State bucket**: Warning.
+  - **API call**: the same describe; only the node-group name is visible after it.
   - **Cost shape**: per-resource.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
@@ -146,37 +169,27 @@ One row per signal from §3 that reaches at least one surface. Healthy is omitte
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `status==CREATING` | 2 | Warning | n/a | S2, S4 | `creating` |
-| `status==UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` |
-| `status==DELETING` | 2 | Warning | n/a | S2, S4 | `deleting` |
-| `status==CREATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `create failed` |
-| `status==DELETE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `delete failed` |
-| `status==DEGRADED` | 2 | Broken | n/a | S2, S4, S5 | `degraded: <first issue code, human-readable>` |
-| `health.issues[] InsufficientFreeAddresses` | 2 | Broken | n/a | S2, S4, S5 | `no free IPs in subnets` |
-| `health.issues[] Ec2LaunchTemplateVersionMismatch` | 2 | Broken | n/a | S2, S4, S5 | `launch template version mismatch` |
-| `health.issues[] AutoScalingGroupInvalidConfiguration` | 2 | Broken | n/a | S2, S4, S5 | `ASG misconfigured` |
-| `health.issues[] AccessDenied` | 2 | Broken | n/a | S2, S4, S5 | `access denied to cluster` |
-| `health.issues[] Ec2SecurityGroupDeletionFailure` | 2 | Broken | n/a | S2, S4, S5 | `remote-access SG delete failed` |
-| `health.issues[] Ec2SecurityGroupNotFound` | 2 | Broken | n/a | S2, S4, S5 | `cluster SG missing` |
-| `health.issues[] IamInstanceProfileNotFound` | 2 | Broken | n/a | S2, S4, S5 | `instance profile missing` |
-| `health.issues[] IamNodeRoleNotFound` | 2 | Broken | n/a | S2, S4, S5 | `node IAM role missing` |
-| `health.issues[] InstanceLimitExceeded` | 2 | Broken | n/a | S2, S4, S5 | `EC2 instance limit reached` |
-| `health.issues[] NodeCreationFailure` | 2 | Broken | n/a | S2, S4, S5 | `nodes cannot register` |
-| `health.issues[] ClusterUnreachable` | 2 | Broken | n/a | S2, S4, S5 | `cluster unreachable` |
-| `health.issues[] Ec2LaunchTemplateNotFound` | 2 | Broken | n/a | S2, S4, S5 | `launch template missing` |
-| `health.issues[] AsgInstanceLaunchFailures` | 2 | Broken | n/a | S2, S4, S5 | `ASG launch failures` |
-| `health.issues[] AutoScalingGroupNotFound` | 2 | Broken | n/a | S2, S4, S5 | `backing ASG missing` |
-| `health.issues[] Ec2SubnetInvalidConfiguration` | 2 | Broken | n/a | S2, S4, S5 | `subnet public-IP setting wrong` |
-| `health.issues[] Ec2InstanceTypeDoesNotExist` | 2 | Broken | n/a | S2, S4, S5 | `instance type unavailable` |
-| `health.issues[] InternalFailure` | 2 | Broken | n/a | S2, S4, S5 | `EKS internal failure` |
+| `status==CREATING` | 1 | Warning | n/a | S2, S4 | `creating` |
+| `status==UPDATING` | 1 | Warning | n/a | S2, S4 | `updating` |
+| `status==DELETING` | 1 | Warning | n/a | S2, S4 | `deleting` |
+| `status==CREATE_FAILED` | 1 | Broken | n/a | S2, S4, S5 | `create failed` |
+| `status==DELETE_FAILED` | 1 | Broken | n/a | S2, S4, S5 | `delete failed` |
+| `status==DEGRADED` | 1 | Broken | n/a | S2, S4, S5 | `degraded` |
+| `health.issues[]` non-empty on an `ACTIVE` group | 1 | Warning | n/a | S2, S4, S5 | `health issue` |
+| describe denied | 1 | Warning | n/a | S2, S4 | `details denied` |
+| describe answered with nothing | 1 | Warning | n/a | S2, S4 | `details unavailable` |
 
-All `health.issues[]` rows above are Wave 2 findings on an already-red row (because `DEGRADED` / `CREATE_FAILED` / `DELETE_FAILED` already bucketed Broken). Per §4 mapping rule — S3 glyph is suppressed on non-green rows; S4 surfaces the *cause*, not a redundant state keyword; S5 carries the full operator sentence. S1 still counts these as `!`-severity findings so the menu tally is accurate.
+The two health rows carry what AWS reported: each code in `health.issues[]` is a
+row under the finding in the detail view, so `insufficient free addresses` is
+read there rather than squeezed into the Status column. S3 is suppressed on all
+of these — the row is never green when one fires — and the Broken rows count
+toward S1.
 
 Healthy (`status==ACTIVE` with no issues) is omitted from the table: S2 renders green, S4 renders blank, no finding. Silence is the UX.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every Broken row pairs the state with a specific cause keyword in S4 (`no free IPs in subnets`, `node IAM role missing`, `launch template missing`, …), so the operator can triage and decide the next pivot (→ subnet, → role, → asg) without navigating into detail first.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reads `create failed`, `delete failed` or `degraded` and a yellow one reads `health issue`, which is enough to pick the group to open; the codes AWS reported are rows under the finding in the detail view, and that is where the next pivot (→ subnet, → role, → asg) is chosen.
 
 ## 5. Out of Scope
 
@@ -201,7 +214,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
   - Amended 2026-07-06: the "otherwise fan-out" branch violated Policy rule 7 (two AWS calls per checker). Both pivots now use the zero-call variant the citation itself calls cheap: the `eks:nodegroup-name` / `eks:cluster-name` tag join over the cached EC2 list (EKS managed node groups always tag their instances), with `BlockDeviceMappings` read from the cached Instance structs for `ebs`. Cold EC2 cache → `?` instead of a fan-out.
 
 - `sg` split between `Resources.RemoteAccessSecurityGroup` and `RemoteAccess.SourceSecurityGroups` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Operators confuse these two; the first is the SG attached to nodes' ENIs for remote access, the second is the list of client SGs allowed to SSH in. Surfacing both (deduplicated) in the related panel prevents "why can't I SSH?" misdiagnosis. Primary data-plane SG for pod traffic lives on the cluster, not the node group.`
-- S4/S5 cause-text rewrites for each `health.issues[]` code — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS surfaces the issue Code and Message verbatim; the spec rewrites jargon-free short causes for S4 (<= 40 chars) and one-line operator sentences for S5 (<= 100 chars). Keeping Message as fallback for DEGRADED so runtime detail isn't lost.`
+- Health-issue codes as rows under the finding — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS surfaces the issue Code and Message verbatim; the humanized code is what the operator reads.` The list line stays the finding's own phrase; each reported code is a row in the detail view, so a group with three issues has three to read.
 
 <!-- BEGIN GENERATED: header -->
 ng — CONTAINERS. Lifecycle key: `status`.

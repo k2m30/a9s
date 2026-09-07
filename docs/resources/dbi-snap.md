@@ -68,9 +68,8 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `Status == "available"` → Healthy.
-  - **State bucket**: Healthy.
-  - **How obtained**: `DBSnapshot.Status` on the `DescribeDBSnapshots` response.
+An `available` snapshot with nothing else wrong raises no signal and renders
+green and blank.
 
 - **Signal**: `Status == "creating"` → Warning.
   - **State bucket**: Warning.
@@ -92,16 +91,20 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `DBSnapshot.Encrypted` on the `DescribeDBSnapshots` response.
 
-- **Signal**: cross-ref `dbi` — source DB instance no longer present in the already-loaded `dbi` list → Warning (orphan snapshot whose parent was deleted).
-  - **State bucket**: Warning.
+### 3.2 Wave 2 — bounded extra API calls
+
+The two cross-reference signals below make no AWS call of their own — they read
+the already-loaded `dbi` list — but they run in the enrichment pass, after the
+list is on screen, so they are Wave 2 like the attribute read.
+
+- **Signal**: cross-ref `dbi` — source DB instance no longer present in the already-loaded `dbi` list (orphan snapshot whose parent was deleted).
+  - **State bucket**: Broken.
   - **How obtained**: read `DBSnapshot.DBInstanceIdentifier`; treat as orphan when the identifier is absent from the loaded `dbi` list. Skip the rule when the `dbi` list has not been loaded in this session (avoids false-positive orphan flags).
 
-- **Signal**: cross-ref `dbi` — when the parent DB is present in the already-loaded `dbi` list, `SnapshotCreateTime` older than the parent `DBInstance.BackupRetentionPeriod` (in days) AND `SnapshotType == "automated"` → Warning (automated snapshot kept past its retention window — signals retention-policy drift or a stuck automated cycle).
-  - **State bucket**: Warning.
+- **Signal**: cross-ref `dbi` — when the parent DB is present in the already-loaded `dbi` list, `SnapshotCreateTime` older than the parent `DBInstance.BackupRetentionPeriod` (in days) AND `SnapshotType == "automated"` (automated snapshot kept past its retention window — retention-policy drift or a stuck automated cycle).
+  - **State bucket**: Broken.
   - **How obtained**: compute age from `DBSnapshot.SnapshotCreateTime` on the list response, cross-reference against the already-loaded `dbi` list by `DBInstanceIdentifier`, compare to `DBInstance.BackupRetentionPeriod`. Skip the rule when the parent DB is not in the loaded sibling list.
   - **Threshold**: fires on `age > retention` (1.0× — no multiplier). `BackupRetentionPeriod` IS the operator's declared retention policy; any snapshot kept past it is policy drift regardless of engine. Same threshold applies to `dbc-snap`.
-
-### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: the snapshot's `restore` attribute lists the `all` group → **Broken** (`shared with all AWS accounts`).
   - **State bucket**: Broken.
@@ -145,11 +148,11 @@ One row per signal from §3:
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating: <pct>%` |
 | `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S2, S4 | `<status>` |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` |
-| `Status == incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (or current keyword) |
+| `Status == incompatible-*` | 1 | Broken | n/a | S2, S4 | `<incompatible-* status>` |
 | `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` |
-| orphan: source DB deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source DB deleted` |
-| automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` |
-| `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S4, S5 | `shared with all AWS accounts` |
+| orphan: source DB deleted | 2 | Broken | n/a | S1, S2, S4, S5 | `orphan: source DB deleted` |
+| automated age > parent `BackupRetentionPeriod` | 2 | Broken | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` |
+| `restore` attribute lists the `all` group | 2 | Broken | n/a | S1, S2, S4, S5 | `shared with all AWS accounts` |
 
 Rules for filling list and detail text:
 

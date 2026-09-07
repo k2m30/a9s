@@ -113,7 +113,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		Findings:  findings,
 		RawStruct: ng,
 	}
-	if len(issueRows) > 0 {
+	if len(findings) > 0 {
 		// The rows belong to whichever finding built them — degraded folds
 		// them into its state finding, ACTIVE-with-issues into the
 		// health-issue one. A row filed under a code the resource does not

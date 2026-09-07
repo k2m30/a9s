@@ -87,9 +87,8 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `Status == "available"`.
-  - **State bucket**: Healthy.
-  - **How obtained**: `DBClusterSnapshot.Status` on the list response.
+An `available` snapshot with nothing else wrong raises no signal and renders
+green and blank.
 
 - **Signal**: `Status == "creating"`.
   - **State bucket**: Warning.
@@ -111,16 +110,24 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: compute `now() - DBClusterSnapshot.SnapshotCreateTime` on the list response; gate on `SnapshotType == "manual"`.
 
-- **Signal**: cross-ref `dbc` — source cluster no longer present in the already-loaded `dbc` list → Warning (orphan snapshot whose parent was deleted).
+- **Signal**: `StorageEncrypted == false` — the snapshot holds cluster data at rest with no key of its own.
   - **State bucket**: Warning.
-  - **How obtained**: read `DBClusterSnapshot.DBClusterIdentifier`; treat as orphan when the identifier is absent from the loaded `dbc` list. Skip the rule when the `dbc` list has not been loaded in this session (avoids false-positive orphan flags).
-
-- **Signal**: cross-ref `dbc` — when the parent cluster is present in the already-loaded `dbc` list, `SnapshotCreateTime` older than `DBCluster.BackupRetentionPeriod` AND `SnapshotType == "automated"` → Warning (automated snapshot kept past its retention window — signals retention-policy drift or a stuck automated cycle).
-  - **State bucket**: Warning.
-  - **How obtained**: compute age from `DBClusterSnapshot.SnapshotCreateTime` on the list response, cross-referenced against the already-loaded `dbc` list by `DBClusterIdentifier`. Skip the rule when the parent cluster is not in the loaded sibling list.
-  - **Threshold**: fires on `age > retention` (1.0× — no multiplier). `BackupRetentionPeriod` IS the operator's declared retention policy; any snapshot kept past it is policy drift regardless of engine. Same threshold applies to `dbi-snap`.
+  - **How obtained**: `DBClusterSnapshot.StorageEncrypted` on the list response.
 
 ### 3.2 Wave 2 — bounded extra API calls
+
+The two cross-reference signals below make no AWS call of their own — they read
+the already-loaded `dbc` list — but they run in the enrichment pass, after the
+list is on screen, so they are Wave 2 like the attribute read.
+
+- **Signal**: cross-ref `dbc` — source cluster no longer present in the already-loaded `dbc` list (orphan snapshot whose parent was deleted).
+  - **State bucket**: Broken.
+  - **How obtained**: read `DBClusterSnapshot.DBClusterIdentifier`; treat as orphan when the identifier is absent from the loaded `dbc` list. Skip the rule when the `dbc` list has not been loaded in this session (avoids false-positive orphan flags).
+
+- **Signal**: cross-ref `dbc` — when the parent cluster is present in the already-loaded `dbc` list, `SnapshotCreateTime` older than `DBCluster.BackupRetentionPeriod` AND `SnapshotType == "automated"` (automated snapshot kept past its retention window — retention-policy drift or a stuck automated cycle).
+  - **State bucket**: Broken.
+  - **How obtained**: compute age from `DBClusterSnapshot.SnapshotCreateTime` on the list response, cross-referenced against the already-loaded `dbc` list by `DBClusterIdentifier`. Skip the rule when the parent cluster is not in the loaded sibling list.
+  - **Threshold**: fires on `age > retention` (1.0× — no multiplier). `BackupRetentionPeriod` IS the operator's declared retention policy; any snapshot kept past it is policy drift regardless of engine. Same threshold applies to `dbi-snap`.
 
 - **Signal**: the snapshot's `restore` attribute lists the `all` group → **Broken** (`shared with all AWS accounts`).
   - **State bucket**: Broken.
@@ -163,11 +170,12 @@ One row per signal from §3:
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating` |
 | `Status` neither `available` nor an enumerated state | 1 | Warning | n/a | S2, S4 | `<status>` |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` |
-| `Status` matches `incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (keyword verbatim) |
-| manual age > 365d | 1 | Warning | n/a | S2, S4 | `manual, unused 400d` |
-| orphan: source cluster deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source cluster deleted` |
-| automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` |
-| `restore` attribute lists the `all` group | 2 | Broken | `!` | S1, S2, S4, S5 | `shared with all AWS accounts` |
+| `Status` matches `incompatible-*` | 1 | Broken | n/a | S2, S4 | `<incompatible-* status>` |
+| manual age > 365d | 1 | Warning | n/a | S2, S4 | `manual, unused <N>d` |
+| `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` |
+| orphan: source cluster deleted | 2 | Broken | n/a | S1, S2, S4, S5 | `orphan: source cluster deleted` |
+| automated age > parent `BackupRetentionPeriod` | 2 | Broken | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` |
+| `restore` attribute lists the `all` group | 2 | Broken | n/a | S1, S2, S4, S5 | `shared with all AWS accounts` |
 
 Rules for filling list and detail text:
 

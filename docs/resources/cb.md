@@ -111,7 +111,30 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `cb`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No health signal on the list response — `ListProjects` is config-only and returns project-name strings, so build status comes from the per-project read behind `docs/attention-signals.md § Signals § CI/CD` row `cb`.
+`ListProjects` returns project-name strings only, so the fetcher reads the
+projects with `BatchGetProjects` before it builds the rows. The four signals
+below come off that response as the row is built, and they are independent: a
+project that is wrong four ways carries four of them.
+
+- **Signal**: the project's build results are readable without an AWS account (`ProjectVisibility == PUBLIC_READ`).
+  - **State bucket**: Broken.
+  - **API call**: `BatchGetProjects` — batched across projects, no per-project call.
+  - **Cost shape**: per-sweep.
+
+- **Signal**: the build instructions come from a file in the source repository rather than the project definition.
+  - **State bucket**: Warning.
+  - **API call**: same `BatchGetProjects` — `Source.Buildspec`. The buildspec path becomes a row under the finding.
+  - **Cost shape**: per-sweep.
+
+- **Signal**: the source repository address embeds a credential.
+  - **State bucket**: Broken.
+  - **API call**: same `BatchGetProjects` — `Source.Location`. The redacted address becomes a row under the finding.
+  - **Cost shape**: per-sweep.
+
+- **Signal**: a plaintext environment variable on the project holds what looks like a credential.
+  - **State bucket**: Broken.
+  - **API call**: same `BatchGetProjects` — `Environment.EnvironmentVariables`.
+  - **Cost shape**: per-sweep.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -156,14 +179,18 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S3, S4, S5 (green row stays green; `!` glyph + cause) | `last build failed: <CurrentPhase>` |
+| build results public | 1 | Broken | n/a | S1, S2, S4, S5 | `build results publicly visible` |
+| buildspec from the source repository | 1 | Warning | n/a | S2, S4, S5 | `buildspec taken from the source repository` |
+| credential in the source address | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in the source repository address` |
+| credential in a plaintext environment variable | 1 | Broken | n/a | S1, S2, S4, S5 | `credential in environment variables` |
+| latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | n/a | S1, S2, S4, S5 | `latest build <status> (<date>)` |
 
-Cause-field sources for S4 / S5: `Build.BuildStatus` (enum) plus `Build.CurrentPhase` and `Build.EndTime` from the batched `BatchGetBuilds` response (AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, CurrentPhase, EndTime`). When `BuildStatus==FAULT` the fault usually reflects a platform/infrastructure problem; `FAILED` reflects a user-code/script exit; `TIMED_OUT` reflects the project's `TimeoutInMinutes`. The S4 line uses the status keyword paired with the phase so the operator sees where it broke without opening detail.
+Cause-field sources for S4 / S5: `Build.BuildStatus` (enum) and `Build.EndTime` from the batched `BatchGetBuilds` response (AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, EndTime`). `FAULT` reflects a platform problem, `FAILED` a user-code exit, `TIMED_OUT` the project's `TimeoutInMinutes`; the list line pairs the status with the date so the operator sees whether it is fresh without opening detail.
 
 Rules for filling list and detail text:
 
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
-- A bare state keyword (`FAILED`, `FAULT`, `TIMED_OUT`) in the List text column is not acceptable. The spec pairs it with the build phase.
+- A bare state keyword (`FAILED`, `FAULT`, `TIMED_OUT`) in the List text column is not acceptable. The line pairs it with the date of the build.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), the row is omitted entirely from this table; §3 still describes it.
 - List text ≤ 40 chars. The Detail sentence lives on the finding definition and is generated into the Findings table below; it is never written here.
 

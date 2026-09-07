@@ -150,6 +150,36 @@ One bullet per distinct signal.
   - **API call**: `DescribeCluster` per cluster (same call — `Health` is on the Describe shape). Each `ClusterIssue` carries `Code` (enum, e.g. `AccessDenied`), `Message` (human sentence), and `ResourceIds[]`; every reported code becomes a row under the finding.
   - **Cost shape**: per-resource.
 
+- **Signal**: the cluster's Kubernetes endpoint answers from the public internet.
+  - **State bucket**: Broken.
+  - **API call**: same `DescribeCluster` — `ResourcesVpcConfig.EndpointPublicAccess` with `PublicAccessCidrs`.
+  - **Cost shape**: per-resource.
+
+- **Signal**: not all five control-plane log types are sent to CloudWatch.
+  - **State bucket**: Warning.
+  - **API call**: same `DescribeCluster` — `Logging.ClusterLogging`.
+  - **Cost shape**: per-resource.
+
+- **Signal**: no KMS key covers the cluster's Kubernetes secrets.
+  - **State bucket**: Warning.
+  - **API call**: same `DescribeCluster` — `EncryptionConfig[].Resources`.
+  - **Cost shape**: per-resource.
+
+- **Signal**: the cluster's Kubernetes minor is past standard support.
+  - **State bucket**: Broken.
+  - **API call**: same `DescribeCluster` for `Version`, compared against `DescribeClusterVersions` — one call per sweep, shared by every cluster.
+  - **Cost shape**: per-sweep.
+
+- **Signal**: `DescribeCluster` was denied for this cluster.
+  - **State bucket**: Warning.
+  - **API call**: the same describe; only the cluster name is visible after it.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `DescribeCluster` answered with nothing usable.
+  - **State bucket**: Warning.
+  - **API call**: the same describe; only the cluster name is visible after it.
+  - **Cost shape**: per-resource.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals: no enricher runs a second pass over a cluster.
@@ -195,6 +225,12 @@ One row per signal from §3. The fetcher's own `DescribeCluster` sets the row co
 | `Status == PENDING` | 1 | Warning | n/a | S2, S4 | `pending` |
 | `Status == FAILED` | 1 | Broken | n/a | S2, S4 | `failed` |
 | `Health.Issues[]` non-empty | 1 | Warning | n/a | S2, S4, S5 | `health issue` |
+| endpoint open to the internet | 1 | Broken | n/a | S1, S2, S4, S5 | `cluster endpoint reachable from the internet` |
+| control-plane log types missing | 1 | Warning | n/a | S2, S4, S5 | `control plane logging incomplete` |
+| no KMS key over secrets | 1 | Warning | n/a | S2, S4, S5 | `secrets not encrypted with KMS` |
+| Kubernetes minor past standard support | 1 | Broken | n/a | S1, S2, S4, S5 | `Kubernetes <version> is out of standard support` |
+| describe denied | 1 | Warning | n/a | S2, S4 | `details denied` |
+| describe answered with nothing | 1 | Warning | n/a | S2, S4 | `details unavailable` |
 
 Notes:
 
