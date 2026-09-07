@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -185,17 +186,6 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 		"inaccessible-encryption-credentials": CodeDBIEncryptionKeyUnavailable,
 		"stopped":                             CodeDBIStopped,
 	}
-	brokenPhraseMap := map[string]string{
-		"failed":                              "failed",
-		"storage-full":                        "storage-full",
-		"incompatible-network":                "incompatible-network",
-		"incompatible-option-group":           "incompatible-option-group",
-		"incompatible-parameters":             "incompatible-parameters",
-		"incompatible-restore":                "incompatible-restore",
-		"restore-error":                       "restore-error",
-		"inaccessible-encryption-credentials": "encryption key unavailable",
-		"stopped":                             "stopped",
-	}
 	postureFindings, postureDetails := dbiPostureFindings(db, now)
 	// An instance on its way out has no posture worth reporting.
 	if isTeardownStatus(status) {
@@ -203,7 +193,7 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 	}
 
 	if code, ok := brokenMap[status]; ok {
-		lead := []domain.Finding{{Code: code, Phrase: brokenPhraseMap[status], Severity: domain.SevBroken, Source: "wave1"}}
+		lead := []domain.Finding{wave1Finding(code, catalog.Phrase(code), domain.SevBroken)}
 		return append(lead, postureFindings...), postureDetails
 	}
 	if _, ok := transitionalStatusSet[status]; ok {

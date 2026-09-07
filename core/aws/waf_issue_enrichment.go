@@ -72,7 +72,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
 				rows = append(rows, domain.DetailRow{
 					Label: "Logging",
-					Value: "no logging configuration",
+					Value: "off",
 					Tier:  "~",
 				})
 			} else {

@@ -203,8 +203,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "LoadBalancerArns", TargetType: "elb"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: tgCodeAllTargetsUnhealthy, Phrase: "all <N> targets unhealthy", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: tgCodeUnhealthyTargets, Phrase: "unhealthy targets: <N>/<M>", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: tgCodeAllTargetsUnhealthy, Phrase: "all <N> targets unhealthy", Severity: domain.SevBroken, Source: "wave2", Detail: "Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with."},
+			{Code: tgCodeUnhealthyTargets, Phrase: "unhealthy targets: <N>/<M>", Severity: domain.SevWarn, Source: "wave2", Detail: "Some of this group's targets are failing their health checks, so every request is landing on the ones that are left. Each failing target is listed with the reason its health check gave; fix or replace them before the remaining targets run out of headroom."},
 		},
 	},
 	{

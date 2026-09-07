@@ -187,7 +187,7 @@ One row per signal from §3:
 Notes:
 
 - The Wave 2 findings land on rows that are Healthy (green) at Wave 1 unless Wave 1 already flagged them (e.g. orphan). For the Warning row, severity is `n/a` rather than `~` because the row color is already yellow — S2 is the attention signal; S3 would be redundant and is suppressed. For the Broken row (all targets unhealthy), the row color is already red; S1 still counts this as an `!`-equivalent issue because it represents a user-facing outage, but the glyph is suppressed per the "already red" rule.
-- List-text `<K>/<N>` is derived from the `DescribeTargetHealth` response: `K = count(TargetHealthDescriptions where TargetHealth.State == "unhealthy")`, `N = len(TargetHealthDescriptions)`. Detail-text source for per-target reason: `TargetHealth.Reason` (e.g. `Target.Timeout`, `Target.ResponseCodeMismatch`, `Target.FailedHealthChecks`) and `TargetHealth.Description`.
+- List-text `<K>/<N>` is derived from the `DescribeTargetHealth` response: `K = count(TargetHealthDescriptions where TargetHealth.State == "unhealthy")`, `N = len(TargetHealthDescriptions)`. The detail lists one `Unhealthy target` row per failing target, `<id>:<port> — <reason>`, from `Target.Id`, `Target.Port` and `TargetHealth.Reason` (e.g. `Target.Timeout`, `Target.ResponseCodeMismatch`, `Target.FailedHealthChecks`). The ratio is the phrase's, so no row repeats it.
 
 ## 4.1 UX review (two sentences)
 
@@ -233,8 +233,8 @@ tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| tg.all-targets-unhealthy | all <N> targets unhealthy | broken | wave2 | — |
-| tg.unhealthy-targets | unhealthy targets: <N>/<M> | warn | wave2 | — |
+| tg.all-targets-unhealthy | all <N> targets unhealthy | broken | wave2 | Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with. |
+| tg.unhealthy-targets | unhealthy targets: <N>/<M> | warn | wave2 | Some of this group's targets are failing their health checks, so every request is landing on the ones that are left. Each failing target is listed with the reason its health check gave; fix or replace them before the remaining targets run out of headroom. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

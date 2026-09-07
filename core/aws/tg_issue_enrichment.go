@@ -81,7 +81,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		// counts. "initial", "draining", "unused", etc. are transitional or
 		// intentional states, not failures, and must not trigger a finding.
 		literalUnhealthy := 0
-		var firstReason string
+		var unhealthyRows []domain.DetailRow
 		for _, t := range out.TargetHealthDescriptions {
 			if t.TargetHealth == nil {
 				continue
@@ -89,15 +89,29 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			if t.TargetHealth.State != elbtypes.TargetHealthStateEnumHealthy {
 				notHealthy++
 			}
-			if t.TargetHealth.State == elbtypes.TargetHealthStateEnumUnhealthy {
-				literalUnhealthy++
-				if firstReason == "" && t.TargetHealth.Reason != "" {
-					// humanizeTargetHealthReason (tg_health.go) strips the
-					// Target./Elb. namespace prefix before humanizing — plain
-					// domain.HumanizeStatusPhrase would emit "target. failed
-					// health checks" for "Target.FailedHealthChecks".
-					firstReason = humanizeTargetHealthReason(string(t.TargetHealth.Reason))
+			if t.TargetHealth.State != elbtypes.TargetHealthStateEnumUnhealthy {
+				continue
+			}
+			literalUnhealthy++
+			value := ""
+			if t.Target != nil {
+				value = aws.ToString(t.Target.Id)
+				if t.Target.Port != nil {
+					value += fmt.Sprintf(":%d", *t.Target.Port)
 				}
+			}
+			// humanizeTargetHealthReason (tg_health.go) strips the Target./Elb.
+			// namespace prefix before humanizing — plain
+			// domain.HumanizeStatusPhrase would emit "target. failed health
+			// checks" for "Target.FailedHealthChecks".
+			switch reason := humanizeTargetHealthReason(string(t.TargetHealth.Reason)); {
+			case value == "":
+				value = reason
+			case reason != "":
+				value += " — " + reason
+			}
+			if value != "" {
+				unhealthyRows = append(unhealthyRows, domain.DetailRow{Label: "Unhealthy target", Value: value})
 			}
 		}
 		healthy := targetCount - notHealthy
@@ -118,18 +132,15 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			if allDown {
 				tier = "!"
 			}
-			rows := []domain.DetailRow{
-				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", literalUnhealthy, targetCount), Tier: tier},
-			}
-			if firstReason != "" {
-				rows = append(rows, domain.DetailRow{Label: "Reason", Value: firstReason, Tier: "~"})
+			for i := range unhealthyRows {
+				unhealthyRows[i].Tier = tier
 			}
 			if allDown {
 				setWave2Finding(&result, r.ID, tgCodeAllTargetsUnhealthy,
-					fmt.Sprintf("all %d targets unhealthy", targetCount), "!", "tg", rows)
+					fmt.Sprintf("all %d targets unhealthy", targetCount), "!", "tg", unhealthyRows)
 			} else {
 				setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets,
-					fmt.Sprintf("unhealthy targets: %d/%d", literalUnhealthy, targetCount), "~", "tg", rows)
+					fmt.Sprintf("unhealthy targets: %d/%d", literalUnhealthy, targetCount), "~", "tg", unhealthyRows)
 			}
 		}
 	})
