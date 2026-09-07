@@ -270,7 +270,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or scope the grant with a condition."},
+			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2", Detail: "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."},
 			{Code: CodeECRScanOnPushOff, Phrase: "scan on push off", Severity: domain.SevWarn, Source: "wave1", Detail: "Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives."},
 			{Code: CodeECRMutableTags, Phrase: "tags are mutable", Severity: domain.SevWarn, Source: "wave1", Detail: "An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from."},
@@ -315,7 +315,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: codeartifactCodeNoPermissionsPolicy, Phrase: "no permissions policy", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or scope the grant with a condition."},
+			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 		},
 	},
 }

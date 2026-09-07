@@ -194,7 +194,7 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 | kms.state.unavailable | <key state> | broken | wave1 | — |
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | — |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 | This customer-managed key never rotates its backing material, so every ciphertext ever written under it depends on one key that has been in use since creation. Enable automatic key rotation on the key. |
-| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "*" principal with the specific accounts or roles that need the key, or add a condition scoping the grant. |
+| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "*" principal with the specific accounts or roles that need the key, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only names the service the request comes through, or only says whether a key is set, scopes nothing. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

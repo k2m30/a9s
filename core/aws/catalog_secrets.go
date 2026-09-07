@@ -92,7 +92,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSecretStaleValue, Phrase: "value unchanged in over 365 days", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: secretsCodePublicPolicy, Phrase: "resource policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the \"*\" principal from the resource policy, or scope it with a condition naming the accounts that need it."},
+			{Code: secretsCodePublicPolicy, Phrase: "resource policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the \"*\" principal from the resource policy, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 			{Code: secretsCodeCrossAccountPolicy, Phrase: "resource policy grants another account", Severity: domain.SevWarn, Source: "wave2", Detail: "The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise."},
 		},
 	},
@@ -169,7 +169,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeKMSAccessDenied, Phrase: "access denied (kms:DescribeKey)", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "This customer-managed key never rotates its backing material, so every ciphertext ever written under it depends on one key that has been in use since creation. Enable automatic key rotation on the key."},
-			{Code: kmsCodePublicPolicy, Phrase: "key policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the \"*\" principal with the specific accounts or roles that need the key, or add a condition scoping the grant."},
+			{Code: kmsCodePublicPolicy, Phrase: "key policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the \"*\" principal with the specific accounts or roles that need the key, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only names the service the request comes through, or only says whether a key is set, scopes nothing."},
 		},
 	},
 }

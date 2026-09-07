@@ -137,7 +137,7 @@ codeartifact — CI/CD. Lifecycle key: none (the list API returns no lifecycle f
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 | — |
-| codeartifact.public-access-policy | public access policy | broken | wave2 | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "*" principal with the accounts or roles that need the repository, or scope the grant with a condition. |
+| codeartifact.public-access-policy | public access policy | broken | wave2 | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "*" principal with the accounts or roles that need the repository, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

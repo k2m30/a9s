@@ -228,7 +228,7 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 | secrets.state.dormant | dormant | warn | wave1 | — |
 | secrets.rotation.disabled | rotation not enabled | warn | wave1 | — |
 | secrets.value.stale | value unchanged in over 365 days | warn | wave1 | — |
-| secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "*" principal from the resource policy, or scope it with a condition naming the accounts that need it. |
+| secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "*" principal from the resource policy, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | secrets.cross-account-policy | resource policy grants another account | warn | wave2 | The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise. |
 <!-- END GENERATED: findings -->
 
