@@ -141,6 +141,13 @@ type ColumnDef struct {
 	// fallback — the isStatusCol branch and identity-column RawStruct
 	// precedence (e.g. EC2 InstanceType) are unaffected.
 	Humanize bool `json:"humanize,omitempty"`
+	// Identity marks the one column that names the row, elected by
+	// IdentityColumnIndex over the resolved (rendered) column set at the
+	// moment that set is built. Carrying the election on the column means a
+	// consumer holding a single ColumnDef — the cell extractor, the sort
+	// comparator — never re-derives it from a column set it cannot see.
+	// Not serialized: renderers get the election as an index on the body.
+	Identity bool `json:"-"`
 }
 
 // RowDecorator is a short tag that renderers use to apply per-row

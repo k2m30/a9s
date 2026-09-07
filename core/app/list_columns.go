@@ -75,6 +75,16 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 	for i, lc := range lcs {
 		cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 	}
+	return electIdentityColumn(cols, td)
+}
+
+// electIdentityColumn marks the type's identity column on a freshly resolved
+// column set. Every resolver returns through here, so the election runs once
+// over the set that will actually be rendered and travels with it.
+func electIdentityColumn(cols []ColumnDef, td *resource.ResourceTypeDef) []ColumnDef {
+	if len(cols) > 0 {
+		cols[IdentityColumnIndex(cols, td)].Identity = true
+	}
 	return cols
 }
 
@@ -418,6 +428,16 @@ func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	// The fallback typeDef is resolved first: it decides the superset guard
+	// below AND the identity election on every branch, including the
+	// viewConfig one, whose columns name rows of the same type.
+	var ftd *resource.ResourceTypeDef
+	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
+		ftd = &fv
+	} else if ct := resource.FindResourceType(typeName); ct != nil {
+		ftd = ct
+	}
+
 	// viewConfig takes highest priority (same as resolveColumns).
 	if c.viewConfig != nil {
 		vd := config.GetViewDef(c.viewConfig, typeName)
@@ -426,16 +446,8 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 			for i, lc := range vd.List {
 				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 			}
-			return cols
+			return electIdentityColumn(cols, ftd)
 		}
-	}
-
-	// No viewConfig — resolve the fallback typeDef so we can compare against defaults.
-	var ftd *resource.ResourceTypeDef
-	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
-		ftd = &fv
-	} else if ct := resource.FindResourceType(typeName); ct != nil {
-		ftd = ct
 	}
 
 	// Apply the same superset + first-column-title guard as resolveColumns:
@@ -453,7 +465,7 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 			for i, lc := range defaultVD.List {
 				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 			}
-			return cols
+			return electIdentityColumn(cols, ftd)
 		}
 	}
 
@@ -463,7 +475,7 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 		for i, col := range ftd.Columns {
 			cols[i] = ColumnDef{Key: col.Key, Title: col.Title, Width: col.Width}
 		}
-		return cols
+		return electIdentityColumn(cols, ftd)
 	}
 
 	return nil
