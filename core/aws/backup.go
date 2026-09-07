@@ -205,8 +205,14 @@ func enumerateBackupPlanResources(
 // report. Such a block is not modelled; the selection is reported unfolded
 // instead, and the caller turns that into an abstention.
 func backupSelectionTagConditions(sel backuptypes.BackupSelection) (tags []string, representable bool) {
+	// A condition AWS returned without a key or a value is one this fold drops,
+	// and a dropped condition narrows what the plan appears to reach — the
+	// direction that invents a "not covered" finding rather than hiding one. So
+	// representable counts what folded, never what was merely present.
+	dropped := 0
 	add := func(key, value *string) {
 		if key == nil || value == nil {
+			dropped++
 			return
 		}
 		tags = append(tags, strings.TrimPrefix(*key, "aws:ResourceTag/")+"="+*value)
@@ -216,11 +222,13 @@ func backupSelectionTagConditions(sel backuptypes.BackupSelection) (tags []strin
 	}
 	c := sel.Conditions
 	if c == nil {
-		return tags, true
+		return tags, dropped == 0
 	}
-	for _, cond := range slices.Concat(c.StringEquals, c.StringLike) {
+	positives := slices.Concat(c.StringEquals, c.StringLike)
+	for _, cond := range positives {
 		add(cond.ConditionKey, cond.ConditionValue)
 	}
-	return tags, len(c.StringNotEquals)+len(c.StringNotLike) == 0 &&
-		len(c.StringEquals)+len(c.StringLike) <= 1
+	return tags, dropped == 0 &&
+		len(c.StringNotEquals)+len(c.StringNotLike) == 0 &&
+		len(positives) <= 1
 }
