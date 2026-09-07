@@ -43,15 +43,19 @@ func (m detailMismatch) String() string {
 }
 
 // checkRowsAgainstDefinitions walks rows' Findings and reports every finding
-// whose non-empty Detail does not equal its type's declared FindingDef.Detail.
+// whose Detail does not equal its type's declared FindingDef.Detail.
 // defsByCode is built once per type from td.Findings, since a code's meaning
 // (and its Detail) is scoped to the type that registers it.
+//
+// An empty emitted Detail counts. A code emitted from two places, one of which
+// stamps the sentence and one of which forgets, renders with a reason on some
+// rows and without one on others; skipping the empty side made exactly that
+// row invisible here. A code whose definition declares no sentence still
+// matches an emitter that stamps none, so the check stays quiet for the many
+// findings that carry a phrase alone.
 func checkRowsAgainstDefinitions(shortName string, defsByCode map[domain.FindingCode]string, findings []domain.Finding) []detailMismatch {
 	var out []detailMismatch
 	for _, f := range findings {
-		if f.Detail == "" {
-			continue
-		}
 		declared := defsByCode[f.Code]
 		if f.Detail != declared {
 			out = append(out, detailMismatch{shortName: shortName, code: f.Code, emitted: f.Detail, declared: declared})
@@ -161,13 +165,11 @@ func TestDetailContract_FullCatalogDemoBench(t *testing.T) {
 }
 
 // TestDetailContract_EveryDeclaredDetailHasABenchWitness closes the class
-// TestDetailContract_FullCatalogDemoBench cannot see: that test only checks
-// findings that actually carry a non-empty Detail, so a definition that
-// declares one while its emitter forgets to stamp it renders phrase-only
-// with nothing catching it (both sides silently agree on ""). Proven with a
-// throwaway mutation during this verify round: deleting sg.go's
-// catalog.Detail(sgCodeDangerousPorts) call left
-// TestDetailContract_FullCatalogDemoBench green.
+// TestDetailContract_FullCatalogDemoBench cannot see: a definition that
+// declares a sentence for a code the demo fixtures never produce. There is no
+// row to compare, so only a coverage check finds it. The case where a row does
+// exist and its emitter forgot the stamp belongs to the row walk, which no
+// longer skips an empty Detail.
 func TestDetailContract_EveryDeclaredDetailHasABenchWitness(t *testing.T) {
 	result := runFullCatalogDetailBench(t)
 
