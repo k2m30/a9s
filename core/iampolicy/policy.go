@@ -132,10 +132,17 @@ func parsePrincipal(v any) Principal {
 	return p
 }
 
-// isAnyoneARN mirrors Prowler's has_public_principal: "arn:aws:iam::*:root"
-// is any account's root, which is as public as "*".
+// isAnyoneARN mirrors Prowler's has_public_principal: an IAM ARN whose
+// account is "*" and whose resource is "root" is every account's root user,
+// which is as public as "*". Every partition names its own ARNs, so the
+// fields are parsed rather than the commercial spelling compared.
 func isAnyoneARN(s string) bool {
-	return s == "*" || s == "arn:aws:iam::*:root"
+	if s == "*" {
+		return true
+	}
+	f := strings.Split(s, ":")
+	return len(f) == 6 && f[0] == "arn" && (f[1] == "aws" || strings.HasPrefix(f[1], "aws-")) &&
+		f[2] == "iam" && f[4] == "*" && f[5] == "root"
 }
 
 func parseCondition(v any) map[string]map[string][]string {

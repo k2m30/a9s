@@ -111,7 +111,7 @@ var sourceScopeKeys = []string{"aws:SourceAccount", "aws:SourceArn", "aws:Source
 func (d Document) HasServicePrincipalWithoutSourceScope() []string {
 	found := map[string]struct{}{}
 	for _, st := range d.Statement {
-		if st.Effect != "Allow" || hasSourceScope(st.Condition) {
+		if st.Effect != "Allow" || isRestrictive(st.Condition, sourceScopeKeys) {
 			continue
 		}
 		for _, svc := range st.Principal.Service {
@@ -122,15 +122,4 @@ func (d Document) HasServicePrincipalWithoutSourceScope() []string {
 		}
 	}
 	return sortedKeys(found)
-}
-
-func hasSourceScope(cond map[string]map[string][]string) bool {
-	for _, block := range cond {
-		for key := range block {
-			if slices.ContainsFunc(sourceScopeKeys, func(k string) bool { return strings.EqualFold(k, key) }) {
-				return true
-			}
-		}
-	}
-	return false
 }
