@@ -13,12 +13,12 @@
 //     preservation. Existing coverage (reapply_checker_leak_test.go,
 //     headless_regression_test.go) only pins leak-prevention and payload
 //     shape, never the merge/grow/sort behavior itself.
-//  3. resolveListMarkerCol (core/app/list_columns.go) — byte-parity
+//  3. IdentityColumnIndex (core/app/list_columns.go) — byte-parity
 //     against the legacy identity-column cascade (resolveIdentityColumn in
 //     internal/tui/views/table_render.go), across every real catalog type.
 //     tui_viewstate_purity_list_test.go's MarkerCol case only covers the
 //     render-CONSUMPTION side (translate body.MarkerCol into a glyph) with
-//     one synthetic type; it never checks that resolveListMarkerCol
+//     one synthetic type; it never checks that IdentityColumnIndex
 //     COMPUTES the same index the legacy cascade would for real types. This
 //     is deliberately self-contained (no shared helpers with
 //     resourcelist_render_parity_test.go) so it keeps running after that
@@ -339,7 +339,7 @@ func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 }
 
 // ===========================================================================
-// 3. resolveListMarkerCol — S13 marker-glyph placement check. Verifies
+// 3. IdentityColumnIndex — S13 marker-glyph placement check. Verifies
 //    RenderList(ListBody) places the enrichment glyph (row.Decorator) at the
 //    exact cell body.MarkerCol/body.ScrollX identify, across every real
 //    catalog type. The legacy ResourceListModel.View() byte-parity oracle
@@ -428,7 +428,7 @@ func wave3ColStarts(headerLine string) []int {
 // names, when that column is on-screen (body.MarkerCol - body.ScrollX >= 0),
 // and that the glyph does NOT leak into the output when the marker column
 // has scrolled off-screen. It reads body.MarkerCol/ScrollX/Decorator
-// verbatim (already computed by resolveListMarkerCol/resolveListDecoratorFull)
+// verbatim (already computed by IdentityColumnIndex/resolveListDecoratorFull)
 // rather than re-deriving them, so it only pins RenderList's OWN placement
 // logic, not the column/decorator resolution cascade (covered elsewhere).
 // wave3AssertT is the subset of *testing.T that wave3AssertMarkerGlyphPlacement
@@ -567,7 +567,7 @@ func TestMarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) {
 
 // TestMarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes
 // ports S15 from resourcelist_render_parity_test.go: MarkerCol is a
-// full-column-space index computed once by resolveListMarkerCol, but the
+// full-column-space index computed once by IdentityColumnIndex, but the
 // GLYPH is placed at a SEPARATE, hscroll-translated visible column index
 // (markerColIdx) — a distinct code path from the un-scrolled S13 case above.
 // When the identity column scrolls off-screen, both the legacy cascade and

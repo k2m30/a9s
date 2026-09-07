@@ -4,7 +4,7 @@
 // widenLifecycleColumn): specs/022-codebase-cleanup/reaudit.md "port+delete:
 // table_render.go foursome ... Pinned only by two in-package test files
 // (resolve_identity_internal_test.go, widen_lifecycle_column_internal_test.go).
-// Port the cascade pins to app.resolveListMarkerCol tests and the widen pins
+// Port the cascade pins to app.IdentityColumnIndex tests and the widen pins
 // to renderListWidenLifecycleColumn, then delete."
 //
 // Both dead functions are unexported (table_render.go, package views) and so
@@ -13,14 +13,14 @@
 // behavior through the two LIVE production seams instead, both reachable
 // from tests/unit/ as an external (package unit_test) black-box:
 //
-//  1. resolveListMarkerCol (core/app/list_columns.go) — mirrors
+//  1. IdentityColumnIndex (core/app/list_columns.go) — mirrors
 //     resolveIdentityColumn's 5-step cascade exactly (its own doc comment:
 //     "Cascade must match resolveIdentityColumn exactly"). Driven via a
 //     fully-controlled per-type config.ViewsConfig (GetViewDef replaces
 //     userDef.List wholesale, giving byte-for-byte control over each
 //     column's Key/Path/Title) + RegisterFallbackTypeDef (controls
 //     IdentityKey/Name), read back via Snapshot().Body.List.MarkerCol — the
-//     exported field buildListBody bakes resolveListMarkerCol's return into.
+//     exported field buildListBody bakes IdentityColumnIndex's return into.
 //  2. renderListWidenLifecycleColumn (internal/tui/views/resourcelist.go) —
 //     NOT a byte-identical mirror of the dead widenLifecycleColumn (it widens
 //     from body.Rows[i].Cells verbatim, post-bake, not by re-deriving from
@@ -80,7 +80,7 @@ func wave3MarkerColOf(t *testing.T, c *app.Controller) int {
 }
 
 // ===========================================================================
-// resolveListMarkerCol cascade — port of resolve_identity_internal_test.go's
+// IdentityColumnIndex cascade — port of resolve_identity_internal_test.go's
 // TestResolveIdentityColumn_* cases (cascade order: 1. td.IdentityKey matches
 // a column's key; 2. column key == "name"; 3. column path contains "Name" or
 // "Identifier"; 4. column title equals "Name" (case-insensitive) or td.Name;

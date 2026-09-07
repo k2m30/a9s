@@ -73,7 +73,7 @@ type ec2InstanceStateFake struct {
 //
 // Ambiguity resolution: "the column key" for a Key="" column is the
 // lowercased Title ("state"), since that is what a RawStruct-less second
-// visit needs r.Fields to contain for listExtractCellValue's Fields-map
+// visit needs r.Fields to contain for ExtractCellValue's Fields-map
 // lookup to succeed (the title-match loop in list_columns.go already
 // tries lowercased title against Fields keys as a fallback cascade step —
 // materialization should populate the SAME key so the primary Key-based

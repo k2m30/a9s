@@ -6,12 +6,12 @@
 //
 // Both legacy files drive views.NewResourceList(...).Update(...).View() —
 // dead code in production (the controller/ViewState render path is the only
-// live consumer of core/app/list_columns.go's listExtractCellValue,
+// live consumer of core/app/list_columns.go's ExtractCellValue,
 // exactly as list_ports_test.go's header already documents for the
 // filter/checker-carry/marker-col pins). This file re-pins every RawStruct/
 // Humanize assertion the two legacy files made, driven instead through the
 // live seam: Controller.ApplyResourcesLoaded -> buildListBody ->
-// extractListCells -> listExtractCellValue, read back via
+// extractListCells -> ExtractCellValue, read back via
 // Snapshot().Body.List.Rows[i].Cells.
 //
 // Assertion style is deliberately unchanged from the legacy files
@@ -538,10 +538,10 @@ func TestListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 // RawStruct stripped, value materialized into Fields). "transfer"'s Endpoint/
 // Identity Provider columns (core/config/defaults_networking.go) are
 // real, registered Key-less/Path-based Humanize:true columns — the title-
-// match loop (list_columns.go's listExtractCellValue) looks them up by their
+// match loop (list_columns.go's ExtractCellValue) looks them up by their
 // OWN title-derived key ("endpoint", "identity_provider"), which is what a
 // Fields-only (RawStruct-stripped) row must carry for that fallback to find
-// them at all — exactly the shape listExtractCellValue's RawStruct-gated
+// them at all — exactly the shape ExtractCellValue's RawStruct-gated
 // Humanize branch currently only reaches when RawStruct != nil. Domain also
 // pins the non-Humanize sibling column ("Domain", Path-only, no Humanize)
 // stays completely raw either way — the fix must not humanize every Path
