@@ -90,9 +90,11 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			mu.Lock()
 			defer mu.Unlock()
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			if fetchErr {
-				failures = append(failures, FailedCall(r.ID, lastErr))
+				MarkSkipped(&result, r.ID, &failures, lastErr)
+			} else {
+				// A page cap, not a failed call: there is no error to record.
+				result.TruncatedIDs[r.ID] = true
 			}
 			return
 		}
@@ -142,7 +144,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	return result,
 		AggregateFailures("tgw-enrich: DescribeTransitGatewayAttachments", failures, total)

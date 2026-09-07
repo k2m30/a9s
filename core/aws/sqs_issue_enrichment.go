@@ -96,7 +96,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	})
-	SortFailures(failures)
+
 	return result,
 		AggregateFailures("sqs-enrich: GetQueueAttributes", failures, total)
 }

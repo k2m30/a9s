@@ -68,18 +68,19 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 	// DKIM is per identity, not per account: one unsigned domain says
 	// nothing about the others, so this runs alongside the replication
 	// above rather than sharing its shape.
-	sesIdentityDKIM(ctx, clients, &result, resources)
+	dkimErr := sesIdentityDKIM(ctx, clients, &result, resources)
 
 	MarkInformationalOnly(&result)
-	return result, nil
+	return result, dkimErr
 }
 
 // sesIdentityDKIM calls GetEmailIdentity per identity (cap EnrichmentCap) and
 // reports a domain that does not sign its outbound mail. A single verified
 // address cannot carry DKIM at all, so only domains are checked.
-func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) {
+func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) error {
 	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -94,7 +95,7 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
 		if out.IdentityType != sesv2types.IdentityTypeDomain {
@@ -106,6 +107,7 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		setWave2Finding(result, r.ID, sesCodeDKIMOff, "DKIM not enabled", "~", "ses",
 			[]domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: "~"}})
 	})
+	return AggregateFailures("ses-enrich: GetEmailIdentity", failures, n)
 }
 
 // sesAccountFinding derives the single account-level finding from GetAccount output.

@@ -70,3 +70,26 @@ func TestFailureLine_OneSentence(t *testing.T) {
 		t.Errorf("failure line %q names a region for a failure that is not about the region", plain)
 	}
 }
+
+// TestFailureLine_SubjectSaidOnce pins the status bar's stutter: the aggregate
+// a fetcher returns labels itself with the resource type, and the subject the
+// handler passes ends with that same type, so the line used to read
+// "availability ec2: ec2: DescribeInstances failed for ...".
+func TestFailureLine_SubjectSaidOnce(t *testing.T) {
+	agg := awsclient.AggregateFailures("ec2: DescribeInstances",
+		[]awsclient.Failure{awsclient.FailedCall("i-0abc", errors.New("connection reset"))}, 3)
+
+	line := failureLine("availability ec2", agg, "us-east-1")
+	if n := strings.Count(line, "ec2"); n != 1 {
+		t.Errorf("failure line %q says the type %d times, want 1", line, n)
+	}
+	if !strings.HasPrefix(line, "availability ec2: ") {
+		t.Errorf("failure line %q lost its qualifier", line)
+	}
+
+	// A subject the cause does not repeat is still prefixed.
+	plain := failureLine("connect", errors.New("connection reset"), "us-east-1")
+	if plain != "connect: connection reset" {
+		t.Errorf("failure line = %q, want %q", plain, "connect: connection reset")
+	}
+}

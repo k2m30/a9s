@@ -64,6 +64,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -79,8 +80,8 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			if apigwRESTFindings(ctx, v1, &result, r, ownAccount) {
-				result.TruncatedIDs[r.ID] = true
+			if restErr := apigwRESTFindings(ctx, v1, &result, r, ownAccount); restErr != nil {
+				MarkSkipped(&result, r.ID, &failures, restErr)
 			}
 			return
 		}
@@ -88,7 +89,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		stagesTruncated := false
 		var stagesNextToken *string
 		stagePages := 0
-		fetchErr := false
+		var fetchErr error
 		for {
 			if stagePages >= PerParentPageCap {
 				stagesTruncated = true
@@ -100,7 +101,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			})
 			stagePages++
 			if err != nil {
-				fetchErr = true
+				fetchErr = err
 				break
 			}
 			stages = append(stages, out.Items...)
@@ -158,17 +159,21 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 
-		if apigwHTTPNoAuthorizer(ctx, clients, &result, apiID) {
-			result.TruncatedIDs[r.ID] = true
+		if authErr := apigwHTTPNoAuthorizer(ctx, clients, &result, apiID); authErr != nil {
+			MarkSkipped(&result, r.ID, &failures, authErr)
 		}
 
-		if stagesTruncated || fetchErr {
+		switch {
+		case fetchErr != nil:
+			MarkSkipped(&result, r.ID, &failures, fetchErr)
+		case stagesTruncated:
+			// A page cap, not a failed call: there is no error to record.
 			result.TruncatedIDs[r.ID] = true
 		}
 		result.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
 
 		stagesCount := len(stages)
-		if stagesCount == 0 && !stagesTruncated && !fetchErr {
+		if stagesCount == 0 && !stagesTruncated && fetchErr == nil {
 			// No deployed stages — surface as an informational finding.
 			// Only emitted when stage fetch succeeded (no error, no page cap).
 			// The phrase says there are none; the row says what kind of API
@@ -187,7 +192,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues,
 			catalog.Phrase(apigwCodeStageConfigIssues), "~", "apigw", rows)
 	})
-	return result, nil
+	return result, AggregateFailures("apigw-enrich: authorizers and stages", failures, n)
 }
 
 // apigwV1API is the pair of REST calls the enricher needs. It is reached by
@@ -202,7 +207,7 @@ type apigwV1API interface {
 // apigwRESTFindings evaluates rows 18-21 for one REST API. It returns true
 // when the stage listing failed, so the caller marks the row truncated rather
 // than reporting an API whose posture it could not read as clean.
-func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) bool {
+func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) error {
 	apiID := r.ID
 	emit := func(code domain.FindingCode, phrase, tier string, rows ...domain.DetailRow) {
 		setWave2Finding(result, apiID, code, phrase, tier, "apigw", rows)
@@ -212,7 +217,7 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 		return api.GetAuthorizers(ctx, &apigateway.GetAuthorizersInput{RestApiId: aws.String(apiID)})
 	})
 	if err != nil {
-		return true
+		return err
 	}
 	if len(authorizers.Items) == 0 {
 		endpoint := strings.ToLower(r.Fields["endpoint"])
@@ -243,7 +248,7 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 		return api.GetStages(ctx, &apigateway.GetStagesInput{RestApiId: aws.String(apiID)})
 	})
 	if err != nil {
-		return true
+		return err
 	}
 	for _, st := range stages.Item {
 		name := aws.ToString(st.StageName)
@@ -261,7 +266,7 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
 		}
 	}
-	return false
+	return nil
 }
 
 // apigwRESTPolicy returns the API's resource policy document, which the
@@ -276,7 +281,7 @@ func apigwRESTPolicy(r resource.Resource) string {
 
 // apigwHTTPNoAuthorizer evaluates row 18 for one HTTP (v2) API. There is no
 // private endpoint type on v2, so an unauthorized one is always the warn code.
-func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, apiID string) bool {
+func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, apiID string) error {
 	// One authorizer on any page is enough to clear the row, so the walk stops
 	// at the first page that has one.
 	input := &apigatewayv2.GetAuthorizersInput{ApiId: aws.String(apiID)}
@@ -286,13 +291,13 @@ func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result 
 		})
 		switch {
 		case err != nil:
-			return true
+			return err
 		case len(out.Items) > 0:
-			return false
+			return nil
 		case out.NextToken == nil:
 			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, "no authorizer", "~", "apigw",
 				[]domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: "~"}})
-			return false
+			return nil
 		}
 		input.NextToken = out.NextToken
 	}

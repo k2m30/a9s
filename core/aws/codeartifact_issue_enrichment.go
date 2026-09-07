@@ -46,6 +46,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -117,9 +118,8 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil)
 				return
 			}
-			// Any other error — skip this repo but flag truncation.
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if out.Policy == nil || out.Policy.Document == nil {
@@ -128,7 +128,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		parsed, perr := iampolicy.Parse(*out.Policy.Document)
 		if perr != nil {
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, perr)
 			return
 		}
 		if ex := iampolicy.Evaluate(parsed, ownAccount); ex.Public {
@@ -138,5 +138,5 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, nil
+	return result, AggregateFailures("codeartifact-enrich: GetRepositoryPermissionsPolicy", failures, n)
 }

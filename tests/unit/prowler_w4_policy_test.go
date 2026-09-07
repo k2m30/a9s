@@ -104,12 +104,20 @@ func w4CustomerPolicyARN(name string) string {
 
 func w4EnrichPolicies(t *testing.T, fake *w4PolicyFake, rs []resource.Resource) awsclient.IssueEnricherResult {
 	t.Helper()
-	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
-	res, err := awsclient.EnrichIAMPolicy(context.Background(), clients, rs, nil)
+	res, err := w4EnrichPoliciesErr(t, fake, rs)
 	if err != nil {
 		t.Fatalf("EnrichIAMPolicy: %v", err)
 	}
 	return res
+}
+
+// w4EnrichPoliciesErr is w4EnrichPolicies for the cases that expect a failure:
+// a policy the account may not read is a recorded failure now, not a silent
+// skip ("skipped" spec row 5).
+func w4EnrichPoliciesErr(t *testing.T, fake *w4PolicyFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
+	t.Helper()
+	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
+	return awsclient.EnrichIAMPolicy(context.Background(), clients, rs, nil)
 }
 
 // TestW4PolicyPrivilegeEscalation pins the positive case: a customer-managed
@@ -207,13 +215,19 @@ func TestW4PolicyPrivEscDocumentFetchFailureIsUnknown(t *testing.T) {
 		docs:     map[string]string{escARN: w4PolicyPrivEscDoc},
 		errByARN: map[string]error{deniedARN: errors.New("AccessDenied: not authorized to GetPolicy")},
 	}
-	res := w4EnrichPolicies(t, fake, []resource.Resource{
+	res, err := w4EnrichPoliciesErr(t, fake, []resource.Resource{
 		w4PolicyResource("acme-denied-policy", deniedARN),
 		w4PolicyResource("acme-lambda-deployer", escARN),
 	})
 
 	if !res.TruncatedIDs[deniedARN] {
 		t.Errorf("TruncatedIDs[%s] = false, want true", deniedARN)
+	}
+	// INVERTED for the "skipped" spec row 5: the helper used to fail the test
+	// on any error, which is what made the silent skip look correct. A policy
+	// nobody could read says so. Do not restore the error-free helper here.
+	if err == nil || !strings.Contains(err.Error(), deniedARN) {
+		t.Errorf("EnrichIAMPolicy err = %v, want it to name the policy it could not read", err)
 	}
 	w4AssertNoCode(t, res.Findings[deniedARN], w4CodePolicyPrivEsc)
 	w4AssertFinding(t, res.Findings[escARN], w4CodePolicyPrivEsc,

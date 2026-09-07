@@ -99,7 +99,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		}
 		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	return result,
 		AggregateFailures("pipeline-enrich: GetPipelineState", failures, total)

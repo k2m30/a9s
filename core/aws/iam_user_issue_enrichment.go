@@ -61,6 +61,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -79,10 +80,9 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		})
 		if err != nil {
 			if !isNoSuchEntity(err) {
-				// Unexpected error — skip this user but flag truncation.
 				mu.Lock()
 				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				MarkSkipped(&result, r.ID, &failures, err)
 				mu.Unlock()
 				return
 			}
@@ -99,7 +99,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if mfaErr != nil {
 				mu.Lock()
 				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				MarkSkipped(&result, r.ID, &failures, mfaErr)
 				mu.Unlock()
 				return
 			}
@@ -112,7 +112,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if keysErr != nil {
 			mu.Lock()
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, keysErr)
 			mu.Unlock()
 			return
 		}
@@ -121,18 +121,18 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		adminPolicy := adminAttachedPolicyName(attachedUser)
 		if aerr != nil {
 			mu.Lock()
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, aerr)
 			mu.Unlock()
 		}
 
 		activeKeys := activeAccessKeys(keysOut.AccessKeyMetadata)
-		unusedKeys, keyUseKnown := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
+		unusedKeys, keyUseErr := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
 
 		mu.Lock()
 		defer mu.Unlock()
 
-		if !keyUseKnown {
-			result.TruncatedIDs[r.ID] = true
+		if keyUseErr != nil {
+			MarkSkipped(&result, r.ID, &failures, keyUseErr)
 		}
 
 		mfaVal := "false"
@@ -222,7 +222,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, nil
+	return result, AggregateFailures("iam-user-enrich: user credentials", failures, n)
 }
 
 // isNoSuchEntity reports the IAM "this entity does not exist" error, which
@@ -269,21 +269,20 @@ type idleKey struct {
 // the user is then unknown for this check, not clean, since the unread key is
 // exactly the one that might be idle. A client that does not serve the API
 // reports no keys and stays ok — nothing was attempted, so nothing is unknown.
-func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys []iamtypes.AccessKeyMetadata) (out []idleKey, ok bool) {
+func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys []iamtypes.AccessKeyMetadata) (out []idleKey, err error) {
 	if api == nil {
-		return nil, true
+		return nil, nil
 	}
-	ok = true
 	for _, k := range keys {
 		keyID := aws.ToString(k.AccessKeyId)
 		if keyID == "" {
 			continue
 		}
-		lastUsedOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetAccessKeyLastUsedOutput, error) {
+		lastUsedOut, keyErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetAccessKeyLastUsedOutput, error) {
 			return api.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: aws.String(keyID)})
 		})
-		if err != nil {
-			ok = false
+		if keyErr != nil {
+			err = keyErr
 			continue
 		}
 		var lastUsedAt *time.Time
@@ -310,7 +309,7 @@ func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys 
 			idleDays: int(idle.Hours() / 24),
 		})
 	}
-	return out, ok
+	return out, err
 }
 
 // lastFourOfKeyID renders an access key ID as its last four characters only.

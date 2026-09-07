@@ -74,6 +74,8 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		defer mu.Unlock()
 		if err != nil {
 			if IsNotFoundErr(err) {
+				// The secret went away between the list call and this one: a
+				// race, not a failure to log.
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
@@ -85,7 +87,7 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		}
 		doc, perr := iampolicy.Parse(aws.ToString(out.ResourcePolicy))
 		if perr != nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, perr)
 			return
 		}
 		ex := iampolicy.Evaluate(doc, ownAccount)

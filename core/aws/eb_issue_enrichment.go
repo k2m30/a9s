@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -52,6 +53,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 	}
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -69,7 +71,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if len(out.Causes) == 0 {
@@ -87,22 +89,23 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		}
 		setWave2Finding(&result, key, ebCodeEnvironmentCauses, catalog.Phrase(ebCodeEnvironmentCauses), "~", "eb", rows)
 	})
-	ebConfigurationPosture(ctx, clients, &result, resources)
+	settingsErr := ebConfigurationPosture(ctx, clients, &result, resources)
 	MarkInformationalOnly(&result)
-	return result, nil
+	return result, errors.Join(AggregateFailures("eb-enrich: DescribeEnvironmentHealth", failures, n), settingsErr)
 }
 
 // ebConfigurationPosture reads DescribeConfigurationSettings once per
 // environment (cap EnrichmentCap). The one response carries all three option
 // values rows 13-15 need, so it is parsed once and emits three independent
 // findings rather than calling three times.
-func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) {
+func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) error {
 	api, ok := clients.ElasticBeanstalk.(EBDescribeConfigurationSettingsAPI)
 	if !ok {
-		return
+		return nil
 	}
 	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -132,7 +135,7 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			result.TruncatedIDs[key] = true
+			MarkSkipped(result, key, &failures, err)
 			return
 		}
 		var options []ebtypes.ConfigurationOptionSetting
@@ -153,6 +156,7 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 			setWave2Finding(result, key, ebCodeCWLogsOff, "log streaming to CloudWatch off", "~", "eb", nil)
 		}
 	})
+	return AggregateFailures("eb-enrich: DescribeConfigurationSettings", failures, n)
 }
 
 // ebOptionValue finds one option by namespace AND name, reporting whether

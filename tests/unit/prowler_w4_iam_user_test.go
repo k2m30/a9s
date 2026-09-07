@@ -136,12 +136,19 @@ func w4UserResource(name string, createdDaysAgo int, passwordLastUsed string) re
 
 func w4EnrichUsers(t *testing.T, fake *w4UserFake, rs []resource.Resource) awsclient.IssueEnricherResult {
 	t.Helper()
-	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
-	res, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, rs, nil)
+	res, err := w4EnrichUsersErr(t, fake, rs)
 	if err != nil {
 		t.Fatalf("EnrichIAMUserMFA: %v", err)
 	}
 	return res
+}
+
+// w4EnrichUsersErr is w4EnrichUsers for the case that expects a refusal: a
+// call the role may not make is a recorded failure ("skipped" spec row 5).
+func w4EnrichUsersErr(t *testing.T, fake *w4UserFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
+	t.Helper()
+	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
+	return awsclient.EnrichIAMUserMFA(context.Background(), clients, rs, nil)
 }
 
 // --- row 6: admin policy attached -------------------------------------------
@@ -423,8 +430,11 @@ func TestW4UserBatchErrorLeavesSiblingsEvaluated(t *testing.T) {
 		w4UserResource("acme-broken-user", 400, "Never"),
 		w4UserResource("acme-ci-user", 400, "Never"),
 	}, nil)
-	if err != nil {
-		t.Fatalf("EnrichIAMUserMFA: %v", err)
+	// INVERTED for the "skipped" spec row 5: this required err == nil, so the
+	// user whose keys could not be listed was marked "?" with nothing in the
+	// log to say what refused. The siblings are still evaluated below.
+	if err == nil {
+		t.Fatal("a failed ListAccessKeys returned no error")
 	}
 
 	if !res.TruncatedIDs["acme-broken-user"] {

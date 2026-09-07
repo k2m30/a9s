@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -215,6 +216,16 @@ func w6aEnrichTrail(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource)
 	return res
 }
 
+// w6aEnrichTrailErr is w6aEnrichTrail for the case that expects a refusal: a
+// bucket the role may not read is a recorded failure ("skipped" spec row 5),
+// so the shape half of the invariants is checked and the error is returned.
+func w6aEnrichTrailErr(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource) (awsclient.IssueEnricherResult, error) {
+	t.Helper()
+	res, err := w2Enricher(t, "trail")(context.Background(), &awsclient.ServiceClients{S3: fake}, rs, nil)
+	w2AssertEnricherShape(t, res)
+	return res, err
+}
+
 // TestW6ATrailLogBucketPublic pins row 4. A publicly readable log bucket hands
 // the account's audit trail to anyone, so this is the batch's one Broken trail
 // row.
@@ -284,7 +295,7 @@ func TestW6ATrailLogBucket_NoBucketPolicyIsNotPublic(t *testing.T) {
 // a bucket whose posture could not be read marks the row truncated rather than
 // reporting it healthy, and the other trails in the batch still resolve.
 func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
-	res := w6aEnrichTrail(t,
+	res, err := w6aEnrichTrailErr(t,
 		&w6aTrailS3Fake{
 			statusErr: map[string]error{"acme-denied-audit-logs": errors.New("AccessDenied: not authorized")},
 			public:    map[string]bool{"acme-public-audit-logs": true},
@@ -293,6 +304,12 @@ func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
 		w6aTrailRes("acme-public-bucket-trail", "acme-public-audit-logs"),
 	)
 
+	// INVERTED for the "skipped" spec row 5: the shared helper failed the test
+	// on any error, so a refused bucket read was marked "?" and never
+	// explained. Do not restore the error-free helper here.
+	if err == nil || !strings.Contains(err.Error(), "acme-denied-trail") {
+		t.Errorf("trail enricher err = %v, want it to name the trail whose bucket it could not read", err)
+	}
 	if !res.TruncatedIDs["acme-denied-trail"] {
 		t.Error("a trail whose bucket posture could not be read was not marked truncated")
 	}

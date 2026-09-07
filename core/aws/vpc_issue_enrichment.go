@@ -38,6 +38,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 	}
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -50,6 +51,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		var flNextToken *string
 		flPages := 0
 		flTruncated := false
+		var flErr error
 		for {
 			if flPages >= PerParentPageCap {
 				flTruncated = true
@@ -63,7 +65,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			})
 			flPages++
 			if err != nil {
-				flTruncated = true
+				flErr = err
 				break
 			}
 			allFlowLogs = append(allFlowLogs, out.FlowLogs...)
@@ -75,7 +77,12 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 
 		mu.Lock()
 		defer mu.Unlock()
-		if flTruncated {
+		switch {
+		case flErr != nil:
+			MarkSkipped(&result, r.ID, &failures, flErr)
+			return
+		case flTruncated:
+			// A page cap, not a failed call: there is no error to record.
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -97,5 +104,5 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, nil
+	return result, AggregateFailures("vpc-enrich: DescribeFlowLogs", failures, n)
 }

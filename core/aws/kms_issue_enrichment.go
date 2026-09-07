@@ -41,6 +41,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -48,11 +49,11 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		if keyID == "" {
 			return
 		}
-		ex, public, ok := kmsKeyPolicyIsPublic(ctx, keyPolicyAPI, r, ownAccount)
+		ex, public, policyErr := kmsKeyPolicyIsPublic(ctx, keyPolicyAPI, r, ownAccount)
 		mu.Lock()
 		switch {
-		case !ok:
-			result.TruncatedIDs[keyID] = true
+		case policyErr != nil:
+			MarkSkipped(&result, keyID, &failures, policyErr)
 		case public:
 			setWave2Finding(&result, keyID, kmsCodePublicPolicy, "key policy open to anyone", "!", "kms",
 				publicPolicyRows(ex))
@@ -69,8 +70,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 				// AWS-managed keys: skip silently without marking truncated
 				return
 			}
-			// Any other error: skip this key but signal incomplete data via truncated
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		rotationVal := "false"
@@ -84,16 +84,17 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil)
 		}
 	})
-	return result, nil
+	return result, AggregateFailures("kms-enrich: key policy and rotation", failures, n)
 }
 
 // kmsKeyPolicyIsPublic reads a key's default policy and returns the exposure
 // when it grants a wildcard principal. AWS-managed keys are skipped: AWS
 // owns their policy and the operator cannot change it. A policy that cannot
-// be read or parsed leaves the key unknown (ok=false), never healthy.
-func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resource.Resource, ownAccount string) (ex iampolicy.Exposure, public, ok bool) {
+// be read or parsed leaves the key unknown, never healthy; the error that made
+// it unknown is returned so the caller can record it.
+func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resource.Resource, ownAccount string) (ex iampolicy.Exposure, public bool, err error) {
 	if api == nil || kmsKeyIsAWSManaged(r) || kmsKeyIsGoingAway(r) {
-		return ex, false, true
+		return ex, false, nil
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.GetKeyPolicyOutput, error) {
 		return api.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
@@ -102,18 +103,18 @@ func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resourc
 		})
 	})
 	if err != nil {
-		return ex, false, false
+		return ex, false, err
 	}
 	if out == nil || out.Policy == nil {
 		// No policy attached is a complete answer, not a gap.
-		return ex, false, true
+		return ex, false, nil
 	}
 	doc, perr := iampolicy.Parse(*out.Policy)
 	if perr != nil {
-		return ex, false, false
+		return ex, false, perr
 	}
 	ex = iampolicy.Evaluate(doc, ownAccount)
-	return ex, ex.Public, true
+	return ex, ex.Public, nil
 }
 
 // kmsKeyIsGoingAway reports a key already scheduled for deletion. The

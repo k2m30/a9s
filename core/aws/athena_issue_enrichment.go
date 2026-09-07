@@ -45,6 +45,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 	}
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -61,7 +62,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if out.WorkGroup == nil || out.WorkGroup.Configuration == nil {
@@ -92,7 +93,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, nil
+	return result, AggregateFailures("athena-enrich: GetWorkGroup", failures, n)
 }
 
 // resultOutputLocation returns the workgroup's configured result location, or

@@ -125,7 +125,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		})
 
 	})
-	SortFailures(failures)
+
 	MarkInformationalOnly(&result)
 	return result,
 		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)

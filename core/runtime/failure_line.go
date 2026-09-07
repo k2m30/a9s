@@ -24,6 +24,16 @@ func failureLine(subject string, err error, region string) string {
 	if subject = strings.TrimSpace(subject); subject == "" {
 		return cause
 	}
+	// A partial-batch cause is labelled with the resource type by the fetcher
+	// that built it, and the subject the handler passes ends with that same
+	// type: "availability ec2: ec2: DescribeInstances failed for ...". The
+	// qualifier is what the subject adds; the type is already said.
+	if qualifier, typ, ok := strings.Cut(subject, " "); ok && strings.HasPrefix(cause, typ+":") {
+		return qualifier + " " + cause
+	}
+	if strings.HasPrefix(cause, subject+":") {
+		return cause
+	}
 	return subject + ": " + cause
 }
 

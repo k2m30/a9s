@@ -45,6 +45,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 
 	// DescribeClusters accepts up to 100 cluster names per call.
 	const descBatch = 100
+	var failures []Failure
 	for i := 0; i < len(clusterNames); i += descBatch {
 		end := min(i+descBatch, len(clusterNames))
 		batch := clusterNames[i:end]
@@ -59,7 +60,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			// badge, but a failed batch must not vanish silently (no finding, no
 			// badge, no "?").
 			for _, name := range batch {
-				result.TruncatedIDs[name] = true
+				MarkSkipped(&result, name, &failures, err)
 			}
 			continue
 		}
@@ -105,5 +106,5 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 	}
 
 	MarkInformationalOnly(&result)
-	return result, nil
+	return result, AggregateFailures("ecs-enrich: DescribeClusters", failures, len(clusterNames))
 }

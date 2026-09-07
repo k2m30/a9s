@@ -222,8 +222,11 @@ func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *te
 	resources := vpcResources("vpc-00000001", "vpc-00000002")
 
 	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// INVERTED for the "skipped" spec row 5: this required err == nil, which
+	// meant the row could render "?" with nothing in the error log to say what
+	// refused. The call that failed is recorded now. Do not restore.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if result.Truncated {
 		t.Error("Truncated must stay false: vpc is a \"~\"-only enricher, so a DescribeFlowLogs error marks the row via TruncatedIDs, never the aggregate issue badge")

@@ -393,16 +393,19 @@ func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 // A row marked uninspected says why
 // ---------------------------------------------------------------------------
 
-// TestConformance_UninspectedRowsRecordTheirReason pins the "skipped" spec row
-// 4: a Wave 2 enricher that marks a row uninspected records the failed call
-// that made it so, through MarkSkipped, so the reason reaches the error log
-// instead of being dropped on the floor. Writing TruncatedIDs directly is the
-// silent-skip shape — the row renders "?" and nobody can say what refused.
+// TestConformance_UninspectedRowsRecordTheirReason pins the "skipped" spec
+// rows 4 and 5: a Wave 2 enricher that marks a row uninspected records the
+// failed call that made it so, through MarkSkipped (or MarkUnusable when the
+// service answered without the field and there is no error to read). Writing
+// TruncatedIDs directly is the silent-skip shape — the row renders "?" and
+// nobody can say what refused.
 //
-// The census below is the debt that existed when the rule landed, per file and
-// per count. It is a ratchet: a new direct write fails the gate, and a file
-// converted to MarkSkipped fails it too until its number comes down. Both
-// directions are deliberate — the list only shrinks, and it shrinks visibly.
+// What is left is a cap mark or a documented race: the walk stopped at its own
+// page cap, or the resource went away between the list call and the per-item
+// one. Each carries a one-line reason on the line above it, and the census
+// below holds the count per file. It is a ratchet in both directions: a new
+// direct write fails the gate, and a file that loses one fails it until its
+// number comes down.
 func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 	directWrite := regexp.MustCompile(`\w+\.TruncatedIDs\[[^\]]*\]\s*=\s*true`)
 
@@ -416,8 +419,9 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		// issue_enrichment.go holds MarkSkipped, markAllUninspected and
-		// capAtEnrichmentCap themselves — the helpers the rule routes through.
+		// issue_enrichment.go holds MarkSkipped, MarkUnusable,
+		// markAllUninspected and capAtEnrichmentCap themselves — the helpers
+		// the rule routes through.
 		if name == "issue_enrichment.go" {
 			continue
 		}
@@ -425,8 +429,16 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 		if rerr != nil {
 			t.Fatalf("read %s: %v", name, rerr)
 		}
-		if n := len(directWrite.FindAll(stripGoComments(raw), -1)); n > 0 {
-			seen[name] = n
+		lines := strings.Split(string(raw), "\n")
+		for i, line := range lines {
+			if !directWrite.MatchString(line) || strings.HasPrefix(strings.TrimSpace(line), "//") {
+				continue
+			}
+			seen[name]++
+			if i == 0 || !strings.HasPrefix(strings.TrimSpace(lines[i-1]), "//") {
+				t.Errorf("core/aws/%s:%d marks a row uninspected with no reason on the line above: "+
+					"name the cap or the race, or record the failure through MarkSkipped", name, i+1)
+			}
 		}
 	}
 
@@ -452,42 +464,26 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 	}
 }
 
-// uninspectedWithoutAReasonCensus is the per-file count of direct TruncatedIDs
-// writes that predate the rule. Every entry is a row that can render "?" with
-// no line in the error log to explain it; each is owed a conversion to
-// MarkSkipped (or, where there is genuinely no error — a cap, an absent field
-// — an explicit decision recorded in the enricher's own doc comment).
+// uninspectedWithoutAReasonCensus is the per-file count of marks that are not
+// a recorded failure: a page cap, or a resource that went away between the
+// list call and the per-item one. Both are true statements about coverage with
+// no error to log, and each site says which it is on the line above the write.
 var uninspectedWithoutAReasonCensus = map[string]int{
-	"apigw_issue_enrichment.go":        3,
-	"asg_issue_enrichment.go":          1,
-	"athena_issue_enrichment.go":       1,
-	"cb_issue_enrichment.go":           1,
-	"cf_issue_enrichment.go":           1,
-	"codeartifact_issue_enrichment.go": 2,
-	"eb_issue_enrichment.go":           2,
-	"eb_rule_issue_enrichment.go":      1,
-	"ec2_issue_enrichment.go":          1,
-	"ecr_issue_enrichment.go":          2,
-	"ecs_issue_enrichment.go":          1,
-	"ecs_task_issue_enrichment.go":     1,
-	"efs_issue_enrichment.go":          2,
-	"glue_issue_enrichment.go":         1,
-	"iam_group_issue_enrichment.go":    1,
-	"iam_policy_issue_enrichment.go":   1,
-	"iam_role_issue_enrichment.go":     2,
-	"iam_user_issue_enrichment.go":     5,
-	"kinesis_issue_enrichment.go":      2,
-	"kms_issue_enrichment.go":          2,
-	"lambda_issue_enrichment.go":       1,
-	"r53_issue_enrichment.go":          3,
-	"redshift_issue_enrichment.go":     1,
-	"s3_issue_enrichment.go":           2,
-	"secrets_issue_enrichment.go":      2,
-	"ses_issue_enrichment.go":          1,
-	"sfn_issue_enrichment.go":          1,
-	"snapshot_cross_ref.go":            1,
-	"sns_issue_enrichment.go":          2,
-	"tgw_issue_enrichment.go":          1,
-	"trail_issue_enrichment.go":        2,
-	"vpc_issue_enrichment.go":          1,
+	"apigw_issue_enrichment.go":     1,
+	"asg_issue_enrichment.go":       1,
+	"eb_rule_issue_enrichment.go":   1,
+	"ec2_issue_enrichment.go":       1,
+	"ecs_task_issue_enrichment.go":  1,
+	"efs_issue_enrichment.go":       1,
+	"iam_group_issue_enrichment.go": 1,
+	"kinesis_issue_enrichment.go":   1,
+	"lambda_issue_enrichment.go":    1,
+	"r53_issue_enrichment.go":       1,
+	"redshift_issue_enrichment.go":  1,
+	"s3_issue_enrichment.go":        1,
+	"secrets_issue_enrichment.go":   1,
+	"snapshot_cross_ref.go":         1,
+	"trail_issue_enrichment.go":     2,
+	"tgw_issue_enrichment.go":       1,
+	"vpc_issue_enrichment.go":       1,
 }

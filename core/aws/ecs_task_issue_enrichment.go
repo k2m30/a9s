@@ -210,6 +210,8 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 		if err != nil || out == nil || out.TaskDefinition == nil {
 			for _, taskID := range tasksByDef[defARN] {
 				if err != nil && IsNotFoundErr(err) {
+					// The definition was deregistered between the two calls:
+					// a race, not a failure to log.
 					result.TruncatedIDs[taskID] = true
 					continue
 				}
@@ -221,7 +223,7 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 			applyTaskDefinitionFindings(result, taskID, *out.TaskDefinition)
 		}
 	})
-	SortFailures(failures)
+
 	return Finish(result, failures, len(defARNs), op)
 }
 

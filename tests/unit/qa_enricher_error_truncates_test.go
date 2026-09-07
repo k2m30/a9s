@@ -49,8 +49,13 @@ func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 	resources := []resource.Resource{{ID: "proj-error"}, {ID: "proj-ok"}}
 
 	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
+	// INVERTED for the "skipped" spec row 5: this asserted err == nil, a proxy
+	// for "the run was not aborted" that also required the reason to be
+	// dropped. The run still continues — the other resource is processed and
+	// Truncated is raised below — and the call that failed now says so. Do not
+	// restore the nil-error assertion.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when a per-resource ListBuildsForProject call fails — was the per-resource error handling reverted?")
@@ -155,8 +160,13 @@ func TestEnrichGlueJobStatus_GetJobRunsError_SetsTruncated(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
+	// INVERTED for the "skipped" spec row 5: this asserted err == nil, a proxy
+	// for "the run was not aborted" that also required the reason to be
+	// dropped. The run still continues — the other resource is processed and
+	// Truncated is raised below — and the call that failed now says so. Do not
+	// restore the nil-error assertion.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when GetJobRuns fails — was the per-resource error handling reverted?")

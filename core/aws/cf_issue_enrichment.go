@@ -193,6 +193,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	bucketGone := cfBucketGoneFunc(clients)
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -206,7 +207,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if out.DistributionConfig == nil {
@@ -256,5 +257,5 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		setWave2Finding(&result, distID, cfCodeInsecureProtocol,
 			catalog.Phrase(cfCodeInsecureProtocol), "~", "cf", rows)
 	})
-	return result, nil
+	return result, AggregateFailures("cf-enrich: GetDistributionConfig", failures, n)
 }

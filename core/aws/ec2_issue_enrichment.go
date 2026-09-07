@@ -328,6 +328,8 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		defer mu.Unlock()
 		if err != nil {
 			if IsNotFoundErr(err) {
+				// The instance went away between the list call and this one:
+				// a race, not a failure to log.
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
@@ -345,6 +347,6 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 			rows)
 
 	})
-	SortFailures(failures)
+
 	return Finish(result, failures, len(targets), op)
 }

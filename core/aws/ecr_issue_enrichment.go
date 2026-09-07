@@ -112,25 +112,25 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		// The two policy reads are issued before the lock is taken: holding it
 		// across a network call would serialise the whole page behind one
 		// repository and undo ForEachParallel.
-		exposure, policyUnreadable := ecrRepositoryExposure(ctx, clients.ECR, repoName, ownAccount)
-		noLifecyclePolicy, lifecycleUnreadable := ecrLifecyclePolicyMissing(ctx, clients.ECR, repoName)
+		exposure, policyErr := ecrRepositoryExposure(ctx, clients.ECR, repoName, ownAccount)
+		noLifecyclePolicy, lifecycleErr := ecrLifecyclePolicyMissing(ctx, clients.ECR, repoName)
 
 		mu.Lock()
 		defer mu.Unlock()
 
 		switch {
-		case policyUnreadable:
+		case policyErr != nil:
 			// Unknown, not clean: the row renders "?" rather than claiming a
 			// repository nobody could read is private.
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, policyErr)
 		case exposure.Public:
 			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "repository policy open to anyone", "!", "ecr", publicPolicyRows(exposure))
 		}
 		switch {
-		case lifecycleUnreadable:
+		case lifecycleErr != nil:
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, lifecycleErr)
 		case noLifecyclePolicy:
 			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "no lifecycle policy", "~", "ecr", nil)
 		}
@@ -187,7 +187,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		summary := strings.Join(parts, ", ") + " vulnerabilities"
 		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, summary, tier, "ecr", rows)
 	})
-	SortFailures(failures)
 
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("ecr-enrich: DescribeImages", failures, total)
@@ -197,28 +196,28 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 // shared policy engine. A repository with no policy at all is a definite
 // answer — the default, and the safe one — so it reports no exposure and no
 // failure. Anything else that stops the read leaves the repository unknown.
-func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount string) (iampolicy.Exposure, bool) {
+func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount string) (iampolicy.Exposure, error) {
 	policyAPI, ok := api.(ECRGetRepositoryPolicyAPI)
 	if !ok {
-		return iampolicy.Exposure{}, false
+		return iampolicy.Exposure{}, nil
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetRepositoryPolicyOutput, error) {
 		return policyAPI.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
 	})
 	if err != nil {
 		if _, notFound := errors.AsType[*ecrtypes.RepositoryPolicyNotFoundException](err); notFound {
-			return iampolicy.Exposure{}, false
+			return iampolicy.Exposure{}, nil
 		}
-		return iampolicy.Exposure{}, true
+		return iampolicy.Exposure{}, err
 	}
 	if out.PolicyText == nil {
-		return iampolicy.Exposure{}, false
+		return iampolicy.Exposure{}, nil
 	}
 	doc, perr := iampolicy.Parse(*out.PolicyText)
 	if perr != nil {
-		return iampolicy.Exposure{}, true
+		return iampolicy.Exposure{}, perr
 	}
-	return iampolicy.Evaluate(doc, ownAccount), false
+	return iampolicy.Evaluate(doc, ownAccount), nil
 }
 
 // ecrLifecyclePolicyMissing reports whether the repository keeps images
@@ -231,21 +230,21 @@ func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount
 // success is the healthy case, and anything else — a denial, a transient
 // failure — is a read that did not happen. The second return says so, and a
 // repository nobody could read is not a repository with a policy.
-func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string) (missing, unreadable bool) {
+func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string) (missing bool, err error) {
 	lifecycleAPI, ok := api.(ECRGetLifecyclePolicyAPI)
 	if !ok {
-		return false, false
+		return false, nil
 	}
-	_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetLifecyclePolicyOutput, error) {
+	_, err = RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetLifecyclePolicyOutput, error) {
 		return lifecycleAPI.GetLifecyclePolicy(ctx, &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)})
 	})
 	if err == nil {
-		return false, false
+		return false, nil
 	}
 	if _, notFound := errors.AsType[*ecrtypes.LifecyclePolicyNotFoundException](err); notFound {
-		return true, false
+		return true, nil
 	}
-	return false, true
+	return false, err
 }
 
 // S5 operator sentences for the two policy findings.

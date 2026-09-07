@@ -92,7 +92,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	// AggregateFailures rather than Finish: this pass emits only "~", so a
 	// table it could not read is a coverage gap on that row, never a lower
 	// bound on the issue count the badge shows.
-	SortFailures(pitrFailures)
+
 	pitrErr := AggregateFailures("ddb-enrich: DescribeContinuousBackups", pitrFailures, n)
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
 	return result, errors.Join(tagErr, pitrErr, err)

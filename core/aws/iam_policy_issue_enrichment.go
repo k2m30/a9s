@@ -48,6 +48,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -73,7 +74,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		defer mu.Unlock()
 		if err != nil {
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		riskVal := ""
@@ -103,7 +104,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, nil
+	return result, AggregateFailures("iam-policy-enrich: GetPolicyVersion", failures, n)
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy

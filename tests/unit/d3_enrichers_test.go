@@ -401,8 +401,12 @@ func TestD3EveryKeyFailingMarksTheUserOnce(t *testing.T) {
 			"AKIAI44QH8DHBEXAMPLE": errors.New("Throttling: rate exceeded"),
 		},
 	}
-	res := d3EnrichUsers(t, fake, []resource.Resource{d3UserResource("acme-batch-user")})
+	res, err := d3EnrichUsersErr(t, fake, []resource.Resource{d3UserResource("acme-batch-user")})
 
+	// INVERTED for the "skipped" spec row 5: see d3EnrichUsersErr.
+	if err == nil {
+		t.Error("every key failing returned no error")
+	}
 	if !res.TruncatedIDs["acme-batch-user"] {
 		t.Errorf("TruncatedIDs[acme-batch-user] = false; no key could be read")
 	}

@@ -236,9 +236,21 @@ func TestErrorHistory_OneShapeForEveryFailedCall(t *testing.T) {
 			if len(lines) == 0 {
 				t.Fatalf("%s logged nothing", tc.name)
 			}
-			want := "availability ec2: " + awsclient.CauseInRegion(tc.err, "us-east-1")
-			if !strings.Contains(lines[0], want) {
-				t.Errorf("error-history line %q, want it to carry %q — one shape for every failed call", lines[0], want)
+			// INVERTED for the "skipped" spec row 5: the wanted line was
+			// "availability ec2: " + the cause, which for a partial-batch
+			// aggregate said the type twice ("availability ec2: ec2:
+			// DescribeInstances failed for ..."). The shape is still subject
+			// then cause; the subject is now said once. Do not restore the
+			// concatenation.
+			cause := awsclient.CauseInRegion(tc.err, "us-east-1")
+			if !strings.HasPrefix(lines[0][strings.Index(lines[0], "] ")+2:], "availability ec2") {
+				t.Errorf("error-history line %q does not lead with its subject", lines[0])
+			}
+			if !strings.HasSuffix(lines[0], strings.TrimPrefix(cause, "ec2: ")) {
+				t.Errorf("error-history line %q does not carry the cause %q — one shape for every failed call", lines[0], cause)
+			}
+			if n := strings.Count(lines[0], "ec2:"); n != 1 {
+				t.Errorf("error-history line %q says the type %d times, want 1", lines[0], n)
 			}
 		})
 	}

@@ -119,12 +119,20 @@ func d3UserResource(name string) resource.Resource {
 
 func d3EnrichUsers(t *testing.T, fake *d3UserFake, rs []resource.Resource) awsclient.IssueEnricherResult {
 	t.Helper()
-	res, err := awsclient.EnrichIAMUserMFA(context.Background(),
-		&awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}, rs, nil)
+	res, err := d3EnrichUsersErr(t, fake, rs)
 	if err != nil {
 		t.Fatalf("EnrichIAMUserMFA: %v", err)
 	}
 	return res
+}
+
+// d3EnrichUsersErr is d3EnrichUsers for the cases that expect a refusal: a key
+// whose last use could not be read is a recorded failure now, not a silent
+// skip ("skipped" spec row 5).
+func d3EnrichUsersErr(t *testing.T, fake *d3UserFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
+	t.Helper()
+	return awsclient.EnrichIAMUserMFA(context.Background(),
+		&awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}, rs, nil)
 }
 
 // TestD3KeyLastUsedErrorMarksTheUserUnknown pins row 1: a GetAccessKeyLastUsed
@@ -142,10 +150,16 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 			"AKIAIOSFODNN7EXAMPL1": errors.New("Throttling: rate exceeded"),
 		},
 	}
-	res := d3EnrichUsers(t, fake, []resource.Resource{
+	res, err := d3EnrichUsersErr(t, fake, []resource.Resource{
 		d3UserResource("acme-batch-user"), d3UserResource("acme-ci-user"),
 	})
 
+	// INVERTED for the "skipped" spec row 5: the helper failed the test on any
+	// error, which is what let the unreadable key be marked "?" with nothing
+	// in the log. Do not restore the error-free helper here.
+	if err == nil {
+		t.Error("a key whose last use could not be read returned no error")
+	}
 	if !res.TruncatedIDs["acme-batch-user"] {
 		t.Errorf("TruncatedIDs[acme-batch-user] = false; an unreadable key is unknown, not clean")
 	}

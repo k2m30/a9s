@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"sync"
 
@@ -48,6 +49,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -64,7 +66,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		memberTruncated := false
 		var groupMarker *string
 		memberPages := 0
-		memberErrd := false
+		var memberErr error
 		memberFirstCallErrd := false
 		for {
 			if memberPages >= PerParentPageCap {
@@ -76,7 +78,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				Marker:    groupMarker,
 			})
 			if err != nil {
-				memberErrd = true
+				memberErr = err
 				if memberPages == 0 {
 					memberFirstCallErrd = true
 				} else {
@@ -98,7 +100,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		attachedTruncated := false
 		var attachedMarker *string
 		attachedPages := 0
-		attachedErrd := false
+		var attachedErr error
 		attachedFirstCallErrd := false
 		for {
 			if attachedPages >= PerParentPageCap {
@@ -110,7 +112,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				Marker:    attachedMarker,
 			})
 			if err != nil {
-				attachedErrd = true
+				attachedErr = err
 				if attachedPages == 0 {
 					attachedFirstCallErrd = true
 				} else {
@@ -132,7 +134,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		inlineTruncated := false
 		var inlineMarker *string
 		inlinePages := 0
-		inlineErrd := false
+		var inlineErr error
 		inlineFirstCallErrd := false
 		for {
 			if inlinePages >= PerParentPageCap {
@@ -144,7 +146,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				Marker:    inlineMarker,
 			})
 			if err != nil {
-				inlineErrd = true
+				inlineErr = err
 				if inlinePages == 0 {
 					inlineFirstCallErrd = true
 				} else {
@@ -164,7 +166,11 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		mu.Lock()
 		defer mu.Unlock()
 
-		if memberTruncated || memberErrd || attachedTruncated || attachedErrd || inlineTruncated || inlineErrd {
+		switch walkErr := cmp.Or(memberErr, attachedErr, inlineErr); {
+		case walkErr != nil:
+			MarkSkipped(&result, r.ID, &failures, walkErr)
+		case memberTruncated || attachedTruncated || inlineTruncated:
+			// A page cap, not a failed call: there is no error to record.
 			result.TruncatedIDs[r.ID] = true
 		}
 

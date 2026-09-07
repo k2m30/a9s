@@ -251,8 +251,11 @@ func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T
 	resources := snsTopicResources("my-topic-1", "my-topic-2")
 
 	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// INVERTED for the "skipped" spec row 5: this required err == nil, which
+	// meant the row could render "?" with nothing in the error log to say what
+	// refused. The call that failed is recorded now. Do not restore.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if _, ok := result.Findings[topic1]; ok {
 		t.Error("my-topic-1 must NOT have a finding when the API call fails")

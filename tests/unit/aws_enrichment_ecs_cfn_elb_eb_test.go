@@ -444,8 +444,11 @@ func TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge(t *testing.T)
 	}
 
 	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// INVERTED for the "skipped" spec row 5: this required err == nil, which
+	// meant the row could render "?" with nothing in the error log to say what
+	// refused. The call that failed is recorded now. Do not restore.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if result.Truncated {
 		t.Error("Truncated must stay false: ecs is a \"~\"-only enricher, so a DescribeClusters API error must not lower-bound the aggregate issue badge")
@@ -1131,8 +1134,11 @@ func TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge(t *testin
 	}
 
 	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// INVERTED for the "skipped" spec row 5: this required err == nil, which
+	// meant the row could render "?" with nothing in the error log to say what
+	// refused. The call that failed is recorded now. Do not restore.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if result.Truncated {
 		t.Error("Truncated must stay false: eb is a \"~\"-only enricher, so a DescribeEnvironmentHealth error marks the row via TruncatedIDs, never the aggregate issue badge")

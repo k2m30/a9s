@@ -262,8 +262,12 @@ func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("enricher must not propagate FetchManagedPolicyDocument errors: %v", err)
+	// INVERTED for the "skipped" spec row 5: "must not propagate" was a proxy
+	// for "must not abort the batch", and it also required the reason to be
+	// dropped. The batch still completes — the safe policy below is evaluated
+	// — and the policy that could not be read says so. Do not restore.
+	if err == nil {
+		t.Fatal("a failed document fetch returned no error — the reason never reaches the log")
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when at least one policy fetch failed")

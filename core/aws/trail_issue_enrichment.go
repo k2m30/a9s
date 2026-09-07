@@ -42,6 +42,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		return result, nil
 	}
 
+	var failures []Failure
 	var mu sync.Mutex
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
@@ -65,8 +66,15 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		// A bucket with no policy cannot be public by policy; anything else
 		// that fails leaves the trail's posture unknown, not clean.
 		public := statusErr == nil && status.PolicyStatus != nil && aws.ToBool(status.PolicyStatus.IsPublic)
-		if statusErr != nil && !isS3APIErrCode(statusErr, "NoSuchBucketPolicy") {
+		switch {
+		case statusErr == nil || isS3APIErrCode(statusErr, "NoSuchBucketPolicy"):
+			// No policy at all is an answer, not a gap.
+		case IsNotFoundErr(statusErr):
+			// The log bucket is gone: a race with whoever deleted it, not a
+			// failure to log.
 			result.TruncatedIDs[r.ID] = true
+		default:
+			MarkSkipped(&result, r.ID, &failures, statusErr)
 		}
 		if public {
 			setWave2Finding(&result, r.ID, CodeTrailLogBucketPublic,
@@ -75,13 +83,16 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		}
 
 		switch {
-		case loggingErr != nil:
+		case loggingErr != nil && IsNotFoundErr(loggingErr):
+			// The log bucket is gone: a race, not a failure to log.
 			result.TruncatedIDs[r.ID] = true
+		case loggingErr != nil:
+			MarkSkipped(&result, r.ID, &failures, loggingErr)
 		case logging.LoggingEnabled == nil:
 			setWave2Finding(&result, r.ID, CodeTrailLogBucketNoAccessLogging,
 				"log bucket has no access logging", "~", "trail",
 				[]domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "~"}})
 		}
 	})
-	return result, nil
+	return result, AggregateFailures("trail-enrich: log bucket posture", failures, n)
 }

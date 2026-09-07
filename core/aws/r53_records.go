@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -146,31 +147,38 @@ func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) re
 	}
 }
 
+// errRecordPagesCapped is the walk stopping at its own page cap rather than
+// on anything AWS said. It is a cause a9s owns, so it reads as one.
+var errRecordPagesCapped = errors.New("record listing stopped at the page cap")
+
 // listAllR53Records walks a zone's record sets to PerParentPageCap and reports
 // whether it reached the end. Route 53 paginates records by a three-part
 // cursor rather than a token, so the walk lives here beside the cursor
 // encoding rather than in the enricher that consumes it.
 //
-// complete is false when the zone is longer than the cap or a page failed. A
-// dangling record found in the pages that did arrive is still real, so the
-// caller reports those and marks the zone truncated: what a short walk cannot
-// say is that the rest of the zone is clean.
-func listAllR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (records []r53types.ResourceRecordSet, complete bool) {
+// A non-nil error means the zone was not seen whole — a page failed, or the
+// walk hit the cap (errRecordPagesCapped). A dangling record found in the
+// pages that did arrive is still real, so the caller reports those and marks
+// the zone truncated: what a short walk cannot say is that the rest of the
+// zone is clean.
+func listAllR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (records []r53types.ResourceRecordSet, err error) {
 	input := &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID}
 	for range PerParentPageCap {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
+		out, pageErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
 			return api.ListResourceRecordSets(ctx, input)
 		})
-		if err != nil {
-			return records, false
+		if pageErr != nil {
+			return records, pageErr
 		}
 		records = append(records, out.ResourceRecordSets...)
 		if !out.IsTruncated {
-			return records, true
+			return records, nil
 		}
 		input.StartRecordName = out.NextRecordName
 		input.StartRecordType = out.NextRecordType
 		input.StartRecordIdentifier = out.NextRecordIdentifier
 	}
-	return records, false
+	// The page cap stopped the walk: the records read are real, but the zone
+	// was not seen whole.
+	return records, errRecordPagesCapped
 }

@@ -92,7 +92,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed,
 			catalog.Phrase(asgCodeScalingActivityFailed), "!", "asg", rows)
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	activitiesErr := AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
 	lcErr := asgLaunchConfigurationPosture(ctx, clients, &result, resources)
@@ -181,6 +181,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 				continue
 			}
 			for _, id := range groupsByLC[name] {
+				// The page cap stopped the walk; there is no error to record.
 				result.TruncatedIDs[id] = true
 			}
 		}

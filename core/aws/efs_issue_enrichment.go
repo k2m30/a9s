@@ -106,9 +106,11 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			mu.Lock()
 			defer mu.Unlock()
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
 			if pageFailed {
-				failures = append(failures, FailedCall(r.ID, pageErr))
+				MarkSkipped(&result, r.ID, &failures, pageErr)
+			} else {
+				// A page cap, not a failed call: there is no error to record.
+				result.TruncatedIDs[r.ID] = true
 			}
 			return
 		}
@@ -153,8 +155,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		})
 
 	})
-	SortFailures(failures)
-	SortFailures(policyFailures)
+
 	SetTruncated(&result, truncated)
 	result.FieldUpdates = make(map[string]map[string]string)
 	// The two passes are counted separately: each names how many of the same
@@ -197,7 +198,7 @@ func enrichEFSPolicies(
 	default:
 		doc, parseErr := iampolicy.Parse(aws.ToString(policyOut.Policy))
 		if parseErr != nil {
-			result.TruncatedIDs[fsID] = true
+			MarkSkipped(result, fsID, failures, parseErr)
 			break
 		}
 		ex := iampolicy.Evaluate(doc, ownAccount)

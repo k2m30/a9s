@@ -42,6 +42,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -62,7 +63,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		targetsTruncated := false
 		var targetsNextToken *string
 		targetPages := 0
-		fetchErr := false
+		var fetchErr error
 		for {
 			if targetPages >= PerParentPageCap {
 				targetsTruncated = true
@@ -78,7 +79,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			out, err := clients.EventBridge.ListTargetsByRule(ctx, pageInput)
 			targetPages++
 			if err != nil {
-				fetchErr = true
+				fetchErr = err
 				break
 			}
 			targets = append(targets, out.Targets...)
@@ -124,8 +125,13 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		mu.Lock()
 		defer mu.Unlock()
 
-		if targetsTruncated || fetchErr {
+		switch {
+		case fetchErr != nil:
 			truncated = true
+			MarkSkipped(&result, r.ID, &failures, fetchErr)
+		case targetsTruncated:
+			truncated = true
+			// A page cap, not a failed call: there is no error to record.
 			result.TruncatedIDs[r.ID] = true
 		}
 		result.FieldUpdates[ruleName] = map[string]string{
@@ -146,5 +152,5 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	})
 
 	SetTruncated(&result, truncated)
-	return result, nil
+	return result, AggregateFailures("eb-rule-enrich: ListTargetsByRule", failures, n)
 }

@@ -36,6 +36,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -50,7 +51,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		defer mu.Unlock()
 		if err != nil {
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		key := r.ID
@@ -78,5 +79,5 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, nil
+	return result, AggregateFailures("glue-enrich: GetJobRuns", failures, n)
 }

@@ -80,14 +80,17 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 			// gone, not unreadable — unknown either way, but not a failure
 			// worth surfacing in the error log.
 			if !isKinesisStreamGone(err) {
-				failures = append(failures, FailedCall(r.ID, err))
+				MarkSkipped(&result, r.ID, &failures, err)
+				return
 			}
+			// The stream went away between the listing and this call: a race,
+			// not a failure to log.
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
 		sum := out.StreamDescriptionSummary
 		if sum == nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkUnusable(&result, r.ID, &failures, "no stream summary in response")
 			return
 		}
 		// AWS omits EncryptionType for an unencrypted stream and returns
@@ -103,7 +106,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 				[]domain.DetailRow{{Label: "Records kept", Value: fmt.Sprintf("%dh", *h), Tier: "~"}})
 		}
 	})
-	SortFailures(failures)
+
 	MarkInformationalOnly(&result)
 	return result, AggregateFailures("kinesis-enrich: DescribeStreamSummary", failures, total)
 }

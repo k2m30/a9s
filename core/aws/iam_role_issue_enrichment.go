@@ -43,6 +43,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 	}
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -61,7 +62,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		adminPolicy := adminAttachedPolicyName(attachedRole)
 		if aerr != nil {
 			mu.Lock()
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, aerr)
 			mu.Unlock()
 		}
 		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
@@ -75,7 +76,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 
 		}
 		if err != nil {
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
 		if out.Role == nil {

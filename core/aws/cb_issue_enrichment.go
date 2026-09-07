@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -47,6 +48,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
 	names = capAtEnrichmentCap(&result, names, func(n string) []string { return []string{n} })
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, len(names), EnrichmentParallelism, func(i int) {
 		name := names[i]
@@ -58,7 +60,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		defer mu.Unlock()
 		if err != nil {
 			SetTruncated(&result, true)
-			result.TruncatedIDs[name] = true
+			MarkSkipped(&result, name, &failures, err)
 			return
 		}
 		if len(out.Ids) > 0 {
@@ -67,14 +69,15 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			buildIDToProject[id] = name
 		}
 	})
+	listErr := AggregateFailures("cb-enrich: ListBuildsForProject", failures, len(names))
 	if len(buildIDs) == 0 {
-		return result, nil
+		return result, listErr
 	}
 	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 		Ids: buildIDs,
 	})
 	if err != nil {
-		return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
+		return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, errors.Join(listErr, err)
 	}
 	for _, b := range builds.Builds {
 		if b.Id == nil {
@@ -125,7 +128,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows)
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	return result, nil
+	return result, listErr
 }
 
 // cbPhaseWords words a CodeBuild phase name for a detail row.

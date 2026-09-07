@@ -60,7 +60,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		// The configuration checks read DescribeStateMachine, which every
 		// state machine answers. They run before the execution listing and
 		// are not subject to its EXPRESS skip.
-		sfnConfigurationPosture(ctx, clients, &result, &mu, r.ID, smARN)
+		sfnConfigurationPosture(ctx, clients, &result, &mu, &failures, r.ID, smARN)
 
 		// EXPRESS state machines reject ListExecutions outright
 		// (StateMachineTypeNotSupported) — skip THAT CALL rather than the
@@ -122,7 +122,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	return result,
 		AggregateFailures("sfn-enrich: ListExecutions", failures, total)
@@ -132,7 +132,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 // configuration signals it carries: execution logging, the encryption key,
 // and whether a credential is pasted into the definition. Takes the
 // enricher's mutex itself, so it can be called from the parallel body.
-func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, mu *sync.Mutex, id, smARN string) {
+func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, mu *sync.Mutex, failures *[]Failure, id, smARN string) {
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
 		return clients.SFN.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{
 			StateMachineArn: aws.String(smARN),
@@ -141,7 +141,7 @@ func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, resul
 	mu.Lock()
 	defer mu.Unlock()
 	if err != nil {
-		result.TruncatedIDs[id] = true
+		MarkSkipped(result, id, failures, err)
 		return
 	}
 	// Absent configuration and an explicit OFF are the same fact: nothing is

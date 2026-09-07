@@ -177,6 +177,8 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 			// A zone deleted between ListHostedZones and this per-zone call
 			// is an operational race, not a failure. See IsNotFoundErr.
 			if IsNotFoundErr(err) {
+				// The zone went away between the list call and this one: a
+				// race, not a failure to log.
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
@@ -190,7 +192,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		// cannot have VPC associations. The public-zone rows are evaluated
 		// first, since they are the other half of this call's answer.
 		if out.HostedZone.Config == nil || !out.HostedZone.Config.PrivateZone {
-			r53PublicZoneFindings(ctx, clients, &result, r, zoneID, held)
+			r53PublicZoneFindings(ctx, clients, &result, &failures, r, zoneID, held)
 			return
 		}
 		if len(out.VPCs) > 0 {
@@ -202,7 +204,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 			{Label: "Zone ID", Value: zoneID, Tier: "~"},
 		})
 	})
-	SortFailures(failures)
+
 	return result,
 		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
 }
@@ -215,15 +217,15 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 // and calling that a takeover sends an operator chasing a healthy record. A
 // zone whose records cannot be listed is marked truncated rather than reported
 // clean.
-func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, r resource.Resource, zoneID string, held map[string]string) {
-	r53QueryLoggingFinding(ctx, clients, result, r, zoneID)
+func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, zoneID string, held map[string]string) {
+	r53QueryLoggingFinding(ctx, clients, result, failures, r, zoneID)
 
 	if held == nil {
 		return
 	}
-	records, complete := listAllR53Records(ctx, clients.Route53, zoneID)
-	if !complete {
-		result.TruncatedIDs[r.ID] = true
+	records, recordsErr := listAllR53Records(ctx, clients.Route53, zoneID)
+	if recordsErr != nil {
+		MarkSkipped(result, r.ID, failures, recordsErr)
 	}
 	for _, rec := range r53DanglingRecords(records, held) {
 		name := aws.ToString(rec.Name)
@@ -242,7 +244,7 @@ func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result 
 // r53QueryLoggingFinding evaluates the query-logging row for one public zone.
 // A zone with no config on any page has none at all, so the walk stops at the
 // first config it sees rather than counting them.
-func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, r resource.Resource, zoneID string) {
+func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, zoneID string) {
 	input := &r53svc.ListQueryLoggingConfigsInput{HostedZoneId: aws.String(zoneID)}
 	for {
 		logs, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.ListQueryLoggingConfigsOutput, error) {
@@ -250,7 +252,7 @@ func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result
 		})
 		switch {
 		case err != nil:
-			result.TruncatedIDs[r.ID] = true
+			MarkSkipped(result, r.ID, failures, err)
 			return
 		case len(logs.QueryLoggingConfigs) > 0:
 			return

@@ -103,18 +103,6 @@ func UnusableAnswer(id, cause string) Failure {
 	return Failure{ID: id, Class: classUnknown, Cause: cause}
 }
 
-// SortFailures orders records by id so an aggregate built from a parallel walk
-// reads the same on every run: which failure a cause names as its example is
-// otherwise whichever goroutine happened to finish first.
-func SortFailures(failures []Failure) {
-	slices.SortFunc(failures, func(a, b Failure) int {
-		if c := strings.Compare(a.ID, b.ID); c != 0 {
-			return c
-		}
-		return strings.Compare(a.Cause, b.Cause)
-	})
-}
-
 // classErr carries the recorded class of a partial-batch failure out through
 // the composite error. The composite's own words are a9s's sentence and hold
 // no AWS error to read, so without this every aggregated denial reclassifies
@@ -171,6 +159,16 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	if len(failures) == 0 {
 		return nil
 	}
+
+	// Ordered by id here rather than by every caller: an aggregate built from
+	// a parallel walk would otherwise name whichever failure its goroutine
+	// finished first as the example, and read differently on every run.
+	failures = slices.SortedFunc(slices.Values(failures), func(a, b Failure) int {
+		if c := strings.Compare(a.ID, b.ID); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Cause, b.Cause)
+	})
 
 	type group struct {
 		cause   string

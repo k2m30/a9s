@@ -110,9 +110,9 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		mu.Lock()
 		defer mu.Unlock()
 		if p.unreachable {
+			truncated = true
 			// Cross-region bucket or a bucket deleted between ListBuckets and
 			// this call: data incomplete, but neither is a failure to log.
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -121,8 +121,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			// share a cause (usually one denied permission), and counting
 			// each would report more failures than there were buckets.
 			truncated = true
-			result.TruncatedIDs[r.ID] = true
-			failures = append(failures, FailedCall(bucketName, p.failures[0]))
+			MarkSkipped(&result, r.ID, &failures, p.failures[0])
 		}
 		for _, f := range p.findings {
 			setWave2Finding(&result, bucketName, f.code, f.phrase, f.glyph, "s3", f.rows)
@@ -131,7 +130,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			result.FieldUpdates[bucketName] = map[string]string{"status": "public access block incomplete"}
 		}
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("s3-enrich: bucket posture", failures, total)
 }

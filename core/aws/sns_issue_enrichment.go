@@ -42,6 +42,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
 	n := len(resources)
+	var failures []Failure
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -53,14 +54,14 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		// Walk all pages so subs_count is exact for topics with >100 subscribers.
 		var subs []snstypes.Subscription
 		var nextToken *string
-		pagedErr := false
+		var pagedErr error
 		for {
 			out, err := clients.SNS.ListSubscriptionsByTopic(ctx, &snssvc.ListSubscriptionsByTopicInput{
 				TopicArn:  aws.String(topicARN),
 				NextToken: nextToken,
 			})
 			if err != nil {
-				pagedErr = true
+				pagedErr = err
 				break
 			}
 			subs = append(subs, out.Subscriptions...)
@@ -72,8 +73,8 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 
 		mu.Lock()
 		defer mu.Unlock()
-		if pagedErr {
-			result.TruncatedIDs[r.ID] = true
+		if pagedErr != nil {
+			MarkSkipped(&result, r.ID, &failures, pagedErr)
 			return
 		}
 		result.FieldUpdates[r.ID] = map[string]string{
@@ -82,7 +83,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		// Posture is read for every topic, including one with no
 		// subscribers: an unencrypted topic nobody listens to is still
 		// unencrypted.
-		snsTopicPosture(ctx, clients, &result, r.ID, ownAccount)
+		snsTopicPosture(ctx, clients, &result, &failures, r.ID, ownAccount)
 		if len(subs) == 0 {
 			setWave2Finding(&result, r.ID, snsCodeNoSubscribers, "topic has no subscribers", "~", "sns", nil)
 			return
@@ -102,20 +103,20 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			setWave2Finding(&result, r.ID, snsCodeAllPending, "all pending confirmation", "~", "sns", nil)
 		}
 	})
-	return result, nil
+	return result, AggregateFailures("sns-enrich: topic posture and subscriptions", failures, n)
 }
 
 // snsTopicPosture reads the topic's own attributes — the access policy and
 // the encryption key — and records what they expose. Called with the
 // enricher's mutex held.
-func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, topicARN, ownAccount string) {
+func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, topicARN, ownAccount string) {
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*snssvc.GetTopicAttributesOutput, error) {
 		return clients.SNS.GetTopicAttributes(ctx, &snssvc.GetTopicAttributesInput{
 			TopicArn: aws.String(topicARN),
 		})
 	})
 	if err != nil {
-		result.TruncatedIDs[topicARN] = true
+		MarkSkipped(result, topicARN, failures, err)
 		return
 	}
 	if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {

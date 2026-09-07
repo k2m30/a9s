@@ -75,6 +75,8 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		}
 		switch {
 		case logErr != nil && IsNotFoundErr(logErr):
+			// The cluster went away between the list call and this one: a
+			// race, not a failure to log.
 			result.TruncatedIDs[r.ID] = true
 		case logErr != nil:
 			MarkSkipped(&result, r.ID, &failures, logErr)

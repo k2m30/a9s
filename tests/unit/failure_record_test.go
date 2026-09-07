@@ -23,9 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/smithy-go"
@@ -307,5 +309,61 @@ func TestAggregateFailures_RegionGap_NamesTheRegionOnce(t *testing.T) {
 	line := awsclient.CauseInRegion(agg, "eu-central-2")
 	if n := strings.Count(line, "eu-central-2"); n != 1 {
 		t.Errorf("failure line %q names the region %d times, want 1", line, n)
+	}
+}
+
+// iamDeniedKeysFake answers every user's access-key listing with a denial and
+// leaves the other calls healthy, so the enricher's only failure is the one
+// call it could not make.
+type iamDeniedKeysFake struct {
+	awsclient.IAMAPI
+}
+
+func (f *iamDeniedKeysFake) GetLoginProfile(
+	_ context.Context, _ *iam.GetLoginProfileInput, _ ...func(*iam.Options),
+) (*iam.GetLoginProfileOutput, error) {
+	return nil, &iamtypes.NoSuchEntityException{Message: aws.String("Login Profile for user cannot be found")}
+}
+
+func (f *iamDeniedKeysFake) ListMFADevices(
+	_ context.Context, _ *iam.ListMFADevicesInput, _ ...func(*iam.Options),
+) (*iam.ListMFADevicesOutput, error) {
+	return &iam.ListMFADevicesOutput{}, nil
+}
+
+func (f *iamDeniedKeysFake) ListAccessKeys(
+	_ context.Context, _ *iam.ListAccessKeysInput, _ ...func(*iam.Options),
+) (*iam.ListAccessKeysOutput, error) {
+	return nil, deniedAs("IAM", "ListAccessKeys", "iam:ListAccessKeys")
+}
+
+func (f *iamDeniedKeysFake) ListAttachedUserPolicies(
+	_ context.Context, _ *iam.ListAttachedUserPoliciesInput, _ ...func(*iam.Options),
+) (*iam.ListAttachedUserPoliciesOutput, error) {
+	return &iam.ListAttachedUserPoliciesOutput{}, nil
+}
+
+// TestEnricher_UninspectedUser_SaysWhy pins spec row 5 through one of the
+// sampled census sites: a user whose access keys could not be read renders "?"
+// AND says what refused. Marking the row without recording the error is the
+// silent-skip shape the census was holding open.
+func TestEnricher_UninspectedUser_SaysWhy(t *testing.T) {
+	clients := &awsclient.ServiceClients{IAM: &iamDeniedKeysFake{}, Region: "us-east-1"}
+	resources := []resource.Resource{
+		{ID: "acme-deploy", Name: "acme-deploy", Type: "iam-user",
+			Fields: map[string]string{"user_name": "acme-deploy", "create_date": "2020-01-01 00:00", "password_last_used": "Never"}},
+	}
+
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources, nil)
+	if !result.TruncatedIDs["acme-deploy"] {
+		t.Error("a user whose keys could not be read must render \"?\"")
+	}
+	if err == nil {
+		t.Fatal("a denied ListAccessKeys returned no error — the reason never reaches the log")
+	}
+	for _, want := range []string{"not authorized to perform iam:ListAccessKeys", "acme-deploy"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("failure line %q does not carry %q", err, want)
+		}
 	}
 }

@@ -85,13 +85,15 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		}
 		if err := cmp.Or(policyErr, urlErr); err != nil {
 			if IsNotFoundErr(err) {
+				// The function went away between the list call and this one:
+				// a race, not a failure to log.
 				result.TruncatedIDs[r.ID] = true
 				return
 			}
 			MarkSkipped(&result, r.ID, &failures, err)
 		}
 	})
-	SortFailures(failures)
+
 	err := Finish(&result, failures, len(targets), op)
 	return result, err
 }

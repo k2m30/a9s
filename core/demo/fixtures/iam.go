@@ -828,6 +828,11 @@ func buildIAMPolicies() []iamtypes.Policy {
 			AttachmentCount: aws.Int32(attachCount),
 			Path:            aws.String("/"),
 			CreateDate:      aws.Time(createDate),
+			// Every real managed policy has a default version, and the
+			// document for it is registered in buildIAMRelations. Without
+			// both, the Wave 2 pass cannot read the policy and every one of
+			// these rows renders "?" with a failure line behind it.
+			DefaultVersionId: aws.String("v1"),
 		})
 	}
 	return policies
@@ -1072,6 +1077,21 @@ func buildIAMRelations(f *IAMFixtures) {
 		Groups: []iamtypes.PolicyGroup{
 			{GroupName: aws.String("admins"), GroupId: aws.String("AGPAEXAMPLE111111111")},
 		},
+	}
+
+	// The generated least-privilege policies: one read-only document each,
+	// named after the service in the policy's own name. Nothing here is a
+	// finding — these rows are the healthy majority the flagged ones stand out
+	// against.
+	for _, p := range f.Policies {
+		arn := aws.ToString(p.Arn)
+		if _, ok := f.PolicyDocuments[arn]; ok || !strings.HasPrefix(aws.ToString(p.PolicyName), "acme-") {
+			continue
+		}
+		service := strings.Split(aws.ToString(p.PolicyName), "-")[1]
+		f.PolicyDocuments[arn] = url.PathEscape(fmt.Sprintf(
+			`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["%s:Describe*","%s:List*","%s:Get*"],"Resource":"arn:aws:%s:us-east-1:123456789012:*"}]}`,
+			service, service, service, service))
 	}
 
 	// Policy documents (URL-encoded JSON)

@@ -197,6 +197,15 @@ func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, er
 	*failures = append(*failures, FailedCall(id, err))
 }
 
+// MarkUnusable records an item the service answered for without the field the
+// enricher needs — a summary the response omitted, a name the batch did not
+// come back with. There is no error to classify, so a9s states the cause
+// itself; the row is uninspected either way.
+func MarkUnusable(result *IssueEnricherResult, id string, failures *[]Failure, cause string) {
+	result.TruncatedIDs[id] = true
+	*failures = append(*failures, UnusableAnswer(id, cause))
+}
+
 // SetTruncated raises result.Truncated when cut is true and never lowers it.
 //
 // One enricher discovers a cut answer in several independent places — a failed

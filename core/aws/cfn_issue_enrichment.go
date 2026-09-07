@@ -111,7 +111,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			catalog.Phrase(cfnCodeRecentResourceFailure), "!", "cfn", failedRows)
 
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
@@ -230,7 +230,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 			}
 		}
 	})
-	SortFailures(failures)
+
 	SetTruncated(&result, truncated)
 	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

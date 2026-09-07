@@ -88,12 +88,19 @@ func w4KMSResource(keyID, alias string, manager kmstypes.KeyManagerType) resourc
 
 func w4EnrichKMS(t *testing.T, fake *w4KMSFake, rs []resource.Resource) awsclient.IssueEnricherResult {
 	t.Helper()
-	clients := &awsclient.ServiceClients{KMS: fake, Region: "us-east-1"}
-	res, err := awsclient.EnrichKMSRotation(context.Background(), clients, rs, nil)
+	res, err := w4EnrichKMSErr(t, fake, rs)
 	if err != nil {
 		t.Fatalf("EnrichKMSRotation: %v", err)
 	}
 	return res
+}
+
+// w4EnrichKMSErr is w4EnrichKMS for the case that expects a refusal: a key
+// policy the role may not read is a recorded failure ("skipped" spec row 5).
+func w4EnrichKMSErr(t *testing.T, fake *w4KMSFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
+	t.Helper()
+	clients := &awsclient.ServiceClients{KMS: fake, Region: "us-east-1"}
+	return awsclient.EnrichKMSRotation(context.Background(), clients, rs, nil)
 }
 
 const (
@@ -150,11 +157,16 @@ func TestW4KMSPolicyFetchFailureIsUnknown(t *testing.T) {
 		policies:  map[string]string{w4KMSPublicKeyID: w4KMSPublicPolicyDoc},
 		policyErr: map[string]error{w4KMSPrivateKeyID: errors.New("AccessDeniedException: kms:GetKeyPolicy")},
 	}
-	res := w4EnrichKMS(t, fake, []resource.Resource{
+	res, err := w4EnrichKMSErr(t, fake, []resource.Resource{
 		w4KMSResource(w4KMSPrivateKeyID, "alias/acme-denied-key", kmstypes.KeyManagerTypeCustomer),
 		w4KMSResource(w4KMSPublicKeyID, "alias/acme-shared-key", kmstypes.KeyManagerTypeCustomer),
 	})
 
+	// INVERTED for the "skipped" spec row 5: the helper failed the test on any
+	// error, so a refused key policy was marked "?" and never explained.
+	if err == nil {
+		t.Error("a refused GetKeyPolicy returned no error")
+	}
 	if !res.TruncatedIDs[w4KMSPrivateKeyID] {
 		t.Errorf("TruncatedIDs[%s] = false, want true", w4KMSPrivateKeyID)
 	}

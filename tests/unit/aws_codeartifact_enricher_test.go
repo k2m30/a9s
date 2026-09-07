@@ -238,8 +238,11 @@ func TestEnrichCodeArtifactRepository_APIErrorSetsTruncatedNoError(t *testing.T)
 	resources := codeArtifactRepoResources(caRepo1, caRepo2)
 
 	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// INVERTED for the "skipped" spec row 5: this required err == nil, which
+	// meant the row could render "?" with nothing in the error log to say what
+	// refused. The call that failed is recorded now. Do not restore.
+	if err == nil {
+		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

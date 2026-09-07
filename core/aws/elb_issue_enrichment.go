@@ -249,7 +249,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 
 		}
 	})
-	SortFailures(failures)
+
 	MarkInformationalOnly(&result)
 	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
 }

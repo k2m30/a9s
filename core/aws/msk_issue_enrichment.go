@@ -112,7 +112,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			setWave2Finding(&result, r.ID, mskCodeUnauthenticated, "unauthenticated access allowed", "!", "msk", nil)
 		}
 	})
-	SortFailures(failures)
+
 	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }
