@@ -7,6 +7,7 @@ package runtime
 // read as three different kinds of event.
 
 import (
+	"strings"
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -17,7 +18,10 @@ import (
 // class is about the region.
 func failureLine(subject string, err error, region string) string {
 	cause := awsclient.CauseInRegion(err, region)
-	if subject == "" {
+	// Three callers build the subject as a prefix plus a resource type, and
+	// the type can be empty: an unregistered fetch, a detail enrichment whose
+	// event carries none, a related result with no target.
+	if subject = strings.TrimSpace(subject); subject == "" {
 		return cause
 	}
 	return subject + ": " + cause

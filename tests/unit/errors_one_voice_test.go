@@ -20,6 +20,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
@@ -364,5 +365,127 @@ func TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear(t *testing.T) {
 
 	if got := c.Snapshot().Header.Flash.Text; !strings.Contains(got, awsclient.CauseOf(denial)) {
 		t.Errorf("flash = %q — the completing probe's failure banner was wiped by its own batch's clear", got)
+	}
+}
+
+// TestResourceHandlers_SpeakThroughTheOneFormatter pins spec row 6: the four
+// remaining sites in handlers_resources.go. Two put the raw SDK chain on the
+// status bar — the same class acceptance rejected on the API error handler —
+// and two build the formatter's sentence by hand, so neither could ever name
+// the region a region gap is about.
+func TestResourceHandlers_SpeakThroughTheOneFormatter(t *testing.T) {
+	denial := apiErrWithMessage("UnauthorizedOperation",
+		"You are not authorized to perform: ec2:DescribeInstances. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg")
+	cause := awsclient.CauseOf(denial)
+
+	drive := func(t *testing.T, run func(*runtime.Core) []runtime.UIIntent) string {
+		t.Helper()
+		c, core := newTestControllerAndCore(t)
+		c.ApplyIntents(run(core))
+		return c.Snapshot().Header.Flash.Text
+	}
+
+	t.Run("a failed list fetch reads the cause", func(t *testing.T) {
+		got := drive(t, func(core *runtime.Core) []runtime.UIIntent {
+			in, _ := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{ResourceType: "ec2", Err: denial})
+			return in
+		})
+		if want := "fetch ec2: " + cause; got != want {
+			t.Errorf("flash = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("a failed detail enrichment reads the cause", func(t *testing.T) {
+		got := drive(t, func(core *runtime.Core) []runtime.UIIntent {
+			in, _ := core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{ResourceType: "ec2", ResourceID: "i-0abc", Err: denial})
+			return in
+		})
+		if want := "enrich ec2: " + cause; got != want {
+			t.Errorf("flash = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("a failed lazy add reads the cause", func(t *testing.T) {
+		got := drive(t, func(core *runtime.Core) []runtime.UIIntent {
+			in, _ := core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+				ResourceType: "ec2", SourceResourceID: "i-0abc",
+				Result:       resource.KnownRelated("sg", nil, false),
+				LazyAddError: denial,
+			})
+			return in
+		})
+		if want := "related-fetch: " + cause; got != want {
+			t.Errorf("flash = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("a failed related check reads the cause", func(t *testing.T) {
+		got := drive(t, func(core *runtime.Core) []runtime.UIIntent {
+			in, _ := core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+				ResourceType: "ec2", SourceResourceID: "i-0abc",
+				Result: resource.ErrorRelated("sg", denial),
+			})
+			return in
+		})
+		if want := "related sg: " + cause; got != want {
+			t.Errorf("flash = %q, want %q", got, want)
+		}
+	})
+
+	// The two hand-built sentences were byte-identical to the formatter's for
+	// an error the class says nothing extra about; the copies were only ever
+	// invisible because no region-gap error had reached them. Drive one and
+	// the difference shows.
+	t.Run("a region gap through these sites names the region", func(t *testing.T) {
+		got := drive(t, func(core *runtime.Core) []runtime.UIIntent {
+			in, _ := core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+				ResourceType: "ec2", SourceResourceID: "i-0abc",
+				Result: resource.ErrorRelated("sg", regionGapErr()),
+			})
+			return in
+		})
+		if !strings.Contains(got, "us-east-1") {
+			t.Errorf("flash = %q does not name the region a region gap is about", got)
+		}
+	})
+}
+
+// TestRevealFailure_SpeaksTheCause pins the site my own round 2 sweep
+// misverdicted: handlers.go:547 sits among the theme-error flashes and is not
+// one — a failed reveal is a failed AWS call, and it put the raw chain on the
+// status bar.
+func TestRevealFailure_SpeaksTheCause(t *testing.T) {
+	denial := apiErrWithMessage("AccessDeniedException",
+		"User: arn:aws:iam::123456789012:role/example-readonly is not authorized to perform: secretsmanager:GetSecretValue on resource: acme-db-password")
+
+	c, core := newTestControllerAndCore(t)
+	intents, _ := core.HandleValueRevealed(runtime.ValueRevealedEvent{Err: denial})
+	c.ApplyIntents(intents)
+
+	got := c.Snapshot().Header.Flash.Text
+	if want := "reveal: " + awsclient.CauseOf(denial); got != want {
+		t.Errorf("flash = %q, want %q", got, want)
+	}
+	for _, banned := range []string{"RequestID", "operation error", "11111111-2222-3333-4444-555555555555"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("reveal flash %q carries %q", got, banned)
+		}
+	}
+}
+
+// TestFailureLine_EmptySubjectLeavesNoDanglingSeparator pins what probing row
+// 6 found: three call sites build their subject as a prefix plus a type, and
+// the type can be empty — an unregistered fetch, a detail enrichment with no
+// type on its event, a related result with no target. The sentence read
+// "fetch : connection reset", a colon with nothing in front of it.
+func TestFailureLine_EmptySubjectLeavesNoDanglingSeparator(t *testing.T) {
+	c, core := newTestControllerAndCore(t)
+	intents, _ := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
+		ResourceType: "", Err: errors.New("connection reset"),
+	})
+	c.ApplyIntents(intents)
+
+	if got := c.Snapshot().Header.Flash.Text; strings.Contains(got, " :") {
+		t.Errorf("flash = %q — a subject that is nothing but its prefix must not leave a dangling separator", got)
 	}
 }

@@ -20,6 +20,13 @@
 - A probe that fails with nothing to show now names the reason on the status
   bar. It used to show the internal outcome and class names, as in
   "probe ec2: failed: transport".
+- A failed list fetch, a failed detail enrichment, a failed related check and
+  a secret that could not be revealed now say the reason on the status bar
+  instead of the raw AWS error, so none of them fills the line with a request
+  id or an encoded authorization blob. A failed enrichment also names the type
+  it was enriching.
+- A service the region does not offer now names the region wherever it is
+  reported, including the related panel, which used to drop it.
 
 ## Fixed
 
@@ -31,6 +38,8 @@
   the row says the call failed.
 - A multi-line AWS message no longer breaks the flash and the menu row it is
   rendered on.
+- A failure reported for a resource type a9s could not name no longer reads
+  with a stray colon, as in "fetch : connection reset".
 - When the last resource type checked at startup is the one that fails, its
   message stays on screen. Finishing the check used to clear it in the same
   breath, so that one failure was never seen.

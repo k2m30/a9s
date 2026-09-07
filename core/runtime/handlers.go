@@ -538,13 +538,14 @@ func (c *Core) HandleProfilesLoaded(ev ProfilesLoadedEvent) ([]UIIntent, []TaskR
 }
 
 // HandleValueRevealed branches on Err. On error the handler emits a
-// "reveal failed: <err>" flash so the user sees why the reveal aborted;
-// on success it emits a PushScreen{ScreenReveal} whose payload carries
-// the resource ID and decrypted value the adapter renders.
+// "reveal: <cause>" flash so the user sees why the reveal aborted; on success
+// it emits a PushScreen{ScreenReveal} whose payload carries the resource ID
+// and decrypted value the adapter renders.
 func (c *Core) HandleValueRevealed(ev ValueRevealedEvent) ([]UIIntent, []TaskRequest) {
 	if ev.Err != nil {
+		_, region := c.session.CurrentPair()
 		return []UIIntent{FlashIntent{
-			Text:    "reveal failed: " + ev.Err.Error(),
+			Text:    failureLine("reveal", ev.Err, region),
 			IsError: true,
 		}}, nil
 	}

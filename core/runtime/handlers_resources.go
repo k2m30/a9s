@@ -28,8 +28,6 @@
 package runtime
 
 import (
-	"fmt"
-
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -109,8 +107,9 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	}
 
 	if ev.Err != nil {
+		_, region := c.session.CurrentPair()
 		intents = append(intents, FlashIntent{
-			Text:    "fetch " + resType + ": " + ev.Err.Error(),
+			Text:    failureLine("fetch "+resType, ev.Err, region),
 			IsError: true,
 		})
 	}
@@ -266,8 +265,9 @@ type EnrichDetailResultEvent struct {
 // refresh must never downgrade the next open back to cache.
 func (c *Core) HandleEnrichDetailResult(ev EnrichDetailResultEvent) ([]UIIntent, []TaskRequest) {
 	if ev.Err != nil {
+		_, region := c.session.CurrentPair()
 		return []UIIntent{FlashIntent{
-			Text:    "enrich failed: " + ev.Err.Error(),
+			Text:    failureLine("enrich "+ev.ResourceType, ev.Err, region),
 			IsError: true,
 		}}, nil
 	}
@@ -383,15 +383,16 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		intents = append(intents, PatchLazyResourceCache{Adds: lazyAdds})
 	}
 
+	_, region := c.session.CurrentPair()
 	if ev.LazyAddError != nil {
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("related-fetch: %s", awsclient.CauseOf(ev.LazyAddError)),
+			Text:    failureLine("related-fetch", ev.LazyAddError, region),
 			IsError: true,
 		})
 	}
 	if err := ev.Result.Err(); err != nil {
 		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("related %s: %s", ev.Result.TargetType(), awsclient.CauseOf(err)),
+			Text:    failureLine("related "+ev.Result.TargetType(), err, region),
 			IsError: true,
 		})
 	}

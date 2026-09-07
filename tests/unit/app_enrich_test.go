@@ -347,8 +347,11 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 	})
 
 	view := stripANSI(rootViewContent(m))
-	if !strings.Contains(view, "enrich failed") {
-		t.Errorf("expected view to show 'enrich failed' flash, got:\n%s", view)
+	// INVERTED by spec row 6 (task "errors"): the flash now names the type it
+	// failed to enrich, through the one formatter, instead of the bare
+	// "enrich failed". Do not restore the old literal.
+	if !strings.Contains(view, "enrich role_policies:") {
+		t.Errorf("expected view to show the 'enrich role_policies' flash, got:\n%s", view)
 	}
 }
 
@@ -408,7 +411,10 @@ func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *t
 	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: genBefore})
 
 	view := stripANSI(rootViewContent(m))
-	if !strings.Contains(view, "enrich failed") {
+	// INVERTED by spec row 6 (task "errors"): same wording change; what this
+	// test is about — a stale ClearFlash must not wipe the new error flash —
+	// is unchanged.
+	if !strings.Contains(view, "enrich role_policies:") {
 		t.Errorf("a stale ClearFlash stamped with the PRE-error gen (%d) cleared the new error flash (now at gen %d) — the gen bump must make them distinct. View:\n%s", genBefore, genAfter, view)
 	}
 

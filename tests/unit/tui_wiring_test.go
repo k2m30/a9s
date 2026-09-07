@@ -686,7 +686,10 @@ func TestWiring_ValueRevealedMsg_Error(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	if !containsSubstring(plain, "reveal failed") {
+	// INVERTED by spec row 6 (task "errors"): the flash is "reveal: <cause>"
+	// now. What this test is about — the failure reaches the rendered header —
+	// is unchanged.
+	if !containsSubstring(plain, "reveal: ") {
 		t.Errorf("should show error flash for reveal failure, got: %s", truncateForLog(plain))
 	}
 }
