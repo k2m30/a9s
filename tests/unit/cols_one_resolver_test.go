@@ -26,8 +26,10 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // colsTypeDefFor resolves the typeDef the cascade must be handed for a short
@@ -309,5 +311,139 @@ func TestCols_SortingByTheIdentityColumnOrdersDegradedRowsByName(t *testing.T) {
 	if got := []string{lb.Rows[0].ResourceID, lb.Rows[1].ResourceID}; got[0] != rows[0].ID || got[1] != rows[1].ID {
 		t.Errorf("%s: sorting ascending by the identity column %q left the rows in %v, want %v — the comparator read a column that carries no election, so every row compared equal",
 			shortName, identity.Title, got, []string{rows[0].ID, rows[1].ID})
+	}
+}
+
+// TestCols_SaveColumnsAreAProjectionOfTheResolvedSet pins the third lane. The
+// cache-save resolver must not resolve anything: it must project the set the
+// render path shows, so a save can never persist a column the list does not
+// render, or miss one it does. Walked for every type with and without the
+// shipped view files, because the two lanes previously duplicated the typeDef
+// lookup and would diverge on whichever branch that lookup answered
+// differently.
+func TestCols_SaveColumnsAreAProjectionOfTheResolvedSet(t *testing.T) {
+	loaded := colsLoadedViewConfig(t)
+
+	for _, half := range []struct {
+		name string
+		vc   *config.ViewsConfig
+	}{
+		{"no_view_config", nil},
+		{"shipped_view_files_loaded", loaded},
+	} {
+		t.Run(half.name, func(t *testing.T) {
+			ctrl := newTestController(t)
+			ctrl.SetViewConfig(half.vc)
+
+			for _, name := range colsAllShortNames() {
+				rendered := ctrl.ResolveColumnsForType(name)
+				saved := ctrl.SaveColumnsForType(name)
+				if len(saved) != len(rendered) {
+					t.Errorf("%s: the save lane resolves %d columns, the render lane %d", name, len(saved), len(rendered))
+					continue
+				}
+				for i := range rendered {
+					r, s := rendered[i], saved[i]
+					if s.Key != r.Key || s.Title != r.Title || s.Width != r.Width || s.Path != r.Path {
+						t.Errorf("%s: col[%d] saved as {key=%q title=%q width=%d path=%q} but rendered as %s",
+							name, i, s.Key, s.Title, s.Width, s.Path, colsDescribe(r))
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestCols_SortOverridesSurviveOntoTheResolvedColumn pins the two fields that
+// exist for one purpose: to let a column sort by something other than the text
+// it shows. A size rendered "1.2 GB" and a timestamp rendered "Mar 28 14:30"
+// sort wrongly as text, so the built-in view declares the raw Fields key or
+// RawStruct path to compare instead. Those declarations have to reach the
+// column the comparator reads, on the branch a real user's session takes —
+// which is the one with the shipped view files loaded, not the built-in
+// defaults.
+func TestCols_SortOverridesSurviveOntoTheResolvedColumn(t *testing.T) {
+	loaded := colsLoadedViewConfig(t)
+	ctrl := newTestController(t)
+	ctrl.SetViewConfig(loaded)
+
+	checked := 0
+	for _, name := range colsAllShortNames() {
+		defaults := config.GetViewDef(nil, name).List
+		resolved := ctrl.ResolveColumnsForType(name)
+		byTitle := make(map[string]app.ColumnDef, len(resolved))
+		for _, c := range resolved {
+			byTitle[c.Title] = c
+		}
+		for _, def := range defaults {
+			if def.SortKey == "" && def.SortPath == "" {
+				continue
+			}
+			checked++
+			got, ok := byTitle[def.Title]
+			if !ok {
+				t.Errorf("%s: the built-in view declares a sort override on %q but no resolved column carries that title", name, def.Title)
+				continue
+			}
+			if got.SortKey != def.SortKey {
+				t.Errorf("%s: column %q resolves SortKey %q, want %q — the comparator falls back to sorting the displayed text",
+					name, def.Title, got.SortKey, def.SortKey)
+			}
+			if got.SortPath != def.SortPath {
+				t.Errorf("%s: column %q resolves SortPath %q, want %q — the comparator falls back to sorting the displayed text",
+					name, def.Title, got.SortPath, def.SortPath)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no built-in column declares a sort override — the gate would pass vacuously")
+	}
+}
+
+// TestCols_SortingCloudTrailByTimeIsChronological is the user-visible half of
+// the rule above. A CloudTrail event's time cell reads "Mar 28 14:30:15", so
+// sorting those cells as text puts April before March and every August before
+// every February. The built-in view declares the RFC3339 field to compare
+// instead; sorting the list ascending has to produce that order.
+func TestCols_SortingCloudTrailByTimeIsChronological(t *testing.T) {
+	const shortName = "ct-events"
+	var td resource.ResourceTypeDef
+	for _, x := range resource.AllResourceTypes() {
+		if x.ShortName == shortName {
+			td = x
+		}
+	}
+	rows, ok := unit.DrainFixtures(t, td, demo.NewServiceClients())
+	if !ok || len(rows) < 2 {
+		t.Fatalf("%s: need at least 2 demo rows, got %d", shortName, len(rows))
+	}
+
+	ctrl := newTestController(t)
+	ctrl.SetViewConfig(colsLoadedViewConfig(t))
+	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: shortName,
+		Resources:    rows,
+		Provenance:   messages.FetchProvenanceCanonicalList,
+	})
+	ctrl.Apply(app.Action{Kind: app.ActionSort, Arg: "time"})
+
+	lb := ctrl.Snapshot().Body.List
+	if lb == nil || len(lb.Rows) < 2 {
+		t.Fatalf("%s: want at least 2 rendered rows after sorting, got %v", shortName, lb)
+	}
+	rawByID := make(map[string]string, len(rows))
+	for _, r := range rows {
+		rawByID[r.ID] = r.Fields["event_time"]
+	}
+	for i := 1; i < len(lb.Rows); i++ {
+		prev, cur := rawByID[lb.Rows[i-1].ResourceID], rawByID[lb.Rows[i].ResourceID]
+		if prev == "" || cur == "" {
+			t.Fatalf("%s: fixture assumption broken — a rendered row carries no event_time", shortName)
+		}
+		if prev > cur {
+			t.Fatalf("%s: sorting ascending by TIME put %s before %s — the comparator compared the displayed text, not the event time",
+				shortName, prev, cur)
+		}
 	}
 }
