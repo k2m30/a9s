@@ -377,6 +377,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while the live sweep re-checks it. A cached count is a real count and its
   list opens on Enter, so the row renders like any other; only a type the
   sweep confirmed empty is dimmed.
+- Opening a resource list now marks that type verified on the menu. It used to keep showing last session's count as unverified until the background sweep happened to reach it.
 
 ### Added
 
@@ -713,6 +714,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   access, or a read of sensitive data.
 - A row a9s could not inspect now says so. Its Status cell reads `not inspected` instead of a lifecycle word, and its detail view carries an Attention entry reading `Not inspected`, saying the checks for that row did not answer because of a cap or an API error. Its colour is unchanged: an unknown posture is not an issue, it is just not a clean bill of health.
 - Types with more resources than one sweep inspects now mark the whole tail. Past the 50th row a list no longer shows rows that look inspected and healthy when nothing looked at them.
+- The first screen now says what it is doing. While a9s re-checks which resource types exist, the menu title counts its way through them (`verifying 12/71`), in the same place the enrichment counter already used, and clears when the sweep is done.
+- A resource type whose check was refused now says why. The row keeps its last known count and reads `denied`, `expired`, `throttled` or `error` where its alias sits, so "not checked yet" no longer looks identical to "checked and refused".
+- When every check fails the same way, the title says it once (`session expired`, `sweep: access denied`) instead of marking all 71 rows.
 
 ### Changed
 
@@ -786,6 +790,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The per-resource design docs now quote only Status text a9s actually shows. The "At 3am" paragraph in each doc named phrases no finding produces (`issuance failed` for certificates, `no data` for alarms, `CRITICAL CVEs in latest` for repositories); every one is now the phrase the list renders, under the colour the row actually takes.
 - The related-panel section of each design doc now lists exactly the pivots the panel builds. Blocks describing pivots a9s does not register — target groups to backups, endpoints to certificates, buckets to WAF — have been removed, and the reason each is excluded is kept where the other exclusions live.
 - References to the related-resources contract now name a heading instead of a line number, so a reader following one lands on the section rather than on whatever moved into that line.
+- A check that a role is not allowed to run is now one log line for the whole resource type: the action the role lacks, how many resources it covered, and one example. It used to be one line per resource, each carrying a request id, a host id and an encoded authorization message.
 
 ### Fixed (security)
 
