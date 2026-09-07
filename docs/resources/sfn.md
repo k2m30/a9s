@@ -125,7 +125,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a state machine whose newest execution ended badly goes red reading `latest execution FAILED`, and the other signals read as plainly (`execution logging off`, `not encrypted with a customer key`); the operator still needs the detail view to read the failing ExecutionArn and error cause, which is the expected next step.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a state machine whose newest execution ended badly goes red reading `latest execution failed`, and the other signals read as plainly (`execution logging off`, `not encrypted with a customer key`); the operator still needs the detail view to read the failing ExecutionArn and error cause, which is the expected next step.
 
 ## 4.2 On-Demand Detail Enrichment
 

@@ -136,7 +136,7 @@ Notes on the table above:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a broken enabled rule reads `no targets — events dropped` in red, a stale disabled rule reads `target drift or no dead-letter config` in gray, and so does a rule whose targets have no dead-letter queue; all three are triageable in the list without navigating to detail, and the detail view separates the two causes.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a broken enabled rule reads `no targets — events dropped` in red, a stale disabled rule reads `target drift or no dead-letter config` in yellow, and so does a rule whose targets have no dead-letter queue; all three are triageable in the list without navigating to detail, and the detail view separates the two causes.
 
 ## 5. Out of Scope
 
