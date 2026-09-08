@@ -461,6 +461,20 @@ func (s *Session) CurrentPair() (profile, region string) {
 	return s.Profile, s.Region
 }
 
+// Pair is one profile/region pair as a single value, so a save frozen now
+// can be checked against the session's pair when it finally reaches disk.
+type Pair struct {
+	Profile string
+	Region  string
+}
+
+// CurrentPairValue is CurrentPair as one value — what a caller stamps onto a
+// payload it is about to hand to another goroutine.
+func (s *Session) CurrentPairValue() Pair {
+	profile, region := s.CurrentPair()
+	return Pair{Profile: profile, Region: region}
+}
+
 // SetProfileRegion sets the live Profile/Region pair while holding pairMu.
 // Every write to Session.Profile/Session.Region MUST go through this method
 // (never a direct field assignment) so a concurrent EnsureCacheStore/
@@ -482,8 +496,11 @@ func sweptPairKey(profile, region string) string {
 }
 
 // PairSwept reports whether the CURRENT profile/region pair's Wave-1
-// availability sweep has already run to completion at least once this
-// session. Reads Profile/Region under pairMu, same discipline as
+// availability sweep has already run to completion. It is a
+// completion latch, not a permission to skip: C1 re-verifies on every pair
+// entry, and the entry point that starts a sweep clears the memo first, so
+// what this guards is a duplicate/redelivered probe result re-running one
+// sweep's completion. Reads Profile/Region under pairMu, same discipline as
 // CurrentPair.
 func (s *Session) PairSwept() bool {
 	s.pairMu.Lock()
@@ -501,11 +518,10 @@ func (s *Session) MarkPairSwept() {
 	s.SweptPairs[sweptPairKey(s.Profile, s.Region)] = true
 }
 
-// ClearPairSwept removes the CURRENT profile/region pair's swept memo, so
-// the next availability-cache load re-runs the full sweep instead of
-// skipping it. Used by the manual full-menu refresh gesture (Ctrl+R on the
-// main menu) — an explicit user refresh must always re-probe even an
-// already-swept pair.
+// ClearPairSwept removes the CURRENT profile/region pair's swept memo and
+// resets the sweep counters, so a sweep about to start owns its own
+// completion. Called by the manual full-menu refresh gesture (Ctrl+R on the
+// main menu) and by the cache-load handler's fresh-start branch.
 //
 // Also resets AvailQueue/AvailChecked/AvailTotal to their pre-sweep zero
 // values: handleAvailabilityCacheLoaded (core/runtime) treats a nonzero
@@ -634,6 +650,12 @@ func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
 // indefinitely — in exchange for pairMu never blocking on file I/O, which is
 // this method's whole reason to exist.
 //
+// pair is the profile/region the caller prepared this save for — for a
+// synchronous caller, the pair it just read; for a save frozen and handed to
+// another goroutine, the pair current at the freeze. When it no longer
+// matches the session's, fn is not called at all: one account's rows must
+// never land in another's directory (C9).
+//
 // fn must not call back into WithCacheStore/WithCacheStoreSave/
 // EnsureCacheStore/CurrentPair/SetProfileRegion (Session's mutex is not
 // reentrant) and must do no blocking I/O at all — that is the point of
@@ -644,8 +666,15 @@ func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
 // short-circuit lives one layer up, in Core.WithCacheStoreSave/
 // Core.ReadCacheStore, which never call down into this method at all when
 // NoCache is set.
-func (s *Session) WithCacheStoreSave(fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
+func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
 	s.pairMu.Lock()
+	if pair.Profile != s.Profile || pair.Region != s.Region {
+		// C9: this save was prepared for a pair the session has since left.
+		// Rejected here, inside the same critical section that resolves the
+		// store, so no switch can slip between the check and the write.
+		s.pairMu.Unlock()
+		return nil
+	}
 	store := s.ensureCacheStoreLocked(s.Profile, s.Region)
 	plans, err := fn(store)
 	s.pairMu.Unlock()

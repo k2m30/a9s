@@ -112,10 +112,15 @@ func TestApplyEnrichmentState_SyncsMenuIssueBadge_S3(t *testing.T) {
 	}
 }
 
-// TestApplyEnrichmentState_MenuBadge_NeverLowersCount pins monotonicity: a
-// menu issue count seeded at 7 (e.g. by an earlier, fuller sweep result) must
-// not be lowered by a subsequent ApplyEnrichmentState reporting only 5.
-func TestApplyEnrichmentState_MenuBadge_NeverLowersCount(t *testing.T) {
+// INVERTED (cachegen row 7, the authoritative issue observation assigns): a
+// Wave-2 result IS the type's issue count as of now, so it lowers the badge
+// as readily as it raises it. The old expectation — 7 surviving a fresh
+// Wave-2 answer of 5 — was the defect: five cached issues healed and
+// re-verified kept showing, and kept being persisted, forever. Monotonicity
+// still applies to the rows-derived lane, which cannot prove an issue gone;
+// that half is pinned by
+// TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount below.
+func TestApplyEnrichmentState_MenuBadge_AuthoritativeResultLowersCount(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
@@ -127,8 +132,31 @@ func TestApplyEnrichmentState_MenuBadge_NeverLowersCount(t *testing.T) {
 
 	c.ApplyEnrichmentState("s3", 5, true, s3EnrichmentFindings(5), nil)
 
+	if got := c.GetMenuIssueCounts()["s3"]; got != 5 {
+		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 5 — a fresh Wave-2 result assigns the badge, it does not only raise it", got)
+	}
+}
+
+// TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount is the
+// other half of cachegen row 7: a NON-authoritative observation — one whose
+// number comes from bare list rows, where Wave-2 may not have run — still
+// only raises. It cannot prove an issue is gone, so it must not clear a
+// badge a real Wave-2 result set.
+func TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenu{ResourceType: "s3", Issues: 7, Truncated: false},
+	})
+
+	// A PatchResourceList carrying no issue result at all: the controller
+	// stands in 0/false for it, non-authoritatively.
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchResourceList{ResourceType: "s3", Enrichment: &runtime.ListEnrichmentPatch{}},
+	})
+
 	if got := c.GetMenuIssueCounts()["s3"]; got != 7 {
-		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 7 (must never be lowered by a smaller Wave-2 result)", got)
+		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 7 — an observation that carries no Wave-2 result must not lower the badge", got)
 	}
 }
 

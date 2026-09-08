@@ -103,7 +103,7 @@ func TestReconcileTypeFile_ExactSubset_ShrinksStoredRows(t *testing.T) {
 	// observation is itself EXACT: resource es-023 was really deleted.
 	survivingRows := make([]cache.Row, 22)
 	copy(survivingRows, existingRows[:22])
-	if err := c.SaveResourceListCache(shortName, survivingRows, 22, true /* exact */, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), shortName, survivingRows, 22, true /* exact */, 0, false, false); err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
@@ -185,7 +185,7 @@ func TestReconcileTypeFile_ExactSubset_Wave2CarrySurvivesShrink(t *testing.T) {
 	freshRows := []cache.Row{
 		{ID: "s3-bucket-survivor", Name: "s3-bucket-survivor"},
 	}
-	if err := c.SaveResourceListCache(shortName, freshRows, 1, true, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), shortName, freshRows, 1, true, 0, false, false); err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestReconcileTypeFile_ExactSubset_FirstSeenSurvivesShrink(t *testing.T) {
 	deletedRow := cache.Row{ID: "bucket-deleted", Name: "bucket-deleted", Findings: []domain.Finding{finding}}
 
 	// Save 1: both rows present, exact — stamps FirstSeen for both.
-	if err := c.SaveResourceListCache(shortName, []cache.Row{survivorRow, deletedRow}, 2, true, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), shortName, []cache.Row{survivorRow, deletedRow}, 2, true, 0, false, false); err != nil {
 		t.Fatalf("save 1: SaveResourceListCache: %v", err)
 	}
 	store1 := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
@@ -266,7 +266,7 @@ func TestReconcileTypeFile_ExactSubset_FirstSeenSurvivesShrink(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 
 	// Save 2: the EXACT-shrink observation — bucket-deleted is gone.
-	if err := c.SaveResourceListCache(shortName, []cache.Row{survivorRow}, 1, true, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), shortName, []cache.Row{survivorRow}, 1, true, 0, false, false); err != nil {
 		t.Fatalf("save 2: SaveResourceListCache: %v", err)
 	}
 
@@ -314,7 +314,7 @@ func TestSaveAvailabilityCache_CountsOnlyExactShrink_NeverAppliesRowsCarryingShr
 	// exact shape that would trigger the new rows-carrying exact-shrink rule
 	// if this were a rows-carrying write. It must not: rule 2 never inspects
 	// Rows at all, regardless of exactness.
-	if err := c.SaveAvailabilityCache(
+	if err := c.SaveAvailabilityCache(c.Pair(),
 		map[string]int{shortName: 1},
 		map[string]bool{shortName: false}, // untruncated: genuine EXACT observation
 		nil, nil, nil,
@@ -436,7 +436,7 @@ func TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals(t 
 	// The population came back: a truncated (first-page) rows-carrying
 	// observation of 50 rows — proof the stored exact-zero total is stale.
 	revivedRows := reconcileRows("revived", 50)
-	if err := c.SaveResourceListCache(shortName, revivedRows, 50, false /* truncated */, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), shortName, revivedRows, 50, false /* truncated */, 0, false, false); err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
@@ -484,7 +484,7 @@ func TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationD
 	}
 
 	c := newSaveCacheRegressionCore(t, false)
-	if err := c.SaveAvailabilityCache(
+	if err := c.SaveAvailabilityCache(c.Pair(),
 		map[string]int{shortName: 50},
 		map[string]bool{shortName: true}, // truncated: a first-page-only probe
 		nil, nil, nil,

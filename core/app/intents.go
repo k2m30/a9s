@@ -74,6 +74,14 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 
 		case runtime.PatchMenuAvailability:
 			if ms := c.rootMenuState(); ms != nil {
+				// C1/C9: a live answer outranks any seed. A cache-origin
+				// patch that arrives after this type was verified this
+				// session is a load that lost the race — applying it would
+				// regress the count the operator is looking at back to the
+				// disk value and re-dim it as unverified.
+				if v.Origin == runtime.OriginCache && ms.Origin[v.ResourceType] == runtime.OriginVerified {
+					break
+				}
 				// Store under the key as emitted by the runtime (may be an alias
 				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
 				// active key per item using menuActiveKey().
@@ -167,6 +175,11 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			c.enrichmentDetails = nil
 			c.enrichmentTruncated = nil
 			c.enrichmentGen++
+			// The sweep acknowledgements belong to the availability state
+			// this intent clears: a pair switch or a manual refresh starts a
+			// new sweep, and a type acknowledged by the previous one must not
+			// let the menu report the new one as already finished.
+			c.menuSweepAcked = nil
 
 		case runtime.PatchResourceList:
 			// Apply enrichment data (findings + issue badge) to the controller's

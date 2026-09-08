@@ -61,13 +61,13 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// applyIntents does not act on it, so route it through the shared helper.
 	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 
-	// Menu-refreshing signal: mark the type's availability sweep acked the moment its
-	// AvailabilityChecked result arrives, regardless of whether HandleEvent's
-	// central gen-guard treated it as stale. MenuBody.Refreshing tracks
-	// wall-clock probe completion (has this type's background check landed
-	// yet), not generation validity — a stale-but-arrived result still means
-	// the sweep is no longer waiting on that type.
-	if msg, ok := ev.(messages.AvailabilityChecked); ok {
+	// Menu-refreshing signal: mark the type's availability sweep acked when
+	// its AvailabilityChecked result arrives. Only a result of the CURRENT
+	// generation may do so — a probe dispatched before a pair switch or a
+	// manual refresh answers for a sweep that no longer exists, and letting
+	// it ack would make the menu claim the live sweep had already reached
+	// that type.
+	if msg, ok := ev.(messages.AvailabilityChecked); ok && !messages.IsStale(msg, c.core) {
 		c.markMenuSweepAcked(msg.ResourceType)
 	}
 
@@ -245,6 +245,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 			c.mu.Unlock()
 		}
 	}
+	c.flushCacheWrites()
 
 	return vs, tasks
 }
@@ -412,7 +413,38 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	issuesKnown := !td.ExcludeFromIssueBadge
 	issues := c.listIssueCount(ls, canon)
 	exact := !ls.HasPagination
-	_ = c.core.SaveTypeRows(canon, ls.Rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination, false)
+	truncated := ls.HasPagination
+	rows := append([]resource.Resource(nil), ls.Rows...)
+	pair := c.core.Pair()
+	// C4: every input is frozen here, under the lock; the write itself runs
+	// after the caller releases it (queueCacheWrite), so a slow filesystem
+	// can never stall the next key or a web snapshot behind this save. The
+	// frozen pair is what lets the write still be rejected if the operator
+	// switches profile before it lands.
+	c.queueCacheWrite(func() {
+		_ = c.core.SaveTypeRows(pair, canon, rows, len(rows), exact, issues, issuesKnown, truncated, false)
+	})
+}
+
+// queueCacheWrite stages a cache write whose inputs are already frozen, to
+// be run by flushCacheWrites once c.mu is released. Caller must hold c.mu
+// (write). Mirrors the costs cache's dirty-store handoff in Handle — the
+// controller mutex is the same lock every key event needs, so no disk I/O
+// may happen while it is held (C4).
+func (c *Controller) queueCacheWrite(write func()) {
+	c.pendingCacheWrites = append(c.pendingCacheWrites, write)
+}
+
+// flushCacheWrites runs and clears whatever queueCacheWrite staged. Caller
+// must NOT hold c.mu.
+func (c *Controller) flushCacheWrites() {
+	c.mu.Lock()
+	pending := c.pendingCacheWrites
+	c.pendingCacheWrites = nil
+	c.mu.Unlock()
+	for _, write := range pending {
+		write()
+	}
 }
 
 // popAutoOpenSinglePlaceholderOnNotFound pops a lane-neutral by-ID auto-open
@@ -567,6 +599,9 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 // path that routed the message through a stored ResourceListModel.Update(). The
 // caller must perform the IsStale check before invoking this.
 func (c *Controller) HandleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
+	// The per-type save this result queues runs after the lock is released
+	// (C4), exactly as Handle runs it — deferred first so it fires last.
+	defer c.flushCacheWrites()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.handleResourcesLoadedEvent(msg)

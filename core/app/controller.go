@@ -98,6 +98,12 @@ type Controller struct {
 	// unlocking. nil means nothing is pending.
 	costsDirtyStore *costs.Store
 
+	// pendingCacheWrites holds per-type disk saves whose inputs were frozen
+	// under c.mu and whose write must run after it is released (C4) — the
+	// same handoff costsDirtyStore performs for the costs cache. Staged by
+	// queueCacheWrite, drained by flushCacheWrites (both in handle.go).
+	pendingCacheWrites []func()
+
 	// identityResult holds the resolved caller identity received via
 	// messages.IdentityLoaded so snapshot can build IdentityBody without
 	// importing core/aws or touching the TUI view stack.

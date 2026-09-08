@@ -10,6 +10,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // availabilitySavePayload is one snapshot of the menu availability/issue
@@ -18,6 +19,11 @@ import (
 // Core.SaveAvailabilityCache's parameters exactly — the writer passes them
 // through unchanged.
 type availabilitySavePayload struct {
+	// pair is the profile/region the snapshot was taken under, so a save
+	// still queued when the operator switches is rejected at the save
+	// chokepoint instead of writing one account's counts into another's
+	// directory (C9).
+	pair        session.Pair
 	avail       map[string]int
 	trunc       map[string]bool
 	issueCounts map[string]int
@@ -164,10 +170,19 @@ func menuSkipUnavailable(ms *MenuState, visible []resource.ResourceTypeDef, dire
 }
 
 // menuIsConfirmedEmpty reports whether item's resource type is confirmed to
-// have zero resources (known count, zero, not truncated) — the skip predicate
-// menuSkipUnavailable steps over.
+// have zero resources — the one predicate that decides both the skip
+// stepping (menuSkipUnavailable) and whether Enter opens the type
+// (MenuSelected), so the cursor can never land somewhere it refuses to open.
+//
+// "Confirmed" means verified THIS session: a zero read from disk is
+// knowledge worth showing (C1) but not proof the type is still empty, and
+// dimming it shut would leave the operator unable to open a type until the
+// sweep happens to reach it.
 func menuIsConfirmedEmpty(ms *MenuState, item resource.ResourceTypeDef) bool {
 	key := menuActiveKey(ms, item)
+	if ms.Origin[key] != runtime.OriginVerified {
+		return false
+	}
 	isTruncated := ms.Truncated != nil && ms.Truncated[key]
 	count, known := ms.Availability[key]
 	return known && count == 0 && !isTruncated
@@ -221,13 +236,11 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 	c.menuSweepAcked[canon] = true
 }
 
-// syncMenuIssueCount applies the monotonic issue-badge guard to ms for canon:
-// only raise ms.IssueCounts[canon] (never regress it), and clear a stale
-// truncated flag once an equal-count exact (untruncated) observation lands —
-// UNLESS the existing truncation was itself set authoritatively by a prior
-// Wave-2 enrichment result and the current call is not itself authoritative
-// (see authoritative below, axis 2). canon must already be the canonical
-// resource short name — callers resolve aliases before calling in. Mirrors
+// syncMenuIssueCount records one observation of canon's issue badge under the
+// single rule every writer of that badge follows: an authoritative
+// observation assigns the count, a non-authoritative one only raises it and
+// may clear a stale truncation flag no authoritative observation set. canon
+// must already be the canonical resource short name — callers resolve aliases before calling in. Mirrors
 // the issue-count half of the exact-total menu sync-back
 // (syncExactTotalToMenu); extracted as the single chokepoint both the sweep
 // lane (handle.go's syncExactTotalToMenu) and the in-list Wave-2 enrichment
@@ -235,35 +248,22 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 // background sweep (e.g. the web/headless lane) still gets the menu badge
 // from in-list enrichment alone.
 //
-// authoritative distinguishes the two callers' semantics along TWO axes:
+// authoritative separates the two callers by what their number proves:
 //
-//  1. Raise-to-zero (the "authoritative && !known" arm): applyEnrichmentState
-//     passes true because newIssues IS the Wave-2 result for canon (a genuine
-//     zero-issue type must still flip IssueKnown so the menu stops showing it
-//     as unswept); syncExactTotalToMenu passes false because its newIssues is
-//     derived from bare list rows, which is not authoritative for a zero
-//     count (Wave-2 enrichment may simply not have run yet for that list).
-//     Without this distinction, a type first observed with newIssues==0 would
-//     never set IssueKnown (no arm below fires on a zero-vs-zero comparison),
-//     leaving a genuinely clean type stuck "unknown" forever — but relaxing
-//     that for the non-authoritative caller would let an un-enriched list's
-//     bare-zero falsely claim "no issues known".
-//
-//  2. Truncation-clear (the "equal-count exact" arm): a rows-derived
-//     (non-authoritative) equal-count resync must never clear a truncation
-//     flag that an authoritative Wave-2 enrichment result itself set.
-//     syncExactTotalToMenu's newTrunc is ls.HasPagination — the LIST'S OWN
-//     fetch pagination, which says nothing about whether the enrichment scan
-//     that produced curIssues covered every row (e.g. a 55-row exact list
-//     whose Wave-2 enrichment cap only scanned the first 50 rows) — the exact
-//     row-fetch proves the ROW COUNT is complete, not that the issue COUNT
-//     among those rows is. ms.IssueTruncAuthoritative[canon] records whether
-//     the CURRENT curIssueTrunc=true was set by an authoritative caller; the
-//     clear arm fires only when that is false (the flag was itself seeded
-//     non-authoritatively — e.g. by PatchMenu or a prior rows-derived sync —
-//     so a later equal-count rows-derived resync is still allowed to clear
-//     it) or when the current call IS authoritative (a fresh Wave-2 result
-//     always has standing to correct its own prior truncation claim).
+//  1. An AUTHORITATIVE observation (applyEnrichmentState: newIssues IS the
+//     Wave-2 result for canon) assigns count, known and truncation outright.
+//     It is the only caller that can prove an issue is gone, so it is the
+//     only one allowed to lower the badge — otherwise five issues healed to
+//     zero keep showing, and keep being persisted, forever.
+//  2. A NON-AUTHORITATIVE observation (syncExactTotalToMenu: newIssues is
+//     derived from bare list rows, where Wave-2 may simply not have run) only
+//     raises. It also may not clear a truncation flag an authoritative
+//     result set: syncExactTotalToMenu's newTrunc is the LIST'S OWN fetch
+//     pagination, which says nothing about whether the enrichment scan
+//     covered every row (a 55-row exact list whose Wave-2 cap scanned 50) —
+//     the exact row-fetch proves the ROW COUNT is complete, not the issue
+//     count among those rows. ms.IssueTruncAuthoritative[canon] records
+//     which kind of caller set the current truncation.
 //
 // Caller must hold c.mu (write).
 func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues int, newTrunc bool, authoritative bool) {
@@ -271,41 +271,17 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 	curIssueTrunc := ms.IssueTruncated[canon]
 	curIssueTruncAuthoritative := ms.IssueTruncAuthoritative[canon]
 	switch {
+	case authoritative:
+		// An authoritative observation IS the type's issue count as of now,
+		// so it assigns rather than raises: five cached issues healed and
+		// re-verified as zero must leave a clean badge, on screen and on the
+		// next launch. Only the rows-derived (non-authoritative) lanes below
+		// stay monotonic, since a bare list row cannot prove a Wave-2 issue
+		// is gone.
+		c.assignMenuIssueCount(ms, canon, newIssues, newTrunc, newTrunc)
 	case newIssues > curIssues:
-		if ms.IssueCounts == nil {
-			ms.IssueCounts = make(map[string]int)
-		}
-		if ms.IssueKnown == nil {
-			ms.IssueKnown = make(map[string]bool)
-		}
-		if ms.IssueTruncated == nil {
-			ms.IssueTruncated = make(map[string]bool)
-		}
-		if ms.IssueTruncAuthoritative == nil {
-			ms.IssueTruncAuthoritative = make(map[string]bool)
-		}
-		ms.IssueCounts[canon] = newIssues
-		ms.IssueKnown[canon] = true
-		ms.IssueTruncated[canon] = newTrunc
-		ms.IssueTruncAuthoritative[canon] = authoritative && newTrunc
-	case authoritative && !ms.IssueKnown[canon]:
-		if ms.IssueCounts == nil {
-			ms.IssueCounts = make(map[string]int)
-		}
-		if ms.IssueKnown == nil {
-			ms.IssueKnown = make(map[string]bool)
-		}
-		if ms.IssueTruncated == nil {
-			ms.IssueTruncated = make(map[string]bool)
-		}
-		if ms.IssueTruncAuthoritative == nil {
-			ms.IssueTruncAuthoritative = make(map[string]bool)
-		}
-		ms.IssueCounts[canon] = newIssues
-		ms.IssueKnown[canon] = true
-		ms.IssueTruncated[canon] = newTrunc
-		ms.IssueTruncAuthoritative[canon] = newTrunc
-	case newIssues == curIssues && curIssueTrunc && !newTrunc && (authoritative || !curIssueTruncAuthoritative):
+		c.assignMenuIssueCount(ms, canon, newIssues, newTrunc, false)
+	case newIssues == curIssues && curIssueTrunc && !newTrunc && !curIssueTruncAuthoritative:
 		if ms.IssueTruncated == nil {
 			ms.IssueTruncated = make(map[string]bool)
 		}
@@ -315,6 +291,29 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 		}
 		ms.IssueTruncAuthoritative[canon] = false
 	}
+}
+
+// assignMenuIssueCount writes canon's issue badge — count, known, truncated,
+// and whether that truncation came from an authoritative observation — as one
+// state, so no caller can update three of the four maps and leave the fourth
+// describing an earlier answer. Caller must hold c.mu (write).
+func (c *Controller) assignMenuIssueCount(ms *MenuState, canon string, issues int, trunc, truncAuthoritative bool) {
+	if ms.IssueCounts == nil {
+		ms.IssueCounts = make(map[string]int)
+	}
+	if ms.IssueKnown == nil {
+		ms.IssueKnown = make(map[string]bool)
+	}
+	if ms.IssueTruncated == nil {
+		ms.IssueTruncated = make(map[string]bool)
+	}
+	if ms.IssueTruncAuthoritative == nil {
+		ms.IssueTruncAuthoritative = make(map[string]bool)
+	}
+	ms.IssueCounts[canon] = issues
+	ms.IssueKnown[canon] = true
+	ms.IssueTruncated[canon] = trunc
+	ms.IssueTruncAuthoritative[canon] = truncAuthoritative
 }
 
 // applyAvailabilityObservation records one observation of how many resources
@@ -391,6 +390,7 @@ func (c *Controller) persistMenuAvailabilityCache(ms *MenuState) {
 	issueKnown := make(map[string]bool, len(ms.IssueKnown))
 	maps.Copy(issueKnown, ms.IssueKnown)
 	c.queueAvailabilitySave(availabilitySavePayload{
+		pair:        c.core.Pair(),
 		avail:       avail,
 		trunc:       trunc,
 		issueCounts: issueCounts,
@@ -451,13 +451,13 @@ func (c *Controller) runAvailabilitySaveLoop() {
 	for {
 		select {
 		case p := <-c.availSaveCh:
-			_ = c.core.SaveAvailabilityCache(p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
+			_ = c.core.SaveAvailabilityCache(p.pair, p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
 		case <-c.availSaveStop:
 			// Drain exactly one more pending snapshot (if any) so a Close
 			// racing a just-queued save still persists it, then exit.
 			select {
 			case p := <-c.availSaveCh:
-				_ = c.core.SaveAvailabilityCache(p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
+				_ = c.core.SaveAvailabilityCache(p.pair, p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
 			default:
 			}
 			return
@@ -575,6 +575,7 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 		}
 
 		entries = append(entries, MenuEntry{
+			ConfirmedEmpty: menuIsConfirmedEmpty(ms, item),
 			ShortName:      activeKey,
 			Display:        item.Name,
 			Alias:          alias,
@@ -718,14 +719,7 @@ func (c *Controller) MenuSelected() (resource.ResourceTypeDef, bool) {
 		cursor = len(visible) - 1
 	}
 	selected := visible[cursor]
-	if ms.Availability != nil {
-		key := menuActiveKey(ms, selected)
-		isTruncated := ms.Truncated != nil && ms.Truncated[key]
-		if count, known := ms.Availability[key]; known && count == 0 && !isTruncated {
-			return selected, false
-		}
-	}
-	return selected, true
+	return selected, !menuIsConfirmedEmpty(ms, selected)
 }
 
 // GetMenuAvailability returns a copy of the root MenuState availability map.

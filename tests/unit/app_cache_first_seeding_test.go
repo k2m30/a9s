@@ -353,12 +353,16 @@ func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T)
 	}
 
 	// Sweep completes: every registered type has been probed.
+	// Gen is the live availability generation: cachegen row 10 acknowledges
+	// the sweep only for a result of the CURRENT generation, so a
+	// hand-built zero-gen message no longer stands in for a real probe
+	// result (HandleEvent already discarded it everywhere else).
 	vs, _ := c.Handle(messages.AvailabilityChecked{
 		ResourceType: "ec2",
 		HasResources: true,
 		Count:        3,
 		Truncated:    false,
-		Gen:          0,
+		Gen:          core.AvailabilityGen(),
 	})
 	if vs.Body.Menu == nil {
 		t.Fatal("Handle(AvailabilityChecked) returned nil Body.Menu")

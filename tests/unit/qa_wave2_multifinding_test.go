@@ -287,7 +287,7 @@ func TestReconcileTypeFile_Wave2Carry_MultiFindingRowSurvivesRefresh(t *testing.
 	freshRows := []cache.Row{
 		{ID: wave2CarryMultiResourceID, Name: wave2CarryMultiResourceID},
 	}
-	if err := c.SaveResourceListCache(wave2CarryMultiShortName, freshRows, 1, true, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), wave2CarryMultiShortName, freshRows, 1, true, 0, false, false); err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 

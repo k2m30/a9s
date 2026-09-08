@@ -196,9 +196,9 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		dimAlias := styles.DimText.Render(aliasPadded)
 		// Only a confirmed-empty type dims. A cache-seeded count is a real
 		// count from the last session and its list opens on Enter, so it
-		// renders like any other row until the live probe replaces it.
-		confirmedEmpty := item.AvailKnown && item.Availability == 0 && !item.AvailTruncated
-		if confirmedEmpty {
+		// renders like any other row until the live probe replaces it. The
+		// verdict comes from the body, never recomputed here.
+		if item.ConfirmedEmpty {
 			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + dimAlias)
 		} else {
 			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + dimAlias)

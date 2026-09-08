@@ -19,6 +19,9 @@ import (
 // ScreenResourceList (not ScreenChildList, and not a filtered/related-nav
 // list — EscPops/ParentContext), matching the real task-result lane.
 func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
+	// The queued per-type save runs after the lock is released, exactly as
+	// Handle runs it (C4) — deferred first so it fires last.
+	defer c.flushCacheWrites()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Resolve canonical short name (handles aliases like "rds" → "dbi"),

@@ -268,6 +268,14 @@ type AvailabilityCacheLoaded struct {
 	IssueCounts    map[string]int  // shortName -> cached issue count
 	IssueTruncated map[string]bool // shortName -> true if issue count was truncated
 	IssueKnown     map[string]bool // shortName -> true if issue count was probed (vs unknown)
+	// Profile and Region name the pair this load describes, taken from the
+	// Store it was read from. The load is dispatched asynchronously and can
+	// be delivered after the operator has switched pairs; the handler drops
+	// it rather than painting one account's counts onto another's menu (C9).
+	// Empty on a synthetic construction that names no pair — such an event
+	// carries no claim about which pair it belongs to and is applied as-is.
+	Profile string
+	Region  string
 }
 
 func (AvailabilityCacheLoaded) isEvent() {}

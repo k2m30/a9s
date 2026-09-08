@@ -36,10 +36,18 @@ import (
 // destination left). The mutate-in-place bug class the dispatch-time payload
 // freeze guards against is exactly what Amend exists to remove — see
 // RowStore.Amend's doc comment.
+// answered reports whether the enrichment result speaks for a given row ID.
+// A row it does not answer for — one the enricher could not inspect, or any
+// row at all when the probe failed outright — keeps the Wave-2 state it
+// already has: a result replaces exactly what it answered, and an
+// unanswered row is not a clean row (C1: stale-until-replaced, never
+// blank-until-replaced). A nil answered folds every row, the plain
+// full-result case.
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string][]domain.Finding,
 	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
+	answered func(id string) bool,
 ) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
@@ -57,6 +65,9 @@ func (c *Core) applyEnrichment(
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
 		for i := range out {
+			if answered != nil && !answered(out[i].ID) {
+				continue
+			}
 			ApplyWave2ToRow(&out[i], td, findings, attentionDetails)
 		}
 		return out

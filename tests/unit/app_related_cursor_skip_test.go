@@ -297,12 +297,16 @@ func TestRelatedCursor_MenuParity_SameDimNonDimPatternSameLandingSequence(t *tes
 	// window to exactly the 5 entries under test, matching the related
 	// panel's 5-row fixture below index-for-index.
 	dimPattern := []int{3, 0, 2, 0, 1} // per-index Count: >0 = non-dim, 0 = dimmed
+	// Origin "verified" throughout: only a count confirmed THIS session dims
+	// a row (cachegen row 12), and this test is about the cursor's landing
+	// sequence over dimmed rows, not about seeded ones.
 	for i, count := range dimPattern {
 		menuCtrl.ApplyIntents([]runtime.UIIntent{
 			runtime.PatchMenuAvailability{
 				ResourceType: all[i].ShortName,
 				Count:        count,
 				Truncated:    false,
+				Origin:       runtime.OriginVerified,
 			},
 		})
 	}
@@ -312,6 +316,7 @@ func TestRelatedCursor_MenuParity_SameDimNonDimPatternSameLandingSequence(t *tes
 				ResourceType: all[i].ShortName,
 				Count:        0,
 				Truncated:    false,
+				Origin:       runtime.OriginVerified,
 			},
 		})
 	}
@@ -326,13 +331,16 @@ func TestRelatedCursor_MenuParity_SameDimNonDimPatternSameLandingSequence(t *tes
 			ResourceType: "costs",
 			Count:        0,
 			Truncated:    false,
+			Origin:       runtime.OriginVerified,
 		},
 	})
 
 	menuLanding := func(vs app.ViewState) int { return vs.Body.Menu.Selected }
+	// cachegen row 12: the dim/skip verdict is MenuEntry.ConfirmedEmpty,
+	// computed once in the body — recomputing it here would let this test
+	// pass while the cursor and the renderer disagreed.
 	menuActionable := func(vs app.ViewState, idx int) bool {
-		e := vs.Body.Menu.Entries[idx]
-		return !(e.AvailKnown && e.Availability == 0 && !e.AvailTruncated)
+		return !vs.Body.Menu.Entries[idx].ConfirmedEmpty
 	}
 
 	vsMenu, _ := menuCtrl.Apply(app.Action{Kind: app.ActionMoveDown})

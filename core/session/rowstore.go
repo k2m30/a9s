@@ -230,10 +230,12 @@ func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *reso
 //
 // Semantics, applied in order:
 //
-//  1. Disk-vs-Fetch/Probe: an OriginDisk observation is rejected over an
-//     existing Fetch-origin (or Probe-origin) entry that already carries
-//     rows — a disk seed race-losing to an already-landed live result must
-//     not regress the session's live knowledge.
+//  1. Disk-vs-Fetch/Probe: an OriginDisk observation is rejected over any
+//     existing Fetch-origin (or Probe-origin) observation — a disk seed
+//     race-losing to an already-landed live result must not regress the
+//     session's live knowledge. Keyed on Gen, not on len(Rows): a live
+//     observation of an EMPTY population is knowledge too, and a seed that
+//     refilled it would resurrect rows the account no longer has.
 //     1b. Probe-vs-Fetch (append=false only): an OriginProbe replace is
 //     rejected over an existing Fetch-origin entry that already carries
 //     rows — a (possibly smaller, truncated) availability-probe page must
@@ -268,7 +270,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	rows = cloneRows(rows)
 	existing := s.types[canon]
 
-	if origin == OriginDisk && len(existing.Rows) > 0 && (existing.Origin == OriginFetch || existing.Origin == OriginProbe) {
+	if origin == OriginDisk && existing.Gen != 0 && (existing.Origin == OriginFetch || existing.Origin == OriginProbe) {
 		return cloneRows(existing.Rows), existing.Gen
 	}
 

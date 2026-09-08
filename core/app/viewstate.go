@@ -395,6 +395,12 @@ type MenuEntry struct {
 	// row when the whole sweep failed for one cause — the frame title says it
 	// once instead (menuSweepCause).
 	Cause string `json:"cause,omitempty"`
+	// ConfirmedEmpty is the one verdict "this type has nothing to open":
+	// verified empty THIS session, not merely a zero read from disk.
+	// Computed once, in buildMenuBody, and read verbatim by the cursor
+	// skip, the Enter guard and both renderers' dim style — so a row can
+	// never be dimmed shut by one rule and landed on by another.
+	ConfirmedEmpty bool `json:"confirmed_empty,omitempty"`
 }
 
 // MenuBody is the body of the main-menu screen.

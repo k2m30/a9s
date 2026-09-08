@@ -12,10 +12,11 @@
 //	initializes it.
 //
 //	handleAvailabilityCacheLoaded (core/runtime/handlers_availability.go):
-//	when c.session.PairSwept() is true, it must NOT rebuild AvailQueue, NOT
-//	fire probes, NOT latch AvailSweepPending — the PatchMenuCheckProgress
-//	intent must report done (Checked==Total). Disk-cache seeding of
-//	rows/counts/issue badges is unaffected either way.
+//	AMENDED by cachegen row 10 — a pair re-entry sweeps again (C1: everything
+//	cached is re-verified on sight), and the sweep start clears the pair's
+//	memo. The memo now only stops a duplicate probe result from re-running
+//	one sweep's completion. Disk-cache seeding of rows/counts/issue badges is
+//	unaffected either way.
 //
 //	handleAvailabilityChecked: on sweep completion (AvailChecked reaches
 //	AvailTotal for a non-empty sweep) it must call MarkPairSwept().
@@ -256,12 +257,17 @@ func TestSweepOnce_CompletionMarksPairSwept(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// 3 — Revisit skip: A (fully swept) -> B (never swept) -> A. A must fire
-// zero probes and report done progress on the revisit; B, never swept,
-// must still fire probes on its own first visit.
+// 3 — INVERTED (cachegen row 10, C1 verify-on-sight): A (fully swept) -> B
+// -> A. The revisit must sweep AGAIN. The old expectation — zero probes and
+// progress reported as done — was the defect: the account moves on while the
+// operator is looking at the other pair, so disk values looked verified when
+// nothing had verified them this visit. The swept memo survives as a
+// completion latch only (it stops a duplicate probe result from re-running
+// one sweep's completion); it is no longer permission to skip. Do not
+// restore the skip.
 // -----------------------------------------------------------------------
 
-func TestSweepOnce_RevisitSweptPair_SkipsProbes_UnsweptPairStillProbes(t *testing.T) {
+func TestSweepOnce_RevisitSweptPair_SweepsAgain_UnsweptPairAlsoProbes(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
 
 	tasksA := fireAvailabilitySweep(c, s, map[string]int{"ec2": 1}, map[string]bool{"ec2": false})
@@ -285,12 +291,14 @@ func TestSweepOnce_RevisitSweptPair_SkipsProbes_UnsweptPairStillProbes(t *testin
 	if !s.PairSwept() {
 		t.Fatal("pair A's completed-sweep memo did not survive the A->B->A round trip")
 	}
+	// The memo is a completion latch, not a skip: the revisit's own sweep
+	// start clears it and takes ownership of its own completion.
 	tasksARevisit := fireAvailabilitySweep(c, s, map[string]int{"ec2": 1}, map[string]bool{"ec2": false})
-	if n := countProbeTasks(tasksARevisit); n != 0 {
-		t.Errorf("pair A revisit: handleAvailabilityCacheLoaded fired %d probe tasks, want 0 — already swept this session", n)
+	if n := countProbeTasks(tasksARevisit); n == 0 {
+		t.Error("pair A revisit: handleAvailabilityCacheLoaded fired zero probe tasks, want > 0 — C1 re-verifies on every pair entry")
 	}
-	if s.AvailChecked != s.AvailTotal {
-		t.Errorf("pair A revisit: AvailChecked=%d AvailTotal=%d, want equal — the skip path must report progress as done", s.AvailChecked, s.AvailTotal)
+	if s.AvailChecked != 0 {
+		t.Errorf("pair A revisit: AvailChecked=%d, want 0 — the revisit starts a fresh sweep, it does not report the old one as done", s.AvailChecked)
 	}
 	if got := c.GetMenuAvailability()["ec2"]; got != 1 {
 		t.Errorf("pair A revisit: GetMenuAvailability()[ec2] = %d, want 1 — disk-cache seeding of counts must still run on the skip path", got)

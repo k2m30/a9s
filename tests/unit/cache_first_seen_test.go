@@ -331,14 +331,14 @@ func TestCacheFirstSeen_NewSincePrevViaControllerSave(t *testing.T) {
 //
 // Intended contract: a non-authoritative (Wave-1-style) save REPLACES the
 // type's delta (a fresh one-step scan baseline); a Wave-2-authoritative save
-// (Wave2Complete=true, the handleEnrichmentChecked "all done" dispatch) MERGES
+// (a Wave2Answered type, the handleEnrichmentChecked "all done" dispatch) MERGES
 // into it instead. Drives the real executor entry point
 // (Core.ExecuteTask(TaskKindSaveCache)) directly, the same production seam
 // TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation in
 // runtime_savecache_regressions_test.go uses, toggling
-// SaveCachePayload.Wave2Complete for the two save kinds under test — this
+// SaveCachePayload.Wave2Answered for the two save kinds under test — this
 // package's TestCacheFirstSeen_NewSincePrevViaControllerSave never exercises
-// a Wave2Complete=true save at all, only saveResourceListCache's non-
+// a Wave-2-authoritative save at all, only saveResourceListCache's non-
 // authoritative branch via Controller.ApplyResourcesLoaded.
 func TestNewFindingPairs_SurviveWave2CompletionSave(t *testing.T) {
 	const shortName = "ec2"
@@ -350,20 +350,28 @@ func TestNewFindingPairs_SurviveWave2CompletionSave(t *testing.T) {
 
 	execSaveCache := func(resources []resource.Resource, wave2Complete bool) {
 		t.Helper()
+		// cachegen row 3: Wave-2 authority is per type (SaveCachePayload.
+		// Wave2Answered), so a failed probe in a sweep cannot make that
+		// sweep's save persist its type as clean. The two save kinds this
+		// test toggles are unchanged otherwise.
+		var wave2Answered map[string]bool
+		if wave2Complete {
+			wave2Answered = map[string]bool{shortName: true}
+		}
 		payload := &runtime.SaveCachePayload{
 			Resources:     map[string][]resource.Resource{shortName: resources},
 			Truncated:     map[string]bool{shortName: false},
-			Wave2Complete: wave2Complete,
+			Wave2Answered: wave2Answered,
 		}
 		ev, err := c.ExecuteTask(ctx, runtime.TaskRequest{
 			Key:     runtime.TaskKey{Kind: runtime.TaskKindSaveCache},
 			Payload: payload,
 		})
 		if err != nil {
-			t.Fatalf("ExecuteTask(TaskKindSaveCache, Wave2Complete=%v): %v", wave2Complete, err)
+			t.Fatalf("ExecuteTask(TaskKindSaveCache, wave2Answered=%v): %v", wave2Complete, err)
 		}
 		if flash, ok := ev.(messages.Flash); ok && flash.IsError {
-			t.Fatalf("ExecuteTask(TaskKindSaveCache, Wave2Complete=%v) returned an error flash: %s", wave2Complete, flash.Text)
+			t.Fatalf("ExecuteTask(TaskKindSaveCache, wave2Answered=%v) returned an error flash: %s", wave2Complete, flash.Text)
 		}
 	}
 
@@ -385,10 +393,10 @@ func TestNewFindingPairs_SurviveWave2CompletionSave(t *testing.T) {
 
 	pairs2 := c.NewFindingPairsSincePrev()[shortName]
 	if pairs2[wave1Finding.Code] < 1 {
-		t.Errorf("save 2 (Wave2Complete): NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1 — a Wave-2-authoritative save must MERGE into the type's delta, not replace it and drop the Wave-1 sweep's own new pair", shortName, wave1Finding.Code, pairs2[wave1Finding.Code])
+		t.Errorf("save 2 (Wave-2-answered): NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1 — a Wave-2-authoritative save must MERGE into the type's delta, not replace it and drop the Wave-1 sweep's own new pair", shortName, wave1Finding.Code, pairs2[wave1Finding.Code])
 	}
 	if pairs2[wave2Finding.Code] < 1 {
-		t.Errorf("save 2 (Wave2Complete): NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1 — the new Wave-2 finding's own pair must also be recorded", shortName, wave2Finding.Code, pairs2[wave2Finding.Code])
+		t.Errorf("save 2 (Wave-2-answered): NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1 — the new Wave-2 finding's own pair must also be recorded", shortName, wave2Finding.Code, pairs2[wave2Finding.Code])
 	}
 
 	// Save 3 — a subsequent Wave-1-style save with no new findings: both

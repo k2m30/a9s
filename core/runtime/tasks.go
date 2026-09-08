@@ -293,18 +293,18 @@ func (SaveThemeConfigPayload) isTaskPayload() {}
 // existing []resource.Resource slices/headers at capture time); the executor
 // only reads them, never mutates in place, so no deeper copy is needed.
 //
-// Wave2Complete (C6b) tags the dispatch source: handleEnrichmentChecked's
-// "all done" branch sets it true because that save IS the fresh Wave-2
-// enrichment result and must supersede any carried Wave-2 data wholesale
-// (a healed/resolved issue must be able to clear). Every other dispatcher of
-// this payload (currently only handleAvailabilityChecked's sweep-completion
-// save) leaves it false, so the executor's save-cache case carries forward
-// on-disk Wave-2 data the fresh rows themselves lack instead of letting a
-// bare Wave-1 observation blank it (D17).
+// Wave2Answered (C6b) names the types this payload carries a FRESH Wave-2
+// answer for: for those, and only those, the save supersedes carried Wave-2
+// data wholesale, so a healed or resolved issue can clear. Every other type
+// — one whose enrichment probe failed or never ran, and every type in
+// handleAvailabilityChecked's bare Wave-1 sweep-completion save — carries
+// forward the on-disk Wave-2 data its rows lack instead of blanking it
+// (D17). A type-scoped tag, not a payload-wide flag: one failed probe in a
+// sweep must not let that sweep's save persist its rows as clean.
 type SaveCachePayload struct {
 	Resources     map[string][]resource.Resource
 	Truncated     map[string]bool
-	Wave2Complete bool
+	Wave2Answered map[string]bool
 }
 
 func (SaveCachePayload) isTaskPayload() {}

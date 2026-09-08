@@ -122,7 +122,7 @@ func TestReconcileTypeFile_Wave2Carry_RefreshDropsWave1KeepsWave2(t *testing.T) 
 		{ID: "s3-bucket-x", Name: "s3-bucket-x"},
 		{ID: "s3-bucket-y", Name: "s3-bucket-y"},
 	}
-	if err := c.SaveResourceListCache(shortName, freshRows, 2, true, 0, false, false); err != nil {
+	if err := c.SaveResourceListCache(c.Pair(), shortName, freshRows, 2, true, 0, false, false); err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 

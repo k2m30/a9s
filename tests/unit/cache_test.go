@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,34 +28,43 @@ func TestCache_DirForTest(t *testing.T) {
 	}
 }
 
-func TestCache_DirForTest_SanitizesSlashes(t *testing.T) {
+// INVERTED (cachegen row 2, the injective pair-directory encoding): the
+// separator is now percent-escaped, not folded to "_". The old expectation
+// was the defect — "my/profile" and "my_profile" resolved to one directory
+// and overwrote each other's cache. Do not restore it.
+func TestCache_DirForTest_EscapesSlashesInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
 	got := cache.DirForTest("my/profile", "us-east-1")
-	want := filepath.Join(tmpDir, "cache", "my_profile--us-east-1")
+	want := filepath.Join(tmpDir, "cache", "my%2Fprofile--us-east-1")
 	if got != want {
 		t.Errorf("Dir() with slashes = %q, want %q", got, want)
 	}
+	if other := cache.DirForTest("my_profile", "us-east-1"); other == got {
+		t.Errorf("Dir(%q) == Dir(%q) == %q — the encoding must be injective", "my/profile", "my_profile", got)
+	}
 }
 
-func TestCache_DirForTest_SanitizesSpaces(t *testing.T) {
+// INVERTED (cachegen row 2): spaces are percent-escaped, not folded to "_".
+func TestCache_DirForTest_EscapesSpacesInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
 	got := cache.DirForTest("my profile", "us west 2")
-	want := filepath.Join(tmpDir, "cache", "my_profile--us_west_2")
+	want := filepath.Join(tmpDir, "cache", "my%20profile--us%20west%202")
 	if got != want {
 		t.Errorf("Dir() with spaces = %q, want %q", got, want)
 	}
 }
 
-func TestCache_DirForTest_SanitizesBackslash(t *testing.T) {
+// INVERTED (cachegen row 2): backslashes are percent-escaped, not folded.
+func TestCache_DirForTest_EscapesBackslashInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
 	got := cache.DirForTest("corp\\admin", "us-east-1")
-	want := filepath.Join(tmpDir, "cache", "corp_admin--us-east-1")
+	want := filepath.Join(tmpDir, "cache", "corp%5Cadmin--us-east-1")
 	if got != want {
 		t.Errorf("Dir() with backslash = %q, want %q", got, want)
 	}
@@ -250,10 +260,14 @@ func TestCache_SaveType_WritesValidYAML(t *testing.T) {
 		t.Fatalf("SaveType(lambda): %v", err)
 	}
 
+	// "rds" is an alias of the "dbi" type: cachegen row 11 canonicalizes a
+	// type file's key once, at load, so an alias-named file supplies the
+	// canonical type's counts AND rows instead of sitting under a key the
+	// row lookup never asks for. Reading it back under "rds" was the defect.
 	reloaded := cache.LoadDirForTest("test-profile", "us-west-2")
-	rds, ok := reloaded.Type("rds")
+	rds, ok := reloaded.Type("dbi")
 	if !ok || rds.Count != 3 {
-		t.Errorf("Type(rds) = %+v (ok=%v), want Count=3", rds, ok)
+		t.Errorf("Type(dbi) after saving alias-named rds.yaml = %+v (ok=%v), want Count=3", rds, ok)
 	}
 	lambda, ok := reloaded.Type("lambda")
 	if !ok || lambda.Count != 0 {
@@ -361,11 +375,20 @@ func TestCache_LoadDirForTest_AllResourceTypes(t *testing.T) {
 		}
 	}
 
+	// cachegen row 11: a type file's key is canonicalized once, at load, so
+	// an alias-named file (rds.yaml for "dbi", cloudtrail.yaml for its
+	// canonical type) is read back under the canonical short name. The names
+	// above are the ones an operator's directory can actually hold; the
+	// lookup resolves each the way every production reader does.
 	reloaded := cache.LoadDirForTest("multi-resource-profile", "us-east-1")
 	for name, orig := range entries {
-		got, ok := reloaded.Type(name)
+		canon := name
+		if td := resource.FindResourceType(name); td != nil {
+			canon = td.ShortName
+		}
+		got, ok := reloaded.Type(canon)
 		if !ok {
-			t.Errorf("missing resource type %q after round-trip", name)
+			t.Errorf("missing resource type %q (canonical %q) after round-trip", name, canon)
 			continue
 		}
 		if got.HasResources != orig.HasResources {

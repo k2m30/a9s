@@ -300,7 +300,7 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 
 	avail := c.GetMenuAvailability()
 	trunc := c.GetMenuTruncated()
-	if err := core.SaveAvailabilityCache(avail, trunc, nil, nil, nil); err != nil {
+	if err := core.SaveAvailabilityCache(core.Pair(), avail, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache: %v", err)
 	}
 

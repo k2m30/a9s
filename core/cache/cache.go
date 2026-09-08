@@ -26,6 +26,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/logging"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // SchemaVersion is the current on-disk format marker. Every TypeFile's
@@ -118,6 +119,15 @@ type TypeFile struct {
 	SavedAt time.Time `yaml:"saved_at"`
 }
 
+// Population is how many resources this file knows the type has: its Count,
+// which is authoritative and may exceed the rows it stored (C6a — a
+// counts-only observation never touches Rows), or the row depth when that is
+// larger. The single accessor every C6a consumer reads, so a verify walk and
+// a save projection can never disagree about a type's size.
+func (tf TypeFile) Population() int {
+	return max(tf.Count, len(tf.Rows))
+}
+
 // DirForTest returns the cache directory path for one profile+region pair
 // under the live cache.Root(): <cache root>/<profile>--<region>/. Thin
 // wrapper over DirIn using the live root rather than a pinned one. Test-only:
@@ -128,16 +138,14 @@ func DirForTest(profile, region string) string {
 }
 
 // DirIn returns the cache directory path for one profile+region pair under
-// the given root: <root>/<profile>--<region>/. Reuses the profile/region
-// filename sanitation from the previous single-file layout (replace path
-// separators and spaces with underscores). Takes root explicitly so a caller
-// that pinned its own root (e.g. session.Session.cacheRoot) never re-reads
-// Root() on every call.
+// the given root: <root>/<profile>--<region>/, each element escaped by
+// EncodePathElem. Takes root explicitly so a caller that pinned its own root
+// (e.g. session.Session.cacheRoot) never re-reads Root() on every call.
 func DirIn(root, profile, region string) string {
 	if root == "" {
 		return ""
 	}
-	dir := filepath.Join(root, SanitizePathElem(profile)+"--"+SanitizePathElem(region))
+	dir := filepath.Join(root, EncodePathElem(profile)+"--"+EncodePathElem(region))
 	// root is the untainted trust boundary (process config, never user input);
 	// profile/region are user-controlled. "" is the same "no cache" sentinel
 	// every caller (LoadDirIn, SaveType) already treats as "this pair does
@@ -168,12 +176,42 @@ func Root() string {
 
 // SanitizePathElem replaces path separators and spaces with underscores so s
 // is safe to use as one path element (e.g. a profile or region name) in a
-// cache file/directory name.
+// cache file/directory name. NOT injective — "team/a" and "team_a" collapse
+// to the same element — so the pair-directory layout uses EncodePathElem
+// instead and keeps this only for the legacy-read fallback in LoadDirIn and
+// for core/costs' single-file-per-profile layout.
 func SanitizePathElem(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
 	s = strings.ReplaceAll(s, "\\", "_")
 	s = strings.ReplaceAll(s, " ", "_")
 	return s
+}
+
+// EncodePathElem escapes s into one path element of a pair directory,
+// injectively: two different profile (or region) names never produce the same
+// element, so one pair can never display or overwrite another's cache.
+//
+// Percent-escapes "%" itself first (so an escape is never confused with
+// literal input), then the characters that must not reach a path element,
+// then any "-" belonging to a run of two or more. That last rule is what
+// makes the "--" joiner in DirIn unambiguous: no encoded element contains
+// "--", so the first "--" in a directory name is always the separator. Names
+// without those characters — every ordinary profile and region — pass
+// through byte-identical, so the common cache directory keeps its existing
+// name and content.
+func EncodePathElem(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		doubleDash := c == '-' && ((i+1 < len(s) && s[i+1] == '-') || (i > 0 && s[i-1] == '-'))
+		switch {
+		case c == '%' || c == '/' || c == '\\' || c == ' ' || doubleDash:
+			fmt.Fprintf(&b, "%%%02X", c)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // Store holds the in-memory, loaded state of every resource type's TypeFile
@@ -212,6 +250,13 @@ type Store struct {
 	// does NOT guarantee commit order matches the order the corresponding
 	// PrepareSave/Put calls happened in.
 	saveMu sync.Mutex
+
+	// seqMu guards nextSeq/committedSeq only. Deliberately not saveMu:
+	// PrepareSave must stay free of disk latency, and saveMu is held for the
+	// whole of a commit's I/O.
+	seqMu        sync.Mutex
+	nextSeq      map[string]uint64
+	committedSeq map[string]uint64
 }
 
 // LoadDirForTest loads every readable, current-version type file under
@@ -244,8 +289,21 @@ func LoadDirIn(root, profile, region string) *Store {
 		return s
 	}
 
-	entries, err := os.ReadDir(dir)
+	readFrom := dir
+	entries, err := os.ReadDir(readFrom)
 	if err != nil {
+		// A pair whose name needed escaping may still have a directory under
+		// the old, non-injective sanitized layout. Read it — writes always go
+		// to the injective path above, so the legacy directory is never
+		// extended, only inherited.
+		if legacy := legacyDirIn(root, profile, region); legacy != "" && legacy != dir {
+			if legacyEntries, legacyErr := os.ReadDir(legacy); legacyErr == nil {
+				readFrom, entries = legacy, legacyEntries
+			}
+		}
+	}
+	loadedFrom := make(map[string]string, len(entries))
+	if entries == nil {
 		// Missing (or otherwise unreadable) directory: "no cache" for every
 		// type. Not an error condition per C1/C7 — a fresh pair has no
 		// history yet.
@@ -261,7 +319,7 @@ func LoadDirIn(root, profile, region string) *Store {
 			continue
 		}
 		shortName := strings.TrimSuffix(name, ".yaml")
-		path := filepath.Join(dir, name)
+		path := filepath.Join(readFrom, name)
 
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -300,11 +358,49 @@ func LoadDirIn(root, profile, region string) *Store {
 			logging.L().Warn("cache skip", "file", path, "reason", fmt.Sprintf("unsupported schema version %d (want %d or %d)", tf.Version, SchemaVersion, SchemaVersion-1))
 			continue
 		}
-		s.types[shortName] = tf
+		// One canonicalization, here at the load boundary: a file named after
+		// a type's alias ("rds.yaml" for "dbi") is a complete TypeFile for
+		// the canonical type, counts and rows together. Keying it under the
+		// alias instead would let a later count lookup find it while the row
+		// lookup — which only ever asks under the canonical name — missed it.
+		// Preference is fixed rather than map-order-dependent: a
+		// canonically-named file always wins over an alias-named one, and
+		// between two aliases the first in the directory's sorted order wins.
+		canon := shortName
+		if td := resource.FindResourceType(shortName); td != nil {
+			canon = td.ShortName
+		}
+		if src, taken := loadedFrom[canon]; taken && (src == canon || shortName != canon) {
+			continue
+		}
+		s.types[canon] = tf
+		loadedFrom[canon] = shortName
 	}
 
 	return s
 }
+
+// legacyDirIn returns the pre-EncodePathElem directory for one pair — the
+// non-injective SanitizePathElem layout LoadDirIn still reads when the
+// injective directory does not exist, so an existing cache written by an
+// older build is inherited rather than silently starting cold.
+func legacyDirIn(root, profile, region string) string {
+	if root == "" {
+		return ""
+	}
+	dir := filepath.Join(root, SanitizePathElem(profile)+"--"+SanitizePathElem(region))
+	cleanRoot := filepath.Clean(root)
+	if cleaned := filepath.Clean(dir); cleaned != cleanRoot && !strings.HasPrefix(cleaned, cleanRoot+string(os.PathSeparator)) {
+		return ""
+	}
+	return dir
+}
+
+// Pair returns the profile and region this Store was loaded for. Every
+// answer derived from a Store therefore carries the pair it describes,
+// without a caller having to remember which pair it asked about (C9: no
+// frame mixes two pairs).
+func (s *Store) Pair() (profile, region string) { return s.profile, s.region }
 
 // Type returns the loaded (or since-Put) TypeFile for shortName.
 func (s *Store) Type(shortName string) (TypeFile, bool) {
@@ -347,6 +443,13 @@ type WritePlan struct {
 	dir  string
 	path string
 	data []byte
+	// seq is this plan's position in its target file's preparation order,
+	// assigned by PrepareSave. CommitSave skips a plan whose seq is older
+	// than the newest one already committed for that path, so a plan
+	// suspended after preparation can never land its staler bytes on top of
+	// a newer plan's (C6a/C7: the file's newest known state is what a
+	// restart must find).
+	seq uint64
 }
 
 // commit performs the disk write staged by PrepareSave — the directory
@@ -459,7 +562,35 @@ func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 		return WritePlan{}, fmt.Errorf("cache: SaveType(%s): resolved path %s escapes cache directory %s", shortName, cleaned, cleanDir)
 	}
 
-	return WritePlan{dir: dir, path: path, data: data}, nil
+	return WritePlan{dir: dir, path: path, data: data, seq: s.nextSeqFor(path)}, nil
+}
+
+// nextSeqFor assigns path's next preparation sequence number.
+func (s *Store) nextSeqFor(path string) uint64 {
+	s.seqMu.Lock()
+	defer s.seqMu.Unlock()
+	if s.nextSeq == nil {
+		s.nextSeq = make(map[string]uint64)
+	}
+	s.nextSeq[path]++
+	return s.nextSeq[path]
+}
+
+// claimCommit reports whether wp is still the newest plan for its target,
+// and records it as committed when it is. A plan prepared before one that
+// has already landed is refused: its bytes describe an older state of the
+// same file.
+func (s *Store) claimCommit(wp WritePlan) bool {
+	s.seqMu.Lock()
+	defer s.seqMu.Unlock()
+	if wp.seq != 0 && wp.seq <= s.committedSeq[wp.path] {
+		return false
+	}
+	if s.committedSeq == nil {
+		s.committedSeq = make(map[string]uint64)
+	}
+	s.committedSeq[wp.path] = wp.seq
+	return true
 }
 
 // CommitSave writes wp to disk (MkdirAll + temp-write + rename), serialized
@@ -470,6 +601,9 @@ func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 func (s *Store) CommitSave(wp WritePlan) error {
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
+	if !s.claimCommit(wp) {
+		return nil
+	}
 	return wp.commit()
 }
 

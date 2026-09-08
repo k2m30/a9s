@@ -268,7 +268,7 @@ func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing
 	}
 
 	c := newSaveCacheRegressionCore(t, false)
-	err := c.SaveAvailabilityCache(
+	err := c.SaveAvailabilityCache(c.Pair(),
 		map[string]int{shortName: 48},
 		map[string]bool{shortName: false}, // untruncated: a genuine EXACT observation
 		nil, nil, nil,
@@ -576,7 +576,7 @@ func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testi
 
 	entries := map[string]int{"ec2": 10, "s3": 20}
 	trunc := map[string]bool{"ec2": false, "s3": false}
-	if err := c.SaveAvailabilityCache(entries, trunc, nil, nil, nil); err != nil {
+	if err := c.SaveAvailabilityCache(c.Pair(), entries, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache (initial save): %v", err)
 	}
 
@@ -586,7 +586,7 @@ func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testi
 	ec2Before := statFile(t, ec2Path)
 	s3Before := statFile(t, s3Path)
 
-	if err := c.SaveAvailabilityCache(entries, trunc, nil, nil, nil); err != nil {
+	if err := c.SaveAvailabilityCache(c.Pair(), entries, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache (identical re-save): %v", err)
 	}
 
@@ -611,7 +611,7 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 	c := newSaveCacheRegressionCore(t, false)
 
 	trunc := map[string]bool{"ec2": false, "s3": false}
-	if err := c.SaveAvailabilityCache(map[string]int{"ec2": 10, "s3": 20}, trunc, nil, nil, nil); err != nil {
+	if err := c.SaveAvailabilityCache(c.Pair(), map[string]int{"ec2": 10, "s3": 20}, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache (initial save): %v", err)
 	}
 
@@ -622,7 +622,7 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 	s3Before := statFile(t, s3Path)
 
 	// Only ec2's count changes; s3 is resubmitted with its identical value.
-	if err := c.SaveAvailabilityCache(map[string]int{"ec2": 11, "s3": 20}, trunc, nil, nil, nil); err != nil {
+	if err := c.SaveAvailabilityCache(c.Pair(), map[string]int{"ec2": 11, "s3": 20}, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache (ec2 changed): %v", err)
 	}
 
@@ -701,7 +701,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 	var saveErr error
 	saveDone := make(chan struct{})
 	go func() {
-		saveErr = c.SaveAvailabilityCache(entries, trunc, nil, nil, nil)
+		saveErr = c.SaveAvailabilityCache(c.Pair(), entries, trunc, nil, nil, nil)
 		close(saveDone)
 	}()
 

@@ -122,7 +122,7 @@ func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
 	return c.session.WithCacheStore(fn)
 }
 
-// WithCacheStoreSave runs fn against the current pair's *cache.Store with
+// WithCacheStoreSave runs fn against pair's *cache.Store with
 // session.pairMu held for the pair read, the store decision, and fn itself —
 // fn's own store.Type read and store.Put write for one type file can never
 // interleave with another such sequence running concurrently (the store-lock
@@ -132,12 +132,17 @@ func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
 // happens after pairMu is released — see Session.WithCacheStoreSave's doc
 // comment for the full design and its trade-offs. No-op (fn not called) when
 // NoCache is set, mirroring EnsureCacheStore.
-func (c *Core) WithCacheStoreSave(fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
+func (c *Core) WithCacheStoreSave(pair session.Pair, fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
 	if c.session.NoCache {
 		return nil
 	}
-	return c.session.WithCacheStoreSave(fn)
+	return c.session.WithCacheStoreSave(pair, fn)
 }
+
+// Pair returns the session's current profile/region as one value — what a
+// save path stamps onto work it is about to hand to another goroutine, and
+// what a synchronous saver passes straight back in.
+func (c *Core) Pair() session.Pair { return c.session.CurrentPairValue() }
 
 // ReadCacheStore runs fn against the current pair's *cache.Store with
 // session.pairMu held, for read-only callers (store.Type/store.Types). See

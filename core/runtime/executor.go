@@ -36,6 +36,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ErrAdapterOnlyTask is returned by ExecuteTask for TaskKind values that are
@@ -148,6 +149,11 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if snap.NoCache {
 			return nil, nil
 		}
+		// C9: this save answers for the pair that dispatched it. Carried down
+		// to the one save chokepoint, which drops it if the operator has
+		// switched pairs in the meantime — a queued save must never write one
+		// account's rows into another's directory.
+		dispatchPair := session.Pair{Profile: snap.Profile, Region: snap.Region}
 		var flashErr error
 		// Per C7/C8: an availability-sweep + Wave-2 enrichment completion
 		// must persist that type's per-row rows/findings (SaveResourceListCache)
@@ -171,22 +177,21 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// The reverse order let the row-derived, potentially-incomplete count
 		// computed here unconditionally clobber a more accurate aggregate.
 		saveResources, saveTruncated := c.rowStoreResourcesAndTruncated()
-		var wave2Complete bool
+		var wave2Answered map[string]bool
 		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
 			saveResources, saveTruncated = p.Resources, p.Truncated
-			wave2Complete = p.Wave2Complete
+			wave2Answered = p.Wave2Answered
 		}
-		// A nil-Payload dispatch is never the tagged Wave-2-completion save
-		// (wave2Complete stays false — C6b): only handleEnrichmentChecked's
-		// "all done" branch sets Wave2Complete, and it always carries a
-		// SaveCachePayload.
-		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated, wave2Complete); err != nil {
+		// A nil-Payload dispatch answers for no type (C6b): only
+		// handleEnrichmentChecked's "all done" branch names Wave-2-answered
+		// types, and it always carries a SaveCachePayload.
+		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered); err != nil {
 			flashErr = err
 		}
 		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
 		if entries != nil {
 			if err := c.SaveAvailabilityCache(
-				entries, truncated, issueCounts, issueTruncated, issueKnown,
+				dispatchPair, entries, truncated, issueCounts, issueTruncated, issueKnown,
 			); err != nil && flashErr == nil {
 				flashErr = err
 			}
@@ -575,7 +580,11 @@ func (c *Core) availabilityFromResourceCache() (
 	issueKnown = make(map[string]bool)
 	typeCache := make(map[string]*resource.ResourceTypeDef)
 	for rt, tr := range all {
-		entries[rt] = len(tr.Rows)
+		// C6a: the type's population is its authoritative total, which may
+		// exceed the rows in hand (a counts-only observation never touches
+		// Rows). Reporting row depth here is what let a valid count:55 file
+		// be re-saved as 50.
+		entries[rt] = max(tr.TotalCount, len(tr.Rows))
 		// C5: a nil Pagination means this entry's truncation state was never
 		// observed (e.g. a partial/legacy cache write) — treat as unknown,
 		// which must NOT be conflated with a genuine "not truncated"
@@ -594,11 +603,12 @@ func (c *Core) availabilityFromResourceCache() (
 			td = resource.FindResourceType(rt)
 			typeCache[rt] = td
 		}
+		// One issue counter for the live badge and the persisted one
+		// (unifiedIssueCount): a Wave-2 warning never counts, so a restart
+		// cannot load an issue badge the previous screen never showed.
 		issues := 0
-		for _, r := range tr.Rows {
-			if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
-				issues++
-			}
+		if td != nil {
+			issues = unifiedIssueCount(tr.Rows, *td, nil)
 		}
 		issueCounts[rt] = issues
 		issueKnown[rt] = true
@@ -623,15 +633,14 @@ func (c *Core) availabilityFromResourceCache() (
 // firstErr convention), matching every other cache-write call site's
 // best-effort posture.
 //
-// wave2Complete distinguishes the two TaskKindSaveCache dispatch sites that
-// both route through this function (C6b): the Wave-1 sweep-completion save
-// (handleAvailabilityChecked) passes false — a bare rows-carrying observation
-// that must carry forward any Wave-2 data the on-disk rows already have
-// (reconcileTypeFile's carry step). The Wave-2-completion save
-// (handleEnrichmentChecked) passes true — this observation IS the fresh
-// enrichment result and must supersede carried data wholesale so a
-// healed/resolved issue can clear.
-func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Complete bool) error {
+// wave2Answered names the types whose rows carry a fresh Wave-2 answer
+// (C6b). For those the write supersedes carried Wave-2 data wholesale, so a
+// healed or resolved issue clears. Every other type — the whole map is empty
+// for the Wave-1 sweep-completion save, and a type whose enrichment probe
+// failed is absent from it — is a bare rows-carrying observation that must
+// carry forward the Wave-2 data the on-disk rows already have
+// (reconcileTypeFile's carry step).
+func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Answered map[string]bool) error {
 	if len(probeResources) == 0 {
 		return nil
 	}
@@ -645,7 +654,7 @@ func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resourc
 		if issuesKnown {
 			issues = unifiedIssueCount(resources, *td, nil)
 		}
-		err := c.SaveTypeRows(shortName, resources, len(resources), exact, issues, issuesKnown, truncated, wave2Complete)
+		err := c.SaveTypeRows(pair, shortName, resources, len(resources), exact, issues, issuesKnown, truncated, wave2Answered[shortName])
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -673,6 +682,7 @@ func CacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 }
 
 func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
+	profile, region := store.Pair()
 	types := store.Types()
 	entries := make(map[string]int, len(types))
 	truncated := make(map[string]bool)
@@ -686,9 +696,11 @@ func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 		// the pre-round-2 cache.Entry.Error-string exclusion and C1's "never
 		// 0" placeholder rule: a genuinely-observed empty type still reports
 		// Count=0 through this same path, but only once something has
-		// actually Put it (HasResources/Count/IssuesKnown/Rows all zero at
-		// once is the "nothing was ever recorded" signature).
-		if !tf.HasResources && tf.Count == 0 && !tf.IssuesKnown && len(tf.Rows) == 0 {
+		// actually Put it (HasResources/Count/Exact/IssuesKnown/Rows all zero
+		// at once is the "nothing was ever recorded" signature). An Exact
+		// zero is a real observation of an empty population and reports as
+		// one.
+		if !tf.HasResources && tf.Count == 0 && !tf.Exact && !tf.IssuesKnown && len(tf.Rows) == 0 {
 			continue
 		}
 		entries[name] = tf.Count
@@ -709,6 +721,8 @@ func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,
+		Profile:        profile,
+		Region:         region,
 	}
 }
 

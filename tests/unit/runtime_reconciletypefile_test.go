@@ -79,7 +79,7 @@ func TestSaveAvailabilityCache_CountsOnly_NeverDropsRows(t *testing.T) {
 	}
 
 	c := newSaveCacheRegressionCore(t, false)
-	err := c.SaveAvailabilityCache(
+	err := c.SaveAvailabilityCache(c.Pair(),
 		map[string]int{shortName: 55},
 		map[string]bool{shortName: false}, // untruncated: genuine EXACT observation
 		nil, nil, nil,
@@ -128,7 +128,7 @@ func TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows(t *testing.T) {
 	// First 50 IDs of the existing 55-row list — a genuine subset.
 	subsetRows := make([]cache.Row, 50)
 	copy(subsetRows, existingRows[:50])
-	err := c.SaveResourceListCache(shortName, subsetRows, 50, false /* truncated page */, 0, false, true)
+	err := c.SaveResourceListCache(c.Pair(), shortName, subsetRows, 50, false /* truncated page */, 0, false, true)
 	if err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestSaveResourceListCache_DeeperRowsWrite_Wins(t *testing.T) {
 
 	c := newSaveCacheRegressionCore(t, false)
 	deeperRows := reconcileRows("dwfull", 55)
-	err := c.SaveResourceListCache(shortName, deeperRows, 55, true, 0, false, false)
+	err := c.SaveResourceListCache(c.Pair(), shortName, deeperRows, 55, true, 0, false, false)
 	if err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 	// Same depth (50), but entirely different IDs — a genuine membership
 	// change, not a shallower page of the same list.
 	freshRows := reconcileRows("new", 50)
-	err := c.SaveResourceListCache(shortName, freshRows, 50, true, 0, false, false)
+	err := c.SaveResourceListCache(c.Pair(), shortName, freshRows, 50, true, 0, false, false)
 	if err != nil {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 	for i := range sweepRows {
 		sweepRows[i] = cache.Row{ID: reconcileRowID("d20", i), Name: reconcileRowID("d20", i)}
 	}
-	if err := core.SaveResourceListCache(shortName, sweepRows, 50, false, 0, false, true); err != nil {
+	if err := core.SaveResourceListCache(core.Pair(), shortName, sweepRows, 50, false, 0, false, true); err != nil {
 		t.Fatalf("stage 2: SaveResourceListCache: %v", err)
 	}
 
@@ -329,7 +329,7 @@ func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 	// Stage 3 — counts-only menu-sync: SaveAvailabilityCache observes an
 	// exact count of 55 (agreeing with what's already on disk, but via the
 	// counts-only lane) — the file must still have 55 rows AND count 55.
-	if err := core.SaveAvailabilityCache(
+	if err := core.SaveAvailabilityCache(core.Pair(),
 		map[string]int{shortName: 55},
 		map[string]bool{shortName: false},
 		nil, nil, nil,

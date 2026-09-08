@@ -32,6 +32,21 @@ import (
 // handleAvailabilityCacheLoaded applies cached entries to the main menu and
 // starts background availability checks.
 func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoaded) ([]UIIntent, []TaskRequest) {
+	// C9: a load carries the pair it read. A result for a pair the operator
+	// has since left is discarded whole — counts, issue badges and seeded
+	// rows alike — rather than describing one account with another's answer.
+	// Checked against a RESOLVED current pair only: before connect settles,
+	// the session's own region is still empty while the load already resolved
+	// one from local config, and dropping the seed there would empty the
+	// first frame (D10/D11).
+	if msg.Profile != "" && msg.Region != "" {
+		if profile, region := c.session.CurrentPair(); profile != "" && region != "" &&
+			(profile != msg.Profile || region != msg.Region) {
+			logging.L().Warn("cache load discarded", "loaded_pair", msg.Profile+"--"+msg.Region, "current_pair", profile+"--"+region)
+			return nil, nil
+		}
+	}
+
 	canonKey := func(k string) string {
 		if td := resource.FindResourceType(k); td != nil {
 			return td.ShortName
@@ -86,14 +101,13 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	// deliver a counts-only AvailabilityCacheLoaded event without a populated
 	// on-disk per-type file (e.g. a synthetic/legacy counts projection).
 	//
-	// task #17 wave 1 stage 2: this is now a store-only write — the
-	// already-observed guard reads RowStore.ProbeOriginTypeNames' membership
-	// test instead of the removed session.ProbeResources map.
+	// A seed never outranks an observation already in hand: any type this
+	// session has fully observed — from disk, from a probe, or from a live
+	// fetch, with rows or verified empty — is left alone, so a load that
+	// loses the race to a live answer cannot regress it (C1/C9). A
+	// Partial-only entry (a by-ID drill) is not a full observation and is
+	// still seeded over.
 	if len(entries) > 0 {
-		alreadyObserved := make(map[string]struct{})
-		for _, name := range c.session.RowStore.ProbeOriginTypeNames() {
-			alreadyObserved[name] = struct{}{}
-		}
 		rowsByType := make(map[string][]cache.Row, len(entries))
 		_ = c.ReadCacheStore(func(store *cache.Store) error {
 			if store == nil {
@@ -107,10 +121,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			return nil
 		})
 		for shortName, count := range entries {
-			if count <= 0 {
-				continue
-			}
-			if _, already := alreadyObserved[shortName]; already {
+			if gen, partial := c.session.RowStore.SnapshotMeta(shortName); gen != 0 && !partial {
 				continue
 			}
 			var realRows []resource.Resource
@@ -123,7 +134,8 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			// A type with no real disk rows (placeholder-only fallback) is a
 			// counts-only observation (C6a): it must never fabricate Rows, so it
 			// feeds ObserveCount instead of Observe.
-			if len(realRows) > 0 {
+			switch {
+			case len(realRows) > 0:
 				c.ObserveRows(shortName, realRows, &resource.PaginationMeta{IsTruncated: truncated[shortName]}, session.OriginDisk, false)
 				// ObserveRows/Observe sets TotalCount=len(rows) unconditionally, which
 				// silently drops a C6a count exceeding the seeded row page (e.g. a
@@ -134,7 +146,14 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 				if count > len(realRows) {
 					c.ObserveCountRows(shortName, count)
 				}
-			} else {
+			case count == 0 && !truncated[shortName]:
+				// An exact zero is an observation, not an absence of one: the
+				// type's population WAS learned, and it was none. Seeding it
+				// as an observed-empty row set is what lets the list render an
+				// empty, stale-marked screen instead of an unknown placeholder
+				// that never resolves until the sweep arrives.
+				c.ObserveRows(shortName, []resource.Resource{}, &resource.PaginationMeta{IsTruncated: false}, session.OriginDisk, false)
+			default:
 				c.ObserveCountRows(shortName, count)
 			}
 		}
@@ -149,18 +168,16 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// Sweep-once-per-pair: a pair already swept this session (PairSwept)
-	// skips rebuilding AvailQueue/firing probes and just reports the
-	// progress intent as done. Disk-cache seeding above (menu counts +
-	// RowStore) runs unconditionally either way.
+	// C1: everything cached is re-verified on sight, including on a re-entry
+	// into a pair this session already swept — the account moved on while the
+	// operator was looking at the other one. The swept memo is therefore not
+	// a reason to skip; it exists only so a duplicate delivery cannot re-run
+	// one sweep's completion (see handleAvailabilityChecked), and the fresh
+	// start below clears it for the sweep it is about to begin.
 	allNames := resource.AllShortNames()
 
 	var tasks []TaskRequest
 	switch {
-	case c.session.PairSwept():
-		c.session.AvailTotal = len(allNames)
-		c.session.AvailChecked = c.session.AvailTotal
-		intents = append(intents, PatchMenuCheckProgress{Checked: c.session.AvailChecked, Total: c.session.AvailTotal})
 	case c.session.AvailTotal > 0:
 		// A sweep for this pair is already under way: an earlier
 		// AvailabilityCacheLoaded already built AvailQueue (messages.
@@ -176,6 +193,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		// restart still reaches the fresh-start case below.
 		intents = append(intents, PatchMenuCheckProgress{Checked: c.session.AvailChecked, Total: c.session.AvailTotal})
 	default:
+		c.session.ClearPairSwept()
 		c.session.AvailQueue = allNames
 		c.session.AvailChecked = 0
 		c.session.AvailTotal = len(allNames)
@@ -432,10 +450,10 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	}
 
 	// The current profile/region pair's Wave-1 sweep has now genuinely
-	// completed (not just interrupted by a mid-sweep pair switch) — memoize
-	// it so a later revisit of this same pair skips the redundant sweep
-	// (see Session.PairSwept's doc comment). Guarded on a non-empty sweep so
-	// a stray zero-total call can never trivially mark a pair swept.
+	// completed (not just interrupted by a mid-sweep pair switch) — latch it
+	// so a duplicate delivery cannot re-run this completion (see
+	// Session.PairSwept's doc comment). Guarded on a non-empty sweep so a
+	// stray zero-total call can never trivially mark a pair swept.
 	if c.session.AvailTotal > 0 {
 		c.session.MarkPairSwept()
 	}
@@ -447,12 +465,12 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// snapshotRowStoreForSave's SnapshotAll call captures a defensive,
 	// by-construction-isolated copy at THIS instant (see SaveCachePayload's
 	// doc comment for why dispatch-time capture is required here). This is
-	// the Wave-1 sweep-completion save, not the Wave-2-completion save, so
-	// wave2Complete=false (C6b): the executor carries forward on-disk Wave-2
-	// data these bare rows themselves lack instead of letting them clobber it.
+	// the Wave-1 sweep-completion save, so no type is Wave-2-answered (C6b):
+	// the executor carries forward on-disk Wave-2 data these bare rows
+	// themselves lack instead of letting them clobber it.
 	tasks = append(tasks, TaskRequest{
 		Key:     TaskKey{Kind: TaskKindSaveCache},
-		Payload: c.snapshotRowStoreForSave(false),
+		Payload: c.snapshotRowStoreForSave(nil),
 	})
 
 	enrichIntents, enrichTasks := c.startEnrichment()
@@ -593,10 +611,11 @@ func (c *Core) finishEnrichmentSweepIfDone(intents []UIIntent, tasks []TaskReque
 		// retained rows. On a stale progress-only completion, it persists the
 		// latest currently retained rows; any newer rerun completion will save
 		// again when it lands.
-		// wave2Complete=true (C6b): this save IS the fresh enrichment result
-		// and must supersede any carried Wave-2 data wholesale so a
-		// healed/resolved issue can clear.
-		saveSnapshot := c.snapshotRowStoreForSave(true)
+		// Wave2Answered (C6b): the types this sweep's enrichment actually
+		// answered for supersede their carried Wave-2 data wholesale, so a
+		// healed or resolved issue clears; a type whose probe failed is
+		// absent from the set and keeps what the file already knows.
+		saveSnapshot := c.snapshotRowStoreForSave(maps.Clone(c.session.EnrichmentRan))
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: TaskKindSaveCache},
 			Payload: saveSnapshot,
@@ -695,6 +714,22 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 	}
 
+	// A probe that came back empty-handed with an error answered for nobody:
+	// no findings, no field updates, no per-id truncation list. It is not a
+	// verdict that this type is clean, so nothing it touches may be treated
+	// as a Wave-2 answer — the rows keep the findings they are rendering,
+	// the type stays out of this sweep's authoritative save, and the menu
+	// badge stands until a probe actually answers (C1: a marked, stale answer
+	// beats a confidently wrong clean one).
+	answeredNobody := msg.Err != nil && len(msg.Findings) == 0 && len(msg.FieldUpdates) == 0 && len(msg.TruncatedIDs) == 0
+	if answeredNobody {
+		intents = append(intents, PatchMenuEnrichProgress{
+			Checked: c.session.EnrichChecked,
+			Total:   c.session.EnrichTotal,
+		})
+		return c.finishEnrichmentSweepIfDone(intents, tasks, refillTasks)
+	}
+
 	// Update findings and menu issue count on success or partial success.
 	{
 		if c.session.EnrichmentRan == nil {
@@ -716,7 +751,10 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// every cached row of this type, using allFindings — every
 		// independently-evaluated Wave-2 condition per resource — so a
 		// multi-condition resource keeps every Finding on its cached row.
-		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails)
+		// TruncatedIDs are the rows this probe could not inspect — it did not
+		// answer for them, so their existing Wave-2 findings stand.
+		answered := func(id string) bool { return !msg.TruncatedIDs[id] }
+		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails, answered)
 
 		// Merge FieldUpdates into RowStore (task #17 wave 1 stage 3 — the
 		// former ResourceCache map leg is gone; a type's rows live in exactly
@@ -841,15 +879,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 // the dispatch-time-freeze property the deleted function's
 // element-by-element copy used to provide by hand.
 //
-// wave2Complete is stamped onto the returned payload's Wave2Complete field
-// as-is (C6b) — see SaveCachePayload's doc comment for what it drives at
-// execute time.
-func (c *Core) snapshotRowStoreForSave(wave2Complete bool) *SaveCachePayload {
+// wave2Answered is stamped onto the returned payload as-is (C6b) — see
+// SaveCachePayload's doc comment for what it drives at execute time.
+func (c *Core) snapshotRowStoreForSave(wave2Answered map[string]bool) *SaveCachePayload {
 	resources, truncated := c.rowStoreResourcesAndTruncated()
 	if len(resources) == 0 {
 		return nil
 	}
-	return &SaveCachePayload{Resources: resources, Truncated: truncated, Wave2Complete: wave2Complete}
+	return &SaveCachePayload{Resources: resources, Truncated: truncated, Wave2Answered: wave2Answered}
 }
 
 // rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) (task
@@ -937,14 +974,31 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1
 // SevBroken-equivalent issue: a Wave-1 structural/wave1-Finding color of
-// ColorBroken/ColorWarning (IsIssue()), or ANY Wave-2 SevBroken finding in
-// findings[id]'s slice — a resource counts once even when it carries more
-// than one independently-evaluated Wave-2 condition. Never a SevWarn Wave-2
-// finding — those are excluded from both halves of this single per-resource
-// decision.
+// ColorBroken/ColorWarning (IsIssue()), or ANY Wave-2 SevBroken finding —
+// from findings[id]'s slice, or already folded onto the row itself — so a
+// resource counts once even when it carries more than one
+// independently-evaluated Wave-2 condition. Never a SevWarn Wave-2 finding.
+//
+// The single counter behind every issue number the operator can see or
+// reload: the menu badge, the list title, and the count each save projects
+// onto disk. Reading the row's own Wave-2 findings, not only the live map,
+// is what lets the save lanes (which hold enriched rows but no findings map)
+// share it instead of re-deriving the split and drifting — a Wave-2 warning
+// persisted as an issue was exactly that drift.
 func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string][]domain.Finding) int {
 	if td.ExcludeFromIssueBadge {
 		return 0
+	}
+	hasBroken := func(fs []domain.Finding, wave2Only bool) bool {
+		for _, f := range fs {
+			if f.Severity != domain.SevBroken {
+				continue
+			}
+			if !wave2Only || f.IsWave2Sourced() {
+				return true
+			}
+		}
+		return false
 	}
 	// Count per resource, not per ID: two DISTINCT resources that share an ID
 	// (e.g. two ACM certs for one domain — ACM keys on the domain name) must
@@ -958,11 +1012,8 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 			continue
 		}
 		// A Wave-2 "!"-severity finding bumps the badge; "~" (SevWarn) never does.
-		for _, finding := range findings[r.ID] {
-			if finding.Severity == domain.SevBroken {
-				count++
-				break
-			}
+		if hasBroken(findings[r.ID], false) || hasBroken(r.Findings, true) {
+			count++
 		}
 	}
 	return count

@@ -275,20 +275,22 @@ func TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault(t *testing.
 	if store == nil {
 		t.Fatal("Core.LoadAvailabilityCache() returned nil for an empty session.Region — D10: an unresolved region must still resolve the profile's config-file default and load that pair's disk cache")
 	}
-	tf, ok := store.Type("rds")
+	// "rds" is an alias of "dbi"; cachegen row 11 canonicalizes a type file's
+	// key at load, so the file seeded as rds.yaml reads back under "dbi".
+	tf, ok := store.Type("dbi")
 	if !ok {
-		t.Fatalf(`store.Type("rds") missing — LoadAvailabilityCache did not resolve to the config-default-region pair %q--%q`, profile, configDefaultRegion)
+		t.Fatalf(`store.Type("dbi") missing — LoadAvailabilityCache did not resolve to the config-default-region pair %q--%q`, profile, configDefaultRegion)
 	}
 	if tf.Count != 4 {
-		t.Errorf("resolved rds TypeFile.Count = %d, want 4", tf.Count)
+		t.Errorf("resolved dbi TypeFile.Count = %d, want 4", tf.Count)
 	}
 
 	// Confirm the event conversion the TUI/web seed callers both use also
 	// carries the count through, exactly as runtime.CacheStoreToEvent would
 	// feed messages.AvailabilityCacheLoaded.
 	ev := runtime.CacheStoreToEvent(store)
-	if got, ok := ev.Entries["rds"]; !ok || got != 4 {
-		t.Errorf("CacheStoreToEvent(store).Entries[%q] = %d (ok=%v), want 4, true", "rds", got, ok)
+	if got, ok := ev.Entries["dbi"]; !ok || got != 4 {
+		t.Errorf("CacheStoreToEvent(store).Entries[%q] = %d (ok=%v), want 4, true", "dbi", got, ok)
 	}
 }
 

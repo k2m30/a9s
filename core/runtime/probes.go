@@ -21,6 +21,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ProbeAvailabilityResult carries the outcome of a single Wave-1 resource
@@ -325,6 +326,7 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 // this method stages goes through reconcileTypeFile (rule 2: a counts-only
 // write never touches existing Rows).
 func (c *Core) SaveAvailabilityCache(
+	pair session.Pair,
 	entries map[string]int,
 	truncated map[string]bool,
 	issueCounts map[string]int,
@@ -334,7 +336,7 @@ func (c *Core) SaveAvailabilityCache(
 	if entries == nil {
 		return nil
 	}
-	return c.WithCacheStoreSave(func(store *cache.Store) ([]cache.WritePlan, error) {
+	return c.WithCacheStoreSave(pair, func(store *cache.Store) ([]cache.WritePlan, error) {
 		if store == nil {
 			return nil, nil
 		}
@@ -554,10 +556,11 @@ func saveFieldKey(col config.ListColumn, fields map[string]string, lifecycleKey 
 // rows have that rows itself lacks). The Wave-2-completion save
 // (handleEnrichmentChecked's "all done" branch, via the TaskKindSaveCache
 // executor case) uses saveResourceListCacheWave2Complete instead, which is
-// reached only through the executor's SaveCachePayload.Wave2Complete tag —
-// never through this exported entry point.
-func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
-	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
+// reached only for a type named in the executor's
+// SaveCachePayload.Wave2Answered set — never through this exported entry
+// point.
+func (c *Core) SaveResourceListCache(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
+	return c.saveResourceListCache(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
 }
 
 // saveResourceListCacheWave2Complete is saveResourceListCache's counterpart
@@ -565,8 +568,8 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 // branch): this observation IS the fresh enrichment result, so it must
 // supersede any carried Wave-2 data wholesale for the rows it replaces —
 // otherwise a healed/resolved issue could never clear (C6b).
-func (c *Core) saveResourceListCacheWave2Complete(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
-	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
+func (c *Core) saveResourceListCacheWave2Complete(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
+	return c.saveResourceListCache(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
 }
 
 // SaveTypeRows is the single per-type save chokepoint (task #17 wave 1 stage
@@ -585,7 +588,7 @@ func (c *Core) saveResourceListCacheWave2Complete(shortName string, rows []cache
 // snapshot) and must keep computing issues/issuesKnown/issuesTruncated
 // themselves; unifying that computation here would silently change either
 // lane's counted total.
-func (c *Core) SaveTypeRows(shortName string, resources []resource.Resource, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
+func (c *Core) SaveTypeRows(pair session.Pair, shortName string, resources []resource.Resource, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
 	materialized := c.materializeListFieldsForSave(shortName, resources)
 	rows := make([]cache.Row, len(materialized))
 	for i, r := range materialized {
@@ -597,12 +600,12 @@ func (c *Core) SaveTypeRows(shortName string, resources []resource.Resource, cou
 		}
 	}
 	if wave2Authoritative {
-		return c.saveResourceListCacheWave2Complete(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated)
+		return c.saveResourceListCacheWave2Complete(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated)
 	}
-	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
+	return c.saveResourceListCache(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
 }
 
-func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
+func (c *Core) saveResourceListCache(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
 	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
 	// canonShortName lookup always agree on the stored key — an
 	// uncanonicalized Put here would silently miss the depth lookup for
@@ -611,7 +614,7 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 	if rows == nil {
 		rows = []cache.Row{}
 	}
-	return c.WithCacheStoreSave(func(store *cache.Store) ([]cache.WritePlan, error) {
+	return c.WithCacheStoreSave(pair, func(store *cache.Store) ([]cache.WritePlan, error) {
 		if store == nil {
 			return nil, nil
 		}
@@ -679,7 +682,10 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 }
 
 // CachedListDepth returns the number of rows previously persisted for
-// shortName's canonical top-level list, so a background verify-refetch
+// shortName's canonical top-level list — its known population, not merely
+// the rows it stored: a file that knows 55 and stored 50 must be verified to
+// 55, or the verify walk stops one page short and the list regresses to
+// "50+" — so a background verify-refetch
 // (KindFetchResources) can be bounded to at most the depth already shown to
 // the user (C1: re-verify must verify the content being shown, not just page
 // 1; C5: a truncated first-page fetch must never downgrade a stored exact
@@ -695,7 +701,7 @@ func (c *Core) CachedListDepth(shortName string) int {
 			return nil
 		}
 		if tf, ok := store.Type(canon); ok {
-			depth = len(tf.Rows)
+			depth = tf.Population()
 		}
 		return nil
 	})
