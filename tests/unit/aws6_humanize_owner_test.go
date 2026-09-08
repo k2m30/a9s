@@ -145,15 +145,21 @@ var rawEnumCellPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$`)
 // run together with no separator.
 var rawCamelEnumCellPattern = regexp.MustCompile(`^([A-Z][a-z0-9]+){2,}$`)
 
-// rawEnumDetailAllowlist names a (type, detail path) pair permitted to render a
-// constant-shaped value, with the reason.
+// verbatimDetailPaths names a (type, detail path) pair whose value must reach
+// the screen exactly as AWS wrote it, with the reason.
 //
-// Two reasons appear. "identifier" means the value is a name AWS assigned and a
-// person types back — an access key, a role id, an API operation name — and
-// rewording it would make it wrong. "out of scope" means a genuine raw enum on
-// a type this task does not touch: real debt, recorded so the gate stays red
-// for anything NEW rather than drowning in what is already there.
-var rawEnumDetailAllowlist = map[string]string{
+// Every entry is a value a person types back or searches for — an access key,
+// a role id, an API operation name, an error code — so rewording it would make
+// it wrong. That is the only reason an entry is allowed here: this is not a
+// waiting list, and a field that merely has not been got to yet does not
+// belong in it.
+//
+// A field that SHOULD read as words is declared on its type
+// (ResourceTypeDef.HumanizeFields) and then renders as words, so the sweep
+// below never reaches it. Those declarations are held to it by the ratchet in
+// aws6_humanize_declared_fields_test.go, which fails the day one of them
+// starts rendering a constant again.
+var verbatimDetailPaths = map[string]string{
 	"alarm/metric_name":                 "identifier: the CloudWatch metric's own name",
 	"alarm/namespace":                   "identifier: the CloudWatch namespace",
 	"cf/distribution_id":                "identifier: the CloudFront distribution id",
@@ -178,36 +184,6 @@ var rawEnumDetailAllowlist = map[string]string{
 	"role/Attention":                    "identifier: the attached policy's own name",
 	"role/role_id":                      "identifier: the IAM role id",
 	"role/role_name":                    "identifier: the role's own name",
-
-	"alarm/state":                         "out of scope: raw enum on a type this task does not touch",
-	"athena/state":                        "out of scope: raw enum on a type this task does not touch",
-	"cb/source_type":                      "out of scope: raw enum on a type this task does not touch",
-	"cf/status":                           "out of scope: raw enum on a type this task does not touch",
-	"cfn/status":                          "out of scope: raw enum on a type this task does not touch",
-	"eb-rule/state":                       "out of scope: raw enum on a type this task does not touch",
-	"ecr/tag_mutability":                  "out of scope: raw enum on a type this task does not touch",
-	"ecs/status":                          "out of scope: raw enum on a type this task does not touch",
-	"ecs-task/launch_type":                "out of scope: raw enum on a type this task does not touch",
-	"ecs-task/status":                     "out of scope: raw enum on a type this task does not touch",
-	"eip/status":                          "out of scope: raw enum on a type this task does not touch",
-	"eks/status":                          "out of scope: raw enum on a type this task does not touch",
-	"kinesis/stream_mode":                 "out of scope: raw enum on a type this task does not touch",
-	"kinesis/stream_status":               "out of scope: raw enum on a type this task does not touch",
-	"kms/status":                          "out of scope: raw enum on a type this task does not touch",
-	"lambda/last_update_status":           "out of scope: raw enum on a type this task does not touch",
-	"msk/cluster_type":                    "out of scope: raw enum on a type this task does not touch",
-	"msk/state":                           "out of scope: raw enum on a type this task does not touch",
-	"opensearch/domain_processing_status": "out of scope: raw enum on a type this task does not touch",
-	"pipeline/pipeline_type":              "out of scope: raw enum on a type this task does not touch",
-	"role/trust_summary":                  "out of scope: a computed summary token on a type this task does not touch",
-	"secrets/status":                      "out of scope: raw enum on a type this task does not touch",
-	"ses/verification_status":             "out of scope: raw enum on a type this task does not touch",
-	"sfn/type":                            "out of scope: raw enum on a type this task does not touch",
-	"ssm/type":                            "out of scope: raw enum on a type this task does not touch",
-	"tg/protocol":                         "out of scope: raw enum on a type this task does not touch",
-	"transfer/domain":                     "out of scope: raw enum on a type this task does not touch",
-	"vpce/state":                          "out of scope: raw enum on a type this task does not touch",
-	"waf/scope":                           "out of scope: raw enum on a type this task does not touch",
 }
 
 // TestNoDemoDetailRowIsARawConstant sweeps every demo detail screen for a row
@@ -235,7 +211,7 @@ func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 					continue
 				}
 				seen[key] = true
-				if _, ok := rawEnumDetailAllowlist[key]; ok {
+				if _, ok := verbatimDetailPaths[key]; ok {
 					continue
 				}
 				offenders = append(offenders, fmt.Sprintf("%s (row %s) = %q", key, r.ID, f.Value))
@@ -245,7 +221,7 @@ func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 	sort.Strings(offenders)
 	for _, o := range offenders {
 		t.Errorf("demo detail row shows a raw SDK constant: %s — declare the field's readable wording on its type, "+
-			"or add the pair to rawEnumDetailAllowlist with the reason it must stay verbatim", o)
+			"or add the pair to verbatimDetailPaths with the reason it must stay verbatim", o)
 	}
 }
 
