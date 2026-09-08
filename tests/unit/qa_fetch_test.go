@@ -813,13 +813,16 @@ func TestQA_FetchResources_Transfer(t *testing.T) {
 
 func TestQA_FetchResources_NilClients(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
-	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	// Do NOT inject clients — they remain nil
 
 	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {
 			t.Parallel()
+			// One model per subtest: the controller's setters and column
+			// resolver expect the single update loop, and a model shared
+			// across parallel subtests races them.
+			m := tui.New("testprofile", "us-east-1")
+			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 			_, cmd := rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
