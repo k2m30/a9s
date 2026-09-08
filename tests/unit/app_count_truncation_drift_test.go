@@ -132,14 +132,6 @@ func TestSyncExactTotalToMenu_DoesNotClearEnrichmentTruncation_OnEqualExactRows(
 // rows-derived equal-count sync", rather than banning the clear arm outright.
 func TestSyncExactTotalToMenu_ClearsPriorRowsDerivedTruncation_OnEqualExactRows(t *testing.T) {
 	c := newCountTruncationDriftController(t)
-
-	c.ApplyIntents([]runtime.UIIntent{
-		runtime.PatchMenu{ResourceType: "s3", Issues: 5, Truncated: true},
-	})
-	if got := c.GetMenuIssueTruncated()["s3"]; !got {
-		t.Fatalf("precondition failed: GetMenuIssueTruncated()[s3] = %v, want true", got)
-	}
-
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	const totalRows = 55
@@ -152,6 +144,24 @@ func TestSyncExactTotalToMenu_ClearsPriorRowsDerivedTruncation_OnEqualExactRows(
 			rows[i].Findings = []domain.Finding{broken[i]}
 		}
 	}
+
+	// Seed the truncation the rows-derived way this case is about: a
+	// truncated first page carrying the same five broken rows. (It used to be
+	// seeded with a PatchMenu intent, which no rows-derived lane emits — every
+	// PatchMenu producer is a live probe or a Wave-2 result, so its truncation
+	// is authoritative and an equal-count rows-derived resync may not clear
+	// it. Seeding it through the lane the case names keeps the distinction the
+	// test isolates.)
+	c.Handle(messages.ResourcesLoaded{
+		ResourceType: "s3",
+		Resources:    rows,
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "next"},
+		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
+	})
+	if got := c.GetMenuIssueTruncated()["s3"]; !got {
+		t.Fatalf("precondition failed: GetMenuIssueTruncated()[s3] = %v, want true", got)
+	}
+
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    rows,

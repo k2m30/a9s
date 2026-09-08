@@ -213,7 +213,11 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// per resource) so a multi-condition resource keeps every Finding across
 	// a silent-swap refetch, not just the worst one.
 	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
-		c.applyRowFindings(typeName, known, c.listEnrichmentDetails(typeName))
+		// The same uninspected set the result carried: a row the last Wave-2
+		// pass could not inspect keeps whatever the silent-swap carry just
+		// re-attached, instead of being folded clean by a map that never had
+		// an answer for it.
+		c.applyRowFindings(typeName, known, c.listEnrichmentDetails(typeName), c.listUninspectedIDs(typeName))
 	}
 }
 
@@ -929,7 +933,14 @@ func (c *Controller) clearRowFindings(typeName string) {
 // per resource ID (mirrors runtime.ApplyWave2ToRow's own contract), so a
 // multi-condition resource's second Finding is never silently dropped by
 // this write.
-func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail) {
+//
+// uninspected comes straight off the intent — the rows the enricher could
+// not inspect, decided once by the runtime — and is handed to the shared
+// fold (runtime.FoldWave2Rows) unexamined. This function does not re-decide
+// which rows the result speaks for; deciding it here as well is how a
+// timed-out probe could strip a finding from the screen while the file it
+// was saved to kept it.
+func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, uninspected map[string]bool) {
 	canon := typeName
 	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(typeName); t != nil {
@@ -940,9 +951,7 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string][]dom
 	}
 
 	applySlice := func(rows []resource.Resource) {
-		for i := range rows {
-			runtime.ApplyWave2ToRow(&rows[i], td, findings, details)
-		}
+		runtime.FoldWave2Rows(rows, td, findings, details, uninspected)
 	}
 
 	for i := range c.stack {

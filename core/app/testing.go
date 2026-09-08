@@ -14,10 +14,11 @@ import (
 // typeName is the canonical short name (e.g. "ec2", "s3").
 // appendPage=true accumulates onto the existing cache page; false replaces it.
 //
-// Mirrors handleResourcesLoadedEvent's C6 scope gate: the disk-cache save
-// only fires when the top-of-stack screen is the canonical top-level
-// ScreenResourceList (not ScreenChildList, and not a filtered/related-nav
-// list — EscPops/ParentContext), matching the real task-result lane.
+// Mirrors handleResourcesLoadedEvent: the same C6 scope gate (the disk-cache
+// save only fires when the top-of-stack screen is the canonical top-level
+// ScreenResourceList, not ScreenChildList and not a filtered/related-nav
+// list) and the same menu sync-back, so what this seam leaves on the menu and
+// on disk is what the real task-result lane leaves.
 func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	// The queued per-type save runs after the lock is released, exactly as
 	// Handle runs it (C4) — deferred first so it fires last.
@@ -34,7 +35,11 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	ls := c.topListState()
 	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)
 	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, topLevelCanonical, false)
-	if topLevelCanonical {
-		c.maybeSaveResourceListCache(ls, canon)
+	if topLevelCanonical && len(c.stack) > 0 {
+		// The same second step the real lane takes (handleResourcesLoadedEvent):
+		// the menu observation and then the save that records it. Calling only
+		// the save would leave this seam persisting an issue count the menu
+		// never reconciled — the two answers the round-2 ruling removes.
+		c.syncExactTotalToMenu(&c.stack[len(c.stack)-1], canon)
 	}
 }

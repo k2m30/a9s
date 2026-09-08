@@ -293,6 +293,42 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 	}
 }
 
+// menuIssueBadge returns the issue count the menu currently holds for canon
+// and whether it is known at all — the reconciled answer every observation
+// of this type has been folded into, and therefore the one number the
+// persisted file records. Caller must hold c.mu (at least read).
+func (c *Controller) menuIssueBadge(canon string) (issues int, known bool) {
+	ms := c.rootMenuState()
+	if ms == nil || !ms.IssueKnown[canon] {
+		return 0, false
+	}
+	return ms.IssueCounts[canon], true
+}
+
+// menuObservationOutranksStored reports whether an observation of origin may
+// touch what the menu already holds for key. The one rule both halves of a
+// menu entry follow: a seed never outranks a value this session verified —
+// the count and the issue badge beside it describe the same type, and a load
+// that lost the race to a live answer must not win on one of them.
+func menuObservationOutranksStored(ms *MenuState, key, origin string) bool {
+	return origin != runtime.OriginCache || ms.Origin[key] != runtime.OriginVerified
+}
+
+// applyMenuIssueObservation records one intent-borne observation of key's
+// issue badge — a live probe or enrichment result, or a disk seed. Both
+// carry a real answer for the type, so both assign; what separates them is
+// standing, and that is the origin gate: a seed is refused outright over a
+// value this session verified, which is the same rule the count beside it
+// follows. (The rows-derived lane, whose zero proves nothing, calls
+// syncMenuIssueCount directly as non-authoritative.) Every intent that
+// writes the badge goes through here. Caller must hold c.mu (write).
+func (c *Controller) applyMenuIssueObservation(ms *MenuState, key string, issues int, trunc bool, origin string) {
+	if !menuObservationOutranksStored(ms, key, origin) {
+		return
+	}
+	c.syncMenuIssueCount(ms, key, issues, trunc, true)
+}
+
 // assignMenuIssueCount writes canon's issue badge — count, known, truncated,
 // and whether that truncation came from an authoritative observation — as one
 // state, so no caller can update three of the four maps and leave the fourth

@@ -78,8 +78,10 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// patch that arrives after this type was verified this
 				// session is a load that lost the race — applying it would
 				// regress the count the operator is looking at back to the
-				// disk value and re-dim it as unverified.
-				if v.Origin == runtime.OriginCache && ms.Origin[v.ResourceType] == runtime.OriginVerified {
+				// disk value and re-dim it as unverified. The issue badge
+				// below is subject to the same rule, through the same
+				// predicate.
+				if !menuObservationOutranksStored(ms, v.ResourceType, v.Origin) {
 					break
 				}
 				// Store under the key as emitted by the runtime (may be an alias
@@ -100,37 +102,17 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			}
 
 		case runtime.PatchMenu:
+			// A live observation (empty Origin): it assigns, exactly as it
+			// always has, but through the one badge writer.
 			if ms := c.rootMenuState(); ms != nil {
-				if ms.IssueCounts == nil {
-					ms.IssueCounts = make(map[string]int)
-				}
-				if ms.IssueKnown == nil {
-					ms.IssueKnown = make(map[string]bool)
-				}
-				if ms.IssueTruncated == nil {
-					ms.IssueTruncated = make(map[string]bool)
-				}
-				ms.IssueCounts[v.ResourceType] = v.Issues
-				ms.IssueKnown[v.ResourceType] = true
-				ms.IssueTruncated[v.ResourceType] = v.Truncated
+				c.applyMenuIssueObservation(ms, v.ResourceType, v.Issues, v.Truncated, "")
 			}
 
 		case runtime.PatchMenuIssueBatch:
 			if ms := c.rootMenuState(); ms != nil && v.Known != nil {
-				if ms.IssueCounts == nil {
-					ms.IssueCounts = make(map[string]int)
-				}
-				if ms.IssueKnown == nil {
-					ms.IssueKnown = make(map[string]bool)
-				}
-				if ms.IssueTruncated == nil {
-					ms.IssueTruncated = make(map[string]bool)
-				}
 				for name, k := range v.Known {
 					if k {
-						ms.IssueCounts[name] = v.Counts[name]
-						ms.IssueKnown[name] = true
-						ms.IssueTruncated[name] = v.Truncated[name]
+						c.applyMenuIssueObservation(ms, name, v.Counts[name], v.Truncated[name], v.Origin)
 					}
 				}
 			}
@@ -218,7 +200,10 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// C6's persisted-findings round-trip). A
 				// multi-condition resource keeps every Finding — and every
 				// finding's own AttentionDetail — on the row.
-				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
+				// TruncatedIDs is the runtime's own decision about which rows
+				// this result speaks for; the controller folds the same rows
+				// the runtime did and re-decides nothing.
+				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.TruncatedIDs)
 			}
 
 		case runtime.SetIdentityIntent:

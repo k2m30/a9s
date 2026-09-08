@@ -36,18 +36,14 @@ import (
 // destination left). The mutate-in-place bug class the dispatch-time payload
 // freeze guards against is exactly what Amend exists to remove — see
 // RowStore.Amend's doc comment.
-// answered reports whether the enrichment result speaks for a given row ID.
-// A row it does not answer for — one the enricher could not inspect, or any
-// row at all when the probe failed outright — keeps the Wave-2 state it
-// already has: a result replaces exactly what it answered, and an
-// unanswered row is not a clean row (C1: stale-until-replaced, never
-// blank-until-replaced). A nil answered folds every row, the plain
-// full-result case.
+// uninspected names the rows this result could not speak for — the
+// enricher's own TruncatedIDs. Threaded to FoldWave2Rows, which leaves those
+// rows the Wave-2 state they already have.
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string][]domain.Finding,
 	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
-	answered func(id string) bool,
+	uninspected map[string]bool,
 ) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
@@ -64,14 +60,41 @@ func (c *Core) applyEnrichment(
 		}
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
-		for i := range out {
-			if answered != nil && !answered(out[i].ID) {
-				continue
-			}
-			ApplyWave2ToRow(&out[i], td, findings, attentionDetails)
-		}
+		FoldWave2Rows(out, td, findings, attentionDetails, uninspected)
 		return out
 	})
+}
+
+// FoldWave2Rows folds one Wave-2 result onto rows, in place, skipping every
+// row the result did not answer for: an id in uninspected (the enricher's
+// TruncatedIDs) keeps the Wave-2 state it already has, because a row nobody
+// looked at is not a clean row (C1: stale-until-replaced, never
+// blank-until-replaced). A nil uninspected folds every row — the plain
+// full-result case, and the deliberate clear paths.
+//
+// The single decision of WHICH rows a result replaces, for both surfaces:
+// the runtime's own fold above and the controller's (core/app/list_body.go's
+// applyRowFindings, which writes the same result onto the rows on screen).
+// Two loops deciding it independently is how a finding could vanish from the
+// list while the file it was saved to kept it.
+//
+// In place: ApplyWave2ToRow replaces a row's Findings slice and
+// AttentionDetails map with fresh allocations rather than writing into
+// either, so a caller that must not disturb a shared backing array needs
+// only a shallow copy of the slice itself first.
+func FoldWave2Rows(
+	rows []resource.Resource,
+	td resource.ResourceTypeDef,
+	findings map[string][]domain.Finding,
+	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
+	uninspected map[string]bool,
+) {
+	for i := range rows {
+		if uninspected[rows[i].ID] {
+			continue
+		}
+		ApplyWave2ToRow(&rows[i], td, findings, attentionDetails)
+	}
 }
 
 // ApplyWave2ToRow strips any existing Wave-2 entries from r.Findings, then

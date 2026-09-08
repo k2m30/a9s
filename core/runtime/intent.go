@@ -84,7 +84,9 @@ type PatchDetail struct {
 func (PatchDetail) isIntent() {}
 
 // PatchMenu instructs the adapter to update the top-level menu badge for
-// ResourceType.
+// ResourceType. Every emitter is a live observation (a Wave-1 probe result, a
+// Wave-2 enrichment result, a synchronous prefetch), so it carries no Origin:
+// the badge rule reads an empty Origin as verified.
 type PatchMenu struct {
 	ResourceType string
 	Issues       int
@@ -182,6 +184,12 @@ type PatchMenuIssueBatch struct {
 	Counts    map[string]int
 	Truncated map[string]bool
 	Known     map[string]bool
+	// Origin says where these counts came from, in PatchMenuAvailability's
+	// vocabulary ("cache" for a disk seed, "verified" for a live answer) —
+	// the badge is subject to the same observation rule as the count beside
+	// it, and the rule needs to know which this is. Empty is treated as a
+	// live observation, matching PatchMenu.
+	Origin string
 }
 
 func (PatchMenuIssueBatch) isIntent() {}

@@ -165,6 +165,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			Counts:    issueCounts,
 			Truncated: issueTruncated,
 			Known:     issueKnown,
+			Origin:    OriginCache,
 		})
 	}
 
@@ -752,9 +753,10 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// independently-evaluated Wave-2 condition per resource — so a
 		// multi-condition resource keeps every Finding on its cached row.
 		// TruncatedIDs are the rows this probe could not inspect — it did not
-		// answer for them, so their existing Wave-2 findings stand.
-		answered := func(id string) bool { return !msg.TruncatedIDs[id] }
-		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails, answered)
+		// answer for them, so their existing Wave-2 findings stand. The same
+		// set rides out on the ListEnrichmentPatch below, so the rows on
+		// screen keep exactly what the stored rows keep.
+		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails, msg.TruncatedIDs)
 
 		// Merge FieldUpdates into RowStore (task #17 wave 1 stage 3 — the
 		// former ResourceCache map leg is gone; a type's rows live in exactly

@@ -344,12 +344,6 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	if ls == nil || ls.EscPops || ls.ParentContext != nil {
 		return
 	}
-	// C6 scope boundary: only the canonical top-level, unfiltered list may
-	// reach the persisted per-type cache file. A ScreenChildList never does,
-	// even when (by coincidence) its resource type matches canon.
-	if screen.ID == runtime.ScreenResourceList {
-		c.maybeSaveResourceListCache(ls, canon)
-	}
 	newCount := len(ls.Rows)
 	newTrunc := ls.HasPagination
 
@@ -373,6 +367,15 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	newIssues := c.listIssueCount(ls, canon)
 	c.syncMenuIssueCount(ms, canon, newIssues, newTrunc, false)
 
+	// C6 scope boundary: only the canonical top-level, unfiltered list may
+	// reach the persisted per-type cache file. A ScreenChildList never does,
+	// even when (by coincidence) its resource type matches canon. Runs AFTER
+	// the badge sync above, because the file records what the badge now
+	// holds — one observation, reconciled once.
+	if screen.ID == runtime.ScreenResourceList {
+		c.maybeSaveResourceListCache(ls, canon)
+	}
+
 	// Persist the updated availability to disk, mirroring the "survives an
 	// app restart" half of the exact-total menu sync-back. Best-effort — a write failure here
 	// must not surface as a controller error.
@@ -391,12 +394,19 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 // ScreenResourceList, not EscPops, not ParentContext) before calling this —
 // isTopLevelCanonicalList computes it.
 //
+// The issue count it writes is the one the menu badge now holds — not a
+// second derivation from the same rows. The badge already applied the one
+// observation rule (an observation that cannot prove an issue is gone does
+// not lower it), and a file that recorded the raw rows-derived number
+// instead would disagree with the screen: a restart would then change the
+// badge although nothing in the account had answered for it. A type whose
+// badge is not known yet writes no issue count at all (issuesKnown=false),
+// so the file keeps what it already had.
+//
 // task #17 wave 1 stage 4: the per-type materialize/build-rows/write body
 // this method used to own directly now lives once in
 // runtime.Core.SaveTypeRows, shared with the sweep lane
-// (saveProbeResourcesToTypeFiles) — this method's job shrinks to computing
-// the two save-lane-specific inputs (issues/issuesKnown via
-// c.listIssueCount, exact via ls.HasPagination) and calling it. The
+// (saveProbeResourcesToTypeFiles). The
 // redundant ObserveRows re-write this method used to perform after the disk
 // save is gone too: applyResourcesLoaded (this method's only two callers'
 // common ancestor) already routed ls.Rows through Core.ObserveRows before
@@ -410,8 +420,8 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 		// Issue-badge eligibility unknowable without a ResourceTypeDef.
 		return
 	}
-	issuesKnown := !td.ExcludeFromIssueBadge
-	issues := c.listIssueCount(ls, canon)
+	issues, issuesKnown := c.menuIssueBadge(canon)
+	issuesKnown = issuesKnown && !td.ExcludeFromIssueBadge
 	exact := !ls.HasPagination
 	truncated := ls.HasPagination
 	rows := append([]resource.Resource(nil), ls.Rows...)

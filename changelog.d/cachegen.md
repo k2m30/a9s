@@ -7,6 +7,7 @@
 - Two cache writes for the same resource type can no longer land out of order: the older one is skipped instead of overwriting the newer state on the next start.
 - Loading a resource list no longer holds the app while its cache file is written, so keys and web requests stay responsive on a slow filesystem.
 - An issue badge now drops to zero once every issue for that type is fixed and re-verified, instead of showing and persisting the old count for the rest of the session.
+- The issue badge on the menu and the one saved for the next launch are now the same number, so restarting no longer changes a badge that nothing in the account answered for.
 - A Wave-2 warning is no longer saved as an issue, so a restart cannot show an issue badge the previous screen never had.
 - A warm list of a type with more resources than the stored page now re-verifies to the full known total instead of stopping at the stored rows and falling back to "50+".
 - Re-entering a profile or region you already visited this session verifies it again, instead of showing the values on disk as if they had just been checked.

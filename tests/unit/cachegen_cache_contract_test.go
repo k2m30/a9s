@@ -652,3 +652,191 @@ func TestExactEmptyCache_SeedsAnObservedEmptyList(t *testing.T) {
 		t.Error("a cached exact zero seeded no observation for s3 — zero is a count like any other and goes through the same seeding path")
 	}
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Round 2 — the runtime decides once and the intent carries the decision;
+// the controller applies what the intent says and never re-decides.
+// ───────────────────────────────────────────────────────────────────────────
+
+// cachegenOpenS3List opens the top-level s3 list with rows and returns the
+// controller's rendered list body.
+func cachegenListBody(t *testing.T, ctrl *app.Controller) *app.ListBody {
+	t.Helper()
+	body := ctrl.Snapshot().Body.List
+	if body == nil {
+		t.Fatal("Body.List is nil — the s3 list is not the top screen")
+	}
+	return body
+}
+
+// cachegenLoadList delivers a canonical top-level s3 list result through the
+// production task-result lane.
+func cachegenLoadList(ctrl *app.Controller, rows []resource.Resource) {
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: "s3",
+		Resources:    rows,
+		Pagination:   &resource.PaginationMeta{IsTruncated: false},
+		Provenance:   messages.FetchProvenanceCanonicalList,
+	})
+}
+
+func cachegenRowFor(t *testing.T, body *app.ListBody, id string) app.ListRow {
+	t.Helper()
+	for _, r := range body.Rows {
+		if r.ResourceID == id {
+			return r
+		}
+	}
+	t.Fatalf("list body has no row for %q", id)
+	return app.ListRow{}
+}
+
+// TestEnrichmentFailure_KeepsRenderedFindingOnTheList is row 3 on the surface
+// the operator actually looks at: a Wave-2 probe that timed out without
+// inspecting a row must leave that row's finding standing on screen, exactly
+// as the file keeps it.
+func TestEnrichmentFailure_KeepsRenderedFindingOnTheList(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	ctrl, _, _ := newCachegenController(t, "cachegen-renderfold", "us-east-1")
+
+	rows := cachegenRows(1, "bucket-render")
+	id := rows[0].ID
+	rows[0].Findings = []domain.Finding{{
+		Code:     "s3-public-read",
+		Phrase:   "publicly accessible",
+		Severity: domain.SevBroken,
+		Source:   "wave2:s3",
+	}}
+
+	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+	cachegenLoadList(ctrl, rows)
+
+	before := cachegenRowFor(t, cachegenListBody(t, ctrl), id)
+	if before.Color != "broken" {
+		t.Fatalf("precondition: rendered row color = %q, want %q", before.Color, "broken")
+	}
+
+	// The probe answers for nobody it was asked about: an error, and every
+	// row listed as uninspected.
+	ctrl.Handle(messages.EnrichmentChecked{
+		ResourceType: "s3",
+		Err:          errors.New("operation timed out"),
+		TruncatedIDs: map[string]bool{id: true},
+	})
+
+	after := cachegenRowFor(t, cachegenListBody(t, ctrl), id)
+	if after.Color != "broken" {
+		t.Errorf("rendered row color = %q after a probe that inspected nothing, want %q — an uninspected row keeps the finding it is showing, the same rule the file follows", after.Color, "broken")
+	}
+}
+
+// TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType is row 4 on the
+// badge: the count beside it already refuses a seed for a type verified this
+// session, and the badge must refuse it under the same rule.
+func TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	ctrl, core, _ := newCachegenController(t, "cachegen-latebadge", "us-east-1")
+
+	// A live probe verifies s3 as empty and issue-free.
+	ctrl.Handle(messages.AvailabilityChecked{
+		ResourceType: "s3",
+		Count:        0,
+		Issues:       0,
+		Gen:          core.AvailabilityGen(),
+	})
+	if got := ctrl.GetMenuIssueCounts()["s3"]; got != 0 {
+		t.Fatalf("precondition: menu s3 issue badge = %d after a live probe, want 0", got)
+	}
+
+	// The startup disk load lands late, carrying the last session's badge.
+	ctrl.Handle(messages.AvailabilityCacheLoaded{
+		Entries:     map[string]int{"s3": 3},
+		IssueCounts: map[string]int{"s3": 3},
+		IssueKnown:  map[string]bool{"s3": true},
+	})
+
+	if got := ctrl.GetMenuIssueCounts()["s3"]; got != 0 {
+		t.Errorf("menu s3 issue badge = %d after a late disk seed over a verified type, want 0 — a seed never outranks a value verified this session, badge or count", got)
+	}
+}
+
+// TestListRefresh_BadgeAndFileAgree is row 7 across both surfaces: one
+// authority decision per observation feeds the menu badge and the saved
+// count, so a restart cannot change the badge with nothing changed in the
+// account.
+func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
+	// seedFiveCachedIssues leaves last session's five issues on disk and
+	// loads them, so the badge reads 5 from the cache exactly as a warm
+	// start does.
+	seedFiveCachedIssues := func(t *testing.T, profile string) (*app.Controller, []resource.Resource) {
+		t.Helper()
+		rows := cachegenRows(5, "bucket-heal")
+		crows := make([]cache.Row, len(rows))
+		for i := range rows {
+			rows[i].Findings = []domain.Finding{cachegenWave2Finding("s3-public-read")}
+			crows[i] = cache.Row{ID: rows[i].ID, Name: rows[i].Name, Findings: rows[i].Findings}
+		}
+		seed := cache.LoadDirForTest(profile, "us-east-1")
+		seed.Put("s3", cache.TypeFile{HasResources: true, Count: 5, Exact: true, Issues: 5, IssuesKnown: true, Rows: crows})
+		if err := seed.SaveType("s3"); err != nil {
+			t.Fatalf("seeding: %v", err)
+		}
+		ctrl, core, _ := newCachegenController(t, profile, "us-east-1")
+		ctrl.Handle(runtime.CacheStoreToEvent(core.LoadAvailabilityCache()))
+		if got := ctrl.GetMenuIssueCounts()["s3"]; got != 5 {
+			t.Fatalf("precondition: menu s3 issue badge = %d after loading last session's cache, want 5", got)
+		}
+		_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+		return ctrl, rows
+	}
+
+	badgeAndFile := func(t *testing.T, ctrl *app.Controller, profile string) (int, int) {
+		t.Helper()
+		tf, ok := cache.LoadDirForTest(profile, "us-east-1").Type("s3")
+		if !ok {
+			t.Fatal("no s3 type file on disk after the refresh")
+		}
+		return ctrl.GetMenuIssueCounts()["s3"], tf.Issues
+	}
+
+	t.Run("a verified refresh lowers both", func(t *testing.T) {
+		t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+		const profile = "cachegen-heal-verified"
+		ctrl, rows := seedFiveCachedIssues(t, profile)
+
+		// Wave-2 answers for the type: every issue is gone.
+		ctrl.Handle(messages.EnrichmentChecked{ResourceType: "s3"})
+		healed := make([]resource.Resource, len(rows))
+		for i, r := range rows {
+			r.Findings = nil
+			healed[i] = r
+		}
+		cachegenLoadList(ctrl, healed)
+
+		badge, file := badgeAndFile(t, ctrl, profile)
+		if badge != 0 || file != 0 {
+			t.Errorf("menu s3 issue badge = %d and persisted issues = %d after a verified refresh of healed rows, want 0 and 0", badge, file)
+		}
+	})
+
+	t.Run("an unverified refresh moves neither", func(t *testing.T) {
+		t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+		const profile = "cachegen-heal-unverified"
+		ctrl, rows := seedFiveCachedIssues(t, profile)
+
+		// No Wave-2 result this session. Four of the five buckets are gone
+		// and the survivor comes back on its own, so the rows carry nothing
+		// to say about the four issues Wave-2 found last session.
+		survivor := rows[:1]
+		survivor[0].Findings = nil
+		cachegenLoadList(ctrl, survivor)
+
+		badge, file := badgeAndFile(t, ctrl, profile)
+		if badge != file {
+			t.Errorf("menu s3 issue badge = %d but the file it just wrote holds %d — one observation, two answers: a restart would change the badge with nothing having answered for it", badge, file)
+		}
+		if badge != 5 {
+			t.Errorf("menu s3 issue badge = %d after an unverified refresh, want 5 — an observation that cannot prove an issue is gone lowers neither surface", badge)
+		}
+	})
+}
