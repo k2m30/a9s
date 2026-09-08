@@ -407,7 +407,18 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 // MUST already hold c.mu — SaveColumnsForType runs under the caller's write
 // lock, and Go's RWMutex is not reentrant.
 func (c *Controller) resolveColumnsLocked(typeName string) []ColumnDef {
-	return resolveListColumnsForBuild(c.viewConfig, typeName, c.typeDefForLocked(typeName))
+	_, columns := c.listColumnsAndTypeLocked(typeName)
+	return columns
+}
+
+// listColumnsAndTypeLocked resolves a screen's typeDef and its column set
+// together, because they are one answer: the columns come FROM the typeDef.
+// Resolving them apart is how a screen renders one type's columns and filters
+// with another's — the shape row 39 removed at the typeDef and this removes at
+// the column set. Callers MUST already hold c.mu.
+func (c *Controller) listColumnsAndTypeLocked(typeName string) (*resource.ResourceTypeDef, []ColumnDef) {
+	td := c.typeDefForLocked(typeName)
+	return td, resolveListColumnsForBuild(c.viewConfig, typeName, td)
 }
 
 // typeDefForLocked resolves the typeDef behind a short name: a registered

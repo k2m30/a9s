@@ -44,8 +44,9 @@ func TestQueuedSave_ForAnEarlierVisitToTheSamePair(t *testing.T) {
 	s.RowStore.Observe("ec2", wipfixSaveLaneRows(40),
 		&domain.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	firstGen, _ := s.RowStore.SnapshotMeta("ec2")
-	if err := b.core.SaveTypeRows(firstVisit, firstGen, "ec2", wipfixSaveLaneRows(40), 40, true,
-		0, false, false, false); err != nil {
+	if err := b.core.SaveTypeRows(
+		runtime.SaveTarget{Pair: firstVisit, ObsGen: firstGen, Type: "ec2", ExactPopulation: true},
+		runtime.SaveContent{Resources: wipfixSaveLaneRows(40), Count: 40}); err != nil {
 		t.Fatalf("A's own save: %v", err)
 	}
 	b.c.WaitForCacheWrites()
@@ -61,8 +62,9 @@ func TestQueuedSave_ForAnEarlierVisitToTheSamePair(t *testing.T) {
 
 	// The save prepared while B was current finally runs, carrying the rows it
 	// froze there and the pair it was prepared for.
-	if err := b.core.SaveTypeRows(firstVisit, bGen, "ec2", wipfixSaveLaneRows(3), 3, true,
-		0, false, false, false); err != nil {
+	if err := b.core.SaveTypeRows(
+		runtime.SaveTarget{Pair: firstVisit, ObsGen: bGen, Type: "ec2", ExactPopulation: true},
+		runtime.SaveContent{Resources: wipfixSaveLaneRows(3), Count: 3}); err != nil {
 		t.Fatalf("the queued save returned an error rather than declining: %v", err)
 	}
 	b.c.WaitForCacheWrites()
@@ -126,8 +128,9 @@ func TestFrozenSweepSave_OlderThanTheLatestObservation(t *testing.T) {
 	s.RowStore.Observe("ec2", wipfixSaveLaneRows(90),
 		&domain.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	newGen, _ := s.RowStore.SnapshotMeta("ec2")
-	if err := b.core.SaveTypeRows(pair, newGen, "ec2", wipfixSaveLaneRows(90), 90, true,
-		0, false, false, false); err != nil {
+	if err := b.core.SaveTypeRows(
+		runtime.SaveTarget{Pair: pair, ObsGen: newGen, Type: "ec2", ExactPopulation: true},
+		runtime.SaveContent{Resources: wipfixSaveLaneRows(90), Count: 90}); err != nil {
 		t.Fatalf("foreground save: %v", err)
 	}
 	b.c.WaitForCacheWrites()

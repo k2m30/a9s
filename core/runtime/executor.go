@@ -774,7 +774,17 @@ func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources m
 		if issuesKnown {
 			issues = unifiedIssueCount(resources, *td, nil)
 		}
-		err := c.SaveTypeRows(pair, gens[shortName], shortName, resources, len(resources), exact, issues, issuesKnown, truncated, wave2Answered[shortName])
+		err := c.SaveTypeRows(
+			SaveTarget{Pair: pair, ObsGen: gens[shortName], Type: shortName, ExactPopulation: exact},
+			SaveContent{
+				Resources:          resources,
+				Count:              len(resources),
+				Issues:             issues,
+				IssuesKnown:        issuesKnown,
+				IssuesTruncated:    truncated,
+				Wave2Authoritative: wave2Answered[shortName],
+			},
+		)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}

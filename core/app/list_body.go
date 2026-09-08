@@ -291,7 +291,7 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 	if len(resources) == 0 {
 		return resources
 	}
-	columns := resolveListColumnsForBuild(c.viewConfig, typeName, c.typeDefForLocked(typeName))
+	columns := c.resolveColumnsLocked(typeName)
 	if len(columns) == 0 {
 		return resources
 	}
@@ -486,9 +486,12 @@ func (c *Controller) listVisibleLocked(ls *ListState, typeName string) []resourc
 	if !c.listBodyMemoStale(ls.bodyMemo, ls, c.fallbackRowsGenFor(ls, typeName)) {
 		return ls.bodyMemo.visible
 	}
-	td := c.typeDefForLocked(typeName)
-	visible := c.applyListFilters(ls, typeName, c.listScreenResources(ls, typeName))
-	return listSortResources(resolveListColumnsForBuild(c.viewConfig, typeName, td), td, ls, visible)
+	// One resolution for both halves, the same pairing the off-lock build uses:
+	// the filter and the sort read the columns the rows are made of.
+	td, columns := c.listColumnsAndTypeLocked(typeName)
+	visible := applyListFiltersWith(ls, td, columns, c.listEnrichmentFindings(typeName),
+		c.listScreenResources(ls, typeName))
+	return listSortResources(columns, td, ls, visible)
 }
 
 // listBodyBuild is one list body's build inputs, frozen under the controller
@@ -509,8 +512,6 @@ type listBodyBuild struct {
 	typeName        string
 	td              *resource.ResourceTypeDef
 	instance        domain.Gen
-	filterTD        *resource.ResourceTypeDef
-	filterColumns   []ColumnDef
 	columns         []ColumnDef
 	findings        map[string][]domain.Finding
 	uninspected     map[string]bool
@@ -522,24 +523,18 @@ type listBodyBuild struct {
 func (c *Controller) captureListBodyBuild(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyBuild {
 	// Build the row set from the per-screen store (Bug 1 fix: uses ls.Rows when
 	// available so two stacked same-type screens see their own independent rows).
-	filterTD := c.typeDefForLocked(typeName)
 	detached := ls.cloneForBuild(c.listScreenResources(ls, typeName))
 	return listBodyBuild{
 		ls:       &detached,
 		typeName: typeName,
 		instance: ls.instance,
 		td:       td,
-		filterTD: filterTD,
-		// The filter resolves its columns from the filter's own typeDef, the
-		// same pair the locked path uses — the text filter compares the
-		// strings the rows on screen are made of, so the two must agree about
-		// which columns those are.
-		filterColumns: resolveListColumnsForBuild(c.viewConfig, typeName, filterTD),
-		// Resolve column definitions using the already-resolved fallback td (not
-		// the catalog) for the superset first-column-title check. This ensures
-		// test typeDefs with non-standard first columns (e.g. rlTestTypeDef
-		// starts with "Instance ID" not "Name") are not silently switched to the
-		// 9-column built-in defaults.
+		// One typeDef per screen (row 39) means one column set: the cells the
+		// rows are made of, the strings the text filter compares and the
+		// column a sort names are the same list, resolved here once. Resolved
+		// from the already-resolved td rather than the catalog, so a test
+		// typeDef with non-standard first columns is not silently switched to
+		// the built-in defaults.
 		columns:         resolveListColumnsForBuild(c.viewConfig, typeName, td),
 		findings:        c.listEnrichmentFindings(typeName),
 		uninspected:     c.listUninspectedIDs(typeName),
@@ -553,7 +548,7 @@ func (c *Controller) captureListBodyBuild(ls *ListState, typeName string, td *re
 // touches no controller state and holds no lock.
 func (b listBodyBuild) run() listBodyMemo {
 	// Apply filters (relatedIDSet -> text -> attention).
-	visible := applyListFiltersWith(b.ls, b.filterTD, b.filterColumns, b.findings, b.ls.Rows)
+	visible := applyListFiltersWith(b.ls, b.td, b.columns, b.findings, b.ls.Rows)
 
 	// Sort over the same resolved set the cells come from, so a user-configured
 	// sort_key column resolves correctly and the

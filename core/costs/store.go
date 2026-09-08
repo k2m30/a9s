@@ -180,7 +180,11 @@ type Store struct {
 
 // Revision returns the number of mutations applied to s since it was
 // loaded. Monotonically increasing within a Store's lifetime.
-func (s *Store) Revision() int { return s.revision }
+func (s *Store) Revision() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.revision
+}
 
 // CachePath returns the on-disk cache file path for one profile's cost
 // data: <cache root>/<profile>--costs.yaml. Cost data is account-scoped,
@@ -275,6 +279,8 @@ func periodKey(p Period) string { return p.Start + "/" + p.End }
 // tile the window period with no gap and no stale open sub-period before
 // treating it as found.
 func (s *Store) Lookup(q Query, window []Period, now time.Time) (records []Record, missing []Period) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	entry := s.data.Queries[q.CacheKey()]
 	for _, w := range window {
 		recs, _, ok := lookupPeriod(entry, w, now)
@@ -293,6 +299,8 @@ func (s *Store) Lookup(q Query, window []Period, now time.Time) (records []Recor
 // tiling Lookup uses, so the two can never disagree about which buckets are
 // answering for a display period.
 func (s *Store) Partial(q Query, window []Period, now time.Time) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	entry := s.data.Queries[q.CacheKey()]
 	for _, w := range window {
 		if _, truncated, ok := lookupPeriod(entry, w, now); ok && truncated {
@@ -508,11 +516,16 @@ func (s *Store) ExpireOpenPeriod(q Query, window []Period, now time.Time) {
 
 // Attrs returns the cached DimensionValueAttributes map (id -> display
 // name), e.g. linked-account id -> account name.
+//
+// A copy, not the live map: MergeAttrs copies INTO the stored one, so handing
+// a caller the map itself would have it reading entries another fetch is
+// writing, after this method's lock is long gone.
 func (s *Store) Attrs() map[string]string {
-	if s.data.Attrs == nil {
-		return map[string]string{}
-	}
-	return s.data.Attrs
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[string]string, len(s.data.Attrs))
+	maps.Copy(out, s.data.Attrs)
+	return out
 }
 
 // MergeAttrs merges newly fetched attrs into the cached map.
@@ -535,6 +548,8 @@ func (s *Store) MergeAttrs(attrs map[string]string) {
 // happened yet" rule ApplyCostsLoaded's per-delivery tracking used to apply
 // per-record; this derives the identical result from the store instead.
 func (s *Store) DataThrough(q Query, now time.Time) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	entry := s.data.Queries[q.CacheKey()]
 	nowDate := utcDate(now)
 	var through string
@@ -567,6 +582,19 @@ func (s *Store) DataThrough(q Query, now time.Time) string {
 // was originally scoped to. AnomaliesCoverage is the range-aware freshness
 // check PlanFetch needs instead.
 func (s *Store) Anomalies(now time.Time) (marks []AnomalyMark, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.anomaliesLocked(now)
+}
+
+// anomaliesLocked is Anomalies' body, for the readers that already hold the
+// lock. The three anomaly readers call down into one another, and each taking
+// the lock for itself would deadlock the second one. Callers hold s.mu.
+//
+// The Marks slice is returned by header: every writer REPLACES the whole
+// bucket rather than appending to a stored slice, so a header copied under the
+// lock stays a stable view of what it pointed at.
+func (s *Store) anomaliesLocked(now time.Time) (marks []AnomalyMark, ok bool) {
 	if s.data.Anomalies == nil {
 		return nil, false
 	}
@@ -583,7 +611,14 @@ func (s *Store) Anomalies(now time.Time) (marks []AnomalyMark, ok bool) {
 // materially wider request (e.g. a multi-year zoom-out) just because its
 // TTL clock hasn't expired yet.
 func (s *Store) AnomaliesCoverage(window []Period, now time.Time) (marks []AnomalyMark, ok bool) {
-	marks, ok = s.Anomalies(now)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.anomaliesCoverageLocked(window, now)
+}
+
+// anomaliesCoverageLocked is AnomaliesCoverage's body. Callers hold s.mu.
+func (s *Store) anomaliesCoverageLocked(window []Period, now time.Time) (marks []AnomalyMark, ok bool) {
+	marks, ok = s.anomaliesLocked(now)
 	if !ok {
 		return marks, ok
 	}
@@ -638,7 +673,9 @@ func (s *Store) putPartialAnomalies(marks []AnomalyMark, now time.Time, covered 
 // marks at all for the years it never looked at — while a capped walk that DID
 // cover them is sitting unused. Freshness alone cannot tell those apart.
 func (s *Store) AnomalyOverlay(window []Period, now time.Time) (marks []AnomalyMark, partial bool) {
-	if marks, ok := s.AnomaliesCoverage(window, now); ok {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if marks, ok := s.anomaliesCoverageLocked(window, now); ok {
 		return marks, false
 	}
 	if s.partialAnomalies == nil || now.Sub(s.partialAnomalies.FetchedAt) >= anomalyTTL ||

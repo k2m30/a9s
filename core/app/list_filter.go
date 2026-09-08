@@ -31,9 +31,8 @@ func relatedIDSubset(ls *ListState, base []resource.Resource) []resource.Resourc
 }
 
 func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
-	td := c.typeDefForLocked(typeName)
-	return applyListFiltersWith(ls, td, resolveListColumnsForBuild(c.viewConfig, typeName, td),
-		c.listEnrichmentFindings(typeName), base)
+	td, columns := c.listColumnsAndTypeLocked(typeName)
+	return applyListFiltersWith(ls, td, columns, c.listEnrichmentFindings(typeName), base)
 }
 
 // applyListFiltersWith is applyListFilters with its controller reads hoisted

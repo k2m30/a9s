@@ -70,6 +70,22 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		policyRows, policyPublic, policyErr := lambdaPolicyExposure(ctx, api, r.ID, ownAccount)
 		urlRows, urlPublic, urlErr := lambdaFunctionURLExposure(ctx, api, r.ID)
 
+		// One of the two may have answered the absent-resource code, which
+		// means either "no policy / no URL config" (healthy) or "the function
+		// is gone" (a race). Only GetFunction can tell them apart, and it is a
+		// network round trip: it runs HERE, on this row's own goroutine, not
+		// under the mutex below. That mutex exists to record results into one
+		// map; holding it across a call makes every other function in the
+		// batch wait on this one's round trip, and the parallel workers fill
+		// with goroutines blocked on it, so rows further down are never asked
+		// about at all.
+		realErr := lambdaRealErr(policyErr, urlErr)
+		var absent bool
+		var verifyErr error
+		if realErr == nil && (policyErr != nil || urlErr != nil) {
+			absent, verifyErr = lambdaFunctionAbsent(ctx, api, r.ID)
+		}
+
 		mu.Lock()
 		defer mu.Unlock()
 		if policyPublic {
@@ -80,27 +96,19 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
 
 		}
-		realErr := lambdaRealErr(policyErr, urlErr)
 		switch {
 		case realErr != nil:
 			MarkSkipped(&result, r.ID, &failures, realErr)
-		case policyErr != nil || urlErr != nil:
-			// One of the two answered the absent-resource code, which means
-			// either "no policy / no URL config" (healthy) or "the function is
-			// gone" (a race). Only GetFunction can tell them apart.
-			absent, verifyErr := lambdaFunctionAbsent(ctx, api, r.ID)
-			switch {
-			case verifyErr != nil:
-				// The question was not settled. Nothing about this function's
-				// posture was established, so the row is uninspected — reading
-				// a failed verification as "still there" reports it clean on
-				// the strength of a call that never succeeded.
-				MarkSkipped(&result, r.ID, &failures, verifyErr)
-			case absent:
-				// Gone between the list call and this one: a race, not a
-				// failure to log, and nothing was inspected either.
-				result.TruncatedIDs[r.ID] = true
-			}
+		case verifyErr != nil:
+			// The question was not settled. Nothing about this function's
+			// posture was established, so the row is uninspected — reading a
+			// failed verification as "still there" reports it clean on the
+			// strength of a call that never succeeded.
+			MarkSkipped(&result, r.ID, &failures, verifyErr)
+		case absent:
+			// Gone between the list call and this one: a race, not a failure
+			// to log, and nothing was inspected either.
+			result.TruncatedIDs[r.ID] = true
 		}
 	})
 

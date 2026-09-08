@@ -654,7 +654,11 @@ func saveFieldKey(col config.ListColumn, fields map[string]string, lifecycleKey 
 // SaveCachePayload.Wave2Answered set — never through this exported entry
 // point.
 func (c *Core) SaveResourceListCache(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
-	return c.saveResourceListCache(pair, 0, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
+	return c.saveResourceListCache(
+		SaveTarget{Pair: pair, Type: shortName, ExactPopulation: exact},
+		rows,
+		SaveContent{Count: count, Issues: issues, IssuesKnown: issuesKnown, IssuesTruncated: issuesTruncated},
+	)
 }
 
 // SaveTypeRows is the single per-type save chokepoint (task #17 wave 1 stage
@@ -673,8 +677,8 @@ func (c *Core) SaveResourceListCache(pair session.Pair, shortName string, rows [
 // snapshot) and must keep computing issues/issuesKnown/issuesTruncated
 // themselves; unifying that computation here would silently change either
 // lane's counted total.
-func (c *Core) SaveTypeRows(pair session.Pair, obsGen domain.Gen, shortName string, resources []resource.Resource, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
-	materialized := c.materializeListFieldsForSave(shortName, resources)
+func (c *Core) SaveTypeRows(target SaveTarget, content SaveContent) error {
+	materialized := c.materializeListFieldsForSave(target.Type, content.Resources)
 	rows := make([]cache.Row, len(materialized))
 	for i, r := range materialized {
 		rows[i] = cache.Row{
@@ -684,10 +688,37 @@ func (c *Core) SaveTypeRows(pair session.Pair, obsGen domain.Gen, shortName stri
 			Findings: r.Findings,
 		}
 	}
-	if wave2Authoritative {
-		return c.saveResourceListCache(pair, obsGen, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
-	}
-	return c.saveResourceListCache(pair, obsGen, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
+	return c.saveResourceListCache(target, rows, content)
+}
+
+// SaveTarget names WHICH save this is. Every field is read before a byte is
+// written: the visit it was frozen in and the observation its rows came from
+// decide whether it may write at all (session.Pair.Gen,
+// session.AcceptTypeSave), the type says which file, and exactness says
+// whether the count it carries may be recorded as the type's confirmed
+// population. None of it is content.
+type SaveTarget struct {
+	Pair   session.Pair
+	ObsGen domain.Gen
+	Type   string
+	// ExactPopulation says the count this save carries IS the type's whole
+	// population, not a lower bound. It is the caller's own observation, not a
+	// derivation: what the FILE ends up recording is decided in one place
+	// (incomingTypeFile, reconcileTypeFile), from this and what is already
+	// stored.
+	ExactPopulation bool
+}
+
+// SaveContent is what the save records. The two lanes that write a type file
+// aggregate the issue tally from different inputs and each keeps computing its
+// own — unifying that here would silently change one lane's counted total.
+type SaveContent struct {
+	Resources          []resource.Resource
+	Count              int
+	Issues             int
+	IssuesKnown        bool
+	IssuesTruncated    bool
+	Wave2Authoritative bool
 }
 
 // obsGen is the row-store observation generation the rows were frozen at.
@@ -695,35 +726,35 @@ func (c *Core) SaveTypeRows(pair session.Pair, obsGen domain.Gen, shortName stri
 // write these files from snapshots frozen at different moments and nothing
 // orders them, so without this a sweep's frozen 100 rows land on top of the 90
 // a later foreground observation already recorded (session.AcceptTypeSave).
-func (c *Core) saveResourceListCache(pair session.Pair, obsGen domain.Gen, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
+func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, content SaveContent) error {
 	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
 	// canonShortName lookup always agree on the stored key — an
 	// uncanonicalized Put here would silently miss the depth lookup for
 	// every alias caller.
-	canon := resource.CanonicalShortName(shortName)
-	if !c.session.AcceptTypeSave(canon, obsGen) {
+	canon := resource.CanonicalShortName(target.Type)
+	if !c.session.AcceptTypeSave(canon, target.ObsGen) {
 		return nil
 	}
 	if rows == nil {
 		rows = []cache.Row{}
 	}
-	return c.WithCacheStoreSave(pair, func(store *cache.Store) ([]cache.WritePlan, error) {
+	return c.WithCacheStoreSave(target.Pair, func(store *cache.Store) ([]cache.WritePlan, error) {
 		if store == nil {
 			return nil, nil
 		}
 		existing, _ := store.Type(canon)
 		incoming := incomingTypeFile(existing, saveObservation{
-			Count:     count,
-			Truncated: !exact,
+			Count:     content.Count,
+			Truncated: !target.ExactPopulation,
 		})
 		incoming.Rows = rows
 		tf := reconcileTypeFile(existing, reconcileInput{
 			Incoming:           incoming,
 			RowsProvided:       true,
-			RawTruncated:       !exact,
-			RawCount:           count,
+			RawTruncated:       !target.ExactPopulation,
+			RawCount:           content.Count,
 			ShortName:          canon,
-			Wave2Authoritative: wave2Authoritative,
+			Wave2Authoritative: content.Wave2Authoritative,
 		})
 		// #463: FirstSeen diff runs unconditionally, after reconcileTypeFile
 		// (including any Wave-2 carry it performed), against the pre-save
@@ -741,15 +772,15 @@ func (c *Core) saveResourceListCache(pair session.Pair, obsGen domain.Gen, short
 		// old-vs-new diff), so the two saves' newPairs sets are disjoint.
 		var newPairs map[domain.FindingCode]int
 		tf.Rows, newPairs = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
-		if wave2Authoritative {
+		if content.Wave2Authoritative {
 			c.session.MergeNewFindingPairs(canon, newPairs)
 		} else {
 			c.session.SetNewFindingPairs(canon, newPairs)
 		}
-		if issuesKnown {
-			tf.Issues = issues
+		if content.IssuesKnown {
+			tf.Issues = content.Issues
 			tf.IssuesKnown = true
-			tf.IssuesTruncated = issuesTruncated
+			tf.IssuesTruncated = content.IssuesTruncated
 		} else {
 			tf.Issues = existing.Issues
 			tf.IssuesKnown = existing.IssuesKnown

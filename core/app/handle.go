@@ -564,8 +564,16 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	// next key or a web snapshot behind this save. The frozen pair is what
 	// lets the write still be rejected if the operator switches profile
 	// before it lands.
+	target := runtime.SaveTarget{Pair: pair, ObsGen: obsGen, Type: canon, ExactPopulation: exact}
+	content := runtime.SaveContent{
+		Resources:       rows,
+		Count:           len(rows),
+		Issues:          issues,
+		IssuesKnown:     issuesKnown,
+		IssuesTruncated: truncated,
+	}
 	c.stageCacheWrite(cacheWrite{run: func() {
-		_ = c.core.SaveTypeRows(pair, obsGen, canon, rows, len(rows), exact, issues, issuesKnown, truncated, false)
+		_ = c.core.SaveTypeRows(target, content)
 	}})
 }
 
