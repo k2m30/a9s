@@ -38,6 +38,7 @@ func PadOrTrunc(s string, w int) string {
 	// it slides left. ESC is the exception — it opens the styling sequences
 	// the measure already reads.
 	if strings.ContainsFunc(s, unpaintable) {
+		s = strings.ReplaceAll(s, "\r\n", "\n")
 		s = strings.Map(func(r rune) rune {
 			if unpaintable(r) {
 				return ' '
