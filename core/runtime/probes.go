@@ -90,11 +90,13 @@ type DemoPrefetchResult struct {
 // does not have to wait on a live connection (C1: cached data renders
 // before any AWS activity). This mirrors the resolution
 // handleClientsReadySuccess performs post-connect. The resolved region is
-// resolved region is stamped onto the session (Session.ResolvePair) rather
+// stamped onto the session (Session.ResolvePair) rather
 // than kept local to this call: it is the pair every answer this lane
 // produces will be stamped with, so the C9 guard that compares the two needs
 // the session to already carry it. Connect still resolves the same region
-// from the same config and finds the pair already filled.
+// from the same config and finds the pair already filled. The stamp precedes
+// the NoCache short circuit so a no-cache session carries the same resolved
+// pair a cached one does; nothing else is read or written there.
 //
 // This method is itself dispatched as a tea.Cmd (background goroutine), so
 // its own Profile/Region read goes through the pairMu-guarded CurrentPair/

@@ -5,7 +5,7 @@
 // LoadDir(profile, region) captures the resulting dir into a *cache.Store —
 // but that Store is built lazily, inside
 // Session.ensureCacheStoreLocked (core/session/session.go), on the FIRST
-// WithCacheStore/EnsureCacheStore call, not at session.New() time. A
+// EnsureCacheStore call, not at session.New() time. A
 // background availability-save goroutine belonging to an earlier, never-Closed
 // Controller performs its first save after a LATER test has re-pointed
 // A9S_CONFIG_FOLDER at its own t.TempDir() — the leaked writer's first
@@ -71,7 +71,7 @@ func TestSessionCacheRoot_PinnedAtConstruction_EnvChangeAfterNewDoesNotRedirectW
 	if _, statErr := os.Stat(wantPath); statErr != nil {
 		t.Errorf("expected cache write pinned to construction-time root %s, but %s is missing: %v "+
 			"(cache root must be captured once at Session construction, not re-read from "+
-			"A9S_CONFIG_FOLDER on first WithCacheStore/EnsureCacheStore call)", dirA, wantPath, statErr)
+			"A9S_CONFIG_FOLDER on first EnsureCacheStore call)", dirA, wantPath, statErr)
 	}
 
 	dirBCacheRoot := filepath.Join(dirB, "cache")

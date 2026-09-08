@@ -638,11 +638,9 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 7 — concurrency safety net for the pairMu critical-section-narrowing
-// fix (WithCacheStore currently holds Session.pairMu for SaveAvailabilityCache's
-// entire per-type deepCopyRows+yaml.Marshal+MkdirAll+temp-write+rename
-// sequence; the fix will snapshot/copy/marshal under the lock and do the
-// file write+rename outside it — see Session.WithCacheStore's doc comment).
+// Test 7 — concurrency safety net for the narrowed pairMu critical section:
+// WithCacheStoreSave snapshots, copies and marshals under the lock and does
+// the file write+rename outside it (see its doc comment).
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock is a
@@ -706,7 +704,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 	}()
 
 	// Concurrent readers hammer the same pairMu-guarded read surface the
-	// save's WithCacheStore contends with (Core.FindingFirstSeenForType ->
+	// save's WithCacheStoreSave contends with (Core.FindingFirstSeenForType ->
 	// Session.ReadCacheStore -> pairMu), for as long as the save is in
 	// flight, then a little past it.
 	const readerGoroutines = 8

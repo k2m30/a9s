@@ -456,8 +456,8 @@ func New() *Session {
 // caller on any goroutine observes a consistent snapshot rather than reading
 // the two fields separately (which could race a concurrent SetProfileRegion
 // writing one and not yet the other). Callers needing the pair together with
-// a CacheStore decision (EnsureCacheStore/WithCacheStore/WithCacheStoreSave/
-// ReadCacheStore) read it from inside their own pairMu-held critical section instead of calling
+// a CacheStore decision (EnsureCacheStore/WithCacheStoreSave/ReadCacheStore)
+// read it from inside their own pairMu-held critical section instead of calling
 // this method, to avoid a lock-release-then-reacquire window between the
 // pair read and the store decision.
 func (s *Session) CurrentPair() (profile, region string) {
@@ -483,7 +483,7 @@ func (s *Session) CurrentPairValue() Pair {
 // SetProfileRegion sets the live Profile/Region pair while holding pairMu.
 // Every write to Session.Profile/Session.Region MUST go through this method
 // (never a direct field assignment) so a concurrent EnsureCacheStore/
-// WithCacheStore/WithCacheStoreSave/ReadCacheStore call on another goroutine
+// WithCacheStoreSave/ReadCacheStore call on another goroutine
 // can never observe a torn or half-written pair, and never races the write itself (see pairMu's
 // doc comment for the CI-caught race this closes).
 func (s *Session) SetProfileRegion(profile, region string) {
@@ -587,9 +587,8 @@ func (s *Session) ResolvePair(profile, region string) {
 	}
 }
 
-// ensureCacheStoreLocked is EnsureCacheStore's
-// shared body, factored out so WithCacheStore/WithCacheStoreSave/
-// ReadCacheStore can also reuse it inside their own already-held pairMu
+// ensureCacheStoreLocked is EnsureCacheStore's shared body, factored out so
+// WithCacheStoreSave/ReadCacheStore can also reuse it inside their own already-held pairMu
 // critical section without a reentrant Lock call (sync.Mutex is not
 // reentrant).
 func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
@@ -648,7 +647,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // matches the session's, fn is not called at all: one account's rows must
 // never land in another's directory (C9).
 //
-// fn must not call back into WithCacheStore/WithCacheStoreSave/
+// fn must not call back into WithCacheStoreSave/
 // EnsureCacheStore/CurrentPair/SetProfileRegion (Session's mutex is not
 // reentrant) and must do no blocking I/O at all — that is the point of
 // returning WritePlans instead of writing inline. Always calls fn (never
@@ -684,11 +683,11 @@ func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]c
 // ReadCacheStore runs fn against the current Profile/Region pair's
 // *cache.Store while holding pairMu, for callers that only read
 // (store.Type/store.Types) and never Put/PrepareSave/SaveType. Pairs with
-// WithCacheStore/WithCacheStoreSave (the store-lock serialization, D13): a
+// WithCacheStoreSave (the store-lock serialization, D13): a
 // reader that bypassed the lock (the shape every read call site once had)
 // could observe cache.Store's internal map mid-write from a concurrent
-// WithCacheStore/WithCacheStoreSave call's fn (the in-memory store.Put half,
-// which always runs under pairMu even for WithCacheStoreSave) — a data race
+// WithCacheStoreSave call's fn (the in-memory store.Put half, which always
+// runs under pairMu) — a data race
 // on the map itself, independent of the logical Count/Rows consistency
 // those callers already guard. Same nil-store-to-fn contract as both.
 func (s *Session) ReadCacheStore(fn func(store *cache.Store) error) error {
