@@ -57,7 +57,6 @@ var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	GetParentRetention: dbcParentRetention,
 	ParentRowLabel:     "Source Cluster",
 	RetentionEnabled:   true,
-	ShortName:          "dbc-snap",
 	OrphanCode:         dbcSnapOrphanCode,
 	PastRetentionCode:  dbcSnapPastRetentionCode,
 	PublicAttr:         dbcSnapShareAttributes,

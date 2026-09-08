@@ -88,9 +88,6 @@ type SnapshotCrossRefConfig struct {
 	// retention rule fires (e.g. "dbi-snap.past-retention"). Required when
 	// RetentionEnabled is true.
 	PastRetentionCode domain.FindingCode
-	// ShortName is the resource short name used to stamp the Source field
-	// ("wave2:<short>") on every emitted Finding. Required.
-	ShortName string
 
 	// PublicAttr, when non-nil, reads one snapshot's share attributes from
 	// AWS so the helper can report a snapshot shared with every account.

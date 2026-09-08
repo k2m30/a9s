@@ -112,6 +112,5 @@ var ebsSnapOrphanCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	},
 	ParentRowLabel:   "Source Volume",
 	RetentionEnabled: false,
-	ShortName:        "ebs-snap",
 	OrphanCode:       CodeEBSSnapOrphan,
 })
