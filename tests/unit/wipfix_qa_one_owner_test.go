@@ -647,3 +647,23 @@ func TestOneOwner_IncomingExactnessIsDerivedOnce(t *testing.T) {
 		}
 	}
 }
+
+// TestOneOwner_OneTypeDefResolverPerScreen pins row 39's shape. The build
+// resolves the display typeDef and the filter typeDef through two functions
+// that differ in one rung, so a screen can render columns from one typeDef
+// and filter with another.
+func TestOneOwner_OneTypeDefResolverPerScreen(t *testing.T) {
+	src := wipfixReadRepoFile(t, "core/app/list_columns.go") +
+		wipfixReadRepoFile(t, "core/app/list_filter.go")
+	var declared []string
+	for _, name := range []string{"typeDefForLocked", "filterTypeDefLocked"} {
+		if strings.Contains(src, "func (c *Controller) "+name+"(") {
+			declared = append(declared, name)
+		}
+	}
+	if len(declared) > 1 {
+		t.Errorf("a screen's typeDef is resolved by %d functions (%s) — the display columns and "+
+			"the filter columns come from whichever the caller happened to reach",
+			len(declared), strings.Join(declared, ", "))
+	}
+}
