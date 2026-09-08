@@ -56,6 +56,17 @@ func (c *Controller) buildDetailBody(ds *DetailState) *DetailBody {
 		fc = 0
 	}
 
+	// Record which Attention line the cursor is on, if any. This build is the
+	// layout the operator sees, so it is the only honest place to take that
+	// identity from — see DetailState.CursorAttentionKey. The section header
+	// is recorded too, under the line that counts the findings: that string
+	// changes whenever the count does, so a cursor there finds no match and
+	// lands back on the header, which is where it was.
+	ds.CursorAttentionKey = ""
+	if fc < len(items) && items[fc].Path == "Attention" {
+		ds.CursorAttentionKey = items[fc].Key
+	}
+
 	// Clamp RelatedCursor.
 	rc := ds.RelatedCursor
 	if len(related) > 0 && rc >= len(related) {

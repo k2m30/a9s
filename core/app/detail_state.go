@@ -375,8 +375,12 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	oldPrepend := ds.AttentionPrepend
 	// The entry the cursor is reading, named rather than numbered: the block is
 	// about to be rebuilt and a more severe finding sorts above the ones
-	// already there, so the index moves even though the entry does not.
-	oldCursorKey := c.attentionEntryKeyAt(ds, ds.FieldCursor, oldPrepend)
+	// already there, so the index moves even though the entry does not. The
+	// name was recorded from the body the operator is looking at, so it holds
+	// on every path that rebuilds the block — including the sweep's, where the
+	// session truncated-ID set has already moved and no reconstruction of the
+	// old block can be trusted.
+	oldCursorKey := ds.CursorAttentionKey
 
 	// Strip prior wave-2 findings: a second result for this resource replaces
 	// the first rather than accumulating beside it.
@@ -413,11 +417,11 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 
 	// Keep the cursor on what the operator was reading:
 	//
-	//   1. If cursor was inside the old attention block (< oldPrepend): follow
-	//      the entry it was on to wherever the rebuild put it, and land on the
-	//      section header only when that entry is gone.
-	//   2. If cursor was in content (>= oldPrepend): shift by delta, but only when
-	//      content items actually exist after injection — mirrors the empty-resource
+	//   1. On an Attention entry (the last build recorded its name): follow that
+	//      entry to wherever the rebuild put it, and land on the section header
+	//      only when the entry is gone.
+	//   2. On a content field: shift by the change in the block's size, but only
+	//      when content items actually exist after injection — the empty-resource
 	//      case, a resource with no content fields at all.
 	// Building the new layout is what re-records ds.AttentionPrepend, so this
 	// one build supplies both the new prepend size and the new item total.
@@ -425,13 +429,13 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	newTotalItems := len(newItems)
 	newPrepend := ds.AttentionPrepend
 	switch {
-	case ds.FieldCursor < oldPrepend:
+	case oldCursorKey != "":
 		// Inside the block, whether or not the block changed length: a finding
 		// that outranks the ones already there sorts above them and moves every
 		// entry below it down, at a length the block can arrive at two ways.
 		ds.FieldCursor = 0
 		for i := 0; i < newPrepend && i < newTotalItems; i++ {
-			if oldCursorKey != "" && newItems[i].Key == oldCursorKey {
+			if newItems[i].Key == oldCursorKey {
 				ds.FieldCursor = i
 				break
 			}
@@ -444,26 +448,6 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 			ds.FieldCursor = adjusted
 		}
 	}
-}
-
-// attentionEntryKeyAt names the Attention item at cursor in the block whose
-// size the last build recorded as prepend, or "" when the cursor is outside
-// that block or the block cannot be reproduced. Reproducing it means building
-// it again from the state the cursor was positioned against; a rebuild of a
-// different size is a block the operator never saw, and it is not used.
-// Callers must hold c.mu (write) — the rebuild writes ds.AttentionPrepend,
-// which is restored here.
-func (c *Controller) attentionEntryKeyAt(ds *DetailState, cursor, prepend int) string {
-	if cursor <= 0 || cursor >= prepend {
-		return ""
-	}
-	saved := ds.AttentionPrepend
-	block := injectAttentionSectionDetail(nil, ds, resource.FindResourceType(ds.ResourceType), c.detailNotInspected(ds))
-	ds.AttentionPrepend = saved
-	if len(block) != prepend {
-		return ""
-	}
-	return block[cursor].Key
 }
 
 // ApplyDetailRelated replaces the RelatedRows slice on the top detail screen's

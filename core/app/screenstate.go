@@ -189,6 +189,15 @@ type DetailState struct {
 	// a layout that was never on screen. Not serialised: it is a record of what
 	// the builder emitted, not state a client supplies.
 	AttentionPrepend int `json:"-"`
+	// CursorAttentionKey names the Attention entry the cursor was on in the
+	// LAST built body, or "" when it was anywhere else. Written by
+	// buildDetailBody, which is the one place the layout the operator is
+	// looking at is produced, so it is an identity recorded from what was on
+	// screen rather than one reconstructed later from state that has since
+	// moved. applyFindingToState reads it to put the cursor back on the same
+	// entry after a rebuild reorders the block. Not serialised, for the same
+	// reason as AttentionPrepend.
+	CursorAttentionKey string `json:"-"`
 }
 
 // DetailRelatedRow is one row in the detail screen's related panel, mirroring

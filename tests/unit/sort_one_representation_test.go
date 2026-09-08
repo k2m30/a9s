@@ -23,6 +23,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -83,6 +84,21 @@ func TestSort_TheSameColumnOrdersTheSameWarmOrLive(t *testing.T) {
 	}
 	replay := make([]resource.Resource, len(tf.Rows))
 	for i, r := range tf.Rows {
+		// A warm row that reached the sort without the key its path-only column
+		// is read back under would render blank and tie with every other such
+		// row — the one way the two frames could still disagree once the
+		// comparator reads the cell alone. The save writes
+		// config.TitleFieldKey and the render cascade reads
+		// config.TitleFieldKeys, of which that is the second spelling, so the
+		// key cannot be missing for a column whose live cell had a value; this
+		// asserts it on the row rather than on the two helpers. The
+		// registry-wide form is TestCols_CacheReplayRendersTheSameCellsAsTheLiveFetch
+		// (replay_cache_round_trip_test.go), which requires every cell of every
+		// registered type to survive the round trip.
+		if got := r.Fields[config.TitleFieldKey("Launch Time")]; got == "" {
+			t.Errorf("row %s reached the warm frame with no value under %q — the sort would read a blank cell for a column the live frame renders; persisted fields: %v",
+				r.ID, config.TitleFieldKey("Launch Time"), r.Fields)
+		}
 		replay[i] = resource.Resource{ID: r.ID, Name: r.Name, Type: "ec2", Fields: r.Fields, Findings: r.Findings}
 	}
 

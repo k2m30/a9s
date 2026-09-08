@@ -220,23 +220,13 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo
 	}
 }
 
-// TestApplyDetailFinding_CursorFollowsItsAttentionEntry pins the third case of
-// the same class, from the other side of the block: a cursor INSIDE the
-// Attention block used to be sent back to the section header whenever the
-// block changed, so an operator reading the second finding lost their place
-// the moment an enrichment result arrived. The entry the cursor is on is the
-// thing to keep, and it is still there — it has only moved down to make room
-// for a more severe one.
-func TestApplyDetailFinding_CursorFollowsItsAttentionEntry(t *testing.T) {
-	const secondPhrase = "public ingress on port 22 from 0.0.0.0/0"
-	res := resource.Resource{
-		ID:   "i-0bbb222222222222b",
-		Name: "batch-runner",
-		Type: "ec2",
-		Fields: map[string]string{
-			"instance_id": "i-0bbb222222222222b",
-			"state":       "running",
-		},
+// wave1TwoWarnings is a row whose Attention block already has two entries
+// before any enrichment runs, so a Wave-2 result rebuilds a block the cursor
+// is sitting inside rather than creating one.
+func wave1TwoWarnings(id, secondPhrase string) resource.Resource {
+	return resource.Resource{
+		ID: id, Name: "batch-runner", Type: "ec2",
+		Fields: map[string]string{"instance_id": id, "name": "batch-runner", "state": "running"},
 		Findings: []domain.Finding{
 			{
 				Code:     "ec2.long-stopped",
@@ -254,34 +244,91 @@ func TestApplyDetailFinding_CursorFollowsItsAttentionEntry(t *testing.T) {
 			},
 		},
 	}
+}
 
-	c := newAttentionCursorController(t, res, "ec2")
+// openDetailWithSweptRow opens a detail on row through the same seams the
+// sweep and the navigation use, at a real viewport size — the Wave-2 result
+// below is delivered as the runtime event, so every input the relocation
+// reads has to be the one the running app produces.
+func openDetailWithSweptRow(t *testing.T, row resource.Resource) (*app.Controller, *runtime.Core) {
+	t.Helper()
+	c, core := newTestControllerAndCore(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	c.ApplyResourcesLoaded("ec2", []resource.Resource{row}, nil, false)
+	core.ObserveRows("ec2", []resource.Resource{row}, nil, session.OriginFetch, false)
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenDetail,
+		Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: row.ID},
+	}})
+	c.EnsureDetailState(row, "ec2")
+	c.SetDetailViewportHeight(40)
+	c.SetDetailViewportWidth(80)
+	return c, core
+}
 
-	// Walk the cursor down onto the second Attention entry's own line.
-	preCursor := -1
+// seekAttentionEntry walks the cursor down until it lands on the Attention
+// entry whose line reads phrase, and returns the index it stopped at.
+func seekAttentionEntry(t *testing.T, c *app.Controller, phrase string) int {
+	t.Helper()
+	c.Apply(app.Action{Kind: app.ActionMoveTop})
 	for step := 0; step < 40; step++ {
 		body := c.Snapshot().Body.Detail
 		if body == nil {
 			t.Fatal("precondition: Body.Detail is nil")
 		}
-		if row := fieldRowAt(t, body, body.FieldCursor); row.Path == "Attention" && row.Key == secondPhrase {
-			preCursor = body.FieldCursor
-			break
+		if row := fieldRowAt(t, body, body.FieldCursor); row.Path == "Attention" && row.Key == phrase {
+			return body.FieldCursor
 		}
 		c.Apply(app.Action{Kind: app.ActionMoveDown})
 	}
-	if preCursor < 0 {
-		t.Fatalf("precondition: never reached the second Attention entry %q with the cursor", secondPhrase)
+	t.Fatalf("precondition: never reached the Attention entry %q with the cursor", phrase)
+	return -1
+}
+
+// deliverEnrichment applies one Wave-2 sweep result for row through the
+// runtime event path — the path a real enrichment takes, and the one the
+// single-finding entry point cannot stand in for: that entry point strips the
+// previous findings, so it can never rebuild a block with more than one
+// Wave-2 entry in it.
+func deliverEnrichment(t *testing.T, c *app.Controller, core *runtime.Core, id string, truncated bool, findings []domain.Finding) {
+	t.Helper()
+	ev := messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		Findings:     map[string][]domain.Finding{id: findings},
 	}
+	if truncated {
+		// The sweep delivers the truncation mark with the findings, and the
+		// runtime writes the session set before the controller applies the
+		// intent — so by then no rebuild can reproduce the block the cursor
+		// was indexed against.
+		ev.TruncatedIDs = map[string]bool{id: true}
+	}
+	intents, _ := core.HandleEvent(ev)
+	c.ApplyIntents(intents)
+}
+
+// TestApplyDetailFinding_CursorFollowsItsAttentionEntry: a cursor INSIDE the
+// Attention block used to be sent back to the section header whenever the
+// block changed, so an operator reading the second finding lost their place
+// the moment an enrichment result arrived. The entry the cursor is on is the
+// thing to keep, and it is still there — it has only moved down to make room
+// for a more severe one.
+func TestApplyDetailFinding_CursorFollowsItsAttentionEntry(t *testing.T) {
+	const secondPhrase = "public ingress on port 22 from 0.0.0.0/0"
+	row := wave1TwoWarnings("i-0bbb222222222222b", secondPhrase)
+	c, core := openDetailWithSweptRow(t, row)
+
+	preCursor := seekAttentionEntry(t, c, secondPhrase)
 
 	// A more severe finding lands and sorts above both warnings, pushing the
-	// entry the cursor is on one row further down.
-	c.ApplyDetailFinding(&domain.Finding{
+	// entry the cursor is on further down the block.
+	deliverEnrichment(t, c, core, row.ID, true, []domain.Finding{{
 		Code:     "ec2.instance-status-impaired",
 		Phrase:   "impaired: system checks failing",
+		Detail:   "The instance failed its system status check.",
 		Severity: domain.SevBroken,
 		Source:   "wave2:ec2",
-	}, nil)
+	}})
 
 	after := c.Snapshot().Body.Detail
 	postRow := fieldRowAt(t, after, after.FieldCursor)
@@ -298,61 +345,33 @@ func TestApplyDetailFinding_CursorFollowsItsAttentionEntry(t *testing.T) {
 }
 
 // TestApplyDetailFinding_CursorFollowsItsEntryWhenTheBlockOnlyReorders is the
-// same rule at the size that hides it: a wave-2 finding replaced by a more
-// severe one of the same shape leaves the block exactly as long as it was, and
+// same rule at the size that hides it: a Wave-2 result replaced by a more
+// severe one of the same shape leaves the block exactly as long as it was and
 // sorts to the top, so every entry below it moves down one row while the block
 // size says nothing changed. A cursor kept by index reads a different finding
 // than the one the operator was on.
 func TestApplyDetailFinding_CursorFollowsItsEntryWhenTheBlockOnlyReorders(t *testing.T) {
 	const secondPhrase = "public ingress on port 22 from 0.0.0.0/0"
-	res := resource.Resource{
-		ID:   "i-0ccc333333333333c",
-		Name: "queue-worker",
-		Type: "ec2",
-		Fields: map[string]string{
-			"instance_id": "i-0ccc333333333333c",
-			"state":       "running",
-		},
-		Findings: []domain.Finding{
-			{Code: "ec2.long-stopped", Phrase: "instance stopped 42d ago", Detail: "Stopped for a long time.", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: "ec2.open-ssh", Phrase: secondPhrase, Detail: "SSH is open to the internet.", Severity: domain.SevWarn, Source: "wave1"},
-		},
-	}
+	row := wave1TwoWarnings("i-0ccc333333333333c", secondPhrase)
+	c, core := openDetailWithSweptRow(t, row)
 
-	c := newAttentionCursorController(t, res, "ec2")
-
-	seekAttentionEntry := func() int {
-		for step := 0; step < 40; step++ {
-			body := c.Snapshot().Body.Detail
-			if body == nil {
-				t.Fatal("precondition: Body.Detail is nil")
-			}
-			if row := fieldRowAt(t, body, body.FieldCursor); row.Path == "Attention" && row.Key == secondPhrase {
-				return body.FieldCursor
-			}
-			c.Apply(app.Action{Kind: app.ActionMoveDown})
-		}
-		t.Fatalf("precondition: never reached the Attention entry %q with the cursor", secondPhrase)
-		return -1
-	}
-
-	preCursor := seekAttentionEntry()
-	// A wave-2 warning of the same shape as the broken finding that replaces
-	// it below: one phrase line, one detail line, sorted after the warnings.
-	c.ApplyDetailFinding(&domain.Finding{
+	// A Wave-2 warning of the same shape as the broken finding that replaces
+	// it below: one phrase line and one detail line, sorted after the warnings.
+	deliverEnrichment(t, c, core, row.ID, false, []domain.Finding{{
 		Code: "ec2.slow-disk", Phrase: "volume queue depth is high", Detail: "One sentence.",
 		Severity: domain.SevWarn, Source: "wave2:ec2",
-	}, nil)
-	beforePrepend := len(c.Snapshot().Body.Detail.Fields)
+	}})
+	preCursor := seekAttentionEntry(t, c, secondPhrase)
+	beforeLen := len(c.Snapshot().Body.Detail.Fields)
 
-	c.ApplyDetailFinding(&domain.Finding{
+	deliverEnrichment(t, c, core, row.ID, false, []domain.Finding{{
 		Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing", Detail: "One sentence.",
 		Severity: domain.SevBroken, Source: "wave2:ec2",
-	}, nil)
+	}})
 
 	after := c.Snapshot().Body.Detail
-	if len(after.Fields) != beforePrepend {
-		t.Fatalf("fixture no longer holds the block length constant (%d then %d) — the reorder-only case is what this pins", beforePrepend, len(after.Fields))
+	if len(after.Fields) != beforeLen {
+		t.Fatalf("fixture no longer holds the block length constant (%d then %d) — the reorder-only case is what this pins", beforeLen, len(after.Fields))
 	}
 	postRow := fieldRowAt(t, after, after.FieldCursor)
 	if postRow.Path != "Attention" || postRow.Key != secondPhrase {
@@ -363,6 +382,41 @@ func TestApplyDetailFinding_CursorFollowsItsEntryWhenTheBlockOnlyReorders(t *tes
 				"want the cursor still on %q.",
 			preCursor, secondPhrase,
 			after.FieldCursor, postRow.Key, postRow.Path, secondPhrase,
+		)
+	}
+}
+
+// TestApplyDetailFinding_CursorOnTheAttentionHeaderStaysThere is the boundary
+// of the same rule. The header is inside the block but is not an entry: its
+// line counts the findings, so it is a different string every time the count
+// moves. A cursor there must stay on the header, never be carried into the
+// block by the content-field arithmetic.
+func TestApplyDetailFinding_CursorOnTheAttentionHeaderStaysThere(t *testing.T) {
+	row := wave1TwoWarnings("i-0ddd444444444444d", "public ingress on port 22 from 0.0.0.0/0")
+	c, core := openDetailWithSweptRow(t, row)
+
+	c.Apply(app.Action{Kind: app.ActionMoveTop})
+	before := c.Snapshot().Body.Detail
+	beforeRow := fieldRowAt(t, before, before.FieldCursor)
+	if !beforeRow.IsSection || beforeRow.Path != "Attention" {
+		t.Fatalf("precondition: the top row is not the Attention header, got Key=%q Path=%q IsSection=%v", beforeRow.Key, beforeRow.Path, beforeRow.IsSection)
+	}
+
+	deliverEnrichment(t, c, core, row.ID, false, []domain.Finding{{
+		Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
+		Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2",
+	}})
+
+	after := c.Snapshot().Body.Detail
+	afterRow := fieldRowAt(t, after, after.FieldCursor)
+	if !afterRow.IsSection || afterRow.Path != "Attention" {
+		t.Errorf(
+			"the cursor was carried off the Attention header into the block:\n"+
+				"  before: FieldCursor=%d Key=%q\n"+
+				"  after:  FieldCursor=%d Key=%q Path=%q IsSection=%v\n"+
+				"want the cursor still on the header.",
+			before.FieldCursor, beforeRow.Key,
+			after.FieldCursor, afterRow.Key, afterRow.Path, afterRow.IsSection,
 		)
 	}
 }
