@@ -63,8 +63,14 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 	})
 
 	beforeEsc := stripANSI(rootViewContent(m))
-	if !strings.Contains(beforeEsc, "ami(1/") {
-		t.Fatalf("expected related filtered list title before Esc; got:\n%s", beforeEsc)
+	// A related drill's count is what its own check named, not the type's
+	// population with the drill's rows filtered out of it: this screen holds
+	// one AMI because one AMI is what the instance was built from. The old
+	// "ami(1/4)" read as a filter over the account's four AMIs, which is the
+	// same claim that let a refreshed drill title ten instances as the
+	// account's whole fleet. Do not restore it.
+	if !strings.Contains(beforeEsc, "ami(1)") {
+		t.Fatalf("expected the related drill's own count in the title before Esc; got:\n%s", beforeEsc)
 	}
 
 	// Esc should pop back to detail directly.

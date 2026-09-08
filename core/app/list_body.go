@@ -536,12 +536,22 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	allResources := c.listScreenResources(ls, typeName)
 	total := len(allResources)
-	// Seed-time provisional total: a seeded-but-unverified list knows the
-	// population its seed source reported (cache.TypeFile.Population) while
-	// holding only the rows that source retained. Prefer it for display until
-	// a fetch result supersedes it (applyResourcesLoaded). Only the displayed
-	// total is overridden; filtered still reflects the rows actually on screen.
-	total = max(total, ls.TotalCount)
+	if ls.RelatedIDSet != nil {
+		// A related drill's population is what its own check named, not the
+		// type's. Its rows arrive as the type's whole list and are prefiltered
+		// to the set, so counting the unfiltered set here titles ten instances
+		// built from one AMI as the account's whole fleet. The seed-time
+		// provisional total below is the type's too, for the same reason.
+		total = len(relatedIDSubset(ls, allResources))
+	} else {
+		// Seed-time provisional total: a seeded-but-unverified list knows the
+		// population its seed source reported (cache.TypeFile.Population) while
+		// holding only the rows that source retained. Prefer it for display
+		// until a fetch result supersedes it (applyResourcesLoaded). Only the
+		// displayed total is overridden; filtered still reflects the rows
+		// actually on screen.
+		total = max(total, ls.TotalCount)
+	}
 	visible := c.applyListFilters(ls, typeName, allResources)
 	filtered := len(visible)
 	truncated := ls.HasPagination

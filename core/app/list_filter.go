@@ -12,6 +12,24 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// relatedIDSubset applies the related-drill prefilter: when RelatedIDSet is
+// non-nil (empty for a "(0+)" drill), only rows the drill's own check named
+// pass. The one owner of that rule — the rendered rows and the title's count
+// both read it, so a drill can never title the type's whole population over
+// the ten rows it is showing.
+func relatedIDSubset(ls *ListState, base []resource.Resource) []resource.Resource {
+	if ls.RelatedIDSet == nil {
+		return base
+	}
+	subset := make([]resource.Resource, 0, len(ls.RelatedIDSet))
+	for _, r := range base {
+		if _, ok := ls.RelatedIDSet[r.ID]; ok {
+			subset = append(subset, r)
+		}
+	}
+	return subset
+}
+
 // applyListFilters applies the relatedIDSet prefilter, text filter, and
 // attention filter to base, returning the visible subset. It is the only
 // filter: ListSelected and buildListBody both call it, so the two cannot
@@ -32,15 +50,7 @@ func (c *Controller) applyListFilters(ls *ListState, typeName string, base []res
 	}
 
 	// RelatedIDSet prefilter: when non-nil (even if empty), only IDs in the set pass.
-	if ls.RelatedIDSet != nil {
-		subset := make([]resource.Resource, 0, len(ls.RelatedIDSet))
-		for _, r := range base {
-			if _, ok := ls.RelatedIDSet[r.ID]; ok {
-				subset = append(subset, r)
-			}
-		}
-		base = subset
-	}
+	base = relatedIDSubset(ls, base)
 
 	// Text filter. The columns are resolved the way the list resolves them, so
 	// the filter compares the strings the rows on screen are made of.
