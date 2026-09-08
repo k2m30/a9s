@@ -4,7 +4,7 @@
 
 ## Changed
 
-- The CloudTrail events list shows TIME before Status, and the load balancer list shows DNS Name second, matching the order the built-in lists already used.
+- On a new installation the CloudTrail events list shows TIME before Status and the load balancer list shows DNS Name second, matching the order the built-in lists already used. A view file written by an earlier build keeps the column order it has; the upgrade adds columns and corrects sources but does not reorder.
 
 ## Fixed
 
