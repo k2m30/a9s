@@ -6,6 +6,7 @@ package fixtures
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -78,14 +79,32 @@ const (
 )
 
 const (
-	// ECSServiceNoTasksRunning is the witness for ecs-svc.tasks.none-running.
+	// ECSServiceNoTasksRunning is the witness for ecs-svc.tasks.none-running,
+	// and for the placement branch of the service event scan: it has no tasks
+	// running because none can be placed, and its event says so.
 	ECSServiceNoTasksRunning = "acme-svc-stalled"
+
+	// ECSServiceBelowDesiredCount runs under its desired count, and is the
+	// witness for the load-balancer branch of the event scan: the tasks that
+	// did start are failing their health checks.
+	ECSServiceBelowDesiredCount = "acme-svc-degraded"
 
 	ecsClusterArnServices = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"
 	ecsClusterArnBatch    = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"
 	ecsClusterArnStaging  = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-staging"
 	ecsClusterArnFailed   = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-failed"
 )
+
+// ecsRecentEventTime is when the two service-event witnesses fired. The
+// enricher reads a ten-minute window, so this is relative to the moment the
+// fixtures are built rather than a fixed date, the same way the acm and backup
+// fixtures stay inside their own windows. Half a minute is what ECS's own
+// retry cadence looks like and leaves the window all but whole, because the
+// fixtures are built once per process (sharedECSFixtures): a run — or a demo
+// session — that reaches these rows more than ten minutes later sees the
+// events aged out, which is what the real enricher does with a real event of
+// that age.
+var ecsRecentEventTime = time.Now().Add(-30 * time.Second)
 
 var ecsServiceNamePool = []string{
 	"metrics-collector", "user-auth-svc", "product-catalog", "search-svc",
@@ -369,7 +388,7 @@ func buildECSServices() []ecstypes.Service {
 
 	// Issue: ACTIVE but RunningCount < DesiredCount → Warning (underprovisioned)
 	named = append(named, ecstypes.Service{
-		ServiceName:        aws.String("acme-svc-degraded"),
+		ServiceName:        aws.String(ECSServiceBelowDesiredCount),
 		ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-services/acme-svc-degraded"),
 		ClusterArn:         aws.String(ecsClusterArnServices),
 		Status:             aws.String("ACTIVE"),
@@ -380,6 +399,12 @@ func buildECSServices() []ecstypes.Service {
 		TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/acme-svc-degraded:3"),
 		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 		CreatedAt:          aws.Time(mustTime("2025-01-12T10:00:00Z")),
+		Events: []ecstypes.ServiceEvent{{
+			CreatedAt: aws.Time(ecsRecentEventTime),
+			Message: aws.String("(service " + ECSServiceBelowDesiredCount + ") (instance i-0a1b2c3d4e5f60001) " +
+				"(port 8080) is unhealthy in (target-group acme-web-tg) due to " +
+				"(reason Health checks failed with these codes: [502])."),
+		}},
 		Tags: []ecstypes.Tag{
 			{Key: aws.String("Environment"), Value: aws.String("prod")},
 			{Key: aws.String("Team"), Value: aws.String("platform")},
@@ -402,6 +427,13 @@ func buildECSServices() []ecstypes.Service {
 		TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/" + ECSServiceNoTasksRunning + ":1"),
 		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 		CreatedAt:          aws.Time(mustTime("2025-06-04T11:00:00Z")),
+		Events: []ecstypes.ServiceEvent{{
+			CreatedAt: aws.Time(ecsRecentEventTime),
+			Message: aws.String("(service " + ECSServiceNoTasksRunning + ") was unable to place a task " +
+				"because no container instance met all of its requirements. The closest matching " +
+				"container-instance 0a1b2c3d has insufficient memory available. For more information, " +
+				"see the Troubleshooting section of the Amazon ECS Developer Guide."),
+		}},
 		Tags: []ecstypes.Tag{
 			{Key: aws.String("Environment"), Value: aws.String("prod")},
 		},

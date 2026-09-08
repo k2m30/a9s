@@ -50,6 +50,12 @@ func ecsEventReason(message string) string {
 	if i := strings.Index(reason, "For more information"); i >= 0 {
 		reason = reason[:i]
 	}
+	reason = strings.TrimSpace(reason)
+	// AWS parenthesises the load-balancer reason as "(reason …).", which under
+	// a row already labelled Reason says the word twice.
+	if rest, ok := strings.CutPrefix(reason, "(reason "); ok {
+		reason = strings.TrimSuffix(strings.TrimSuffix(rest, "."), ")")
+	}
 	return strings.TrimSpace(reason)
 }
 
@@ -131,26 +137,28 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				}
 
 				// Check deployments for rollout failures and circuit-breaker.
+				// Same shape as the event scan below: a9s's words on one row,
+				// AWS's reason on the row under it. The reason used to ride in
+				// the value behind a colon, which shaped one fact two ways
+				// inside one function and put AWS's FAILED on the screen.
 				hasInProgress := false
-				var deploymentIssues []string
+				var deploymentRows []domain.DetailRow
 				for _, dep := range svc.Deployments {
 					if dep.RolloutState == ecstypes.DeploymentRolloutStateInProgress {
 						hasInProgress = true
 					}
-					if dep.RolloutState == ecstypes.DeploymentRolloutStateFailed {
-						reason := ""
-						if dep.RolloutStateReason != nil {
-							reason = *dep.RolloutStateReason
-						}
-						if reason != "" {
-							deploymentIssues = append(deploymentIssues, fmt.Sprintf("deployment rollout FAILED: %s", reason))
-						} else {
-							deploymentIssues = append(deploymentIssues, "deployment rollout FAILED")
-						}
-						// Detect circuit-breaker in the rollout-state reason.
-						if strings.Contains(strings.ToLower(reason), "circuit breaker") {
-							deploymentIssues = append(deploymentIssues, "deployment circuit-breaker triggered")
-						}
+					if dep.RolloutState != ecstypes.DeploymentRolloutStateFailed {
+						continue
+					}
+					reason := aws.ToString(dep.RolloutStateReason)
+					deploymentRows = append(deploymentRows, domain.DetailRow{Label: "Deployment", Value: "rollout failed", Tier: "!"})
+					if reason != "" {
+						deploymentRows = append(deploymentRows, domain.DetailRow{Label: "Reason", Value: reason, Tier: "!"})
+					}
+					// The circuit breaker is a second thing to say about the
+					// same deployment, and AWS only says it inside the reason.
+					if strings.Contains(strings.ToLower(reason), "circuit breaker") {
+						deploymentRows = append(deploymentRows, domain.DetailRow{Label: "Deployment", Value: "circuit breaker triggered", Tier: "!"})
 					}
 				}
 
@@ -177,7 +185,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					case strings.Contains(msg, "unable to place"):
 						phrase = "unable to place task"
 					case strings.Contains(msg, "elb health checks failed"), strings.Contains(msg, "health checks failed"):
-						phrase = "ELB health checks failed"
+						phrase = "load balancer health checks failed"
 					default:
 						continue
 					}
@@ -202,14 +210,11 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 
 				}
 
-				if len(deploymentIssues) == 0 && !serviceStuck && len(eventRows) == 0 {
+				if len(deploymentRows) == 0 && !serviceStuck && len(eventRows) == 0 {
 					continue
 				}
 
-				var rows []domain.DetailRow
-				for _, issue := range deploymentIssues {
-					rows = append(rows, domain.DetailRow{Label: "Deployment", Value: issue, Tier: "!"})
-				}
+				rows := deploymentRows
 				if serviceStuck {
 					rows = append(rows, domain.DetailRow{
 						Label: "Tasks",

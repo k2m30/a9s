@@ -79,18 +79,26 @@ func TestECSSvc_PlacementEventKeepsAWSReason(t *testing.T) {
 	}
 }
 
-// TestECSSvc_ELBEventKeepsAWSReason is the sibling in the same loop: the ELB
-// branch threw its message away the same way, and AWS puts the failing health
-// check codes in it.
+// TestECSSvc_ELBEventKeepsAWSReason is the sibling in the same loop: the load
+// balancer branch threw its message away the same way, and AWS puts the
+// failing health check codes in it.
+//
+// The phrase reads "load balancer" rather than "ELB", which this test pinned
+// one round ago: the demo witness added below put the row on a rendered
+// surface for the first time and the machine-style gate reported the bare
+// acronym. Reworded rather than exempted, because the words on the row are
+// a9s's to choose. Do not restore the acronym.
 func TestECSSvc_ELBEventKeepsAWSReason(t *testing.T) {
 	rows := aws5ECSEventRows(t, "(service acme-checkout-svc) (instance i-0a1b2c3d4e5f60001) (port 8080) "+
 		"is unhealthy in (target-group acme-web) due to (reason Health checks failed with these codes: [502]).")
 
-	if got := aws5RowValue(rows, "Event"); got != "ELB health checks failed" {
-		t.Errorf("Event row = %q, want %q", got, "ELB health checks failed")
+	if got := aws5RowValue(rows, "Event"); got != "load balancer health checks failed" {
+		t.Errorf("Event row = %q, want %q", got, "load balancer health checks failed")
 	}
-	if reason := aws5RowValue(rows, "Reason"); !strings.Contains(reason, "502") {
-		t.Errorf("Reason row = %q, want the codes AWS named", reason)
+	// AWS wraps this one in "(reason …)", which under a row already labelled
+	// Reason says the word twice; the demo witness put it on screen.
+	if got := aws5RowValue(rows, "Reason"); got != "Health checks failed with these codes: [502]" {
+		t.Errorf("Reason row = %q, want AWS's sentence without its own \"(reason …)\" wrapper", got)
 	}
 }
 
@@ -117,4 +125,85 @@ func TestECSSvc_EventWithNothingAfterTheMarkerAddsNoRow(t *testing.T) {
 	if got := aws5RowValue(rows, "Event"); got != "unable to place task" {
 		t.Errorf("Event row = %q, want it kept regardless", got)
 	}
+}
+
+// ── One row shape for all three signals ───────────────────────────────────
+
+// aws5ECSDeploymentRows drives EnrichECSServices over one service whose only
+// deployment failed, and returns the rows the finding grew.
+func aws5ECSDeploymentRows(t *testing.T, rolloutReason string) []domain.DetailRow {
+	t.Helper()
+	const svc = "acme-checkout-svc"
+	dep := ecstypes.Deployment{RolloutState: ecstypes.DeploymentRolloutStateFailed}
+	if rolloutReason != "" {
+		dep.RolloutStateReason = aws.String(rolloutReason)
+	}
+	fake := &d3ECSFake{services: []ecstypes.Service{{
+		ServiceName:  aws.String(svc),
+		Status:       aws.String("ACTIVE"),
+		DesiredCount: 2,
+		RunningCount: 2,
+		Deployments:  []ecstypes.Deployment{dep},
+	}}}
+	res, err := awsclient.EnrichECSServices(context.Background(),
+		&awsclient.ServiceClients{ECS: fake, Region: "us-east-1"},
+		[]resource.Resource{{
+			ID: svc, Name: svc, Type: "ecs-svc",
+			Fields: map[string]string{"cluster": "acme-prod", "service_name": svc},
+		}}, nil)
+	if err != nil {
+		t.Fatalf("EnrichECSServices: %v", err)
+	}
+	return res.AttentionDetails[svc][d3CodeECSDeployFailed].Rows
+}
+
+// TestECSSvc_RolloutFailureUsesTheRowShape pins one shape for all three of
+// this finding's signals. The two event signals put a9s's phrase on one row
+// and AWS's reason on the row under it; the rollout signal crammed both into
+// one value with a colon, so the same fact was shaped two ways inside one
+// function.
+func TestECSSvc_RolloutFailureUsesTheRowShape(t *testing.T) {
+	const reason = "ECS deployment circuit breaker: task failed to start."
+	rows := aws5ECSDeploymentRows(t, reason)
+
+	if got := aws5RowValue(rows, "Deployment"); got != "rollout failed" {
+		t.Errorf("Deployment row = %q, want %q on a row of its own", got, "rollout failed")
+	}
+	if got := aws5RowValue(rows, "Reason"); got != reason {
+		t.Errorf("Reason row = %q, want AWS's rollout reason %q under the phrase", got, reason)
+	}
+	// The circuit breaker is a second thing to say about the same deployment,
+	// so it is a second row rather than a suffix on the first.
+	if !aws5HasRow(rows, "Deployment", "circuit breaker triggered") {
+		t.Errorf("rows = %v, want a row saying the circuit breaker tripped", rows)
+	}
+	for _, r := range rows {
+		if strings.Contains(r.Value, "FAILED") {
+			t.Errorf("row %s = %q carries the raw AWS enum; the words on a row are a9s's", r.Label, r.Value)
+		}
+	}
+}
+
+// TestECSSvc_RolloutFailureWithNoReasonAddsNoRow is the negated form: AWS does
+// not always fill RolloutStateReason, and an empty row renders as a blank line.
+func TestECSSvc_RolloutFailureWithNoReasonAddsNoRow(t *testing.T) {
+	rows := aws5ECSDeploymentRows(t, "")
+	if got := aws5RowValue(rows, "Deployment"); got != "rollout failed" {
+		t.Errorf("Deployment row = %q, want it regardless of the reason", got)
+	}
+	for _, r := range rows {
+		if r.Label == "Reason" {
+			t.Errorf("Reason row = %q, want no row when AWS filled no reason", r.Value)
+		}
+	}
+}
+
+// aws5HasRow reports whether rows carry one with exactly this label and value.
+func aws5HasRow(rows []domain.DetailRow, label, value string) bool {
+	for _, r := range rows {
+		if r.Label == label && r.Value == value {
+			return true
+		}
+	}
+	return false
 }
