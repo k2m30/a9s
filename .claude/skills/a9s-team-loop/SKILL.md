@@ -8,13 +8,14 @@ description: The implementer / acceptance loop — shared protocol every team ag
 Three roles, one loop. The orchestrator (the main session) writes the spec, dispatches, rules, and lands; it writes no code and no tests beyond the fast path below.
 
 ```text
- spec ─► a9s-dev (red test per row → fix → checked probes → one suite run) ─► a9s-acceptance ─► ACCEPT ─► landing
-                     │                                                              │
-                     └── OFF / BLOCKED / LOOP ──► a9s-facilitator (ruling) ◄────────┘ REJECT on behaviour (a9s-dev round 2)
-                                                                                     REJECT on wording (orchestrator fast path)
+ spec ─► a9s-qa (red test per row, blind to the code) ─► a9s-dev (every test green → checked probes → the suite, itself) ─► a9s-acceptance ─► ACCEPT ─► landing
+                     │                                                    │                                                   │
+                     └── OFF / BLOCKED / LOOP ──► a9s-facilitator (ruling) ◄──────────────────────────────────────────────────┘ REJECT on behaviour (QA adds the red test, dev round 2)
+                                                                                                                              REJECT on wording (orchestrator fast path)
 ```
 
-- **a9s-dev** is the implementer: per spec row, the failing test, then the smallest correct change, then its own edge-case probes (`checked:`); one round per task in the common case, another only after an acceptance REJECT or a facilitator ruling. The separate QA role was retired on 2026-09-07 (the user: its verify round re-ran the suite dev had just run and handed the same findings back).
+- **a9s-qa** writes the failing test for every spec row before the implementer exists in the worktree: from the spec, the given/when/then stories and the failure scenario, never from the implementation. Its red output is pasted in the log and its tests are the definition of done for the row. QA has no verify round: dev runs the suite itself (the user, 2026-09-07: dev can and should run the tests himself, not pass them back and forth).
+- **a9s-dev** is the implementer: makes every QA test pass with the smallest correct change, adds its own edge-case probes (`checked:`), and runs the whole suite itself until green — one round per task in the common case, another only after an acceptance REJECT or a facilitator ruling. Dev never edits, inverts or deletes a QA test; when a QA test encodes a wrong expectation, dev logs it with evidence and the orchestrator has QA rewrite it.
 - **a9s-facilitator** is called only on `OFF`, `LOOP` or `BLOCKED`. It rules; it never codes. Every other deviation is ruled by the orchestrator as a bullet under the spec table, which is the only form a ruling takes.
 - **a9s-acceptance** is the skeptical end user. It sees the finished tree, not the log, and accepts or rejects with evidence.
 
