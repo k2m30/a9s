@@ -474,7 +474,7 @@ func TestW45_LiveRowWithANilNameFieldRendersBlank(t *testing.T) {
 // app's own list-body path rather than the extractor alone. The rendered
 // ViewState is what both the TUI and the web draw from, and it is where the
 // two user-visible consequences land: the marker glyph is prepended to the
-// MarkerCol cell, and the cells are the values a reader sees. ec2's marker
+// IdentityCol cell, and the cells are the values a reader sees. ec2's marker
 // column moved from Status to Name with the election fix, and no golden covers
 // that move because no row in the golden scenarios carries a Decorator.
 func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
@@ -482,7 +482,7 @@ func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 
 	for _, tc := range []struct {
 		shortName    string
-		markerCol    int
+		identityCol  int
 		identityCell string
 		blankColumn  string
 	}{
@@ -510,12 +510,12 @@ func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 			if lb == nil {
 				t.Fatalf("%s: nil list body", tc.shortName)
 			}
-			if lb.MarkerCol != tc.markerCol {
-				t.Errorf("%s: MarkerCol = %d (%q), want %d (%q)",
-					tc.shortName, lb.MarkerCol, lb.Columns[lb.MarkerCol].Title, tc.markerCol, tc.identityCell)
+			if lb.IdentityCol != tc.identityCol {
+				t.Errorf("%s: IdentityCol = %d (%q), want %d (%q)",
+					tc.shortName, lb.IdentityCol, lb.Columns[lb.IdentityCol].Title, tc.identityCol, tc.identityCell)
 			}
-			if lb.Columns[lb.MarkerCol].Title != tc.identityCell {
-				t.Errorf("%s: marker column title = %q, want %q", tc.shortName, lb.Columns[lb.MarkerCol].Title, tc.identityCell)
+			if lb.Columns[lb.IdentityCol].Title != tc.identityCell {
+				t.Errorf("%s: marker column title = %q, want %q", tc.shortName, lb.Columns[lb.IdentityCol].Title, tc.identityCell)
 			}
 			if len(lb.Rows) == 0 {
 				t.Fatalf("%s: no rendered rows", tc.shortName)
@@ -527,7 +527,7 @@ func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 			}
 			for i, row := range lb.Rows {
 				name := stripped[i].Name
-				if got := row.Cells[lb.MarkerCol]; got != name {
+				if got := row.Cells[lb.IdentityCol]; got != name {
 					t.Errorf("%s row %d: the column that names the row shows %q, want %q", tc.shortName, i, got, name)
 				}
 				if tc.blankColumn == "" {

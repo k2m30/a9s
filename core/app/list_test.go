@@ -142,7 +142,6 @@ func fakeS3Resources() []resource.Resource {
 			Type: "s3",
 			Fields: map[string]string{
 				"name":          "acme-app-state",
-				"bucket_name":   "acme-app-state",
 				"creation_date": "2025-06-20 11:35",
 			},
 		},
@@ -152,7 +151,6 @@ func fakeS3Resources() []resource.Resource {
 			Type: "s3",
 			Fields: map[string]string{
 				"name":          "acme-cdn-logs",
-				"bucket_name":   "acme-cdn-logs",
 				"creation_date": "2025-05-12 19:24",
 			},
 		},
@@ -162,7 +160,6 @@ func fakeS3Resources() []resource.Resource {
 			Type: "s3",
 			Fields: map[string]string{
 				"name":          "acme-backups",
-				"bucket_name":   "acme-backups",
 				"creation_date": "2025-04-01 08:00",
 			},
 		},

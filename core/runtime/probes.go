@@ -369,7 +369,7 @@ func (c *Core) SaveAvailabilityCache(
 		var firstErr error
 		var plans []cache.WritePlan
 		for rawName, count := range entries {
-			name := canonShortName(rawName)
+			name := resource.CanonicalShortName(rawName)
 			trunc := false
 			if truncated != nil {
 				trunc = truncated[rawName]
@@ -636,7 +636,7 @@ func (c *Core) saveResourceListCache(pair session.Pair, shortName string, rows [
 	// canonShortName lookup always agree on the stored key — an
 	// uncanonicalized Put here would silently miss the depth lookup for
 	// every alias caller.
-	canon := canonShortName(shortName)
+	canon := resource.CanonicalShortName(shortName)
 	if rows == nil {
 		rows = []cache.Row{}
 	}
@@ -720,7 +720,7 @@ func (c *Core) saveResourceListCache(pair session.Pair, shortName string, rows [
 // caching is disabled or no stored rows exist for shortName, in which case
 // callers fall back to the un-paginated first-page result.
 func (c *Core) CachedListDepth(shortName string) int {
-	canon := canonShortName(shortName)
+	canon := resource.CanonicalShortName(shortName)
 	depth := 0
 	_ = c.ReadCacheStore(func(store *cache.Store) error {
 		if store == nil {

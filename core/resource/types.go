@@ -82,6 +82,21 @@ func FindResourceType(name string) *ResourceTypeDef {
 	return catalog.Find(name)
 }
 
+// CanonicalShortName resolves an alias to its type's canonical ShortName, and
+// returns the input verbatim for a name no type claims (an unregistered or
+// fetcher-only key passes through unchanged).
+//
+// It lives here, beside the registry it reads, because every layer needs it:
+// the runtime keys its per-type session state by the canonical name, the
+// controller keys its screens and cache writes by it, and a name that is
+// canonicalised in one of them and not the other is two entries for one type.
+func CanonicalShortName(name string) string {
+	if td := FindResourceType(name); td != nil {
+		return td.ShortName
+	}
+	return name
+}
+
 // DetailFrameTitle composes the TUI detail-view frame-border title. When
 // omitID is true (types whose ID is an opaque synthetic key, e.g. a 56-digit
 // CloudWatch event id — see ResourceTypeDef.TitleOmitsID) it renders

@@ -196,7 +196,7 @@ func (c *Core) BumpEnrichmentTypeGen(rt string) domain.Gen {
 
 // DeleteEnrichmentRan clears the per-type enrichment-ran latch so the next
 // enrichment dispatch for the type re-runs from scratch.
-func (c *Core) DeleteEnrichmentRan(rt string) { delete(c.session.EnrichmentRan, rt) }
+func (c *Core) DeleteEnrichmentRan(rt string) { c.session.EnrichmentRanDelete(rt) }
 
 // EnrichmentTruncatedIDs returns the truncated-ID set for the given
 // resource type, or nil when no enrichment has retained truncation data
@@ -214,7 +214,7 @@ func (c *Core) DeleteEnrichmentTruncatedIDs(rt string) {
 // in one shot. Used by the global refresh path (Ctrl+R from main menu)
 // where every type must re-enrich from scratch.
 func (c *Core) ResetEnrichmentMaps() {
-	c.session.EnrichmentRan = make(map[string]bool)
+	c.session.EnrichmentRanReset()
 	c.session.EnrichmentTypeGenReset()
 	c.session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 }
@@ -473,7 +473,7 @@ func (c *Core) NewFindingPairsSincePrev() map[string]map[domain.FindingCode]int 
 // accessor through which core/app reads FirstSeen, so *cache.Store never
 // leaks past this package.
 func (c *Core) FindingFirstSeenForType(shortName string) map[string]map[domain.FindingCode]time.Time {
-	canon := canonShortName(shortName)
+	canon := resource.CanonicalShortName(shortName)
 	out := make(map[string]map[domain.FindingCode]time.Time)
 	_ = c.ReadCacheStore(func(store *cache.Store) error {
 		if store == nil {

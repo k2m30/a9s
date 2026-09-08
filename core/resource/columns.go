@@ -89,7 +89,7 @@ func EcsSvcEventColumns() []Column {
 // EcsSvcTaskColumns returns the column definitions for ECS service tasks.
 func EcsSvcTaskColumns() []Column {
 	return []Column{
-		{Key: "task_id_short", Title: "Task ID", Width: 14, Sortable: true},
+		{Key: "task_id", Title: "Task ID", Width: 14, Sortable: true},
 		{Key: "status", Title: "Status", Width: 12, Sortable: true},
 		{Key: "health", Title: "Health", Width: 10, Sortable: true},
 		{Key: "task_def_short", Title: "Task Definition", Width: 28, Sortable: true},

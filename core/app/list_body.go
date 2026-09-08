@@ -186,24 +186,17 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		} else {
 			ls.LastFetchError = ""
 		}
+		// Two facts, two fields. HasPagination answers "is there another page
+		// to fetch", which only the fetch's own cursor can say. Whether this
+		// result may be recorded as the type's exact population is a different
+		// question: a partial-success result (some resources landed AND
+		// something failed — e.g. the IAM policy fetcher's inline-group
+		// enumeration failing while managed-policy pagination reports
+		// IsTruncated=false) reached the last page and still cannot speak for
+		// the whole population, because a DIFFERENT component of the fetch is
+		// what failed. Answering both from HasPagination titled such a list
+		// "N+" and offered a load-more with no cursor behind it.
 		switch {
-		case fetchErr != nil:
-			// A partial-success result (some resources landed AND something
-			// failed — e.g. the IAM policy fetcher's inline-group enumeration
-			// failing while managed-policy pagination reports IsTruncated=false)
-			// must never assert an exact/complete population: pagination.
-			// IsTruncated can be false purely because a DIFFERENT component of
-			// the fetch finished cleanly while a sibling enumeration failed.
-			// Trusting it here would let maybeSaveResourceListCache's
-			// exact := !ls.HasPagination persist an incomplete population to
-			// disk as a confirmed total — the same false-confident-answer
-			// class the related-checker fix already closes for
-			// RelatedCheckResult. Force HasPagination=true (never exact) while
-			// still adopting whatever continuation cursor the fetch did return.
-			ls.HasPagination = true
-			if pagination != nil {
-				ls.PaginationCursor = pagination.NextToken
-			}
 		case pagination != nil:
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
@@ -211,6 +204,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			ls.HasPagination = false
 			ls.PaginationCursor = ""
 		}
+		ls.PopulationUnconfirmed = ls.HasPagination || fetchErr != nil
 	}
 
 	// Fresh rows arrive without Wave-2 findings; re-apply the latest known
@@ -302,7 +296,7 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 // column-index lookups derived from that column set — keyed on every input
 // that can change what they contain. Rebuilt only on a key mismatch; a
 // cursor move, spinner tick, or any other re-render whose inputs are
-// unchanged reuses columns/rows/markerCol/statusCol verbatim.
+// unchanged reuses columns/rows/identityCol/statusCol verbatim.
 //
 // Selected/ScrollX/Filter/Sort/AttentionOnly/Loading/Truncated/Pagination/
 // EnrichmentFindings/EnrichmentTruncated/LoadingMore/Refreshing/
@@ -319,10 +313,10 @@ type listBodyMemo struct {
 	sortDir         string
 	enrichGen       uint64
 
-	columns   []ColumnDef
-	rows      []ListRow
-	markerCol int
-	statusCol int
+	columns     []ColumnDef
+	rows        []ListRow
+	identityCol int
+	statusCol   int
 }
 
 // buildListBody constructs a ListBody from the top list screen's ListState and
@@ -391,7 +385,7 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		Pagination:          pagination,
 		EnrichmentFindings:  c.listEnrichmentFindings(typeName),
 		EnrichmentTruncated: enrichTruncated,
-		MarkerCol:           memo.markerCol,
+		IdentityCol:         memo.identityCol,
 		StatusCol:           memo.statusCol,
 		LoadingMore:         ls.LoadingMore,
 		Refreshing:          ls.Refreshing,
@@ -480,7 +474,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 	}
 
 	// Resolve the identity column index (full column list, before hscroll).
-	markerCol := IdentityColumnIndex(columns, td)
+	identityCol := IdentityColumnIndex(columns, td)
 
 	return listBodyMemo{
 		valid:           true,
@@ -493,7 +487,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		enrichGen:       c.enrichmentGen,
 		columns:         columns,
 		rows:            rows,
-		markerCol:       markerCol,
+		identityCol:     identityCol,
 		statusCol:       statusCol,
 	}
 }
@@ -768,10 +762,7 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 	// screen leaves a stacked same-type list's per-screen Rows stale (or wrongly
 	// mutates a top list of a different type), and buildListBody prefers ls.Rows
 	// over the type cache, so popping back would render stale cell values.
-	canon := typeName
-	if td := resource.FindResourceType(typeName); td != nil {
-		canon = td.ShortName
-	}
+	canon := resource.CanonicalShortName(typeName)
 	for i := range c.stack {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
@@ -842,10 +833,7 @@ func (c *Controller) clearRowFindings(typeName string) {
 		}
 	}
 
-	canon := typeName
-	if td := resource.FindResourceType(typeName); td != nil {
-		canon = td.ShortName
-	}
+	canon := resource.CanonicalShortName(typeName)
 
 	// Every list screen of this type in the stack (mirrors applyListFieldUpdates).
 	for i := range c.stack {

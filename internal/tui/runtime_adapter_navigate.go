@@ -682,7 +682,11 @@ func (m Model) refreshActiveList() tea.Cmd {
 	if pc := m.ctrl.GetListParentContext(); pc != nil {
 		return m.fetchChildResources(rt, pc)
 	}
-	return m.fetchResources(rt, gen)
+	// The screen's own lane, from the one owner. A client-side related drill
+	// reaches here — it has neither a fetch filter nor a parent context — and
+	// a refresh stamped as the canonical list is refused by the delivery gate
+	// on the drill itself and can land on the list beneath it instead.
+	return m.fetchResources(rt, gen, m.ctrl.GetListLane())
 }
 
 // refreshActiveListWithEnrichmentRerun wraps refreshActiveList with an

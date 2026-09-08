@@ -19,7 +19,7 @@
 //     Nothing else checks that IdentityColumnIndex COMPUTES the same index
 //     the legacy cascade would for real types: the purity file's
 //     render-consumption counterpart went with the glyph it used to translate
-//     body.MarkerCol into. Self-contained on purpose — it shares no helper
+//     body.IdentityCol into. Self-contained on purpose — it shares no helper
 //     with the parity file it outlived.
 package unit_test
 
@@ -337,13 +337,13 @@ func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 // ===========================================================================
 // 3. IdentityColumnIndex — S13 marker-glyph placement check. Verifies
 //    RenderList(ListBody) places the enrichment glyph (row.Decorator) at the
-//    exact cell body.MarkerCol/body.ScrollX identify, across every real
+//    exact cell body.IdentityCol/body.ScrollX identify, across every real
 //    catalog type. The legacy ResourceListModel.View() byte-parity oracle
 //    this once ran against is gone (View() is dead code); this now asserts
 //    directly against the already-resolved body fields instead.
 // ===========================================================================
 
-func wave3MarkerColResources(td resource.ResourceTypeDef, n int) []resource.Resource {
+func wave3IdentityColResources(td resource.ResourceTypeDef, n int) []resource.Resource {
 	statuses := []string{"running", "stopped", "pending", "available", "active", "terminated"}
 	lk := td.LifecycleKey
 	if lk == "" {

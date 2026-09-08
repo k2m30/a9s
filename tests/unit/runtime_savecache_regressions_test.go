@@ -499,6 +499,14 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 	}
 	c.SetResourceCache(shortName, &domain.ListViewCacheEntry{Resources: issueRows})
 
+	// ec2 has a registered Wave-2 enricher, and both save lanes now write
+	// IssuesKnown only for a type whose enricher has actually answered (a
+	// badge-carrying type is not the same as a probed one). Without this
+	// latch neither lane records a count at all, and the double-write
+	// ordering this test exists for is never exercised. Do not drop it back
+	// to an unprobed type to "simplify" the setup.
+	c.Session().EnrichmentRanSet(shortName)
+
 	// The SaveCachePayload's swept rows carry NO findings at all (mirrors a
 	// sweep landing before Wave-2 enrichment confirms anything) — the
 	// row-derived recomputation inside saveProbeResourcesToTypeFiles must not

@@ -54,9 +54,22 @@ type ListState struct {
 	PaginationCursor string `json:"pagination_cursor,omitempty"`
 
 	// Inventory fields from docs/historical/analysis/web-ui-state-inventory.md §ResourceListModel.
-	HasPagination  bool                `json:"has_pagination,omitempty"`
-	AutoOpenSingle bool                `json:"auto_open_single,omitempty"`
-	RelatedIDSet   map[string]struct{} `json:"related_id_set,omitempty"`
+	HasPagination bool `json:"has_pagination,omitempty"`
+	// PopulationUnconfirmed is true when this list cannot assert that its rows
+	// are the type's whole population. HasPagination implies it — a page left
+	// behind is a population not seen — but so does a partial-success fetch
+	// that DID reach the last page while a sibling enumeration failed.
+	//
+	// The two are separate fields because they drive opposite surfaces.
+	// HasPagination is "another page exists": the "+" on the count, the "m"
+	// hint, the load-more dispatch, all of which need a cursor to be true of.
+	// PopulationUnconfirmed is "do not record this as an exact total": the
+	// disk-cache exactness flag and the menu's count sync-back. Carrying both
+	// on one field titled a fully-loaded list as "N+" and offered a load-more
+	// with no cursor to follow.
+	PopulationUnconfirmed bool                `json:"population_unconfirmed,omitempty"`
+	AutoOpenSingle        bool                `json:"auto_open_single,omitempty"`
+	RelatedIDSet          map[string]struct{} `json:"related_id_set,omitempty"`
 
 	// reapplyChecker + reapplySource belong to THIS related-list screen: for a
 	// truncated reverse-scan pivot, each loaded page is re-run through the checker

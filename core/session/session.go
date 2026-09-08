@@ -278,7 +278,17 @@ type Session struct {
 	// (see internal/tui/app_enrich_fold.go applyEnrichment). The Wave-2 progress
 	// / control maps below remain here because they are session-scoped and are
 	// cleared on Session.Rotate() — they are not the authority for finding data.
+	// EnrichmentRan is the per-type "the Wave-2 enricher has answered"
+	// latch, guarded by enrichmentRanMu. The availability-cache producer
+	// (Core.availabilityFromResourceCache) reads it from the menu-badge
+	// writer goroutine and from the executor's save task, while the handler
+	// loop writes it — different goroutines under every host, so a bare
+	// index races the concurrent write. Access only through
+	// EnrichmentRanGet/EnrichmentRanSet/EnrichmentRanDelete/
+	// EnrichmentRanSnapshot/EnrichmentRanReset — never read/write this
+	// field directly outside enrichmentRanMu.
 	EnrichmentRan          map[string]bool
+	enrichmentRanMu        sync.Mutex
 	EnrichmentTruncatedIDs map[string]map[string]bool
 
 	// EnrichmentTypeGen is the per-type Wave-2 enrichment counter, guarded by
@@ -795,6 +805,49 @@ func (s *Session) EnrichmentTypeGenReset() {
 	s.EnrichmentTypeGen = make(map[string]domain.Gen)
 }
 
+// EnrichmentRanGet reports whether the type's Wave-2 enricher has already
+// answered in this session.
+func (s *Session) EnrichmentRanGet(shortName string) bool {
+	s.enrichmentRanMu.Lock()
+	defer s.enrichmentRanMu.Unlock()
+	return s.EnrichmentRan[shortName]
+}
+
+// EnrichmentRanSet latches the type as answered, building the map when a
+// partially-constructed Session left it nil.
+func (s *Session) EnrichmentRanSet(shortName string) {
+	s.enrichmentRanMu.Lock()
+	defer s.enrichmentRanMu.Unlock()
+	if s.EnrichmentRan == nil {
+		s.EnrichmentRan = make(map[string]bool)
+	}
+	s.EnrichmentRan[shortName] = true
+}
+
+// EnrichmentRanDelete clears the type's latch so the next enrichment
+// dispatch for it re-runs from scratch.
+func (s *Session) EnrichmentRanDelete(shortName string) {
+	s.enrichmentRanMu.Lock()
+	defer s.enrichmentRanMu.Unlock()
+	delete(s.EnrichmentRan, shortName)
+}
+
+// EnrichmentRanSnapshot returns a defensive copy of the latch map, safe for
+// a dispatch-time snapshot to carry into an async goroutine.
+func (s *Session) EnrichmentRanSnapshot() map[string]bool {
+	s.enrichmentRanMu.Lock()
+	defer s.enrichmentRanMu.Unlock()
+	return maps.Clone(s.EnrichmentRan)
+}
+
+// EnrichmentRanReset replaces the latch map wholesale with a fresh, empty
+// one (global refresh / Rotate).
+func (s *Session) EnrichmentRanReset() {
+	s.enrichmentRanMu.Lock()
+	defer s.enrichmentRanMu.Unlock()
+	s.EnrichmentRan = make(map[string]bool)
+}
+
 // SetNewFindingPairs replaces shortName's new-finding-pair counts wholesale
 // with counts (#463) — used by a non-authoritative save (each one is a fresh
 // one-step scan baseline, so REPLACE is correct there). A wave2Authoritative
@@ -912,7 +965,7 @@ func (s *Session) Rotate() {
 	s.EnrichChecked = 0
 	s.EnrichTotal = 0
 	s.RowStore.Clear()
-	s.EnrichmentRan = make(map[string]bool)
+	s.EnrichmentRanReset()
 	s.ScanHealthLogged = make(map[string]bool)
 	s.EnrichmentTypeGenReset()
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)

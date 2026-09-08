@@ -1,7 +1,7 @@
 generated: 4
 list:
   Task ID:
-    key: task_id_short
+    key: task_id
     width: 14
   Status:
     key: status

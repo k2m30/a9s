@@ -319,6 +319,20 @@ func (f *d3LambdaFake) ListFunctionUrlConfigs(
 	return &lambda.ListFunctionUrlConfigsOutput{}, nil
 }
 
+// GetFunction is the stub half of a partial test double: this fake embeds
+// LambdaAPI as a nil interface and implements only the calls the enricher
+// made when it was written. The posture enricher now asks this one to tell a
+// function with no resource policy (what these scenarios are about) from a
+// function that no longer exists — both of which GetPolicy answers with
+// ResourceNotFoundException. Every function here exists, so it answers.
+func (f *d3LambdaFake) GetFunction(
+	_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options),
+) (*lambda.GetFunctionOutput, error) {
+	return &lambda.GetFunctionOutput{
+		Configuration: &lambdatypes.FunctionConfiguration{FunctionName: in.FunctionName},
+	}, nil
+}
+
 var _ awsclient.LambdaAPI = (*d3LambdaFake)(nil)
 
 const d3LambdaPublicPolicy = `{"Version":"2012-10-17","Statement":[{"Sid":"AllowAnyone",` +

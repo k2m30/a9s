@@ -320,13 +320,8 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 // handleFlash itself calls (Core.HandleFlash, dispatchHandlerResult) rather
 // than duplicating either body.
 func (m *Model) dispatchDetailOpResultIntents(intents []runtime.UIIntent) tea.Cmd {
-	m.ctrl.ApplyIntents(withoutBannerFlashes(intents))
 	var cmds []tea.Cmd
-	for _, in := range intents {
-		fi, ok := in.(runtime.FlashIntent)
-		if !ok || fi.LogOnly {
-			continue
-		}
+	for _, fi := range m.forwardIntents(intents) {
 		m.flash.gen++
 		flashIntents, flashTasks := m.core.HandleFlash(runtime.FlashEvent{
 			Text: fi.Text, IsError: fi.IsError, NewGen: m.flash.gen,

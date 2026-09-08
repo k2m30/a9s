@@ -53,8 +53,8 @@ func wideTitleHeaderAndRow(t *testing.T, title string) (string, string) {
 		// No status column and no marker column: the widen pass would
 		// otherwise grow the first column past its declared width and hide
 		// what the reservation alone does with the title.
-		StatusCol: -1,
-		MarkerCol: -1,
+		StatusCol:   -1,
+		IdentityCol: -1,
 	})
 	lines := strings.SplitN(stripANSI(out), "\n", 3)
 	if len(lines) < 2 {

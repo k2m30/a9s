@@ -212,7 +212,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 		ID:   taskIDShort,
 		Name: taskIDShort,
 		Fields: map[string]string{
-			"task_id_short":  taskIDShort,
+			"task_id":        taskIDShort,
 			"status":         status,
 			"health":         health,
 			"task_def_short": taskDefShort,

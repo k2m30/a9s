@@ -325,7 +325,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.ParentContext) > 0 {
 			cmd = m.fetchChildResources(msg.ResourceType, msg.ParentContext)
 		} else {
-			cmd = m.fetchResources(msg.ResourceType, m.core.AvailabilityGen())
+			cmd = m.fetchResources(msg.ResourceType, m.core.AvailabilityGen(), messages.FetchProvenanceCanonicalList)
 		}
 		return m, cmd
 	case messages.LoadMore:

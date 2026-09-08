@@ -468,17 +468,17 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 // a recorded failure: a page cap, or a resource that went away between the
 // list call and the per-item one. Both are true statements about coverage with
 // no error to log, and each site says which it is on the line above the write.
-// Three files left the census when a page cap on a COUNTING walk stopped
-// marking its row uninspected: apigw stages, codeartifact packages and sns
-// subscriptions each report their cap as the "+" on the count instead, so the
-// independent check beside them (an authorizer read, a permissions policy, a
-// topic's posture) still reaches the row.
+// Five files left the census when a page cap on a COUNTING walk stopped
+// marking its row uninspected: apigw stages, codeartifact packages, sns
+// subscriptions, efs mount targets and eb-rule targets each report their cap
+// as the "+" on the count instead, so what the enricher did establish beside
+// the capped walk — an authorizer read, a permissions policy, a topic's
+// posture, a file-system policy, the targets the walk already saw — still
+// reaches the row instead of being skipped by FoldWave2Rows.
 var uninspectedWithoutAReasonCensus = map[string]int{
 	"asg_issue_enrichment.go":       1,
-	"eb_rule_issue_enrichment.go":   1,
 	"ec2_issue_enrichment.go":       1,
 	"ecs_task_issue_enrichment.go":  1,
-	"efs_issue_enrichment.go":       1,
 	"iam_group_issue_enrichment.go": 1,
 	"kinesis_issue_enrichment.go":   1,
 	"lambda_issue_enrichment.go":    1,

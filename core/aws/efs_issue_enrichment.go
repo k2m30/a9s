@@ -108,10 +108,13 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			truncated = true
 			if pageFailed {
 				MarkSkipped(&result, r.ID, &failures, pageErr)
-			} else {
-				// A page cap, not a failed call: there is no error to record.
-				result.TruncatedIDs[r.ID] = true
 			}
+			// A page cap is not a failed call and not a coverage gap on the
+			// row: the mount-target findings below need a complete walk and
+			// are skipped, but the policy checks above already answered from
+			// their own call. Marking the id uninspected would make
+			// FoldWave2Rows skip the row and drop them — which is exactly what
+			// running them first was meant to prevent.
 			return
 		}
 

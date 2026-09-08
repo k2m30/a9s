@@ -86,7 +86,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					// Partial coverage: fall through to fetch so missing IDs are retrieved.
 					if len(filtered) < len(result.RelatedIDs) {
-						fetchCmd := m.fetchResources(msg.TargetType, m.core.AvailabilityGen())
+						fetchCmd := m.fetchResources(msg.TargetType, m.core.AvailabilityGen(), messages.FetchProvenanceFilteredList)
 						return m, fetchCmd
 					}
 				}

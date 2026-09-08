@@ -255,10 +255,7 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	// mirrors syncExactTotalToMenu's issue-count half via the shared
 	// syncMenuIssueCount chokepoint, so a TUI-only sweep-driven badge doesn't
 	// mask this lane's inability to update it any other way.
-	canon := typeName
-	if td := resource.FindResourceType(typeName); td != nil {
-		canon = td.ShortName
-	}
+	canon := resource.CanonicalShortName(typeName)
 	if ms := c.rootMenuState(); ms != nil {
 		// authoritative propagates the caller's own authority over issueCount:
 		// when true (issueCount IS the confirmed Wave-2 result for canon), even

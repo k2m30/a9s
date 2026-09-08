@@ -130,8 +130,13 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			MarkSkipped(&result, r.ID, &failures, fetchErr)
 		case targetsTruncated:
 			truncated = true
-			// A page cap, not a failed call: there is no error to record.
-			result.TruncatedIDs[r.ID] = true
+			// A page cap, not a failed call, and not a coverage gap on the
+			// row: the "+" on target_count is where it is reported. The rows
+			// below name targets the walk really did see — a target without a
+			// dead-letter config is a fact whatever lies on page 11 — and
+			// marking the id uninspected would make FoldWave2Rows drop every
+			// one of them. Only noTargets, which needs a complete walk, is
+			// suppressed, by its own !targetsTruncated guard above.
 		}
 		result.FieldUpdates[ruleName] = map[string]string{
 			"target_count": targetCountStr,

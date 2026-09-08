@@ -173,14 +173,20 @@ func (s *Store) Revision() int { return s.revision }
 // data: <cache root>/<profile>--costs.yaml. Cost data is account-scoped,
 // not region-scoped (data-model.md), so — unlike core/cache's
 // per-profile+region directories — there is exactly one file per profile.
-// Root resolution and filename sanitization come from core/cache
-// (Root/SanitizePathElem) — the same single source core/cache.Dir uses.
+// Root resolution and the filename encoding come from core/cache
+// (Root/EncodePathElem) — the same single source core/cache.DirIn uses.
+//
+// EncodePathElem, not SanitizePathElem: the latter maps a slash and a space
+// alike to an underscore, so two profiles differing only there would share
+// one costs file and read each other's spend. Like the pair directories,
+// there is no fallback to the collapsed name — a profile whose name needs
+// escaping starts cold once and writes its own file from then on.
 func CachePath(profile string) string {
 	root := cache.Root()
 	if root == "" {
 		return ""
 	}
-	return filepath.Join(root, cache.SanitizePathElem(profile)+"--costs.yaml")
+	return filepath.Join(root, cache.EncodePathElem(profile)+"--costs.yaml")
 }
 
 // NewMemoryStore returns an empty, memory-only Store for profile: no disk

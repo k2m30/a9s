@@ -455,7 +455,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 		Columns: resource.EcsSvcTaskColumns(),
 		FieldKeys: []string{
-			"task_id_short", "status", "health", "task_def_short",
+			"task_id", "status", "health", "task_def_short",
 			"started_at", "stopped_reason", "stop_code", "task_arn",
 		},
 		Color: func(r domain.Resource) domain.Color {

@@ -208,10 +208,7 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 	if shortName == "" {
 		return
 	}
-	canon := shortName
-	if td := resource.FindResourceType(shortName); td != nil {
-		canon = td.ShortName
-	}
+	canon := resource.CanonicalShortName(shortName)
 	if c.menuSweepAcked == nil {
 		c.menuSweepAcked = make(map[string]bool)
 	}
@@ -517,10 +514,7 @@ func (c *Controller) Close() {
 // Stage 3 to fold into whatever core/app's own RowStore migration does.
 func (c *Controller) menuRefreshing() bool {
 	for _, shortName := range c.core.ProbeOriginTypeNames() {
-		canon := shortName
-		if td := resource.FindResourceType(shortName); td != nil {
-			canon = td.ShortName
-		}
+		canon := resource.CanonicalShortName(shortName)
 		if !c.menuSweepAcked[canon] {
 			return true
 		}

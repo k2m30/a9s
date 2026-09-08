@@ -112,13 +112,13 @@ func (c *Core) StampListFetchSeq(task *TaskRequest) {
 // resolving an alias to the canonical short name the apply point compares
 // against.
 func (c *Core) NextListFetchSeq(shortName string) domain.Gen {
-	return c.session.ListFetchSeqNext(canonShortName(shortName))
+	return c.session.ListFetchSeqNext(resource.CanonicalShortName(shortName))
 }
 
 // LatestListFetchSeq returns the newest canonical-list fetch sequence handed
 // out for shortName — the only value the apply point accepts.
 func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
-	return c.session.ListFetchSeqLatest(canonShortName(shortName))
+	return c.session.ListFetchSeqLatest(resource.CanonicalShortName(shortName))
 }
 
 // ListResultSuperseded reports whether a list result dispatched for shortName
@@ -695,7 +695,14 @@ func (c *Core) availabilityFromResourceCache() (
 			issues = unifiedIssueCount(tr.Rows, *td, nil)
 		}
 		issueCounts[rt] = issues
-		issueKnown[rt] = true
+		// "Probed", not "has rows": the badge's known/unknown state is the
+		// probe status the sweep recorded (session.EnrichmentRan, written
+		// where a Wave-2 result lands), never row presence. A type whose rows
+		// carry only Wave-1 findings has not been asked the Wave-2 question
+		// yet, and persisting it as "probed, this many issues" is the answer
+		// nobody gave. A type with no registered Wave-2 enricher is known by
+		// its Wave-1 rows alone — there is no second answer coming.
+		issueKnown[rt] = c.session.EnrichmentRanGet(rt) || !c.HasIssueEnricher(rt)
 	}
 	return
 }
@@ -733,7 +740,13 @@ func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources m
 		truncated := probeTruncated[shortName]
 		exact := !truncated
 		td := resource.FindResourceType(shortName)
-		issuesKnown := td != nil && !td.ExcludeFromIssueBadge
+		// Same rule as availabilityFromResourceCache: "known" is the
+		// answer a probe gave, not the fact that the type carries a badge.
+		// A type with a registered Wave-2 enricher that has not answered yet
+		// has no issue count to persist, and writing one from Wave-1 rows
+		// alone makes the next session open on a confident zero.
+		issuesKnown := td != nil && !td.ExcludeFromIssueBadge &&
+			(c.session.EnrichmentRanGet(shortName) || !c.HasIssueEnricher(shortName))
 		issues := 0
 		if issuesKnown {
 			issues = unifiedIssueCount(resources, *td, nil)

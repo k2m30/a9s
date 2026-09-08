@@ -19,7 +19,7 @@
 //     fully-controlled per-type config.ViewsConfig (GetViewDef replaces
 //     userDef.List wholesale, giving byte-for-byte control over each
 //     column's Key/Path/Title) + RegisterFallbackTypeDef (controls
-//     IdentityKey/Name), read back via Snapshot().Body.List.MarkerCol — the
+//     IdentityKey/Name), read back via Snapshot().Body.List.IdentityCol — the
 //     exported field buildListBody bakes IdentityColumnIndex's return into.
 //  2. renderListWidenLifecycleColumn (internal/tui/views/resourcelist.go) —
 //     NOT a byte-identical mirror of the dead widenLifecycleColumn (it widens
@@ -46,7 +46,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// wave3MarkerColControllerWith builds a Controller navigated to the real "ec2"
+// wave3IdentityColControllerWith builds a Controller navigated to the real "ec2"
 // catalog command (so ActionCommand routing succeeds) but with columns and
 // identity resolution fully overridden: cfg's Views["ec2"].List replaces the
 // built-in column set wholesale (config.GetViewDef: "user-provided fields
@@ -55,7 +55,7 @@ import (
 // ("the model's explicitly-supplied typeDef rather than the catalog's when
 // they differ" — RegisterFallbackTypeDef's own doc). Both must be set before
 // the first Snapshot()-triggering call, matching SetViewConfig's contract.
-func wave3MarkerColControllerWith(t *testing.T, td resource.ResourceTypeDef, cols []config.ListColumn) *app.Controller {
+func wave3IdentityColControllerWith(t *testing.T, td resource.ResourceTypeDef, cols []config.ListColumn) *app.Controller {
 	t.Helper()
 	td.ShortName = "ec2"
 	cfg := &config.ViewsConfig{Views: map[string]config.ViewDef{"ec2": {List: cols}}}
@@ -66,17 +66,17 @@ func wave3MarkerColControllerWith(t *testing.T, td resource.ResourceTypeDef, col
 	return c
 }
 
-// wave3MarkerColOf applies a single resource and returns the resolved
-// full-column-space MarkerCol index — the live equivalent of calling
+// wave3IdentityColOf applies a single resource and returns the resolved
+// full-column-space IdentityCol index — the live equivalent of calling
 // resolveIdentityColumn(cols, td) directly.
-func wave3MarkerColOf(t *testing.T, c *app.Controller) int {
+func wave3IdentityColOf(t *testing.T, c *app.Controller) int {
 	t.Helper()
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{{ID: "r1", Name: "r1"}}, nil, false)
 	lb := c.Snapshot().Body.List
 	if lb == nil {
 		t.Fatal("nil list body after ApplyResourcesLoaded")
 	}
-	return lb.MarkerCol
+	return lb.IdentityCol
 }
 
 // ===========================================================================
@@ -90,7 +90,7 @@ func wave3MarkerColOf(t *testing.T, c *app.Controller) int {
 // the guard itself is a trivial zero-iteration loop with no branch to lose.
 // ===========================================================================
 
-func TestResolveListMarkerCol_MatchesIdentityKey(t *testing.T) {
+func TestResolveListIdentityCol_MatchesIdentityKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "EC2 Instances", IdentityKey: "foo"}
 	cols := []config.ListColumn{
 		{Key: "status", Title: "Status", Width: 10},
@@ -98,22 +98,22 @@ func TestResolveListMarkerCol_MatchesIdentityKey(t *testing.T) {
 		{Key: "foo", Title: "Foo", Width: 10},
 		{Key: "name", Title: "Name", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 2 {
-		t.Errorf("MarkerCol with IdentityKey=%q: got %d, want 2", td.IdentityKey, got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 2 {
+		t.Errorf("IdentityCol with IdentityKey=%q: got %d, want 2", td.IdentityKey, got)
 	}
 }
 
-func TestResolveListMarkerCol_FallsThroughToNameKey(t *testing.T) {
+func TestResolveListIdentityCol_FallsThroughToNameKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
 		{Key: "id", Title: "ID", Width: 10},
 		{Key: "name", Title: "Name", Width: 10},
 		{Key: "status", Title: "Status", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 1 {
-		t.Errorf("MarkerCol via name key: got %d, want 1", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 1 {
+		t.Errorf("IdentityCol via name key: got %d, want 1", got)
 	}
 }
 
@@ -123,7 +123,7 @@ func TestResolveListMarkerCol_FallsThroughToNameKey(t *testing.T) {
 // marker on a foreign column. With the step gone the cascade reaches the
 // index-0 default. The old want of 2 asserts the deleted step and must not be
 // restored.
-func TestResolveListMarkerCol_PathIdentifierSubstringDoesNotElect(t *testing.T) {
+func TestResolveListIdentityCol_PathIdentifierSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
 		{Key: "id", Title: "ID", Width: 10},
@@ -131,27 +131,27 @@ func TestResolveListMarkerCol_PathIdentifierSubstringDoesNotElect(t *testing.T) 
 		{Path: "DBInstanceIdentifier", Title: "DB Instance", Width: 10},
 		{Path: "Engine", Title: "Engine", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 0 {
-		t.Errorf("MarkerCol with path=DBInstanceIdentifier: got %d, want 0", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 0 {
+		t.Errorf("IdentityCol with path=DBInstanceIdentifier: got %d, want 0", got)
 	}
 }
 
 // Inverted for w45 spec row 4, as above: "FunctionName" in a path is a
 // substring, not a declaration. The old want of 1 asserts the deleted step.
-func TestResolveListMarkerCol_PathNameSubstringDoesNotElect(t *testing.T) {
+func TestResolveListIdentityCol_PathNameSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "Lambda Functions"}
 	cols := []config.ListColumn{
 		{Title: "Arn", Width: 10},
 		{Path: "FunctionName", Title: "Function", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 0 {
-		t.Errorf("MarkerCol with path containing Name: got %d, want 0", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 0 {
+		t.Errorf("IdentityCol with path containing Name: got %d, want 0", got)
 	}
 }
 
-func TestResolveListMarkerCol_FallsThroughToTitle(t *testing.T) {
+func TestResolveListIdentityCol_FallsThroughToTitle(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "ACM Certificates"}
 	cols := []config.ListColumn{
 		{Title: "ARN", Width: 10},
@@ -159,13 +159,13 @@ func TestResolveListMarkerCol_FallsThroughToTitle(t *testing.T) {
 		{Title: "Region", Width: 10},
 		{Title: "Name", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 3 {
-		t.Errorf("MarkerCol via title=Name: got %d, want 3", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 3 {
+		t.Errorf("IdentityCol via title=Name: got %d, want 3", got)
 	}
 }
 
-func TestResolveListMarkerCol_CaseInsensitiveTitleMatch(t *testing.T) {
+func TestResolveListIdentityCol_CaseInsensitiveTitleMatch(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "ACM Certificates"}
 	cols := []config.ListColumn{
 		{Title: "ARN", Width: 10},
@@ -173,58 +173,58 @@ func TestResolveListMarkerCol_CaseInsensitiveTitleMatch(t *testing.T) {
 		{Title: "NAME", Width: 10},
 		{Title: "Region", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 2 {
-		t.Errorf("MarkerCol case-insensitive title match: got %d, want 2", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 2 {
+		t.Errorf("IdentityCol case-insensitive title match: got %d, want 2", got)
 	}
 }
 
-func TestResolveListMarkerCol_TitleMatchesTypeName(t *testing.T) {
+func TestResolveListIdentityCol_TitleMatchesTypeName(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "S3 Buckets"}
 	cols := []config.ListColumn{
 		{Title: "ARN", Width: 10},
 		{Title: "Bucket", Width: 10},
 		{Title: "s3 buckets", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 2 {
-		t.Errorf("MarkerCol via td.Name title match: got %d, want 2", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 2 {
+		t.Errorf("IdentityCol via td.Name title match: got %d, want 2", got)
 	}
 }
 
-func TestResolveListMarkerCol_FallsBackToZero(t *testing.T) {
+func TestResolveListIdentityCol_FallsBackToZero(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "ECR Repositories"}
 	cols := []config.ListColumn{
 		{Key: "arn", Title: "ARN", Width: 10},
 		{Key: "status", Title: "Status", Width: 10},
 		{Key: "region", Title: "Region", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 0 {
-		t.Errorf("MarkerCol fallback: got %d, want 0", got)
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 0 {
+		t.Errorf("IdentityCol fallback: got %d, want 0", got)
 	}
 }
 
-func TestResolveListMarkerCol_IdentityKeyBeatsNameKey(t *testing.T) {
+func TestResolveListIdentityCol_IdentityKeyBeatsNameKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "DB Instances", IdentityKey: "db_id"}
 	cols := []config.ListColumn{
 		{Key: "name", Title: "Name", Width: 10},
 		{Key: "db_id", Title: "DB ID", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 1 {
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 1 {
 		t.Errorf("IdentityKey should beat name key: got %d, want 1", got)
 	}
 }
 
-func TestResolveListMarkerCol_IdentityKeyNotFound_FallsToNameKey(t *testing.T) {
+func TestResolveListIdentityCol_IdentityKeyNotFound_FallsToNameKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "EC2 Instances", IdentityKey: "nonexistent_key"}
 	cols := []config.ListColumn{
 		{Key: "name", Title: "Name", Width: 10},
 		{Key: "status", Title: "Status", Width: 10},
 	}
-	c := wave3MarkerColControllerWith(t, td, cols)
-	if got := wave3MarkerColOf(t, c); got != 0 {
+	c := wave3IdentityColControllerWith(t, td, cols)
+	if got := wave3IdentityColOf(t, c); got != 0 {
 		t.Errorf("IdentityKey not found, should fall to name key at idx 0: got %d, want 0", got)
 	}
 }

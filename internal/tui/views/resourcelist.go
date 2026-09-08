@@ -373,12 +373,19 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				token := m.ctrl.GetListPaginationCursor()
 				pc := m.ctrl.GetListParentContext()
 				ff := m.ctrl.GetListFetchFilter()
+				// The screen's own lane, from the one owner: a client-side
+				// related drill has neither a parent context nor a fetch
+				// filter, so a continuation classified from those two maps
+				// calls itself the type's canonical list and the delivery gate
+				// refuses it on the very screen that asked for the page.
+				lane := m.ctrl.GetListLane()
 				return m, func() tea.Msg {
 					return messages.LoadMore{
 						ResourceType:      rt,
 						ContinuationToken: token,
 						ParentContext:     pc,
 						FetchFilter:       ff,
+						Provenance:        lane,
 					}
 				}
 			}

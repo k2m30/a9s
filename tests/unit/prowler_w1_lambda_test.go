@@ -86,6 +86,17 @@ func (f *pw1LambdaPostureFake) ListFunctionUrlConfigs(_ context.Context, in *lam
 	return &lambda.ListFunctionUrlConfigsOutput{FunctionUrlConfigs: f.urlConfigs[name]}, nil
 }
 
+// GetFunction is the stub half of a partial test double: this fake embeds
+// LambdaAPI as a nil interface and implements only the two posture reads. The
+// enricher now asks this one to tell a function with no resource policy from a
+// function that is gone, which GetPolicy answers with the same code. Every
+// function in these scenarios exists.
+func (f *pw1LambdaPostureFake) GetFunction(_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
+	return &lambda.GetFunctionOutput{
+		Configuration: &lambdatypes.FunctionConfiguration{FunctionName: in.FunctionName},
+	}, nil
+}
+
 // pw1LambdaFn builds a realistic healthy ListFunctions entry: active, current
 // runtime, a dead-letter queue, and an environment that references its
 // credential rather than carrying it.

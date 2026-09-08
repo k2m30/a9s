@@ -916,9 +916,10 @@ func isResourceDrillQuery(q costs.Query) bool {
 // isClassifiedResourceDrillRefusal reports whether err is one of the
 // specific classified CE sentinels a resource-level drill can legitimately
 // hit as an honest, expected outcome rather than a fetch failure:
-// ErrCostsAccessDenied (the real-account shape — CE's resource-level opt-in
-// refusal arrives as AccessDeniedException, "Resource-level data
-// granularity is an opt-in only feature...") and ErrCostsDataUnavailable.
+// ErrCostsAccessDenied (the real-account shape — CE refuses resource-level
+// data until the account opts in) and ErrCostsDataUnavailable. Which wire
+// codes map to those sentinels is the classifier's to say, not this
+// comment's.
 func isClassifiedResourceDrillRefusal(err error) bool {
 	return errors.Is(err, awsclient.ErrCostsAccessDenied) || errors.Is(err, awsclient.ErrCostsDataUnavailable)
 }
@@ -1030,7 +1031,11 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 				c.applyCostsBack(cs)
 				cs.DrillRefusedReason = costsResourceDrillRefusalNote(ev.Err)
 			} else {
-				cs.ErrorMsg = ev.Err.Error()
+				// The words core/aws owns, not the chain: %v-ing the error
+				// prints the SDK's "operation error <service>: <op>" preamble,
+				// which repeats what the screen already says and pushes the
+				// sentence the operator can act on off the end of the line.
+				cs.ErrorMsg = awsclient.CauseOf(ev.Err)
 			}
 		}
 		return nil

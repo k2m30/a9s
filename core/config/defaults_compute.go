@@ -154,7 +154,7 @@ func computeDefaultViews() map[string]ViewDef {
 		// Child views for compute resources
 		"ecs_tasks": {
 			List: []ListColumn{
-				{Title: "Task ID", Key: "task_id_short", Width: 14},
+				{Title: "Task ID", Key: "task_id", Width: 14},
 				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Health", Key: "health", Width: 10},
 				{Title: "Task Definition", Key: "task_def_short", Width: 28},
@@ -194,7 +194,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Request ID", Key: "request_id", Width: 38},
 				{Title: "Status", Key: "status", Width: 10},
 				{Title: "Duration", Key: "duration_ms", SortKey: "duration_ms_raw", Width: 14},
-				{Title: "Memory", Key: "memory_used", SortKey: "memory_used_mb_raw", Width: 16},
+				{Title: "Memory", Key: "memory_used", SortKey: "memory_used_mb", Width: 16},
 				{Title: "Cold Start", Key: "cold_start", Width: 12},
 			},
 			Detail: []DetailField{

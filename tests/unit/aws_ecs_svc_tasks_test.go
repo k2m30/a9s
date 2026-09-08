@@ -21,7 +21,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // TestFetchEcsSvcTasks_Basic verifies parsing of 2 running tasks from a service,
-// checking all computed fields: task_id_short, status, health, task_def_short,
+// checking all computed fields: task_id, status, health, task_def_short,
 // started_at, stopped_reason.
 func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
@@ -82,11 +82,11 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
-	t.Run("task_0_task_id_short", func(t *testing.T) {
+	t.Run("task_0_task_id", func(t *testing.T) {
 		r := result.Resources[0]
-		// task_id_short should be the last segment of the task ARN
-		if r.Fields["task_id_short"] != "abc123def456" {
-			t.Errorf("Fields[task_id_short]: expected %q, got %q", "abc123def456", r.Fields["task_id_short"])
+		// task_id should be the last segment of the task ARN
+		if r.Fields["task_id"] != "abc123def456" {
+			t.Errorf("Fields[task_id]: expected %q, got %q", "abc123def456", r.Fields["task_id"])
 		}
 	})
 
@@ -153,7 +153,7 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 
 	// Verify required fields on all tasks
 	t.Run("required_fields_present", func(t *testing.T) {
-		requiredFields := []string{"task_id_short", "status", "health", "task_def_short", "started_at", "stopped_reason"}
+		requiredFields := []string{"task_id", "status", "health", "task_def_short", "started_at", "stopped_reason"}
 		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
@@ -380,7 +380,7 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 }
 
 // TestFetchEcsSvcTasks_ComputedFields verifies that computed fields are correct:
-// task_id_short from ARN, task_def_short from TaskDefinitionArn.
+// task_id from ARN, task_def_short from TaskDefinitionArn.
 func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
@@ -425,9 +425,9 @@ func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 
 	r := result.Resources[0]
 
-	t.Run("task_id_short_extracts_last_segment", func(t *testing.T) {
-		if r.Fields["task_id_short"] != "a1b2c3d4e5f6" {
-			t.Errorf("Fields[task_id_short]: expected %q, got %q", "a1b2c3d4e5f6", r.Fields["task_id_short"])
+	t.Run("task_id_extracts_last_segment", func(t *testing.T) {
+		if r.Fields["task_id"] != "a1b2c3d4e5f6" {
+			t.Errorf("Fields[task_id]: expected %q, got %q", "a1b2c3d4e5f6", r.Fields["task_id"])
 		}
 	})
 
@@ -484,9 +484,9 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 		// If we got here, no panic occurred
 	})
 
-	t.Run("task_id_short_empty", func(t *testing.T) {
-		if r.Fields["task_id_short"] != "" {
-			t.Errorf("Fields[task_id_short]: expected empty, got %q", r.Fields["task_id_short"])
+	t.Run("task_id_empty", func(t *testing.T) {
+		if r.Fields["task_id"] != "" {
+			t.Errorf("Fields[task_id]: expected empty, got %q", r.Fields["task_id"])
 		}
 	})
 
@@ -595,7 +595,7 @@ func TestFetchEcsSvcTasks_RawStruct(t *testing.T) {
 func TestEcsSvcTaskColumns(t *testing.T) {
 	cols := resource.EcsSvcTaskColumns()
 
-	expectedKeys := []string{"task_id_short", "status", "health", "task_def_short", "started_at", "stopped_reason"}
+	expectedKeys := []string{"task_id", "status", "health", "task_def_short", "started_at", "stopped_reason"}
 
 	t.Run("column_count", func(t *testing.T) {
 		if len(cols) != 6 {

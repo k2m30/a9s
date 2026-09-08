@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -332,13 +333,23 @@ func (c *Controller) mergeRelatedCacheIntoDetail(resourceType string, res resour
 		return
 	}
 	for _, entry := range cached {
-		errMsg := ""
-		if err := entry.Result.Err(); err != nil {
-			errMsg = err.Error()
-		}
+		errMsg := relatedRowErrorText(entry.Result)
 		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType(),
 			entry.Result.EffectiveState(), entry.Result.Count(), false, errMsg, entry.Result.Truncated(), entry.Result.ResourceIDs(), entry.Result.FetchFilter())
 	}
+}
+
+// relatedRowErrorText is the related panel's per-row failure text. One
+// producer for the two lanes that build it — a result as it lands
+// (handle.go's foldRelatedCheckResultLocked) and the cache replay of an
+// earlier one above — so the panel cannot say two things about one fact.
+// The words are the ones core/aws owns, never the raw chain, whose wrapper
+// preamble repeats the call the row already names.
+func relatedRowErrorText(res resource.RelatedCheckResult) string {
+	if err := res.Err(); err != nil {
+		return awsclient.CauseOf(err)
+	}
+	return ""
 }
 
 // SeedFilteredListFromCache seeds the top list screen from the session
@@ -359,10 +370,7 @@ func (c *Controller) seedFilteredListFromCache(targetType string, filter map[str
 	if len(filter) == 0 {
 		return false
 	}
-	canon := targetType
-	if td := resource.FindResourceType(targetType); td != nil {
-		canon = td.ShortName
-	}
+	canon := resource.CanonicalShortName(targetType)
 	entry, ok := c.core.FilteredRowsGet(canon, filter)
 	if !ok || len(entry.Rows) == 0 {
 		return false
@@ -374,6 +382,7 @@ func (c *Controller) seedFilteredListFromCache(targetType string, filter map[str
 	ls.Rows = append([]resource.Resource(nil), entry.Rows...)
 	ls.Loading = false
 	ls.HasPagination = entry.Truncated
+	ls.PopulationUnconfirmed = entry.Truncated
 	ls.PaginationCursor = entry.Cursor
 	ls.Refreshing = true
 	ls.rowsVersion++

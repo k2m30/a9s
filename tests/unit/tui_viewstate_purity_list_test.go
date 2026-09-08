@@ -102,11 +102,11 @@ func TestViewStatePurity_List_NoGlyphIsDerivedFromFindings(t *testing.T) {
 		Color:      "healthy",
 	}
 	body := app.ListBody{
-		Columns:   purityColumns(),
-		Rows:      []app.ListRow{row},
-		Selected:  0,
-		MarkerCol: 0,
-		StatusCol: 1, // "Status" column — matches purityColumns()[1]
+		Columns:     purityColumns(),
+		Rows:        []app.ListRow{row},
+		Selected:    0,
+		IdentityCol: 0,
+		StatusCol:   1, // "Status" column — matches purityColumns()[1]
 		// Deliberately carries an issue-severity finding for res-2, which a
 		// re-deriving renderer would surface as a "! " prefix.
 		EnrichmentFindings: map[string][]domain.Finding{
@@ -154,11 +154,11 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 		Color:      "healthy",
 	}
 	body := app.ListBody{
-		Columns:   purityColumns(),
-		Rows:      []app.ListRow{row},
-		Selected:  0,
-		MarkerCol: 0,
-		StatusCol: 1, // "Status" column — matches purityColumns()[1]
+		Columns:     purityColumns(),
+		Rows:        []app.ListRow{row},
+		Selected:    0,
+		IdentityCol: 0,
+		StatusCol:   1, // "Status" column — matches purityColumns()[1]
 		EnrichmentFindings: map[string][]domain.Finding{
 			"res-3": {{
 				Code:     "PURITY-TEST",
@@ -183,8 +183,8 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 
 // ---------------------------------------------------------------------------
 // Case 4 — deleted with the row-decorator plumbing (tui5 row 5). It pinned
-// that the glyph landed on body.MarkerCol's cell rather than on a re-derived
-// identity column; no cell carries a glyph any more. body.MarkerCol survives
+// that the glyph landed on body.IdentityCol's cell rather than on a re-derived
+// identity column; no cell carries a glyph any more. body.IdentityCol survives
 // for the widen pass, and Case 2 covers the "no glyph, whatever the findings
 // say" half. Do not restore a glyph-placement pin.
 // ---------------------------------------------------------------------------

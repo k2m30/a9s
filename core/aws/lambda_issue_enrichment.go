@@ -6,7 +6,6 @@
 package aws
 
 import (
-	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -81,14 +80,16 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
 
 		}
-		if err := cmp.Or(policyErr, urlErr); err != nil {
-			if IsNotFoundErr(err) {
-				// The function went away between the list call and this one:
-				// a race, not a failure to log.
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
-			MarkSkipped(&result, r.ID, &failures, err)
+		switch realErr := lambdaRealErr(policyErr, urlErr); {
+		case realErr != nil:
+			MarkSkipped(&result, r.ID, &failures, realErr)
+		case (policyErr != nil || urlErr != nil) && lambdaFunctionGone(ctx, api, r.ID):
+			// The function went away between the list call and this one: a
+			// race, not a failure to log — and nothing about its posture was
+			// inspected, so the row must not read as clean. The healthy case
+			// answers the same wire code and lands here with the function
+			// still there, recording nothing.
+			result.TruncatedIDs[r.ID] = true
 		}
 	})
 
@@ -103,9 +104,6 @@ func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, own
 		return api.GetPolicy(ctx, &lambda.GetPolicyInput{FunctionName: aws.String(name)})
 	})
 	if err != nil {
-		if isLambdaNoPolicy(err) {
-			return nil, false, nil
-		}
 		return nil, false, err
 	}
 	if out == nil || out.Policy == nil || *out.Policy == "" {
@@ -131,9 +129,6 @@ func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlCon
 		return api.ListFunctionUrlConfigs(ctx, &lambda.ListFunctionUrlConfigsInput{FunctionName: aws.String(name)})
 	})
 	if err != nil {
-		if isLambdaNoPolicy(err) {
-			return nil, false, nil
-		}
 		return nil, false, err
 	}
 	if out == nil {
@@ -152,11 +147,36 @@ func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlCon
 	return nil, false, nil
 }
 
-// isLambdaNoPolicy reports the "this function has no policy / no URL config"
-// answer. Lambda returns ResourceNotFoundException for both the absent
-// resource policy and the absent function-URL config, which is the healthy
-// state — distinct from a deleted function, which the enricher can only see
-// as the same code and therefore also treats as "nothing to report".
+// isLambdaNoPolicy reports the wire code Lambda answers when the thing asked
+// for is absent. It is deliberately NOT a verdict: the same code means "this
+// function has no resource policy / no URL config" (healthy) and "this
+// function no longer exists" (a race). Which one it is takes a second
+// question — see lambdaFunctionGone — asked once by the enricher rather than
+// guessed at each call site.
 func isLambdaNoPolicy(err error) bool {
 	return ErrCodeIs(err, "ResourceNotFoundException")
+}
+
+// lambdaRealErr returns the first error that is an actual failure, skipping
+// the absent-resource answers isLambdaNoPolicy names. Taking cmp.Or of the two
+// raw errors instead would let a healthy "no policy" hide a genuine
+// ListFunctionUrlConfigs failure behind it.
+func lambdaRealErr(errs ...error) error {
+	for _, err := range errs {
+		if err != nil && !isLambdaNoPolicy(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// lambdaFunctionGone reports whether the function is absent, which is the one
+// question GetPolicy's and ListFunctionUrlConfigs' shared error code cannot
+// answer. Asked only after one of them reported absence, so a healthy
+// function costs no extra call.
+func lambdaFunctionGone(ctx context.Context, api LambdaGetFunctionAPI, name string) bool {
+	_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
+		return api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(name)})
+	})
+	return isLambdaNoPolicy(err)
 }

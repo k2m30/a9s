@@ -223,7 +223,6 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 			"memory_size_mb":         memorySizeMB,
 			"memory_used_mb":         memoryUsedMB,
 			"memory_used":            memoryUsed,
-			"memory_used_mb_raw":     memoryUsedMB,
 			"init_duration_ms":       initDurationMs,
 			"cold_start":             coldStart,
 			"xray_trace_id":          xrayTraceID,

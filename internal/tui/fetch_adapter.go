@@ -17,6 +17,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -33,9 +35,20 @@ type profilesLoadedMsg struct {
 // converts the result to ResourcesLoaded or APIError.
 // gen is the AvailabilityGen captured at dispatch time; it is stamped onto the
 // returned message so the handler can discard stale results after a switch.
-func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
+//
+// lane is the screen's own lane, from core/app's one owner (GetListLane) for
+// a refresh of an open list, or the constant the call site knows for a fresh
+// list open. It decides two things together, exactly as the continuation lane
+// does: which screen the delivery gate will accept this result on, and whether
+// the fetch takes a list sequence at all — only the type's canonical list can
+// supersede, so a drill's refresh must never hand out one and overtake the
+// verification of the list beneath it.
+func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane messages.FetchProvenance) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
-	seq := m.core.NextListFetchSeq(resourceType)
+	var seq domain.Gen
+	if lane.CanonicalList() {
+		seq = m.core.NextListFetchSeq(resourceType)
+	}
 	return func() tea.Msg {
 		res, err := m.core.FetchResources(ctx, clients, resourceType)
 		// Partial-success contract: fetchers may return BOTH a non-empty
@@ -43,7 +56,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 		// surface the error AND keep the partial Resources; hard failures
 		// (no resources at all) route through APIError.
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceCanonicalList}
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: lane}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -52,7 +65,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      seq,
-			Provenance:   messages.FetchProvenanceCanonicalList,
+			Provenance:   lane,
 		}
 	}
 }
@@ -195,7 +208,10 @@ func (m *Model) fetchProfiles() tea.Cmd {
 	return func() tea.Msg {
 		profiles, err := m.core.FetchProfiles()
 		if err != nil {
-			return messages.Flash{Text: err.Error(), IsError: true}
+			// The error's own words, through the one extraction — the same
+			// one the controller's profile selector uses, so a failed local
+			// config read reads the same on both lanes.
+			return messages.Flash{Text: awsclient.MessageOf(err), IsError: true}
 		}
 		return profilesLoadedMsg{profiles: profiles}
 	}

@@ -21,8 +21,9 @@ package unit
 //      GetGroup errors on the second group → TruncatedIDs["second-group"] == true,
 //      TruncatedIDs["first-group"] == false (first succeeded), Truncated == false
 //      (iam-group is "~"-only — the gap never lower-bounds the issue badge).
-//   2. TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit:
-//      NextToken always set → after PerParentPageCap pages, TruncatedIDs[ruleID] == true.
+//   2. TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected:
+//      NextToken always set → after PerParentPageCap pages, Truncated == true
+//      but TruncatedIDs[ruleID] == false: the cap is reported on the count.
 //      (eb-rule can emit SevBroken findings, so its Truncated follows IssueCount
 //      lower-bound rules independently of this file's iam-group case.)
 //   3. TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs:
@@ -176,12 +177,18 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 // Test 2: pagination cap hit → TruncatedIDs populated for the capped rule
 // ---------------------------------------------------------------------------
 
-// TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit verifies that when
-// ListTargetsByRule always returns a NextToken (simulating a huge rule), after
-// PerParentPageCap pages the enricher marks the rule as truncated:
-//   - result.TruncatedIDs[ruleID] == true
-//   - result.Truncated == true
-func TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit(t *testing.T) {
+// TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected verifies what
+// a page cap on a per-parent COUNTING walk records: the aggregate Truncated
+// flag (the issue badge is a lower bound) and a "+" on the count, but NOT a
+// per-row coverage gap.
+//
+// The assertion below is inverted from its original form, which required
+// TruncatedIDs[ruleID] == true. That is the defect wipfix row 31 deletes:
+// FoldWave2Rows skips every id in TruncatedIDs, so marking the row dropped the
+// dead-letter rows the walk had already found on the pages that did arrive —
+// targets that really exist. Do not restore the old assertion; a cap on one
+// walk never suppresses what that walk already saw.
+func TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected(t *testing.T) {
 	const ruleName = "huge-rule-truncated"
 
 	fake := newEBPaginatedFake()
@@ -220,12 +227,13 @@ func TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit(t *testing.T
 		t.Error("Truncated must be true when pagination cap is hit")
 	}
 
-	// TruncatedIDs must carry a true entry for the capped rule.
+	// TruncatedIDs must NOT carry the capped rule — see this test's own doc.
 	if result.TruncatedIDs == nil {
-		t.Fatal("TruncatedIDs must not be nil when per-rule pagination cap is hit")
+		t.Fatal("TruncatedIDs must not be nil")
 	}
-	if !result.TruncatedIDs[ruleName] {
-		t.Errorf("TruncatedIDs[%q] = false, want true (pagination cap hit)", ruleName)
+	if result.TruncatedIDs[ruleName] {
+		t.Errorf("TruncatedIDs[%q] = true, want false — a page cap on the target COUNT is reported "+
+			"by the \"+\" on target_count, not by marking the row uninspected", ruleName)
 	}
 }
 

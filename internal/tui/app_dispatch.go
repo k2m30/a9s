@@ -48,28 +48,43 @@ import (
 // rendererState half of an intent whose controller half the forward pass
 // already applied. See each case comment for which half is being applied
 // here to avoid double-application.
-func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
+// forwardIntents applies the whole slice to the controller except the banner
+// flashes, and returns those for the caller to route through handleFlash.
+//
+// One rule, one place. A banner flash reaches the controller exactly once, at
+// the end of the handleFlash route, so the bulk forward must withhold it and
+// the caller must re-emit it; two copies of that pairing drift into a flash
+// applied twice (two error-log entries for one failure) or dropped. LogOnly
+// flashes are not banners: the forward carries them and nothing is returned.
+func (m *Model) forwardIntents(intents []runtime.UIIntent) []runtime.FlashIntent {
 	m.ctrl.ApplyIntents(withoutBannerFlashes(intents))
+	var banners []runtime.FlashIntent
+	for _, in := range intents {
+		if fi, ok := in.(runtime.FlashIntent); ok && !fi.LogOnly {
+			banners = append(banners, fi)
+		}
+	}
+	return banners
+}
 
+func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 	var cmds []tea.Cmd
+	for _, fi := range m.forwardIntents(intents) {
+		// Re-emit as messages.Flash so the flash routes through HandleFlash
+		// and picks up the auto-clear tick. That route ends in
+		// runtime_adapter.go's applyIntent (singular), which forwards the
+		// flash to the controller — which is why forwardIntents withheld it: a
+		// flash forwarded there as well would be applied twice, and the
+		// controller records one error-log entry per application.
+		text, isErr := fi.Text, fi.IsError
+		cmds = append(cmds, func() tea.Msg {
+			return messages.Flash{Text: text, IsError: isErr}
+		})
+	}
 	for _, intent := range intents {
 		switch v := intent.(type) {
 		case runtime.FlashIntent:
-			if v.LogOnly {
-				// No banner to raise, so nothing to re-emit: the forward above
-				// carried it to the controller, which made the log entry.
-				break
-			}
-			// Re-emit as messages.Flash so the flash routes through
-			// HandleFlash and picks up the auto-clear tick. That route ends in
-			// runtime_adapter.go's applyIntent (singular), which forwards the
-			// flash to the controller — hence withoutBannerFlashes above: a
-			// flash forwarded here as well would be applied twice, and the
-			// controller records one error-log entry per application.
-			text, isErr := v.Text, v.IsError
-			cmds = append(cmds, func() tea.Msg {
-				return messages.Flash{Text: text, IsError: isErr}
-			})
+			// Forwarded and re-emitted above; nothing renderer-side is left.
 		case runtime.ClearFlash:
 			// Controller half (c.flash = Flash{}) already applied by the forward.
 			m.flash.active = false

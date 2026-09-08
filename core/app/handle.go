@@ -504,7 +504,11 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	}
 	issues, issuesKnown := c.menuIssueBadge(canon)
 	issuesKnown = issuesKnown && !td.ExcludeFromIssueBadge
-	exact := !ls.HasPagination
+	// Two facts, two fields: "another page exists" is what puts the "+" on
+	// the count and offers the m key; "this list cannot claim to be the
+	// type's whole population" is what forbids recording it as an exact
+	// total. A failed fetch leaves the second true while the first is false.
+	exact := !ls.PopulationUnconfirmed
 	truncated := ls.HasPagination
 	rows := append([]resource.Resource(nil), ls.Rows...)
 	pair := c.core.Pair()
@@ -735,10 +739,7 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 	})
 	c.applyIntents(intents)
 
-	errMsg := ""
-	if err := result.Result.Err(); err != nil {
-		errMsg = err.Error()
-	}
+	errMsg := relatedRowErrorText(result.Result)
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
 			continue

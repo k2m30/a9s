@@ -401,6 +401,12 @@ func TestSaveProjection_Wave2Warning_IsNotPersistedAsAnIssue(t *testing.T) {
 		Severity: domain.SevWarn,
 		Source:   "wave2:s3",
 	}}
+	// In production a row only carries a "wave2:s3" finding after the
+	// enricher answered for the type, which is what latches this. Both save
+	// lanes write IssuesKnown from the latch, not from the findings on the
+	// rows, so a test that plants Wave-2 findings without it describes a
+	// state the app cannot reach.
+	core.Session().EnrichmentRanSet("s3")
 	core.ObserveRows("s3", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
 
 	if _, err := core.ExecuteTask(t.Context(), runtime.TaskRequest{
@@ -426,6 +432,12 @@ func TestSaveProjection_Wave2Broken_IsPersistedAsAnIssue(t *testing.T) {
 	_, core, _ := newCachegenController(t, "cachegen-brokensave", "us-east-1")
 	rows := cachegenRows(1, "bucket-broken")
 	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3-public-read")}
+	// In production a row only carries a "wave2:s3" finding after the
+	// enricher answered for the type, which is what latches this. Both save
+	// lanes write IssuesKnown from the latch, not from the findings on the
+	// rows, so a test that plants Wave-2 findings without it describes a
+	// state the app cannot reach.
+	core.Session().EnrichmentRanSet("s3")
 	core.ObserveRows("s3", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
 
 	if _, err := core.ExecuteTask(t.Context(), runtime.TaskRequest{

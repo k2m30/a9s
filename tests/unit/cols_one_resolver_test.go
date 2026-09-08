@@ -199,11 +199,11 @@ func colsDegradedRows(shortName string) []resource.Resource {
 	}
 }
 
-// TestCols_MarkerColumnIsTheColumnThatShowsTheRowName drives the app's own
+// TestCols_IdentityColumnIsTheColumnThatShowsTheRowName drives the app's own
 // render path: a list opened on the controller with the shipped view files
 // loaded, rows delivered through the real ResourcesLoaded event, cells read
 // off the ListBody the renderers consume. The column the body marks as the
-// identity column (MarkerCol) must be the column whose cell carries the row's
+// identity column (IdentityCol) must be the column whose cell carries the row's
 // name, and no other column may carry it.
 //
 // ct-events and eb are the types where this fails today: their view file
@@ -211,7 +211,7 @@ func colsDegradedRows(shortName string) []resource.Resource {
 // re-elects from the built-in set, so the name lands under a column the
 // marker is not on — or, when no built-in title matches a view-file title,
 // under no column at all and the first cell of every row goes blank.
-func TestCols_MarkerColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
+func TestCols_IdentityColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
 	vc := colsLoadedViewConfig(t)
 
 	for _, td := range resource.AllResourceTypes() {
@@ -234,8 +234,8 @@ func TestCols_MarkerColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
 			if len(lb.Rows) != len(rows) {
 				t.Fatalf("%s: %d rows rendered, want %d", td.ShortName, len(lb.Rows), len(rows))
 			}
-			if lb.MarkerCol < 0 || lb.MarkerCol >= len(lb.Columns) {
-				t.Fatalf("%s: MarkerCol=%d out of range for %d columns", td.ShortName, lb.MarkerCol, len(lb.Columns))
+			if lb.IdentityCol < 0 || lb.IdentityCol >= len(lb.Columns) {
+				t.Fatalf("%s: IdentityCol=%d out of range for %d columns", td.ShortName, lb.IdentityCol, len(lb.Columns))
 			}
 
 			for _, lr := range lb.Rows {
@@ -250,12 +250,12 @@ func TestCols_MarkerColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
 				}
 				for i, cell := range lr.Cells {
 					switch {
-					case i == lb.MarkerCol && cell != want:
-						t.Errorf("%s: MarkerCol is col[%d] %q, but its cell on row %q is %q, want the row's name %q",
+					case i == lb.IdentityCol && cell != want:
+						t.Errorf("%s: IdentityCol is col[%d] %q, but its cell on row %q is %q, want the row's name %q",
 							td.ShortName, i, lb.Columns[i].Title, lr.ResourceID, cell, want)
-					case i != lb.MarkerCol && cell == want:
+					case i != lb.IdentityCol && cell == want:
 						t.Errorf("%s: col[%d] %q shows the row's own name %q on row %q, but the marker is on col[%d] %q",
-							td.ShortName, i, lb.Columns[i].Title, want, lr.ResourceID, lb.MarkerCol, lb.Columns[lb.MarkerCol].Title)
+							td.ShortName, i, lb.Columns[i].Title, want, lr.ResourceID, lb.IdentityCol, lb.Columns[lb.IdentityCol].Title)
 					}
 				}
 			}

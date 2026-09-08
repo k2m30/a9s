@@ -366,10 +366,7 @@ func LoadDirIn(root, profile, region string) *Store {
 		// Preference is fixed rather than map-order-dependent: a
 		// canonically-named file always wins over an alias-named one, and
 		// between two aliases the first in the directory's sorted order wins.
-		canon := shortName
-		if td := resource.FindResourceType(shortName); td != nil {
-			canon = td.ShortName
-		}
+		canon := resource.CanonicalShortName(shortName)
 		if src, taken := loadedFrom[canon]; taken && (src == canon || shortName != canon) {
 			continue
 		}

@@ -48,14 +48,14 @@ func (c *Core) observeResourcesLoadedRows(msg messages.ResourcesLoaded) {
 // would otherwise apply via PatchResourceCache/PatchLazyResourceCache.
 func (c *Core) observeRelatedCheckResultRows(msg messages.RelatedCheckResult) {
 	for aliasName, entry := range msg.CachedPages {
-		canon := canonShortName(aliasName)
+		canon := resource.CanonicalShortName(aliasName)
 		c.ObserveRows(canon, entry.Resources, resolveCachedPagePagination(entry), session.OriginFetch, false)
 	}
 	for aliasName, extra := range msg.LazyAddedResources {
 		if len(extra) == 0 {
 			continue
 		}
-		canon := canonShortName(aliasName)
+		canon := resource.CanonicalShortName(aliasName)
 		c.ObservePartialRows(canon, extra)
 	}
 }

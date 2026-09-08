@@ -14,6 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // Core returns the runtime-owned *runtime.Core handle. Test-only accessor
@@ -64,7 +65,7 @@ func (m Model) ActiveListResources() []resource.Resource {
 // the given resourceType and gen. Test-only: lets tests execute the cmd
 // synchronously and assert that the Gen field was captured at dispatch time.
 func (m Model) FetchResourcesCmdForTest(resourceType string, gen domain.Gen) tea.Cmd {
-	return m.fetchResources(resourceType, gen)
+	return m.fetchResources(resourceType, gen, messages.FetchProvenanceCanonicalList)
 }
 
 // FetchIdentityCmdForTest returns a tea.Cmd produced by fetchIdentity for

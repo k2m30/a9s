@@ -29,6 +29,8 @@ package runtime
 
 import (
 	"errors"
+	"slices"
+	"strings"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -233,7 +235,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 // treat a 0 return as "nothing to stamp; dispatch the normal, unstamped
 // refetch."
 func (c *Core) RefreshListEnrichment(rt string) domain.Gen {
-	canon := canonShortName(rt)
+	canon := resource.CanonicalShortName(rt)
 	if !c.HasIssueEnricher(canon) {
 		return 0
 	}
@@ -397,7 +399,7 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 	// canonicalise to the same ShortName.
 	addedInBatch := map[string]struct{}{}
 	for aliasName, entry := range ev.CachedPages {
-		shortName := canonShortName(aliasName)
+		shortName := resource.CanonicalShortName(aliasName)
 		if _, dup := addedInBatch[shortName]; dup {
 			continue
 		}
@@ -426,7 +428,7 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		if len(extra) == 0 {
 			continue
 		}
-		shortName := canonShortName(aliasName)
+		shortName := resource.CanonicalShortName(aliasName)
 		existing := c.session.RowStore.Snapshot(shortName).Rows
 		known := make(map[string]struct{}, len(existing))
 		for _, r := range existing {
@@ -449,18 +451,24 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		intents = append(intents, PatchLazyResourceCache{Adds: lazyAdds})
 	}
 
+	// One result, one sentence. A related check can fail twice — the checker
+	// itself and the by-ID lazy add beside it — and both flashes land on the
+	// same status line, so a second intent only overwrites the first and the
+	// operator never learns there were two. Identical lines collapse: the two
+	// halves often fail on the same denied call, and saying it twice is not
+	// more information.
 	_, region := c.session.CurrentPair()
+	var lines []string
 	if ev.LazyAddError != nil {
-		intents = append(intents, FlashIntent{
-			Text:    failureLine("related-fetch", ev.LazyAddError, region),
-			IsError: true,
-		})
+		lines = append(lines, failureLine("related-fetch", ev.LazyAddError, region))
 	}
 	if err := ev.Result.Err(); err != nil {
-		intents = append(intents, FlashIntent{
-			Text:    failureLine("related "+ev.Result.TargetType(), err, region),
-			IsError: true,
-		})
+		if line := failureLine("related "+ev.Result.TargetType(), err, region); !slices.Contains(lines, line) {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) > 0 {
+		intents = append(intents, FlashIntent{Text: strings.Join(lines, "; "), IsError: true})
 	}
 	return intents, nil
 }
@@ -541,17 +549,6 @@ func (c *Core) ResetRuleSets() {
 	if c.session.Clients != nil {
 		c.session.Clients.SetRuleSets(c.session.RuleSets)
 	}
-}
-
-// canonShortName resolves an alias to the canonical ShortName when
-// resource.FindResourceType returns a hit; otherwise it returns the
-// input verbatim (matches the original case-body behaviour for unknown
-// keys — they pass through unchanged).
-func canonShortName(alias string) string {
-	if td := resource.FindResourceType(alias); td != nil {
-		return td.ShortName
-	}
-	return alias
 }
 
 // domainCallerIdentityFrom converts an *awsclient.CallerIdentity to the

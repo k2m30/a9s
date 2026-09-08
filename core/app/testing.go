@@ -28,10 +28,7 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	// Resolve canonical short name (handles aliases like "rds" → "dbi"),
 	// matching handleResourcesLoadedEvent — the real task-result lane never
 	// saves under the raw incoming typeName.
-	canon := typeName
-	if td := resource.FindResourceType(typeName); td != nil {
-		canon = td.ShortName
-	}
+	canon := resource.CanonicalShortName(typeName)
 	ls := c.topListState()
 	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)
 	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, appendPage, topLevelCanonical, nil)

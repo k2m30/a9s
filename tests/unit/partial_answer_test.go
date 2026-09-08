@@ -116,6 +116,17 @@ func (f *partialLambdaFake) ListFunctionUrlConfigs(_ context.Context, _ *lambdas
 	}}}, nil
 }
 
+// GetFunction is the stub half of a partial test double: this fake embeds
+// LambdaAPI as a nil interface and implements only the two posture reads the
+// enricher made when it was written. It now asks this one to tell a function
+// with no resource policy from a function that is gone, which GetPolicy
+// answers with the same code. The function in these scenarios exists.
+func (f *partialLambdaFake) GetFunction(_ context.Context, in *lambdasvc.GetFunctionInput, _ ...func(*lambdasvc.Options)) (*lambdasvc.GetFunctionOutput, error) {
+	return &lambdasvc.GetFunctionOutput{
+		Configuration: &lambdatypes.FunctionConfiguration{FunctionName: in.FunctionName},
+	}, nil
+}
+
 func partialEnrichLambda(t *testing.T, fake *partialLambdaFake) awsclient.IssueEnricherResult {
 	t.Helper()
 	store := session.NewIdentityStore()

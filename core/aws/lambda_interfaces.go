@@ -45,10 +45,15 @@ type LambdaListFunctionUrlConfigsAPI interface {
 	ListFunctionUrlConfigs(ctx context.Context, params *lambda.ListFunctionUrlConfigsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionUrlConfigsOutput, error)
 }
 
-// LambdaPostureAPI is the pair of read-only calls EnrichLambdaPosture makes.
+// LambdaPostureAPI is the set of read-only calls EnrichLambdaPosture makes.
+// GetFunction is in it for one reason: Lambda answers
+// ResourceNotFoundException from the other two both for "this function has no
+// policy / no URL config" (healthy) and for "this function no longer exists"
+// (a race), and only asking whether the function is there separates them.
 type LambdaPostureAPI interface {
 	LambdaGetPolicyAPI
 	LambdaListFunctionUrlConfigsAPI
+	LambdaGetFunctionAPI
 }
 
 // LambdaAPI is the aggregate interface covering all Lambda operations used by a9s fetchers.

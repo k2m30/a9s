@@ -328,7 +328,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// ("dbi"); keying the per-sweep scan-health guard, the probe-status
 	// record and the emitted intents on the raw string made the same type two
 	// entries and let a redundant delivery re-flash its banner.
-	canon := canonShortName(msg.ResourceType)
+	canon := resource.CanonicalShortName(msg.ResourceType)
 
 	// #462: record this probe's scan status regardless of outcome — a
 	// hard-failed probe still needs to be visible via Core.ScanStatus.
@@ -537,7 +537,7 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 		// naturally clears a genuinely-healed row and replaces a still-broken
 		// one — no separate eager clear is needed to reach that end state.
 		c.session.EnrichmentTypeGenBump(name)
-		delete(c.session.EnrichmentRan, name)
+		c.session.EnrichmentRanDelete(name)
 		c.session.EnrichSweepMembers[name] = true
 
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: name}})
@@ -570,7 +570,7 @@ func (c *Core) refillEnrichSweep() []TaskRequest {
 		}
 
 		c.session.EnrichmentTypeGenBump(next)
-		delete(c.session.EnrichmentRan, next)
+		c.session.EnrichmentRanDelete(next)
 		c.session.EnrichSweepMembers[next] = true
 
 		return []TaskRequest{{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: next}}}
@@ -621,7 +621,7 @@ func (c *Core) finishEnrichmentSweepIfDone(intents []UIIntent, tasks []TaskReque
 		// answered for supersede their carried Wave-2 data wholesale, so a
 		// healed or resolved issue clears; a type whose probe failed is
 		// absent from the set and keeps what the file already knows.
-		saveSnapshot := c.snapshotRowStoreForSave(maps.Clone(c.session.EnrichmentRan))
+		saveSnapshot := c.snapshotRowStoreForSave(c.session.EnrichmentRanSnapshot())
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: TaskKindSaveCache},
 			Payload: saveSnapshot,
@@ -738,10 +738,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 	// Update findings and menu issue count on success or partial success.
 	{
-		if c.session.EnrichmentRan == nil {
-			c.session.EnrichmentRan = make(map[string]bool)
-		}
-		c.session.EnrichmentRan[msg.ResourceType] = true
+		c.session.EnrichmentRanSet(msg.ResourceType)
 
 		if c.session.EnrichmentTruncatedIDs == nil {
 			c.session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)

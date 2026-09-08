@@ -167,7 +167,7 @@ func sortRowOrder(t *testing.T, shortName, key string, rows []resource.Resource)
 	}
 	ids := make([]string, 0, len(body.Rows))
 	for _, row := range body.Rows {
-		ids = append(ids, row.Cells[body.MarkerCol])
+		ids = append(ids, row.Cells[body.IdentityCol])
 	}
 	if len(ids) != len(rows) {
 		t.Fatalf("%s: sorted %d rows, want %d", shortName, len(ids), len(rows))
