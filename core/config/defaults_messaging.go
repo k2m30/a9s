@@ -20,7 +20,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		},
 		"sns": {
 			List: []ListColumn{
-				{Title: "Topic Name", Path: "TopicArn", Width: 40},
+				{Title: "Topic Name", Key: "display_name", Width: 40},
 				{Title: "Status", Width: 12},
 				{Title: "Subs", Key: "subs_count", Width: 6},
 				{Title: "Topic ARN", Path: "TopicArn", Width: 60},
@@ -35,7 +35,7 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Status", Width: 12},
 				{Title: "Protocol", Path: "Protocol", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
-				{Title: "Confirmed", Path: "SubscriptionArn", Width: 22},
+				{Title: "Confirmed", Key: "confirmed", Width: 12},
 				{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60},
 			},
 			Detail: []DetailField{

@@ -9,6 +9,5 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeEBRuleDisabled — rule is in the "DISABLED" lifecycle state.
-	// Severity: SevDim (deliberately paused, not an error).
 	CodeEBRuleDisabled domain.FindingCode = "eb-rule.state.disabled"
 )

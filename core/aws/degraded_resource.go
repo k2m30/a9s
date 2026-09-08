@@ -65,17 +65,24 @@ func detailsUnavailableFinding(shortName string) domain.Finding {
 	return wave1Finding(code)
 }
 
-// degradedStatusFindings recovers the degraded row's finding for a row rebuilt
-// from Fields alone. DegradedDetails writes the phrase into "status", so those
-// two words are the closed vocabulary a type's fallback predicate reads them
-// back from — no other status can hold them, and any other value yields
-// nothing. A type whose fetcher builds degraded rows calls this first in its
-// own predicate, before the vocabulary its live status uses.
-func degradedStatusFindings(shortName, status string) []domain.Finding {
-	switch status {
-	case detailsDeniedPhrase:
+// DegradedFindingField is where DegradedDetails records the code of the
+// finding it emitted, so a row rebuilt from Fields alone carries the finding's
+// one identity. The status cell holds the same finding's rendered phrase, but
+// a phrase is wording: reading it back would make every reword a silent
+// retirement of the recovery below.
+const DegradedFindingField = "degraded_finding"
+
+// degradedFindings recovers the degraded row's finding for a row rebuilt from
+// Fields alone — a cache read, a colour fallback. It reads the code
+// DegradedDetails recorded, and answers only for the two codes shortName
+// itself declares, so a Fields map carrying anything else yields nothing. A
+// type whose fetcher builds degraded rows calls this first in its own
+// predicate, before the vocabulary its live status uses.
+func degradedFindings(shortName, degradedCode string) []domain.Finding {
+	switch domain.FindingCode(degradedCode) {
+	case DetailsDeniedCode(shortName):
 		return []domain.Finding{detailsDeniedFinding(shortName)}
-	case detailsUnavailablePhrase:
+	case DetailsUnavailableCode(shortName):
 		return []domain.Finding{detailsUnavailableFinding(shortName)}
 	}
 	return nil
@@ -125,8 +132,9 @@ func DegradedDetails(shortName, id string, err error) resource.Resource {
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
-			"name":   id,
-			"status": finding.Phrase,
+			"name":               id,
+			"status":             finding.Phrase,
+			DegradedFindingField: string(finding.Code),
 		},
 		Findings: []domain.Finding{finding},
 	}

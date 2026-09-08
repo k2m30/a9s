@@ -9,11 +9,9 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeAMIStatePending — AMI is in the "pending" or "transient" state.
-	// Severity: SevWarn (transitional).
 	CodeAMIStatePending domain.FindingCode = "ami.state.pending"
 
 	// CodeAMIStateFailed — AMI is in the "failed", "error", or "invalid" state.
-	// Severity: SevBroken.
 	CodeAMIStateFailed domain.FindingCode = "ami.state.failed"
 
 	// CodeAMIStateDim — AMI is in the "deregistered" or "disabled" state

@@ -236,11 +236,11 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 				elbOffendingListener{port: aws.ToInt32(listener.Port), row: row})
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodePlainHTTPListener]); ports != "" {
-			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener, rows, elbCount(rows, "port ", "ports ")+ports)
+			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener, rows, ports)
 
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodeWeakTLSPolicy]); ports != "" {
-			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy, rows, elbCount(rows, "port ", "ports ")+ports)
+			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy, rows, ports)
 
 		}
 	})
@@ -297,14 +297,4 @@ func elbOffendersInPortOrder(offenders []elbOffendingListener) (string, []domain
 		rows = append(rows, o.row)
 	}
 	return strings.Join(ports, ", "), rows
-}
-
-// elbCount picks the singular wording when exactly one listener offends — one
-// port under a plural heading reads as a list that got truncated. There is one
-// row per offending listener, so the rows are the count.
-func elbCount(rows []domain.DetailRow, one, many string) string {
-	if len(rows) == 1 {
-		return one
-	}
-	return many
 }

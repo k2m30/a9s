@@ -49,5 +49,4 @@ var dbiPostureCodes = rdsPostureCodes{
 
 // CodeDBINotInBackupPlan — no backup plan selection matches this instance.
 // Automated backups are a separate setting and do not satisfy it.
-// Severity: SevWarn.
 const CodeDBINotInBackupPlan domain.FindingCode = "dbi.not-in-backup-plan"

@@ -13,15 +13,15 @@
 //     `BackupRetentionPeriod` (1.0× — no multiplier; the operator's
 //     declared retention IS the policy). Only fires when the parent IS in
 //     the cache, the snapshot is "automated", and the parent retention > 0.
-//     Phrase: the code's own, from the catalog
-//     (e.g. "automated, <N>d past retention").
+//     Phrase: the code's own, from the catalog.
 //
-// Wave classification stays Wave 1 (zero SDK calls) — the helper scans the
-// in-memory ResourceCache only. Both signals route through
-// `IssueEnricherResult.Findings` (which surfaces in S5 Attention and, via
-// `applyEnrichment` → `applyWave2ToRow`, in the S4 status column via
-// `domain.StatusPhrase(r.Findings)` at render time). Re-runs are idempotent:
-// Findings is map-keyed so a second pass overwrites the first.
+// Both signals are read from the in-memory ResourceCache, so the helper makes
+// no SDK call of its own unless PublicAttr is set. They are emitted as
+// findings on IssueEnricherResult, which runtime.ApplyWave2ToRow folds onto
+// the row: the detail view's Attention section lists them, and the list's
+// status cell renders the worst one's phrase. Re-running the helper on the
+// same rows emits the same findings, and setWave2Finding keeps one entry per
+// code, so a second pass adds nothing.
 //
 // Retention-rule-disabled mode: when a future consumer's parent type has no
 // retention concept (e.g. ebs-snap on ec2.Volume), set
@@ -224,10 +224,6 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				continue
 			}
 
-			// setWave2Finding is the sole append-only builder for both Findings
-			// and AttentionDetails (core/aws/issue_enrichment.go) — it
-			// drives the detail-view Attention section AND the S4 status
-			// column at render time via domain.StatusPhrase(r.Findings).
 			setWave2Finding(&result, res.ID, code, rows, values...)
 		}
 

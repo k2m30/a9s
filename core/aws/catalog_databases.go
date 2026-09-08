@@ -138,8 +138,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBINotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2", Detail: "No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on."},
 			{Code: CodeDBIIAMAuthOff, Phrase: "IAM database authentication off", Severity: domain.SevWarn, Source: "wave1", Detail: "Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities."},
 			{Code: CodeDBIDefaultMasterUser, Phrase: "default master username", Severity: domain.SevWarn, Source: "wave1", Detail: "The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one."},
-			{Code: CodeDBICACertExpiring, Phrase: "server certificate expires in <N> days", Severity: domain.SevWarn, Source: "wave1", Detail: "The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window."},
-			{Code: CodeDBICACertExpiringUrgent, Phrase: "server certificate expires in <N> days", Severity: domain.SevBroken, Source: "wave1", Detail: "The server certificate expires within a month, and every client that verifies the connection will refuse to talk to the instance the moment it does. Book the maintenance window now and rotate the instance onto the current certificate authority."},
+			{Code: CodeDBICACertExpiring, Phrase: "server certificate expires in <N day(s)>", Severity: domain.SevWarn, Source: "wave1", Detail: "The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window."},
+			{Code: CodeDBICACertExpiringUrgent, Phrase: "server certificate expires in <N day(s)>", Severity: domain.SevBroken, Source: "wave1", Detail: "The server certificate expires within a month, and every client that verifies the connection will refuse to talk to the instance the moment it does. Book the maintenance window now and rotate the instance onto the current certificate authority."},
 			{Code: dbiCodeEngineDeprecated, Phrase: "engine version deprecated", Severity: domain.SevBroken, Source: "wave2", Detail: "AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing."},
 		},
 	},
@@ -502,10 +502,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: opensearchCodePublic, Phrase: "reachable outside a VPC", Severity: domain.SevBroken, Source: "wave1", Detail: "The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals."},
 			{Code: opensearchCodeHTTPSNotForced, Phrase: "HTTPS not enforced", Severity: domain.SevWarn, Source: "wave1", Detail: "The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options."},
 			{Code: opensearchCodeN2NOff, Phrase: "node-to-node encryption off", Severity: domain.SevWarn, Source: "wave1", Detail: "Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive."},
-			// DescribeDomains is one batched call, so a denial degrades every
-			// listed domain at once and no demo fixture can witness this row
-			// beside healthy domains; the row renders its phrase alone.
-			{Code: DetailsDeniedCode("opensearch"), Phrase: detailsDeniedPhrase, Severity: domain.SevWarn, Source: "wave1"},
+			DetailsDeniedFindingDefPhraseOnly("opensearch"),
 			DetailsUnavailableFindingDef("opensearch"),
 		},
 	},

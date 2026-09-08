@@ -9,11 +9,9 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeLambdaStatePending — function is in the "Pending" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeLambdaStatePending domain.FindingCode = "lambda.state.pending"
 
 	// CodeLambdaStateFailed — function is in the "Failed" lifecycle state.
-	// Severity: SevBroken.
 	CodeLambdaStateFailed domain.FindingCode = "lambda.state.failed"
 
 	// CodeLambdaNoDLQ — function has no dead-letter queue configured, so

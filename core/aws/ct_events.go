@@ -606,7 +606,7 @@ func ctEventFindings(status, cause, errorCode, eventName string) []domain.Findin
 	switch status {
 	case "ct-danger":
 		if cause == ctCauseError {
-			return []domain.Finding{wave1Finding(CodeCTEventFailedCall, domain.HumanizeStatusPhrase(errorCode))}
+			return []domain.Finding{wave1Finding(CodeCTEventFailedCall, ctErrorWord(errorCode))}
 		}
 		return []domain.Finding{wave1Finding(CodeCTEventDanger)}
 	case "ct-attention":
@@ -624,6 +624,17 @@ func ctEventFindings(status, cause, errorCode, eventName string) []domain.Findin
 	// bucket for events, so the routine/no-signal tier still needs a
 	// Finding to explain its Dim color on the list/detail surfaces.
 	return []domain.Finding{wave1Finding(CodeCTEventInfo)}
+}
+
+// ctErrorWord is what the failed-call phrase names as the error.
+// computeCTStatus reaches ctCauseError only for a record that carries an
+// error code, but colorCTEvents rebuilds the cause from Fields, where a row
+// restored without error_code has none — and "failed: " names nothing.
+func ctErrorWord(errorCode string) string {
+	if word := domain.HumanizeStatusPhrase(errorCode); word != "" {
+		return word
+	}
+	return "unknown error"
 }
 
 // computeCTStatus implements the §1.2 severity ladder, returning the tier

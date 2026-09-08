@@ -15,43 +15,34 @@ import (
 
 const (
 	// CodeECSTaskStateProvisioning — task is in the "PROVISIONING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeECSTaskStateProvisioning domain.FindingCode = "ecs-task.state.provisioning"
 
 	// CodeECSTaskStatePending — task is in the "PENDING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeECSTaskStatePending domain.FindingCode = "ecs-task.state.pending"
 
 	// CodeECSTaskStateActivating — task is in the "ACTIVATING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeECSTaskStateActivating domain.FindingCode = "ecs-task.state.activating"
 
 	// CodeECSTaskStateDeactivating — task is in the "DEACTIVATING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeECSTaskStateDeactivating domain.FindingCode = "ecs-task.state.deactivating"
 
 	// CodeECSTaskStateStopping — task is in the "STOPPING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeECSTaskStateStopping domain.FindingCode = "ecs-task.state.stopping"
 
 	// CodeECSTaskStateDeprovisioning — task is in the "DEPROVISIONING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeECSTaskStateDeprovisioning domain.FindingCode = "ecs-task.state.deprovisioning"
 
 	// CodeECSTaskStateStopped — task is in the "STOPPED" lifecycle state with a
 	// user-initiated or empty stop code (a normal, non-error stop).
-	// Severity: SevDim.
 	CodeECSTaskStateStopped domain.FindingCode = "ecs-task.state.stopped"
 
 	// CodeECSTaskStopCodeFailed — task is STOPPED with a stop code other than
 	// UserInitiated (AWS-initiated stop, e.g. task failed to start or its
 	// essential container exited).
-	// Severity: SevBroken.
 	CodeECSTaskStopCodeFailed domain.FindingCode = "ecs-task.stop-code.failed"
 
 	// CodeECSTaskHealthUnhealthy — task's container health check reports
 	// UNHEALTHY while the task itself is still RUNNING.
-	// Severity: SevBroken.
 	CodeECSTaskHealthUnhealthy domain.FindingCode = "ecs-task.health.unhealthy"
 )
 

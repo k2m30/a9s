@@ -9,15 +9,12 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeEBSStateCreating — EBS volume is in the "creating" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeEBSStateCreating domain.FindingCode = "ebs.state.creating"
 
 	// CodeEBSStateDeleting — EBS volume is in the "deleting" lifecycle state.
-	// Severity: SevWarn.
 	CodeEBSStateDeleting domain.FindingCode = "ebs.state.deleting"
 
 	// CodeEBSStateError — EBS volume is in the "error" state.
-	// Severity: SevBroken.
 	CodeEBSStateError domain.FindingCode = "ebs.state.error"
 
 	// CodeEBSOrphanUnattached — volume is "available" (unattached) and older
@@ -29,7 +26,6 @@ const (
 	CodeEBSUnencrypted domain.FindingCode = "ebs.encryption.disabled"
 
 	// CodeEBSSnapStatePending — EBS snapshot is in the "pending" state.
-	// Severity: SevWarn (transitional).
 	CodeEBSSnapStatePending domain.FindingCode = "ebs-snap.state.pending"
 
 	// CodeEBSSnapStateError — EBS snapshot is in the "error", "recoverable", or
@@ -42,7 +38,6 @@ const (
 
 	// CodeEBSSnapAgedAutomated — automated snapshot older than 365 days —
 	// billed indefinitely with no retention policy pruning it.
-	// Severity: SevWarn.
 	CodeEBSSnapAgedAutomated domain.FindingCode = "ebs-snap.aged-automated"
 
 	// CodeEBSSnapOrphan — snapshot's source volume is no longer present in

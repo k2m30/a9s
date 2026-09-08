@@ -148,7 +148,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 	}
 
 	var issueRows []domain.DetailRow
-	r.Findings, issueRows = eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
+	r.Findings, issueRows = eksClusterFindings(status, r.Fields[DegradedFindingField], healthIssuesCount, issueCodes, version, posture)
 	if len(r.Findings) > 0 {
 		// The rows belong to whichever finding built them — the failed state
 		// folds them in, any other state leaves them on the health-issue
@@ -337,6 +337,13 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 		findings = append(findings, wave1Finding(CodeEKSSecretsNotKMS))
 	}
 	if p.VersionSupport == eksSupportEnded {
+		// The verdict and the version reach this predicate separately: a row
+		// rebuilt from a Fields map that kept the verdict and dropped the
+		// version still has to say the cluster is out of support, and the
+		// phrase needs a word where the number would go.
+		if version == "" {
+			version = "at an unknown version"
+		}
 		findings = append(findings, wave1Finding(CodeEKSVersionUnsupported, version))
 	}
 	return findings
@@ -378,8 +385,8 @@ func addEKSPostureRows(r *resource.Resource, cluster *ekstypes.Cluster, versions
 // outside the fetcher, which have the issue count but not the codes; the phrase
 // is then the fallback wording and the severity, which is what decides the
 // colour, is the same either way.
-func eksClusterFindings(status string, healthIssuesCount int, issueCodes []string, version string, p eksPosture) ([]domain.Finding, []domain.DetailRow) {
-	if f := degradedStatusFindings("eks", status); f != nil {
+func eksClusterFindings(status, degradedCode string, healthIssuesCount int, issueCodes []string, version string, p eksPosture) ([]domain.Finding, []domain.DetailRow) {
+	if f := degradedFindings("eks", degradedCode); f != nil {
 		return f, nil
 	}
 	var findings []domain.Finding

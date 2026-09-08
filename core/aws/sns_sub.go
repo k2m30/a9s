@@ -77,6 +77,7 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 				"protocol":         protocol,
 				"endpoint":         endpoint,
 				"subscription_arn": subscriptionArn,
+				"confirmed":        snsSubConfirmed(subscriptionArn),
 			},
 			Findings:         findings,
 			AttentionDetails: details,
@@ -145,15 +146,40 @@ func snsSubEndpointOrigin(endpoint string) string {
 	return u.Scheme + "://" + u.Host
 }
 
-// snsSubStateFindings mirrors colorSNSSub's own precedence: AWS returns the
-// literal strings "PendingConfirmation" / "Deleted" AS the SubscriptionArn
-// value for subscriptions in those states.
+// AWS returns these two words in place of the SubscriptionArn for a
+// subscription in either state — they are the state, not an ARN. Named so the
+// finding and the Confirmed column read the same two literals.
+const (
+	snsSubArnPending = "PendingConfirmation"
+	snsSubArnDeleted = "Deleted"
+)
+
+// snsSubStateFindings mirrors colorSNSSub's own precedence.
 func snsSubStateFindings(subscriptionArn string) []domain.Finding {
 	switch subscriptionArn {
-	case "PendingConfirmation":
+	case snsSubArnPending:
 		return []domain.Finding{wave1Finding(CodeSNSSubPendingConfirmation)}
-	case "Deleted":
+	case snsSubArnDeleted:
 		return []domain.Finding{wave1Finding(CodeSNSSubDeleted)}
 	}
 	return nil
+}
+
+// snsSubConfirmed is the Confirmed column's own value. The column cannot read
+// it off the SubscriptionArn: an unconfirmed subscription has the state where
+// the ARN goes, and a confirmed one has an ARN, so the cell showed a slice of
+// an ARN for every healthy row and a state word for the rest.
+func snsSubConfirmed(subscriptionArn string) string {
+	switch subscriptionArn {
+	case snsSubArnPending:
+		return "pending"
+	case snsSubArnDeleted:
+		return "deleted"
+	case "":
+		// No ARN and no state word: the subscription came back without the
+		// field, and a row that says "yes" here claims a confirmation nobody
+		// reported.
+		return "unknown"
+	}
+	return "yes"
 }

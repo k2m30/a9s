@@ -1,7 +1,7 @@
 generated: 1
 list:
   Topic Name:
-    path: TopicArn
+    key: display_name
     width: 40
   Status:
     width: 12

@@ -9,15 +9,12 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeASGStateDeleting — Auto Scaling Group has "Delete in progress" status.
-	// Severity: SevWarn (transitional, lifecycle terminal).
 	CodeASGStateDeleting domain.FindingCode = "asg.state.deleting"
 
 	// CodeASGUnderprovisioned — fewer instances in service than MinSize.
-	// Severity: SevBroken.
 	CodeASGUnderprovisioned domain.FindingCode = "asg.instances.underprovisioned"
 
 	// CodeASGUnhealthyInstances — at least one instance reports Unhealthy.
-	// Severity: SevWarn.
 	CodeASGUnhealthyInstances domain.FindingCode = "asg.instances.unhealthy"
 
 	// CodeASGScalingSuspended — SuspendedProcesses includes a Launch,
@@ -30,12 +27,10 @@ const (
 	CodeASGLegacyLaunchConfig domain.FindingCode = "asg.launch-config.legacy"
 
 	// CodeASGSingleAZ — the group spans fewer than two availability zones.
-	// Severity: SevWarn.
 	CodeASGSingleAZ domain.FindingCode = "asg.single-az"
 
 	// CodeASGNoELBHealthCheck — the group is attached to a load balancer or
 	// target group but still decides health from EC2 status checks alone.
-	// Severity: SevWarn.
 	CodeASGNoELBHealthCheck domain.FindingCode = "asg.no-elb-health-check"
 )
 

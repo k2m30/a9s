@@ -37,7 +37,6 @@ const (
 	// CodeTrailDeliveryStale — LatestDeliveryTime older than
 	// trailDeliveryStaleAfter on a logging trail (GetTrailStatus). No file has
 	// been delivered recently even though the trail believes it's logging.
-	// Severity: SevBroken.
 	CodeTrailDeliveryStale domain.FindingCode = "trail.delivery-stale"
 
 	// CodeTrailNoCloudWatchLogs — CloudWatchLogsLogGroupArn empty. Events land

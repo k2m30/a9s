@@ -19,5 +19,4 @@ const CodeDDBDeletionProtectionOff domain.FindingCode = "ddb.deletion-protection
 
 // CodeDDBNotInBackupPlan — no backup plan selection matches this table.
 // Point-in-time recovery is a separate setting and does not satisfy it.
-// Severity: SevWarn.
 const CodeDDBNotInBackupPlan domain.FindingCode = "ddb.not-in-backup-plan"

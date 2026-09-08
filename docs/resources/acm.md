@@ -142,8 +142,8 @@ One row per signal from §3:
 | `Status == FAILED` — emits `acm.status.failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
 | `Status == VALIDATION_TIMED_OUT` — emits `acm.status.failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
 | `Status == INACTIVE` — emits `acm.status.inactive` | 1 | Dim | n/a | S2, S4 | `inactive` |
-| `NotAfter within 30 days` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `expires in <N> days` |
-| `NotAfter within 7 days` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expires in <N> days` |
+| `NotAfter within 30 days` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `expires in <N day(s)>` |
+| `NotAfter within 7 days` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expires in <N day(s)>` |
 | `InUse == false on non-expired cert` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `certificate not in use (orphan)` |
 | `KeyAlgorithm` is RSA below 2048 bits | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `weak key algorithm` |
 | `RenewalSummary.RenewalStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `auto-renewal failed` |
@@ -156,7 +156,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy cert carries a specific cause in S4 (`expired`, `expires in <N> days`, `pending validation`, `certificate not in use (orphan)`, `weak key algorithm`), and the detail view carries the full sentence for each, one keypress away. The one generic cell is `<status, in words>`, which spells whatever ACM reports; a Wave 2 refinement would read `CertificateDetail.FailureReason` and say why issuance failed.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy cert carries a specific cause in S4 (`expired`, `expires in <N day(s)>`, `pending validation`, `certificate not in use (orphan)`, `weak key algorithm`), and the detail view carries the full sentence for each, one keypress away. The one generic cell is `<status, in words>`, which spells whatever ACM reports; a Wave 2 refinement would read `CertificateDetail.FailureReason` and say why issuance failed.
 
 ## 5. Out of Scope
 
@@ -187,8 +187,8 @@ acm — DNS & CDN. Lifecycle key: `status`.
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | acm.expired | expired | broken | wave1 | The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one. |
-| acm.expires-critical | expires in <N> days | broken | wave1 | The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
-| acm.expires-soon | expires in <N> days | warn | wave1 | The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published. |
+| acm.expires-critical | expires in <N day(s)> | broken | wave1 | The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one. |
+| acm.expires-soon | expires in <N day(s)> | warn | wave1 | The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published. |
 | acm.orphan | certificate not in use (orphan) | warn | wave1 | Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for. |
 | acm.status.pending-validation | pending validation | warn | wave1 | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |
 | acm.status.failed | <status, in words> | broken | wave1 | The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it. |

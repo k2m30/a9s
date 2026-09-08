@@ -21,6 +21,5 @@ const (
 
 	// CodeCTEventInfo — routine, non-sensitive management/read event with no
 	// error, no cross-account signal, and no root/sensitive-read match.
-	// Severity: SevDim (informational, de-emphasized).
 	CodeCTEventInfo domain.FindingCode = "ct_event.severity.info"
 )

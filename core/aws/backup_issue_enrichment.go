@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -65,7 +66,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 			return out.BackupJobs, out.NextToken, nil
 		})
 	if walkErr != nil {
-		failures = append(failures, FailedCall(fmt.Sprintf("page %d", pages), walkErr))
+		failures = append(failures, FailedOnPage(pages, walkErr))
 	}
 
 	// Bucket jobs by plan ID. Each plan tracks all in-window jobs.
@@ -111,7 +112,10 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 		totalCount := b.totalCount
 
 		if failedCount >= 1 {
-			summary := fmt.Sprintf("%d job%s failed in last 24h", failedCount, plural(failedCount))
+			// The status cell says what the finding says, read off the same
+			// declaration, so the cell and the phrase cannot word the same
+			// fact two ways.
+			summary := fillPhrase(catalog.Phrase(backupCodeJobFailed), strconv.Itoa(failedCount))
 
 			// The two facts about the whole bucket lead, and the per-job rows
 			// follow, because only the per-job list is unbounded: capRows
@@ -146,7 +150,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 				})
 			}
 
-			setWave2Finding(&result, planID, backupCodeJobFailed, rows, fmt.Sprintf("%d job%s", failedCount, plural(failedCount)))
+			setWave2Finding(&result, planID, backupCodeJobFailed, rows, strconv.Itoa(failedCount))
 			if result.FieldUpdates[planID] == nil {
 				result.FieldUpdates[planID] = make(map[string]string)
 			}
@@ -168,12 +172,4 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 
 	SetTruncated(&result, cut)
 	return result, AggregateFailures("ListBackupJobs", failures, pages)
-}
-
-// plural returns "s" when n != 1, "" otherwise.
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
 }

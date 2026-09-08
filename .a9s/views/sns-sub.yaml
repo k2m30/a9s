@@ -12,8 +12,8 @@ list:
     path: Endpoint
     width: 48
   Confirmed:
-    path: SubscriptionArn
-    width: 22
+    key: confirmed
+    width: 12
   Subscription ARN:
     path: SubscriptionArn
     width: 60

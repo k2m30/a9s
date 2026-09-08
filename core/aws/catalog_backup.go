@@ -55,7 +55,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
-			{Code: backupCodeJobFailed, Phrase: "<N jobs> failed in last 24h", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last 24h", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: backupCodeJobPartial, Phrase: "partial: <N> of <M> resources skipped", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},

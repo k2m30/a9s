@@ -24,7 +24,7 @@ func colorEKSCluster(r domain.Resource) domain.Color {
 	}
 	issues, _ := strconv.Atoi(r.Fields["health_issues_count"])
 	findings, _ := eksClusterFindings(
-		r.Fields["status"], issues, nil, r.Fields["version"], eksPosture{
+		r.Fields["status"], r.Fields[DegradedFindingField], issues, nil, r.Fields["version"], eksPosture{
 			PublicEndpoint:      r.Fields["public_endpoint"],
 			ControlPlaneLogging: r.Fields["control_plane_logging"],
 			SecretsEncryption:   r.Fields["secrets_encryption"],
@@ -38,7 +38,7 @@ func colorEKSNodeGroup(r domain.Resource) domain.Color {
 		return c
 	}
 	issues, _ := strconv.Atoi(r.Fields["health_issues_count"])
-	findings, _ := ngFindings(r.Fields["status"], issues, nil)
+	findings, _ := ngFindings(r.Fields["status"], r.Fields[DegradedFindingField], issues, nil)
 	return colorFromFindings(findings)
 }
 

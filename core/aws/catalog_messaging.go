@@ -304,7 +304,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 			return FetchSNSSubscriptionsPage(ctx, subsAPI, continuationToken)
 		}),
-		FieldKeys: []string{"topic_arn", "protocol", "endpoint", "subscription_arn"},
+		FieldKeys: []string{"topic_arn", "protocol", "endpoint", "subscription_arn", "confirmed"},
 		Related: []domain.RelatedDef{
 			{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true, Truncated: true},

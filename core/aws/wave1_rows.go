@@ -7,7 +7,9 @@
 package aws
 
 import (
+	"fmt"
 	"strings"
+	"testing"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -37,7 +39,7 @@ func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.
 // drift apart.
 //
 // values fill the declared phrase's "<…>" slots left to right — a code whose
-// wording carries a measurement ("expires in <N> days") passes the
+// wording carries a measurement ("expires in <N day(s)>") passes the
 // measurement, never a sentence it assembled itself. The severity is the
 // code's own too: an emitter that needs two tiers needs two codes, so that a
 // row's colour and the tier the generated signals page prints have one owner.
@@ -78,10 +80,62 @@ func fillPhrase(phrase string, values ...string) string {
 		if closeAt < 0 {
 			break
 		}
-		phrase = phrase[:open] + v + phrase[open+closeAt+1:]
-		done = open + len(v)
+		filled := fillSlot(phrase[open+1:open+closeAt], v)
+		phrase = phrase[:open] + filled + phrase[open+closeAt+1:]
+		done = open + len(filled)
 	}
 	return phrase
+}
+
+// pluralMarker marks a noun inside a slot that agrees with the slot's value.
+// slotCountToken and slotListToken say where the value lands and what it
+// counts: a count of its own, or a comma-separated list whose length counts.
+const (
+	pluralMarker   = "(s)"
+	slotCountToken = "N"
+	slotListToken  = "LIST"
+)
+
+// fillSlot renders one "<…>" slot's content with value.
+//
+// A slot carrying no pluralMarker is a placeholder and nothing more: the value
+// replaces it whole, which is every declaration that names a status, an error
+// or an identifier. A slot carrying one is a shape — "<N day(s)>",
+// "<port(s) LIST>" — and number agreement is read off it here rather than at
+// the emit site, so a wording and its singular live in the same declaration
+// and an emitter passes the number or the list and nothing else.
+func fillSlot(slot, value string) string {
+	if value == "" {
+		if testing.Testing() {
+			panic(fmt.Sprintf("finding phrase slot %q filled with an empty value — "+
+				"the emitter must pass a word or a declared fallback, not a hole in the sentence", slot))
+		}
+		// Only reachable in a release build: the panic above is where an
+		// emitter that forgot a value is caught.
+		value = "unknown"
+	}
+	if !strings.Contains(slot, pluralMarker) {
+		return value
+	}
+	var singular bool
+	switch {
+	case strings.Contains(slot, slotListToken):
+		singular = !strings.Contains(value, ",")
+		slot = strings.Replace(slot, slotListToken, value, 1)
+	case strings.Contains(slot, slotCountToken):
+		singular = value == "1"
+		slot = strings.Replace(slot, slotCountToken, value, 1)
+	default:
+		// The declaration marked a noun for agreement and named no token, so
+		// there is nowhere to put the value. The value is what the reader is
+		// being shown; the declaration is what is wrong, and the gate over
+		// the registered phrases is where that is caught.
+		return value
+	}
+	if singular {
+		return strings.ReplaceAll(slot, pluralMarker, "")
+	}
+	return strings.ReplaceAll(slot, pluralMarker, "s")
 }
 
 // addWave1Finding appends the Wave-1 posture Finding for code to r.

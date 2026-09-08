@@ -30,6 +30,19 @@ func DetailsDeniedFindingDef(shortName, detail string) catalog.FindingDef {
 	}
 }
 
+// DetailsDeniedFindingDefPhraseOnly is DetailsDeniedFindingDef for a type
+// whose per-item describe is one batched call: a denial there degrades every
+// listed row at once, so no demo fixture can show a denied row beside healthy
+// ones and the detail-witness gate can never be satisfied for it. It declares
+// the phrase alone. A Detail sentence no surface ever renders is a sentence
+// nobody proof-reads, and turning the gate off for one type would stop
+// demanding a witness for every other.
+func DetailsDeniedFindingDefPhraseOnly(shortName string) catalog.FindingDef {
+	def := DetailsDeniedFindingDef(shortName, "")
+	def.Detail = ""
+	return def
+}
+
 // DetailsUnavailableFindingDef returns the catalog declaration matching what
 // detailsUnavailableFinding emits. Every adopting type lists this alongside
 // DetailsDeniedFindingDef in its `Findings` slice so the coverage gates

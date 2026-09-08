@@ -483,3 +483,24 @@ func TestW2DBIDeletingInstanceEmitsNoWave2Finding(t *testing.T) {
 
 	w2AssertNoCode(t, res.Findings["acme-old-db"], w2DBICodeEngineDeprecated)
 }
+
+// TestW2DBICACertSingularDay pins spec row 3 (task aws3) at this emit site:
+// number agreement in the wording is the slot filler's, read off the declared
+// phrase, so a certificate one day out reads "1 day" and not "1 days". The
+// site passes the number and nothing else.
+func TestW2DBICACertSingularDay(t *testing.T) {
+	one := w2DBIInstance("acme-db-1")
+	one.CertificateDetails = &rdstypes.CertificateDetails{
+		CAIdentifier: aws.String("rds-ca-2019"),
+		ValidTill:    aws.Time(w2DBINow.AddDate(0, 0, 1)),
+	}
+	two := w2DBIInstance("acme-db-2")
+	two.CertificateDetails = &rdstypes.CertificateDetails{
+		CAIdentifier: aws.String("rds-ca-2019"),
+		ValidTill:    aws.Time(w2DBINow.AddDate(0, 0, 2)),
+	}
+
+	got := w2DBIFetch(t, w2DBINow, one, two)
+	w2AssertFinding(t, got["acme-db-1"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 1 day", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-db-2"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 2 days", domain.SevBroken, "wave1")
+}

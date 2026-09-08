@@ -210,6 +210,13 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 		return append(findings, postureFindings...), postureDetails
 	}
 
+	// A cluster AWS reported no status for has no keyword to pass through.
+	// The transitional wording puts that keyword in front of "in progress",
+	// and an empty one claims a transition nobody reported.
+	if status == "" {
+		return postureFindings, postureDetails
+	}
+
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
 	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
 	return append(lead, postureFindings...), postureDetails

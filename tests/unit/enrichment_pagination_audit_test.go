@@ -682,8 +682,9 @@ var paginationBurnDown = map[string]bool{}
 //
 //  1. Is a 3-level selector call (clients.X.Op(...)) to an AWS SDK
 //     list/describe operation that is NOT in the nonPaginatedAPIs allowlist, AND
-//  2. Sits in no enclosing loop that drives a NextToken, Marker or
-//     ContinuationToken.
+//  2. Sits in no enclosing loop that drives a cursor — a NextToken, Marker or
+//     ContinuationToken, a Start… field of a multi-field cursor, the
+//     IsTruncated flag those answer with, or an SDK paginator's HasMorePages.
 //
 // Every function in the file is walked, not only the exported Enrich* ones.
 // An enricher that hands the call to an unexported helper has the same defect
@@ -882,11 +883,19 @@ func collectThreeLevelCalls(body ast.Node, rootIdent string) []callSite {
 }
 
 // inPaginatedWalk reports whether the call currently on top of stack is part
-// of a pagination walk: either a loop enclosing it drives a token, or it is
+// of a pagination walk: either a loop enclosing it drives a cursor, or it is
 // the page reader handed to walkAccountPages.
 //
-// The token has to live in the loop that contains the call, because a second
+// The cursor has to live in the loop that contains the call, because a second
 // loop elsewhere in the same function says nothing about this call.
+//
+// A cursor is not always one token named NextToken. Route 53 pages
+// ListResourceRecordSets on three Start… input fields and an IsTruncated
+// boolean, and the SDK's own paginators expose HasMorePages and nothing else.
+// Recognising only the three token names read those loops as unpaginated,
+// which is a false alarm the next author answers with an allowlist entry —
+// and an allowlist entry then hides the real single-call regression the audit
+// exists to catch.
 //
 // The walkAccountPages arm inverts what this audit asserted before the cap
 // batch's spec row 1 ("one page-cap helper owns the walk bound"): an
@@ -899,7 +908,7 @@ func inPaginatedWalk(stack []ast.Node) bool {
 	for _, n := range stack {
 		switch node := n.(type) {
 		case *ast.ForStmt, *ast.RangeStmt:
-			if bodyContainsAny(n, "NextToken", "Marker", "ContinuationToken") {
+			if bodyContainsAny(n, cursorNames...) {
 				return true
 			}
 		case *ast.CallExpr:
@@ -909,6 +918,16 @@ func inPaginatedWalk(stack []ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// cursorNames are the identifiers a paginating loop drives its cursor with:
+// the three single-token names, the Start… fields of a multi-field cursor,
+// the IsTruncated flag those answer with, and the SDK paginator's own
+// condition.
+var cursorNames = []string{
+	"NextToken", "Marker", "ContinuationToken",
+	"IsTruncated", "HasMorePages",
+	"StartRecordName", "StartRecordType", "StartRecordIdentifier",
 }
 
 // bodyContainsAny reports whether any of the given identifier names appear
@@ -967,6 +986,20 @@ func EnrichThing(ctx any, clients *ServiceClients) {
 	for _, id := range ids {
 		clients.EC2.DescribeInstanceStatus(ctx, &In{})
 	}
+	input := &In{}
+	for range PerParentPageCap {
+		out, _ := clients.Route53.ListResourceRecordSets(ctx, input)
+		if !out.IsTruncated {
+			break
+		}
+		input.StartRecordName = out.NextRecordName
+		input.StartRecordType = out.NextRecordType
+	}
+	pager := NewListThingsPaginator(clients.Athena, &In{})
+	for pager.HasMorePages() {
+		pager.NextPage(ctx)
+		clients.Athena.ListDataCatalogs(ctx, &In{})
+	}
 }
 `
 	fset := token.NewFileSet()
@@ -989,6 +1022,14 @@ func EnrichThing(ctx any, clients *ServiceClients) {
 		// Inside a loop, but one that iterates resource IDs and drives no
 		// token — the shape a function-wide check cannot tell from the first.
 		"DescribeInstanceStatus": false,
+		// Route 53's cursor is three input fields and a boolean on the output,
+		// and it spells none of them NextToken. A loop this correct read as
+		// unpaginated, which is a false alarm the next author answers with an
+		// allowlist entry that then hides a real one.
+		"ListResourceRecordSets": true,
+		// The SDK's own paginator drives the cursor; the loop condition is
+		// the paginator's, not a token the enricher names.
+		"ListDataCatalogs": true,
 	}
 	for op, wantPaginated := range want {
 		gotPaginated, seen := got[op]

@@ -9,23 +9,18 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeNGStateCreating — node group is in the "CREATING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeNGStateCreating domain.FindingCode = "ng.state.creating"
 
 	// CodeNGStateUpdating — node group is in the "UPDATING" lifecycle state.
-	// Severity: SevWarn (transitional).
 	CodeNGStateUpdating domain.FindingCode = "ng.state.updating"
 
 	// CodeNGStateDeleting — node group is in the "DELETING" lifecycle state.
-	// Severity: SevWarn (transitional; non-terminal from operator's perspective).
 	CodeNGStateDeleting domain.FindingCode = "ng.state.deleting"
 
 	// CodeNGStateCreateFailed — node group creation failed.
-	// Severity: SevBroken.
 	CodeNGStateCreateFailed domain.FindingCode = "ng.state.create-failed"
 
 	// CodeNGStateDeleteFailed — node group deletion failed.
-	// Severity: SevBroken.
 	CodeNGStateDeleteFailed domain.FindingCode = "ng.state.delete-failed"
 
 	// CodeNGHealthIssue — node group reports a Health.Issues[] entry while its
@@ -33,6 +28,5 @@ const (
 	CodeNGHealthIssue domain.FindingCode = "ng.health-issue"
 
 	// CodeNGStateDegraded — node group is degraded.
-	// Severity: SevBroken.
 	CodeNGStateDegraded domain.FindingCode = "ng.state.degraded"
 )

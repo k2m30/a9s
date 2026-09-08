@@ -120,7 +120,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | any target `unhealthy` (not all) | 2 | Warning | `~` | S2, S3, S4, S5 | `unhealthy targets: <N>/<M>` |
-| all targets `unhealthy` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `all <N> targets unhealthy` |
+| all targets `unhealthy` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `all <N target(s)> unhealthy` |
 
 Notes:
 
@@ -129,7 +129,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a partial outage shows a yellow row reading `unhealthy targets: <N>/<M>`, and a total outage shows a red row reading `all <N> targets unhealthy`; the operator knows the scope (how many) and the next pivot (`ec2` or `lambda` for target failures) without opening detail. A target group with no load balancer carries no finding, so it reads as healthy — the `elb` pivot is the way to see that.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a partial outage shows a yellow row reading `unhealthy targets: <N>/<M>`, and a total outage shows a red row reading `all <N target(s)> unhealthy`; the operator knows the scope (how many) and the next pivot (`ec2` or `lambda` for target failures) without opening detail. A target group with no load balancer carries no finding, so it reads as healthy — the `elb` pivot is the way to see that.
 
 ## 5. Out of Scope
 
@@ -165,7 +165,7 @@ tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| tg.all-targets-unhealthy | all <N> targets unhealthy | broken | wave2 | Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with. |
+| tg.all-targets-unhealthy | all <N target(s)> unhealthy | broken | wave2 | Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with. |
 | tg.unhealthy-targets | unhealthy targets: <N>/<M> | warn | wave2 | Some of this group's targets are failing their health checks, so every request is landing on the ones that are left. Each failing target is listed with the reason its health check gave; fix or replace them before the remaining targets run out of headroom. |
 <!-- END GENERATED: findings -->
 

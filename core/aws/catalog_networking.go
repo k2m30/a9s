@@ -145,8 +145,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: elbCodeMisconfigured, Phrase: "deletion protection or access logs disabled", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2", Detail: "The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest."},
 			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2", Detail: "Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields."},
-			{Code: elbCodePlainHTTPListener, Phrase: "<ports> in the clear", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener."},
-			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on <ports>", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later."},
+			{Code: elbCodePlainHTTPListener, Phrase: "<port(s) LIST> in the clear", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener."},
+			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on <port(s) LIST>", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later."},
 		},
 	},
 	{
@@ -203,7 +203,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "LoadBalancerArns", TargetType: "elb"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: tgCodeAllTargetsUnhealthy, Phrase: "all <N> targets unhealthy", Severity: domain.SevBroken, Source: "wave2", Detail: "Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with."},
+			{Code: tgCodeAllTargetsUnhealthy, Phrase: "all <N target(s)> unhealthy", Severity: domain.SevBroken, Source: "wave2", Detail: "Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with."},
 			{Code: tgCodeUnhealthyTargets, Phrase: "unhealthy targets: <N>/<M>", Severity: domain.SevWarn, Source: "wave2", Detail: "Some of this group's targets are failing their health checks, so every request is landing on the ones that are left. Each failing target is listed with the reason its health check gave; fix or replace them before the remaining targets run out of headroom."},
 		},
 	},

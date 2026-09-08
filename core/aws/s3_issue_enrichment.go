@@ -116,12 +116,20 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
-		if len(p.failures) > 0 {
-			// One entry per failed BUCKET, not per failed call: the six calls
-			// share a cause (usually one denied permission), and counting
-			// each would report more failures than there were buckets.
+		// One entry per distinct cause, not per failed call: the six calls
+		// usually refuse for one reason, and recording each would report six
+		// failures where the operator has one permission to grant. Two
+		// different refusals are two permissions, though, and the operator
+		// who grants only the one named would watch the bucket fail again.
+		seen := make(map[string]bool, len(p.failures))
+		for _, callErr := range p.failures {
+			cause := FailedCall(r.ID, callErr).Cause
+			if seen[cause] {
+				continue
+			}
+			seen[cause] = true
 			truncated = true
-			MarkSkipped(&result, r.ID, &failures, p.failures[0])
+			MarkSkipped(&result, r.ID, &failures, callErr)
 		}
 		for _, f := range p.findings {
 			setWave2Finding(&result, bucketName, f.code, f.rows)

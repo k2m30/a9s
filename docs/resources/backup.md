@@ -93,7 +93,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N jobs> failed in last 24h` |
+| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N job(s)> failed in last 24h` |
 | recent job `PARTIAL` | 2 | Warning | `~` | S2, S3, S4, S5 | `partial: <N> of <M> resources skipped` |
 
 Rules for filling list and detail text:
@@ -105,7 +105,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, the operator sees a red plan row reading `<N jobs> failed in last 24h` and knows immediately to open the detail view for the error message and to pivot into the `role` and `kms` related panels. All problem rows are self-explanatory in the list — operator can triage without opening detail; detail adds the exact timestamp of the most recent failure so the operator can correlate with CloudTrail.
+At 3am, glancing at the list, the operator sees a red plan row reading `<N job(s)> failed in last 24h` and knows immediately to open the detail view for the error message and to pivot into the `role` and `kms` related panels. All problem rows are self-explanatory in the list — operator can triage without opening detail; detail adds the exact timestamp of the most recent failure so the operator can correlate with CloudTrail.
 
 ## 5. Out of Scope
 
@@ -149,7 +149,7 @@ backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| backup.job-failed | <N jobs> failed in last 24h | broken | wave2 | — |
+| backup.job-failed | <N job(s)> failed in last 24h | broken | wave2 | — |
 | backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 

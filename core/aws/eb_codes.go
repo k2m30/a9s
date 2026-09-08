@@ -9,31 +9,25 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeEBHealthRed — environment health is Red (critical).
-	// Severity: SevBroken.
 	CodeEBHealthRed domain.FindingCode = "eb.health.red"
 
 	// CodeEBHealthYellow — environment health is Yellow (degraded).
-	// Severity: SevWarn.
 	CodeEBHealthYellow domain.FindingCode = "eb.health.yellow"
 
 	// CodeEBHealthGrey — environment health is Grey (unknown/no data, e.g.
 	// mid-transition).
-	// Severity: SevWarn.
 	CodeEBHealthGrey domain.FindingCode = "eb.health.grey"
 
 	// CodeEBTerminated — environment Status is Terminated. Takes precedence
 	// over a Grey/Yellow health reading (a torn-down environment's stale
 	// health data is not itself the story) but not over Red (a critical
 	// health reading on a not-yet-fully-terminated environment still wins).
-	// Severity: SevDim.
 	CodeEBTerminated domain.FindingCode = "eb.status.terminated"
 
 	// CodeEBLaunching — Status is Launching/Updating with no health signal.
-	// Severity: SevWarn.
 	CodeEBLaunching domain.FindingCode = "eb.status.launching"
 
 	// CodeEBTerminating — Status is Terminating with no health signal.
-	// Severity: SevDim.
 	CodeEBTerminating domain.FindingCode = "eb.status.terminating"
 )
 

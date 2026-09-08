@@ -84,7 +84,10 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		}
 	}
 
-	findings, issueRows := ngFindings(status, healthIssuesCount, issueCodes)
+	// No degraded code: this row came back from DescribeNodegroup. The
+	// recovery arm is for rows rebuilt from Fields, which degradedNodeGroup
+	// stamps.
+	findings, issueRows := ngFindings(status, "", healthIssuesCount, issueCodes)
 
 	r := resource.Resource{
 		ID:   nodegroupName,
@@ -128,8 +131,8 @@ func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource 
 // tracked independently of the state, the same way it is for the cluster.
 // colorEKSNodeGroup runs it over Fields for rows built outside the fetcher,
 // which have the issue count but not the codes.
-func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]domain.Finding, []domain.DetailRow) {
-	if f := degradedStatusFindings("ng", status); f != nil {
+func ngFindings(status, degradedCode string, healthIssuesCount int, issueCodes []string) ([]domain.Finding, []domain.DetailRow) {
+	if f := degradedFindings("ng", degradedCode); f != nil {
 		return f, nil
 	}
 	switch status {

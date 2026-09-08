@@ -55,6 +55,13 @@ func IsNotFoundErr(err error) bool {
 // AggregateFailures names before summarizing the rest. Failures are grouped by
 // cause, so this bounds the line by how many DIFFERENT things went wrong, not
 // by how many resources they happened to.
+//
+// It is deliberately not FindingRowCap, and the overflow is worded as a
+// sentence rather than capRows's "… +N more" row. capRows bounds a list of
+// detail rows a reader scrolls; this bounds one line of prose that has to fit
+// in a flash and a log line, and it counts causes where capRows counts rows.
+// A shared constant would tie the length of a status line to the height of a
+// detail section.
 const aggregateFailuresCap = 5
 
 // Failure is one failed per-item call, recorded from the error's own fields:
@@ -66,6 +73,10 @@ type Failure struct {
 	ID    string
 	Class string
 	Cause string
+	// Page is the 1-based page number when the failure is the page walk's own
+	// rather than any one item's: the call that would have returned the page
+	// failed, so there is no resource on it to name. Zero for an item.
+	Page int
 }
 
 // FailedCall records a per-item call that failed with err.
@@ -93,6 +104,16 @@ func FailedCallInRegion(id string, err error, region string) Failure {
 		cause = opErr.OperationName + ": " + cause
 	}
 	return Failure{ID: id, Class: ErrClass(err), Cause: cause}
+}
+
+// FailedOnPage records a paged walk stopped by a failed page. The page never
+// arrived, so it holds no resource id to blame; naming the page as if it were
+// one would put "e.g. page 3" where every other aggregate names something the
+// operator can go and look at.
+func FailedOnPage(page int, err error) Failure {
+	f := FailedCall("", err)
+	f.Page = page
+	return f
 }
 
 // UnusableAnswer records an item the service answered for without the field
@@ -150,6 +171,9 @@ func isPhrased(err error) bool {
 //	"<op> failed for 46 of 46 IDs: not authorized to perform ec2:DescribeSnapshotAttribute (e.g. snap-0abc)"
 //	"<op> failed for 3 of 9 IDs: timeout (2, e.g. snap-1); no metadata (1, e.g. snap-3)"
 //
+// A record FailedOnPage made names the page instead of an example, because a
+// page that never arrived carries no resource to point at.
+//
 // Above aggregateFailuresCap distinct causes the rest are summarized as
 // "; and N more causes". Grouping is per cause rather than per class so two
 // actions the same role lacks stay two lines: one denial must never speak for
@@ -173,6 +197,7 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	type group struct {
 		cause   string
 		example string
+		page    int
 		n       int
 	}
 	var groups []*group
@@ -181,7 +206,7 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	for _, f := range failures {
 		g, ok := byCause[f.Cause]
 		if !ok {
-			g = &group{cause: f.Cause, example: f.ID}
+			g = &group{cause: f.Cause, example: f.ID, page: f.Page}
 			byCause[f.Cause] = g
 			groups = append(groups, g)
 		}
@@ -201,6 +226,10 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	for _, g := range groups {
 		part := g.cause
 		switch {
+		case g.page > 0 && len(byCause) == 1:
+			part += fmt.Sprintf(" (on page %d)", g.page)
+		case g.page > 0:
+			part += fmt.Sprintf(" (%d, on page %d)", g.n, g.page)
 		case len(byCause) == 1 && g.example != "":
 			part += fmt.Sprintf(" (e.g. %s)", g.example)
 		case g.example != "":

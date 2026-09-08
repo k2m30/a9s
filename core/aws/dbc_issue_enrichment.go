@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -104,7 +103,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			return out.PendingMaintenanceActions, out.Marker, nil
 		})
 	if walkErr != nil {
-		failures = append(failures, FailedCall(fmt.Sprintf("page %d", pages), walkErr))
+		failures = append(failures, FailedOnPage(pages, walkErr))
 	}
 
 	for _, action := range allActions {

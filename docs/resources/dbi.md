@@ -240,8 +240,8 @@ One row per signal from §3:
 | `AutoMinorVersionUpgrade == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `auto minor version upgrade off` |
 | `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IAM database authentication off` |
 | `MasterUsername` is a vendor default | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default master username` |
-| `CertificateDetails.ValidTill` within 90d (but more than 30d out) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `server certificate expires in <N> days` |
-| `CertificateDetails.ValidTill` within 30d | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `server certificate expires in <N> days` |
+| `CertificateDetails.ValidTill` within 90d (but more than 30d out) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `server certificate expires in <N day(s)>` |
+| `CertificateDetails.ValidTill` within 30d | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `server certificate expires in <N day(s)>` |
 | `DBInstanceStatus == stopped` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped` |
 | Pending maintenance overdue | 2 | Warning | `~` | S2, S3, S4, S5 | `maintenance scheduled` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `engine version deprecated` |
@@ -325,8 +325,8 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 | dbi.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this database, so its retention is whatever the instance's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
 | dbi.iam-auth-off | IAM database authentication off | warn | wave1 | Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities. |
 | dbi.default-master-user | default master username | warn | wave1 | The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one. |
-| dbi.ca-cert-expiring | server certificate expires in <N> days | warn | wave1 | The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window. |
-| dbi.ca-cert-expiring-urgent | server certificate expires in <N> days | broken | wave1 | The server certificate expires within a month, and every client that verifies the connection will refuse to talk to the instance the moment it does. Book the maintenance window now and rotate the instance onto the current certificate authority. |
+| dbi.ca-cert-expiring | server certificate expires in <N day(s)> | warn | wave1 | The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window. |
+| dbi.ca-cert-expiring-urgent | server certificate expires in <N day(s)> | broken | wave1 | The server certificate expires within a month, and every client that verifies the connection will refuse to talk to the instance the moment it does. Book the maintenance window now and rotate the instance onto the current certificate authority. |
 | dbi.engine-deprecated | engine version deprecated | broken | wave2 | AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing. |
 <!-- END GENERATED: findings -->
 

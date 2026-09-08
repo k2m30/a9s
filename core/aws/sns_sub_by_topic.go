@@ -84,11 +84,12 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 		topicArn = *sub.TopicArn
 	}
 
-	// Determine confirmation status and ID
+	// A pending subscription has no ARN to be identified by — AWS puts the
+	// state where the ARN goes — so the row is keyed on what it does have.
 	confirmationStatus := "Confirmed"
 	id := subscriptionArn
-	if subscriptionArn == "PendingConfirmation" {
-		confirmationStatus = "PendingConfirmation"
+	if subscriptionArn == snsSubArnPending {
+		confirmationStatus = snsSubArnPending
 		id = fmt.Sprintf("pending/%s/%s", protocol, endpoint)
 	}
 

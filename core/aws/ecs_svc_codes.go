@@ -9,19 +9,15 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeECSSvcStateInactive — service is inactive (terminal; non-recoverable without recreation).
-	// Severity: SevBroken.
 	CodeECSSvcStateInactive domain.FindingCode = "ecs-svc.state.inactive"
 
 	// CodeECSSvcStateDraining — service is draining connections.
-	// Severity: SevWarn (transitional).
 	CodeECSSvcStateDraining domain.FindingCode = "ecs-svc.state.draining"
 
 	// CodeECSSvcNoTasksRunning — the service wants tasks but none are running.
-	// Severity: SevBroken.
 	CodeECSSvcNoTasksRunning domain.FindingCode = "ecs-svc.tasks.none-running"
 
 	// CodeECSSvcTasksBelowDesired — fewer tasks are running than the service asks for.
-	// Severity: SevWarn.
 	CodeECSSvcTasksBelowDesired domain.FindingCode = "ecs-svc.tasks.below-desired"
 )
 
