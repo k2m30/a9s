@@ -376,7 +376,7 @@ func TestEC2_InternetExposed_SensitivePortFromSGCache(t *testing.T) {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
 	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-		"port(s) 27017 reachable from the internet", domain.SevBroken, "wave2")
+		"port 27017 reachable from the internet", domain.SevBroken, "wave2")
 	rows := pw1Rows(res, id, pw1EC2CodeInternetExposed)
 	pw1RequireRow(t, rows, "Public address", "203.0.113.10")
 	pw1RequireRow(t, rows, "Security groups", "sg-0mongo000aaaaaa1")
@@ -385,6 +385,11 @@ func TestEC2_InternetExposed_SensitivePortFromSGCache(t *testing.T) {
 
 // TestEC2_InternetExposed_WideOpenSGReportsAll pins that an all-protocols
 // rule reports every port rather than enumerating a list.
+//
+// Inverted by misc4 row 1: the wide-open case is now ec2.internet-exposed-all
+// with its own sentence, because "port(s) all reachable from the internet"
+// read the word "all" as a port list and carried an unresolved hedge. Do not
+// restore the old assertion — the port-list code must stay silent here.
 func TestEC2_InternetExposed_WideOpenSGReportsAll(t *testing.T) {
 	const id = "i-0wideopen0aaaaa1"
 	cache := pw1SGCache(t, pw1SG("sg-0wide0000aaaaaa1", 0, 0, true))
@@ -394,9 +399,9 @@ func TestEC2_InternetExposed_WideOpenSGReportsAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
-	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-		"port(s) all reachable from the internet", domain.SevBroken, "wave2")
-	pw1RequireRow(t, pw1Rows(res, id, pw1EC2CodeInternetExposed), "Ports", "all")
+	pw1RequireFinding(t, res.Findings[id], misc4CodeExposedAll,
+		"every port reachable from the internet", domain.SevBroken, "wave2")
+	pw1RequireRow(t, pw1Rows(res, id, misc4CodeExposedAll), "Ports", "all")
 }
 
 // TestEC2_InternetExposed_NoPublicIPIsHealthy pins that a private instance
@@ -471,7 +476,7 @@ func TestEC2_InternetExposed_EvaluatesEveryInputInstance(t *testing.T) {
 	}
 	for _, id := range []string{"i-0batch00aaaaaaa1", "i-0batch00aaaaaaa2"} {
 		pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-			"port(s) 3389 reachable from the internet", domain.SevBroken, "wave2")
+			"port 3389 reachable from the internet", domain.SevBroken, "wave2")
 	}
 }
 
@@ -496,7 +501,7 @@ func TestEC2_PublicIPAndInternetExposedBothFire(t *testing.T) {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
 	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-		"port(s) 22 reachable from the internet", domain.SevBroken, "wave2")
+		"port 22 reachable from the internet", domain.SevBroken, "wave2")
 }
 
 // ─── row 4: ec2.user-data-secret ────────────────────────────────────────────
@@ -688,17 +693,21 @@ func TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding(t *testing.T) {
 	}
 	pw1RequireOnlyWitness(t, pw1EC2CodeIMDSv1, fixtures.EC2InstanceIMDSv1, imdsv1)
 
-	// Two rows legitimately carry ec2.public-ip: its own witness, and the
-	// internet-exposed witness, which needs a public address to be reachable
-	// at all. Both signals fire on that row under the interim no-suppression
-	// rule, so the demo contract here is "these two and nobody else".
+	// Three rows legitimately carry ec2.public-ip: its own witness, and the
+	// two exposure witnesses, which need a public address to be reachable at
+	// all. Both signals fire on those rows under the interim no-suppression
+	// rule, so the demo contract here is "these three and nobody else".
 	publicIP := map[string]bool{}
 	for _, r := range out.Resources {
 		if _, ok := pw1FindFinding(r.Findings, pw1EC2CodePublicIP); ok {
 			publicIP[r.ID] = true
 		}
 	}
-	for _, want := range []string{fixtures.EC2InstancePublicIPOnly, fixtures.EC2InstanceInternetExposed} {
+	for _, want := range []string{
+		fixtures.EC2InstancePublicIPOnly,
+		fixtures.EC2InstanceInternetExposed,
+		fixtures.EC2InstanceInternetExposedAll,
+	} {
 		if !publicIP[want] {
 			t.Errorf("ec2.public-ip: witness %s does not carry the finding", want)
 		}
@@ -710,6 +719,7 @@ func TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding(t *testing.T) {
 
 	wave2 := map[domain.FindingCode]string{
 		pw1EC2CodeInternetExposed: fixtures.EC2InstanceInternetExposed,
+		misc4CodeExposedAll:       fixtures.EC2InstanceInternetExposedAll,
 		pw1EC2CodeUserDataSecret:  fixtures.EC2InstanceUserDataSecret,
 	}
 	for code, witness := range wave2 {

@@ -65,11 +65,13 @@ const (
 	// PendingModifiedValues / DeferredMaintenanceWindows / PubliclyAccessible / Unencrypted
 	RedshiftPendingChangeID       = "redshift-pending-change"
 	RedshiftMaintenanceDeferredID = "redshift-maintenance-deferred"
-	// Use a non-prefix-sharing ID so `findRow("redshift-maintenance-deferred")` in
-	// scenario tests picks the active fixture, not this expired variant.
-	RedshiftMaintenanceDeferredExpiredID = "redshift-expired-window"
-	RedshiftPubliclyAccessibleID         = "redshift-publicly-accessible"
-	RedshiftUnencryptedID                = "redshift-unencrypted"
+	// The negative control for RedshiftMaintenanceDeferredID: a deferral whose
+	// window has run out, which reports nothing. The ID shares no prefix with
+	// the active fixture so `findRow("redshift-maintenance-deferred")` in
+	// scenario tests picks that one and not this.
+	RedshiftDeferralLapsedID     = "redshift-deferral-lapsed"
+	RedshiftPubliclyAccessibleID = "redshift-publicly-accessible"
+	RedshiftUnencryptedID        = "redshift-unencrypted"
 
 	// Multi-finding (rule 7)
 	WarnRedshiftMultiID = "warn-redshift-multi"
@@ -432,10 +434,10 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	maintenanceDeferred.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-03-15T12:00:00Z"))
 
 	// -----------------------------------------------------------------------
-	// 15. redshift-maintenance-deferred-expired — expired DeferredMaintenanceWindow → Healthy (negative case)
-	// DeferMaintenanceEndTime is in the past → window inactive
+	// 15. redshift-deferral-lapsed — DeferMaintenanceEndTime in the past, so
+	// the window is inactive and no deferral finding fires (negative case)
 	// -----------------------------------------------------------------------
-	maintenanceDeferredExpired := redshiftBaselineHealthy(RedshiftMaintenanceDeferredExpiredID)
+	maintenanceDeferredExpired := redshiftBaselineHealthy(RedshiftDeferralLapsedID)
 	maintenanceDeferredExpired.DeferredMaintenanceWindows = []redshifttypes.DeferredMaintenanceWindow{
 		{
 			DeferMaintenanceIdentifier: aws.String("dmw-expired"),

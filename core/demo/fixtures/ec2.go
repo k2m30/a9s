@@ -93,6 +93,11 @@ const (
 	// EC2InstanceInternetExposed holds a public address AND carries
 	// public-ssh-bad (sg-0public0ssh000001, port 22 open to 0.0.0.0/0).
 	EC2InstanceInternetExposed = "i-0a1b2c3d4e5f60005"
+	// EC2InstanceInternetExposedAll is the only instance behind a group that
+	// admits every protocol from 0.0.0.0/0 (public-all-open,
+	// sg-0public0all000003); every other public instance is behind a group
+	// that names its ports.
+	EC2InstanceInternetExposedAll = "i-0a1b2c3d4e5f60050"
 	// EBSSnapPublic is the only demo snapshot restorable by every AWS
 	// account; every other snapshot is private to this account.
 	EBSSnapPublic = "snap-0a1b2c3d4e5f60002"
@@ -281,6 +286,13 @@ var namedExtras = map[string]instExtras{
 		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
 			{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	},
+	EC2InstanceInternetExposedAll: {
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0public0all000003"), GroupName: aws.String("public-all-open")},
 		},
 	},
 	"i-0a1b2c3d4e5f60006": {
@@ -707,6 +719,7 @@ func buildReservations() []ec2types.Reservation {
 		{"i-0a1b2c3d4e5f60040", "ml-inference-01", "running", ec2types.InstanceTypeG5Xlarge, "10.0.6.10", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 1, 10, 9, 0, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60041", "ml-inference-02", "running", ec2types.InstanceTypeG5Xlarge, "10.0.6.11", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 1, 12, 9, 0, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60042", "ml-inference-03", "running", ec2types.InstanceTypeG5Xlarge, "10.0.6.12", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 2, 1, 9, 0, 0, 0, time.UTC), ""},
+		{EC2InstanceInternetExposedAll, "legacy-jump-host", "running", ec2types.InstanceTypeT3Micro, "10.0.0.6", "52.87.221.45", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 6, 2, 9, 0, 0, 0, time.UTC), ""},
 	}
 
 	var reservations []ec2types.Reservation
@@ -1112,6 +1125,29 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			},
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("public-ssh-bad")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		// Every protocol open to 0.0.0.0/0 → wide_open, which the ec2
+		// exposure signal reports as its own sentence rather than a port list.
+		{
+			GroupId:          aws.String("sg-0public0all000003"),
+			GroupName:        aws.String("public-all-open"),
+			VpcId:            aws.String(fixtProdVPCID),
+			Description:      aws.String("Misconfigured SG — every protocol open to the world"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/sg-0public0all000003"),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("-1"),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("public-all-open")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},

@@ -255,7 +255,7 @@ func TestRedshift_Fetch_MaintenanceDeferred_Active(t *testing.T) {
 // TestRedshift_Fetch_MaintenanceDeferred_Expired asserts expired DeferredMaintenanceWindow is silent.
 // The fixture has DeferMaintenanceEndTime in the past — must NOT trigger a finding.
 func TestRedshift_Fetch_MaintenanceDeferred_Expired(t *testing.T) {
-	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftMaintenanceDeferredExpiredID))
+	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftDeferralLapsedID))
 	assertStatus(t, r, "")
 	assertFindings(t, r, nil)
 	assertClusterStatusField(t, r, "available")

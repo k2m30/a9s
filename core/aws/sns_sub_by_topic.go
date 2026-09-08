@@ -88,18 +88,25 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 	// own reading of it: snsSubConfirmation is the one place the ARN is
 	// interpreted, so this column and the subscription list's Confirmed column
 	// cannot disagree about the same subscription.
+	//
+	// Only a confirmed subscription has an ARN to be identified by — AWS puts
+	// the state word where the ARN goes for the other two and sends nothing at
+	// all for the third — so every other row is keyed on what it does have.
+	// Taking the state word, or the empty string, would make every
+	// subscription in that state under one topic a single identity, and the
+	// row store's page dedup would keep exactly one of them.
 	confirmationStatus := "Confirmed"
 	id := subscriptionArn
-	switch snsSubConfirmation(subscriptionArn) {
-	case snsSubPending:
-		confirmationStatus = snsSubArnPending
-		// A pending subscription has no ARN to be identified by, so the row is
-		// keyed on what it does have.
-		id = fmt.Sprintf("pending/%s/%s", protocol, endpoint)
-	case snsSubDeleted:
-		confirmationStatus = snsSubArnDeleted
-	case snsSubUnknown:
-		confirmationStatus = "Unknown"
+	if state := snsSubConfirmation(subscriptionArn); state != snsSubConfirmed {
+		switch state {
+		case snsSubPending:
+			confirmationStatus = snsSubArnPending
+		case snsSubDeleted:
+			confirmationStatus = snsSubArnDeleted
+		default:
+			confirmationStatus = "Unknown"
+		}
+		id = fmt.Sprintf("%s/%s/%s", state, protocol, endpoint)
 	}
 
 	findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)

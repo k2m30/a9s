@@ -256,12 +256,12 @@ func (m Model) headerRight() string {
 	if m.flash.active {
 		msg := m.flash.text
 		// Truncate to prevent header wrapping (fixes #84).
-		// Reserve ~40 chars for the left side (a9s + version + profile:region + padding).
-		// Errors get more header width; reserve 6 chars minimum for the brand + gap.
+		// The 40 columns reserved for the left side are the account identity:
+		// a9s + version + profile:region + padding. An error is cut to what
+		// remains rather than given the rest of the line — which account the
+		// operator is looking at outranks the text of one failure, and is not
+		// readable anywhere else on the screen.
 		maxFlash := max(m.width-40, 20)
-		if m.flash.isError {
-			maxFlash = max(m.width-6, 20) // errors get wider display; 6 = innerPad(2)+minLeft(3)+gap(1)
-		}
 		// The slot is counted in terminal columns, so the cut is measured in
 		// them too: a message counted in runes fits the test at twice the
 		// width and takes the profile and region off the header to fit.

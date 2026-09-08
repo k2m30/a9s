@@ -78,7 +78,7 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftUnencryptedID, "unencrypted at rest")
 
 	// Expired deferred-maintenance window — must NOT trigger (U2 negative).
-	scenario.ExpectRowStatusBlank(demofixtures.RedshiftMaintenanceDeferredExpiredID)
+	scenario.ExpectRowStatusBlank(demofixtures.RedshiftDeferralLapsedID)
 
 	// U7a — multi-W1: 3 warnings → top + (+2).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnRedshiftMultiID, "pending change queued (+2)")
@@ -118,7 +118,7 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 		demofixtures.AcmeWarehouseID,
 		demofixtures.AcmeReportingID,
 		demofixtures.StagingDwhID,
-		demofixtures.RedshiftMaintenanceDeferredExpiredID,
+		demofixtures.RedshiftDeferralLapsedID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
@@ -196,7 +196,7 @@ func TestScenario_RedshiftVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{demofixtures.AcmeWarehouseID, nil},
 		{demofixtures.AcmeReportingID, nil},
 		{demofixtures.StagingDwhID, nil},
-		{demofixtures.RedshiftMaintenanceDeferredExpiredID, nil},
+		{demofixtures.RedshiftDeferralLapsedID, nil},
 		// Wave-1 single-phrase rows.
 		{demofixtures.RedshiftResizingID, []string{"Resizing"}},
 		{demofixtures.RedshiftRebootingID, []string{"Rebooting"}},
@@ -258,7 +258,7 @@ func TestScenario_RedshiftVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 		demofixtures.AcmeWarehouseID,
 		demofixtures.AcmeReportingID,
 		demofixtures.StagingDwhID,
-		demofixtures.RedshiftMaintenanceDeferredExpiredID,
+		demofixtures.RedshiftDeferralLapsedID,
 	} {
 		t.Run(id, func(t *testing.T) {
 			res := selectRedshiftByID(t, scenario, id)

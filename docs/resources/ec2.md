@@ -210,6 +210,10 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
+- **Signal**: public address behind a security group admitting every protocol from `0.0.0.0/0` (`sg` cache cross-ref, `wide_open`).
+  - **State bucket**: Broken.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type. A group that opens every port says everything a port list would, so it is reported instead of the list, not beside it.
+
 - **Signal**: credential in `DescribeInstanceAttribute(userData)`.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
@@ -243,7 +247,8 @@ One row per signal from §3:
 | `SystemStatus.Status == initializing` | 2 | Warning | `~` | S2, S3, S4, S5 | `initializing: checks in progress` |
 | `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S2, S3, S4, S5 | `status unknown: AWS insufficient-data` |
 | `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `~` | S2, S3, S4, S5 | `scheduled event` |
-| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `port(s) <list> reachable from the internet` |
+| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<port(s) LIST> reachable from the internet` |
+| public address behind a security group admitting every protocol from `0.0.0.0/0` (`sg` cache cross-ref, `wide_open`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `every port reachable from the internet` |
 | credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in user data` |
 
 Notes on list-text construction:
@@ -327,7 +332,8 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 | ec2.scheduled-event | scheduled event | warn | wave2 | — |
 | ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata. |
 | ec2.public-ip | public address | warn | wave1 | The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly. |
-| ec2.internet-exposed | port(s) <list> reachable from the internet | broken | wave2 | Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion. |
+| ec2.internet-exposed | <port(s) LIST> reachable from the internet | broken | wave2 | Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion. |
+| ec2.internet-exposed-all | every port reachable from the internet | broken | wave2 | A security group on this instance admits every protocol and port from any address on the internet, so nothing the host listens on is shielded. Replace the all-protocols rule with the ports the service actually needs, from the addresses that need them. |
 | ec2.user-data-secret | credential in user data | broken | wave2 | A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it. |
 <!-- END GENERATED: findings -->
 

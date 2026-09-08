@@ -187,7 +187,10 @@ func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 
 	want := map[string]map[domain.FindingCode]int{
 		"eip": {"eip.unassociated": 4},
-		"ec2": {"ec2.public-ip": 2},
+		// Three: the public-address witness and the two exposure witnesses,
+		// each of which needs a public address to be reachable at all
+		// (misc4 row 1 added the wide-open one).
+		"ec2": {"ec2.public-ip": 3},
 	}
 	for short, codes := range want {
 		got := map[domain.FindingCode]int{}
@@ -204,7 +207,7 @@ func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 	}
 
 	// Row counts on the sibling lists the reshuffle touched.
-	for short, n := range map[string]int{"eni": 47, "ec2": 40, "nat": 6} {
+	for short, n := range map[string]int{"eni": 48, "ec2": 41, "nat": 6} {
 		if got := len(d4Rows(t, short)); got != n {
 			t.Errorf("demo %s list = %d rows, want %d", short, got, n)
 		}

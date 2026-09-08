@@ -91,33 +91,36 @@ func TestErrorHistoryAccumulation_NonErrorFlashesNotAdded(t *testing.T) {
 
 // ── TestErrorFlashFullWidth ───────────────────────────────────────────────────
 
-// TestErrorFlashFullWidth verifies that error flash messages use (width-6)
-// for truncation rather than the old max(width-60, 20), so long error messages
-// are not prematurely cut off on wide terminals.
+// TestErrorFlashWidth_MessageIsCutToTheSlotLeftByTheIdentity pins that an
+// error takes the same header slot every other flash takes, so the profile and
+// region survive beside it.
 //
-// The test uses a 120-column terminal and a 100-char error message.
-// Old behavior: truncated at width-60 = 80 chars.
-// New behavior: truncated at width-6 = 116 chars (fits the full 100-char message).
-func TestErrorFlashFullWidth_LongMessageNotTruncatedAt80(t *testing.T) {
+// INVERTED by misc4 row 7. This test previously asserted the opposite: that an
+// error reserved all but six columns and so was NOT cut at width-40. That
+// reservation left the frame renderer nothing for the left side, and it
+// truncated the account identity away — "which account am I looking at" is not
+// readable anywhere else on the screen, and it outranks the text of one
+// failure. Do not restore the width-6 assertion.
+func TestErrorFlashWidth_MessageIsCutToTheSlotLeftByTheIdentity(t *testing.T) {
 	tui.Version = "test"
 
-	// Create model with width=120
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 
-	// Build a 100-character error message. With width=120:
-	//   old: max(120-40, 20) = 80  → message truncated at 77 chars + "..."
-	//   new: 120-4 = 116           → 100-char message fits without truncation
-	longMsg := strings.Repeat("x", 100) // exactly 100 chars
-
+	longMsg := strings.Repeat("x", 100)
 	m, _ = rootApplyMsg(m, messages.Flash{Text: longMsg, IsError: true})
 
 	plain := stripANSI(rootViewContent(m))
+	firstL := firstLine(plain)
 
-	// The full 100-char sequence must appear in the output (not truncated to 77+...).
-	if !strings.Contains(plain, strings.Repeat("x", 80)) {
-		t.Errorf("error flash should not be truncated to 80 chars (old width-60 behavior) at width=120; got header: %q",
-			firstLine(plain))
+	if !strings.Contains(firstL, "testprofile:us-east-1") {
+		t.Errorf("the error took the account identity off the header; got: %q", firstL)
+	}
+	if !strings.Contains(firstL, strings.Repeat("x", 60)) {
+		t.Errorf("the error message is cut far shorter than the slot allows; got: %q", firstL)
+	}
+	if strings.Contains(firstL, strings.Repeat("x", 100)) {
+		t.Errorf("the error message was not cut to the header slot at all; got: %q", firstL)
 	}
 }
 

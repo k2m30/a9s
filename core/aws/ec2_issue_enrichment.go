@@ -31,6 +31,7 @@ const (
 	ec2CodeInstanceStatusInsufficient domain.FindingCode = "ec2.instance-status.insufficient-data"
 	ec2CodeScheduledEvent             domain.FindingCode = "ec2.scheduled-event"
 	ec2CodeInternetExposed            domain.FindingCode = "ec2.internet-exposed"
+	ec2CodeInternetExposedAll         domain.FindingCode = "ec2.internet-exposed-all"
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	ec2CodeUserDataSecret domain.FindingCode = "ec2.user-data-secret"
 )
@@ -270,12 +271,19 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 			portList = strings.Join(ports, ", ")
 		}
 		sort.Strings(groupIDs)
-		setWave2Finding(result, r.ID, ec2CodeInternetExposed, []domain.DetailRow{
+		rows := []domain.DetailRow{
 			{Label: "Public address", Value: publicIP, Tier: "!"},
 			{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
 			{Label: "Ports", Value: portList, Tier: "!"},
-		}, portList)
-
+		}
+		// A group admitting every protocol is a different statement from a
+		// list of ports, so it carries its own code and its own sentence
+		// rather than a list whose only member is the word "all".
+		if wideOpen {
+			setWave2Finding(result, r.ID, ec2CodeInternetExposedAll, rows)
+			continue
+		}
+		setWave2Finding(result, r.ID, ec2CodeInternetExposed, rows, portList)
 	}
 }
 

@@ -87,14 +87,21 @@ type ViewsConfig struct {
 }
 
 // GeneratedViewsVersion stamps the view files this build generates. Bump it in
-// the same change that adds, removes or renames a built-in column, or that
-// changes where an existing one reads its value from: EnsureViewsDir reads the
-// stamp off a file already on disk and, when it is older, adds the columns this
-// build ships that the file has never heard of and carries the corrected source
-// onto the columns listed in viewColumnSourceChanges. Without the stamp an
-// operator who ran a9s once keeps the columns of that day forever — and without
-// the source half, they keep a column reading the field it was corrected away
-// from, which is worse than a missing column because it looks like it works.
+// the same change that ADDS a built-in column, or that changes where an
+// existing one reads its value from: EnsureViewsDir reads the stamp off a file
+// already on disk and, when it is older, adds the columns this build ships
+// that the file has never heard of and carries the corrected source onto the
+// columns listed in viewColumnSourceChanges. Without the stamp an operator who
+// ran a9s once keeps the columns of that day forever — and without the source
+// half, they keep a column reading the field it was corrected away from, which
+// is worse than a missing column because it looks like it works.
+//
+// Those two are its whole reach. REMOVING a built-in column and RENAMING one
+// are NOT handled, and bumping the stamp does not deliver them: the merge only
+// ever adds and re-sources, so a removed column stays on the operator's disk,
+// and a rename arrives as a title the file has never heard of — the operator
+// keeps the old column beside the new one. Shipping either needs a migration
+// this file does not have yet.
 const GeneratedViewsVersion = 2
 
 // ViewDef defines the list and detail view configuration for a single resource type.

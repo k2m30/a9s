@@ -29,7 +29,8 @@ type pw1DefExpectation struct {
 var pw1ComputeDefs = []pw1DefExpectation{
 	{"ec2", "ec2.imdsv1-allowed", "IMDSv1 allowed", domain.SevWarn, "wave1"},
 	{"ec2", "ec2.public-ip", "public address", domain.SevWarn, "wave1"},
-	{"ec2", "ec2.internet-exposed", "port(s) <list> reachable from the internet", domain.SevBroken, "wave2"},
+	{"ec2", "ec2.internet-exposed", "<port(s) LIST> reachable from the internet", domain.SevBroken, "wave2"},
+	{"ec2", "ec2.internet-exposed-all", "every port reachable from the internet", domain.SevBroken, "wave2"},
 	{"ec2", "ec2.user-data-secret", "credential in user data", domain.SevBroken, "wave2"},
 	{"ami", "ami.public", "shared with all AWS accounts", domain.SevBroken, "wave1"},
 	{"ecs-svc", "ecs-svc.public-ip", "tasks get public IPs", domain.SevWarn, "wave2"},

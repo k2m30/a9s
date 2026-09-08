@@ -309,7 +309,7 @@ var knownConstructionDebt = map[string]bool{
 	"qa_enrichment_detail_live_test.go:navigateToDetailWithRDS#1":                                                 true,
 	"qa_enrichment_dispatch_test.go:newTestModel#1":                                                               true,
 	"qa_error_log_test.go:TestErrorFlashFullWidth_ExceedsWidthMinus4IsTruncated#1":                                true,
-	"qa_error_log_test.go:TestErrorFlashFullWidth_LongMessageNotTruncatedAt80#1":                                  true,
+	"qa_error_log_test.go:TestErrorFlashWidth_MessageIsCutToTheSlotLeftByTheIdentity#1":                           true,
 	"qa_fetch_test.go:TestQA_FetchResources_NilClients#1":                                                         true,
 	"qa_fetch_test.go:buildModelWithMockClients#1":                                                                true,
 	"qa_glyph_continuity_test.go:glyphContinuityPair#1":                                                           true,

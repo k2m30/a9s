@@ -37,13 +37,20 @@ func (m DetailModel) RawYAML() string {
 const detailKeyFloor = 22
 
 // computeKeyWidth returns the width of the key column: the widest key plus its
-// colon, never under detailKeyFloor. Measured in terminal columns, because that
-// is what the padding under it fills — a key counted in bytes reserves three
-// times the room a CJK field name paints.
-func computeKeyWidth(keys []string) int {
+// colon, never under detailKeyFloor and never over two fifths of the viewport.
+// The bound is what keeps a field name wider than the terminal from reserving
+// the whole line and leaving the value — the thing the reader opened the
+// detail view for — off the right edge. Measured in terminal columns, because
+// that is what the padding under it fills: a key counted in bytes reserves
+// three times the room a CJK field name paints. A viewport of zero is a model
+// that has not been sized yet and bounds nothing.
+func computeKeyWidth(keys []string, viewport int) int {
 	w := detailKeyFloor
 	for _, k := range keys {
 		w = max(w, text.Width(k)+1)
+	}
+	if viewport > 0 {
+		return min(w, viewport*2/5)
 	}
 	return w
 }

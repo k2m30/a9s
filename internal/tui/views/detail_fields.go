@@ -62,7 +62,7 @@ func (m DetailModel) renderFromFieldList() string {
 			topPaths = append(topPaths, item.Key)
 		}
 	}
-	keyW := computeKeyWidth(topPaths)
+	keyW := computeKeyWidth(topPaths, m.width)
 
 	leftFocused := !m.rightCol.IsFocused()
 

@@ -908,7 +908,7 @@ func inPaginatedWalk(stack []ast.Node) bool {
 	for _, n := range stack {
 		switch node := n.(type) {
 		case *ast.ForStmt, *ast.RangeStmt:
-			if bodyContainsAny(n, cursorNames...) {
+			if bodyContainsAny(n, cursorNames...) || bodyReadsTruncatedOffACallResult(n) {
 				return true
 			}
 		case *ast.CallExpr:
@@ -922,12 +922,56 @@ func inPaginatedWalk(stack []ast.Node) bool {
 
 // cursorNames are the identifiers a paginating loop drives its cursor with:
 // the three single-token names, the Start… fields of a multi-field cursor,
-// the IsTruncated flag those answer with, and the SDK paginator's own
-// condition.
+// and the SDK paginator's own condition.
+//
+// IsTruncated is deliberately NOT here. It is a field name a cached list
+// entry carries too, so a loop over cache entries that reads
+// entry.IsTruncated and single-shots an API inside would read as paginated —
+// the very regression this audit exists to catch. It is recognised by
+// bodyReadsTruncatedOffACallResult instead, which requires it be read off a
+// value the loop itself got back from a call.
 var cursorNames = []string{
 	"NextToken", "Marker", "ContinuationToken",
-	"IsTruncated", "HasMorePages",
+	"HasMorePages",
 	"StartRecordName", "StartRecordType", "StartRecordIdentifier",
+}
+
+// bodyReadsTruncatedOffACallResult reports whether body reads .IsTruncated off
+// a variable the body itself assigned from a call — the Route 53 shape, where
+// the loop's own page response answers whether another page is due.
+func bodyReadsTruncatedOffACallResult(body ast.Node) bool {
+	fromCall := map[string]bool{}
+	ast.Inspect(body, func(n ast.Node) bool {
+		assign, ok := n.(*ast.AssignStmt)
+		if !ok || len(assign.Rhs) != 1 {
+			return true
+		}
+		if _, isCall := assign.Rhs[0].(*ast.CallExpr); !isCall {
+			return true
+		}
+		for _, lhs := range assign.Lhs {
+			if id, ok := lhs.(*ast.Ident); ok {
+				fromCall[id.Name] = true
+			}
+		}
+		return true
+	})
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "IsTruncated" {
+			return true
+		}
+		if base, ok := sel.X.(*ast.Ident); ok && fromCall[base.Name] {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 // bodyContainsAny reports whether any of the given identifier names appear
@@ -1000,6 +1044,13 @@ func EnrichThing(ctx any, clients *ServiceClients) {
 		pager.NextPage(ctx)
 		clients.Athena.ListDataCatalogs(ctx, &In{})
 	}
+	for _, name := range []string{"eip", "ec2"} {
+		entry := cache[name]
+		if entry.IsTruncated {
+			continue
+		}
+		clients.EC2.DescribeAddresses(ctx, &In{})
+	}
 }
 `
 	fset := token.NewFileSet()
@@ -1030,6 +1081,11 @@ func EnrichThing(ctx any, clients *ServiceClients) {
 		// The SDK's own paginator drives the cursor; the loop condition is
 		// the paginator's, not a token the enricher names.
 		"ListDataCatalogs": true,
+		// IsTruncated read off a CACHE ENTRY, not off this loop's own call
+		// output. The loop drives no cursor and the call inside it is a
+		// single shot, which is exactly the regression the audit exists to
+		// catch — recognising the field wherever it appears would exempt it.
+		"DescribeAddresses": false,
 	}
 	for op, wantPaginated := range want {
 		gotPaginated, seen := got[op]

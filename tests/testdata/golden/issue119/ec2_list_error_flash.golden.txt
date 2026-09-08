@@ -1,5 +1,5 @@
  a9s v  demo:us-east-1                                                                                                   Error: load failed 
-┌────────────────────────────────────────────────────────────── ec2(40) !15 ───────────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────────────────── ec2(41) !16 ───────────────────────────────────────────────────────────────┐
 │ 1:Name                    2:Status        3:Health      4:Lifecycle   5:Type          6:Private IP      7:Public IP       8:Instance ID  │
 │ web-prod-01               public address  ok            on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e…  │
 │ web-prod-02               running         ok            on-demand     t3.large        10.0.1.11                           i-0a1b2c3d4e…  │
@@ -26,5 +26,5 @@
 │ ml-inference-01           running         ok            on-demand     g5.xlarge       10.0.6.10                           i-0a1b2c3d4e…  │
 │ ml-inference-02           running         ok            on-demand     g5.xlarge       10.0.6.11                           i-0a1b2c3d4e…  │
 │ ml-inference-03           running         ok            on-demand     g5.xlarge       10.0.6.12                           i-0a1b2c3d4e…  │
-│ worker-11                 running         ok            on-demand     t3.medium       10.0.2.21                           i-0a1b2c3d4e…  │
+│ legacy-jump-host          public address  ok            on-demand     t3.micro        10.0.0.6          52.87.221.45      i-0a1b2c3d4e…  │
 └─────────────────────────────────────────────────────────────────────y YAML──J JSON──o Open──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘
