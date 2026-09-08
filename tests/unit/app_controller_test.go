@@ -115,9 +115,9 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 					{Key: "type", Title: "Type", Width: 14},
 				},
 				Rows: []app.ListRow{
-					{Cells: []string{"i-0abc123def456", "running", "t3.micro"}, Decorator: app.DecoratorNormal, Severity: ""},
-					{Cells: []string{"i-0def789abc012", "stopped", "m5.large"}, Decorator: app.RowDecorator("~"), Severity: "medium"},
-					{Cells: []string{"i-0000000000001", "terminated", "t2.nano"}, Decorator: app.RowDecorator("!"), Severity: "critical"},
+					{Cells: []string{"i-0abc123def456", "running", "t3.micro"}, Severity: ""},
+					{Cells: []string{"i-0def789abc012", "stopped", "m5.large"}, Severity: "medium"},
+					{Cells: []string{"i-0000000000001", "terminated", "t2.nano"}, Severity: "critical"},
 				},
 				Selected:      1,
 				ScrollX:       4,
@@ -225,9 +225,6 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 			if gotRow.Cells[j] != cell {
 				t.Errorf("Rows[%d].Cells[%d]: got %q want %q", i, j, gotRow.Cells[j], cell)
 			}
-		}
-		if gotRow.Decorator != row.Decorator {
-			t.Errorf("Rows[%d].Decorator: got %q want %q", i, gotRow.Decorator, row.Decorator)
 		}
 		if gotRow.Severity != row.Severity {
 			t.Errorf("Rows[%d].Severity: got %q want %q", i, gotRow.Severity, row.Severity)

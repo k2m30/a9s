@@ -130,9 +130,6 @@ func TestCols_CacheReplayRendersTheSameCellsAsTheLiveFetch(t *testing.T) {
 				if got.Severity != want.Severity {
 					t.Errorf("%s: row %q has severity %q live and %q after a cache round trip", td.ShortName, id, want.Severity, got.Severity)
 				}
-				if got.Decorator != want.Decorator {
-					t.Errorf("%s: row %q is decorated %+v live and %+v after a cache round trip", td.ShortName, id, want.Decorator, got.Decorator)
-				}
 				if len(got.Cells) != len(want.Cells) {
 					t.Errorf("%s: row %q renders %d cells live and %d on replay", td.ShortName, id, len(want.Cells), len(got.Cells))
 					continue
@@ -192,9 +189,11 @@ var replayShadowedCells = []replayShadowedCell{
 	// The retention policy is one field carrying words (aws5 row 1): "30 days"
 	// where the number-only key used to render "30".
 	{"logs", "/aws/lambda/process-orders", "Retention", "30 days"},
-	// timestamp: the fetcher's value loses the time of day.
-	{"secrets", "prod/app/long-lived-signing-key", "Last Changed", "2024-12-01 00:00"},
-	{"secrets", "prod/payments/stripe-webhook-secret", "Last Accessed", "2026-04-28 00:00"},
+	// timestamp: the fetcher writes a date and no time of day, and the cell
+	// says exactly that. Inverted for tui5 row "one humanizer" — both rows
+	// expected a "00:00" the fetcher never reported. Do not restore it.
+	{"secrets", "prod/app/long-lived-signing-key", "Last Changed", "2024-12-01"},
+	{"secrets", "prod/payments/stripe-webhook-secret", "Last Accessed", "2026-04-28"},
 	// The identifier column. Inverted by misc4 round 2: the fetch-side column
 	// change this row's earlier comment anticipated is the one that landed —
 	// the defaults read the fetcher's task_id, so a column headed "Task ID"
@@ -438,8 +437,12 @@ func TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord(t *testi
 	if idx < 0 {
 		t.Fatal("no column titled \"Last Accessed\" in the rendered list")
 	}
-	if got := body.Rows[0].Cells[idx]; got != "2026-04-28 00:00" {
-		t.Errorf("a row from the previous build's cache renders Last Accessed as %q, want %q — the value that build's screen showed",
-			got, "2026-04-28 00:00")
+	// The subject is which of the two keys wins, and the fetcher's own still
+	// does. The expected string is inverted for tui5 row "one humanizer": that
+	// build's screen showed a midnight its fetcher never reported, and matching
+	// it forever would keep the defect. Do not restore the "00:00".
+	if got := body.Rows[0].Cells[idx]; got != "2026-04-28" {
+		t.Errorf("a row from the previous build's cache renders Last Accessed as %q, want %q — the fetcher's own key still wins",
+			got, "2026-04-28")
 	}
 }

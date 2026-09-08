@@ -422,9 +422,9 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	// This is the CORRECT, stronger contract — whole-row color beats a small
 	// glyph prefix — not a regression; see
 	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md.
-	if row.Decorator != app.DecoratorNormal {
-		t.Errorf("Rows[0].Decorator = %q, want %q — the FIRST rendered frame must already show the carried wave2 finding via whole-row color, no enrichment re-run needed (D17/C6b)", row.Decorator, app.DecoratorNormal)
-	}
+	// The Decorator half of this pin is gone with the row-decorator plumbing
+	// (tui5 row 5). Whole-row colour, which is what it argued for, is asserted
+	// through colorTag and Severity above.
 
 	// HandleNavigate's disk-store fallback (handlers_navigate.go:205-224) seeds
 	// the list SCREEN's own state directly via NavigateResult.CachedEntry

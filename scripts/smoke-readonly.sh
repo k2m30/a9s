@@ -45,6 +45,22 @@ trap cleanup EXIT
 tmux new-session -d -s "$SESSION" -x 220 -y 90 \
 	"$BIN --profile $PROFILE --region $REGION"
 
+# Nothing is on screen until the app has resolved credentials and reached the
+# region, which is a network round trip of unbounded length. Wait for the menu
+# to have painted — the catalog line is the first thing it draws — so the sweep
+# window below is 30 seconds of the sweep and not 30 seconds of the connect.
+MENU_PAINTED=0
+i=0
+while [ $i -lt 120 ]; do
+	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/menu_first.txt"
+	if grep -qE 'resource-types\([0-9]+\)' "$CAPDIR/menu_first.txt"; then
+		MENU_PAINTED=1
+		break
+	fi
+	sleep 0.5
+	i=$((i + 1))
+done
+
 # The first screen must say what it is doing while it does it: catch the
 # title's sweep counter before the sweep settles. Polled fast (0.5s) because
 # on a small account the whole sweep can finish inside one 5s step.
@@ -126,6 +142,12 @@ expect menu.txt 'issues:[0-9]+' "sweep produced at least one issue badge"
 # First screen: the sweep announces itself while it runs and stops saying so
 # when it is done; a healthy read-only role leaves no row marked with a cause
 # and no account-wide failure in the title.
+if [ "$MENU_PAINTED" = 1 ]; then
+	echo "PASS  the menu painted the catalog"
+else
+	echo "FAIL  the menu never painted within 60s of launch — see $CAPDIR/menu_first.txt"
+	FAILURES=$((FAILURES + 1))
+fi
 if [ "$SAW_VERIFYING" = 1 ]; then
 	echo "PASS  menu title carried the sweep counter while the sweep ran"
 else

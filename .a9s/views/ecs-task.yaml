@@ -13,6 +13,7 @@ list:
   Stop Code:
     path: StopCode
     width: 24
+    humanize: true
   Health:
     path: HealthStatus
     width: 12

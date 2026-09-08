@@ -7,23 +7,20 @@
 // other side channel. Today RenderList re-derives three things instead of
 // consuming the pre-resolved body fields:
 //
-//  1. renderListDataRow (~line 882 resourcelist.go): the "!"/"~" glyph is
-//     re-derived from body.EnrichmentFindings[row.ResourceID] + row.Color ==
-//     "healthy", instead of consuming row.Decorator (which buildListBody
-//     already computed by buildListBody).
+//  1. renderListDataRow: no "!"/"~" glyph may be re-derived from
+//     body.EnrichmentFindings[row.ResourceID] + row.Color == "healthy". A
+//     row's colour already carries its worst finding, and the row-decorator
+//     plumbing that once fed this was deleted (tui5 row 5).
 //  2. renderListDataRow (~line 874): the S4 status-cell override re-applies
 //     findings[row.ResourceID].Phrase at statusColIdx, even though
 //     buildListBody (list_body.go ~line 124) already bakes the phrase into
 //     row.Cells[statusCol].
-//  3. RenderList (~line 583-617): markerColIdx/statusColIdx are re-resolved
-//     from cols/fullCols/typeDef instead of consuming body.MarkerCol (which
-//     exists) and a to-be-added body.StatusCol (which does NOT exist yet —
-//     see TestViewStatePurity_StatusCol_FieldExists below, legitimate
-//     compile-red until the architect adds the field).
+//  3. RenderList: statusColIdx is re-resolved from cols/fullCols/typeDef
+//     instead of consuming body.StatusCol.
 //
-// Each test below constructs a SYNTHETIC ListBody whose pre-resolved fields
-// (Decorator, Cells) deliberately DISAGREE with what re-derivation from
-// EnrichmentFindings would produce. A pure renderer follows the body fields;
+// Each test below constructs a SYNTHETIC ListBody whose pre-resolved Cells
+// deliberately DISAGREE with what re-derivation from EnrichmentFindings would
+// produce. A pure renderer follows the body fields;
 // today's renderer follows the re-derivation, so these tests fail red.
 //
 // Harness: mirrors tests/unit/resourcelist_render_parity_test.go — construct
@@ -81,54 +78,18 @@ func newPurityListModel(td resource.ResourceTypeDef) views.ResourceListModel {
 }
 
 // ---------------------------------------------------------------------------
-// Case 1 — Decorator="!" present, findings map does NOT contain the row's ID.
-// A pure renderer consumes row.Decorator and MUST show the glyph. Today's
-// renderer re-derives from findings[row.ResourceID] (absent) and shows none.
+// Case 1 — deleted with the row-decorator plumbing (tui5 row 5). It pinned
+// that the renderer prefers row.Decorator over a re-derivation from
+// EnrichmentFindings; there is no row decorator any more, so the only half of
+// that contract left to hold is Case 2's: no glyph is prepended to any cell,
+// whatever the findings map says. Do not restore a Decorator-carrying pin.
 // ---------------------------------------------------------------------------
 
-// The named DecoratorError/DecoratorWarning constants were deleted with
-// resolveListDecoratorFull's glyph branch: a list row's colour is the worst
-// finding over both waves, so buildListBody never produces a glyph. These pins
-// are about the RENDERER's purity, not about what the body produces — they
-// construct the decorator value directly, so they still hold if a body ever
-// carries one again. Do not restore the constants to make them read better.
-func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Present(t *testing.T) {
-	ensureNoColor(t)
-	styles.ReinitForTest()
-	t.Cleanup(styles.ReinitForTest)
-
-	td := purityTypeDef("purity-glyph-present")
-	m := newPurityListModel(td)
-
-	row := app.ListRow{
-		Cells:      []string{"demo-instance-1", "running"},
-		Decorator:  app.RowDecorator("!"), // pre-resolved by buildListBody
-		ResourceID: "res-1",
-		Color:      "healthy",
-	}
-	body := app.ListBody{
-		Columns:   purityColumns(),
-		Rows:      []app.ListRow{row},
-		Selected:  0,
-		MarkerCol: 0,
-		StatusCol: 1, // "Status" column — matches purityColumns()[1]
-		// Deliberately EMPTY — no finding for res-1. Re-derivation (which scans
-		// EnrichmentFindings[row.ResourceID]) will find nothing and skip the
-		// glyph. A pure consumer of row.Decorator must still show it.
-		EnrichmentFindings: map[string][]domain.Finding{},
-	}
-
-	out := m.RenderList(body)
-	if !strings.Contains(out, "! demo-instance-1") {
-		t.Errorf("expected glyph prefix from row.Decorator (pure consumer) even though "+
-			"EnrichmentFindings has no entry for res-1 — got:\n%s", out)
-	}
-}
-
 // ---------------------------------------------------------------------------
-// Case 2 — Decorator="" (no glyph), findings map DOES contain an issue
-// finding for the row. A pure renderer consumes row.Decorator=="" and MUST
-// NOT show a glyph. Today's renderer re-derives from findings and shows one.
+// Case 2 — the findings map DOES carry an issue finding for the row, and the
+// row still renders with no glyph on any cell. A row's colour is the worst
+// finding over both waves, so there is nothing for a marker to add; a renderer
+// that re-derived one from EnrichmentFindings would be inventing a surface.
 // ---------------------------------------------------------------------------
 
 func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing.T) {
@@ -141,7 +102,6 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing
 
 	row := app.ListRow{
 		Cells:      []string{"demo-instance-2", "running"},
-		Decorator:  app.DecoratorNormal, // "" — pre-resolved: no glyph
 		ResourceID: "res-2",
 		Color:      "healthy",
 	}
@@ -151,8 +111,8 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing
 		Selected:  0,
 		MarkerCol: 0,
 		StatusCol: 1, // "Status" column — matches purityColumns()[1]
-		// Deliberately carries an issue-severity finding for res-2. Re-derivation
-		// will find it and prepend "! " even though Decorator says otherwise.
+		// Deliberately carries an issue-severity finding for res-2, which a
+		// re-deriving renderer would surface as a "! " prefix.
 		EnrichmentFindings: map[string][]domain.Finding{
 			"res-2": {{
 				Code:     "PURITY-TEST",
@@ -164,9 +124,9 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing
 
 	out := m.RenderList(body)
 	if strings.Contains(out, "! demo-instance-2") || strings.Contains(out, "~ demo-instance-2") {
-		t.Errorf("expected NO glyph prefix — row.Decorator is DecoratorNormal (pure consumer "+
-			"contract), but EnrichmentFindings carries an issue finding for res-2 that a "+
-			"re-deriving renderer would surface as a glyph — got:\n%s", out)
+		t.Errorf("expected NO glyph prefix on any cell — EnrichmentFindings carries an "+
+			"issue finding for res-2 that a re-deriving renderer would surface as a "+
+			"glyph — got:\n%s", out)
 	}
 	if !strings.Contains(out, "demo-instance-2") {
 		t.Fatalf("expected row identity cell to render at all — got:\n%s", out)
@@ -194,7 +154,6 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 	row := app.ListRow{
 		// Cells[1] is the "status" column — already carries the baked S4 phrase.
 		Cells:      []string{"demo-instance-3", bakedPhrase},
-		Decorator:  app.DecoratorNormal,
 		ResourceID: "res-3",
 		Color:      "healthy",
 	}
@@ -227,60 +186,12 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 }
 
 // ---------------------------------------------------------------------------
-// Case 4 — body.MarkerCol points at column 1 (not 0), with a decorator
-// present. Glyph must prefix column 1's cell exactly. This exercises the
-// SAME markerColIdx-translation code path RenderList already uses for
-// body.MarkerCol (unlike Case 1/2, this does not require touching the
-// re-derivation branch) — kept as a pin either way; see the per-test comment
-// on which side of the contract it verifies.
+// Case 4 — deleted with the row-decorator plumbing (tui5 row 5). It pinned
+// that the glyph landed on body.MarkerCol's cell rather than on a re-derived
+// identity column; no cell carries a glyph any more. body.MarkerCol survives
+// for the widen pass, and Case 2 covers the "no glyph, whatever the findings
+// say" half. Do not restore a glyph-placement pin.
 // ---------------------------------------------------------------------------
-
-func TestViewStatePurity_List_MarkerColSelectsPrefixedColumn(t *testing.T) {
-	ensureNoColor(t)
-	styles.ReinitForTest()
-	t.Cleanup(styles.ReinitForTest)
-
-	td := purityTypeDef("purity-markercol")
-	m := newPurityListModel(td)
-
-	row := app.ListRow{
-		Cells:      []string{"demo-instance-4", "needs-attention"},
-		Decorator:  app.RowDecorator("!"),
-		ResourceID: "res-4",
-		Color:      "healthy",
-	}
-	body := app.ListBody{
-		Columns:  purityColumns(),
-		Rows:     []app.ListRow{row},
-		Selected: 0,
-		// Marker column is column 1 ("Status"), NOT the default column 0 ("Name").
-		MarkerCol: 1,
-		StatusCol: 1, // "Status" column — matches purityColumns()[1]
-		EnrichmentFindings: map[string][]domain.Finding{
-			"res-4": {{
-				Code:     "PURITY-TEST",
-				Phrase:   "needs-attention",
-				Severity: domain.SevBroken,
-			}},
-		},
-	}
-
-	out := m.RenderList(body)
-	// PIN: this assertion currently PASSES — RenderList already translates
-	// body.MarkerCol (full-column-space) into the visible markerColIdx via the
-	// fullMarkerColIdx cascade at resourcelist.go ~line 583-592, and
-	// renderListDataRow prepends the glyph at i==markerColIdx regardless of
-	// which column that is. Kept as a purity pin: if a future change makes
-	// the glyph placement depend on re-derived identity-column logic instead
-	// of body.MarkerCol, this test must catch the regression.
-	if !strings.Contains(out, "! needs-attention") {
-		t.Errorf("expected glyph to prefix column 1 (body.MarkerCol=1)'s cell "+
-			"\"needs-attention\", not column 0 — got:\n%s", out)
-	}
-	if strings.Contains(out, "! demo-instance-4") {
-		t.Errorf("glyph incorrectly prefixed column 0 instead of body.MarkerCol=1 — got:\n%s", out)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Compile-red marker — body.StatusCol does not exist yet.

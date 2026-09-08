@@ -126,6 +126,8 @@ A reviewer's suggested patch is a proposal, not verified code: read every snippe
 - **Exit**: every external finding resolved or disproved on the record.
 - **Anti-pattern**: running Codex per fix. Treating a reviewer's patch as compiling code.
 
+**Deleted symbols are swept out of the live docs only.** When a symbol, file or flag is deleted, every page that names it is corrected — `docs/*.md`, `docs/resources/`, `docs/shared/`, `website/`, `README.md`, `CLAUDE.md`. `docs/historical/` is **exempt from that sweep**: those pages are the record of a world that existed before a refactor, and editing them to name today's symbols destroys the traceability they are kept for. A historical page that has gone wrong about the past is a bug in the record; a historical page that names a symbol which no longer exists is the record working. The same exemption is why `make mdlint` skips `docs/historical/refactor/`.
+
 ### Stage 6 — Pre-push Validation (single command)
 
 ```bash

@@ -2,7 +2,10 @@
 
 package app
 
-import "github.com/k2m30/a9s/v3/core/runtime"
+import (
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/runtime"
+)
 
 // OpenProfileSelector is the blessed headless entry point for opening the
 // profile selector (issue #464 part 2). runtime.NavigateKindFetchProfiles
@@ -28,8 +31,12 @@ func (c *Controller) OpenProfileSelector() (ViewState, []runtime.TaskRequest) {
 
 	profiles, err := c.core.FetchProfiles()
 	if err != nil {
+		// The failure is a local file, not an API, so no error class in
+		// core/aws names it — a9s supplies the cause word and the error's own
+		// words follow through awsclient.CauseOf, the one formatter every
+		// other surface that renders a failure phrases through.
 		c.applyIntents([]runtime.UIIntent{runtime.FlashIntent{
-			Text:    err.Error(),
+			Text:    "local AWS config: " + awsclient.CauseOf(err),
 			IsError: true,
 		}})
 		return c.snapshot(), nil

@@ -118,6 +118,12 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		fields = FieldAliasProvider(shortName, fields)
 	}
 
+	// Settle the fetcher's own spellings before anything reads them, so the
+	// detail row shows what the list cell above it shows. It is the Fields map
+	// alone: a value that comes off the RawStruct is formatted by fieldpath,
+	// and a raw document's text is the document's.
+	fields = config.CanonicalFieldValues(fields)
+
 	// Synthesise minimal Fields from ID/Name when the resource is a bare
 	// stub (no Fields, no RawStruct).
 	if len(fields) == 0 && r.RawStruct == nil && (r.ID != "" || r.Name != "") {

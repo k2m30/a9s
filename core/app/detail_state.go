@@ -12,6 +12,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
+// wave2SourceUnattributed is the provenance the detail controller stamps on a
+// Wave-2 finding that reached it without one — an enrichment result delivered
+// straight to a detail screen, past runtime.ApplyWave2ToRow, which is the one
+// seam that knows which registered type's enricher produced a finding.
+//
+// It carries the "wave2:" prefix every reader tests for, and deliberately not
+// a short name: the rest of the codebase spells this field
+// "wave2:<short-name>", so a sentinel spelled like one is a short name a
+// reader will try to resolve and a registry lookup will fail to find.
+const wave2SourceUnattributed = "wave2:(unattributed)"
+
 // topDetailState returns the DetailState of the top-of-stack screen when the
 // top screen is ScreenDetail, nil otherwise.
 func (c *Controller) topDetailState() *DetailState {
@@ -190,7 +201,7 @@ func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, resour
 	// on-demand DetailEnrich computes (e.g. transfer_children.go's
 	// cert-expiry checks) would otherwise never reach an already-open
 	// detail. applyFindingToState already re-tags every non-"wave2:" finding
-	// as "wave2:controller" before appending, and sorts Broken before
+	// with wave2SourceUnattributed before appending, and sorts Broken before
 	// Warning when the Attention block renders — both reused unchanged here.
 	fallbackFindings := singleFindingSlice(f)
 	attentionDetails := singleAttentionDetailMap(f, ad)
@@ -399,7 +410,7 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 		}
 		finding := f
 		if !strings.HasPrefix(string(finding.Source), "wave2:") {
-			finding.Source = "wave2:controller"
+			finding.Source = wave2SourceUnattributed
 		}
 		ds.Findings = append(ds.Findings, finding)
 		if ad, ok := attentionDetails[finding.Code]; ok && len(ad.Rows) > 0 {

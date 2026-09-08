@@ -855,9 +855,10 @@ detail:
 	if len(lbLoaded.Rows) != 1 {
 		t.Fatalf("ListBody.Rows = %d after the verify fetch, want 1", len(lbLoaded.Rows))
 	}
-	if lbLoaded.Rows[0].Decorator != app.DecoratorNormal {
-		t.Errorf("post-verify bucket-s4-1 Decorator = %q, want normal (no findings)", lbLoaded.Rows[0].Decorator)
-	}
+	// The row-decorator pin that stood here is gone with the plumbing (tui5
+	// row 5): a list row carries no marker, so "no findings" is read off the
+	// row's colour, which the sibling assertions already cover. Do not restore
+	// a Decorator assertion — there is no such field.
 
 	// Step 3: persisted file now carries the new column's field too.
 	afterTF := readTypeFile(t, profile, region)
@@ -868,6 +869,12 @@ detail:
 	if v, present := got.Fields["bucket_owner"]; !present || v != "team-platform" {
 		t.Errorf(`persisted bucket-s4-1.Fields["bucket_owner"] = %q (present=%v), want "team-platform" — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present)
 	}
+	// "bucket_name" here is this scenario's own view config talking, not the
+	// s3 fetcher: the YAML above declares a Key-less column titled "Bucket
+	// Name", and the save projection keys a Key-less column by its title. The
+	// row this test feeds in carries no such field, and no fetcher writes one
+	// for it. Do not "follow" a fetcher key rename here — the projection is
+	// the subject.
 	if v, present := got.Fields["bucket_name"]; !present || v == "" {
 		t.Errorf(`persisted bucket-s4-1.Fields["bucket_name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
 	}

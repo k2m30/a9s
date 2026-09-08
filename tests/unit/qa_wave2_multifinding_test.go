@@ -360,9 +360,10 @@ func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T)
 	if row.ResourceID != wave2CarryMultiResourceID {
 		t.Fatalf("Rows[0].ResourceID = %q, want %q", row.ResourceID, wave2CarryMultiResourceID)
 	}
-	if row.Decorator != app.DecoratorNormal {
-		t.Errorf("Rows[0].Decorator = %q, want %q — colorECSSvc resolves ColorBroken directly from the worst carried finding, giving whole-row color (no glyph prefix), same precedent as the single-finding D17/C6b restart-seed pin", row.Decorator, app.DecoratorNormal)
-	}
+	// The "no glyph prefix" half of this pin is gone with the row-decorator
+	// plumbing (tui5 row 5) — there is no marker on any row to assert the
+	// absence of. What it was really pinning, whole-row colour from the worst
+	// carried finding, is the Severity assertion below.
 	if row.Severity != "issue" {
 		t.Errorf(`Rows[0].Severity = %q, want "issue" — the FIRST render must already reflect the carried worst finding, no enrichment needed`, row.Severity)
 	}

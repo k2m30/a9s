@@ -33,8 +33,14 @@ test-race:
 test-budget:
 	@scripts/test-budget-gate.sh capture
 
+# Two passes. tests/integration/ is behind the `integration` build tag, so the
+# untagged pass cannot see a single file in it. The tagged pass is scoped to
+# that directory because the first already covers everything else, and
+# testmain_test.go there is `//go:build !integration`, which only the untagged
+# pass reaches.
 lint:
 	golangci-lint run --allow-serial-runners ./...
+	golangci-lint run --allow-serial-runners --build-tags=integration ./tests/integration/...
 
 gofix:
 	@if go fix -inline -diff ./... 2>&1 | grep -q '^'; then \

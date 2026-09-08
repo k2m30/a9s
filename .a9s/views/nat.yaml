@@ -17,6 +17,7 @@ list:
   Failure:
     path: FailureCode
     width: 22
+    humanize: true
   Public IP:
     key: public_ip
     width: 16

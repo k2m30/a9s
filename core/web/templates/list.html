@@ -11,9 +11,9 @@
   </thead>
   <tbody>
     {{range $i, $row := .Rows}}
-    <tr class="{{if eq $i $.Selected}}selected{{end}}{{if $row.Color}} row-{{$row.Color}}{{end}}{{if eq $row.Decorator "!"}} dec-error{{else if eq $row.Decorator "~"}} dec-warn{{end}}"
+    <tr class="{{if eq $i $.Selected}}selected{{end}}{{if $row.Color}} row-{{$row.Color}}{{end}}"
         onclick="clickSelect({{$i}})">
-      {{range $ci, $cell := $row.Cells}}<td>{{if and $row.Decorator (eq $ci $.MarkerCol)}}<span class="row-glyph">{{$row.Decorator}}</span> {{end}}{{$cell}}</td>{{end}}
+      {{range $row.Cells}}<td>{{.}}</td>{{end}}
     </tr>
     {{end}}
   </tbody>

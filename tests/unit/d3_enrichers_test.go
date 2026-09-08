@@ -8,6 +8,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -246,6 +247,22 @@ func TestD3ECSRecentEventFoundOutOfOrder(t *testing.T) {
 	// row now and the phrase is the code's. Do not restore the old expectation.
 	w4AssertFinding(t, res.Findings[svc], d3CodeECSDeployFailed,
 		catalog.Phrase(d3CodeECSDeployFailed), domain.SevBroken, "wave2")
+
+	// The inversion above moved the event text off the phrase but left nothing
+	// asserting it survives at all, so the out-of-order scan this test exists
+	// for could have stopped finding the recent event without failing. The
+	// event is a supporting row now, and this is the pin on it.
+	var eventRows []string
+	for _, row := range res.AttentionDetails[svc][d3CodeECSDeployFailed].Rows {
+		if row.Label == "Event" {
+			eventRows = append(eventRows, row.Value)
+		}
+	}
+	if !slices.Contains(eventRows, "unable to place task") {
+		t.Errorf("Event rows = %v, want one saying %q — the recent placement failure "+
+			"is what this finding is about and nothing else names it",
+			eventRows, "unable to place task")
+	}
 }
 
 // TestD3ECSQuietServiceReportsNothing pins the negative case: a service whose

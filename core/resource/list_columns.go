@@ -10,10 +10,8 @@ import (
 
 // ResolveListColumnCascade resolves the list column set for typeName: prefer
 // vc's per-session ViewDef.List when non-empty, else the built-in default
-// ViewDef.List when it is a strict superset of td.Columns (guarded by a
-// first-column-title match so a custom td with a different layout is not
-// silently switched to the built-in defaults), else td.Columns (carrying
-// Path/SortKey/Humanize from the defaults by title match), else the
+// ViewDef.List when it is a strict superset of td.Columns, else td.Columns
+// (carrying Path/SortKey/Humanize from the defaults by title match), else the
 // raw built-in defaults.
 //
 // The only resolver of the column-set cascade. core/app's
@@ -43,19 +41,15 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 	// and the widths. They do not drive what a cell reads: mergeListColumn
 	// puts the catalog's Key back on every title both declare.
 	if len(defaultVD.List) > len(td.Columns) {
-		firstMatch := len(td.Columns) == 0 ||
-			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
-		if firstMatch {
-			catalogKeyByTitle := make(map[string]string, len(td.Columns))
-			for _, c := range td.Columns {
-				catalogKeyByTitle[strings.ToLower(c.Title)] = c.Key
-			}
-			cols := make([]config.ListColumn, len(defaultVD.List))
-			for i, lc := range defaultVD.List {
-				cols[i] = mergeListColumn(lc.Title, lc.Width, catalogKeyByTitle[strings.ToLower(lc.Title)], lc)
-			}
-			return cols
+		catalogKeyByTitle := make(map[string]string, len(td.Columns))
+		for _, c := range td.Columns {
+			catalogKeyByTitle[strings.ToLower(c.Title)] = c.Key
 		}
+		cols := make([]config.ListColumn, len(defaultVD.List))
+		for i, lc := range defaultVD.List {
+			cols[i] = mergeListColumn(lc.Title, lc.Width, catalogKeyByTitle[strings.ToLower(lc.Title)], lc)
+		}
+		return cols
 	}
 
 	if len(td.Columns) > 0 {

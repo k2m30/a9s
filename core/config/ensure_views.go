@@ -75,11 +75,20 @@ func yamlKey(s string) string {
 // files written by an older build up to this one's column set.
 //
 // A file already stamped with this build is left byte for byte alone: whatever
-// the operator did to it is theirs. A file with an older stamp (or none, which
-// is every file written before the stamp existed) keeps every column it has and
-// gains the built-in columns whose titles it does not carry — each at the
-// position it holds in the built-in set, so a column added in the middle does
-// not land at the far right of the operator's table.
+// the operator did to it is theirs.
+//
+// A file with an older stamp (or none, which is every file written before the
+// stamp existed) is first read for evidence of an edit. One whose every column
+// is still the source and width the build at its stamp generated has never been
+// touched: it takes this build's column set and order wholesale, which is the
+// only way a corrected default order reaches an installation that already
+// exists. Reordering columns and changing nothing else leaves no such evidence,
+// so a file edited only that way is reordered back.
+//
+// Any other file is the operator's. It keeps every column it has, in the order
+// it has them, and gains the built-in columns whose titles it does not carry —
+// each at the position it holds in the built-in set, so a column added in the
+// middle does not land at the far right of the operator's table.
 //
 // A column it does carry keeps the width, path and key it has, with one
 // exception: a built-in column whose source this build corrected, and which the
@@ -177,6 +186,19 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 	for _, c := range def.List {
 		want[c.Title] = c
 	}
+
+	// A file nobody has touched carries this build's column set, or the set the
+	// build at its stamp generated, and nothing else. It has no order of its
+	// own to protect, so it takes this build's — which is the only way a
+	// corrected default order reaches an operator who has already run a9s once.
+	// The trade is deliberate: reordering columns and changing nothing else is
+	// indistinguishable from never having opened the file, and such a file is
+	// reordered back.
+	if generatedAsIs(name, vd.List, want, vd.Generated) {
+		vd.List = append([]ListColumn(nil), def.List...)
+		return GenerateViewYAML(*vd), true
+	}
+
 	for i, c := range def.List {
 		if have[c.Title] {
 			continue
@@ -207,6 +229,44 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 		}
 	}
 	return GenerateViewYAML(*vd), true
+}
+
+// generatedAsIs reports whether every column onDisk is one a build generated
+// and left alone: this build's own declaration of that column, or — for a
+// column a later build re-sourced — exactly what the build at stamp wrote for
+// it. A column the defaults do not declare at all is the operator's, and so is
+// any other spelling of one they do.
+func generatedAsIs(name string, onDisk []ListColumn, want map[string]ListColumn, stamp int) bool {
+	for _, on := range onDisk {
+		now, ok := want[on.Title]
+		if !ok {
+			return false
+		}
+		if on == now {
+			continue
+		}
+		if !generatedByStamp(name, on, now, stamp) {
+			return false
+		}
+	}
+	return true
+}
+
+// generatedByStamp reports whether on is what the build at stamp generated for
+// a column this build has since re-sourced — the pre-correction source and
+// width recorded in viewColumnSourceChanges, with everything the correction did
+// not touch still equal to this build's declaration.
+func generatedByStamp(name string, on, now ListColumn, stamp int) bool {
+	for _, ch := range viewColumnSourceChanges {
+		if ch.View != name || ch.Title != on.Title || ch.Version <= stamp {
+			continue
+		}
+		if on.Path == ch.WasPath && on.Key == ch.WasKey && on.Width == ch.WasWidth &&
+			on.SortKey == now.SortKey && on.Humanize == now.Humanize {
+			return true
+		}
+	}
+	return false
 }
 
 // EnsureViewsReference writes the embedded views_reference.yaml to configDir.

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -70,7 +71,9 @@ func (c *Controller) applyListFilters(ls *ListState, typeName string, base []res
 	return result
 }
 
-// listFilterResources is the pure text-filter; mirrors FilterResources in views.
+// listFilterResources is the pure text-filter, and the only one: it matches
+// the row identity, the rendered form of every Fields value, and every
+// finding phrase.
 func listFilterResources(query string, resources []resource.Resource) []resource.Resource {
 	if query == "" {
 		return resources
@@ -85,7 +88,10 @@ func listFilterResources(query string, resources []resource.Resource) []resource
 		}
 		matched := false
 		for _, v := range r.Fields {
-			if strings.Contains(strings.ToLower(v), q) {
+			// The operator types what the screen showed them, so the value
+			// compared is the one the cell renders — config.CanonicalFieldValue
+			// is the same rule humanizeListCell applies on the way to the cell.
+			if strings.Contains(strings.ToLower(config.CanonicalFieldValue(v)), q) {
 				matched = true
 				break
 			}

@@ -156,22 +156,14 @@ type ColumnDef struct {
 	Identity bool `json:"-"`
 }
 
-// RowDecorator is a short tag that renderers use to apply per-row
-// formatting. A list row's colour is the worst finding over both waves
-// (docs/attention-signals.md S3), so no severity glyph is produced: the only
-// value a ListRow carries today is DecoratorNormal.
-type RowDecorator string
-
-const (
-	DecoratorNormal RowDecorator = ""
-)
-
-// ListRow is one row in a resource-list body.
+// ListRow is one row in a resource-list body. It carries no per-row marker:
+// a row's colour is the worst finding over both waves, so a row with anything
+// to say is already off-green and there is no green row for a glyph to
+// annotate (docs/attention-signals.md §Visualization Surfaces, S3).
 type ListRow struct {
-	Cells      []string     `json:"cells"`
-	Decorator  RowDecorator `json:"decorator,omitempty"`
-	Severity   string       `json:"severity,omitempty"`
-	ResourceID string       `json:"resource_id,omitempty"`
+	Cells      []string `json:"cells"`
+	Severity   string   `json:"severity,omitempty"`
+	ResourceID string   `json:"resource_id,omitempty"`
 	// Color is the pre-resolved row color tag: "healthy", "warning", "broken",
 	// "dim", or "" (normal/no-color). Populated by buildListBody so RenderList
 	// can reproduce the exact lipgloss.Style that View() derives from

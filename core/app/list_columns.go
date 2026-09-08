@@ -5,7 +5,6 @@ package app
 import (
 	"maps"
 	"strings"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -283,38 +282,9 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 // domain.HumanizeStatusPhrase. And canonicalCellValue settles the two shapes
 // the two lanes spelled differently.
 func humanizeListCell(col ColumnDef, v string) string {
-	v = canonicalCellValue(v)
+	v = config.CanonicalFieldValue(v)
 	if col.Humanize {
 		return domain.HumanizeStatusPhrase(v)
-	}
-	return v
-}
-
-// cellTimeLayouts are the two spellings a fetcher writes a timestamp into
-// Fields as. The rendered shape parses as neither, so this is idempotent.
-var cellTimeLayouts = []string{time.RFC3339, time.DateOnly}
-
-// canonicalCellValue renders a scalar the one way the list shows it, whichever
-// lane produced it. fieldpath.FormatValue applies these conventions to a value
-// read off a RawStruct; a Fields value arrives as whatever the fetcher chose to
-// write, so the same conventions are applied to it here.
-//
-// Only the two shapes with a settled convention are canonicalised. Numbers are
-// deliberately left alone: a decimal in a cell is an engine version at least as
-// often as it is a number, and rendering "1.10" as "1.1" is a wrong answer
-// rather than a tidier one. A column whose two declarations disagree about a
-// number is fixed in the defaults instead.
-func canonicalCellValue(v string) string {
-	switch v {
-	case "true":
-		return "Yes"
-	case "false":
-		return "No"
-	}
-	for _, layout := range cellTimeLayouts {
-		if t, err := time.Parse(layout, v); err == nil {
-			return t.Format("2006-01-02 15:04")
-		}
 	}
 	return v
 }

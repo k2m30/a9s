@@ -77,10 +77,15 @@ func TestBothLanesRenderATimestampTheSameWay(t *testing.T) {
 			t.Errorf("timestamp %q rendered %q, want \"2026-04-20 09:30\"", field, fields)
 		}
 	}
-	// A date with no time of day is still a date; the shape says so.
+	// Inverted for tui5 row "one humanizer": this case expected
+	// "2026-04-20 00:00" while its own comment said a date with no time of day
+	// is still a date. A fetcher that writes a bare date knows the day and not
+	// the hour, and a midnight AWS never reported is a wrong answer rather than
+	// a tidier one — the same limit that leaves numbers alone below. Do not
+	// restore the old expectation.
 	fields, _ := misc4BothLanes(t, "stamp", "Stamp", "2026-04-20", misc4Raw{Stamp: stamp})
-	if fields != "2026-04-20 00:00" {
-		t.Errorf("date-only rendered %q, want \"2026-04-20 00:00\"", fields)
+	if fields != "2026-04-20" {
+		t.Errorf("date-only rendered %q, want \"2026-04-20\"", fields)
 	}
 }
 

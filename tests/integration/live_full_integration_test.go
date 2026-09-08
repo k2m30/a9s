@@ -41,9 +41,6 @@ func TestLiveFullIntegration_AllResourcesBaseline(t *testing.T) {
 	if clientsReady.Err != nil {
 		t.Fatalf("live AWS connect failed for profile=%q region=%q: %v", profile, region, clientsReady.Err)
 	}
-	if region == "" {
-		region = clientsReady.Region
-	}
 	clients, ok := clientsReady.Clients.(*awsclient.ServiceClients)
 	if !ok || clients == nil {
 		t.Fatalf("live AWS connect returned clients %T, expected *aws.ServiceClients", clientsReady.Clients)
@@ -86,9 +83,6 @@ func TestLiveFullIntegration_RelatedHopScenarios(t *testing.T) {
 	}
 	if clientsReady.Err != nil {
 		t.Fatalf("live AWS connect failed for profile=%q region=%q: %v", profile, region, clientsReady.Err)
-	}
-	if region == "" {
-		region = clientsReady.Region
 	}
 	clients, ok := clientsReady.Clients.(*awsclient.ServiceClients)
 	if !ok || clients == nil {

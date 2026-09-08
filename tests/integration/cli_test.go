@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +45,7 @@ func TestMain(m *testing.M) {
 		panic("failed to create the test binary directory: " + err.Error())
 	}
 	testBinary = filepath.Join(buildDir, "a9s-test")
-	cmd := exec.Command("go", "build", "-ldflags", "-X main.version=test-0.0.0", "-o", testBinary, "./cmd/a9s/")
+	cmd := exec.CommandContext(context.Background(), "go", "build", "-ldflags", "-X main.version=test-0.0.0", "-o", testBinary, "./cmd/a9s/")
 	cmd.Dir = findProjectRoot()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		panic("failed to build test binary: " + string(out) + ": " + err.Error())
@@ -88,7 +89,7 @@ func TestQA_011_CorruptConfigFile(t *testing.T) {
 
 	// Set AWS_CONFIG_FILE to the corrupt file and run the binary with --version
 	// to verify the binary doesn't crash on corrupt config
-	cmd := exec.Command(testBinary, "--version")
+	cmd := exec.CommandContext(t.Context(), testBinary, "--version")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+tmpFile.Name(),
 		"AWS_SHARED_CREDENTIALS_FILE=/nonexistent",
@@ -104,7 +105,7 @@ func TestQA_011_CorruptConfigFile(t *testing.T) {
 
 // QA-012: Launch with --version flag
 func TestQA_012_VersionFlag(t *testing.T) {
-	cmd := exec.Command(testBinary, "--version")
+	cmd := exec.CommandContext(t.Context(), testBinary, "--version")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("--version failed: %v, output: %s", err, string(out))
@@ -121,7 +122,7 @@ func TestQA_012_VersionFlag(t *testing.T) {
 
 // QA-012b: Launch with -v shorthand for --version
 func TestQA_012b_ShortVersionFlag(t *testing.T) {
-	cmd := exec.Command(testBinary, "-v")
+	cmd := exec.CommandContext(t.Context(), testBinary, "-v")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("-v failed: %v, output: %s", err, string(out))
@@ -134,7 +135,7 @@ func TestQA_012b_ShortVersionFlag(t *testing.T) {
 
 // QA-013: Launch with --help flag
 func TestQA_013_HelpFlag(t *testing.T) {
-	cmd := exec.Command(testBinary, "--help")
+	cmd := exec.CommandContext(t.Context(), testBinary, "--help")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("--help failed: %v, output: %s", err, string(out))
@@ -153,7 +154,7 @@ func TestQA_013_HelpFlag(t *testing.T) {
 
 // QA-013b: Launch with -h shorthand for --help
 func TestQA_013b_ShortHelpFlag(t *testing.T) {
-	cmd := exec.Command(testBinary, "-h")
+	cmd := exec.CommandContext(t.Context(), testBinary, "-h")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("-h failed: %v, output: %s", err, string(out))
@@ -168,7 +169,7 @@ func TestQA_013b_ShortHelpFlag(t *testing.T) {
 // We can't fully test TUI interaction, but we verify the binary starts
 // and doesn't crash immediately when given a -p flag.
 func TestQA_017_ShorthandProfileFlag(t *testing.T) {
-	cmd := exec.Command(testBinary, "-p", "nonexistent-test-profile")
+	cmd := exec.CommandContext(t.Context(), testBinary, "-p", "nonexistent-test-profile")
 	cmd.Env = append(os.Environ(), "TERM=dumb")
 
 	// Use a short timeout -- TUI will block waiting for terminal input,
@@ -197,7 +198,7 @@ func TestQA_017_ShorthandProfileFlag(t *testing.T) {
 
 // QA-018: Launch with -r shorthand for --region
 func TestQA_018_ShorthandRegionFlag(t *testing.T) {
-	cmd := exec.Command(testBinary, "-r", "eu-central-1")
+	cmd := exec.CommandContext(t.Context(), testBinary, "-r", "eu-central-1")
 	cmd.Env = append(os.Environ(), "TERM=dumb")
 
 	done := make(chan error, 1)

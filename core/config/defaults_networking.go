@@ -108,7 +108,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "Status", Path: "State", Width: 12},
-				{Title: "Failure", Path: "FailureCode", Width: 22},
+				{Title: "Failure", Path: "FailureCode", Width: 22, Humanize: true},
 				{Title: "Public IP", Path: "", Key: "public_ip", Width: 16},
 			},
 			Detail: []DetailField{
