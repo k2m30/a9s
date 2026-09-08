@@ -515,7 +515,7 @@ func TestApp_008_RelatedNavigate_CountOne_AlwaysOpensDetail(t *testing.T) {
 			res: resource.Resource{
 				ID:     "a9s-drill-rule-bucket",
 				Name:   "a9s-drill-rule-bucket",
-				Fields: map[string]string{"bucket_name": "a9s-drill-rule-bucket"},
+				Fields: map[string]string{"name": "a9s-drill-rule-bucket"},
 			},
 		},
 		{

@@ -74,7 +74,6 @@ func healthyBucketResource() resource.Resource {
 		Name: fixtures.HealthyBucketName,
 		Fields: map[string]string{
 			"name":                fixtures.HealthyBucketName,
-			"bucket_name":         fixtures.HealthyBucketName,
 			"notification_lambda": "arn:aws:lambda:us-east-1:123456789012:function:" + fixtures.S3NotifierLambdaName,
 			"notification_sns":    "arn:aws:sns:us-east-1:123456789012:" + fixtures.S3EventsTopicName,
 			"notification_sqs":    "arn:aws:sqs:us-east-1:123456789012:" + fixtures.S3DLQueueName,

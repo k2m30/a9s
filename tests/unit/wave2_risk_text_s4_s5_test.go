@@ -50,10 +50,10 @@ package unit
 //     buzzword Phrase "pending maintenance" instead of the §4-mandated
 //     "maintenance scheduled".
 //   - Test #4 (logs, driven through the real Wave-1 fetcher
-//     FetchCloudWatchLogGroupsPage) is LOGIC-RED independent of the Detail
-//     field: the fetcher does not classify retention-nil into a
-//     domain.Finding at all today — it only stores the raw retention_days
-//     field string — so the resulting resource has zero Findings.
+//     FetchCloudWatchLogGroupsPage) was LOGIC-RED independent of the Detail
+//     field: the fetcher did not classify retention-nil into a
+//     domain.Finding at all, it only stored a number. It classifies it now,
+//     and stores the policy in words under Fields["retention"].
 
 import (
 	"context"
@@ -119,12 +119,12 @@ var _ awsclient.CWLogsDescribeLogGroupsAPI = (*logsRetentionNilFake)(nil)
 // RetentionInDays == nil and asserts the resulting resource carries a
 // Finding with the exact §4-mandated Phrase and Detail.
 //
-// LOGIC-RED today regardless of the Detail field: FetchCloudWatchLogGroupsPage
-// (core/aws/cwlogs.go) does not classify retention-nil into a
-// domain.Finding at all — it only stores the raw retention_days field string.
-// This test fails today with zero Findings on the resource, not merely a
-// missing Detail string; the coder must add Wave-1 classification for this
-// signal, not just extend the struct.
+// It was LOGIC-RED regardless of the Detail field: FetchCloudWatchLogGroupsPage
+// (core/aws/cwlogs.go) did not classify retention-nil into a domain.Finding at
+// all, so the resource came back with zero Findings and the Wave-1
+// classification had to be added before the Detail string could be pinned.
+// Both exist now: the fetcher emits the finding and writes the policy in words
+// ("never expire", "<N> days") under Fields["retention"].
 func TestWave2_Logs_RetentionNil_PinsS4S5Strings(t *testing.T) {
 	fake := &logsRetentionNilFake{logGroupName: "/aws/lambda/never-expire-fn"}
 

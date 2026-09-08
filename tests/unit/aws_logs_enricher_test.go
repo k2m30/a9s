@@ -55,7 +55,7 @@ func logsGroupResource(logGroupName string) resource.Resource {
 		Fields: map[string]string{
 			"log_group_name": logGroupName,
 			"stored_bytes":   "4096",
-			"retention_days": "30",
+			"retention":      "30 days",
 			"creation_time":  "2025-01-01 00:00",
 		},
 	}

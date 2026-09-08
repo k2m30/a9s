@@ -113,7 +113,7 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 				Name:      "S3 Buckets",
 				ShortName: "s3",
 				Category:  "STORAGE",
-				FieldKeys: []string{"name", "bucket_name", "creation_date", "notification_targets"},
+				FieldKeys: []string{"name", "creation_date", "notification_lambda", "notification_sqs", "notification_sns"},
 			},
 			wantHeader: "s3 — STORAGE. Lifecycle key: none (the list API returns no lifecycle field).",
 		},

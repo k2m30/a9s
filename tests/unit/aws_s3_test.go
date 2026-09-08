@@ -57,7 +57,7 @@ func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestS3_FetcherIdentityFields_HealthyBucket verifies that the healthy-bucket
-// fixture produces the expected identity fields (name, bucket_name, creation_date)
+// fixture produces the expected identity fields (name, creation_date)
 // matching spec §1. This catches mapping regressions.
 func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 	fake := fakes.NewS3()

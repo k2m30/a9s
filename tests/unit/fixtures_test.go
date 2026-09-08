@@ -17,7 +17,6 @@ func fixtureS3Buckets() []resource.Resource {
 			Name: "test-app-state",
 			Fields: map[string]string{
 				"name":          "test-app-state",
-				"bucket_name":   "test-app-state",
 				"creation_date": "2025-06-20 11:35",
 			},
 		},
@@ -26,7 +25,6 @@ func fixtureS3Buckets() []resource.Resource {
 			Name: "cdn-logs.example.com",
 			Fields: map[string]string{
 				"name":          "cdn-logs.example.com",
-				"bucket_name":   "cdn-logs.example.com",
 				"creation_date": "2025-05-12 19:24",
 			},
 		},
@@ -35,7 +33,6 @@ func fixtureS3Buckets() []resource.Resource {
 			Name: "cdn-website.example.com",
 			Fields: map[string]string{
 				"name":          "cdn-website.example.com",
-				"bucket_name":   "cdn-website.example.com",
 				"creation_date": "2025-05-13 17:36",
 			},
 		},
@@ -44,7 +41,6 @@ func fixtureS3Buckets() []resource.Resource {
 			Name: "dev-fileshare",
 			Fields: map[string]string{
 				"name":          "dev-fileshare",
-				"bucket_name":   "dev-fileshare",
 				"creation_date": "2025-03-06 11:49",
 			},
 		},
@@ -53,7 +49,6 @@ func fixtureS3Buckets() []resource.Resource {
 			Name: "dev-loki-chunks",
 			Fields: map[string]string{
 				"name":          "dev-loki-chunks",
-				"bucket_name":   "dev-loki-chunks",
 				"creation_date": "2025-07-01 13:57",
 			},
 		},

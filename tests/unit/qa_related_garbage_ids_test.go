@@ -2,7 +2,7 @@ package unit_test
 
 // qa_related_garbage_ids_test.go — regression pins for a live-reported
 // related-panel bug: opening the detail view over a CACHE-SEEDED s3 row
-// (thin fields — bucket_name/creation_date/name/notification_*/region,
+// (thin fields — name/creation_date/notification_*/region,
 // RawStruct nil) fired the s3→kms related check, which returned a bare
 // (non-ARN) KMSMasterKeyID value equal to the SOURCE resource's own type
 // ("s3") as the navigation key ID. The downstream by-ID fetch then called
@@ -68,8 +68,8 @@ func (f *s3EncryptionGarbageKeyFake) GetBucketEncryption(
 }
 
 // thinCacheSeededS3Resource mirrors the live-bug shape: a cache-seeded s3 row
-// carries only the list-view fields (bucket_name/creation_date/name/
-// notification_*/region) with RawStruct nil — no encryption-related field is
+// carries only the list-view fields (name/creation_date/notification_*/
+// region) with RawStruct nil — no encryption-related field is
 // ever populated by the s3 fetcher, so a related check over this row has NO
 // legitimate source data to extract a KMS key ID from at all.
 func thinCacheSeededS3Resource(bucket string) resource.Resource {
@@ -78,7 +78,6 @@ func thinCacheSeededS3Resource(bucket string) resource.Resource {
 		Name: bucket,
 		Type: "s3",
 		Fields: map[string]string{
-			"bucket_name":         bucket,
 			"name":                bucket,
 			"creation_date":       "2026-01-01T00:00:00Z",
 			"notification_lambda": "",
