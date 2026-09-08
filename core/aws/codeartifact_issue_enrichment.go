@@ -105,14 +105,17 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				nextToken = pkgOut.NextToken
 			}
 			if total >= 0 {
-				mu.Lock()
+				count := resource.FormatExact(total)
 				if pkgTruncated {
-					// A page cap, not a failed call: there is no error to record.
-					result.TruncatedIDs[r.ID] = true
-					result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatTruncated(total)}
-				} else {
-					result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
+					// A page cap on an informational count, not a failed call:
+					// the "+" is where the cap is reported. Marking the ID
+					// truncated would make FoldWave2Rows skip the row, and the
+					// permissions-policy verdict below — a separate call the
+					// count says nothing about — would never reach it.
+					count = resource.FormatTruncated(total)
 				}
+				mu.Lock()
+				result.FieldUpdates[key] = map[string]string{"package_count": count}
 				mu.Unlock()
 			}
 		}

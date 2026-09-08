@@ -5,6 +5,7 @@ package app
 import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // listPageSize is the default cursor jump for PageUp/PageDown on a list screen
@@ -48,6 +49,41 @@ func isTopLevelCanonicalList(screenID runtime.ScreenID, ls *ListState) bool {
 		return false
 	}
 	return !ls.EscPops && ls.ParentContext == nil
+}
+
+// listLane is the lane every fetch a list screen issues must declare — the
+// request half of the agreement handleResourcesLoadedEvent enforces on
+// delivery. Both halves read isTopLevelCanonicalList, so a screen and the
+// results it asked for can never disagree about what that screen is.
+//
+// It is derived here rather than stored on the ListState because the two
+// facts it reads (EscPops, ParentContext) are set by the navigation AFTER the
+// state is constructed: a field written "at open" would be written before
+// either is known, and keeping it true would take a writer at every site that
+// touches those flags. One reader beats five writers.
+//
+// A continuation that instead classified itself from ParentContext/FetchFilter
+// (messages.ProvenanceForContinuation) gets a client-side related drill wrong:
+// both maps are empty there, so the drill's own page-2 request claims to be
+// the type's canonical list and the gate refuses it on the drill's screen.
+func listLane(screenID runtime.ScreenID, ls *ListState) messages.FetchProvenance {
+	switch {
+	case isTopLevelCanonicalList(screenID, ls):
+		return messages.FetchProvenanceCanonicalList
+	case screenID == runtime.ScreenChildList:
+		return messages.FetchProvenanceChild
+	default:
+		return messages.FetchProvenanceFilteredList
+	}
+}
+
+// GetListLane exposes listLane for the top list screen — the TUI builds its
+// own messages.LoadMore rather than going through handleActionLoadMore, and
+// must stamp the same lane the controller would.
+func (c *Controller) GetListLane() messages.FetchProvenance {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return listLane(c.topScreenID(), c.topListState())
 }
 
 // pushByIDPlaceholderList pushes a placeholder ScreenResourceList for

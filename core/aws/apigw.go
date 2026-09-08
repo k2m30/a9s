@@ -23,9 +23,16 @@ import (
 // NextToken, the ordinary case. An empty continuationToken legitimately
 // means "first page of both" and decodes to the zero cursor. Round-tripped
 // opaquely — nothing outside this fetcher interprets it.
+//
+// V2Done is what an empty V2Token cannot say. The two lanes finish
+// independently, and "no NextToken" is also what "start from page one" looks
+// like: a V2 lane that drained while V1 was still mid-walk would otherwise be
+// restarted from its first page by every following continuation, delivering
+// its rows again.
 type apigwMergedCursor struct {
 	V1Position string `json:"v1,omitempty"`
 	V2Token    string `json:"v2,omitempty"`
+	V2Done     bool   `json:"v2done,omitempty"`
 }
 
 // decodeAPIGWMergedCursor decodes a compound continuation token previously
@@ -87,23 +94,28 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 		v1Position = resumePosition
 	}
 
-	v2Result, err := FetchAPIGatewaysPage(ctx, c.APIGatewayV2, cur.V2Token)
-	if err != nil {
-		return resource.FetchResult{}, err
-	}
-	resources = append(resources, v2Result.Resources...)
-
 	v2Token := ""
 	v2Truncated := false
-	if v2Result.Pagination != nil {
-		v2Token = v2Result.Pagination.NextToken
-		v2Truncated = v2Result.Pagination.IsTruncated
+	if !cur.V2Done {
+		v2Result, v2Err := FetchAPIGatewaysPage(ctx, c.APIGatewayV2, cur.V2Token)
+		if v2Err != nil {
+			return resource.FetchResult{}, v2Err
+		}
+		resources = append(resources, v2Result.Resources...)
+		if v2Result.Pagination != nil {
+			v2Token = v2Result.Pagination.NextToken
+			v2Truncated = v2Result.Pagination.IsTruncated
+		}
 	}
 
 	isTruncated := v1Position != "" || v2Truncated
 	nextToken := ""
 	if isTruncated {
-		nextToken = apigwMergedCursor{V1Position: v1Position, V2Token: v2Token}.encode()
+		nextToken = apigwMergedCursor{
+			V1Position: v1Position,
+			V2Token:    v2Token,
+			V2Done:     !v2Truncated,
+		}.encode()
 	}
 
 	totalHint := len(resources)

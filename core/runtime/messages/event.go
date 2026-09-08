@@ -106,6 +106,16 @@ type ResourcesLoaded struct {
 	// renders Resources as usual AND routes Err through Flash so the `!`
 	// log records the partial failure.
 	Err error
+	// LoadingMore names the activity flag the request that produced this
+	// result raised on its list, so the completion retires the one it
+	// actually owns. Every producer stamps it from what its own request did,
+	// rather than the apply point inferring it from Append — a different
+	// question, about how the rows merge. The two answers part company for
+	// the one continuation nobody pressed "m" for: a related drill whose
+	// target is not on the cached page opens ON a continuation while the
+	// screen is still in its initial load, so its result appends rows
+	// (Append) while the flag it must clear is Loading.
+	LoadingMore bool
 }
 
 func (ResourcesLoaded) isEvent()               {}
@@ -135,6 +145,9 @@ type APIError struct {
 	// the sibling request's flag (core/app/list_state.go's
 	// clearFetchInFlight).
 	Append bool
+	// LoadingMore mirrors ResourcesLoaded.LoadingMore on the failure path:
+	// the activity flag the failed request raised, which its failure retires.
+	LoadingMore bool
 	// Provenance mirrors ResourcesLoaded.Provenance's meaning applied to the
 	// failure path: every production construction site pairs an APIError
 	// branch with a ResourcesLoaded success branch and stamps this field with

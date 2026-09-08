@@ -334,12 +334,19 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	}
 	// Superseded-dispatch discard, the same rule each lane's door applies —
 	// this seam is called directly by the TUI as well as by Handle, so it
-	// carries its own check rather than trusting its callers.
+	// carries its own check rather than trusting its callers. Discarding the
+	// result still retires the activity flag the discarded request raised:
+	// no other completion is coming for it, and a Ctrl+R that supersedes an
+	// outstanding load-more clears only Loading/Refreshing, so LoadingMore
+	// would stay set for the rest of the session and the "m" key with it.
 	if c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
+		if ls := s.State.List; ls != nil {
+			ls.clearFetchInFlight(msg.LoadingMore)
+		}
 		return
 	}
 	topLevelCanonical := isTopLevelCanonicalList(s.ID, s.State.List)
-	c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, topLevelCanonical, msg.Err)
+	c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, msg.LoadingMore, topLevelCanonical, msg.Err)
 	// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
 	// availability badge here, at the controller level, so both the TUI and
 	// web renderer get it — this replaces the TUI-only sync-back that used
@@ -653,6 +660,7 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 					ContinuationToken: ls.PaginationCursor,
 					ParentContext:     ls.ParentContext,
 					FetchFilter:       ls.FetchFilter,
+					Provenance:        listLane(top.ID, ls),
 				},
 			}}
 		}

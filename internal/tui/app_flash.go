@@ -48,7 +48,7 @@ func (m Model) handleClearFlash(msg messages.ClearFlash) (tea.Model, tea.Cmd) {
 func (m Model) handleAPIError(msg messages.APIError) (tea.Model, tea.Cmd) {
 	m.flash.gen++
 	intents, tasks := m.core.HandleAPIError(runtime.APIErrorEvent{
-		Err: msg.Err, NewGen: m.flash.gen, Append: msg.Append,
+		Err: msg.Err, NewGen: m.flash.gen, Append: msg.Append, LoadingMore: msg.LoadingMore,
 		ResourceType: msg.ResourceType, Provenance: msg.Provenance,
 	})
 	cmd := m.dispatchHandlerResult(intents, tasks)

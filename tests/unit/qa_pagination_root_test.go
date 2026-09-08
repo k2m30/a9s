@@ -566,14 +566,18 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 	}
 
 	// Deliver an APIErrorMsg for ct-events (simulating a network failure on page 2).
-	// Append: true mirrors the real KindFetchMore failure shape (executor.go's
-	// own APIError construction for that case) — this failure is the outcome
-	// of the M-key load-more continuation just pressed above, not an initial
-	// load/refresh, so only LoadingMore (not Loading/Refreshing) may clear.
+	// Append/LoadingMore mirror the real KindFetchMore failure shape
+	// (executor.go's own APIError construction for that case) — this failure
+	// is the outcome of the M-key load-more continuation just pressed above,
+	// not an initial load/refresh, so only LoadingMore (not Loading/
+	// Refreshing) may clear. LoadingMore is the field the clear reads: the
+	// request records which flag it raised instead of the handler inferring
+	// it from Append.
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ct-events",
 		Err:          fmt.Errorf("RequestTimeout: connection timed out"),
 		Append:       true,
+		LoadingMore:  true,
 	})
 
 	plain = stripANSI(rootViewContent(m))

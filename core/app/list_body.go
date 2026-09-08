@@ -48,7 +48,7 @@ import (
 // unrelated failure may have left behind); a hard failure (no resources at
 // all) never reaches this method, routing through
 // messages.APIError/ClearActiveListLoadingIntent instead.
-func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, topLevelCanonical bool, fetchErr error) {
+func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, loadingMore bool, topLevelCanonical bool, fetchErr error) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
 	// Silent-swap findings carry: a silent swap (a non-append replace — the common cold-boot shape
@@ -151,16 +151,18 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	}
 
 	if ls != nil {
-		// Cache-first seeding contract: a fetch result landing clears its own
-		// in-flight flag (LoadingMore when appendPage, otherwise Loading/
-		// Refreshing) via the shared clearFetchInFlight choke point, leaving a
+		// Cache-first seeding contract: a fetch result landing clears the
+		// in-flight flag ITS OWN REQUEST raised (loadingMore, recorded on the
+		// request — never inferred from appendPage, which answers a different
+		// question: how the rows merge) via the shared clearFetchInFlight
+		// choke point, leaving a
 		// concurrently in-flight sibling request's flag (LoadingMore vs
 		// Refreshing are allowed to overlap) untouched — the seeded (or
 		// now-replaced) rows are confirmed for THIS request only. Callers that
 		// seed rows from a cache-first source set Refreshing=true themselves
 		// AFTER calling this method, so this clear only ever fires for a
 		// genuine fetch-result swap, never undoing the seed-time flag.
-		ls.clearFetchInFlight(appendPage)
+		ls.clearFetchInFlight(loadingMore)
 		// Seed-time provisional total: a fetch result retires the seed's
 		// population only when it actually supersedes it — an EXACT result
 		// (authoritative proof of the new total, C5), or one that already

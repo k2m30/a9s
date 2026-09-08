@@ -180,6 +180,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 			Err:          msg.Err,
 			NewGen:       c.session.ConnectGen,
 			Append:       msg.Append,
+			LoadingMore:  msg.LoadingMore,
 			ResourceType: msg.ResourceType,
 			Provenance:   msg.Provenance,
 		})

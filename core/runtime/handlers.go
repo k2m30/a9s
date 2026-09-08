@@ -82,9 +82,13 @@ type APIErrorEvent struct {
 	Err    error
 	NewGen domain.Gen
 	// Append mirrors messages.APIError.Append: true when this failure is the
-	// outcome of a load-more continuation, so ClearActiveListLoadingIntent
-	// clears only the LoadingMore indicator rather than every in-flight flag.
+	// outcome of a load-more continuation.
 	Append bool
+	// LoadingMore mirrors messages.APIError.LoadingMore: the activity flag
+	// the failed request raised, which ClearActiveListLoadingIntent retires —
+	// never inferred from Append, which answers how the rows would have
+	// merged.
+	LoadingMore bool
 	// ResourceType and Provenance mirror messages.APIError's own fields —
 	// every adapter (orchestrator.go's HandleEvent, internal/tui/app_flash.go's
 	// handleAPIError) forwards them unchanged so ClearActiveListLoadingIntent
@@ -174,6 +178,7 @@ func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 		ClearActiveListLoadingIntent{
 			Err:          text,
 			Append:       ev.Append,
+			LoadingMore:  ev.LoadingMore,
 			ResourceType: ev.ResourceType,
 			Provenance:   ev.Provenance,
 		},

@@ -65,7 +65,14 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	// invoked directly (not via HandleEvent's central GenStamped gate) and the
 	// pre-Core view-side derive + updateActiveView would otherwise mutate state
 	// from a previous profile/region rotation.
-	if messages.IsStale(msg, m.core) || m.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
+	if messages.IsStale(msg, m.core) {
+		return m, nil
+	}
+	if m.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
+		// Still routed to the controller: its own door discards the result
+		// AND retires the activity flag the discarded request raised, which
+		// no later completion will ever do (core/app/handle.go).
+		m.ctrl.HandleResourcesLoadedEvent(msg)
 		return m, nil
 	}
 	// Update the controller's list state with the loaded resources.
@@ -120,11 +127,13 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 				shortName := rs.resourceType
 				token := m.ctrl.GetListPaginationCursor()
 				pc := m.ctrl.GetListParentContext()
+				lane := m.ctrl.GetListLane()
 				return m, tea.Batch(coreCmd, func() tea.Msg {
 					return messages.LoadMore{
 						ResourceType:      shortName,
 						ContinuationToken: token,
 						ParentContext:     pc,
+						Provenance:        lane,
 					}
 				})
 			}

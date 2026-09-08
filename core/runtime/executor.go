@@ -99,7 +99,7 @@ func (c *Core) StampListFetchSeq(task *TaskRequest) {
 	case KindFetchResources:
 	case KindFetchMore:
 		p, ok := task.Payload.(FetchMorePayload)
-		if !ok || !messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter).CanonicalList() {
+		if !ok || !p.Lane().CanonicalList() {
 			return
 		}
 	default:
@@ -450,18 +450,16 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			ParentCtx:    p.ParentContext,
 			FetchFilter:  p.FetchFilter,
 		})
-		provenance := p.Provenance
-		if provenance == messages.FetchProvenanceUnknown {
-			provenance = messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter)
-		}
+		provenance := p.Lane()
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Append: true, Provenance: provenance}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Append: true, LoadingMore: !p.ContinuesInitialLoad, Provenance: provenance}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
 			Append:       true,
+			LoadingMore:  !p.ContinuesInitialLoad,
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      req.ListSeq,

@@ -340,9 +340,11 @@ func costsGridForFrame(cs *CostsState, drill costs.DrillLevel) costs.Grid {
 	// step (ApplyAnomalies, BuildViewModel's own zero-row filter) that
 	// keys off it.
 	grid.RowDim = drill.RowDim
-	if marks, ok := cs.Store.Anomalies(cs.Now); ok {
-		grid = costs.ApplyAnomalies(grid, marks)
-	}
+	// AnomalyOverlay, not Anomalies: a page-capped result is a lower bound
+	// the cache refuses, but the marks it did find are real and belong on
+	// the grid — under the warning costsAnomalyOverlayPartial raises.
+	marks, _ := cs.Store.AnomalyOverlay(cs.Now)
+	grid = costs.ApplyAnomalies(grid, marks)
 	if drill.RowDim == costs.DimensionService {
 		for i := range grid.Rows {
 			grid.Rows[i].Label = stripCostsServiceVendorPrefix(grid.Rows[i].Label)
@@ -984,16 +986,7 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 		if now.IsZero() {
 			now = Now()
 		}
-		store.ApplyFetchResult(costs.FetchResult{
-			Query:     ev.Query,
-			Records:   ev.Grid.Records,
-			Attrs:     ev.Attrs,
-			Anomalies: costsAnomalyResultFromEvent(ev),
-			Requests:  ev.Requests,
-		}, now)
-		if len(ev.Window) > 0 && ev.Grid.Fetched {
-			store.MergeCoverage(ev.Query, ev.Window, now)
-		}
+		store.ApplyFetchResult(costsFetchResultFromEvent(ev), now)
 		c.costsDirtyStore = store
 		return nil
 	}
@@ -1046,26 +1039,9 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 		cs.Loading = false
 		cs.ErrorMsg = ""
 		cs.AwaitedIdentity = ""
-		if ev.Grid.Fetched {
-			// Only a delivery that actually attempted the grid fetch carries
-			// a meaningful Truncated value — a SkipGrid anomalies-only
-			// delivery (ensureCostsShapeFetched's X3 branch) leaves
-			// ev.Grid.Truncated at its zero value and must never stomp the
-			// frame's last real grid outcome with a false "complete" signal.
-			cs.DrillStack[len(cs.DrillStack)-1].Truncated = ev.Grid.Truncated
-		}
 	}
 
-	cs.Store.ApplyFetchResult(costs.FetchResult{
-		Query:     ev.Query,
-		Records:   ev.Grid.Records,
-		Attrs:     ev.Attrs,
-		Anomalies: costsAnomalyResultFromEvent(ev),
-		Requests:  ev.Requests,
-	}, cs.Now)
-	if len(ev.Window) > 0 && ev.Grid.Fetched {
-		cs.Store.MergeCoverage(ev.Query, ev.Window, cs.Now)
-	}
+	cs.Store.ApplyFetchResult(costsFetchResultFromEvent(ev), cs.Now)
 
 	// Persist beyond this screen's lifetime — otherwise a fetch merged into
 	// the in-memory Store is lost the moment the costs screen is left and
@@ -1134,6 +1110,30 @@ func (c *Controller) applyCostsGranularityFallback(cs *CostsState, ev messages.C
 // the wire message since both want the identical "preserve" outcome.
 func costsAnomalyResultFromEvent(ev messages.CostsLoaded) costs.AnomalyResult {
 	return costs.AnomalyResult{Requested: ev.Anomalies != nil, Marks: ev.Anomalies, Truncated: ev.AnomaliesTruncated}
+}
+
+// costsFetchResultFromEvent maps one delivery to the single value the store
+// merges — the one place the two lanes that merge a CostsLoaded (the live
+// screen and the no-screen persist path) share, so neither can pass the
+// records without the completeness that qualifies them.
+//
+// Coverage and Truncated are taken only from a delivery that actually
+// attempted the grid fetch: a SkipGrid anomalies-only delivery
+// (ensureCostsShapeFetched's X3 branch) leaves Grid.Truncated at its zero
+// value and would otherwise stamp a window it never fetched as complete.
+func costsFetchResultFromEvent(ev messages.CostsLoaded) costs.FetchResult {
+	r := costs.FetchResult{
+		Query:     ev.Query,
+		Records:   ev.Grid.Records,
+		Attrs:     ev.Attrs,
+		Anomalies: costsAnomalyResultFromEvent(ev),
+		Requests:  ev.Requests,
+	}
+	if ev.Grid.Fetched {
+		r.Coverage = ev.Window
+		r.Truncated = ev.Grid.Truncated
+	}
+	return r
 }
 
 func clampInt(v, lo, hi int) int {

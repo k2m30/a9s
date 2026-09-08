@@ -275,6 +275,10 @@ func (SetErrorHintIntent) isIntent() {}
 type ClearActiveListLoadingIntent struct {
 	Err    string
 	Append bool
+	// LoadingMore is the activity flag the failed request raised, recorded on
+	// that request — the one this intent retires. Append says how the rows
+	// would have merged, a different question and not this one.
+	LoadingMore bool
 	// ResourceType and Provenance mirror messages.APIError's own fields
 	// (threaded through APIErrorEvent) and let the consumer
 	// (core/app/intents.go's applyIntents) route this clear to the exact

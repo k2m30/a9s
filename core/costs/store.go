@@ -45,6 +45,12 @@ const settlementLag = 72 * time.Hour
 type periodEntry struct {
 	FetchedAt time.Time `yaml:"fetched_at"`
 	Records   []Record  `yaml:"records"`
+	// Truncated is true when the fetch that wrote this bucket was cut short
+	// by the CE pagination cap: Records is a lower bound, not CE's answer.
+	// It travels with the data because nothing else can carry it — the frame
+	// that displayed the warning is gone the moment the screen is left,
+	// while the bucket outlives the session on disk.
+	Truncated bool `yaml:"truncated,omitempty"`
 }
 
 // immutableAt reports whether e was fetched at or after p's own End PLUS
@@ -59,6 +65,12 @@ type periodEntry struct {
 // to fall after p.End; only a fetch that itself landed on/after
 // p.End+settlementLag does.
 func (e periodEntry) immutableAt(p Period) bool {
+	// A bucket written from a page-capped fetch is a lower bound, so no
+	// amount of elapsed settlement time makes it permanent: promoting it
+	// would leave the refresh nothing it could repair.
+	if e.Truncated {
+		return false
+	}
 	end, err := ParseDate(p.End)
 	if err != nil {
 		return false
@@ -136,6 +148,10 @@ type Store struct {
 	path      string
 	data      fileSchema
 	recovered bool
+	// partialAnomalies holds a page-capped GetAnomalies result — see
+	// putPartialAnomalies. Deliberately outside data: it is a lower bound,
+	// so it must never be written to disk as the profile's cached snapshot.
+	partialAnomalies *anomalyBucket
 	// revision counts mutations (Merge/MergeCoverage/MergeAttrs/PutAnomalies/
 	// ExpireOpenPeriod) since this Store was loaded — transient, never
 	// persisted. The single cheap signal a grid-build memoization key needs
@@ -242,7 +258,7 @@ func periodKey(p Period) string { return p.Start + "/" + p.End }
 func (s *Store) Lookup(q Query, window []Period, now time.Time) (records []Record, missing []Period) {
 	entry := s.data.Queries[q.CacheKey()]
 	for _, w := range window {
-		recs, ok := lookupPeriod(entry, w, now)
+		recs, _, ok := lookupPeriod(entry, w, now)
 		if !ok {
 			missing = append(missing, w)
 			continue
@@ -252,12 +268,27 @@ func (s *Store) Lookup(q Query, window []Period, now time.Time) (records []Recor
 	return records, missing
 }
 
-func lookupPeriod(entry queryEntry, w Period, now time.Time) ([]Record, bool) {
+// Partial reports whether any bucket Lookup would serve for window under q was
+// written by a page-capped fetch — the records on screen are a lower bound and
+// the surface showing them has to say so. Read through the same lookupPeriod
+// tiling Lookup uses, so the two can never disagree about which buckets are
+// answering for a display period.
+func (s *Store) Partial(q Query, window []Period, now time.Time) bool {
+	entry := s.data.Queries[q.CacheKey()]
+	for _, w := range window {
+		if _, truncated, ok := lookupPeriod(entry, w, now); ok && truncated {
+			return true
+		}
+	}
+	return false
+}
+
+func lookupPeriod(entry queryEntry, w Period, now time.Time) ([]Record, bool, bool) {
 	if bucket, found := entry.Periods[periodKey(w)]; found {
 		if bucket.immutableAt(w) || now.Sub(bucket.FetchedAt) < openPeriodTTL {
-			return bucket.Records, true
+			return bucket.Records, bucket.Truncated, true
 		}
-		return nil, false
+		return nil, false, false
 	}
 	return lookupContained(entry.Periods, w, now)
 }
@@ -267,7 +298,7 @@ func lookupPeriod(entry queryEntry, w Period, now time.Time) ([]Record, bool) {
 // Start — to tile w edge-to-edge with no gap. A stale (TTL-expired) open
 // sub-period anywhere inside w fails the whole lookup, mirroring the
 // exact-match TTL rule at the aggregate granularity.
-func lookupContained(periods map[string]periodEntry, w Period, now time.Time) ([]Record, bool) {
+func lookupContained(periods map[string]periodEntry, w Period, now time.Time) ([]Record, bool, bool) {
 	type native struct {
 		period Period
 		bucket periodEntry
@@ -280,31 +311,33 @@ func lookupContained(periods map[string]periodEntry, w Period, now time.Time) ([
 		}
 		p := Period{Start: start, End: end}
 		if !bucket.immutableAt(p) && now.Sub(bucket.FetchedAt) >= openPeriodTTL {
-			return nil, false
+			return nil, false, false
 		}
 		matched = append(matched, native{period: p, bucket: bucket})
 	}
 	if len(matched) == 0 {
-		return nil, false
+		return nil, false, false
 	}
 	sort.Slice(matched, func(i, j int) bool { return matched[i].period.Start < matched[j].period.Start })
 
 	if matched[0].period.Start != w.Start {
-		return nil, false
+		return nil, false, false
 	}
 	records := append([]Record(nil), matched[0].bucket.Records...)
+	truncated := matched[0].bucket.Truncated
 	cursor := matched[0].period.End
 	for _, m := range matched[1:] {
 		if m.period.Start != cursor {
-			return nil, false
+			return nil, false, false
 		}
 		cursor = m.period.End
 		records = append(records, m.bucket.Records...)
+		truncated = truncated || m.bucket.Truncated
 	}
 	if cursor != w.End {
-		return nil, false
+		return nil, false, false
 	}
-	return records, true
+	return records, truncated, true
 }
 
 // Merge stages recs, fetched at now, into q's cache entry. Records are
@@ -317,6 +350,14 @@ func lookupContained(periods map[string]periodEntry, w Period, now time.Time) ([
 // newer spend as the month progresses, and a legitimate post-closure re-fetch
 // must replace a stale pre-closure snapshot rather than being skipped by it.
 func (s *Store) Merge(q Query, recs []Record, now time.Time) {
+	s.merge(q, recs, now, false)
+}
+
+// merge is Merge plus the completeness of the fetch that produced recs.
+// ApplyFetchResult is the only caller that can pass truncated=true: it is the
+// single point a fetch enters the store, so a caller cannot merge partial
+// records and forget to say they were partial.
+func (s *Store) merge(q Query, recs []Record, now time.Time, truncated bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.revision++
@@ -341,7 +382,7 @@ func (s *Store) Merge(q Query, recs []Record, now time.Time) {
 		if existing, exists := entry.Periods[pk]; exists && existing.immutableAt(batch[0].Period) {
 			continue
 		}
-		entry.Periods[pk] = periodEntry{FetchedAt: now, Records: batch}
+		entry.Periods[pk] = periodEntry{FetchedAt: now, Records: batch, Truncated: truncated}
 	}
 
 	s.data.Queries[key] = entry
@@ -375,6 +416,12 @@ func (s *Store) Merge(q Query, recs []Record, now time.Time) {
 //     promote it toward immutability off a round that never actually
 //     re-confirmed it.
 func (s *Store) MergeCoverage(q Query, covered []Period, now time.Time) {
+	s.mergeCoverage(q, covered, now, false)
+}
+
+// mergeCoverage is MergeCoverage plus the completeness of the fetch whose
+// window it stamps — see merge for why only ApplyFetchResult can set it.
+func (s *Store) mergeCoverage(q Query, covered []Period, now time.Time, truncated bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.revision++
@@ -388,9 +435,12 @@ func (s *Store) MergeCoverage(q Query, covered []Period, now time.Time) {
 		existing, exists := entry.Periods[pk]
 		switch {
 		case !exists:
-			entry.Periods[pk] = periodEntry{FetchedAt: now}
-		case existing.fetchedWhileOpen(p) && !existing.FetchedAt.Equal(now):
-			entry.Periods[pk] = periodEntry{FetchedAt: now}
+			entry.Periods[pk] = periodEntry{FetchedAt: now, Truncated: truncated}
+		case existing.FetchedAt.Equal(now):
+			// Merge wrote this bucket in the same round; it already carries
+			// this fetch's own completeness, records and all.
+		case existing.fetchedWhileOpen(p):
+			entry.Periods[pk] = periodEntry{FetchedAt: now, Truncated: truncated}
 		}
 	}
 	s.data.Queries[key] = entry
@@ -519,6 +569,35 @@ func (s *Store) PutAnomalies(marks []AnomalyMark, now time.Time, covered Period)
 	defer s.mu.Unlock()
 	s.revision++
 	s.data.Anomalies = &anomalyBucket{FetchedAt: now, Marks: marks, Covered: covered}
+	// An authoritative answer supersedes whatever a capped walk had found.
+	s.partialAnomalies = nil
+}
+
+// putPartialAnomalies keeps the marks a page-capped GetAnomalies did find.
+// They are real anomalies — CE reported them — but the set is a lower bound,
+// so it is held apart from the snapshot Anomalies() serves and never
+// persisted: the next open re-plans the anomaly fetch precisely because the
+// authoritative slot is still empty.
+func (s *Store) putPartialAnomalies(marks []AnomalyMark, now time.Time, covered Period) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.revision++
+	s.partialAnomalies = &anomalyBucket{FetchedAt: now, Marks: marks, Covered: covered}
+}
+
+// AnomalyOverlay returns the marks to overlay on the grid and whether they are
+// a lower bound: the authoritative snapshot when one is fresh, otherwise the
+// page-capped set a truncated fetch left behind. Dropping the capped set
+// instead would make a confirmed anomaly disappear from the grid with nothing
+// said, which is the one outcome worse than showing it with a caveat.
+func (s *Store) AnomalyOverlay(now time.Time) (marks []AnomalyMark, partial bool) {
+	if marks, ok := s.Anomalies(now); ok {
+		return marks, false
+	}
+	if s.partialAnomalies == nil || now.Sub(s.partialAnomalies.FetchedAt) >= anomalyTTL {
+		return nil, false
+	}
+	return s.partialAnomalies.Marks, true
 }
 
 // FetchResult is one completed Cost Explorer fetch: the grid data (Records/
@@ -527,8 +606,18 @@ func (s *Store) PutAnomalies(marks []AnomalyMark, now time.Time, covered Period)
 // merge grid data and anomaly data through two calls that drift on ordering
 // or on what "this fetch" even means.
 type FetchResult struct {
-	Query     Query
-	Records   []Record
+	Query   Query
+	Records []Record
+	// Coverage is the display window the fetch was scoped to, exactly as the
+	// caller built it — the periods CE answered for even when it returned no
+	// group for one of them. Empty when the grid fetch was skipped, so a
+	// delivery that never attempted the grid cannot stamp coverage.
+	Coverage []Period
+	// Truncated is true when the grid fetch was cut short by the CE
+	// pagination cap. It rides in here rather than being applied to the
+	// screen alone: the frame that showed the warning is gone the moment the
+	// screen is left, while the records it warned about stay in the cache.
+	Truncated bool
 	Attrs     map[string]string
 	Anomalies AnomalyResult
 	Requests  int
@@ -549,11 +638,19 @@ type FetchResult struct {
 // truncated, possibly zero Marks) replaces it, which is also the case that
 // correctly clears a stale mark when CE now genuinely reports none.
 func (s *Store) ApplyFetchResult(r FetchResult, now time.Time) {
-	s.Merge(r.Query, r.Records, now)
+	s.merge(r.Query, r.Records, now, r.Truncated)
+	if len(r.Coverage) > 0 {
+		s.mergeCoverage(r.Query, r.Coverage, now, r.Truncated)
+	}
 	if len(r.Attrs) > 0 {
 		s.MergeAttrs(r.Attrs)
 	}
-	if r.Anomalies.Requested && r.Anomalies.Err == nil && !r.Anomalies.Truncated {
+	switch {
+	case !r.Anomalies.Requested || r.Anomalies.Err != nil:
+		// Nothing was learned: neither cache is touched.
+	case r.Anomalies.Truncated:
+		s.putPartialAnomalies(r.Anomalies.Marks, now, r.Query.Range)
+	default:
 		s.PutAnomalies(r.Anomalies.Marks, now, r.Query.Range)
 	}
 }

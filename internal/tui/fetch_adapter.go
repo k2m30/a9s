@@ -147,22 +147,27 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 		ParentCtx:    msg.ParentContext,
 		FetchFilter:  msg.FetchFilter,
 	}
-	provenance := messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
+	// The lane the list that pressed "m" recorded on the message, not a
+	// re-derivation from the two maps above — see messages.LoadMore.
+	provenance := msg.Provenance
+	if provenance == messages.FetchProvenanceUnknown {
+		provenance = messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
+	}
 	var seq domain.Gen
 	if provenance.CanonicalList() {
 		seq = m.core.NextListFetchSeq(msg.ResourceType)
 	}
 	return func() tea.Msg {
 		res, err := m.core.FetchMoreResources(ctx, clients, p)
-		provenance := messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: msg.ResourceType, Err: err, Gen: gen, Append: true, Provenance: provenance}
+			return messages.APIError{ResourceType: msg.ResourceType, Err: err, Gen: gen, Append: true, LoadingMore: true, Provenance: provenance}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: msg.ResourceType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
 			Append:       true,
+			LoadingMore:  true,
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      seq,

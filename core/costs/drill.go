@@ -26,17 +26,6 @@ type DrillLevel struct {
 	// any way other than a fresh PushDrill, or one whose selected parent
 	// cell was itself zero, never triggers the fallback.
 	Fallback FallbackGate
-
-	// Truncated is true when this frame's own last delivered grid fetch was
-	// cut short by the CE pagination page cap (costs.GridResult.Truncated,
-	// threaded in by ApplyCostsLoaded) — the frame's Rows/Totals are then a
-	// lower bound, not CE's own authoritative complete result. Carried on
-	// the frame itself, not on CostsState, so it survives an Enter/Esc
-	// drill round-trip: a child frame's own fetch outcome must never
-	// overwrite what the parent frame already learned about ITS OWN last
-	// fetch, and popping back to the parent must show the parent's real
-	// status again, not whatever the just-discarded child last reported.
-	Truncated bool
 }
 
 // FallbackGate is one frame's granularity-fallback eligibility and

@@ -468,24 +468,26 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 // a recorded failure: a page cap, or a resource that went away between the
 // list call and the per-item one. Both are true statements about coverage with
 // no error to log, and each site says which it is on the line above the write.
+// Three files left the census when a page cap on a COUNTING walk stopped
+// marking its row uninspected: apigw stages, codeartifact packages and sns
+// subscriptions each report their cap as the "+" on the count instead, so the
+// independent check beside them (an authorizer read, a permissions policy, a
+// topic's posture) still reaches the row.
 var uninspectedWithoutAReasonCensus = map[string]int{
-	"apigw_issue_enrichment.go":        1,
-	"asg_issue_enrichment.go":          1,
-	"codeartifact_issue_enrichment.go": 1,
-	"eb_rule_issue_enrichment.go":      1,
-	"ec2_issue_enrichment.go":          1,
-	"ecs_task_issue_enrichment.go":     1,
-	"efs_issue_enrichment.go":          1,
-	"iam_group_issue_enrichment.go":    1,
-	"kinesis_issue_enrichment.go":      1,
-	"lambda_issue_enrichment.go":       1,
-	"r53_issue_enrichment.go":          1,
-	"redshift_issue_enrichment.go":     1,
-	"s3_issue_enrichment.go":           1,
-	"secrets_issue_enrichment.go":      1,
-	"sns_issue_enrichment.go":          1,
-	"snapshot_cross_ref.go":            1,
-	"trail_issue_enrichment.go":        2,
-	"tgw_issue_enrichment.go":          1,
-	"vpc_issue_enrichment.go":          1,
+	"asg_issue_enrichment.go":       1,
+	"eb_rule_issue_enrichment.go":   1,
+	"ec2_issue_enrichment.go":       1,
+	"ecs_task_issue_enrichment.go":  1,
+	"efs_issue_enrichment.go":       1,
+	"iam_group_issue_enrichment.go": 1,
+	"kinesis_issue_enrichment.go":   1,
+	"lambda_issue_enrichment.go":    1,
+	"r53_issue_enrichment.go":       1,
+	"redshift_issue_enrichment.go":  1,
+	"s3_issue_enrichment.go":        1,
+	"secrets_issue_enrichment.go":   1,
+	"snapshot_cross_ref.go":         1,
+	"trail_issue_enrichment.go":     2,
+	"tgw_issue_enrichment.go":       1,
+	"vpc_issue_enrichment.go":       1,
 }

@@ -86,12 +86,22 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			MarkSkipped(&result, r.ID, &failures, pagedErr)
 			return
 		}
+		count := resource.FormatExact(len(subs))
 		if pageCapped {
-			// A page cap, not a failed call: there is no error to record.
-			result.TruncatedIDs[r.ID] = true
-			result.FieldUpdates[r.ID] = map[string]string{
-				"subs_count": resource.FormatTruncated(len(subs)),
-			}
+			// A page cap, not a failed call: there is no error to record, and
+			// the row is not uninspected either — the "+" on the count is
+			// where the cap is reported. Marking the ID truncated would make
+			// FoldWave2Rows skip the row entirely, dropping the posture
+			// findings below with it.
+			count = resource.FormatTruncated(len(subs))
+		}
+		result.FieldUpdates[r.ID] = map[string]string{"subs_count": count}
+		// Posture is read for every topic, including one with no
+		// subscribers and one whose subscription walk was capped: the access
+		// policy and the encryption key come from GetTopicAttributes, which
+		// the subscription walk's completeness has no bearing on.
+		snsTopicPosture(ctx, clients, &result, &failures, r.ID, ownAccount)
+		if pageCapped {
 			// A capped walk can never rule out a confirmed subscriber sitting
 			// beyond the pages inspected — reporting allPending here would be
 			// a FALSE "!"-shaped finding (a real confirmed subscriber on page
@@ -101,13 +111,6 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			// the cap.
 			return
 		}
-		result.FieldUpdates[r.ID] = map[string]string{
-			"subs_count": resource.FormatExact(len(subs)),
-		}
-		// Posture is read for every topic, including one with no
-		// subscribers: an unencrypted topic nobody listens to is still
-		// unencrypted.
-		snsTopicPosture(ctx, clients, &result, &failures, r.ID, ownAccount)
 		if len(subs) == 0 {
 			setWave2Finding(&result, r.ID, snsCodeNoSubscribers, nil)
 			return

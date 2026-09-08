@@ -145,9 +145,26 @@ type FetchMorePayload struct {
 	ParentContext     map[string]string
 	FetchFilter       map[string]string
 	Provenance        messages.FetchProvenance
+	// ContinuesInitialLoad records which of the list's activity flags this
+	// request raised, so its completion retires that one instead of guessing
+	// from Append. True is the drill that opens ON a continuation
+	// (relatedFetchTasks below): nothing pressed "m", the screen is still in
+	// its initial Loading, and clearing LoadingMore would leave the loading
+	// screen sitting over the rows the continuation just fetched.
+	ContinuesInitialLoad bool
 }
 
 func (FetchMorePayload) isTaskPayload() {}
+
+// Lane resolves the provenance this continuation's result must carry: the
+// one its issuing screen recorded, or — for a payload built before any
+// screen could record it — the classification of its own context maps.
+func (p FetchMorePayload) Lane() messages.FetchProvenance {
+	if p.Provenance != messages.FetchProvenanceUnknown {
+		return p.Provenance
+	}
+	return messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter)
+}
 
 // FetchByIDDetailPayload carries the target type and exact ID for a
 // KindFetchByIDDetail task. The runtime populates these at dispatch time so the
@@ -272,8 +289,9 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 			Key:   TaskKey{Kind: KindFetchMore, Scope: targetType},
 			Cache: CacheNone,
 			Payload: FetchMorePayload{
-				ContinuationToken: tr.Pagination.NextToken,
-				Provenance:        messages.FetchProvenanceFilteredList,
+				ContinuationToken:    tr.Pagination.NextToken,
+				Provenance:           messages.FetchProvenanceFilteredList,
+				ContinuesInitialLoad: true,
 			},
 		}}
 	}

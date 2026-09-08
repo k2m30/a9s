@@ -42,6 +42,12 @@ type LoadMore struct {
 	ContinuationToken string
 	ParentContext     map[string]string // non-nil for child views
 	FetchFilter       map[string]string
+	// Provenance is the lane the list that pressed "m" belongs to, taken
+	// from that screen (core/app.listLane) rather than re-derived from the
+	// two maps above: a client-side related drill has neither, and would
+	// otherwise call itself the type's canonical list and be refused by the
+	// delivery gate on the very screen that asked for the page.
+	Provenance FetchProvenance
 }
 
 func (LoadMore) isCmd() {}

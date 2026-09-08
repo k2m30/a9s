@@ -378,10 +378,15 @@ func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *
 	// Controller.Handle — the same event HandleAPIError/
 	// ClearActiveListLoadingIntent produce for any failed
 	// KindFetchResources/KindFetchMore execution (core/runtime/handlers.go).
-	// Append: true mirrors executor.go's own KindFetchMore-failure
+	// Append/LoadingMore mirror executor.go's own KindFetchMore-failure
 	// construction — this failure is the outcome of the load-more
 	// continuation dispatched above, so only LoadingMore may clear.
-	vs, _ := c.Handle(messages.APIError{ResourceType: "ec2", Err: errLoadMoreAPIFailed{}, Append: true})
+	// LoadingMore is the field the clear reads: the request records which
+	// flag it raised instead of the handler inferring it from Append, which
+	// answers how the rows would have merged. Do not drop it back to
+	// Append-only — that is the shape the drill-opens-on-a-continuation
+	// defect lived in.
+	vs, _ := c.Handle(messages.APIError{ResourceType: "ec2", Err: errLoadMoreAPIFailed{}, Append: true, LoadingMore: true})
 
 	got := vs.Body.List
 	if got == nil {

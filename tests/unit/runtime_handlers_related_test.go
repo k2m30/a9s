@@ -235,12 +235,18 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_Fetc
 	if result.Kind != runtime.NavigationKindFilteredList {
 		t.Errorf("Kind = %v, want NavigationKindFilteredList", result.Kind)
 	}
+	// ContinuesInitialLoad is true here and must stay true: this is the one
+	// continuation nobody pressed "m" for. The drill screen is still in its
+	// initial Loading, so the flag its result retires is Loading — a
+	// completion that cleared LoadingMore instead left the fetched rows
+	// behind the loading screen.
 	wantTasks := []runtime.TaskRequest{{
 		Key:   runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: "ec2"},
 		Cache: runtime.CacheNone,
 		Payload: runtime.FetchMorePayload{
-			ContinuationToken: "next-tok-xyz",
-			Provenance:        messages.FetchProvenanceFilteredList,
+			ContinuationToken:    "next-tok-xyz",
+			Provenance:           messages.FetchProvenanceFilteredList,
+			ContinuesInitialLoad: true,
 		},
 	}}
 	if !reflect.DeepEqual(tasks, wantTasks) {

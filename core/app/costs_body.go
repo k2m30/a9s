@@ -91,16 +91,24 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 	}
 
 	footerNote := costsFooterNote(vm)
+	_, anomaliesPartial := cs.Store.AnomalyOverlay(cs.Now)
 	switch {
-	case top.Truncated:
+	case cs.Store.Partial(costsQueryForFrame(top, cs.Metric), top.Window, cs.Now):
 		// FR-017: partial dollars rendered as complete dollars is a
-		// correctness defect, not a cosmetic one — this frame's own grid
-		// fetch was cut short by the CE pagination cap, so Rows/Totals are
-		// a lower bound. Takes priority over every other footer note
-		// (including DrillRefusedReason/ResourceRowNote below): a data-
-		// completeness warning about the numbers on screen right now
-		// outranks feedback about a past interaction.
+		// correctness defect, not a cosmetic one — the cached records this
+		// frame is built from were fetched under the CE pagination cap, so
+		// Rows/Totals are a lower bound. Read from the store rather than
+		// from the frame, so leaving and re-entering the screen cannot lose
+		// the warning while keeping the numbers it was about. Takes priority
+		// over every other footer note (including DrillRefusedReason/
+		// ResourceRowNote below): a data-completeness warning about the
+		// numbers on screen right now outranks feedback about a past
+		// interaction.
 		footerNote = "partial data — CE pagination cap reached, totals are a lower bound, not the full spend"
+	case anomaliesPartial:
+		// The anomaly walk, not the grid walk: the dollars are whole, the
+		// overlay on them is not.
+		footerNote = "partial anomaly data — CE pagination cap reached, more anomalies may exist than are marked"
 	case cs.DrillRefusedReason != "":
 		// The most recent refused drill attempt's honest reason (FR-007)
 		// takes priority over the cursor cell's own delta/anomaly note —

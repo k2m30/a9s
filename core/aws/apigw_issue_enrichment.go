@@ -162,13 +162,13 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			MarkSkipped(&result, r.ID, &failures, authErr)
 		}
 
-		switch {
-		case fetchErr != nil:
+		if fetchErr != nil {
 			MarkSkipped(&result, r.ID, &failures, fetchErr)
-		case stagesTruncated:
-			// A page cap, not a failed call: there is no error to record.
-			result.TruncatedIDs[r.ID] = true
 		}
+		// A stage-count page cap is not a coverage gap on the row: the "+" on
+		// stages_count is where it is reported. Marking the ID truncated would
+		// make FoldWave2Rows skip the row, dropping the authorizer verdict
+		// above — a separate call the stage walk says nothing about.
 		result.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
 
 		stagesCount := len(stages)
