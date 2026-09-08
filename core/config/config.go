@@ -102,7 +102,7 @@ type ViewsConfig struct {
 // and a rename arrives as a title the file has never heard of — the operator
 // keeps the old column beside the new one. Shipping either needs a migration
 // this file does not have yet.
-const GeneratedViewsVersion = 2
+const GeneratedViewsVersion = 3
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {

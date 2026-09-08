@@ -11,7 +11,10 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Actions On", Path: "ActionsEnabled", Width: 10},
 				{Title: "Metric", Path: "MetricName", Width: 24},
 				{Title: "Namespace", Path: "Namespace", Width: 24},
-				{Title: "Threshold", Path: "Threshold", Width: 12},
+				// Keyed as well as Path-based: the fetcher writes the threshold
+				// with the precision CloudWatch reports it at, which %g on the
+				// float drops.
+				{Title: "Threshold", Key: "threshold", Path: "Threshold", Width: 12},
 			},
 			Detail: []DetailField{
 				{Path: "AlarmName"}, {Path: "AlarmArn"}, {Path: "StateValue"}, {Path: "StateReason"},
@@ -28,7 +31,12 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
 				{Title: "Status", Width: 12},
 				{Title: "Size", Key: "stored_bytes", SortKey: "stored_bytes_raw", Width: 14},
-				{Title: "Retention", Path: "RetentionInDays", Width: 10},
+				// Keyed as well as Path-based: without the key this column fell
+				// through to a title match on Fields["retention"] whenever the
+				// path was empty, so a group with no policy read "never expire"
+				// here and blank on the built-in list. The warning itself is the
+				// Status cell's (logs.retention-never-expire).
+				{Title: "Retention", Key: "retention_days", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Last Event", Key: "last_event_at", Width: 22},
 				{Title: "Created", Path: "", Key: "creation_time", Width: 16},
@@ -93,8 +101,8 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"ct-events": {
 			List: []ListColumn{
 				{Title: "V", Key: "_ct.verb", Width: 1},
-				{Title: "Status", Key: "status", Width: 12},
 				{Title: "TIME", Key: "time", SortKey: "event_time", Width: 15},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "ACTOR", Key: "_ct.actor", Width: 36},
 				{Title: "ORIGIN", Key: "_ct.origin", Width: 7},
 				{Title: "EVENT", Path: "EventName", Width: 34},

@@ -149,6 +149,13 @@ type viewColumnSourceChange struct {
 var viewColumnSourceChanges = []viewColumnSourceChange{
 	{Version: 2, View: "sns", Title: "Topic Name", WasPath: "TopicArn", WasWidth: 40},
 	{Version: 2, View: "sns-sub", Title: "Confirmed", WasPath: "SubscriptionArn", WasWidth: 22},
+	{Version: 3, View: "alarm", Title: "Threshold", WasPath: "Threshold", WasWidth: 12},
+	{Version: 3, View: "ecs-task", Title: "Task ID", WasPath: "TaskArn", WasWidth: 38},
+	{Version: 3, View: "logs", Title: "Retention", WasPath: "RetentionInDays", WasWidth: 10},
+	{Version: 3, View: "ng", Title: "Node Group", WasPath: "NodegroupName", WasWidth: 28},
+	{Version: 3, View: "secrets", Title: "Last Accessed", WasPath: "LastAccessedDate", WasWidth: 18},
+	{Version: 3, View: "secrets", Title: "Last Changed", WasPath: "LastChangedDate", WasWidth: 18},
+	{Version: 3, View: "sns-sub", Title: "Subscription ARN", WasPath: "SubscriptionArn", WasWidth: 60},
 }
 
 // mergeGeneratedColumns returns the YAML for onDisk brought up to this build:

@@ -30,38 +30,70 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 	}
 
 	defaultVD := config.GetViewDef(nil, typeName)
+	if td == nil {
+		return copyListColumns(defaultVD.List)
+	}
 
-	if td != nil && len(defaultVD.List) > len(td.Columns) {
+	// Both lookups below are keyed case-insensitively: a catalog column and
+	// the built-in view spell the same title differently often enough ("Time"
+	// against "TIME") that an exact match silently drops what the other
+	// declaration says about that very column.
+
+	// The defaults hold columns the catalog does not, so they drive the order
+	// and the widths. They do not drive what a cell reads: mergeListColumn
+	// puts the catalog's Key back on every title both declare.
+	if len(defaultVD.List) > len(td.Columns) {
 		firstMatch := len(td.Columns) == 0 ||
 			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
 		if firstMatch {
-			return copyListColumns(defaultVD.List)
+			catalogKeyByTitle := make(map[string]string, len(td.Columns))
+			for _, c := range td.Columns {
+				catalogKeyByTitle[strings.ToLower(c.Title)] = c.Key
+			}
+			cols := make([]config.ListColumn, len(defaultVD.List))
+			for i, lc := range defaultVD.List {
+				cols[i] = mergeListColumn(lc.Title, lc.Width, catalogKeyByTitle[strings.ToLower(lc.Title)], lc)
+			}
+			return cols
 		}
 	}
 
-	if td != nil && len(td.Columns) > 0 {
-		// Keyed case-insensitively: a catalog column and the built-in view
-		// spell the same title differently often enough ("Time" against
-		// "TIME") that an exact match silently drops the sort key, the path
-		// and the humanize flag the default declares for that very column.
+	if len(td.Columns) > 0 {
 		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
 		for _, lc := range defaultVD.List {
 			defaultByTitle[strings.ToLower(lc.Title)] = lc
 		}
 		cols := make([]config.ListColumn, len(td.Columns))
 		for i, c := range td.Columns {
-			cd := config.ListColumn{Key: c.Key, Title: c.Title, Width: c.Width}
-			if def, ok := defaultByTitle[strings.ToLower(c.Title)]; ok {
-				cd.Path = def.Path
-				cd.SortKey = def.SortKey
-				cd.Humanize = def.Humanize
-			}
-			cols[i] = cd
+			cols[i] = mergeListColumn(c.Title, c.Width, c.Key, defaultByTitle[strings.ToLower(c.Title)])
 		}
 		return cols
 	}
 
 	return copyListColumns(defaultVD.List)
+}
+
+// mergeListColumn is the one merge of the two declarations of a column, called
+// by both arms of the cascade so neither can read the pair its own way.
+//
+// The catalog owns what the cell reads: its Key wins wherever it declares one.
+// The defaults own the rendering hints the catalog literal has no field for —
+// Path, SortKey, Humanize — and their own Key on a column the catalog does not
+// declare at all. Title and width come from whichever declaration the calling
+// arm is built around, which is the only thing the two arms still differ on.
+func mergeListColumn(title string, width int, catalogKey string, def config.ListColumn) config.ListColumn {
+	key := def.Key
+	if catalogKey != "" {
+		key = catalogKey
+	}
+	return config.ListColumn{
+		Title:    title,
+		Width:    width,
+		Key:      key,
+		Path:     def.Path,
+		SortKey:  def.SortKey,
+		Humanize: def.Humanize,
+	}
 }
 
 // copyListColumns copies a view definition's columns whole. Every field a

@@ -9,8 +9,11 @@ func secretsDefaultViews() map[string]ViewDef {
 				{Title: "Secret Name", Path: "Name", Width: 36},
 				{Title: "Status", Path: "Name", Key: "status", Width: 10},
 				{Title: "Description", Path: "Description", Width: 30},
-				{Title: "Last Accessed", Path: "LastAccessedDate", Width: 18},
-				{Title: "Last Changed", Path: "LastChangedDate", Width: 18},
+				// Keyed as well as Path-based: AWS records these to the day, and
+				// the fetcher writes the date. Rendering the struct value put a
+				// time of day beside it that Secrets Manager does not promise.
+				{Title: "Last Accessed", Key: "last_accessed", Path: "LastAccessedDate", Width: 18},
+				{Title: "Last Changed", Key: "last_changed", Path: "LastChangedDate", Width: 18},
 				{Title: "Rotation", Path: "RotationEnabled", Width: 10},
 			},
 			Detail: []DetailField{

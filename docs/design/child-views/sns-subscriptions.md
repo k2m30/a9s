@@ -40,7 +40,7 @@ sns_subscriptions:
 
 Note on computed fields:
 - `confirmation_status`: "Confirmed" if `SubscriptionArn` is a real ARN, "PendingConfirmation" or "Deleted" if `SubscriptionArn` equals that word, "Unknown" if the subscription came back with no `SubscriptionArn` at all. This is how AWS signals unconfirmed and deleted subscriptions — through the ARN field itself — so an absent value is not a confirmation. The reading is shared with the subscription list, which words the same four states for its own Confirmed column.
-- Row ID: the `SubscriptionArn` when it is a real ARN. AWS puts the word `PendingConfirmation` or `Deleted` in that field instead of an ARN for a subscription in either state, so those rows are keyed `pending/<protocol>/<endpoint>` and `deleted/<protocol>/<endpoint>`. Keying them on the state word itself would make every subscription in that state under one topic a single identity, and the second would be dropped by the row store's page dedup.
+- Row ID: the `SubscriptionArn` when it is a real ARN. AWS puts the word `PendingConfirmation` or `Deleted` in that field instead of an ARN for a subscription in either state, and sends nothing at all when it can report neither, so those rows are keyed `<state>/<topic-arn>/<protocol>/<endpoint>` by `snsSubRowID`, which the account-wide subscription list calls too. Keying them on the state word itself would make every subscription in that state a single identity, and the row store's page dedup would keep exactly one of them; the topic is part of the key because the account-wide list spans every topic.
 
 Source struct: `snstypes.Subscription`
 

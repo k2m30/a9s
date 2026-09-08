@@ -72,13 +72,17 @@ func TestSNSSubConfirmedColumnShowsTheConfirmationState(t *testing.T) {
 		if strings.HasPrefix(got, "arn:") {
 			t.Errorf("Confirmed = %q for %s — the cell shows the subscription ARN, not a confirmation state", got, r.ID)
 		}
-		switch r.Fields["subscription_arn"] {
-		case "PendingConfirmation":
+		// Read off the confirmation field rather than re-deriving the state
+		// from the ARN. Since misc4 round 2 the ARN field is empty when AWS
+		// sent a state word in its place, so the ARN is no longer evidence of
+		// anything and a test that reads it is reading a second truth source.
+		switch r.Fields["confirmed"] {
+		case "pending":
 			sawPending = true
 			if got != "pending" {
 				t.Errorf("Confirmed = %q for an unconfirmed subscription, want %q", got, "pending")
 			}
-		case "Deleted", "":
+		case "deleted", "unknown":
 		default:
 			sawConfirmed = true
 			if got != "yes" {

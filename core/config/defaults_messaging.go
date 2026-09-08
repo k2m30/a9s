@@ -36,7 +36,12 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Protocol", Path: "Protocol", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 				{Title: "Confirmed", Key: "confirmed", Width: 12},
-				{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60},
+				// Key-only lookup, NO Path fallback. AWS puts the state word in
+				// SubscriptionArn when there is no ARN, so the fetcher leaves
+				// the field empty; a Path fallback would reach past that and
+				// render "PendingConfirmation" under a heading that promises an
+				// identifier. The state has its own Confirmed column.
+				{Title: "Subscription ARN", Key: "subscription_arn", Width: 60},
 			},
 			Detail: []DetailField{
 				{Path: "SubscriptionArn"}, {Path: "TopicArn"}, {Path: "Protocol"},

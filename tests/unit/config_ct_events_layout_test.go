@@ -10,10 +10,10 @@ package unit
 // would not be caught by compilation. A width change (e.g., TIME from 15→19)
 // is a silent regression — the code compiles but the layout violates the spec.
 //
-// §8 column spec (plus the Status column inserted at index 1):
+// §8 column spec (plus the Status column, inserted after TIME):
 //   V       width=1   key="_ct.verb"
-//   Status  width=12  key="status"
 //   TIME    width=15  key="time"
+//   Status  width=12  key="status"
 //   ACTOR   width=36  key="_ct.actor"
 //   ORIGIN  width=7   key="_ct.origin"
 //   EVENT   width=34  path="EventName"
@@ -35,8 +35,13 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 		width int
 	}{
 		{"V", 1},
-		{"Status", 12},
+		// TIME ahead of Status since misc4 round 2 item (a): §8 puts TIME
+		// second and says nothing about Status, which a later change inserted
+		// at index 1. The catalog literal builds the same two columns in
+		// TIME-then-Status order, and the two declarations of one list must
+		// hold one order. Do not move Status back to index 1.
 		{"TIME", 15},
+		{"Status", 12},
 		{"ACTOR", 36},
 		{"ORIGIN", 7},
 		{"EVENT", 34},
@@ -52,7 +57,7 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 	for i, want := range wantCols {
 		got := vd.List[i]
 		if got.Title != want.title {
-			t.Errorf("col %d: title = %q, want %q (column order must be V/Status/TIME/ACTOR/ORIGIN/EVENT/TARGET/OUTCOME)",
+			t.Errorf("col %d: title = %q, want %q (column order must be V/TIME/Status/ACTOR/ORIGIN/EVENT/TARGET/OUTCOME)",
 				i, got.Title, want.title)
 		}
 		if got.Width != want.width {

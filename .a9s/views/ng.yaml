@@ -1,7 +1,8 @@
-generated: 2
+generated: 3
 list:
   Node Group:
     path: NodegroupName
+    key: nodegroup_name
     width: 28
   Cluster:
     path: ClusterName

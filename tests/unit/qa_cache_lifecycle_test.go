@@ -368,7 +368,11 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	if !ok {
 		t.Fatal("persisted Rows missing bucket-s1-1")
 	}
-	for _, key := range []string{"bucket_name", "region", "creation_date"} {
+	// "name" rather than "bucket_name" since misc4 round 2 item (b): the
+	// resolved Bucket Name column carries the catalog's Key, so that is the
+	// key its cell is read from and the key materialization writes. The title
+	// key nothing reads is not what a cache replay needs.
+	for _, key := range []string{"name", "region", "creation_date"} {
 		if v, present := r1.Fields[key]; !present || v == "" {
 			t.Errorf("persisted bucket-s1-1.Fields[%q] = %q (present=%v), want a non-empty materialized value", key, v, present)
 		}
@@ -673,7 +677,11 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	if !ok {
 		t.Fatal("persisted Rows missing bucket-s3-added")
 	}
-	for _, key := range []string{"bucket_name", "region", "creation_date"} {
+	// "name" rather than "bucket_name" since misc4 round 2 item (b): the
+	// resolved Bucket Name column carries the catalog's Key, so that is the
+	// key its cell is read from and the key materialization writes. The title
+	// key nothing reads is not what a cache replay needs.
+	for _, key := range []string{"name", "region", "creation_date"} {
 		if v, present := addedRow.Fields[key]; !present || v == "" {
 			t.Errorf("persisted bucket-s3-added.Fields[%q] = %q (present=%v), want a non-empty materialized value", key, v, present)
 		}

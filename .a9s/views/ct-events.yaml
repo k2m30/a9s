@@ -1,15 +1,15 @@
-generated: 2
+generated: 3
 list:
   V:
     key: _ct.verb
     width: 1
-  Status:
-    key: status
-    width: 12
   TIME:
     key: time
     width: 15
     sort_key: event_time
+  Status:
+    key: status
+    width: 12
   ACTOR:
     key: _ct.actor
     width: 36

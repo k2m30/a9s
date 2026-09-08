@@ -5,6 +5,7 @@ package app
 import (
 	"maps"
 	"strings"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -13,19 +14,22 @@ import (
 )
 
 // MaterializeListFields returns a copy of r with Fields populated for every
-// Path-based, Key-less column in columns, extracting the scalar via
-// fieldpath.ExtractScalar(r.RawStruct, col.Path) and writing it under the
-// column's title key (config.TitleFieldKey — the one spelling the extraction
-// cascade reads first). This is the generic render-sufficiency step Contract B requires:
-// running it once, before a fetch result is cached or a screen's rows are
-// stored, means a later cache replay with RawStruct stripped renders
-// identical cells (extractListCells's key-based Fields lookup finds the
-// value directly, without falling back to fieldpath on a nil RawStruct).
+// Path-based column in columns, extracting the scalar via
+// fieldpath.ExtractScalar(r.RawStruct, col.Path) and writing it under the key
+// that column's cell is read from — its own Key, or its title key
+// (config.TitleFieldKey, the spelling the extraction cascade reads first) when
+// it has none. This is the generic render-sufficiency step Contract B
+// requires: running it once, before a fetch result is cached or a screen's
+// rows are stored, means a later cache replay with RawStruct stripped renders
+// identical cells, without falling back to fieldpath on a nil RawStruct.
 //
-// Key-based columns (col.Key != "") are left untouched — they already
-// resolve via the Fields-map lookup and may carry a Wave-2 enrichment
-// override that fieldpath cannot see, so materializing over them risks
-// clobbering a value RawStruct doesn't know about.
+// A column carrying BOTH a Key and a Path is materialized too. It is the
+// ordinary shape since ResolveListColumnCascade started merging the catalog's
+// Key onto the defaults' Path, and skipping it left the cached row blank
+// wherever the fetcher had not written that key itself. The clobbering worry
+// that kept keyed columns out — a Wave-2 override fieldpath cannot see — is
+// already answered by the guard below: a key that already holds a non-empty
+// value is never written.
 //
 // A column is only materialized when Fields does not already carry a
 // non-empty value under the resolved key, so a prior explicit value (or an
@@ -37,10 +41,13 @@ func MaterializeListFields(r resource.Resource, columns []ColumnDef) resource.Re
 	out := r
 	copied := false
 	for _, col := range columns {
-		if col.Path == "" || col.Key != "" {
+		if col.Path == "" {
 			continue
 		}
-		key := config.TitleFieldKey(col.Title)
+		key := col.Key
+		if key == "" {
+			key = config.TitleFieldKey(col.Title)
+		}
 		if key == "" {
 			continue
 		}
@@ -265,14 +272,49 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 	return ""
 }
 
-// humanizeListCell applies domain.HumanizeStatusPhrase when col.Humanize is
-// set, so a warm-cache row (RawStruct stripped, value materialized in
-// r.Fields) renders the same humanized phrase a live row gets via the
-// RawStruct+Humanize branch — the RawStruct/Fields cascade must never change
-// what the cell shows, only where the raw value came from.
+// humanizeListCell is the one formatter every non-status cell returns through,
+// down either lane: the Fields map the fetcher wrote, or the RawStruct path
+// fieldpath rendered. The RawStruct/Fields cascade must never change what the
+// cell shows, only where the raw value came from — so a warm-cache row renders
+// what the live row rendered, and a column resolved down one arm of
+// ResolveListColumnCascade says what the other arm would have said.
+//
+// It does two things. col.Humanize opts an AWS enum into
+// domain.HumanizeStatusPhrase. And canonicalCellValue settles the two shapes
+// the two lanes spelled differently.
 func humanizeListCell(col ColumnDef, v string) string {
+	v = canonicalCellValue(v)
 	if col.Humanize {
 		return domain.HumanizeStatusPhrase(v)
+	}
+	return v
+}
+
+// cellTimeLayouts are the two spellings a fetcher writes a timestamp into
+// Fields as. The rendered shape parses as neither, so this is idempotent.
+var cellTimeLayouts = []string{time.RFC3339, time.DateOnly}
+
+// canonicalCellValue renders a scalar the one way the list shows it, whichever
+// lane produced it. fieldpath.FormatValue applies these conventions to a value
+// read off a RawStruct; a Fields value arrives as whatever the fetcher chose to
+// write, so the same conventions are applied to it here.
+//
+// Only the two shapes with a settled convention are canonicalised. Numbers are
+// deliberately left alone: a decimal in a cell is an engine version at least as
+// often as it is a number, and rendering "1.10" as "1.1" is a wrong answer
+// rather than a tidier one. A column whose two declarations disagree about a
+// number is fixed in the defaults instead.
+func canonicalCellValue(v string) string {
+	switch v {
+	case "true":
+		return "Yes"
+	case "false":
+		return "No"
+	}
+	for _, layout := range cellTimeLayouts {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t.Format("2006-01-02 15:04")
+		}
 	}
 	return v
 }

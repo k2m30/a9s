@@ -1,4 +1,4 @@
-generated: 2
+generated: 3
 list:
   Topic ARN:
     path: TopicArn
@@ -15,7 +15,7 @@ list:
     key: confirmed
     width: 12
   Subscription ARN:
-    path: SubscriptionArn
+    key: subscription_arn
     width: 60
 
 detail:

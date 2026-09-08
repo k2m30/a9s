@@ -62,7 +62,9 @@ func computeDefaultViews() map[string]ViewDef {
 		},
 		"ecs-task": {
 			List: []ListColumn{
-				{Title: "Task ID", Path: "TaskArn", Width: 38},
+				// Keyed as well as Path-based: the column is titled for the ID,
+				// and the path answers with the whole ARN.
+				{Title: "Task ID", Key: "task_id", Path: "TaskArn", Width: 38},
 				{Title: "Cluster", Path: "ClusterArn", Width: 24},
 				{Title: "Status", Path: "LastStatus", Width: 12},
 				{Title: "Stop Code", Path: "StopCode", Width: 24},

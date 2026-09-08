@@ -86,28 +86,18 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 
 	// The child view has its own words for the confirmation state, but not its
 	// own reading of it: snsSubConfirmation is the one place the ARN is
-	// interpreted, so this column and the subscription list's Confirmed column
-	// cannot disagree about the same subscription.
-	//
-	// Only a confirmed subscription has an ARN to be identified by — AWS puts
-	// the state word where the ARN goes for the other two and sends nothing at
-	// all for the third — so every other row is keyed on what it does have.
-	// Taking the state word, or the empty string, would make every
-	// subscription in that state under one topic a single identity, and the
-	// row store's page dedup would keep exactly one of them.
+	// interpreted, and snsSubRowID the one place a row is keyed, so this view
+	// and the subscription list cannot disagree about the same subscription.
 	confirmationStatus := "Confirmed"
-	id := subscriptionArn
-	if state := snsSubConfirmation(subscriptionArn); state != snsSubConfirmed {
-		switch state {
-		case snsSubPending:
-			confirmationStatus = snsSubArnPending
-		case snsSubDeleted:
-			confirmationStatus = snsSubArnDeleted
-		default:
-			confirmationStatus = "Unknown"
-		}
-		id = fmt.Sprintf("%s/%s/%s", state, protocol, endpoint)
+	switch snsSubConfirmation(subscriptionArn) {
+	case snsSubPending:
+		confirmationStatus = snsSubArnPending
+	case snsSubDeleted:
+		confirmationStatus = snsSubArnDeleted
+	case snsSubUnknown:
+		confirmationStatus = "Unknown"
 	}
+	id := snsSubRowID(subscriptionArn, topicArn, protocol, endpoint)
 
 	findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
 
@@ -119,7 +109,7 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 			"endpoint":            endpoint,
 			"confirmation_status": confirmationStatus,
 			"owner":               owner,
-			"subscription_arn":    subscriptionArn,
+			"subscription_arn":    snsSubARNOrEmpty(subscriptionArn),
 			"topic_arn":           topicArn,
 		},
 		// snsSubFindings (sns_sub.go) is the single source both fetchers

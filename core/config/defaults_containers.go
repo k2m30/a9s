@@ -21,7 +21,9 @@ func containersDefaultViews() map[string]ViewDef {
 		},
 		"ng": {
 			List: []ListColumn{
-				{Title: "Node Group", Path: "NodegroupName", Width: 28},
+				// Keyed as well as Path-based, for the reason the Cluster and
+				// Status columns below already are.
+				{Title: "Node Group", Key: "nodegroup_name", Path: "NodegroupName", Width: 28},
 				// Keyed as well as Path-based, unlike the columns beside
 				// it: on a row with no RawStruct — a warm cache replay, or a
 				// node group whose describe was denied — the path cannot

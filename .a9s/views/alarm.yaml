@@ -1,4 +1,4 @@
-generated: 2
+generated: 3
 list:
   Alarm Name:
     path: AlarmName
@@ -17,6 +17,7 @@ list:
     width: 24
   Threshold:
     path: Threshold
+    key: threshold
     width: 12
 
 detail:

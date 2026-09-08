@@ -249,29 +249,36 @@ func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 	}{
 		{
 			// Path branch: "MetricName" is the name of the metric the alarm
-			// watches, never the alarm's own name.
+			// watches, never the alarm's own name — which is what this case
+			// guards against. Since misc4 round 2 item (b) the resolved column
+			// carries the catalog's Key, so the struct-less row answers from
+			// Fields with the metric. That is the right cell; the row's own
+			// name must still never appear here.
 			name: "path substring — alarm Metric",
 			td:   alarmTD,
 			col:  w45ColumnByTitle(t, *alarmTD, "Metric"),
 			row:  alarmRow,
-			want: "",
+			want: "5XXError",
 		},
 		{
-			// Path branch: "DBName" is the database inside the cluster.
+			// Path branch: "DBName" is the database inside the cluster, never
+			// the cluster's name. Answers from Fields since misc4 round 2
+			// item (b); see the alarm case above.
 			name: "path substring — redshift Database",
 			td:   redshiftTD,
 			col:  w45ColumnByTitle(t, *redshiftTD, "Database"),
 			row:  redshiftRow,
-			want: "",
+			want: "analytics",
 		},
 		{
 			// Path branch: "DomainName" is the CodeArtifact domain the
-			// repository belongs to, not the repository.
+			// repository belongs to, not the repository. Answers from Fields
+			// since misc4 round 2 item (b); see the alarm case above.
 			name: "path substring — codeartifact Domain",
 			td:   codeartifactTD,
 			col:  w45ColumnByTitle(t, *codeartifactTD, "Domain"),
 			row:  codeartifactRow,
-			want: "",
+			want: "acme-artifacts",
 		},
 		{
 			// Key branch: "action_name" is the pipeline action, and this row

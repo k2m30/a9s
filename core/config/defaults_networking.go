@@ -7,10 +7,10 @@ func networkingDefaultViews() map[string]ViewDef {
 		"elb": {
 			List: []ListColumn{
 				{Title: "Name", Path: "LoadBalancerName", Width: 32},
+				{Title: "DNS Name", Path: "DNSName", Width: 48},
 				{Title: "Type", Path: "Type", Width: 12},
 				{Title: "Scheme", Path: "Scheme", Width: 14},
 				{Title: "Status", Path: "State.Code", Width: 12},
-				{Title: "DNS Name", Path: "DNSName", Width: 48},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 			},
 			Detail: []DetailField{

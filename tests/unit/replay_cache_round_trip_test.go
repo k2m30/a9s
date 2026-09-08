@@ -184,18 +184,20 @@ var replayShadowedCells = []replayShadowedCell{
 	{"acm", "arn:aws:acm:us-east-1:123456789012:certificate/c9d0e1f2-3456-78ab-cdef-999999999999", "In Use", "No"},
 	{"cf", "E1A2B3C4D5E6F7", "Enabled", "Yes"},
 	{"cf", "E3C4D5E6F7G8H9", "Enabled", "No"},
-	// float64: the cascade drops the trailing zeros the fetcher's %.2f added.
-	{"alarm", "cf-e1a2b3c4d5e6f7-error-rate", "Threshold", "5"},
+	// float64. Inverted by misc4 round 2: the defaults now read the fetcher's
+	// own value for this column, so both frames show the precision CloudWatch
+	// reports the threshold at rather than the %g the reflect formatter left.
+	{"alarm", "cf-e1a2b3c4d5e6f7-error-rate", "Threshold", "5.00"},
 	// int over a phrase: the fetcher's Fields value is not a retention at all.
 	{"logs", "/aws/lambda/process-orders", "Retention", "30"},
 	// timestamp: the fetcher's value loses the time of day.
 	{"secrets", "prod/app/long-lived-signing-key", "Last Changed", "2024-12-01 00:00"},
 	{"secrets", "prod/payments/stripe-webhook-secret", "Last Accessed", "2026-04-28 00:00"},
-	// The identifier column: the cascade shows the whole task ARN. Shortening
-	// it is a fetch-side column change, not something the replay lane decides,
-	// so what replay owes is the ARN.
-	{"ecs-task", "a1b2c3d4e5f6a1b2c3d4e5f6", "Task ID",
-		"arn:aws:ecs:us-east-1:123456789012:task/acme-services/a1b2c3d4e5f6a1b2c3d4e5f6"},
+	// The identifier column. Inverted by misc4 round 2: the fetch-side column
+	// change this row's earlier comment anticipated is the one that landed —
+	// the defaults read the fetcher's task_id, so a column headed "Task ID"
+	// and 38 wide shows the ID rather than a 78-character ARN cut in half.
+	{"ecs-task", "a1b2c3d4e5f6a1b2c3d4e5f6", "Task ID", "a1b2c3d4e5f6a1b2c3d4e5f6"},
 	// The status column, which the save lane excludes outright: the fetcher
 	// left no lifecycle key behind, so the replayed cell is empty.
 	{"kinesis", "clickstream-ingest", "Status", "active"},

@@ -70,13 +70,13 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 		findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
 
 		r := resource.Resource{
-			ID:   subscriptionArn,
+			ID:   snsSubRowID(subscriptionArn, topicArn, protocol, endpoint),
 			Name: topicName,
 			Fields: map[string]string{
 				"topic_arn":        topicArn,
 				"protocol":         protocol,
 				"endpoint":         endpoint,
-				"subscription_arn": subscriptionArn,
+				"subscription_arn": snsSubARNOrEmpty(subscriptionArn),
 				"confirmed":        snsSubConfirmedWord(subscriptionArn),
 			},
 			Findings:         findings,
@@ -123,7 +123,7 @@ func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Findin
 	findings := snsSubStateFindings(subscriptionArn)
 	// A subscription AWS reports as Deleted or still unconfirmed is not
 	// carrying traffic, so its transport is not a posture problem yet.
-	if subscriptionArn == "Deleted" || protocol != "http" {
+	if snsSubConfirmation(subscriptionArn) == snsSubDeleted || protocol != "http" {
 		return findings, nil
 	}
 	findings = append(findings, wave1Finding(CodeSNSSubPlainHTTP))
@@ -189,6 +189,38 @@ func snsSubConfirmation(subscriptionArn string) string {
 		return snsSubUnknown
 	}
 	return snsSubConfirmed
+}
+
+// snsSubRowID is the row identity both subscription surfaces use. A confirmed
+// subscription is its ARN. For the other three states AWS puts the state word
+// where the ARN goes, or sends nothing at all, so the row is keyed on what it
+// does have — and taking the state word itself would make every subscription
+// in that state one identity, which the row store's page dedup then collapses
+// to a single row.
+//
+// The topic is part of the key because the account-wide list spans every
+// topic: the same address unsubscribed from two topics is two subscriptions,
+// and protocol plus endpoint alone would merge them. The by-topic child gets
+// the same key for the same subscription, so a row's identity does not depend
+// on which list it was reached from.
+func snsSubRowID(subscriptionArn, topicArn, protocol, endpoint string) string {
+	state := snsSubConfirmation(subscriptionArn)
+	if state == snsSubConfirmed {
+		return subscriptionArn
+	}
+	return strings.Join([]string{state, topicArn, protocol, endpoint}, "/")
+}
+
+// snsSubARNOrEmpty is the subscription's ARN, or empty when there is none.
+// AWS puts the state word in that field instead, and a column headed
+// "Subscription ARN" showing the word "PendingConfirmation" is telling the
+// reader an SDK enum where it promised an identifier. The state has its own
+// column, which snsSubConfirmedWord words.
+func snsSubARNOrEmpty(subscriptionArn string) string {
+	if snsSubConfirmation(subscriptionArn) == snsSubConfirmed {
+		return subscriptionArn
+	}
+	return ""
 }
 
 // snsSubConfirmedWord is the subscription list's Confirmed column: under that

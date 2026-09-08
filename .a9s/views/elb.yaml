@@ -1,8 +1,11 @@
-generated: 2
+generated: 3
 list:
   Name:
     path: LoadBalancerName
     width: 32
+  DNS Name:
+    path: DNSName
+    width: 48
   Type:
     path: Type
     width: 12
@@ -12,9 +15,6 @@ list:
   Status:
     path: State.Code
     width: 12
-  DNS Name:
-    path: DNSName
-    width: 48
   VPC ID:
     path: VpcId
     width: 24

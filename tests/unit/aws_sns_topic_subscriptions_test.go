@@ -407,8 +407,14 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 }
 
 // TestFetchSNSTopicSubscriptions_PendingIDFormat verifies that pending
-// subscriptions get an ID like "pending/Protocol/Endpoint" instead of the
-// literal "PendingConfirmation" string.
+// subscriptions get a composed ID instead of the literal
+// "PendingConfirmation" string.
+//
+// Inverted by misc4 round 2 item (c): the key gained the topic ARN. Both
+// subscription surfaces now key a stateless row through snsSubRowID, and the
+// account-wide list spans every topic — the same address unsubscribed from two
+// topics is two subscriptions, which protocol plus endpoint alone merged into
+// one row. Do not restore the topic-less shape.
 func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
@@ -445,14 +451,14 @@ func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
 	}
 
 	t.Run("pending_email_ID", func(t *testing.T) {
-		expected := "pending/email/user@example.com"
+		expected := "pending/arn:aws:sns:us-east-1:123456789012:topic/email/user@example.com"
 		if resources[0].ID != expected {
 			t.Errorf("pending email ID: expected %q, got %q", expected, resources[0].ID)
 		}
 	})
 
 	t.Run("pending_sqs_ID", func(t *testing.T) {
-		expected := "pending/sqs/arn:aws:sqs:us-east-1:123456789012:my-queue"
+		expected := "pending/arn:aws:sns:us-east-1:123456789012:topic/sqs/arn:aws:sqs:us-east-1:123456789012:my-queue"
 		if resources[1].ID != expected {
 			t.Errorf("pending sqs ID: expected %q, got %q", expected, resources[1].ID)
 		}

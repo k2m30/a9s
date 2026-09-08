@@ -1,4 +1,4 @@
-generated: 2
+generated: 3
 list:
   Log Group Name:
     path: LogGroupName
@@ -11,6 +11,7 @@ list:
     sort_key: stored_bytes_raw
   Retention:
     path: RetentionInDays
+    key: retention_days
     width: 10
   Metric Filters:
     path: MetricFilterCount
