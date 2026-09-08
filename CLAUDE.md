@@ -49,7 +49,8 @@ Plus `/ponytail-review` for over-engineering (delete/simplify only — it does n
 
 Rules:
 
-- **Batch. Never per fix.** Codex is expensive: one pass per phase boundary or pre-merge.
+- **Once per task, before its commits fast-forward into main.** Codex is expensive: one pass per task on the task's committed range, never per fix, and only when the task's production diff (`core/`, `internal/`, `cmd/`, `scripts/`, tests excluded) is at least 100 changed lines or touches 3 or more production files. One-liners, wording, docs and test-only changes are not reviewed.
+- **Code review only.** Every Codex prompt opens with: "DO NOT run build, make, go test or any gate — this is a code review only. Ignore tests/ entirely; review the production code in the range." The loop has already run the gates; paying Codex to run them again buys nothing.
 - **Review the committed range**, not the working tree — `--base-commit <base>` for CodeRabbit, an explicit range for Codex.
 - **A reviewer's suggested patch is a proposal, not verified code.** Read every snippet against the actual file before applying it; patches routinely reference helpers that do not exist in that file's package. The finding can be correct while the patch does not compile.
 - **Point reviewers at production code.** A large mechanical test migration will drown the signal otherwise.
