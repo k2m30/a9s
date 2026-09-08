@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -573,9 +574,18 @@ func capitalizeFirstDetail(s string) string {
 func fieldItemsToFieldRows(items []fieldpath.FieldItem) []FieldRow {
 	rows := make([]FieldRow, 0, len(items))
 	for _, item := range items {
+		// The one place a projected value becomes detail-row text, so the
+		// conventions are applied here rather than in either projector. A
+		// sub-field carries a whole line of a raw document in Key and repeats
+		// it in Value; that line is the document's own text and is left as it
+		// is, which is why only a scalar row's Value is settled.
+		value := item.Value
+		if !item.IsSubField {
+			value = config.CanonicalValue(value)
+		}
 		rows = append(rows, FieldRow{
 			Key:         item.Key,
-			Value:       item.Value,
+			Value:       value,
 			IsSection:   item.IsSection,
 			IsHeader:    item.IsHeader,
 			IsSubField:  item.IsSubField,

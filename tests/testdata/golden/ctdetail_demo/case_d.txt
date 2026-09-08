@@ -9,16 +9,16 @@
  Region:               us-east-1                                                                                                                   │  Secrets
  Source IP:            AWS Internal                                                                                                                │  VPC Endpoints
  Recipient:            444444444444 (cross-account)                                                                                                │  Security Groups
- Time:                 2026-04-07T02:00:07Z                                                                                                        │  DynamoDB Tables
+ Time:                 2026-04-07 02:00                                                                                                            │  DynamoDB Tables
  REQUEST                                                                                                                                           │  CloudFormation Stacks
- backingKey:           true                                                                                                                        │  CloudTrail Trails
+ backingKey:           Yes                                                                                                                         │  CloudTrail Trails
  rotationType:         AUTOMATIC                                                                                                                   │  CT events by AccessKeyId
  ENVELOPE                                                                                                                                          │  CT events by Username
  EventId:              e-d4e5f6a7                                                                                                                  │  CT events by EventName
  EventName:            RotateKey                                                                                                                   │  CT events by SharedEventId
  EventSource:          kms.amazonaws.com                                                                                                           │
- EventTime:            2026-04-07T02:00:07Z                                                                                                        │
- ReadOnly:             false                                                                                                                       │
+ EventTime:            2026-04-07 02:00                                                                                                            │
+ ReadOnly:             No                                                                                                                          │
  RAW EVENT                                                                                                                                         │
  awsRegion:            us-east-1                                                                                                                   │
  eventCategory:        Management                                                                                                                  │
@@ -28,7 +28,7 @@
  eventTime:            "2026-04-07T02:00:07Z"                                                                                                      │
  eventType:            AwsServiceEvent                                                                                                             │
  eventVersion:         "1.08"                                                                                                                      │
- readOnly:             false                                                                                                                       │
+ readOnly:             No                                                                                                                          │
  recipientAccountId:   "444444444444"                                                                                                              │
  requestParameters:                                                                                                                                │
        backingKey: true                                                                                                                            │

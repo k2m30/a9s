@@ -102,7 +102,7 @@ func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.Attentio
 // A row may carry more than one independently-evaluated wave2 Finding; every
 // one of them is carried through unreduced — the plural store is the
 // canonical, single source of truth for a resource's full finding set, and
-// nothing downstream of it (row glyph, detail Attention panel, menu badge)
+// nothing downstream of it (row colour, detail Attention panel, menu badge)
 // should be starved of a condition another consumer needs. Returns nil when
 // no wave2 findings are present.
 func wave2FindingsByID(rows []resource.Resource) map[string][]domain.Finding {

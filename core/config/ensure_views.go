@@ -90,14 +90,13 @@ func yamlKey(s string) string {
 // each at the position it holds in the built-in set, so a column added in the
 // middle does not land at the far right of the operator's table.
 //
-// A column it does carry keeps the width, path and key it has, with one
-// exception: a built-in column whose source this build corrected, and which the
-// file still reads from the source the older build generated, takes the new
-// source — and the new width too, while the width on disk is still the one that
-// older build wrote. Such a column has never been edited, and leaving it behind
-// would leave the operator reading the field the correction moved away from.
-// Any other source under that title is the operator's own and is left alone, as
-// is a width they changed. viewColumnSourceChanges is the list of corrections.
+// A column it does carry keeps what it has, field by field, with one
+// exception: on a column this build has corrected (viewColumnChanges), every
+// field still holding what the build at the file's stamp generated takes this
+// build's value. That field has never been edited, and leaving it behind leaves
+// the operator reading the source, or the raw constant, the correction moved
+// away from. A field they changed is theirs — and only that field, so widening
+// a column never costs them the rest of a correction.
 func EnsureViewsDir(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -132,39 +131,39 @@ func EnsureViewsDir(dir string) error {
 	return nil
 }
 
-// viewColumnSourceChange records one built-in column whose SOURCE changed, and
-// the source the build before Version generated for it. The corrected source is
-// deliberately not recorded here: it is whatever the defaults now say, which is
-// the one place a built-in column is defined.
+// viewColumnChange records one built-in column this build has corrected, and
+// the whole column the build before Version generated for it. What it is
+// corrected TO is deliberately not recorded: that is whatever the defaults now
+// say, which is the one place a built-in column is defined.
 //
-// A column that changes source keeps its title, so the missing-title rule below
-// never sees it and an operator who had run a9s once kept reading the field the
-// column was corrected away from — a cell that looks like it works and is
-// wrong. Matching on the previous generated source is what separates a column
-// nobody has touched from one the operator set themselves: theirs does not
-// match, and is left exactly as it is.
-type viewColumnSourceChange struct {
-	Version  int    // the GeneratedViewsVersion that introduced the correction
-	View     string // the view file's name, e.g. "sns"
-	Title    string // the column title, unchanged by the correction
-	WasPath  string // what the build before Version generated
-	WasKey   string
-	WasWidth int
+// A corrected column keeps its title, so the missing-title rule below never
+// sees it and an operator who had run a9s once kept the column the correction
+// moved away from — a cell that looks like it works and is wrong. Matching on
+// the whole column the previous build generated is what separates a column
+// nobody has touched from one the operator set themselves: theirs differs in
+// at least the field they changed, and is left exactly as it is.
+type viewColumnChange struct {
+	Version int        // the GeneratedViewsVersion that introduced the correction
+	View    string     // the view file's name, e.g. "sns"
+	Was     ListColumn // the column the build before Version generated, whole
 }
 
-// viewColumnSourceChanges is the migration table, scanned in order. Add a row
-// in the same change that alters a built-in column's Path or Key, and bump
-// GeneratedViewsVersion with it.
-var viewColumnSourceChanges = []viewColumnSourceChange{
-	{Version: 2, View: "sns", Title: "Topic Name", WasPath: "TopicArn", WasWidth: 40},
-	{Version: 2, View: "sns-sub", Title: "Confirmed", WasPath: "SubscriptionArn", WasWidth: 22},
-	{Version: 3, View: "alarm", Title: "Threshold", WasPath: "Threshold", WasWidth: 12},
-	{Version: 3, View: "ecs-task", Title: "Task ID", WasPath: "TaskArn", WasWidth: 38},
-	{Version: 3, View: "logs", Title: "Retention", WasPath: "RetentionInDays", WasWidth: 10},
-	{Version: 3, View: "ng", Title: "Node Group", WasPath: "NodegroupName", WasWidth: 28},
-	{Version: 3, View: "secrets", Title: "Last Accessed", WasPath: "LastAccessedDate", WasWidth: 18},
-	{Version: 3, View: "secrets", Title: "Last Changed", WasPath: "LastChangedDate", WasWidth: 18},
-	{Version: 3, View: "sns-sub", Title: "Subscription ARN", WasPath: "SubscriptionArn", WasWidth: 60},
+// viewColumnChanges is the migration table, scanned in order. Add a row in the
+// same change that alters ANY field of a built-in column — its path, its key,
+// its width, whether it humanizes — and bump GeneratedViewsVersion with it.
+var viewColumnChanges = []viewColumnChange{
+	{Version: 2, View: "sns", Was: ListColumn{Title: "Topic Name", Path: "TopicArn", Width: 40}},
+	{Version: 2, View: "sns-sub", Was: ListColumn{Title: "Confirmed", Path: "SubscriptionArn", Width: 22}},
+	{Version: 3, View: "alarm", Was: ListColumn{Title: "Threshold", Path: "Threshold", Width: 12}},
+	{Version: 3, View: "ecs-task", Was: ListColumn{Title: "Task ID", Path: "TaskArn", Width: 38}},
+	{Version: 3, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	{Version: 3, View: "ng", Was: ListColumn{Title: "Node Group", Path: "NodegroupName", Width: 28}},
+	{Version: 3, View: "secrets", Was: ListColumn{Title: "Last Accessed", Path: "LastAccessedDate", Width: 18}},
+	{Version: 3, View: "secrets", Was: ListColumn{Title: "Last Changed", Path: "LastChangedDate", Width: 18}},
+	{Version: 3, View: "sns-sub", Was: ListColumn{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60}},
+	// The two columns that gained humanize: the cell showed a raw AWS constant.
+	{Version: 4, View: "ecs-task", Was: ListColumn{Title: "Stop Code", Path: "StopCode", Width: 24}},
+	{Version: 4, View: "nat", Was: ListColumn{Title: "Failure", Path: "FailureCode", Width: 22}},
 }
 
 // mergeGeneratedColumns returns the YAML for onDisk brought up to this build:
@@ -206,26 +205,24 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 		at := min(i, len(vd.List))
 		vd.List = append(vd.List[:at], append([]ListColumn{c}, vd.List[at:]...)...)
 	}
-	for _, ch := range viewColumnSourceChanges {
-		if ch.View != name || ch.Version <= vd.Generated {
-			continue
-		}
-		now, ok := want[ch.Title]
+	// Carry this build's corrections, field by field. An entry names the whole
+	// column an older build generated, so every field of it can be compared:
+	// one still holding what that build wrote is one nobody has touched and
+	// takes the current default's value, and one the operator changed is
+	// theirs. Comparing whole columns instead would let a single edit freeze
+	// every other field, and comparing only the fields a given correction
+	// happens to change would leave the next kind of correction stranded —
+	// which is how the humanize flag reached new installations alone.
+	for i, on := range vd.List {
+		now, ok := want[on.Title]
 		if !ok {
 			continue
 		}
-		for i, on := range vd.List {
-			if on.Title != ch.Title || on.Path != ch.WasPath || on.Key != ch.WasKey {
+		for _, ch := range viewColumnChanges {
+			if ch.View != name || ch.Was.Title != on.Title || ch.Version <= vd.Generated {
 				continue
 			}
-			vd.List[i].Path, vd.List[i].Key = now.Path, now.Key
-			// The width follows only while it is still the one the older build
-			// generated. A width the operator set is theirs even on a column
-			// they never re-sourced, and the corrected source is what makes the
-			// cell right — the width only makes it comfortable.
-			if on.Width == ch.WasWidth {
-				vd.List[i].Width = now.Width
-			}
+			vd.List[i] = carryGeneratedFields(vd.List[i], ch.Was, now)
 		}
 	}
 	return GenerateViewYAML(*vd), true
@@ -233,7 +230,7 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 
 // generatedAsIs reports whether every column onDisk is one a build generated
 // and left alone: this build's own declaration of that column, or — for a
-// column a later build re-sourced — exactly what the build at stamp wrote for
+// column a later build corrected — exactly what the build at stamp wrote for
 // it. A column the defaults do not declare at all is the operator's, and so is
 // any other spelling of one they do.
 func generatedAsIs(name string, onDisk []ListColumn, want map[string]ListColumn, stamp int) bool {
@@ -242,31 +239,54 @@ func generatedAsIs(name string, onDisk []ListColumn, want map[string]ListColumn,
 		if !ok {
 			return false
 		}
-		if on == now {
-			continue
-		}
-		if !generatedByStamp(name, on, now, stamp) {
+		if on != now && !generatedByStamp(name, on, stamp) {
 			return false
 		}
 	}
 	return true
 }
 
-// generatedByStamp reports whether on is what the build at stamp generated for
-// a column this build has since re-sourced — the pre-correction source and
-// width recorded in viewColumnSourceChanges, with everything the correction did
-// not touch still equal to this build's declaration.
-func generatedByStamp(name string, on, now ListColumn, stamp int) bool {
-	for _, ch := range viewColumnSourceChanges {
-		if ch.View != name || ch.Title != on.Title || ch.Version <= stamp {
-			continue
-		}
-		if on.Path == ch.WasPath && on.Key == ch.WasKey && on.Width == ch.WasWidth &&
-			on.SortKey == now.SortKey && on.Humanize == now.Humanize {
+// generatedByStamp reports whether on is, whole, what the build at stamp
+// generated for a column this build has since corrected. Whole rather than
+// field by field because its caller asks a different question: not "may this
+// field be corrected" but "has this file been edited at all".
+func generatedByStamp(name string, on ListColumn, stamp int) bool {
+	for _, ch := range viewColumnChanges {
+		if ch.View == name && ch.Version > stamp && ch.Was == on {
 			return true
 		}
 	}
 	return false
+}
+
+// carryGeneratedFields returns on with every field that still holds what the
+// previous build generated (was) replaced by what this build declares (now).
+// Title identifies the column and is never carried; it is what the two are
+// matched on.
+//
+// ponytail: "untouched" is "equal to what the previous build wrote", which a
+// bool cannot always express — an operator who sets a flag back to the value
+// that build generated is indistinguishable from one who never opened the
+// file, and the correction lands on them once. They set it again afterwards
+// and the current stamp leaves the file alone from then on. Recording what the
+// operator changed, rather than inferring it, is the upgrade path.
+func carryGeneratedFields(on, was, now ListColumn) ListColumn {
+	if on.Path == was.Path {
+		on.Path = now.Path
+	}
+	if on.Key == was.Key {
+		on.Key = now.Key
+	}
+	if on.Width == was.Width {
+		on.Width = now.Width
+	}
+	if on.SortKey == was.SortKey {
+		on.SortKey = now.SortKey
+	}
+	if on.Humanize == was.Humanize {
+		on.Humanize = now.Humanize
+	}
+	return on
 }
 
 // EnsureViewsReference writes the embedded views_reference.yaml to configDir.

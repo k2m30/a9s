@@ -396,24 +396,15 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	return m, nil
 }
 
-// RenderList renders the list body from a controller-supplied ListBody,
-// byte-identical to View()'s output. The renderer owns scrollOffset/width/height
-// (read from m); all data comes from body.
+// RenderList renders the list body from a controller-supplied ListBody. Every
+// value it paints comes from body — the cells, their colours, the sort, the
+// horizontal scroll, the pagination hint. The model supplies only the terminal
+// geometry the controller cannot know: width, height, and the scroll offset.
 //
-// Mapping from body fields to View() state:
-//   - body.Loading            → m.loading
-//   - body.Rows               → m.filteredResources (cells pre-extracted by controller)
-//   - body.Selected           → consumed directly (ResourceListModel has no
-//     ScrollState field; VisibleWindow below builds a synthetic ScrollState
-//     from body.Selected instead of storing a cursor)
-//   - body.Columns            → resolved listCol slice (width/title/key from body)
-//   - body.Sort               → renderHeaderRow's sortColKey / sortAsc
-//   - body.ScrollX            → renderHeaderRow's hScrollOffset
-//   - body.Truncated          → m.pagination.IsTruncated
-//   - body.LoadingMore        → m.loadingMore
-//   - body.Filter             → m.filterText (for load-more hint text)
-//   - body.EnrichmentFindings → m.findingsByID (for glyph prepend on identity col)
-//   - body.Rows[i].Color      → resolveRowColor(m.typeDef, r) → styles.ColorStyle
+// Nothing here re-derives a presentation decision the controller already made.
+// body.EnrichmentFindings in particular is not consulted: the status cell and
+// the row colour are resolved once, in core/app, and arrive already settled
+// (tests/unit/tui_viewstate_purity_list_test.go holds this).
 func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	if body.Loading {
 		return m.spinner.View() + " Loading..."

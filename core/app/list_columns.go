@@ -170,6 +170,13 @@ func lookupListDecorator(decs map[string]func(resource.Resource, string) string,
 // share, and it works from ColumnDef (Key+Title+Path) so that path-only
 // columns (e.g. EC2 Name/State/Type with key="") resolve correctly.
 func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) string {
+	return config.CanonicalValue(extractCellText(col, td, r))
+}
+
+// extractCellText resolves which of the row's several representations answers
+// for this column. It says where the value came from; ExtractCellValue, the
+// one exit, says how it reads.
+func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) string {
 	if col.Key == "@id" {
 		return r.ID
 	}
@@ -271,18 +278,11 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 	return ""
 }
 
-// humanizeListCell is the one formatter every non-status cell returns through,
-// down either lane: the Fields map the fetcher wrote, or the RawStruct path
-// fieldpath rendered. The RawStruct/Fields cascade must never change what the
-// cell shows, only where the raw value came from — so a warm-cache row renders
-// what the live row rendered, and a column resolved down one arm of
-// ResolveListColumnCascade says what the other arm would have said.
-//
-// It does two things. col.Humanize opts an AWS enum into
-// domain.HumanizeStatusPhrase. And canonicalCellValue settles the two shapes
-// the two lanes spelled differently.
+// humanizeListCell applies what the COLUMN says about its own values, which
+// is one thing: col.Humanize opts an AWS enum into
+// domain.HumanizeStatusPhrase. What every value reads like regardless of its
+// column is ExtractCellValue's exit, not this.
 func humanizeListCell(col ColumnDef, v string) string {
-	v = config.CanonicalFieldValue(v)
 	if col.Humanize {
 		return domain.HumanizeStatusPhrase(v)
 	}

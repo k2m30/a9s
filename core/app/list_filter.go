@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -43,8 +42,9 @@ func (c *Controller) applyListFilters(ls *ListState, typeName string, base []res
 		base = subset
 	}
 
-	// Text filter — matches r.ID, r.Name, r.Fields values, r.Findings[i].Phrase.
-	result := listFilterResources(ls.Filter, base)
+	// Text filter. The columns are resolved the way the list resolves them, so
+	// the filter compares the strings the rows on screen are made of.
+	result := listFilterResources(ls.Filter, resolveListColumnsForBuild(c.viewConfig, typeName, td), td, base)
 
 	// Attention filter: a row is kept when it carries an issue finding of its
 	// own, or — having no findings at all — when the type's classifier calls
@@ -73,43 +73,46 @@ func (c *Controller) applyListFilters(ls *ListState, typeName string, base []res
 	return result
 }
 
-// listFilterResources is the pure text-filter, and the only one: it matches
-// the row identity, the rendered form of every Fields value, and every
-// finding phrase.
-func listFilterResources(query string, resources []resource.Resource) []resource.Resource {
+// listFilterResources is the pure text-filter, and the only one. It matches
+// the row's identity, every cell the row renders, and every finding phrase.
+//
+// Cells rather than raw Fields values: the operator types what the screen
+// showed them. A humanized column renders "task failed to start" and the AWS
+// constant behind it appears nowhere, so the constant matches nothing and the
+// words do — and a Fields entry no column shows cannot pull in a row for a
+// reason the operator can neither see nor guess. columns and td are what the
+// list itself resolved, so the two cannot disagree about what a cell says.
+func listFilterResources(query string, columns []ColumnDef, td *resource.ResourceTypeDef, resources []resource.Resource) []resource.Resource {
 	if query == "" {
 		return resources
 	}
 	q := strings.ToLower(query)
 	result := make([]resource.Resource, 0, len(resources))
 	for _, r := range resources {
-		if strings.Contains(strings.ToLower(r.ID), q) ||
-			strings.Contains(strings.ToLower(r.Name), q) {
+		if listRowMatches(q, columns, td, r) {
 			result = append(result, r)
-			continue
-		}
-		matched := false
-		for _, v := range r.Fields {
-			// The operator types what the screen showed them, so the value
-			// compared is the one the cell renders — config.CanonicalFieldValue
-			// is the same rule humanizeListCell applies on the way to the cell.
-			if strings.Contains(strings.ToLower(config.CanonicalFieldValue(v)), q) {
-				matched = true
-				break
-			}
-		}
-		if matched {
-			result = append(result, r)
-			continue
-		}
-		for _, f := range r.Findings {
-			if strings.Contains(strings.ToLower(f.Phrase), q) {
-				result = append(result, r)
-				break
-			}
 		}
 	}
 	return result
+}
+
+// listRowMatches reports whether one row answers the (already lowercased)
+// query on any of the three things an operator can read off it.
+func listRowMatches(q string, columns []ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) bool {
+	if strings.Contains(strings.ToLower(r.ID), q) || strings.Contains(strings.ToLower(r.Name), q) {
+		return true
+	}
+	for _, col := range columns {
+		if strings.Contains(strings.ToLower(ExtractCellValue(col, td, r)), q) {
+			return true
+		}
+	}
+	for _, f := range r.Findings {
+		if strings.Contains(strings.ToLower(f.Phrase), q) {
+			return true
+		}
+	}
+	return false
 }
 
 // listHasIssueFinding mirrors hasIssueFinding in views.
