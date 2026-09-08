@@ -123,7 +123,7 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 			res := w7EnrichEBS(t, []resource.Resource{partialRow10Volume(tc.tags)}, plans)
 			if tc.wantWarning {
 				w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-					"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+					"not covered by a backup plan", domain.SevWarn, "wave2")
 				return
 			}
 			w4AssertNoCode(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan)

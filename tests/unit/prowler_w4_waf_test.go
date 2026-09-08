@@ -20,7 +20,7 @@ import (
 const (
 	w4CodeWAFNoRules   domain.FindingCode = "waf.no-rules"
 	w4PhraseWAFNoRules                    = "web ACL has no rules"
-	w4SourceWAFWave2                      = "wave2:waf"
+	w4SourceWAFWave2                      = "wave2"
 )
 
 // w4WAFFake serves the WebACL calls the waf enricher makes. Logging and

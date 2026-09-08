@@ -203,7 +203,7 @@ func TestECSTask_Privileged_ContainerEscapesIsolation(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, pw1HealthyContainer("app"), priv))
 
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodePrivileged,
-		"privileged container", domain.SevBroken, "wave2:ecs-task")
+		"privileged container", domain.SevBroken, "wave2")
 	rows := pw1Rows(res, id, pw1ECSTaskCodePrivileged)
 	pw1RequireRow(t, rows, "Container", "sidecar")
 	for _, r := range rows {
@@ -241,7 +241,7 @@ func TestECSTask_HostNamespace_HostNetworkMode(t *testing.T) {
 	res := pw1RunOneTask(t, id, def)
 
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeHostNamespace,
-		"shares the host network or process namespace", domain.SevWarn, "wave2:ecs-task")
+		"shares the host network or process namespace", domain.SevWarn, "wave2")
 	rows := pw1Rows(res, id, pw1ECSTaskCodeHostNamespace)
 	pw1RequireRow(t, rows, "Network mode", "host")
 	for _, r := range rows {
@@ -260,7 +260,7 @@ func TestECSTask_HostNamespace_HostPidMode(t *testing.T) {
 	res := pw1RunOneTask(t, id, def)
 
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeHostNamespace,
-		"shares the host network or process namespace", domain.SevWarn, "wave2:ecs-task")
+		"shares the host network or process namespace", domain.SevWarn, "wave2")
 	rows := pw1Rows(res, id, pw1ECSTaskCodeHostNamespace)
 	pw1RequireRow(t, rows, "Process namespace", "host")
 	for _, r := range rows {
@@ -280,7 +280,7 @@ func TestECSTask_HostNamespace_BothConditionsCiteBothRows(t *testing.T) {
 	res := pw1RunOneTask(t, id, def)
 
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeHostNamespace,
-		"shares the host network or process namespace", domain.SevWarn, "wave2:ecs-task")
+		"shares the host network or process namespace", domain.SevWarn, "wave2")
 	rows := pw1Rows(res, id, pw1ECSTaskCodeHostNamespace)
 	pw1RequireRow(t, rows, "Network mode", "host")
 	pw1RequireRow(t, rows, "Process namespace", "host")
@@ -304,7 +304,7 @@ func TestECSTask_WritableRoot_ExplicitFalse(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, c))
 
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeWritableRoot,
-		"writable root filesystem", domain.SevWarn, "wave2:ecs-task")
+		"writable root filesystem", domain.SevWarn, "wave2")
 	pw1RequireRow(t, pw1Rows(res, id, pw1ECSTaskCodeWritableRoot), "Container", "app")
 }
 
@@ -317,7 +317,7 @@ func TestECSTask_WritableRoot_NilIsWritable(t *testing.T) {
 	c.ReadonlyRootFilesystem = nil
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, c))
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeWritableRoot,
-		"writable root filesystem", domain.SevWarn, "wave2:ecs-task")
+		"writable root filesystem", domain.SevWarn, "wave2")
 }
 
 // TestECSTask_WritableRoot_ReadOnlyIsHealthy pins the negative case.
@@ -355,7 +355,7 @@ func TestECSTask_NoLogging_MissingLogConfiguration(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, c))
 
 	pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeNoLogging,
-		"container without log driver", domain.SevWarn, "wave2:ecs-task")
+		"container without log driver", domain.SevWarn, "wave2")
 	pw1RequireRow(t, pw1Rows(res, id, pw1ECSTaskCodeNoLogging), "Container", "app")
 }
 
@@ -381,7 +381,7 @@ func TestECSTask_EnvSecret_PlaintextEnvironmentVariable(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, c))
 
 	f := pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodeEnvSecret,
-		"credential in container environment", domain.SevBroken, "wave2:ecs-task")
+		"credential in container environment", domain.SevBroken, "wave2")
 	rows := pw1Rows(res, id, pw1ECSTaskCodeEnvSecret)
 	pw1RequireRow(t, rows, "Container", "app")
 	pw1RequireRow(t, rows, "DB_PASSWORD", "keyword")
@@ -473,7 +473,7 @@ func TestECSTask_TaskDefinitionDescribedOncePerDistinctARN(t *testing.T) {
 	}
 	for _, id := range []string{idA, idB} {
 		pw1RequireFinding(t, res.Findings[id], pw1ECSTaskCodePrivileged,
-			"privileged container", domain.SevBroken, "wave2:ecs-task")
+			"privileged container", domain.SevBroken, "wave2")
 	}
 }
 
@@ -501,7 +501,7 @@ func TestECSTask_TaskDefinitionErrorMarksOnlyItsOwnTasks(t *testing.T) {
 		t.Errorf("TruncatedIDs missing %s after its task definition could not be read", badID)
 	}
 	pw1RequireFinding(t, res.Findings[goodID], pw1ECSTaskCodePrivileged,
-		"privileged container", domain.SevBroken, "wave2:ecs-task")
+		"privileged container", domain.SevBroken, "wave2")
 	if res.TruncatedIDs[goodID] {
 		t.Errorf("healthy neighbour %s wrongly marked truncated", goodID)
 	}

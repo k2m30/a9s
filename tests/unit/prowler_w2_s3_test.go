@@ -35,7 +35,7 @@ const (
 	w2S3CodeNoLifecycle      = "s3.no-lifecycle"
 	w2S3CodeNoObjectLock     = "s3.no-object-lock"
 
-	w2S3Source = "wave2:s3"
+	w2S3Source = "wave2"
 )
 
 // ---------------------------------------------------------------------------

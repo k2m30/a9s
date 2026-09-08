@@ -39,7 +39,7 @@ func countIssueRowsForType(td *resource.ResourceTypeDef, resources []resource.Re
 // colorFromAnyFinding-only (core/aws/catalog_compute.go) — it has NO
 // raw-field fallback at all. Every non-healthy fixture here attaches the
 // Finding the real fetcher (core/aws/ec2.go, wave1) or Wave-2 enricher
-// (core/aws/ec2_issue_enrichment.go, Source "wave2:ec2") would produce.
+// (core/aws/ec2_issue_enrichment.go, Source "wave2") would produce.
 func TestCountIssueRowsForType_EC2(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {

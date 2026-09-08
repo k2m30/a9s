@@ -105,7 +105,7 @@ func TestECSSvc_PublicIP_Enabled(t *testing.T) {
 	}}
 	res := pw1EnrichECSSvc(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1ECSSvcCodePublicIP,
-		"tasks get public IPs", domain.SevWarn, "wave2:ecs-svc")
+		"tasks get public IPs", domain.SevWarn, "wave2")
 	pw1RequireRow(t, pw1Rows(res, name, pw1ECSSvcCodePublicIP), "Public address assignment", "enabled")
 }
 
@@ -145,7 +145,7 @@ func TestECSSvc_PublicIP_CoexistsWithDeploymentFailure(t *testing.T) {
 
 	res := pw1EnrichECSSvc(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1ECSSvcCodePublicIP,
-		"tasks get public IPs", domain.SevWarn, "wave2:ecs-svc")
+		"tasks get public IPs", domain.SevWarn, "wave2")
 	if _, ok := pw1FindFinding(res.Findings[name], domain.FindingCode("ecs-svc.deployment-failed")); !ok {
 		t.Errorf("deployment-failed finding lost alongside the posture finding: %+v", res.Findings[name])
 	}
@@ -178,7 +178,7 @@ func TestECSSvc_PublicIP_HealthyNeighbourStillEvaluated(t *testing.T) {
 	}}
 	res := pw1EnrichECSSvc(t, fake, "acme-absent", "acme-present")
 	pw1RequireFinding(t, res.Findings["acme-present"], pw1ECSSvcCodePublicIP,
-		"tasks get public IPs", domain.SevWarn, "wave2:ecs-svc")
+		"tasks get public IPs", domain.SevWarn, "wave2")
 	pw1RequireNoFinding(t, res.Findings["acme-absent"], pw1ECSSvcCodePublicIP)
 }
 

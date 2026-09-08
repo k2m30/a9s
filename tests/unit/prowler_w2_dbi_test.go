@@ -358,7 +358,7 @@ func TestW2DBIEngineDeprecated(t *testing.T) {
 	}}
 	res := w2DBIEnrich(t, fake, old, current)
 
-	w2AssertFinding(t, res.Findings["acme-legacy-db"], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2:dbi")
+	w2AssertFinding(t, res.Findings["acme-legacy-db"], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "acme-legacy-db", w2DBICodeEngineDeprecated), "Engine", "mysql 5.7.44")
 	w2AssertNoCode(t, res.Findings["acme-billing-db"], w2DBICodeEngineDeprecated)
 	w2AssertFindingDef(t, "dbi", w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2")
@@ -372,7 +372,7 @@ func TestW2DBIEngineUnpublishedCountsAsDeprecated(t *testing.T) {
 	gone.EngineVersion = aws.String("5.6.51")
 
 	res := w2DBIEnrich(t, &w2RDSEngineVersionsFake{status: map[string]string{}}, gone)
-	w2AssertFinding(t, res.Findings["acme-ancient-db"], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2:dbi")
+	w2AssertFinding(t, res.Findings["acme-ancient-db"], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2")
 }
 
 // Ten instances on one engine version must cost one call, not ten — the
@@ -393,7 +393,7 @@ func TestW2DBIEngineVersionLookupCachedPerPair(t *testing.T) {
 	}
 	for _, db := range instances {
 		id := aws.ToString(db.DBInstanceIdentifier)
-		w2AssertFinding(t, res.Findings[id], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2:dbi")
+		w2AssertFinding(t, res.Findings[id], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2")
 	}
 }
 
@@ -418,7 +418,7 @@ func TestW2DBIEngineLookupErrorMarksTruncated(t *testing.T) {
 		t.Error("instance whose engine lookup failed was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied-db"], w2DBICodeEngineDeprecated)
-	w2AssertFinding(t, res.Findings["acme-legacy-db"], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2:dbi")
+	w2AssertFinding(t, res.Findings["acme-legacy-db"], w2DBICodeEngineDeprecated, "engine version deprecated", domain.SevBroken, "wave2")
 }
 
 func TestW2DBIEngineNilClientIsSafe(t *testing.T) {

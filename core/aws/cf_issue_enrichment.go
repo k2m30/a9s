@@ -93,7 +93,7 @@ func cfBucketGoneFunc(clients *ServiceClients) func(context.Context, string) boo
 // unanswerable question raises nothing.
 func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig, knownBuckets map[string]bool, bucketGone func(context.Context, string) bool) {
 	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
-		setWave2Finding(result, distID, code, "cf", rows)
+		setWave2Finding(result, distID, code, rows)
 	}
 
 	var origins []cftypes.Origin
@@ -253,7 +253,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, distID, cfCodeInsecureProtocol, "cf", rows)
+		setWave2Finding(&result, distID, cfCodeInsecureProtocol, rows)
 	})
 	return result, AggregateFailures("GetDistributionConfig", failures, n)
 }

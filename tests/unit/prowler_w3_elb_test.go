@@ -214,8 +214,8 @@ func TestW3ELBDesync_MonitorModeFlagged(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	if f.Source != "wave2:elb" {
-		t.Errorf("Source = %q, want %q", f.Source, "wave2:elb")
+	if f.Source != "wave2" {
+		t.Errorf("Source = %q, want %q", f.Source, "wave2")
 	}
 	if f.Detail == "" {
 		t.Error("Detail is empty; every finding carries an operator sentence")
@@ -261,8 +261,8 @@ func TestW3ELBInvalidHeaders_Flagged(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	if f.Source != "wave2:elb" {
-		t.Errorf("Source = %q, want %q", f.Source, "wave2:elb")
+	if f.Source != "wave2" {
+		t.Errorf("Source = %q, want %q", f.Source, "wave2")
 	}
 	if f.Detail == "" {
 		t.Error("Detail is empty; every finding carries an operator sentence")
@@ -353,8 +353,8 @@ func TestW3ELBPlainHTTP_ALBHTTPListenerFlagged(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	if f.Source != "wave2:elb" {
-		t.Errorf("Source = %q, want %q", f.Source, "wave2:elb")
+	if f.Source != "wave2" {
+		t.Errorf("Source = %q, want %q", f.Source, "wave2")
 	}
 	if f.Detail == "" {
 		t.Error("Detail is empty; every finding carries an operator sentence")
@@ -487,8 +487,8 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 			if f.Severity != domain.SevWarn {
 				t.Errorf("Severity = %v, want SevWarn", f.Severity)
 			}
-			if f.Source != "wave2:elb" {
-				t.Errorf("Source = %q, want %q", f.Source, "wave2:elb")
+			if f.Source != "wave2" {
+				t.Errorf("Source = %q, want %q", f.Source, "wave2")
 			}
 			if f.Detail == "" {
 				t.Error("Detail is empty; every finding carries an operator sentence")

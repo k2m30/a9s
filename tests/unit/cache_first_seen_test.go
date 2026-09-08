@@ -89,7 +89,7 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		Code:     "s3-public-read",
 		Phrase:   "publicly readable",
 		Severity: domain.SevBroken,
-		// Source "wave1", not "wave2:s3": a Wave-2-sourced finding's absence
+		// Source "wave1", not "wave2": a Wave-2-sourced finding's absence
 		// from an incoming row is legitimately carried forward by
 		// reconcileTypeFile's C6b Wave-2 carry (carryWave2ForRows) — that's
 		// the flicker guard, not a resolution. Only a Wave-1 finding's

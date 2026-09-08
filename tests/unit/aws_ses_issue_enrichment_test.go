@@ -589,7 +589,7 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 
 // TestSES_ColorReadsWave2FindingsForAccountFindings pins AS-1397's rendering
 // invariant: the SES Color resolver returns the Wave-2 finding's severity color
-// when the account-level finding lives in r.Findings (Source="wave2:ses").
+// when the account-level finding lives in r.Findings (Source="wave2").
 // FieldUpdates["status"] is no longer written; the Wave-2 phrase reaches color
 // classification via r.Findings, not via Fields["status"].
 //

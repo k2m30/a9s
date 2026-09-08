@@ -33,6 +33,9 @@
 
 ## Fixed
 
+- A Wave-2 finding's provenance is stamped once, where the runtime merges the
+  enricher's result under its registered type, instead of being spelled out by
+  hand at every one of the 122 places a finding is raised.
 - A finding's severity is the signal catalog's, everywhere: the two
   constructors no longer accept one, so a row's colour and the tier on its
   supporting rows cannot disagree with the tier the docs print.

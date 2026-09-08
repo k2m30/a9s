@@ -126,8 +126,8 @@ func TestW2DBCSnapPublicIdenticalAcrossBothClients(t *testing.T) {
 		w2Res(rdsID, w2RDSClusterSnapshot(rdsID)),
 	)
 
-	docF := w2AssertFinding(t, res.Findings[docID], w2DBCSnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2:dbc-snap")
-	rdsF := w2AssertFinding(t, res.Findings[rdsID], w2DBCSnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2:dbc-snap")
+	docF := w2AssertFinding(t, res.Findings[docID], w2DBCSnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
+	rdsF := w2AssertFinding(t, res.Findings[rdsID], w2DBCSnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
 	if docF.Detail != rdsF.Detail {
 		t.Errorf("Detail differs by client: docdb %q vs rds %q", docF.Detail, rdsF.Detail)
 	}
@@ -190,7 +190,7 @@ func TestW2DBCSnapErrorOnOneClientLeavesTheOtherAnswered(t *testing.T) {
 		t.Error("vanished DocumentDB snapshot not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings[docID], w2DBCSnapCodePublic)
-	w2AssertFinding(t, res.Findings[rdsID], w2DBCSnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2:dbc-snap")
+	w2AssertFinding(t, res.Findings[rdsID], w2DBCSnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
 }
 
 func TestW2DBCSnapNilClientsAreSafe(t *testing.T) {

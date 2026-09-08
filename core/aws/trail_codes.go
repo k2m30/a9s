@@ -98,13 +98,13 @@ func trailDeliveryIsStale(isLogging, latestDeliveryTime string) bool {
 func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logFileValidationEnabled string) []domain.Finding {
 	var findings []domain.Finding
 	if isLogging == "false" {
-		findings = append(findings, wave2Finding(CodeTrailNotLogging, ""))
+		findings = append(findings, wave2Finding(CodeTrailNotLogging))
 	}
 	if latestDeliveryError != "" && latestDeliveryError != "-" {
-		findings = append(findings, wave2Finding(CodeTrailDeliveryError, "", latestDeliveryError))
+		findings = append(findings, wave2Finding(CodeTrailDeliveryError, latestDeliveryError))
 	}
 	if trailDeliveryIsStale(isLogging, latestDeliveryTime) {
-		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, "", latestDeliveryTime))
+		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, latestDeliveryTime))
 	}
 	if logFileValidationEnabled == "false" {
 		findings = append(findings, wave1Finding(CodeTrailLogFileValidationDisabled))

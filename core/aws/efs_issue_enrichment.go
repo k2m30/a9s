@@ -147,7 +147,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		// Summary must NOT embed any Row value (U11 contract).
-		setWave2Finding(&result, fsID, efsCodeMountTargetDown, "efs", []domain.DetailRow{
+		setWave2Finding(&result, fsID, efsCodeMountTargetDown, []domain.DetailRow{
 			{Label: "Mount Target", Value: mtID, Tier: "!"},
 			{Label: "AZ", Value: az},
 			{Label: "State", Value: state, Tier: "!"},
@@ -203,7 +203,7 @@ func enrichEFSPolicies(
 		}
 		ex := iampolicy.Evaluate(doc, ownAccount)
 		if ex.Public {
-			setWave2Finding(result, fsID, efsCodePublicPolicy, "efs", []domain.DetailRow{
+			setWave2Finding(result, fsID, efsCodePublicPolicy, []domain.DetailRow{
 				{Label: "Principal", Value: "*", Tier: "!"},
 				{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
 			})
@@ -225,7 +225,7 @@ func enrichEFSPolicies(
 	if backedUp {
 		return
 	}
-	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, "efs", nil)
+	setWave2Finding(result, fsID, efsCodeNoBackupPolicy, nil)
 }
 
 // isEFSPolicyNotFound reports whether err is EFS's "no policy is set" answer

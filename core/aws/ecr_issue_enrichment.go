@@ -127,14 +127,14 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, policyErr)
 		case exposure.Public:
-			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "ecr", publicPolicyRows(exposure))
+			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, publicPolicyRows(exposure))
 		}
 		switch {
 		case lifecycleErr != nil:
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, lifecycleErr)
 		case noLifecyclePolicy:
-			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "ecr", nil)
+			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, nil)
 		}
 
 		scannedCount := 0
@@ -184,12 +184,10 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		// A repository with a critical is a different signal from one with
 		// highs alone, and a code declares one severity.
 		if criticalTotal > 0 {
-			setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, "ecr", rows,
-				strconv.Itoa(int(criticalTotal)), strconv.Itoa(int(highTotal)))
+			setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, rows, strconv.Itoa(int(criticalTotal)), strconv.Itoa(int(highTotal)))
 			return
 		}
-		setWave2Finding(&result, r.ID, ecrCodeHighVulnerabilities, "ecr", rows,
-			strconv.Itoa(int(highTotal)))
+		setWave2Finding(&result, r.ID, ecrCodeHighVulnerabilities, rows, strconv.Itoa(int(highTotal)))
 	})
 
 	SetTruncated(&result, truncated)

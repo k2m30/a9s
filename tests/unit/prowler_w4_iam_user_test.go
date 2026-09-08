@@ -30,7 +30,7 @@ const (
 
 	w4PhraseUserTwoActiveKeys = "two active access keys"
 	w4PhraseUserConsoleNever  = "console password never used"
-	w4SourceUserWave2         = "wave2:iam-user"
+	w4SourceUserWave2         = "wave2"
 )
 
 // w4UserFake serves the five calls the user enricher makes. Every map is

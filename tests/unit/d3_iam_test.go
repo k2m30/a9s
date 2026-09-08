@@ -171,7 +171,7 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 	// key's number stood for every idle key on the user; they are an Idle row
 	// now. Do not restore the old expectation.
 	w4AssertFinding(t, res.Findings["acme-ci-user"], d3CodeUserKeyUnused,
-		catalog.Phrase(d3CodeUserKeyUnused), domain.SevWarn, "wave2:iam-user")
+		catalog.Phrase(d3CodeUserKeyUnused), domain.SevWarn, "wave2")
 }
 
 // TestD3UserRowsDoNotRestateTheirPhrase pins row 2: a supporting row exists to

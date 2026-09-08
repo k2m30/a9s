@@ -139,7 +139,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			tier string
 		}{{tgwCodeAttachmentFailed, "!"}, {tgwCodeAttachmentTransitional, "~"}} {
 			if rows := attRows[c.code]; len(rows) > 0 {
-				setWave2Finding(&result, tgwID, c.code, "tgw", rows)
+				setWave2Finding(&result, tgwID, c.code, rows)
 			}
 		}
 	})

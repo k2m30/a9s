@@ -8,7 +8,7 @@ package unit
 // Finding shaped exactly like the real fetcher (core/aws/ebs.go, wave1
 // state Findings + ebsSnapStructuralFindings) or the real Wave-2 cross-ref
 // enricher (core/aws/ebs_snap_issue_enrichment.go, Source
-// "wave2:ebs-snap"). Fields are kept for realism/context only — they are no
+// "wave2"). Fields are kept for realism/context only — they are no
 // longer read by Color.
 //
 // colorEBSSnap is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does

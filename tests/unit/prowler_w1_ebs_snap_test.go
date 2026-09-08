@@ -118,7 +118,7 @@ func TestEBSSnap_Public_RestorableByAnyone(t *testing.T) {
 
 	res := pw1EnrichEBSSnap(t, fake, pw1EBSCache("vol-0aaaa1111bbbb2222"), pub)
 	pw1RequireFinding(t, res.Findings["snap-0public00aaaaa1"], pw1EBSSnapCodePublic,
-		"shared with all AWS accounts", domain.SevBroken, "wave2:ebs-snap")
+		"shared with all AWS accounts", domain.SevBroken, "wave2")
 	// d4 row 20: the value is a word, not the SDK field's shape. Do not
 	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
 	pw1RequireRow(t, pw1Rows(res, "snap-0public00aaaaa1", pw1EBSSnapCodePublic), "Public", "yes")
@@ -150,7 +150,7 @@ func TestEBSSnap_Public_QueriesTheAccountOnceForTheAllGroup(t *testing.T) {
 		t.Errorf("RestorableByUserIds = %v, want [[all]]", fake.restorable)
 	}
 	pw1RequireFinding(t, res.Findings["snap-0aaaa1111bbbb2"], pw1EBSSnapCodePublic,
-		"shared with all AWS accounts", domain.SevBroken, "wave2:ebs-snap")
+		"shared with all AWS accounts", domain.SevBroken, "wave2")
 	for _, id := range []string{"snap-0aaaa1111bbbb1", "snap-0aaaa1111bbbb3"} {
 		pw1RequireNoFinding(t, res.Findings[id], pw1EBSSnapCodePublic)
 	}
@@ -180,7 +180,7 @@ func TestEBSSnap_Public_FiresWithoutTheParentVolumeCache(t *testing.T) {
 
 	res := pw1EnrichEBSSnap(t, fake, resource.ResourceCache{}, pub)
 	pw1RequireFinding(t, res.Findings["snap-0nocache00aaaa1"], pw1EBSSnapCodePublic,
-		"shared with all AWS accounts", domain.SevBroken, "wave2:ebs-snap")
+		"shared with all AWS accounts", domain.SevBroken, "wave2")
 }
 
 // TestEBSSnap_PublicAndOrphanAreTwoFindings pins independence: a public
@@ -192,7 +192,7 @@ func TestEBSSnap_PublicAndOrphanAreTwoFindings(t *testing.T) {
 
 	res := pw1EnrichEBSSnap(t, fake, pw1EBSCache("vol-0other1111bbbb2"), pub)
 	pw1RequireFinding(t, res.Findings["snap-0puborphan0aa1"], pw1EBSSnapCodePublic,
-		"shared with all AWS accounts", domain.SevBroken, "wave2:ebs-snap")
+		"shared with all AWS accounts", domain.SevBroken, "wave2")
 	if _, ok := pw1FindFinding(res.Findings["snap-0puborphan0aa1"], domain.FindingCode("ebs-snap.orphan")); !ok {
 		t.Errorf("orphan finding lost when the public finding was added: %+v", res.Findings["snap-0puborphan0aa1"])
 	}

@@ -237,7 +237,7 @@ func TestW6ATrailLogBucketPublic(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["acme-public-bucket-trail"], w6aTrailBucketPublic,
-		"log bucket is publicly accessible", domain.SevBroken, "wave2:trail")
+		"log bucket is publicly accessible", domain.SevBroken, "wave2")
 	w2AssertNoCode(t, res.Findings["acme-healthy-trail"], w6aTrailBucketPublic)
 	w2AssertRow(t, w2Rows(t, res, "acme-public-bucket-trail", w6aTrailBucketPublic),
 		"Bucket", "acme-public-audit-logs")
@@ -252,7 +252,7 @@ func TestW6ATrailLogBucketNoAccessLogging(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["acme-unlogged-bucket-trail"], w6aTrailBucketNoAccess,
-		"log bucket has no access logging", domain.SevWarn, "wave2:trail")
+		"log bucket has no access logging", domain.SevWarn, "wave2")
 	w2AssertNoCode(t, res.Findings["acme-healthy-trail"], w6aTrailBucketNoAccess)
 	w2AssertRow(t, w2Rows(t, res, "acme-unlogged-bucket-trail", w6aTrailBucketNoAccess),
 		"Bucket", "acme-unlogged-audit-logs")
@@ -315,7 +315,7 @@ func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied-trail"], w6aTrailBucketPublic)
 	w2AssertFinding(t, res.Findings["acme-public-bucket-trail"], w6aTrailBucketPublic,
-		"log bucket is publicly accessible", domain.SevBroken, "wave2:trail")
+		"log bucket is publicly accessible", domain.SevBroken, "wave2")
 }
 
 // TestW6ATrailLogBucket_CapBoundsTheIssueCount pins that the "!" row makes the

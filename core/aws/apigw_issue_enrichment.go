@@ -177,7 +177,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			// Only emitted when stage fetch succeeded (no error, no page cap).
 			// The phrase says there are none; the row says what kind of API
 			// is sitting undeployed, which the phrase cannot.
-			setWave2Finding(&result, apiID, apigwCodeNoDeployedStages, "apigw", []domain.DetailRow{{
+			setWave2Finding(&result, apiID, apigwCodeNoDeployedStages, []domain.DetailRow{{
 				Label: "Protocol",
 				Value: strings.ToLower(r.Fields["protocol"]),
 				Tier:  "~",
@@ -188,7 +188,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, "apigw", rows)
+		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, rows)
 	})
 	return result, AggregateFailures("authorizers and stages", failures, n)
 }
@@ -208,7 +208,7 @@ type apigwV1API interface {
 func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) error {
 	apiID := r.ID
 	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
-		setWave2Finding(result, apiID, code, "apigw", rows)
+		setWave2Finding(result, apiID, code, rows)
 	}
 
 	authorizers, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigateway.GetAuthorizersOutput, error) {
@@ -293,7 +293,7 @@ func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result 
 		case len(out.Items) > 0:
 			return nil
 		case out.NextToken == nil:
-			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, "apigw", []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: tierOf(CodeAPIGWNoAuthorizer)}})
+			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: tierOf(CodeAPIGWNoAuthorizer)}})
 			return nil
 		}
 		input.NextToken = out.NextToken

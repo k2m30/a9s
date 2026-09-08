@@ -194,7 +194,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		slices.Sort(codes)
 		for _, code := range codes {
 			c := conditions[code]
-			setWave2Finding(&result, id, code, "ec2", c.rows)
+			setWave2Finding(&result, id, code, c.rows)
 		}
 	}
 
@@ -270,7 +270,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 			portList = strings.Join(ports, ", ")
 		}
 		sort.Strings(groupIDs)
-		setWave2Finding(result, r.ID, ec2CodeInternetExposed, "ec2", []domain.DetailRow{
+		setWave2Finding(result, r.ID, ec2CodeInternetExposed, []domain.DetailRow{
 			{Label: "Public address", Value: publicIP, Tier: "!"},
 			{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
 			{Label: "Ports", Value: portList, Tier: "!"},
@@ -332,7 +332,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "ec2", rows)
+		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, rows)
 
 	})
 

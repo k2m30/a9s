@@ -204,7 +204,7 @@ func TestW2DDBPublicPolicy(t *testing.T) {
 	fake := &w2DDBPolicyFake{policies: map[string]string{"acme-public": w2DDBPublicPolicyDoc}}
 	res := w2DDBEnrich(t, fake, "acme-public", "acme-billing")
 
-	w2AssertFinding(t, res.Findings["acme-public"], w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2:ddb")
+	w2AssertFinding(t, res.Findings["acme-public"], w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "acme-public", w2DDBCodePublicPolicy), "Principal", "*")
 	w2AssertFindingDef(t, "ddb", w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2")
 
@@ -222,7 +222,7 @@ func TestW2DDBCrossAccountPolicy(t *testing.T) {
 	fake := &w2DDBPolicyFake{policies: map[string]string{"acme-shared": w2DDBCrossAccountPolicyDoc}}
 	res := w2DDBEnrich(t, fake, "acme-shared")
 
-	w2AssertFinding(t, res.Findings["acme-shared"], w2DDBCodeCrossAccountPolicy, "resource policy grants another account", domain.SevWarn, "wave2:ddb")
+	w2AssertFinding(t, res.Findings["acme-shared"], w2DDBCodeCrossAccountPolicy, "resource policy grants another account", domain.SevWarn, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "acme-shared", w2DDBCodeCrossAccountPolicy), "Accounts", "210987654321, 333333333333")
 	w2AssertNoCode(t, res.Findings["acme-shared"], w2DDBCodePublicPolicy)
 	w2AssertFindingDef(t, "ddb", w2DDBCodeCrossAccountPolicy, "resource policy grants another account", domain.SevWarn, "wave2")
@@ -245,7 +245,7 @@ func TestW2DDBSingleStatementObjectIsStillEvaluated(t *testing.T) {
 	fake := &w2DDBPolicyFake{policies: map[string]string{"acme-public": doc}}
 	res := w2DDBEnrich(t, fake, "acme-public")
 
-	w2AssertFinding(t, res.Findings["acme-public"], w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2:ddb")
+	w2AssertFinding(t, res.Findings["acme-public"], w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2")
 }
 
 // A wildcard principal narrowed by a source-VPCE condition is a scoped grant,
@@ -285,7 +285,7 @@ func TestW2DDBPolicyErrorMarksTruncatedAndSparesTheRest(t *testing.T) {
 		t.Error("table whose policy could not be read was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied"], w2DDBCodePublicPolicy)
-	w2AssertFinding(t, res.Findings["acme-public"], w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2:ddb")
+	w2AssertFinding(t, res.Findings["acme-public"], w2DDBCodePublicPolicy, "resource policy open to anyone", domain.SevBroken, "wave2")
 }
 
 func TestW2DDBPolicyNilClientIsSafe(t *testing.T) {

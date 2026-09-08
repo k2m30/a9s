@@ -38,7 +38,7 @@ const (
 	// The role enricher stamps its Wave-2 findings with the "iam-role"
 	// short name; a second finding from the same enricher keeps that
 	// provenance rather than inventing a second one for the same type.
-	w4SourceRoleWave2 = "wave2:iam-role"
+	w4SourceRoleWave2 = "wave2"
 
 	w4AdminAccessARN     = "arn:aws:iam::aws:policy/AdministratorAccess"
 	w4PowerUserAccessARN = "arn:aws:iam::aws:policy/PowerUserAccess"

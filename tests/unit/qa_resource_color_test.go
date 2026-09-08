@@ -97,7 +97,7 @@ func projectRoot(t *testing.T) string {
 // wave is colorFromAnyFinding-only with NO raw-field fallback — every
 // non-healthy case must attach a Finding shaped like the real fetcher
 // (core/aws/ec2.go wave1 Findings) or Wave-2 enricher
-// (core/aws/ec2_issue_enrichment.go, Source "wave2:ec2"). Fields are kept
+// (core/aws/ec2_issue_enrichment.go, Source "wave2"). Fields are kept
 // for realism/context only — they are no longer read by Color.
 func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 	td := resource.FindResourceType("ec2")

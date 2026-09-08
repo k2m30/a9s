@@ -157,7 +157,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 					continue
 				}
 
-				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, "ecs-task", rows)
+				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, rows)
 			}
 		}
 	}
@@ -252,7 +252,7 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 	}
 
 	if len(privileged) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodePrivileged, "ecs-task", privileged)
+		setWave2Finding(result, taskID, ecsTaskCodePrivileged, privileged)
 
 	}
 	var nsRows []domain.DetailRow
@@ -263,19 +263,19 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 		nsRows = append(nsRows, domain.DetailRow{Label: "Process namespace", Value: "host", Tier: "~"})
 	}
 	if len(nsRows) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeHostNamespace, "ecs-task", nsRows)
+		setWave2Finding(result, taskID, ecsTaskCodeHostNamespace, nsRows)
 
 	}
 	if len(writableRoot) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeWritableRoot, "ecs-task", writableRoot)
+		setWave2Finding(result, taskID, ecsTaskCodeWritableRoot, writableRoot)
 
 	}
 	if len(noLogging) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeNoLogging, "ecs-task", noLogging)
+		setWave2Finding(result, taskID, ecsTaskCodeNoLogging, noLogging)
 
 	}
 	if len(secretRows) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeEnvSecret, "ecs-task", secretRows)
+		setWave2Finding(result, taskID, ecsTaskCodeEnvSecret, secretRows)
 
 	}
 }

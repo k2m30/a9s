@@ -100,7 +100,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 				rows = append(rows, domain.DetailRow{Label: "Action Code", Value: *ac.Code})
 			}
 		}
-		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "ebs", rows)
+		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, rows)
 	}
 	SetTruncated(&result, cut)
 	return result, walkErr
@@ -170,6 +170,6 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 		if volumeID == "" || r.Fields["state"] != string(ec2types.VolumeStateInUse) || snapshotted[volumeID] {
 			continue
 		}
-		setWave2Finding(result, r.ID, CodeEBSNoSnapshot, "ebs", []domain.DetailRow{{Label: "Snapshots", Value: "0"}})
+		setWave2Finding(result, r.ID, CodeEBSNoSnapshot, []domain.DetailRow{{Label: "Snapshots", Value: "0"}})
 	}
 }

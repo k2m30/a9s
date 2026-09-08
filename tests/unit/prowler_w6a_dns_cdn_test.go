@@ -146,7 +146,7 @@ func w6aEnrichR53(t *testing.T, fake *w6aR53Fake, cache resource.ResourceCache, 
 func TestW6AR53QueryLoggingOff(t *testing.T) {
 	off := w6aEnrichR53(t, &w6aR53Fake{logConfigs: 0}, nil, w6aZoneRes("Z0OFF00000000000000A", "no-query-logging.acme-corp.com."))
 	w2AssertFinding(t, off.Findings["Z0OFF00000000000000A"], w6aR53QueryLoggingOff,
-		"query logging off", domain.SevWarn, "wave2:r53")
+		"query logging off", domain.SevWarn, "wave2")
 	// The phrase already states that logging is off; the row says why the
 	// check applies to this zone at all (U11).
 	w2AssertRow(t, w2Rows(t, off, "Z0OFF00000000000000A", w6aR53QueryLoggingOff), "Zone type", "public")
@@ -214,7 +214,7 @@ func TestW6AR53DanglingRecord(t *testing.T) {
 	res := w6aEnrichR53(t, fake, cache, w6aZoneRes("Z0DANGLING0000000000", "acme-corp.com."))
 
 	w2AssertFinding(t, res.Findings["Z0DANGLING0000000000"], w6aR53Dangling,
-		"record points at an unassociated elastic IP", domain.SevBroken, "wave2:r53")
+		"record points at an unassociated elastic IP", domain.SevBroken, "wave2")
 	rows := w2Rows(t, res, "Z0DANGLING0000000000", w6aR53Dangling)
 	w2AssertRow(t, rows, "Record", "dangling.acme-corp.com.")
 	w2AssertRow(t, rows, "Target", "203.0.113.11")
@@ -442,7 +442,7 @@ func TestW6ACFOriginBucketMissing(t *testing.T) {
 	res := w6aCFOne(t, "E6F7G8H9I0J1K2", cfg, w6aS3NameCache(false, "acme-live-origin"))
 
 	w2AssertFinding(t, res.Findings["E6F7G8H9I0J1K2"], w6aCFOriginMissing,
-		"S3 origin bucket does not exist", domain.SevBroken, "wave2:cf")
+		"S3 origin bucket does not exist", domain.SevBroken, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "E6F7G8H9I0J1K2", w6aCFOriginMissing),
 		"Origin", "acme-deleted-origin.s3.us-east-1.amazonaws.com")
 
@@ -463,7 +463,7 @@ func TestW6ACFOriginBucketMissing_BothDomainShapes(t *testing.T) {
 			cfg := w6aCFConfig("shop.acme-corp.com", domainName)
 			res := w6aCFOne(t, "E6F7G8H9I0J1K2", cfg, w6aS3NameCache(false, "acme-live-origin"))
 			w2AssertFinding(t, res.Findings["E6F7G8H9I0J1K2"], w6aCFOriginMissing,
-				"S3 origin bucket does not exist", domain.SevBroken, "wave2:cf")
+				"S3 origin bucket does not exist", domain.SevBroken, "wave2")
 		})
 	}
 }
@@ -516,7 +516,7 @@ func TestW6ACFDeprecatedTLS(t *testing.T) {
 			cfg.ViewerCertificate.MinimumProtocolVersion = version
 			res := w6aCFOne(t, "E7G8H9I0J1K2L3", cfg, w6aS3NameCache(false, "acme-live-origin"))
 			w2AssertFinding(t, res.Findings["E7G8H9I0J1K2L3"], w6aCFDeprecatedTLS,
-				"minimum TLS below 1.2", domain.SevWarn, "wave2:cf")
+				"minimum TLS below 1.2", domain.SevWarn, "wave2")
 			w2AssertRow(t, w2Rows(t, res, "E7G8H9I0J1K2L3", w6aCFDeprecatedTLS),
 				"Minimum TLS version", want)
 		})
@@ -549,7 +549,7 @@ func TestW6ACFLoggingOff(t *testing.T) {
 			mutate(cfg)
 			res := w6aCFOne(t, "E8H9I0J1K2L3M4", cfg, w6aS3NameCache(false, "acme-live-origin"))
 			w2AssertFinding(t, res.Findings["E8H9I0J1K2L3M4"], w6aCFLoggingOff,
-				"access logging off", domain.SevWarn, "wave2:cf")
+				"access logging off", domain.SevWarn, "wave2")
 			// The phrase says logging is off; the row names the destination
 			// that is missing (U11).
 			w2AssertRow(t, w2Rows(t, res, "E8H9I0J1K2L3M4", w6aCFLoggingOff), "Log bucket", "none")
@@ -571,7 +571,7 @@ func TestW6ACFNoDefaultRootObject(t *testing.T) {
 			cfg.DefaultRootObject = value
 			res := w6aCFOne(t, "E9I0J1K2L3M4N5", cfg, w6aS3NameCache(false, "acme-live-origin"))
 			w2AssertFinding(t, res.Findings["E9I0J1K2L3M4N5"], w6aCFNoRootObject,
-				"no default root object", domain.SevWarn, "wave2:cf")
+				"no default root object", domain.SevWarn, "wave2")
 			w2AssertRow(t, w2Rows(t, res, "E9I0J1K2L3M4N5", w6aCFNoRootObject), "Default root object", "none")
 		})
 	}
@@ -592,7 +592,7 @@ func TestW6ACFS3OriginWithoutOriginAccessControl(t *testing.T) {
 
 	res := w6aCFOne(t, "EA0J1K2L3M4N5O", cfg, w6aS3NameCache(false, "acme-live-origin"))
 	w2AssertFinding(t, res.Findings["EA0J1K2L3M4N5O"], w6aCFNoOAC,
-		"S3 origin without origin access control", domain.SevWarn, "wave2:cf")
+		"S3 origin without origin access control", domain.SevWarn, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "EA0J1K2L3M4N5O", w6aCFNoOAC),
 		"Origin", "acme-live-origin.s3.us-east-1.amazonaws.com")
 }
@@ -618,7 +618,7 @@ func TestW6ACFDefaultCertificate(t *testing.T) {
 	withAlias.ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
 	res := w6aCFOne(t, "EB1K2L3M4N5O6P", withAlias, w6aS3NameCache(false, "acme-live-origin"))
 	w2AssertFinding(t, res.Findings["EB1K2L3M4N5O6P"], w6aCFDefaultCert,
-		"uses the default CloudFront certificate", domain.SevWarn, "wave2:cf")
+		"uses the default CloudFront certificate", domain.SevWarn, "wave2")
 	// The phrase names the certificate; the row names the custom domain that
 	// makes the default certificate wrong here (U11).
 	w2AssertRow(t, w2Rows(t, res, "EB1K2L3M4N5O6P", w6aCFDefaultCert), "Alias", "shop.acme-corp.com")
@@ -639,7 +639,7 @@ func TestW6ACFNoGeoRestriction(t *testing.T) {
 	}}
 	res := w6aCFOne(t, "EC2L3M4N5O6P7Q", cfg, w6aS3NameCache(false, "acme-live-origin"))
 	w2AssertFinding(t, res.Findings["EC2L3M4N5O6P7Q"], w6aCFNoGeoRestriction,
-		"no geo restriction", domain.SevWarn, "wave2:cf")
+		"no geo restriction", domain.SevWarn, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "EC2L3M4N5O6P7Q", w6aCFNoGeoRestriction), "Countries", "none")
 
 	restricted := w6aCFOne(t, "EC2L3M4N5O6P7Q",
@@ -695,7 +695,7 @@ func TestW6ACF_ConfigFailureTruncatesTheDistribution(t *testing.T) {
 		"EE4N5O6P7Q8R9S", "EF5O6P7Q8R9S0T", "EG6P7Q8R9S0T1U")
 
 	w2AssertFinding(t, res.Findings["EF5O6P7Q8R9S0T"], w6aCFLoggingOff,
-		"access logging off", domain.SevWarn, "wave2:cf")
+		"access logging off", domain.SevWarn, "wave2")
 	w2AssertNoCode(t, res.Findings["EE4N5O6P7Q8R9S"], w6aCFLoggingOff)
 	w2AssertNoCode(t, res.Findings["EG6P7Q8R9S0T1U"], w6aCFLoggingOff)
 }
@@ -770,7 +770,7 @@ func TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo(t *testing.T) {
 		t.Error("a zone longer than the page cap was not marked truncated")
 	}
 	w2AssertFinding(t, res.Findings["Z0LONGZONE0000000000"], w6aR53Dangling,
-		"record points at an unassociated elastic IP", domain.SevBroken, "wave2:r53")
+		"record points at an unassociated elastic IP", domain.SevBroken, "wave2")
 }
 
 // TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig pins the other half: the
@@ -792,5 +792,5 @@ func TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig(t *testing.T) {
 		t.Errorf("ListQueryLoggingConfigs called %d times over 3 pages, want 3", empty.logCalls)
 	}
 	w2AssertFinding(t, res.Findings["Z0NOCONFIG0000000000"], w6aR53QueryLoggingOff,
-		"query logging off", domain.SevWarn, "wave2:r53")
+		"query logging off", domain.SevWarn, "wave2")
 }

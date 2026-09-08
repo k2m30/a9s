@@ -115,7 +115,7 @@ func TestD3ListenerOnSecondPageIsSeen(t *testing.T) {
 	}
 	res := d3EnrichELB(t, fake)
 	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBPlainHTTP,
-		"port 80 in the clear", domain.SevWarn, "wave2:elb")
+		"port 80 in the clear", domain.SevWarn, "wave2")
 	// d4 row 26: one listener, so the phrase is singular. Do not restore "ports".
 }
 
@@ -131,7 +131,7 @@ func TestD3EveryCleartextPortIsNamed(t *testing.T) {
 	res := d3EnrichELB(t, fake)
 
 	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBPlainHTTP,
-		"ports 80, 8080, 8081 in the clear", domain.SevWarn, "wave2:elb")
+		"ports 80, 8080, 8081 in the clear", domain.SevWarn, "wave2")
 	ad, ok := res.AttentionDetails["acme-web"][d3CodeELBPlainHTTP]
 	if !ok || len(ad.Rows) != 3 {
 		t.Fatalf("rows = %+v, want one per offending listener", ad.Rows)
@@ -162,7 +162,7 @@ func TestD3EveryWeakTLSPortIsNamed(t *testing.T) {
 	}})
 
 	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBWeakTLS,
-		"weak TLS policy on ports 443, 8443", domain.SevWarn, "wave2:elb")
+		"weak TLS policy on ports 443, 8443", domain.SevWarn, "wave2")
 	w4AssertRows(t, res.AttentionDetails["acme-web"], d3CodeELBWeakTLS, []domain.DetailRow{
 		{Label: "Security policy", Value: "443: ELBSecurityPolicy-2016-08"},
 		{Label: "Security policy", Value: "8443: ELBSecurityPolicy-2016-08"},
@@ -406,7 +406,7 @@ func TestD3UndecodableUserDataIsScannedRaw(t *testing.T) {
 		t.Fatalf("EnrichLTDeprecatedAMI: %v", err)
 	}
 	w4AssertFinding(t, res.Findings["lt-0acme1234567890"], d3CodeLTUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:lt")
+		"credential in user data", domain.SevBroken, "wave2")
 }
 
 // TestD3CleanUserDataReportsNothing pins the negative case: a template whose
@@ -458,5 +458,5 @@ func TestD3CleartextPortsMergeAcrossPages(t *testing.T) {
 		page2: []elbtypes.Listener{d3PlainHTTPListener(8080)},
 	})
 	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBPlainHTTP,
-		"ports 80, 8080 in the clear", domain.SevWarn, "wave2:elb")
+		"ports 80, 8080 in the clear", domain.SevWarn, "wave2")
 }

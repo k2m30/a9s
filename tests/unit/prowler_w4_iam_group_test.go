@@ -19,7 +19,7 @@ import (
 
 const (
 	w4CodeGroupAdminAttached domain.FindingCode = "iam-group.admin-attached"
-	w4SourceGroupWave2                          = "wave2:iam-group"
+	w4SourceGroupWave2                          = "wave2"
 )
 
 // w4GroupFake serves the three calls the group enricher makes, keyed by

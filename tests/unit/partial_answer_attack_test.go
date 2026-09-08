@@ -66,9 +66,9 @@ func TestPartialAttackLambda_BothConditionsOnOneFunction(t *testing.T) {
 		urlAuth: lambdatypes.FunctionUrlAuthTypeNone,
 	})
 	w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.public-policy",
-		"invokable by anyone", domain.SevBroken, "wave2:lambda")
+		"invokable by anyone", domain.SevBroken, "wave2")
 	w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.function-url-public",
-		"function endpoint open without authentication", domain.SevBroken, "wave2:lambda")
+		"function endpoint open without authentication", domain.SevBroken, "wave2")
 	partialAssertInspected(t, res, partialLambdaFn)
 }
 
@@ -302,7 +302,7 @@ func TestPartialAttackEBS_StatusFailureMarksEveryVolumeInTheBatch(t *testing.T) 
 
 	for _, id := range []string{w7VolumeID, second.ID} {
 		w4AssertFinding(t, res.Findings[id], awsclient.CodeEBSNotInBackupPlan,
-			"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+			"not covered by a backup plan", domain.SevWarn, "wave2")
 		partialAssertUninspected(t, res, id)
 	}
 }
@@ -319,7 +319,7 @@ func TestPartialAttackECR_PublicPolicyAndUnreadableLifecycle(t *testing.T) {
 		partialECRFake: partialECRFake{lifecycleErr: partialAccessDenied()},
 	})
 	w4AssertFinding(t, res.Findings[partialECRRepo], "ecr.public-policy",
-		"repository policy open to anyone", domain.SevBroken, "wave2:ecr")
+		"repository policy open to anyone", domain.SevBroken, "wave2")
 	w4AssertNoCode(t, res.Findings[partialECRRepo], "ecr.no-lifecycle-policy")
 	partialAssertUninspected(t, res, partialECRRepo)
 }
@@ -389,7 +389,7 @@ func TestPartialAttackRedshift_MarkerClearedByAnEmptyStringIsComplete(t *testing
 	w2AssertEnricherShape(t, res)
 
 	w4AssertFinding(t, res.Findings[id], "redshift.require-ssl-off",
-		"SSL not required", domain.SevWarn, "wave2:redshift")
+		"SSL not required", domain.SevWarn, "wave2")
 	w2AssertRow(t, w2Rows(t, res, id, "redshift.require-ssl-off"),
 		"Requires encrypted connections", "unset (require_ssl)")
 	partialAssertInspected(t, res, id)

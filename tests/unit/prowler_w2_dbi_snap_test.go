@@ -89,7 +89,7 @@ func TestW2DBISnapPublic(t *testing.T) {
 	}}
 	res := w2DBISnapEnrich(t, fake, "acme-orders-db-2026-02-01", "acme-orders-db-2026-02-02")
 
-	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2:dbi-snap")
+	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "acme-orders-db-2026-02-01", w2DBISnapCodePublic), "Restore", "all")
 	w2AssertFindingDef(t, "dbi-snap", w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
 
@@ -133,7 +133,7 @@ func TestW2DBISnapNotFoundIsTruncatedNotFailure(t *testing.T) {
 		t.Error("vanished snapshot not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-orders-db-gone"], w2DBISnapCodePublic)
-	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2:dbi-snap")
+	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
 }
 
 // An AccessDenied on one snapshot must leave that row unknown and the rest of
@@ -153,7 +153,7 @@ func TestW2DBISnapDeniedOnOneItemKeepsTheRestEvaluated(t *testing.T) {
 	if !res.TruncatedIDs["acme-orders-db-denied"] {
 		t.Error("denied snapshot not marked in TruncatedIDs")
 	}
-	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2:dbi-snap")
+	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")
 }
 
 func TestW2DBISnapNilClientIsSafe(t *testing.T) {

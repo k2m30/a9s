@@ -383,7 +383,7 @@ func TestLambda_PublicPolicy_FunctionURLAuthTypeNoneIsPublic(t *testing.T) {
 	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2:lambda")
+		"invokable by anyone", domain.SevBroken, "wave2")
 }
 
 func TestLambda_PublicPolicy_FunctionURLAuthTypeIAMIsHealthy(t *testing.T) {

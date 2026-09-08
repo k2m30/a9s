@@ -28,7 +28,7 @@ const (
 	w2EFSCodeUnencrypted    = "efs.unencrypted"
 	w2EFSCodePublicPolicy   = "efs.public-policy"
 	w2EFSCodeNoBackupPolicy = "efs.no-backup-policy"
-	w2EFSSource             = "wave2:efs"
+	w2EFSSource             = "wave2"
 )
 
 // ---------------------------------------------------------------------------

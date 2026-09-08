@@ -276,7 +276,7 @@ func TestASG_LaunchConfigIMDSv1_Optional(t *testing.T) {
 
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-imdsv1-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-imdsv1-asg"], pw1ASGCodeLCIMDSv1,
-		"launch configuration allows IMDSv1", domain.SevWarn, "wave2:asg")
+		"launch configuration allows IMDSv1", domain.SevWarn, "wave2")
 	pw1RequireRow(t, pw1Rows(res, "acme-imdsv1-asg", pw1ASGCodeLCIMDSv1), "Metadata tokens", "optional")
 }
 
@@ -293,7 +293,7 @@ func TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset(t *testing.T) {
 
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-unset-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-unset-asg"], pw1ASGCodeLCIMDSv1,
-		"launch configuration allows IMDSv1", domain.SevWarn, "wave2:asg")
+		"launch configuration allows IMDSv1", domain.SevWarn, "wave2")
 	pw1RequireRow(t, pw1Rows(res, "acme-unset-asg", pw1ASGCodeLCIMDSv1), "Metadata tokens", "unset")
 }
 
@@ -319,7 +319,7 @@ func TestASG_LaunchConfigPublicIP_Enabled(t *testing.T) {
 
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-public-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-public-asg"], pw1ASGCodeLCPublicIP,
-		"launch configuration assigns public IPs", domain.SevWarn, "wave2:asg")
+		"launch configuration assigns public IPs", domain.SevWarn, "wave2")
 	// d4 row 20: the value is a word, not the SDK field's shape. Do not
 	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
 	pw1RequireRow(t, pw1Rows(res, "acme-public-asg", pw1ASGCodeLCPublicIP), "Public address assignment", "enabled")
@@ -359,7 +359,7 @@ func TestASG_LaunchConfigSecret_PlaintextUserData(t *testing.T) {
 
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-secret-asg", lcName))
 	f := pw1RequireFinding(t, res.Findings["acme-secret-asg"], pw1ASGCodeLCSecret,
-		"credential in launch configuration user data", domain.SevBroken, "wave2:asg")
+		"credential in launch configuration user data", domain.SevBroken, "wave2")
 	pw1RequireRow(t, pw1Rows(res, "acme-secret-asg", pw1ASGCodeLCSecret), "line 2", "keyword")
 	if strings.Contains(f.Phrase+f.Detail, "hunter2hunter2") {
 		t.Errorf("credential value leaked into the finding text")
@@ -440,7 +440,7 @@ func TestASG_LaunchConfigurationsAreDescribedInOneBatch(t *testing.T) {
 	}
 	for _, name := range []string{"acme-asg-a", "acme-asg-b"} {
 		pw1RequireFinding(t, res.Findings[name], pw1ASGCodeLCPublicIP,
-			"launch configuration assigns public IPs", domain.SevWarn, "wave2:asg")
+			"launch configuration assigns public IPs", domain.SevWarn, "wave2")
 	}
 	pw1RequireNoFinding(t, res.Findings["acme-asg-template"], pw1ASGCodeLCPublicIP)
 }

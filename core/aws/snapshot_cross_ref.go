@@ -231,7 +231,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			// and AttentionDetails (core/aws/issue_enrichment.go) — it
 			// drives the detail-view Attention section AND the S4 status
 			// column at render time via domain.StatusPhrase(r.Findings).
-			setWave2Finding(&result, res.ID, code, cfg.ShortName, rows, values...)
+			setWave2Finding(&result, res.ID, code, rows, values...)
 		}
 
 		return result, publicErr
@@ -280,7 +280,7 @@ func enrichSnapshotPublicShare(
 		if !restoreSharedWithAll(attrs) {
 			return
 		}
-		setWave2Finding(result, res.ID, cfg.PublicCode, cfg.ShortName, []domain.DetailRow{{Label: "Restore", Value: "all", Tier: tierOf(cfg.PublicCode)}})
+		setWave2Finding(result, res.ID, cfg.PublicCode, []domain.DetailRow{{Label: "Restore", Value: "all", Tier: tierOf(cfg.PublicCode)}})
 
 	})
 	return Finish(result, failures, n, "snapshot share attributes")

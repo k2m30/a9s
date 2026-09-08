@@ -121,7 +121,7 @@ func TestW7Coverage_WholeListWithNoMatchReportsUncovered(t *testing.T) {
 		w7CacheWith(w7Plan("arn:aws:dynamodb:us-east-1:123456789012:table/other-table", "", "")))
 
 	w4AssertFinding(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ddb")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 	w4AssertRows(t, res.AttentionDetails["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
 		[]domain.DetailRow{{Label: "Backup plans", Value: "0"}})
 }
@@ -159,7 +159,7 @@ func TestW7Coverage_EmptyWholeListReportsUncovered(t *testing.T) {
 	res := w7EnrichDDB(t, []resource.Resource{w7Row("acme-orders", w7TableARN)}, w7CacheWith())
 
 	w4AssertFinding(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ddb")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
 // ── the three matching modes, plus the exclusion ──────────────────────────
@@ -215,7 +215,7 @@ func TestW7Coverage_MatchingModes(t *testing.T) {
 			res := w7EnrichDDB(t, []resource.Resource{w7Row("acme-orders", w7TableARN)}, w7CacheWith(tc.plan))
 			if tc.wantUncovered {
 				w4AssertFinding(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
-					"not covered by a backup plan", domain.SevWarn, "wave2:ddb")
+					"not covered by a backup plan", domain.SevWarn, "wave2")
 				return
 			}
 			w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
@@ -240,7 +240,7 @@ func TestW7Coverage_SelectionTagsMatchTheVolumesTags(t *testing.T) {
 	// A condition on a tag the volume does not carry leaves it uncovered.
 	uncovered := w7EnrichEBS(t, []resource.Resource{volume}, w7CacheWith(w7Plan("", "", "backup=weekly")))
 	w4AssertFinding(t, uncovered.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
 // ── the four types ────────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ func TestW7Coverage_EveryTypeReportsItsOwnCode(t *testing.T) {
 			res := tc.enrich(t, []resource.Resource{w7Row(tc.id, tc.arn)}, w7CacheWith())
 
 			f := w4AssertFinding(t, res.Findings[tc.id], tc.code,
-				"not covered by a backup plan", domain.SevWarn, "wave2:"+tc.short)
+				"not covered by a backup plan", domain.SevWarn, "wave2")
 			if f.Detail == "" {
 				t.Error("no Detail sentence")
 			}
@@ -347,7 +347,7 @@ func TestW7EBS_ARNIsBuiltFromTheAccountAndTheRegion(t *testing.T) {
 	} {
 		res := w7EnrichEBS(t, []resource.Resource{volume}, w7CacheWith(w7Plan(other, "", "")))
 		w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-			"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+			"not covered by a backup plan", domain.SevWarn, "wave2")
 	}
 }
 
@@ -416,7 +416,7 @@ func TestW7EBS_NoSnapshotJoin(t *testing.T) {
 
 			if tc.wantNoSnapNow {
 				w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNoSnapshot,
-					"no snapshot exists", domain.SevWarn, "wave2:ebs")
+					"no snapshot exists", domain.SevWarn, "wave2")
 				w4AssertRows(t, res.AttentionDetails[w7VolumeID], awsclient.CodeEBSNoSnapshot,
 					[]domain.DetailRow{{Label: "Snapshots", Value: "0"}})
 				return
@@ -436,9 +436,9 @@ func TestW7EBS_BothConditionsOnOneVolume(t *testing.T) {
 	res := w7EnrichEBS(t, []resource.Resource{w7Volume("in-use")}, cache)
 
 	w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 	w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNoSnapshot,
-		"no snapshot exists", domain.SevWarn, "wave2:ebs")
+		"no snapshot exists", domain.SevWarn, "wave2")
 }
 
 // ── the fetcher's nil-client guard ────────────────────────────────────────
@@ -555,7 +555,7 @@ func TestW7Tags_NonMatchingTagLeavesTheTableUncovered(t *testing.T) {
 		w7CacheWith(w7Plan("", "", "backup=nightly")))
 
 	w4AssertFinding(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ddb")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
 // TestW7Tags_FailedReadReportsNothing pins the rule that separates unknown from
@@ -679,7 +679,7 @@ func TestW7Tags_ClientWithoutTheTagCallJudgesOnARNsAlone(t *testing.T) {
 		w7CacheWith(w7Plan("arn:aws:dynamodb:us-east-1:123456789012:table/other", "", "backup=nightly")))
 
 	w4AssertFinding(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ddb")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
 // ── the demo bench ────────────────────────────────────────────────────────

@@ -96,7 +96,7 @@ func TestLT_UserDataSecret_PlaintextCredential(t *testing.T) {
 		pw1LTResource(id, "acme-web", 3, pw1LTUserDataWithSecret))
 
 	f := pw1RequireFinding(t, res.Findings[id], pw1LTCodeUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:lt")
+		"credential in user data", domain.SevBroken, "wave2")
 	rows := pw1Rows(res, id, pw1LTCodeUserDataSecret)
 	pw1RequireRow(t, rows, "Version", "3")
 	pw1RequireRow(t, rows, "line 3", "keyword")
@@ -148,7 +148,7 @@ func TestLT_UserDataSecret_FiresWithoutTheAMICache(t *testing.T) {
 	res := pw1EnrichLT(t, resource.ResourceCache{},
 		pw1LTResource(id, "acme-web-nocache", 3, pw1LTUserDataWithSecret))
 	pw1RequireFinding(t, res.Findings[id], pw1LTCodeUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:lt")
+		"credential in user data", domain.SevBroken, "wave2")
 }
 
 // TestLT_SecretAndDeprecatedAMIAreTwoFindings pins independence: a template
@@ -170,7 +170,7 @@ func TestLT_SecretAndDeprecatedAMIAreTwoFindings(t *testing.T) {
 
 	res := pw1EnrichLT(t, cache, r)
 	pw1RequireFinding(t, res.Findings[id], pw1LTCodeUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:lt")
+		"credential in user data", domain.SevBroken, "wave2")
 	if _, ok := pw1FindFinding(res.Findings[id], domain.FindingCode("lt.warn.deprecated_ami")); !ok {
 		t.Errorf("deprecated-AMI finding lost when the secret finding was added: %+v", res.Findings[id])
 	}
@@ -188,7 +188,7 @@ func TestLT_UserDataSecret_EvaluatesEveryRow(t *testing.T) {
 		pw1LTResource("lt-0clean2000aaaaa1", "acme-c", 3, pw1LTUserDataClean),
 	)
 	pw1RequireFinding(t, res.Findings["lt-0leak11000aaaaa1"], pw1LTCodeUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:lt")
+		"credential in user data", domain.SevBroken, "wave2")
 	pw1RequireRow(t, pw1Rows(res, "lt-0leak11000aaaaa1", pw1LTCodeUserDataSecret), "Version", "2")
 	for _, id := range []string{"lt-0clean1000aaaaa1", "lt-0clean2000aaaaa1"} {
 		pw1RequireNoFinding(t, res.Findings[id], pw1LTCodeUserDataSecret)

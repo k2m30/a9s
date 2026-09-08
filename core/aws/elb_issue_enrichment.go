@@ -191,18 +191,18 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 				}
 			case "routing.http.desync_mitigation_mode":
 				if isALB && *attr.Value == elbDesyncMonitorMode {
-					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, "elb", []domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: tierOf(elbCodeDesyncMitigationOff)}})
+					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, []domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: tierOf(elbCodeDesyncMitigationOff)}})
 
 				}
 			case "routing.http.drop_invalid_header_fields.enabled":
 				if isALB && *attr.Value != "true" {
-					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, "elb", []domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: tierOf(elbCodeInvalidHeadersKept)}})
+					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, []domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: tierOf(elbCodeInvalidHeadersKept)}})
 
 				}
 			}
 		}
 		if len(rows) > 0 {
-			setWave2Finding(&result, r.ID, elbCodeMisconfigured, "elb", rows)
+			setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows)
 		}
 	})
 	// Listener posture needs a second read per load balancer, so it runs as
@@ -236,11 +236,11 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 				elbOffendingListener{port: aws.ToInt32(listener.Port), row: row})
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodePlainHTTPListener]); ports != "" {
-			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener, "elb", rows, elbCount(rows, "port ", "ports ")+ports)
+			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener, rows, elbCount(rows, "port ", "ports ")+ports)
 
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodeWeakTLSPolicy]); ports != "" {
-			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy, "elb", rows, elbCount(rows, "port ", "ports ")+ports)
+			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy, rows, elbCount(rows, "port ", "ports ")+ports)
 
 		}
 	})

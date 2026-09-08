@@ -38,7 +38,7 @@ const (
 	w6bECRPhraseMutableTags   = "tags are mutable"
 	w6bECRPhrasePublicPolicy  = "repository policy open to anyone"
 	w6bECRPhraseNoLifecycle   = "no lifecycle policy"
-	w6bECRSource              = "wave2:ecr"
+	w6bECRSource              = "wave2"
 )
 
 // ─── wave 1: DescribeRepositories ───────────────────────────────────────────

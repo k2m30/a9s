@@ -398,13 +398,13 @@ func TestCloudFrontS3Origin_DottedAndChinaOriginsReachBothChecks(t *testing.T) {
 
 			if tc.wantMissing {
 				w4AssertFinding(t, res.Findings[distID], missing,
-					"S3 origin bucket does not exist", domain.SevBroken, "wave2:cf")
+					"S3 origin bucket does not exist", domain.SevBroken, "wave2")
 			} else {
 				w4AssertNoCode(t, res.Findings[distID], missing)
 			}
 			if tc.wantNoOAC {
 				w4AssertFinding(t, res.Findings[distID], noOAC,
-					"S3 origin without origin access control", domain.SevWarn, "wave2:cf")
+					"S3 origin without origin access control", domain.SevWarn, "wave2")
 			} else {
 				w4AssertNoCode(t, res.Findings[distID], noOAC)
 			}
@@ -540,7 +540,7 @@ func TestEBSBackupARN_PartitionAndRegionComeFromTheSession(t *testing.T) {
 			}
 			if tc.wantUncovered {
 				w4AssertFinding(t, res.Findings[id], code,
-					"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+					"not covered by a backup plan", domain.SevWarn, "wave2")
 				return
 			}
 			w4AssertNoCode(t, res.Findings[id], code)

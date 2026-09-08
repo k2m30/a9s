@@ -183,7 +183,7 @@ func TestW5_SFNLoggingOff_Positive(t *testing.T) {
 
 			res := w5EnrichSFN(t, f, w5SFNRes(sm, "STANDARD"))
 			w2AssertFinding(t, res.Findings[sm], "sfn.logging-off",
-				"execution logging off", domain.SevWarn, "wave2:sfn")
+				"execution logging off", domain.SevWarn, "wave2")
 
 			rows := w2Rows(t, res, sm, "sfn.logging-off")
 			w2AssertRow(t, rows, "Logging level", "off")
@@ -227,9 +227,9 @@ func TestW5_SFNExpressStateMachineStillReportsConfigurationFindings(t *testing.T
 
 	res := w5EnrichSFN(t, f, w5SFNRes(sm, "EXPRESS"))
 	w2AssertFinding(t, res.Findings[sm], "sfn.logging-off",
-		"execution logging off", domain.SevWarn, "wave2:sfn")
+		"execution logging off", domain.SevWarn, "wave2")
 	w2AssertFinding(t, res.Findings[sm], "sfn.no-cmk",
-		"not encrypted with a customer key", domain.SevWarn, "wave2:sfn")
+		"not encrypted with a customer key", domain.SevWarn, "wave2")
 }
 
 // A state machine on the AWS-owned key cannot have its data access audited
@@ -253,7 +253,7 @@ func TestW5_SFNNoCMK_Positive(t *testing.T) {
 
 			res := w5EnrichSFN(t, f, w5SFNRes(sm, "STANDARD"))
 			w2AssertFinding(t, res.Findings[sm], "sfn.no-cmk",
-				"not encrypted with a customer key", domain.SevWarn, "wave2:sfn")
+				"not encrypted with a customer key", domain.SevWarn, "wave2")
 		})
 	}
 }
@@ -278,7 +278,7 @@ func TestW5_SFNDefinitionSecret_Positive(t *testing.T) {
 
 	res := w5EnrichSFN(t, f, w5SFNRes(sm, "STANDARD"))
 	finding := w2AssertFinding(t, res.Findings[sm], "sfn.definition-secret",
-		"credential in state machine definition", domain.SevBroken, "wave2:sfn")
+		"credential in state machine definition", domain.SevBroken, "wave2")
 
 	// Rule 7: the value never appears anywhere an operator can read it.
 	// Where and Kind are the whole of the evidence.
@@ -387,7 +387,7 @@ func TestW5_SFN_APIErrorOnOneMachineTruncatesOnlyThatMachine(t *testing.T) {
 	}
 	w2AssertNoCode(t, res.Findings[broken], "sfn.logging-off")
 	w2AssertFinding(t, res.Findings[silent], "sfn.logging-off",
-		"execution logging off", domain.SevWarn, "wave2:sfn")
+		"execution logging off", domain.SevWarn, "wave2")
 }
 
 func TestW5_SFNCatalogDefs(t *testing.T) {
@@ -507,7 +507,7 @@ func TestW5_SESDKIMOff_Positive(t *testing.T) {
 
 			res := w5EnrichSES(t, f, w5SESRes(id, "DOMAIN"))
 			w2AssertFinding(t, res.Findings[id], "ses.dkim-off",
-				"DKIM not enabled", domain.SevWarn, "wave2:ses")
+				"DKIM not enabled", domain.SevWarn, "wave2")
 
 			rows := w2Rows(t, res, id, "ses.dkim-off")
 			w2AssertRow(t, rows, "DKIM signing", "disabled")
@@ -548,7 +548,7 @@ func TestW5_SESDKIMOff_IsPerIdentityNotReplicated(t *testing.T) {
 
 	res := w5EnrichSES(t, f, w5SESRes(bad, "DOMAIN"), w5SESRes(good, "DOMAIN"))
 	w2AssertFinding(t, res.Findings[bad], "ses.dkim-off",
-		"DKIM not enabled", domain.SevWarn, "wave2:ses")
+		"DKIM not enabled", domain.SevWarn, "wave2")
 	w2AssertNoCode(t, res.Findings[good], "ses.dkim-off")
 }
 
@@ -573,7 +573,7 @@ func TestW5_SESDKIMOff_APIErrorOnOneIdentityTruncatesOnlyThatIdentity(t *testing
 	}
 	w2AssertNoCode(t, res.Findings[broken], "ses.dkim-off")
 	w2AssertFinding(t, res.Findings[bad], "ses.dkim-off",
-		"DKIM not enabled", domain.SevWarn, "wave2:ses")
+		"DKIM not enabled", domain.SevWarn, "wave2")
 }
 
 // The pre-existing account-level finding must still reach every row.
@@ -750,7 +750,7 @@ func TestW5_EBManagedUpdatesOff_Positive(t *testing.T) {
 
 	res := w5EnrichEB(t, f, w5EBRes(env))
 	w2AssertFinding(t, res.Findings["e-"+env], "eb.managed-updates-off",
-		"managed platform updates off", domain.SevWarn, "wave2:eb")
+		"managed platform updates off", domain.SevWarn, "wave2")
 }
 
 func TestW5_EBManagedUpdatesOff_EnabledIsHealthy(t *testing.T) {
@@ -771,7 +771,7 @@ func TestW5_EBEnhancedHealthOff_Positive(t *testing.T) {
 
 	res := w5EnrichEB(t, f, w5EBRes(env))
 	w2AssertFinding(t, res.Findings["e-"+env], "eb.enhanced-health-off",
-		"enhanced health reporting off", domain.SevWarn, "wave2:eb")
+		"enhanced health reporting off", domain.SevWarn, "wave2")
 
 	rows := w2Rows(t, res, "e-"+env, "eb.enhanced-health-off")
 	var got []string
@@ -802,7 +802,7 @@ func TestW5_EBCloudWatchLogsOff_Positive(t *testing.T) {
 
 	res := w5EnrichEB(t, f, w5EBRes(env))
 	w2AssertFinding(t, res.Findings["e-"+env], "eb.cloudwatch-logs-off",
-		"log streaming to CloudWatch off", domain.SevWarn, "wave2:eb")
+		"log streaming to CloudWatch off", domain.SevWarn, "wave2")
 }
 
 func TestW5_EBCloudWatchLogsOff_StreamingIsHealthy(t *testing.T) {
@@ -876,7 +876,7 @@ func TestW5_EB_APIErrorOnOneEnvironmentTruncatesOnlyThatEnvironment(t *testing.T
 		w2AssertNoCode(t, res.Findings["e-"+broken], code)
 	}
 	w2AssertFinding(t, res.Findings["e-"+unmanaged], "eb.managed-updates-off",
-		"managed platform updates off", domain.SevWarn, "wave2:eb")
+		"managed platform updates off", domain.SevWarn, "wave2")
 }
 
 // The pre-existing causes finding must survive the addition.
@@ -982,7 +982,7 @@ func TestW5_EBRunningEnvironmentStillReportsConfiguration(t *testing.T) {
 
 			res := w5EnrichEB(t, f, r)
 			w2AssertFinding(t, res.Findings["e-"+env], "eb.cloudwatch-logs-off",
-				"log streaming to CloudWatch off", domain.SevWarn, "wave2:eb")
+				"log streaming to CloudWatch off", domain.SevWarn, "wave2")
 		})
 	}
 }

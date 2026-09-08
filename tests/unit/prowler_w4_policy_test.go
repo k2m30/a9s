@@ -26,7 +26,7 @@ import (
 const (
 	w4CodePolicyPrivEsc   domain.FindingCode = "policy.privilege-escalation"
 	w4CodePolicyAdminStar domain.FindingCode = "iam-policy.admin-star"
-	w4SourcePolicyWave2                      = "wave2:iam-policy"
+	w4SourcePolicyWave2                      = "wave2"
 )
 
 // The lambda escalation path: pass a role to a function you create and then

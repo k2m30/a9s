@@ -266,7 +266,7 @@ func TestW6AAPIGWRESTNoAuthorizerIsBrokenWhenReachable(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["rst001noauth"], w6aAPIGWNoAuthPublic,
-		"internet-facing with no authorizer", domain.SevBroken, "wave2:apigw")
+		"internet-facing with no authorizer", domain.SevBroken, "wave2")
 	rows := w2Rows(t, res, "rst001noauth", w6aAPIGWNoAuthPublic)
 	w2AssertRow(t, rows, "Authorizers", "0")
 	w2AssertRow(t, rows, "Endpoint", "edge")
@@ -283,7 +283,7 @@ func TestW6AAPIGWRESTNoAuthorizer_PrivateEndpointIsOnlyAWarning(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["rst005private"], w6aAPIGWNoAuth,
-		"no authorizer", domain.SevWarn, "wave2:apigw")
+		"no authorizer", domain.SevWarn, "wave2")
 	w2AssertNoCode(t, res.Findings["rst005private"], w6aAPIGWNoAuthPublic)
 }
 
@@ -309,7 +309,7 @@ func TestW6AAPIGWRESTNoAuthorizer_ScopedResourcePolicyClosesIt(t *testing.T) {
 		w6aRESTRes("rst007open", "acme-open-rest", "REGIONAL", open),
 	)
 	w2AssertFinding(t, exposed.Findings["rst007open"], w6aAPIGWNoAuthPublic,
-		"internet-facing with no authorizer", domain.SevBroken, "wave2:apigw")
+		"internet-facing with no authorizer", domain.SevBroken, "wave2")
 }
 
 // TestW6AAPIGWRESTNoAuthorizer_AnAuthorizerClosesIt pins the negative half.
@@ -338,7 +338,7 @@ func TestW6AAPIGWHTTPNoAuthorizer(t *testing.T) {
 		w6aHTTPRes("htp001noauth", "acme-orders-http"),
 	)
 	w2AssertFinding(t, res.Findings["htp001noauth"], w6aAPIGWNoAuth,
-		"no authorizer", domain.SevWarn, "wave2:apigw")
+		"no authorizer", domain.SevWarn, "wave2")
 
 	guarded := w6aEnrichAPIGW(t, nil,
 		&w6aAPIGWV2Fake{
@@ -370,7 +370,7 @@ func TestW6AAPIGWRESTNoAccessLogs(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["rst002nologs"], w6aAPIGWNoAccessLogs,
-		"no access logs", domain.SevWarn, "wave2:apigw")
+		"no access logs", domain.SevWarn, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "rst002nologs", w6aAPIGWNoAccessLogs), "Stage", "prod")
 
 	logged := w6aEnrichAPIGW(t,
@@ -399,7 +399,7 @@ func TestW6AAPIGWRESTTracingOff(t *testing.T) {
 	)
 
 	w2AssertFinding(t, res.Findings["rst003notrace"], w6aAPIGWTracingOff,
-		"X-Ray tracing off", domain.SevWarn, "wave2:apigw")
+		"X-Ray tracing off", domain.SevWarn, "wave2")
 	w2AssertRow(t, w2Rows(t, res, "rst003notrace", w6aAPIGWTracingOff), "Stage", "prod")
 
 	traced := w6aEnrichAPIGW(t,
@@ -433,7 +433,7 @@ func TestW6AAPIGWStageVariableSecret(t *testing.T) {
 	)
 
 	f := w2AssertFinding(t, res.Findings["rst004secret"], w6aAPIGWStageSecret,
-		"credential in stage variables", domain.SevBroken, "wave2:apigw")
+		"credential in stage variables", domain.SevBroken, "wave2")
 	rows := w2Rows(t, res, "rst004secret", w6aAPIGWStageSecret)
 	w2AssertRow(t, rows, "Stage", "prod")
 	w2AssertRow(t, rows, "DB_PASSWORD", "keyword")
@@ -500,7 +500,7 @@ func TestW6AAPIGW_StageFailureTruncatesTheAPI(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["rst013gone"], w6aAPIGWNoAccessLogs)
 	// The other API in the same batch is still evaluated.
 	w2AssertFinding(t, res.Findings["htp003noauth"], w6aAPIGWNoAuth,
-		"no authorizer", domain.SevWarn, "wave2:apigw")
+		"no authorizer", domain.SevWarn, "wave2")
 }
 
 // TestW6AAPIGW_NoV1ClientLeavesTheV2LaneWorking pins that the v1 calls are
@@ -512,7 +512,7 @@ func TestW6AAPIGW_NoV1ClientLeavesTheV2LaneWorking(t *testing.T) {
 		w6aHTTPRes("htp004noauth", "acme-orders-http"),
 	)
 	w2AssertFinding(t, res.Findings["htp004noauth"], w6aAPIGWNoAuth,
-		"no authorizer", domain.SevWarn, "wave2:apigw")
+		"no authorizer", domain.SevWarn, "wave2")
 }
 
 // TestW6AAPIGW_CatalogDefs pins the catalog rows for the five apigw codes.
@@ -577,7 +577,7 @@ func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
 		t.Errorf("GetAuthorizers called %d times over 3 pages, want 3", open.authCalls)
 	}
 	w2AssertFinding(t, res.Findings["htp006noauth"], w6aAPIGWNoAuth,
-		"no authorizer", domain.SevWarn, "wave2:apigw")
+		"no authorizer", domain.SevWarn, "wave2")
 }
 
 // TestW6AAPIGWRESTEndpointType pins row 22, one case per branch.
@@ -606,7 +606,7 @@ func TestW6AAPIGWRESTEndpointType(t *testing.T) {
 				&w6aAPIGWV2Fake{},
 				w6aRESTRes(id, "acme-"+tc.word+"-rest", tc.endpoint, ""),
 			)
-			w2AssertFinding(t, res.Findings[id], tc.code, tc.phrase, tc.sev, "wave2:apigw")
+			w2AssertFinding(t, res.Findings[id], tc.code, tc.phrase, tc.sev, "wave2")
 			w2AssertRow(t, w2Rows(t, res, id, tc.code), "Endpoint", tc.word)
 		})
 	}

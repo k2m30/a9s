@@ -190,7 +190,7 @@ func TestW5_SQSPublicPolicy_Positive(t *testing.T) {
 	w2AssertEnricherInvariants(t, res, err)
 
 	w2AssertFinding(t, res.Findings[name], "sqs.public-policy",
-		"queue policy open to anyone", domain.SevBroken, "wave2:sqs")
+		"queue policy open to anyone", domain.SevBroken, "wave2")
 
 	rows := w2Rows(t, res, name, "sqs.public-policy")
 	w2AssertRow(t, rows, "Principal", "*")
@@ -395,7 +395,7 @@ func TestW5_SQSPublicPolicy_APIErrorOnOneQueueTruncatesOnlyThatQueue(t *testing.
 		t.Errorf("TruncatedIDs[%q] = true; one queue's failure must not mark the others unknown", healthy)
 	}
 	w2AssertFinding(t, res.Findings[healthy], "sqs.public-policy",
-		"queue policy open to anyone", domain.SevBroken, "wave2:sqs")
+		"queue policy open to anyone", domain.SevBroken, "wave2")
 }
 
 func TestW5_SQSPublicPolicy_NilClientReturnsEmptyResult(t *testing.T) {
@@ -510,7 +510,7 @@ func TestW5_SNSPublicPolicy_Positive(t *testing.T) {
 	w2AssertEnricherInvariants(t, res, err)
 
 	w2AssertFinding(t, res.Findings[arn], "sns.public-policy",
-		"topic policy open to anyone", domain.SevBroken, "wave2:sns")
+		"topic policy open to anyone", domain.SevBroken, "wave2")
 
 	rows := w2Rows(t, res, arn, "sns.public-policy")
 	w2AssertRow(t, rows, "Principal", "*")
@@ -576,7 +576,7 @@ func TestW5_SNSNoKMS_Positive(t *testing.T) {
 	w2AssertEnricherInvariants(t, res, err)
 
 	w2AssertFinding(t, res.Findings[arn], "sns.no-kms",
-		"not encrypted with KMS", domain.SevWarn, "wave2:sns")
+		"not encrypted with KMS", domain.SevWarn, "wave2")
 
 	// The value is pinned; the label is left to the rendered-surface gate,
 	// which forbids the SDK's own field name on a rendered row.
@@ -608,7 +608,7 @@ func TestW5_SNSNoKMS_EmptyKeyIDIsTheSameAsAbsent(t *testing.T) {
 	)
 	w2AssertEnricherInvariants(t, res, err)
 	w2AssertFinding(t, res.Findings[arn], "sns.no-kms",
-		"not encrypted with KMS", domain.SevWarn, "wave2:sns")
+		"not encrypted with KMS", domain.SevWarn, "wave2")
 }
 
 func TestW5_SNSNoKMS_EncryptedTopicIsHealthy(t *testing.T) {
@@ -652,9 +652,9 @@ func TestW5_SNSPublicAndUnencrypted_AreTwoFindings(t *testing.T) {
 	w2AssertEnricherInvariants(t, res, err)
 
 	w2AssertFinding(t, res.Findings[arn], "sns.public-policy",
-		"topic policy open to anyone", domain.SevBroken, "wave2:sns")
+		"topic policy open to anyone", domain.SevBroken, "wave2")
 	w2AssertFinding(t, res.Findings[arn], "sns.no-kms",
-		"not encrypted with KMS", domain.SevWarn, "wave2:sns")
+		"not encrypted with KMS", domain.SevWarn, "wave2")
 
 	if _, ok := res.AttentionDetails[arn][domain.FindingCode("sns.public-policy")]; !ok {
 		t.Error("the two findings share one AttentionDetail entry; rows are keyed per code so each condition keeps its own evidence")
@@ -695,7 +695,7 @@ func TestW5_SNSTopicAttributes_APIErrorTruncatesOnlyThatTopic(t *testing.T) {
 		t.Errorf("TruncatedIDs[%q] = true; one topic's failure must not mark the others unknown", healthy)
 	}
 	w2AssertFinding(t, res.Findings[healthyARN], "sns.public-policy",
-		"topic policy open to anyone", domain.SevBroken, "wave2:sns")
+		"topic policy open to anyone", domain.SevBroken, "wave2")
 }
 
 // The cap bounds how many topics are inspected. With EnrichmentCap+1 topics

@@ -376,7 +376,7 @@ func TestEC2_InternetExposed_SensitivePortFromSGCache(t *testing.T) {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
 	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-		"port(s) 27017 reachable from the internet", domain.SevBroken, "wave2:ec2")
+		"port(s) 27017 reachable from the internet", domain.SevBroken, "wave2")
 	rows := pw1Rows(res, id, pw1EC2CodeInternetExposed)
 	pw1RequireRow(t, rows, "Public address", "203.0.113.10")
 	pw1RequireRow(t, rows, "Security groups", "sg-0mongo000aaaaaa1")
@@ -395,7 +395,7 @@ func TestEC2_InternetExposed_WideOpenSGReportsAll(t *testing.T) {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
 	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-		"port(s) all reachable from the internet", domain.SevBroken, "wave2:ec2")
+		"port(s) all reachable from the internet", domain.SevBroken, "wave2")
 	pw1RequireRow(t, pw1Rows(res, id, pw1EC2CodeInternetExposed), "Ports", "all")
 }
 
@@ -471,7 +471,7 @@ func TestEC2_InternetExposed_EvaluatesEveryInputInstance(t *testing.T) {
 	}
 	for _, id := range []string{"i-0batch00aaaaaaa1", "i-0batch00aaaaaaa2"} {
 		pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-			"port(s) 3389 reachable from the internet", domain.SevBroken, "wave2:ec2")
+			"port(s) 3389 reachable from the internet", domain.SevBroken, "wave2")
 	}
 }
 
@@ -496,7 +496,7 @@ func TestEC2_PublicIPAndInternetExposedBothFire(t *testing.T) {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
 	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
-		"port(s) 22 reachable from the internet", domain.SevBroken, "wave2:ec2")
+		"port(s) 22 reachable from the internet", domain.SevBroken, "wave2")
 }
 
 // ─── row 4: ec2.user-data-secret ────────────────────────────────────────────
@@ -526,7 +526,7 @@ func TestEC2_UserDataSecret_PlaintextCredential(t *testing.T) {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
 	f := pw1RequireFinding(t, res.Findings[id], pw1EC2CodeUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:ec2")
+		"credential in user data", domain.SevBroken, "wave2")
 	pw1RequireRow(t, pw1Rows(res, id, pw1EC2CodeUserDataSecret), "line 3", "keyword")
 
 	for _, text := range []string{f.Phrase, f.Detail} {
@@ -609,7 +609,7 @@ func TestEC2_UserDataSecret_PerItemErrorMarksOnlyThatRow(t *testing.T) {
 	}
 	pw1RequireNoFinding(t, res.Findings[bad], pw1EC2CodeUserDataSecret)
 	pw1RequireFinding(t, res.Findings[good], pw1EC2CodeUserDataSecret,
-		"credential in user data", domain.SevBroken, "wave2:ec2")
+		"credential in user data", domain.SevBroken, "wave2")
 	if res.TruncatedIDs[good] {
 		t.Errorf("healthy neighbour %s wrongly marked truncated", good)
 	}

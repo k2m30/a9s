@@ -67,7 +67,7 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 			Value: strconv.FormatInt(aws.ToInt64(raw.DefaultVersion.VersionNumber), 10),
 			Tier:  "!",
 		}}, hitRows...)
-		setWave2Finding(&result, res.ID, ltCodeUserDataSecret, "lt", rows)
+		setWave2Finding(&result, res.ID, ltCodeUserDataSecret, rows)
 
 	}
 
@@ -103,7 +103,7 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 		if !strings.HasPrefix(imageID, "ami-") || !deprecatedByID[imageID] {
 			continue
 		}
-		setWave2Finding(&result, res.ID, ltCodeDeprecatedAMI, "lt", []domain.DetailRow{{Label: "AMI", Value: imageID, Tier: tierOf(ltCodeDeprecatedAMI)}})
+		setWave2Finding(&result, res.ID, ltCodeDeprecatedAMI, []domain.DetailRow{{Label: "AMI", Value: imageID, Tier: tierOf(ltCodeDeprecatedAMI)}})
 
 	}
 

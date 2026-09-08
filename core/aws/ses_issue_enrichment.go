@@ -61,7 +61,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 	code, rows, hasFinding := sesAccountFinding(out)
 	if hasFinding {
 		for _, res := range resources {
-			setWave2Finding(&result, res.ID, code, "ses", rows)
+			setWave2Finding(&result, res.ID, code, rows)
 		}
 	}
 
@@ -104,7 +104,7 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		if out.DkimAttributes != nil && out.DkimAttributes.SigningEnabled {
 			return
 		}
-		setWave2Finding(result, r.ID, sesCodeDKIMOff, "ses", []domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: tierOf(sesCodeDKIMOff)}})
+		setWave2Finding(result, r.ID, sesCodeDKIMOff, []domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: tierOf(sesCodeDKIMOff)}})
 	})
 	return AggregateFailures("GetEmailIdentity", failures, n)
 }

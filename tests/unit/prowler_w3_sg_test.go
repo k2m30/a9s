@@ -419,8 +419,8 @@ func TestW3EnrichSGUsage_UnreferencedGroupFlagged(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	if f.Source != "wave2:sg" {
-		t.Errorf("Source = %q, want %q", f.Source, "wave2:sg")
+	if f.Source != "wave2" {
+		t.Errorf("Source = %q, want %q", f.Source, "wave2")
 	}
 	if f.Detail == "" {
 		t.Error("Detail is empty; every finding carries an operator sentence")

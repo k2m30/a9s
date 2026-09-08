@@ -131,7 +131,7 @@ func TestW5_MSKPublicAccess_Positive(t *testing.T) {
 
 	res := w5EnrichMSK(t, f, w5MSKRes(name))
 	w2AssertFinding(t, res.Findings[name], "msk.public-access",
-		"brokers reachable from the internet", domain.SevBroken, "wave2:msk")
+		"brokers reachable from the internet", domain.SevBroken, "wave2")
 }
 
 func TestW5_MSKPublicAccess_DisabledIsHealthy(t *testing.T) {
@@ -186,7 +186,7 @@ func TestW5_MSKUnauthenticated_Positive(t *testing.T) {
 
 	res := w5EnrichMSK(t, f, w5MSKRes(name))
 	w2AssertFinding(t, res.Findings[name], "msk.unauthenticated",
-		"unauthenticated access allowed", domain.SevBroken, "wave2:msk")
+		"unauthenticated access allowed", domain.SevBroken, "wave2")
 }
 
 func TestW5_MSKUnauthenticated_DisabledIsHealthy(t *testing.T) {
@@ -239,9 +239,9 @@ func TestW5_MSKPublicAndUnauthenticated_AreTwoFindings(t *testing.T) {
 
 	res := w5EnrichMSK(t, f, w5MSKRes(name))
 	w2AssertFinding(t, res.Findings[name], "msk.public-access",
-		"brokers reachable from the internet", domain.SevBroken, "wave2:msk")
+		"brokers reachable from the internet", domain.SevBroken, "wave2")
 	w2AssertFinding(t, res.Findings[name], "msk.unauthenticated",
-		"unauthenticated access allowed", domain.SevBroken, "wave2:msk")
+		"unauthenticated access allowed", domain.SevBroken, "wave2")
 }
 
 // Serverless clusters carry no Provisioned block and neither setting exists
@@ -287,7 +287,7 @@ func TestW5_MSK_APIErrorOnOneClusterTruncatesOnlyThatCluster(t *testing.T) {
 		t.Errorf("failed cluster %q carries findings %v", broken, w2Codes(res.Findings[broken]))
 	}
 	w2AssertFinding(t, res.Findings[open], "msk.unauthenticated",
-		"unauthenticated access allowed", domain.SevBroken, "wave2:msk")
+		"unauthenticated access allowed", domain.SevBroken, "wave2")
 }
 
 func TestW5_MSK_NilClientReturnsEmptyResult(t *testing.T) {
@@ -428,7 +428,7 @@ func TestW5_KinesisUnencrypted_Positive(t *testing.T) {
 
 			res := w5EnrichKinesis(t, f, w5KinesisRes(stream))
 			w2AssertFinding(t, res.Findings[stream], "kinesis.unencrypted",
-				"not encrypted at rest", domain.SevWarn, "wave2:kinesis")
+				"not encrypted at rest", domain.SevWarn, "wave2")
 
 			rows := w2Rows(t, res, stream, "kinesis.unencrypted")
 			var got []string
@@ -482,7 +482,7 @@ func TestW5_KinesisMinRetention_Boundary(t *testing.T) {
 				return
 			}
 			w2AssertFinding(t, res.Findings[stream], "kinesis.min-retention",
-				"24h retention", domain.SevWarn, "wave2:kinesis")
+				"24h retention", domain.SevWarn, "wave2")
 		})
 	}
 }
@@ -520,9 +520,9 @@ func TestW5_KinesisUnencryptedAndMinRetention_AreTwoFindings(t *testing.T) {
 
 	res := w5EnrichKinesis(t, f, w5KinesisRes(stream))
 	w2AssertFinding(t, res.Findings[stream], "kinesis.unencrypted",
-		"not encrypted at rest", domain.SevWarn, "wave2:kinesis")
+		"not encrypted at rest", domain.SevWarn, "wave2")
 	w2AssertFinding(t, res.Findings[stream], "kinesis.min-retention",
-		"24h retention", domain.SevWarn, "wave2:kinesis")
+		"24h retention", domain.SevWarn, "wave2")
 }
 
 // A stream being torn down is not a posture problem; rule 4 keeps deleting
@@ -571,7 +571,7 @@ func TestW5_Kinesis_APIErrorOnOneStreamTruncatesOnlyThatStream(t *testing.T) {
 		t.Errorf("TruncatedIDs[%q] = true; one stream's failure must not mark the others unknown", plain)
 	}
 	w2AssertFinding(t, res.Findings[plain], "kinesis.unencrypted",
-		"not encrypted at rest", domain.SevWarn, "wave2:kinesis")
+		"not encrypted at rest", domain.SevWarn, "wave2")
 }
 
 // A stream AWS reports as gone between the list and the describe is not a
@@ -605,7 +605,7 @@ func TestW5_Kinesis_NotFoundMarksTruncatedWithoutFailing(t *testing.T) {
 		t.Errorf("enricher returned %v; a stream deleted between the list and the describe is an expected race, not a batch failure", err)
 	}
 	w2AssertFinding(t, res.Findings[plain], "kinesis.unencrypted",
-		"not encrypted at rest", domain.SevWarn, "wave2:kinesis")
+		"not encrypted at rest", domain.SevWarn, "wave2")
 }
 
 func TestW5_Kinesis_CapPlusOne(t *testing.T) {
@@ -743,9 +743,9 @@ func TestW5_MSKDegradedClusterStillReportsReachability(t *testing.T) {
 
 			res := w5EnrichMSK(t, f, r)
 			w2AssertFinding(t, res.Findings[name], "msk.public-access",
-				"brokers reachable from the internet", domain.SevBroken, "wave2:msk")
+				"brokers reachable from the internet", domain.SevBroken, "wave2")
 			w2AssertFinding(t, res.Findings[name], "msk.unauthenticated",
-				"unauthenticated access allowed", domain.SevBroken, "wave2:msk")
+				"unauthenticated access allowed", domain.SevBroken, "wave2")
 		})
 	}
 }

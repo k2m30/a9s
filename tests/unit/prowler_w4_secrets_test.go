@@ -26,7 +26,7 @@ const (
 
 	w4PhraseSecretPublic    = "resource policy open to anyone"
 	w4PhraseSecretCrossAcct = "resource policy grants another account"
-	w4SourceSecretsWave2    = "wave2:secrets"
+	w4SourceSecretsWave2    = "wave2"
 	w4OwnAccount            = "123456789012"
 	w4ForeignAccount        = "210987654321"
 	w4SecondForeignAccount  = "987654321098"

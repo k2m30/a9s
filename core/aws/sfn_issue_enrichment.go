@@ -115,7 +115,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 				if exec.Name != nil && *exec.Name != "" {
 					rows = append(rows, domain.DetailRow{Label: "Execution Name", Value: *exec.Name})
 				}
-				setWave2Finding(&result, r.ID, sfnCodeLatestExecutionFailed, "sfn", rows, statusPhrase)
+				setWave2Finding(&result, r.ID, sfnCodeLatestExecutionFailed, rows, statusPhrase)
 			}
 			result.FieldUpdates[r.ID] = map[string]string{
 				"last_run": lastRunVal,
@@ -147,12 +147,12 @@ func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, resul
 	// Absent configuration and an explicit OFF are the same fact: nothing is
 	// being recorded.
 	if out.LoggingConfiguration == nil || out.LoggingConfiguration.Level == "" || out.LoggingConfiguration.Level == sfntypes.LogLevelOff {
-		setWave2Finding(result, id, sfnCodeLoggingOff, "sfn", []domain.DetailRow{{Label: "Logging level", Value: "off", Tier: tierOf(sfnCodeLoggingOff)}})
+		setWave2Finding(result, id, sfnCodeLoggingOff, []domain.DetailRow{{Label: "Logging level", Value: "off", Tier: tierOf(sfnCodeLoggingOff)}})
 	}
 	if out.EncryptionConfiguration == nil || out.EncryptionConfiguration.Type != sfntypes.EncryptionTypeCustomerManagedKmsKey {
-		setWave2Finding(result, id, sfnCodeNoCMK, "sfn", []domain.DetailRow{{Label: "Key owner", Value: "amazon", Tier: tierOf(sfnCodeNoCMK)}})
+		setWave2Finding(result, id, sfnCodeNoCMK, []domain.DetailRow{{Label: "Key owner", Value: "amazon", Tier: tierOf(sfnCodeNoCMK)}})
 	}
 	if rows := secretScanTextRows(aws.ToString(out.Definition)); len(rows) > 0 {
-		setWave2Finding(result, id, sfnCodeDefinitionSecret, "sfn", rows)
+		setWave2Finding(result, id, sfnCodeDefinitionSecret, rows)
 	}
 }

@@ -162,7 +162,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				if nc := svc.NetworkConfiguration; ecsServiceScheduling(aws.ToString(svc.Status)) &&
 					nc != nil && nc.AwsvpcConfiguration != nil &&
 					nc.AwsvpcConfiguration.AssignPublicIp == ecstypes.AssignPublicIpEnabled {
-					setWave2Finding(&result, svcName, ecsSvcCodePublicIP, "ecs-svc", []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: tierOf(ecsSvcCodePublicIP)}})
+					setWave2Finding(&result, svcName, ecsSvcCodePublicIP, []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: tierOf(ecsSvcCodePublicIP)}})
 
 				}
 
@@ -185,7 +185,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					rows = append(rows, domain.DetailRow{Label: "Event", Value: issue, Tier: "!"})
 				}
 
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, "ecs-svc", rows)
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, rows)
 			}
 		}
 	}

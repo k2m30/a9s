@@ -11,8 +11,6 @@ package runtime
 // both.
 
 import (
-	"strings"
-
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -121,7 +119,7 @@ func ApplyWave2ToRow(
 	out := make([]domain.Finding, 0, len(r.Findings))
 	stale := make(map[domain.FindingCode]bool, len(r.Findings))
 	for _, f := range r.Findings {
-		if strings.HasPrefix(f.Source, "wave2:") {
+		if f.IsWave2Sourced() {
 			stale[f.Code] = true
 			continue
 		}
@@ -147,14 +145,13 @@ func ApplyWave2ToRow(
 			continue
 		}
 		seen[f.Code] = true
-		// Enricher-emitted Findings already carry the canonical Code and
-		// Source. Source must be "wave2:<short>" for the existing
-		// app_enrich_fold readers (primaryWave2Finding, wave2FindingsByID,
-		// stripWave2) to recognise the entry. Tolerate enrichers that forgot
-		// to set Source by stamping the canonical form here.
-		if f.Source == "" || !strings.HasPrefix(f.Source, "wave2:") {
-			f.Source = "wave2:" + td.ShortName
-		}
+		// The provenance is stamped here and nowhere else: this is the only
+		// point that knows which registered type's enricher produced fs, so
+		// an enricher can neither spell its own short name wrong nor spell it
+		// two ways at two call sites. "wave2:<short>" is the form the readers
+		// test for (Finding.IsWave2Sourced, and app_enrich_fold's
+		// primaryWave2Finding / wave2FindingsByID / stripWave2).
+		f.Source = "wave2:" + td.ShortName
 		r.Findings = append(r.Findings, f)
 		// Each Finding gets its OWN AttentionDetail by its Code — a resource
 		// with more than one independently-evaluated condition keeps every

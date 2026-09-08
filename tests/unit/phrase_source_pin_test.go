@@ -372,8 +372,9 @@ func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 	}
 	for _, o := range dictated {
 		t.Errorf("finding dictated at the call site: %s — a constructor builds the wording and "+
-			"the severity from the code's own declaration; a phrase or severity argument is a "+
-			"second owner wearing a parameter name", o)
+			"the severity from the code's own declaration and leaves the provenance to the "+
+			"registry; a phrase, severity or short-name argument is a second owner wearing a "+
+			"parameter name", o)
 	}
 }
 
@@ -405,11 +406,15 @@ func phraseAssignments(t *testing.T, fset *token.FileSet, files map[string]*ast.
 }
 
 // findingConstructors are the four functions that build a finding, and
-// dictatedArgs the parameter names that would let a call site dictate what
-// the finding says instead of reading it off the code's declaration.
+// dictatedArgs the parameter names that would let a call site dictate a fact
+// somebody else owns: the wording and the severity belong to the code's
+// declaration, and the provenance belongs to the registry entry the runtime
+// merges the result under.
 var (
 	findingConstructors = []string{"wave1Finding", "addWave1Finding", "wave2Finding", "setWave2Finding"}
-	dictatedArgs        = map[string]bool{"phrase": true, "severity": true, "severityGlyph": true}
+	dictatedArgs        = map[string]bool{
+		"phrase": true, "severity": true, "severityGlyph": true, "shortName": true,
+	}
 )
 
 // dictatedArguments reports every call site that hands a constructor one of

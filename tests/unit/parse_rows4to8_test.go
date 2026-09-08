@@ -446,7 +446,7 @@ func TestR53DanglingRecord_OnlyAnUnassociatedElasticIPRaisesIt(t *testing.T) {
 				return
 			}
 			w4AssertFinding(t, res.Findings[zoneID], code,
-				"record points at an unassociated elastic IP", domain.SevBroken, "wave2:r53")
+				"record points at an unassociated elastic IP", domain.SevBroken, "wave2")
 		})
 	}
 }
@@ -530,7 +530,7 @@ func TestCloudFrontOriginBucket_MissingIsAssertedOnlyOnProof(t *testing.T) {
 			}
 			if tc.wantMissing {
 				w4AssertFinding(t, res.Findings[distID], missing,
-					"S3 origin bucket does not exist", domain.SevBroken, "wave2:cf")
+					"S3 origin bucket does not exist", domain.SevBroken, "wave2")
 			} else {
 				w4AssertNoCode(t, res.Findings[distID], missing)
 			}

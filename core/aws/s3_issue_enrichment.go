@@ -124,7 +124,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			MarkSkipped(&result, r.ID, &failures, p.failures[0])
 		}
 		for _, f := range p.findings {
-			setWave2Finding(&result, bucketName, f.code, "s3", f.rows)
+			setWave2Finding(&result, bucketName, f.code, f.rows)
 		}
 		if p.pabIncomplete {
 			result.FieldUpdates[bucketName] = map[string]string{"status": "public access block incomplete"}

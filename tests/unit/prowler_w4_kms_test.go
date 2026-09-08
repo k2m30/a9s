@@ -20,7 +20,7 @@ import (
 const (
 	w4CodeKMSPublicPolicy domain.FindingCode = "kms.public-policy"
 	w4PhraseKMSPublic                        = "key policy open to anyone"
-	w4SourceKMSWave2                         = "wave2:kms"
+	w4SourceKMSWave2                         = "wave2"
 )
 
 // A key policy granting use to everyone, alongside the usual root statement.

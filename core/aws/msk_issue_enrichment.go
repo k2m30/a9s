@@ -81,7 +81,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
-				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "msk", nil)
+				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, nil)
 			}
 		}
 		// Check encryption in transit — independently evaluated from the broker
@@ -90,7 +90,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		if prov.EncryptionInfo != nil &&
 			prov.EncryptionInfo.EncryptionInTransit != nil &&
 			prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "msk", nil)
+			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, nil)
 		}
 		// Rule 4: a cluster being torn down, or already broken beyond use,
 		// has no posture worth reporting. The two checks above describe the
@@ -104,12 +104,12 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			bng.ConnectivityInfo != nil &&
 			bng.ConnectivityInfo.PublicAccess != nil &&
 			aws.ToString(bng.ConnectivityInfo.PublicAccess.Type) == mskPublicAccessOn {
-			setWave2Finding(&result, r.ID, mskCodePublicAccess, "msk", nil)
+			setWave2Finding(&result, r.ID, mskCodePublicAccess, nil)
 		}
 		if ca := prov.ClientAuthentication; ca != nil &&
 			ca.Unauthenticated != nil &&
 			aws.ToBool(ca.Unauthenticated.Enabled) {
-			setWave2Finding(&result, r.ID, mskCodeUnauthenticated, "msk", nil)
+			setWave2Finding(&result, r.ID, mskCodeUnauthenticated, nil)
 		}
 	})
 

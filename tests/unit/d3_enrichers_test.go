@@ -81,7 +81,7 @@ func TestD3MaintenanceWalkKeepsThePagesItRead(t *testing.T) {
 		[]resource.Resource{{ID: instance, Name: instance, Type: "dbi"}}, nil)
 
 	w4AssertFinding(t, res.Findings[instance], d3CodeDBIMaintenance,
-		"maintenance scheduled", domain.SevWarn, "wave2:dbi")
+		"maintenance scheduled", domain.SevWarn, "wave2")
 	if !res.Truncated {
 		t.Errorf("Truncated = false; a walk that stopped early has not seen every instance")
 	}
@@ -196,7 +196,7 @@ func TestD3RedshiftParameterGroupReadOncePerGroup(t *testing.T) {
 	}
 	for _, id := range []string{"acme-warehouse", "acme-reporting"} {
 		w4AssertFinding(t, res.Findings[id], d3CodeRedshiftSSLOff,
-			"SSL not required", domain.SevWarn, "wave2:redshift")
+			"SSL not required", domain.SevWarn, "wave2")
 	}
 }
 
@@ -245,7 +245,7 @@ func TestD3ECSRecentEventFoundOutOfOrder(t *testing.T) {
 	// the wording a property of whichever event came first; it is a supporting
 	// row now and the phrase is the code's. Do not restore the old expectation.
 	w4AssertFinding(t, res.Findings[svc], d3CodeECSDeployFailed,
-		catalog.Phrase(d3CodeECSDeployFailed), domain.SevBroken, "wave2:ecs-svc")
+		catalog.Phrase(d3CodeECSDeployFailed), domain.SevBroken, "wave2")
 }
 
 // TestD3ECSQuietServiceReportsNothing pins the negative case: a service whose
@@ -342,7 +342,7 @@ func TestD3LambdaWithAPublicPolicyStillReports(t *testing.T) {
 		[]resource.Resource{d3LambdaResource("acme-open-fn")}, nil)
 
 	w4AssertFinding(t, res.Findings["acme-open-fn"], d3CodeLambdaPublic,
-		"invokable by anyone", domain.SevBroken, "wave2:lambda")
+		"invokable by anyone", domain.SevBroken, "wave2")
 }
 
 // d3NotFoundErr is the shape a service returns when the thing asked about

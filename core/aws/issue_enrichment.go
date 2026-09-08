@@ -113,9 +113,6 @@ var Wave2EmissionObserver func(resourceID string, f domain.Finding)
 // rows MAY be nil; the helper omits the AttentionDetail entry when empty so a
 // nil-row finding does not surface an empty Attention section.
 //
-// shortName stamps Source = "wave2:<shortName>" on the emitted Finding. It is
-// the resource short name the enricher serves (e.g. "acm", "dbi", "tg").
-//
 // Append-style: calling this a second time for the same resourceID with a
 // DIFFERENT code (an enricher with two independently-evaluated conditions on
 // the same resource, e.g. opensearch's update-forced + encryption-off)
@@ -149,11 +146,10 @@ func setWave2Finding(
 	r *IssueEnricherResult,
 	resourceID string,
 	code domain.FindingCode,
-	shortName string,
 	rows []domain.DetailRow,
 	values ...string,
 ) {
-	f := wave2Finding(code, shortName, values...)
+	f := wave2Finding(code, values...)
 	if Wave2EmissionObserver != nil {
 		Wave2EmissionObserver(resourceID, f)
 	}
@@ -179,21 +175,18 @@ func setWave2Finding(
 // only places a domain.Finding is constructed, so a wording, a sentence and a
 // Source string each have one owner.
 //
-// shortName stamps Source = "wave2:<shortName>". Pass "" for a predicate that
-// recomputes a Wave-2 finding from a row's Fields, where the enricher that
-// originally emitted it is not in hand. values fill the declared phrase's
-// "<…>" slots left to right, and the severity is the code's own.
-func wave2Finding(code domain.FindingCode, shortName string, values ...string) domain.Finding {
-	source := "wave2"
-	if shortName != "" {
-		source += ":" + shortName
-	}
+// Source is the bare provenance class. The type-qualified form the readers
+// test for ("wave2:<short>") is stamped by runtime.ApplyWave2ToRow, which
+// holds the registry entry the result is being merged under and is therefore
+// the only thing that knows which type's enricher ran. values fill the
+// declared phrase's "<…>" slots left to right, and the severity is the code's.
+func wave2Finding(code domain.FindingCode, values ...string) domain.Finding {
 	return domain.Finding{
 		Code:     code,
 		Phrase:   fillPhrase(catalog.Phrase(code), values...),
 		Detail:   catalog.Detail(code),
 		Severity: catalog.Severity(code),
-		Source:   source,
+		Source:   "wave2",
 	}
 }
 

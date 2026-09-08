@@ -122,8 +122,8 @@ func TestPipelineTwoFailedStagesNamesBothUnderOnePhrase(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", f.Severity)
 	}
-	if f.Source != "wave2:pipeline" {
-		t.Errorf("Source = %q, want %q", f.Source, "wave2:pipeline")
+	if f.Source != "wave2" {
+		t.Errorf("Source = %q, want %q", f.Source, "wave2")
 	}
 
 	stages := phraseRowValues(result, "acme-release", code, "Failed Stage")
@@ -272,8 +272,8 @@ func TestECSTaskTwoFailedContainersNameBothUnderOnePhrase(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", f.Severity)
 	}
-	if f.Source != "wave2:ecs-task" {
-		t.Errorf("Source = %q, want %q", f.Source, "wave2:ecs-task")
+	if f.Source != "wave2" {
+		t.Errorf("Source = %q, want %q", f.Source, "wave2")
 	}
 
 	containers := phraseRowValues(result, taskID, code, "Container")

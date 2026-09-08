@@ -8,7 +8,7 @@ package unit
 // so every non-healthy case here must attach a Finding shaped exactly like
 // the real fetcher (core/aws/ec2.go, wave1 lifecycle Findings) or the
 // real Wave-2 enricher (core/aws/ec2_issue_enrichment.go, Source
-// "wave2:ec2") would produce. Fields are kept for realism/context only —
+// "wave2") would produce. Fields are kept for realism/context only —
 // they are no longer read by Color.
 //
 // colorEC2 is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does not
@@ -79,7 +79,7 @@ func TestEc2Color(t *testing.T) {
 		},
 		{
 			// Running instance with impaired instance status check (Wave 2
-			// enricher EnrichEC2InstanceStatus, Source "wave2:ec2"). Must
+			// enricher EnrichEC2InstanceStatus, Source "wave2"). Must
 			// override the (findings-absent) healthy state color.
 			name: "impaired_via_enricher",
 			fields: map[string]string{

@@ -132,7 +132,7 @@ var appCtrlZHealthyFieldOverrides = map[string]map[string]string{
 // appCtrlZPerTypeResources returns a genuine issue row and a genuine healthy
 // row for shortName, built against that type's real Color func so
 // TestAppCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes never degrades
-// to comparing two empty sets. colorSES only recognizes Source "wave2:ses"
+// to comparing two empty sets. colorSES only recognizes Source "wave2"
 // (never bare "wave1"), so it gets its own Finding source distinct from the
 // generic wave1 Finding every other Finding-driven Color func recognizes
 // (colorFromAnyFinding accepts any Source, so the bare wave1 Finding colours

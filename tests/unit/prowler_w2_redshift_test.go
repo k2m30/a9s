@@ -31,7 +31,7 @@ import (
 const (
 	w2RedshiftCodeAuditLoggingOff = "redshift.audit-logging-off"
 	w2RedshiftCodeRequireSSLOff   = "redshift.require-ssl-off"
-	w2RedshiftSource              = "wave2:redshift"
+	w2RedshiftSource              = "wave2"
 )
 
 // w2RedshiftFake answers both DescribeLoggingStatus (per cluster) and

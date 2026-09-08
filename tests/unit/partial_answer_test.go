@@ -139,7 +139,7 @@ func TestPartialLambda_OneFailedCheckKeepsTheOtherOne(t *testing.T) {
 			urlErr: partialAccessDenied(),
 		})
 		w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.public-policy",
-			"invokable by anyone", domain.SevBroken, "wave2:lambda")
+			"invokable by anyone", domain.SevBroken, "wave2")
 		partialAssertUninspected(t, res, partialLambdaFn)
 	})
 
@@ -150,7 +150,7 @@ func TestPartialLambda_OneFailedCheckKeepsTheOtherOne(t *testing.T) {
 			urlAuth:   lambdatypes.FunctionUrlAuthTypeNone,
 		})
 		w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.function-url-public",
-			"function endpoint open without authentication", domain.SevBroken, "wave2:lambda")
+			"function endpoint open without authentication", domain.SevBroken, "wave2")
 		partialAssertUninspected(t, res, partialLambdaFn)
 	})
 
@@ -393,7 +393,7 @@ func TestPartialEC2_EveryInstanceAtTheCapIsInspected(t *testing.T) {
 	res := partialEnrichEC2(t, fake, rows)
 
 	w4AssertFinding(t, res.Findings[last], "ec2.user-data-secret",
-		"credential in user data", domain.SevBroken, "wave2:ec2")
+		"credential in user data", domain.SevBroken, "wave2")
 	for i := range n {
 		partialAssertInspected(t, res, partialEC2InstanceID(i))
 	}
@@ -549,7 +549,7 @@ func TestPartialBackup_SelectionEnumerationNeverInventsCoverage(t *testing.T) {
 		})
 		res := w7EnrichEBS(t, []resource.Resource{volume}, cacheEntry)
 		w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-			"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+			"not covered by a backup plan", domain.SevWarn, "wave2")
 	})
 }
 
@@ -683,9 +683,9 @@ func TestPartialEBS_StatusFailureKeepsTheCoverageFindings(t *testing.T) {
 	}
 
 	w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-		"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+		"not covered by a backup plan", domain.SevWarn, "wave2")
 	w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNoSnapshot,
-		"no snapshot exists", domain.SevWarn, "wave2:ebs")
+		"no snapshot exists", domain.SevWarn, "wave2")
 	partialAssertUninspected(t, res, w7VolumeID)
 }
 
@@ -765,7 +765,7 @@ func TestPartialECR_OnlyNotFoundMeansTheLifecyclePolicyIsMissing(t *testing.T) {
 			lifecycleErr: &ecrtypes.LifecyclePolicyNotFoundException{Message: aws.String("Lifecycle policy does not exist for the repository")},
 		})
 		w4AssertFinding(t, res.Findings[partialECRRepo], "ecr.no-lifecycle-policy",
-			"no lifecycle policy", domain.SevWarn, "wave2:ecr")
+			"no lifecycle policy", domain.SevWarn, "wave2")
 		partialAssertInspected(t, res, partialECRRepo)
 	})
 
@@ -865,7 +865,7 @@ func TestPartialRedshift_ParameterWalkCutShortIsNotAnEmptyAnswer(t *testing.T) {
 			requireSSL:     "false",
 		}, id)
 		w4AssertFinding(t, res.Findings[id], "redshift.require-ssl-off",
-			"SSL not required", domain.SevWarn, "wave2:redshift")
+			"SSL not required", domain.SevWarn, "wave2")
 		partialAssertInspected(t, res, id)
 	})
 }
@@ -1036,7 +1036,7 @@ func TestPartialRow10_ConditionsTheFlatListCannotRepresentAbstain(t *testing.T) 
 			res := w7EnrichEBS(t, []resource.Resource{partialRow10Volume(tc.tags)}, plans)
 			if tc.wantWarning {
 				w4AssertFinding(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan,
-					"not covered by a backup plan", domain.SevWarn, "wave2:ebs")
+					"not covered by a backup plan", domain.SevWarn, "wave2")
 				return
 			}
 			w4AssertNoCode(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan)
