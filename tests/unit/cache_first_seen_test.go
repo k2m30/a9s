@@ -54,6 +54,7 @@ func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{row}, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store1 := cache.LoadDirForTest("demo", "us-east-1")
 	tf1, ok := store1.Type("s3")
 	if !ok || len(tf1.Rows) != 1 {
@@ -67,6 +68,7 @@ func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{row}, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store2 := cache.LoadDirForTest("demo", "us-east-1")
 	tf2, ok := store2.Type("s3")
 	if !ok || len(tf2.Rows) != 1 {
@@ -106,6 +108,7 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		Findings: []domain.Finding{finding},
 	}}, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store1 := cache.LoadDirForTest("demo", "us-east-1")
 	tf1, ok := store1.Type("s3")
 	if !ok || len(tf1.Rows) != 1 {
@@ -123,6 +126,7 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		Fields: map[string]string{"region": "us-east-1"},
 	}}, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store2 := cache.LoadDirForTest("demo", "us-east-1")
 	tf2, ok := store2.Type("s3")
 	if !ok || len(tf2.Rows) != 1 {
@@ -160,6 +164,7 @@ func TestCacheFirstSeen_ReappearingFindingFreshStamp(t *testing.T) {
 	}
 
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{withFinding}, nil, false)
+	ctrl.WaitForCacheWrites()
 	store1 := cache.LoadDirForTest("demo", "us-east-1")
 	tf1, ok := store1.Type("s3")
 	if !ok || len(tf1.Rows) != 1 {
@@ -176,6 +181,7 @@ func TestCacheFirstSeen_ReappearingFindingFreshStamp(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{withFinding}, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store3 := cache.LoadDirForTest("demo", "us-east-1")
 	tf3, ok := store3.Type("s3")
 	if !ok || len(tf3.Rows) != 1 {

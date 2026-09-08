@@ -77,6 +77,7 @@ func TestSort_TheSameColumnOrdersTheSameWarmOrLive(t *testing.T) {
 	ctrl.Apply(app.Action{Kind: app.ActionSort, Arg: "Launch Time"})
 	liveOrder := sortFrameIDs(t, ctrl)
 
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest(profile, region)
 	tf, found := store.Type("ec2")
 	if !found || len(tf.Rows) != len(live) {

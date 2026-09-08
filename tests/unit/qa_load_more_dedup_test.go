@@ -435,6 +435,7 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 		PageSize:    50,
 	}, true)
 
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type("s3")
 	if !ok {

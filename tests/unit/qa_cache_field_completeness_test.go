@@ -257,6 +257,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				}
 				ctrl.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
 
+				ctrl.WaitForCacheWrites()
 				store := cache.LoadDirForTest(profile, region)
 				tf, ok := store.Type(td.ShortName)
 				if !ok {
@@ -342,6 +343,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				// Step 4: drive the save (the coder's save-seam
 				// materialization guarantee applies to this fetch-result
 				// save the same way it does for Scenario A).
+				ctrl.WaitForCacheWrites()
 				store := cache.LoadDirForTest(profile, region)
 				tf, ok := store.Type(td.ShortName)
 				if !ok {
@@ -471,6 +473,7 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("s3", freshRows, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-heal"}, false)
 
+	ctrl.WaitForCacheWrites()
 	reloaded := cache.LoadDirForTest(profile, region)
 	tf, ok := reloaded.Type("s3")
 	if !ok {

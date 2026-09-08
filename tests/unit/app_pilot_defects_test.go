@@ -313,6 +313,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 		{ID: "bucket-coldreseed-1", Name: "coldreseed-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
 	}, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest("pilot-coldreseed-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
@@ -470,6 +471,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	ctrl.ApplyResourcesLoaded("s3", rows50, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-truncrefetch"}, false)
 
+	ctrl.WaitForCacheWrites()
 	reloaded := cache.LoadDirForTest("pilot-truncrefetch-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
 	if !ok {
@@ -811,6 +813,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 
 	// Sanity: the pre-enrichment save must NOT carry the finding yet (setup
 	// assumption, not the defect under test).
+	ctrl.WaitForCacheWrites()
 	preStore := cache.LoadDirForTest("pilot-enrichchecked-prof", "us-east-1")
 	preTF, ok := preStore.Type("s3")
 	if !ok || len(preTF.Rows) != 1 {
@@ -838,6 +841,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// rows maybeSaveResourceListCache always reads from ls.Rows.
 	ctrl.ApplyResourcesLoaded("s3", baseRows, nil, false)
 
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest("pilot-enrichchecked-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {

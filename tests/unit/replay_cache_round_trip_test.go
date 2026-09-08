@@ -81,6 +81,7 @@ func colsRoundTrip(t *testing.T, td resource.ResourceTypeDef, profilePrefix stri
 		t.Fatalf("%s: the live fetch rendered no rows", td.ShortName)
 	}
 
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest(profile, region)
 	tf, found := store.Type(td.ShortName)
 	if !found || len(tf.Rows) == 0 {
@@ -282,6 +283,7 @@ func TestReplay_SavedRowLeavesOneAnswerForAColumnTitle(t *testing.T) {
 			ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 			ctrl.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
+			ctrl.WaitForCacheWrites()
 			store := cache.LoadDirForTest(profile, region)
 			tf, found := store.Type(td.ShortName)
 			if !found || len(tf.Rows) == 0 {
@@ -367,6 +369,7 @@ func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 			ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 			ctrl.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
+			ctrl.WaitForCacheWrites()
 			store := cache.LoadDirForTest(profile, region)
 			tf, found := store.Type(td.ShortName)
 			if !found {

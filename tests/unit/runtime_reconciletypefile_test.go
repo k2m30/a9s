@@ -293,6 +293,7 @@ func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded(shortName, page2, &resource.PaginationMeta{IsTruncated: false}, true)
 
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest(def20Profile, def20Region)
 	tf, ok := store.Type(shortName)
 	if !ok {
