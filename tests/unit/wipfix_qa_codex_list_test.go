@@ -118,8 +118,14 @@ func TestPartialPageOneThenExhaustingPageTwo_IsNotSavedAsExact(t *testing.T) {
 			"the list and page two only says there are no more pages, which is a different "+
 			"fact\n%s", wipfixTypeFileHead(body[len(body)-1]))
 	}
-	if title := c.Snapshot().FrameTitle; !strings.Contains(title, "+") {
-		t.Errorf("the list titles %q with no %q — the population is still unconfirmed", title, "+")
+	// Row 27's contract owns the title: the "+" means another page exists, and
+	// pagination is exhausted here. The incompleteness is the file's business
+	// and the partial-success flash's, not the count's.
+	if title := c.Snapshot().FrameTitle; strings.Contains(title, "+") {
+		t.Errorf("the list titles %q — pagination is exhausted, so there is no page to offer", title)
+	}
+	if _, tasks := c.Apply(app.Action{Kind: app.ActionLoadMore}); len(tasks) != 0 {
+		t.Errorf("load-more produced %d task(s) with pagination exhausted, want 0", len(tasks))
 	}
 }
 

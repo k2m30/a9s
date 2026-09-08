@@ -105,6 +105,7 @@ func TestChildTypeResolvesTheSameOnBothPaths(t *testing.T) {
 		},
 	}
 	resource.SetChildTypeForTest(child)
+	t.Cleanup(func() { resource.CleanupChildTypeForTest(child.ShortName) })
 
 	c.PushChildListScreen(child.ShortName)
 	c.ApplyResourcesLoaded(child.ShortName, []resource.Resource{
