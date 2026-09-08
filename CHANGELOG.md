@@ -489,6 +489,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A refused call while checking IAM roles or groups is now reported instead of passing silently. Those two checks built a failure list and threw it away.
 - A resource that is deleted while a9s is checking it no longer counts as a failed check anywhere. The row still says it was not inspected.
 - A refused lookup of an RDS engine version is now reported instead of only greying the row. That check built a failure list and threw it away, the third such lane found.
+- An internet-exposed EC2 instance now reads "port 22" or "ports 22, 3389" instead of the literal "port(s)".
+- Deleted and unconfirmed SNS subscriptions are now separate rows on both the topic's subscription list and the account-wide one. They shared one identity before, so paging a list kept only the first of them.
+- The Subscription ARN column is now empty for a subscription that has none, instead of showing the word "PendingConfirmation" under a heading that promises an identifier.
+- A list cell now reads the same whether it came from a live fetch or a warm cache. A yes/no value said "true" down one path and "Yes" down the other, and a timestamp showed the raw stamp or the readable one, depending on which.
+- The CloudWatch alarm Threshold, ECS task Task ID, CloudWatch Logs Retention, EKS Node Group name and Secrets Manager timestamps now show the same value the rest of a9s shows for them. The Task ID column shows the ID rather than the full task ARN, and the secret timestamps show the date Secrets Manager reports without a time of day it does not.
+- A detail field name wider than the terminal no longer pushes its value off the right edge; the label column now takes at most two fifths of the width.
+- An error in the header no longer takes the profile and region off it. The message is cut to the room that remains.
+- A demo Redshift cluster named for an expired maintenance window, which reports nothing, is now named for what it shows: a lapsed deferral.
 
 ### Added
 
@@ -839,6 +847,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Target-health rows in a target group's child view now carry a finding and a
   colour: an unhealthy or unreachable target no longer renders green with its
   reason in a plain cell.
+- An EC2 instance behind a security group that admits every protocol from the internet now says "every port reachable from the internet" as its own signal, instead of listing a port called "all".
 
 ### Changed
 
@@ -964,6 +973,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bare keyword.
 - `make test-race` allows 900 seconds instead of 300. Under the race detector the unit tests take around 200 seconds on an idle machine, so the old ceiling reported a timeout whenever the machine was busy.
 - On a large account the public-snapshot check now reads up to 50 pages instead of 10, so fewer snapshots fall past it and read `?`.
+- On a new installation the CloudTrail events list shows TIME before Status and the load balancer list shows DNS Name second, matching the order the built-in lists already used. A view file written by an earlier build keeps the column order it has; the upgrade adds columns and corrects sources but does not reorder.
 
 ### Fixed (security)
 
