@@ -6,12 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/k2m30/a9s/v3/core/session"
+
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/costs"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
-	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // Controller is the headless app controller. It wraps runtime.Core and
@@ -109,9 +110,10 @@ type Controller struct {
 	costsDirtyStore *costs.Store
 
 	// pendingCacheWrites holds per-type disk saves whose inputs were frozen
-	// under c.mu and whose write must run after it is released (C4) — the
-	// same handoff costsDirtyStore performs for the costs cache. Staged by
-	// queueCacheWrite, drained by flushCacheWrites (both in handle.go).
+	// under c.mu and whose write runs on the cache writer's goroutine (C4) —
+	// the same handoff costsDirtyStore performs for the costs cache. Staged by
+	// queueCacheWrite, performed by runCacheWriteLoop (both in handle.go).
+	// Guarded by cacheWriteMu, not c.mu.
 	pendingCacheWrites []func()
 
 	// identityResult holds the resolved caller identity received via
@@ -159,23 +161,49 @@ type Controller struct {
 	menuSweepAcked map[string]bool
 
 	// availSaveCh feeds persistMenuAvailabilityCache's save requests — one
-	// profile/region pair each — to the single writer goroutine started by
+	// pair at a time — to the writer goroutine started once by
 	// availSaveOnce. Buffered to exactly 1 so a burst of calls coalesces into
-	// one pending write instead of stacking a write per call (see menu.go).
+	// one disk write.
 	availSaveCh chan session.Pair
 
 	// availSaveOnce starts the persistMenuAvailabilityCache writer goroutine
-	// on the first send, so a Controller that never touches the availability
-	// badge (e.g. most unit tests) never spawns it.
+	// on the first save that needs it.
 	availSaveOnce sync.Once
 
-	// availSaveStop signals runAvailabilitySaveLoop to drain and exit; closed
-	// exactly once by Close via availSaveCloseOnce.
+	// availSaveStop signals runAvailabilitySaveLoop and the cache writer to
+	// drain and exit; closed exactly once by Close via availSaveCloseOnce.
 	availSaveStop chan struct{}
 
 	// availSaveCloseOnce guards closing availSaveStop so a Controller.Close
 	// called more than once (or concurrently) never double-closes the channel.
 	availSaveCloseOnce sync.Once
+
+	// cacheWriteMu guards pendingCacheWrites — deliberately NOT c.mu. The
+	// whole point of this lane is that persisting a result never touches the
+	// lock a key press needs: a writer taking c.mu to pick up its next batch
+	// makes every reader queue behind it (Go's RWMutex blocks new readers once
+	// a writer is waiting), which is the latency this lane exists to avoid.
+	// Never held while a write runs — a staged write calls back into the
+	// Controller (SaveColumnsForType takes c.mu.RLock), so holding this lock
+	// across one would invert the order queueCacheWrite establishes.
+	cacheWriteMu sync.Mutex
+
+	// cacheWriteWake nudges the per-type cache writer that pendingCacheWrites
+	// has something in it. Buffered to exactly 1 and sent to non-blockingly:
+	// the queue is the slice, not this channel, so a nudge that arrives while
+	// the writer is already draining costs nothing and loses nothing.
+	cacheWriteWake chan struct{}
+
+	// cacheWriteOnce starts the per-type cache writer goroutine on the first
+	// write that needs it, so a Controller that never persists anything never
+	// spawns it.
+	cacheWriteOnce sync.Once
+
+	// cacheWriteWG counts staged-but-unwritten cache writes: Add(1) when one
+	// is queued, Done when it has run. WaitForCacheWrites (testing.go) is the
+	// only reader — a test that reads the file a call it just made produces
+	// needs a barrier, since the write no longer happens on its goroutine.
+	cacheWriteWG sync.WaitGroup
 
 	// availSaveWG is Add(1)-ed when the writer goroutine starts and Done on
 	// its return; Close.Wait()s on it so the last queued write is guaranteed
@@ -209,8 +237,9 @@ func New(core *runtime.Core) *Controller {
 				State: ScreenState{Menu: &MenuState{}},
 			},
 		},
-		availSaveCh:   make(chan session.Pair, 1),
-		availSaveStop: make(chan struct{}),
+		availSaveCh:    make(chan session.Pair, 1),
+		availSaveStop:  make(chan struct{}),
+		cacheWriteWake: make(chan struct{}, 1),
 	}
 	core.SetSaveColumns(c.SaveColumnsForType)
 	return c
@@ -234,21 +263,17 @@ func New(core *runtime.Core) *Controller {
 // after New returns.
 //
 // Locking: Go's sync.RWMutex is not reentrant, and every production call to
-// Core.SaveTypeRows (and thus this resolver) from the list-open lane
-// (maybeSaveResourceListCache) currently runs while c.mu is ALREADY held for
-// writing (Handle/Apply take c.mu.Lock() once at the top and every helper
-// down to maybeSaveResourceListCache is lock-free by convention) — a
-// c.mu.RLock() here would self-deadlock on that path. The executor's
-// background sweep lane (saveProbeResourcesToTypeFiles) never touches
-// Controller at all, so it cannot race this method's reads against
-// SetViewConfig/RegisterFallbackTypeDef, which only ever run from a
-// Controller-owned, c.mu-serialized call (SetViewConfig, RegisterFallbackTypeDef
-// themselves take c.mu.Lock()). The only remaining hazard — a concurrent
-// SetViewConfig/RegisterFallbackTypeDef call racing THIS method while it runs
-// under the caller's already-held write lock — cannot happen either: both of
-// those setters also require c.mu, so they cannot run concurrently with any
-// other Controller method. No additional lock is taken here.
+// It reads c.viewConfig and c.fallbackTypeDefs, and it takes the read lock to
+// do it: neither caller of Core.SaveTypeRows holds c.mu. The list-open lane
+// queues its save with frozen inputs and the cache writer performs it on its
+// own goroutine (queueCacheWrite/runCacheWriteLoop), and the executor's sweep
+// lane never touches Controller at all. Without the lock, a save running there
+// reads those maps while RegisterFallbackTypeDef or SetViewConfig writes them —
+// a concurrent map read that took the whole process down once the writer moved
+// off the caller's goroutine.
 func (c *Controller) SaveColumnsForType(shortName string) []config.ListColumn {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	cols := c.resolveColumnsLocked(shortName)
 	out := make([]config.ListColumn, len(cols))
 	for i, cd := range cols {

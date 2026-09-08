@@ -79,6 +79,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
@@ -188,6 +189,10 @@ func openS3List(ctrl *app.Controller) (app.ViewState, []runtime.TaskRequest) {
 // syncExactTotalToMenu), not the ApplyResourcesLoaded test-only seam (which
 // bypasses menu sync). Gen:0 always passes the staleness guard
 // (AcceptZeroGen=true).
+// The delivery's own save runs on the cache writer's goroutine, and these
+// scenarios read what one boot persisted from the NEXT boot's controller. So
+// the helper waits for it: from a lifecycle test's point of view "the fetch
+// landed" and "the file it produced exists" are one step.
 func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, truncated bool) app.ViewState {
 	vs, _ := ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: lifecycleShortName,
@@ -195,6 +200,7 @@ func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, tru
 		Pagination:   &resource.PaginationMeta{IsTruncated: truncated},
 		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
+	ctrl.WaitForCacheWrites()
 	return vs
 }
 
@@ -219,14 +225,24 @@ func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string][]d
 
 // readTypeFile re-reads the on-disk TypeFile for lifecycleShortName under
 // (profile, region), failing the test if it is missing.
+// The per-type save no longer runs on the goroutine that triggered it: a
+// 6000-row type file's marshal used to sit in the latency of the fetch that
+// produced it, so the cache writer owns it now. A test that reads the file it
+// just caused therefore waits for it rather than assuming it is already
+// there. The deadline is what turns "never written" into a failure instead of
+// a hang.
 func readTypeFile(t *testing.T, profile, region string) cache.TypeFile {
 	t.Helper()
-	store := cache.LoadDirForTest(profile, region)
-	tf, ok := store.Type(lifecycleShortName)
-	if !ok {
-		t.Fatalf("cache.LoadDirForTest(%q, %q).Type(%q) missing — expected a persisted TypeFile", profile, region, lifecycleShortName)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if tf, ok := cache.LoadDirForTest(profile, region).Type(lifecycleShortName); ok {
+			return tf
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("cache.LoadDirForTest(%q, %q).Type(%q) missing after 5s — expected a persisted TypeFile", profile, region, lifecycleShortName)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
-	return tf
 }
 
 // lifecycleFindRow returns the cache.Row with the given ID, or (Row{}, false).

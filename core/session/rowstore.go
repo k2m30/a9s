@@ -191,23 +191,27 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 // rejected observation leaves Gen unchanged.
 //
 // rows is deep-copied (cloneRows) before it is ever retained in newRows or
-// stored as canon's next row set, and every returned row set is likewise a
-// deep copy: the store's own backing arrays/Fields/Findings/AttentionDetails
-// allocations are never the same allocation as what the caller passed in or
-// receives back. The three rejection gates below (Disk-vs-Fetch/Probe,
-// Probe-vs-Fetch, stale-replace) read rows uncloned — they only inspect IDs,
-// lengths, and pagination, never retain or mutate what they read, so cloning
-// ahead of them would pay a per-row allocation on every gate-rejected
-// observation (including the common warm-restart disk-seed path, where a
-// full row set with populated Fields maps is cloned and then immediately
-// discarded) for a clone nothing keeps. Two independent mutexes otherwise
-// guard the same TypeRows.Rows the caller and the store each hold (the
-// controller's per-screen ListState.Rows and RowStore.mu) — sharing an
-// allocation across that boundary is a data race regardless of which side
-// writes first, and an append into spare capacity on either side would
-// silently mutate the other's content with no corresponding Gen bump. The
-// clone-on-ingress/egress pair closes both directions at this one
-// chokepoint rather than requiring it of every caller.
+// stored as canon's next row set: the store's own backing arrays and per-row
+// maps are never the same allocation as what the caller passed in, so a
+// caller that keeps its slice cannot reach into what the store retained. The
+// three rejection gates below (Disk-vs-Fetch/Probe, Probe-vs-Fetch,
+// stale-replace) read rows uncloned — they only inspect IDs, lengths, and
+// pagination, never retain or mutate what they read, so cloning ahead of them
+// would pay a per-row allocation on every gate-rejected observation
+// (including the common warm-restart disk-seed path, where a full row set
+// with populated Fields maps is cloned and then immediately discarded) for a
+// clone nothing keeps.
+//
+// Every row set the store hands BACK is likewise a deep copy — with one
+// exception that costs nothing to state and saved the largest thing left on
+// the controller lock: an accepted REPLACE returns the caller's own slice
+// verbatim. The rows it accepted are the rows the caller passed, the store
+// kept its own deep clone of them a few lines above, and the two arrays are
+// already independent — so cloning here produced a third copy of the same
+// content for a caller that already had one. A 6000-row list result paid that
+// clone on the controller lock every time it landed. Append and the rejection
+// gates still clone: what they return comes out of the store, not out of the
+// caller's hand.
 //
 // Semantics, applied in order:
 //
@@ -258,6 +262,9 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		return cloneRows(existing.Rows), existing.Gen
 	}
 
+	// callerRows is what the caller handed in; rows becomes the store's own
+	// deep copy of it from here on.
+	callerRows := rows
 	rows = cloneRows(rows)
 
 	var newRows []resource.Resource
@@ -294,6 +301,9 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		ViewState:  existing.ViewState,
 	}
 	s.types[canon] = next
+	if !appendPage {
+		return callerRows, next.Gen
+	}
 	return cloneRows(next.Rows), next.Gen
 }
 

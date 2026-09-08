@@ -1,5 +1,10 @@
 ## Fixed
 
+- Saving a list to the on-disk cache no longer happens in the latency of the
+  fetch that produced it: absorbing 6000 rows returns in about 20 ms instead
+  of 65.
+- Two browser tabs reading the same session no longer take turns: a page view
+  that changes nothing takes a read lock.
 - A large list no longer freezes the interface while it lands. Absorbing a
   6000-row result blocked every key press for about 50 ms and a 12000-row one
   for about 80; the wait is now a few milliseconds and no longer grows with

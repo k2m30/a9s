@@ -348,6 +348,7 @@ func TestListSave_DoesNotBlockControllerReadersOnDiskIO(t *testing.T) {
 	close(release)
 	<-handled
 
+	ctrl.WaitForCacheWrites()
 	if _, ok := cache.LoadDirForTest("cachegen-lock", "us-east-1").Type("s3"); !ok {
 		t.Error("the queued list save never reached disk — moving the write off the lock must not lose it")
 	}
@@ -687,6 +688,10 @@ func cachegenListBody(t *testing.T, ctrl *app.Controller) *app.ListBody {
 
 // cachegenLoadList delivers a canonical top-level s3 list result through the
 // production task-result lane.
+// cachegenLoadList delivers a canonical s3 result and waits for whatever it
+// persists. The save runs on the cache writer's goroutine now, so a test that
+// reads the type file on the next line has to wait for it — the delivery and
+// the file it produces are one step from these tests' point of view.
 func cachegenLoadList(ctrl *app.Controller, rows []resource.Resource) {
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: "s3",
@@ -694,6 +699,7 @@ func cachegenLoadList(ctrl *app.Controller, rows []resource.Resource) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
+	ctrl.WaitForCacheWrites()
 }
 
 func cachegenRowFor(t *testing.T, body *app.ListBody, id string) app.ListRow {

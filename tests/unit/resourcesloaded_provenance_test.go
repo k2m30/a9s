@@ -64,8 +64,15 @@ func provenancePinEC2Rows(n int, prefix string) []resource.Resource {
 // failing the test if missing — the disk-reached half of every assertion
 // here, since the original defect specifically persisted the corrupted
 // count/rows to disk and survived restart.
-func provenancePinReadTypeFile(t *testing.T, profile, region, shortName string) cache.TypeFile {
+// The per-type save no longer runs on the goroutine that triggered it: a
+// 6000-row type file's marshal used to sit in the latency of the fetch that
+// produced it, so the cache writer owns it now. A test that reads the file a
+// call it just made produces therefore waits for that writer first —
+// re-reading the directory without the barrier returns whatever the PREVIOUS
+// save left, which reads as a passing assertion against stale bytes.
+func provenancePinReadTypeFile(t *testing.T, ctrl *app.Controller, profile, region, shortName string) cache.TypeFile {
 	t.Helper()
+	ctrl.WaitForCacheWrites()
 	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type(shortName)
 	if !ok {
@@ -93,7 +100,7 @@ func seedCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, pr
 	if len(snap.Rows) != 200 || snap.TotalCount != 200 {
 		t.Fatalf("precondition failed: RowStore snapshot after canonical seed = %d rows, TotalCount=%d, want 200/200", len(snap.Rows), snap.TotalCount)
 	}
-	tf := provenancePinReadTypeFile(t, profile, region, provenancePinType)
+	tf := provenancePinReadTypeFile(t, ctrl, profile, region, provenancePinType)
 	if len(tf.Rows) != 200 || tf.Count != 200 {
 		t.Fatalf("precondition failed: disk TypeFile after canonical seed = %d rows, Count=%d, want 200/200", len(tf.Rows), tf.Count)
 	}
@@ -102,13 +109,13 @@ func seedCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, pr
 // assertStillCanonical200 re-reads both the RowStore snapshot and the disk
 // TypeFile and fails if either has moved away from the 200-row canonical
 // seed — the exact shape of the regression that reached disk.
-func assertStillCanonical200(t *testing.T, core *runtime.Core, profile, region, label string) {
+func assertStillCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, profile, region, label string) {
 	t.Helper()
 	snap := core.Session().RowStore.Snapshot(provenancePinType)
 	if len(snap.Rows) != 200 || snap.TotalCount != 200 {
 		t.Errorf("%s: RowStore entry = %d rows, TotalCount=%d, want 200/200 unchanged — a non-canonical result must never replace the canonical population", label, len(snap.Rows), snap.TotalCount)
 	}
-	tf := provenancePinReadTypeFile(t, profile, region, provenancePinType)
+	tf := provenancePinReadTypeFile(t, ctrl, profile, region, provenancePinType)
 	if len(tf.Rows) != 200 || tf.Count != 200 {
 		t.Errorf("%s: disk TypeFile = %d rows, Count=%d, want 200/200 unchanged — this is the regression that reached disk and survived restart", label, len(tf.Rows), tf.Count)
 	}
@@ -156,7 +163,7 @@ func TestObserveResourcesLoadedRows_FilteredDrill_RealRepro_DoesNotReplaceCanoni
 		Provenance:   messages.FetchProvenanceFilteredList,
 	})
 
-	assertStillCanonical200(t, core, profile, region, "filtered-drill 3-row result")
+	assertStillCanonical200(t, ctrl, core, profile, region, "filtered-drill 3-row result")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -280,7 +287,7 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 	// was never touched by any of the above — both the per-screen Rows and
 	// the shared RowStore/disk entry.
 	ctrl.Apply(app.Action{Kind: app.ActionBack})
-	assertStillCanonical200(t, core, profile, region, "after a buried-screen FilteredList delivery two levels down")
+	assertStillCanonical200(t, ctrl, core, profile, region, "after a buried-screen FilteredList delivery two levels down")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -370,7 +377,7 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsT
 	if len(snap.Rows) != 250 || snap.TotalCount != 250 {
 		t.Errorf("RowStore entry after the late CanonicalList result = %d rows, TotalCount=%d, want 250/250", len(snap.Rows), snap.TotalCount)
 	}
-	tf := provenancePinReadTypeFile(t, profile, region, provenancePinType)
+	tf := provenancePinReadTypeFile(t, ctrl, profile, region, provenancePinType)
 	if len(tf.Rows) != 250 || tf.Count != 250 {
 		t.Errorf("disk TypeFile after the late CanonicalList result = %d rows, Count=%d, want 250/250", len(tf.Rows), tf.Count)
 	}
@@ -456,7 +463,7 @@ func TestObserveResourcesLoadedRows_ByIDFetch_DoesNotReplaceCanonical(t *testing
 		Provenance:   messages.FetchProvenanceByID,
 	})
 
-	assertStillCanonical200(t, core, profile, region, "by-ID single-resource result")
+	assertStillCanonical200(t, ctrl, core, profile, region, "by-ID single-resource result")
 }
 
 func TestObserveResourcesLoadedRows_ChildFetch_DoesNotReplaceCanonical(t *testing.T) {
@@ -470,7 +477,7 @@ func TestObserveResourcesLoadedRows_ChildFetch_DoesNotReplaceCanonical(t *testin
 		Provenance:   messages.FetchProvenanceChild,
 	})
 
-	assertStillCanonical200(t, core, profile, region, "child-fetch result")
+	assertStillCanonical200(t, ctrl, core, profile, region, "child-fetch result")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -493,7 +500,7 @@ func TestObserveResourcesLoadedRows_CanonicalList_DoesReplace(t *testing.T) {
 	if len(snap.Rows) != 5 || snap.TotalCount != 5 {
 		t.Errorf("RowStore entry after a second CanonicalList result = %d rows, TotalCount=%d, want 5/5 — a genuine canonical result must still replace", len(snap.Rows), snap.TotalCount)
 	}
-	tf := provenancePinReadTypeFile(t, profile, region, provenancePinType)
+	tf := provenancePinReadTypeFile(t, ctrl, profile, region, provenancePinType)
 	if len(tf.Rows) != 5 || tf.Count != 5 {
 		t.Errorf("disk TypeFile after a second CanonicalList result = %d rows, Count=%d, want 5/5 — a genuine canonical result must still persist", len(tf.Rows), tf.Count)
 	}
@@ -516,7 +523,7 @@ func TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCan
 		Resources:    provenancePinEC2Rows(7, "i-unknown"),
 	})
 
-	assertStillCanonical200(t, core, profile, region, "zero-value (undeclared) Provenance result")
+	assertStillCanonical200(t, ctrl, core, profile, region, "zero-value (undeclared) Provenance result")
 }
 
 // ────────────────────────────────────────────────────────────────────────────

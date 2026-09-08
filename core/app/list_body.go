@@ -321,8 +321,13 @@ type listBodyMemo struct {
 	sortDir         string
 	enrichGen       uint64
 
-	columns     []ColumnDef
-	rows        []ListRow
+	columns []ColumnDef
+	rows    []ListRow
+	// visible is the filtered+sorted resource set the rows were built from,
+	// in the same order. The frame title's count and the two cursor accessors
+	// read it instead of running the chain again per call — a second run is
+	// O(n) on every keystroke and can disagree with what is on screen.
+	visible     []resource.Resource
 	identityCol int
 	statusCol   int
 }
@@ -345,10 +350,7 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	td := c.typeDefForLocked(typeName)
 
 	memo := &ls.bodyMemo
-	fallbackRowsGen := domain.Gen(0)
-	if ls.Rows == nil {
-		fallbackRowsGen = c.core.AnyOriginResourceCacheGen(typeName)
-	}
+	fallbackRowsGen := c.fallbackRowsGenFor(ls, typeName)
 	if c.listBodyMemoStale(*memo, ls, fallbackRowsGen) {
 		*memo = c.captureListBodyBuild(ls, typeName, td, fallbackRowsGen).run()
 	}
@@ -424,10 +426,7 @@ func (c *Controller) captureTopListBodyBuild() (listBodyBuild, bool) {
 		return listBodyBuild{}, false
 	}
 	typeName := top.Ctx.ResourceType
-	fallbackRowsGen := domain.Gen(0)
-	if ls.Rows == nil {
-		fallbackRowsGen = c.core.AnyOriginResourceCacheGen(typeName)
-	}
+	fallbackRowsGen := c.fallbackRowsGenFor(ls, typeName)
 	if !c.listBodyMemoStale(ls.bodyMemo, ls, fallbackRowsGen) {
 		return listBodyBuild{}, false
 	}
@@ -453,6 +452,36 @@ func (c *Controller) installListBodyMemo(build listBodyBuild, memo listBodyMemo)
 		return
 	}
 	ls.bodyMemo = memo
+}
+
+// fallbackRowsGenFor is the memo key's second half: a screen with no rows of
+// its own renders the type's store entry, so that entry's generation is what
+// invalidates the memo. Zero for a screen that holds its own rows.
+// Callers must hold c.mu.
+func (c *Controller) fallbackRowsGenFor(ls *ListState, typeName string) domain.Gen {
+	if ls.Rows != nil {
+		return 0
+	}
+	return c.core.AnyOriginResourceCacheGen(typeName)
+}
+
+// listVisibleLocked returns the filtered+sorted resource set for ls — the
+// rows on screen, in screen order. It reads the body memo when the memo
+// answers for the current state, and runs the same chain the build runs when
+// it does not. The one caller of that chain outside the build.
+//
+// Never memoises: a read lock is enough for every caller here, and populating
+// the memo is a mutation. A cold screen therefore pays the chain once per
+// call until the next snapshot builds the body — which is what these callers
+// did on every call, warm or cold, before.
+// Callers must hold c.mu (read is enough).
+func (c *Controller) listVisibleLocked(ls *ListState, typeName string) []resource.Resource {
+	if !c.listBodyMemoStale(ls.bodyMemo, ls, c.fallbackRowsGenFor(ls, typeName)) {
+		return ls.bodyMemo.visible
+	}
+	td := c.typeDefForLocked(typeName)
+	visible := c.applyListFilters(ls, typeName, c.listScreenResources(ls, typeName))
+	return listSortResources(resolveListColumnsForBuild(c.viewConfig, typeName, td), td, ls, visible)
 }
 
 // listBodyBuild is one list body's build inputs, frozen under the controller
@@ -582,6 +611,7 @@ func (b listBodyBuild) run() listBodyMemo {
 
 	return listBodyMemo{
 		valid:           true,
+		visible:         visible,
 		rowsVersion:     b.ls.rowsVersion,
 		fallbackRowsGen: b.fallbackRowsGen,
 		filter:          b.ls.Filter,
@@ -657,8 +687,7 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 		// actually on screen.
 		total = max(total, ls.TotalCount)
 	}
-	visible := c.applyListFilters(ls, typeName, allResources)
-	filtered := len(visible)
+	filtered := len(c.listVisibleLocked(ls, typeName))
 	truncated := ls.HasPagination
 
 	totalStr := strconv.Itoa(total)
@@ -728,10 +757,7 @@ func (c *Controller) listSelected() (resource.Resource, bool) {
 	top := c.stack[len(c.stack)-1]
 	typeName := top.Ctx.ResourceType
 
-	allResources := c.listScreenResources(ls, typeName)
-	visible := c.applyListFilters(ls, typeName, allResources)
-	td := c.typeDefForLocked(typeName)
-	visible = listSortResources(resolveListColumnsForBuild(c.viewConfig, typeName, td), td, ls, visible)
+	visible := c.listVisibleLocked(ls, typeName)
 
 	if len(visible) == 0 {
 		return resource.Resource{}, false
@@ -832,10 +858,7 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 	}
 	top := c.stack[len(c.stack)-1]
 	typeName := top.Ctx.ResourceType
-	all := c.listScreenResources(ls, typeName)
-	visible := c.applyListFilters(ls, typeName, all)
-	td := c.typeDefForLocked(typeName)
-	return listSortResources(resolveListColumnsForBuild(c.viewConfig, typeName, td), td, ls, visible)
+	return c.listVisibleLocked(ls, typeName)
 }
 
 // ApplyListFieldUpdates merges Wave-2 field updates into the cached resource

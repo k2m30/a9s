@@ -21,8 +21,13 @@ import (
 // on disk is what the real task-result lane leaves.
 func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	// The queued per-type save runs after the lock is released, exactly as
-	// Handle runs it (C4) — deferred first so it fires last.
-	defer c.flushCacheWrites()
+	// Handle runs it (C4) — deferred first so it fires last. This seam
+	// performs it on the caller's goroutine rather than handing it to the
+	// cache writer: a test that seeds through here reads the file it just
+	// wrote on the next line, and the real lane's asynchrony would only make
+	// every such test poll for something this seam can simply finish. Same
+	// writes, same order, same function.
+	defer c.drainCacheWrites()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Resolve canonical short name (handles aliases like "rds" → "dbi"),
@@ -39,4 +44,15 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 		// never reconciled — the two answers the round-2 ruling removes.
 		c.syncExactTotalToMenu(&c.stack[len(c.stack)-1], canon)
 	}
+}
+
+// WaitForCacheWrites blocks until every per-type save staged so far has been
+// written. Test support, like ApplyResourcesLoaded above: the real lanes hand
+// their saves to the cache writer and return, so a test that reads the file a
+// call it just made produces has to wait for it — there is nothing else to
+// synchronise on, and polling the file cannot tell a stale copy from the new
+// one.
+func (c *Controller) WaitForCacheWrites() {
+	c.flushCacheWrites()
+	c.cacheWriteWG.Wait()
 }

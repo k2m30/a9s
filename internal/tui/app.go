@@ -189,6 +189,16 @@ func (m Model) CloseController() {
 	}
 }
 
+// WaitForCacheWrites blocks until every per-type save the controller has
+// staged has been written (see app.Controller.WaitForCacheWrites). Unlike
+// CloseController it leaves the writer running, so a test can go on driving
+// the model afterwards. Safe to call on a zero-value Model.
+func (m Model) WaitForCacheWrites() {
+	if m.ctrl != nil {
+		m.ctrl.WaitForCacheWrites()
+	}
+}
+
 // Init implements tea.Model. Fires a command to establish the live AWS connection.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.

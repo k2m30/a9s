@@ -101,6 +101,9 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 	})
 	_ = m
 
+	// The save the delivery above queued runs on the cache writer's goroutine,
+	// so the file it produces is read after waiting for it.
+	m.WaitForCacheWrites()
 	store := cache.LoadDirForTest(profile, region)
 	if store == nil {
 		t.Fatal("cache.LoadDirForTest returned nil — expected a persisted s3 type file")

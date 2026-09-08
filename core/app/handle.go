@@ -561,18 +561,72 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 // controller mutex is the same lock every key event needs, so no disk I/O
 // may happen while it is held (C4).
 func (c *Controller) queueCacheWrite(write func()) {
+	c.cacheWriteWG.Add(1)
+	c.cacheWriteMu.Lock()
 	c.pendingCacheWrites = append(c.pendingCacheWrites, write)
+	c.cacheWriteMu.Unlock()
 }
 
-// flushCacheWrites runs and clears whatever queueCacheWrite staged. Caller
-// must NOT hold c.mu.
+// flushCacheWrites hands whatever queueCacheWrite staged to the cache writer
+// and returns. It does not perform the write: a type file's yaml.Marshal of
+// the whole row set is the same order of work as the row pass the absorb just
+// moved off the lock (C4), and running it here only moves that cost from the
+// lock into the caller's own latency — the fetch that triggered the save, and
+// the key press behind it, still wait for a 6000-row marshal.
+//
+// Caller must NOT hold c.mu.
 func (c *Controller) flushCacheWrites() {
-	c.mu.Lock()
-	pending := c.pendingCacheWrites
-	c.pendingCacheWrites = nil
-	c.mu.Unlock()
-	for _, write := range pending {
-		write()
+	c.cacheWriteMu.Lock()
+	pending := len(c.pendingCacheWrites) > 0
+	c.cacheWriteMu.Unlock()
+	if !pending {
+		return
+	}
+	c.cacheWriteOnce.Do(func() {
+		c.availSaveWG.Add(1)
+		go c.runCacheWriteLoop()
+	})
+	select {
+	case c.cacheWriteWake <- struct{}{}:
+	default:
+	}
+}
+
+// runCacheWriteLoop is the single goroutine that performs the staged per-type
+// saves, in the order they were queued. It shares Close's stop signal and wait
+// group with the availability writer, so one Close drains and waits for both —
+// the restart guarantee (the last save before a real shutdown lands) covers
+// this lane too.
+func (c *Controller) runCacheWriteLoop() {
+	defer c.availSaveWG.Done()
+	for {
+		select {
+		case <-c.cacheWriteWake:
+			c.drainCacheWrites()
+		case <-c.availSaveStop:
+			// Whatever was queued at the time Close was called still has to
+			// land, including anything a nudge had not yet woken us for.
+			c.drainCacheWrites()
+			return
+		}
+	}
+}
+
+// drainCacheWrites performs every staged write, and keeps going while more
+// arrive: a save queued while this one runs must not wait for another nudge.
+func (c *Controller) drainCacheWrites() {
+	for {
+		c.cacheWriteMu.Lock()
+		pending := c.pendingCacheWrites
+		c.pendingCacheWrites = nil
+		c.cacheWriteMu.Unlock()
+		if len(pending) == 0 {
+			return
+		}
+		for _, write := range pending {
+			write()
+			c.cacheWriteWG.Done()
+		}
 	}
 }
 

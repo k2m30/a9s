@@ -22,9 +22,45 @@ import (
 // Controller (e.g. two web requests against the same session) must not race
 // that write — see Controller's Concurrency doc comment.
 func (c *Controller) Snapshot() ViewState {
+	// Reading a screen that has nothing left to compute is a read: two web
+	// requests against one session must not take turns behind each other.
+	// The write lock is still what a build needs, so the predicate below is
+	// exact and conservative — it is the same staleness question buildListBody
+	// asks, answered under the same lock, so there is no window between the
+	// answer and the build.
+	c.mu.RLock()
+	if c.snapshotIsPureReadLocked() {
+		defer c.mu.RUnlock()
+		return c.snapshot()
+	}
+	c.mu.RUnlock()
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.snapshot()
+}
+
+// snapshotIsPureReadLocked reports whether snapshot() would mutate anything in
+// the state it finds. Only two things in it can: buildListBody populates a
+// stale body memo, and a detail screen records the cursor layout its build
+// produced. Everything else is a fold of state into a ViewState.
+//
+// Conservative by construction — an unknown shape answers false and takes the
+// write lock, exactly as every snapshot did before. Callers must hold c.mu
+// (read is enough).
+func (c *Controller) snapshotIsPureReadLocked() bool {
+	if len(c.stack) == 0 {
+		return true
+	}
+	top := c.stack[len(c.stack)-1]
+	if top.State.Detail != nil {
+		return false
+	}
+	ls := top.State.List
+	if ls == nil {
+		return false
+	}
+	return !c.listBodyMemoStale(ls.bodyMemo, ls, c.fallbackRowsGenFor(ls, top.Ctx.ResourceType))
 }
 
 // snapshot is the lock-free implementation of Snapshot.

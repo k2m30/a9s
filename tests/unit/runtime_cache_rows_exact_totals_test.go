@@ -304,6 +304,10 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 		t.Fatalf("SaveAvailabilityCache: %v", err)
 	}
 
+	// The list lane's own save runs on the cache writer's goroutine; the
+	// availability save above is this test's subject, but both land in the
+	// same type file, so read it only once the queued one is in.
+	c.WaitForCacheWrites()
 	store := cache.LoadDirForTest("demo", "us-east-1")
 	if store == nil {
 		t.Fatal("cache.LoadDirForTest returned nil after SaveAvailabilityCache")

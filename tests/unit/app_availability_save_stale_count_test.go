@@ -39,7 +39,7 @@ func TestPendingAvailabilitySave_NeverResurrectsASupersededCount(t *testing.T) {
 	})
 
 	// Precondition: the synchronous row save already agrees with itself.
-	if tf := provenancePinReadTypeFile(t, profile, region, provenancePinType); len(tf.Rows) != 5 || tf.Count != 5 {
+	if tf := provenancePinReadTypeFile(t, ctrl, profile, region, provenancePinType); len(tf.Rows) != 5 || tf.Count != 5 {
 		t.Fatalf("precondition: TypeFile right after the second result = %d rows, Count=%d, want 5/5", len(tf.Rows), tf.Count)
 	}
 
@@ -47,7 +47,7 @@ func TestPendingAvailabilitySave_NeverResurrectsASupersededCount(t *testing.T) {
 	// disk, in the order the goroutine would have written it anyway.
 	ctrl.Close()
 
-	tf := provenancePinReadTypeFile(t, profile, region, provenancePinType)
+	tf := provenancePinReadTypeFile(t, ctrl, profile, region, provenancePinType)
 	if len(tf.Rows) != 5 || tf.Count != 5 {
 		t.Errorf("TypeFile after the pending availability save landed = %d rows, Count=%d, want 5/5 — the availability writer put back a count the same event had already replaced", len(tf.Rows), tf.Count)
 	}

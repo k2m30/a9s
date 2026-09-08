@@ -351,6 +351,9 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
+	// The save the delivery above queued runs on the cache writer's goroutine,
+	// so the file it produces is read after waiting for it.
+	ctrl.WaitForCacheWrites()
 	listLaneTF := stage4PinReadTypeFile(t, "stage4-pin-profile", "us-east-1", stage4PinType)
 	if len(listLaneTF.Rows) != 1 {
 		t.Fatalf("list-lane save persisted %d rows, want 1", len(listLaneTF.Rows))

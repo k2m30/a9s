@@ -114,7 +114,7 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	if body.LoadingMore {
 		t.Errorf("the drill list is still marked loading-more after its own continuation landed")
 	}
-	assertStillCanonical200(t, core, profile, region, "related-drill load-more")
+	assertStillCanonical200(t, ctrl, core, profile, region, "related-drill load-more")
 }
 
 // ---------------------------------------------------------------------------

@@ -358,6 +358,9 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 	// unconditionally on every ResourcesLoaded delivery (core/app/
 	// handle.go), not just on list-close — so no separate save call is needed
 	// here.
+	// The save the delivery above queued runs on the cache writer's goroutine,
+	// so the file it produces is read after waiting for it.
+	c.WaitForCacheWrites()
 	listLaneTF := stage2PinReadTypeFile(t, s.Profile, s.Region, "s3")
 	if len(listLaneTF.Rows) != 3 {
 		t.Fatalf("list-lane save persisted %d rows, want 3 (precondition for the D16 comparison)", len(listLaneTF.Rows))
