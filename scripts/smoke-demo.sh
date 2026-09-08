@@ -146,7 +146,7 @@ expect menu.txt "resource-types(71)" "menu shows the full catalog"
 
 # Security groups: owner-worded risk phrases, no raw classifier tokens.
 expect sg.txt "all ports open" "sg wide-open row uses the owner wording"
-expect sg.txt "ports 22 open" "sg dangerous-ports row uses the owner wording"
+expect sg.txt "port 22 open" "sg dangerous-ports row uses the owner wording"
 forbid sg.txt "WIDE_OPEN" "sg shows no raw WIDE_OPEN token"
 forbid sg.txt "PORTS:" "sg shows no raw PORTS: token"
 
