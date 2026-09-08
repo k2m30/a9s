@@ -34,6 +34,15 @@ import (
 // screen's buildListBody memo cache (list_body.go), which is a mutation of
 // ListState.bodyMemo/rowsVersion. Internal helpers called while a lock is
 // already held must NOT lock — Go mutexes are not reentrant.
+//
+// Handle releases the lock BETWEEN its mutations and its snapshot, to build
+// the list body for a freshly absorbed result outside it (captureTopListBodyBuild
+// -> listBodyBuild.run -> installListBodyMemo, C4's absorb half). Everything
+// that build reads is frozen under the lock first, and the memo it produces is
+// installed only while it still describes the screen — so the lock is held for
+// the swap, never for the row pass. That is why a row's contents are replaced
+// rather than written into anywhere in this package: the build reads a shallow
+// copy of a row set while other writers keep working.
 type Controller struct {
 	mu    sync.RWMutex
 	core  *runtime.Core

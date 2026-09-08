@@ -8,8 +8,8 @@
 //
 // The zero value, FetchProvenanceUnknown, silently means "this is not the
 // type's canonical top-level population" to every real consumer
-// (core/app/handle.go's handleResourcesLoadedEvent, core/runtime's
-// observeResourcesLoadedRows) — so a test literal that never states
+// (core/app/handle.go's handleResourcesLoadedEvent, which owns both the
+// screen write and the store write) — so a test literal that never states
 // Provenance is not neutral, it is a discard instruction the author never
 // meant to write. #209 found ~200 such literals already in tests/unit,
 // several of them silently asserting against a PRIOR test's leaked rows

@@ -140,10 +140,19 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// TUI reaches the same producer via its own direct
 		// HandleResourcesLoaded call in runtime_adapter_resources.go, so that
 		// task is emitted exactly once per lane per list load.
+		//
+		// The RowStore write is NOT here. Controller.Handle is the only caller
+		// that reaches this case with a ResourcesLoaded (the TUI routes the
+		// message to its own shim), and its pipeline observes the same rows a
+		// few lines later — materialized, which is the shape every reader
+		// wants. Two observations of one delivery meant two deep clones of the
+		// row set under the controller lock, and the second one won anyway.
+		// core/app.Controller.handleResourcesLoadedEvent owns the write for
+		// every screen state, including the one this used to cover: a
+		// canonical result whose screen is gone.
 		if c.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
 			return nil, nil
 		}
-		c.observeResourcesLoadedRows(msg)
 		intents, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 			ResourceType: msg.ResourceType,
 			Resources:    msg.Resources,

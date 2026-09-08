@@ -30,37 +30,42 @@ func relatedIDSubset(ls *ListState, base []resource.Resource) []resource.Resourc
 	return subset
 }
 
-// applyListFilters applies the relatedIDSet prefilter, text filter, and
-// attention filter to base, returning the visible subset. It is the only
-// filter: ListSelected and buildListBody both call it, so the two cannot
-// disagree about which row is "selected".
-func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
-	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
-	// the model constructor) over the catalog: the model's typeDef is the
-	// authoritative Color classifier, matching listIssueCount/GetListIssueCount.
-	// Test typeDefs frequently share a ShortName with a catalog type (e.g.
-	// "ec2") but use a different Color implementation (or none, falling back
-	// to colorFallback(r.Fields["status"])) — using the catalog type here
-	// would silently disagree with the issue count the title/badge report.
-	var td *resource.ResourceTypeDef
+// filterTypeDefLocked prefers the fallback typeDef (registered via
+// RegisterFallbackTypeDef from the model constructor) over the catalog: the
+// model's typeDef is the authoritative Color classifier, matching
+// listIssueCount/GetListIssueCount. Test typeDefs frequently share a ShortName
+// with a catalog type (e.g. "ec2") but use a different Color implementation (or
+// none, falling back to colorFallback(r.Fields["status"])) — using the catalog
+// type here would silently disagree with the issue count the title/badge
+// report. Callers must hold c.mu.
+func (c *Controller) filterTypeDefLocked(typeName string) *resource.ResourceTypeDef {
 	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
-		td = &fv
-	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
-		td = catalogTD
+		return &fv
 	}
+	return resource.FindResourceType(typeName)
+}
 
+func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
+	td := c.filterTypeDefLocked(typeName)
+	return applyListFiltersWith(ls, td, resolveListColumnsForBuild(c.viewConfig, typeName, td),
+		c.listEnrichmentFindings(typeName), base)
+}
+
+// applyListFiltersWith is applyListFilters with its controller reads hoisted
+// into arguments, so an off-lock build (listBodyBuild.run) and the locked
+// callers run the identical filter chain rather than two spellings of it.
+func applyListFiltersWith(ls *ListState, td *resource.ResourceTypeDef, columns []ColumnDef, findings map[string][]domain.Finding, base []resource.Resource) []resource.Resource {
 	// RelatedIDSet prefilter: when non-nil (even if empty), only IDs in the set pass.
 	base = relatedIDSubset(ls, base)
 
 	// Text filter. The columns are resolved the way the list resolves them, so
 	// the filter compares the strings the rows on screen are made of.
-	result := listFilterResources(ls.Filter, resolveListColumnsForBuild(c.viewConfig, typeName, td), td, base)
+	result := listFilterResources(ls.Filter, columns, td, base)
 
 	// Attention filter: a row is kept when it carries an issue finding of its
 	// own, or — having no findings at all — when the type's classifier calls
 	// it an issue or the Wave-2 store holds one for it.
 	if ls.AttentionOnly && td != nil {
-		findings := c.listEnrichmentFindings(typeName)
 		kept := make([]resource.Resource, 0, len(result))
 		for _, r := range result {
 			if listHasIssueFinding(r) {

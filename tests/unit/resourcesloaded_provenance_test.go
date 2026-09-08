@@ -1,15 +1,15 @@
 // resourcesloaded_provenance_test.go — behavior pins for
 // messages.ResourcesLoaded.Provenance (FetchProvenance), the fix for the
 // defect where a filtered/by-ID/child fetch result was indistinguishable
-// from a canonical top-level list fetch, so observeResourcesLoadedRows wrote
+// from a canonical top-level list fetch, so the RowStore write accepted
 // EVERY one into the shared per-type RowStore as a canonical full replace.
 // Reproduced: an EC2 list paged to 200 exact rows, then a filtered related
 // drill returning 3 rows replaced the entry — 3 rows, TotalCount 200→3 —
 // surviving to disk and restart.
 //
 // Every non-canonical-provenance pin here drives the REAL Controller.Handle
-// -> core.HandleEvent -> observeResourcesLoadedRows path (never pokes
-// observeResourcesLoadedRows or the RowStore gate directly), and reads back
+// -> handleResourcesLoadedEvent -> RowStore path (never pokes the
+// provenance gate or the RowStore directly), and reads back
 // BOTH the in-memory RowStore snapshot AND the persisted on-disk TypeFile —
 // this is the regression that reached disk and survived restart, so a
 // unit-level stub on the gate function would have passed happily while the
@@ -431,7 +431,7 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_DoesNo
 // pre-existing gate this fix does not touch and msg.Provenance does not
 // reach. Leaving the canonical ec2 list open while delivering a by-ID/child
 // result would exercise THAT gate, not the one under test here
-// (observeResourcesLoadedRows's Provenance gate, orchestrator.go). A real
+// (the Provenance gate in handleResourcesLoadedEvent). A real
 // by-ID or child continuation legitimately lands while its originating
 // screen is no longer on top (handle.go's own comment: "a late fetch ...
 // lands on X's screen even when it is not currently on top" — or, as here,

@@ -9,6 +9,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 	"github.com/k2m30/a9s/v3/core/trace"
 )
 
@@ -54,7 +55,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	c.mu.Lock()
 
 	intents, tasks := c.core.HandleEvent(ev)
-	c.applyIntents(intents)
+	c.applyIntentsLocked(intents)
 	// C10: a navigation issued before AWS connect completes must replay once
 	// ClientsReady lands. HandleEvent's ClientsReady path (and any other event
 	// that can carry PendingRefresh) emits RefreshActiveListIntent for that;
@@ -129,7 +130,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 			HasActiveCosts: c.costsStateBeneathOverlay() != nil,
 			NewGen:         c.core.ConnectGen(),
 		})
-		c.applyIntents(crIntents)
+		c.applyIntentsLocked(crIntents)
 		tasks = append(tasks, crTasks...)
 		tasks = append(tasks, c.refreshTasksForIntents(crIntents)...)
 	}
@@ -150,7 +151,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 			Err:        msg.Err,
 		}
 		revealIntents, revealTasks := c.core.HandleValueRevealed(revealed)
-		c.applyIntents(revealIntents)
+		c.applyIntentsLocked(revealIntents)
 		tasks = append(tasks, revealTasks...)
 	}
 
@@ -191,7 +192,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		c.traceFoldAcceptance("EnrichDetailResult", msg.OperationID, accepted)
 		if accepted {
 			foldIntents, foldTasks := c.foldEnrichDetailResultLocked(msg)
-			c.applyIntents(foldIntents)
+			c.applyIntentsLocked(foldIntents)
 			tasks = append(tasks, foldTasks...)
 		}
 	}
@@ -227,9 +228,26 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	}
 
 	tasks = c.stampDispatchSnapshotLocked(tasks)
-	vs := c.snapshot()
+	// C4, absorb half: the row pass this event just made stale is the most
+	// expensive thing the snapshot below would do, and it is pure. Freeze its
+	// inputs here, drop the lock, build, and take the lock back only to swap
+	// the built body in — so a 6000-row result holds the lock for the swap and
+	// not for its rows.
+	build, prewarm := c.captureTopListBodyBuild()
 	dirtyStore := c.costsDirtyStore
 	c.costsDirtyStore = nil
+	c.mu.Unlock()
+
+	var built listBodyMemo
+	if prewarm {
+		built = build.run()
+	}
+
+	c.mu.Lock()
+	if prewarm {
+		c.installListBodyMemo(build, built)
+	}
+	vs := c.snapshot()
 	c.mu.Unlock()
 
 	// The yaml.Marshal+os.WriteFile Store.Save performs must not run under
@@ -330,6 +348,21 @@ func (c *Controller) findResourceListScreen(resourceType string, provenance mess
 func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	s, canon, ok := c.findResourceListScreen(msg.ResourceType, msg.Provenance)
 	if !ok {
+		// No screen owns this result — it arrived after its list was popped,
+		// or none was ever opened. A canonical one still speaks for the type's
+		// population, so the store takes it: this is the one RowStore write for
+		// a delivery nothing renders, and the reason Core.HandleEvent no longer
+		// makes its own.
+		//
+		// Only a canonical result is eligible, the gate that write carried: a
+		// filtered drill, a by-ID lookup and a child fetch share this message
+		// shape but are never the type's global population, and must neither
+		// replace nor extend the shared per-type entry a canonical fetch owns.
+		if msg.Provenance.CanonicalList() && msg.ResourceType != "" &&
+			!c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
+			c.core.ObserveRows(resource.CanonicalShortName(msg.ResourceType), msg.Resources,
+				msg.Pagination, session.OriginFetch, msg.Append)
+		}
 		return
 	}
 	// Superseded-dispatch discard, the same rule each lane's door applies —
@@ -575,7 +608,7 @@ func (c *Controller) popAutoOpenSinglePlaceholderOnNotFound(msg messages.ByIDFet
 	if _, ok := ls.RelatedIDSet[msg.ID]; !ok {
 		return
 	}
-	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	c.applyIntentsLocked([]runtime.UIIntent{runtime.PopScreen{}})
 	if cs := c.topCostsState(); cs != nil {
 		cs.ResourceRowNote = fmt.Sprintf(
 			"%s — Cost Explorer resource rows are account/region-wide; this session queries one region/account",
@@ -680,13 +713,13 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 		}
 		stub := td.StubCreator(targetID)
 		ls.AutoOpenSingle = false
-		c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+		c.applyIntentsLocked([]runtime.UIIntent{runtime.PopScreen{}})
 		return c.openRelatedDetail(stub, targetType)
 	}
 	res := *matched
 	ls.AutoOpenSingle = false
 	// Replace the placeholder list with the resource's detail.
-	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	c.applyIntentsLocked([]runtime.UIIntent{runtime.PopScreen{}})
 	return c.openRelatedDetail(res, targetType)
 }
 
@@ -737,7 +770,7 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 		LazyAddedResources: result.LazyAddedResources,
 		LazyAddError:       result.LazyAddError,
 	})
-	c.applyIntents(intents)
+	c.applyIntentsLocked(intents)
 
 	errMsg := relatedRowErrorText(result.Result)
 	for i := range c.stack {

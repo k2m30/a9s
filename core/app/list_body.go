@@ -63,7 +63,9 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// onto this screen) BEFORE they are overwritten, keyed by resource ID, so
 	// they can be carried onto the incoming replacement rows for any ID that
 	// survives the swap.
-	priorFindings, priorDetails := outgoingRowFindingsByID(ls, c.cachedResources(typeName))
+	priorFindings, priorDetails := outgoingRowFindingsByID(ls, func() []resource.Resource {
+		return c.cachedResources(typeName)
+	})
 
 	// Silent-swap findings carry (continued): a silent swap is exactly the
 	// !appendPage replace path below. Fold the captured prior findings onto the incoming
@@ -239,10 +241,16 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 // FindingCode present in the first, so it is captured verbatim (r.
 // AttentionDetails itself, not a filtered copy) with no cost to the common
 // no-findings path.
-func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) (map[string][]domain.Finding, map[string]map[domain.FindingCode]domain.AttentionDetail) {
-	source := cachedRows
+func outgoingRowFindingsByID(ls *ListState, cachedRows func() []resource.Resource) (map[string][]domain.Finding, map[string]map[domain.FindingCode]domain.AttentionDetail) {
+	// The fallback is a function, not a slice: reading the type cache clones
+	// every row it holds, and the common case (a screen that already has rows)
+	// never looks at it. Passed eagerly, that clone was a full copy of the
+	// type's rows on every result, under the controller lock, for nobody.
+	var source []resource.Resource
 	if ls != nil && len(ls.Rows) > 0 {
 		source = ls.Rows
+	} else {
+		source = cachedRows()
 	}
 	if len(source) == 0 {
 		return nil, nil
@@ -341,15 +349,8 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	if ls.Rows == nil {
 		fallbackRowsGen = c.core.AnyOriginResourceCacheGen(typeName)
 	}
-	if !memo.valid ||
-		memo.rowsVersion != ls.rowsVersion ||
-		memo.fallbackRowsGen != fallbackRowsGen ||
-		memo.filter != ls.Filter ||
-		memo.attnOnly != ls.AttentionOnly ||
-		memo.sortCol != ls.SortCol ||
-		memo.sortDir != ls.SortDir ||
-		memo.enrichGen != c.enrichmentGen {
-		*memo = c.rebuildListBodyMemo(ls, typeName, td, fallbackRowsGen)
+	if c.listBodyMemoStale(*memo, ls, fallbackRowsGen) {
+		*memo = c.captureListBodyBuild(ls, typeName, td, fallbackRowsGen).run()
 	}
 
 	// Clamp selected row against the (possibly cached) visible row count.
@@ -393,40 +394,146 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	}
 }
 
-// rebuildListBodyMemo runs the O(n log n) filter+sort and the O(n·cols) cell
-// extraction/decoration pass that buildListBody used to run unconditionally
-// on every call, returning a fresh listBodyMemo stamped with the input key
-// that produced it. Callers must hold c.mu (write).
-func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyMemo {
-	// Resolve column definitions using the already-resolved fallback td (not
-	// the catalog) for the superset
-	// first-column-title check. This ensures test typeDefs with non-standard
-	// first columns (e.g. rlTestTypeDef starts with "Instance ID" not "Name")
-	// are not silently switched to the 9-column built-in defaults.
-	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
+// listBodyMemoStale reports whether a memo was built from inputs that have
+// since moved. The one owner of that comparison: buildListBody asks it before
+// reusing a memo, and installListBodyMemo asks it before adopting one built
+// off the lock, so a prewarmed memo can never be installed over state it does
+// not describe. Callers must hold c.mu.
+func (c *Controller) listBodyMemoStale(memo listBodyMemo, ls *ListState, fallbackRowsGen domain.Gen) bool {
+	return !memo.valid ||
+		memo.rowsVersion != ls.rowsVersion ||
+		memo.fallbackRowsGen != fallbackRowsGen ||
+		memo.filter != ls.Filter ||
+		memo.attnOnly != ls.AttentionOnly ||
+		memo.sortCol != ls.SortCol ||
+		memo.sortDir != ls.SortDir ||
+		memo.enrichGen != c.enrichmentGen
+}
 
+// captureTopListBodyBuild freezes the build inputs of the top screen's list
+// body, when there is one and its memo is stale. ok=false means there is
+// nothing worth prewarming (no list on top, or its memo already answers), and
+// the caller skips straight to the snapshot. Callers must hold c.mu.
+func (c *Controller) captureTopListBodyBuild() (listBodyBuild, bool) {
+	if len(c.stack) == 0 {
+		return listBodyBuild{}, false
+	}
+	top := c.stack[len(c.stack)-1]
+	ls := top.State.List
+	if ls == nil {
+		return listBodyBuild{}, false
+	}
+	typeName := top.Ctx.ResourceType
+	fallbackRowsGen := domain.Gen(0)
+	if ls.Rows == nil {
+		fallbackRowsGen = c.core.AnyOriginResourceCacheGen(typeName)
+	}
+	if !c.listBodyMemoStale(ls.bodyMemo, ls, fallbackRowsGen) {
+		return listBodyBuild{}, false
+	}
+	return c.captureListBodyBuild(ls, typeName, c.typeDefForLocked(typeName), fallbackRowsGen), true
+}
+
+// installListBodyMemo adopts a memo built off the lock, onto the screen it was
+// built for — but only while it still describes that screen. Anything that
+// moved in the meantime (another result landed, a filter changed, enrichment
+// arrived) makes it stale, and the next buildListBody rebuilds under the lock
+// as it always did: the memo is a cache, never a source of truth. Callers must
+// hold c.mu.
+func (c *Controller) installListBodyMemo(build listBodyBuild, memo listBodyMemo) {
+	if len(c.stack) == 0 {
+		return
+	}
+	top := c.stack[len(c.stack)-1]
+	ls := top.State.List
+	if ls == nil || top.Ctx.ResourceType != build.typeName {
+		return
+	}
+	if c.listBodyMemoStale(memo, ls, build.fallbackRowsGen) {
+		return
+	}
+	ls.bodyMemo = memo
+}
+
+// listBodyBuild is one list body's build inputs, frozen under the controller
+// lock so the O(n log n) filter+sort and the O(n·cols) cell extraction can run
+// WITHOUT it — the absorb half of the C4 latency guarantee (a 6000-row result
+// used to hold the lock for its whole row pass, and every key press waited
+// behind it).
+//
+// ls is a detached copy of the screen's ListState, and its Rows a shallow copy
+// of the resolved row set: the build reads them while other writers keep
+// mutating the live screen. A shallow row copy is enough because a row's
+// Findings and AttentionDetails are REPLACED by every writer that touches them
+// (runtime.ApplyWave2ToRow's discipline, relied on by applyRowFindings' own
+// amend), never written into in place — so the structs this copy holds are
+// stable for the length of the build.
+type listBodyBuild struct {
+	ls              *ListState
+	typeName        string
+	td              *resource.ResourceTypeDef
+	filterTD        *resource.ResourceTypeDef
+	filterColumns   []ColumnDef
+	columns         []ColumnDef
+	findings        map[string][]domain.Finding
+	uninspected     map[string]bool
+	enrichGen       uint64
+	fallbackRowsGen domain.Gen
+}
+
+// captureListBodyBuild freezes everything run() reads. Callers must hold c.mu.
+func (c *Controller) captureListBodyBuild(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyBuild {
 	// Build the row set from the per-screen store (Bug 1 fix: uses ls.Rows when
 	// available so two stacked same-type screens see their own independent rows).
-	allResources := c.listScreenResources(ls, typeName)
+	src := c.listScreenResources(ls, typeName)
+	filterTD := c.filterTypeDefLocked(typeName)
+	detached := *ls
+	// The previous generation's memo is not an input to the next one, and
+	// carrying it would keep that generation's rows alive for the build.
+	detached.bodyMemo = listBodyMemo{}
+	detached.Rows = make([]resource.Resource, len(src))
+	copy(detached.Rows, src)
+	return listBodyBuild{
+		ls:       &detached,
+		typeName: typeName,
+		td:       td,
+		filterTD: filterTD,
+		// The filter resolves its columns from the filter's own typeDef, the
+		// same pair the locked path uses — the text filter compares the
+		// strings the rows on screen are made of, so the two must agree about
+		// which columns those are.
+		filterColumns: resolveListColumnsForBuild(c.viewConfig, typeName, filterTD),
+		// Resolve column definitions using the already-resolved fallback td (not
+		// the catalog) for the superset first-column-title check. This ensures
+		// test typeDefs with non-standard first columns (e.g. rlTestTypeDef
+		// starts with "Instance ID" not "Name") are not silently switched to the
+		// 9-column built-in defaults.
+		columns:         resolveListColumnsForBuild(c.viewConfig, typeName, td),
+		findings:        c.listEnrichmentFindings(typeName),
+		uninspected:     c.listUninspectedIDs(typeName),
+		enrichGen:       c.enrichmentGen,
+		fallbackRowsGen: fallbackRowsGen,
+	}
+}
 
-	// Apply filters (relatedIDSet → text → attention).
-	visible := c.applyListFilters(ls, typeName, allResources)
+// run performs the filter+sort and the per-row cell extraction/decoration
+// pass, returning a memo stamped with the key its inputs carried. Pure: it
+// touches no controller state and holds no lock.
+func (b listBodyBuild) run() listBodyMemo {
+	// Apply filters (relatedIDSet -> text -> attention).
+	visible := applyListFiltersWith(b.ls, b.filterTD, b.filterColumns, b.findings, b.ls.Rows)
 
 	// Sort over the same resolved set the cells come from, so a user-configured
 	// sort_key column resolves correctly and the
 	// comparator sees the identity election.
-	visible = listSortResources(columns, td, ls, visible)
-
-	// Enrichment data.
-	findings := c.listEnrichmentFindings(typeName)
-	uninspected := c.listUninspectedIDs(typeName)
+	visible = listSortResources(b.columns, b.td, b.ls, visible)
 
 	// Build rows.
-	statusCol := resolveListStatusCol(columns, td)
+	statusCol := resolveListStatusCol(b.columns, b.td)
 	rows := make([]ListRow, 0, len(visible))
 	for _, r := range visible {
-		cells := extractListCells(columns, r, td)
-		severity, colorTag := resolveListRowSeverity(td, r)
+		cells := extractListCells(b.columns, r, b.td)
+		severity, colorTag := resolveListRowSeverity(b.td, r)
 		// S4: bake the Wave-2 issue-Finding Phrase into the status cell, from the
 		// same enrichment findings map that drives the glyph. Without this the web
 		// renders a blank Status for flagged rows in live mode (the cell only
@@ -450,7 +557,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		// Wave-1 phrase with a same-or-lower-severity Wave-2 one.
 		phrased := domain.StatusPhrase(r.Findings) != ""
 		if statusCol >= 0 && statusCol < len(cells) && !hasWave2Finding(r.Findings) {
-			if fs, ok := findings[r.ID]; ok && len(fs) > 0 {
+			if fs, ok := b.findings[r.ID]; ok && len(fs) > 0 {
 				if f := domain.WorstSeverityFinding(fs); f.Severity.IsIssue() && f.Phrase != "" {
 					cells[statusCol] = f.Phrase
 					phrased = true
@@ -462,7 +569,7 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		// already reports something concrete is not "unknown". The colour is
 		// deliberately left alone — an uninspected row is not an issue, so it
 		// must neither tint the row nor bump a badge.
-		if statusCol >= 0 && statusCol < len(cells) && !phrased && uninspected[r.ID] {
+		if statusCol >= 0 && statusCol < len(cells) && !phrased && b.uninspected[r.ID] {
 			cells[statusCol] = domain.NotInspectedPhrase
 		}
 		rows = append(rows, ListRow{
@@ -473,22 +580,20 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 		})
 	}
 
-	// Resolve the identity column index (full column list, before hscroll).
-	identityCol := IdentityColumnIndex(columns, td)
-
 	return listBodyMemo{
 		valid:           true,
-		rowsVersion:     ls.rowsVersion,
-		fallbackRowsGen: fallbackRowsGen,
-		filter:          ls.Filter,
-		attnOnly:        ls.AttentionOnly,
-		sortCol:         ls.SortCol,
-		sortDir:         ls.SortDir,
-		enrichGen:       c.enrichmentGen,
-		columns:         columns,
+		rowsVersion:     b.ls.rowsVersion,
+		fallbackRowsGen: b.fallbackRowsGen,
+		filter:          b.ls.Filter,
+		attnOnly:        b.ls.AttentionOnly,
+		sortCol:         b.ls.SortCol,
+		sortDir:         b.ls.SortDir,
+		enrichGen:       b.enrichGen,
+		columns:         b.columns,
 		rows:            rows,
-		identityCol:     identityCol,
-		statusCol:       statusCol,
+		// Resolve the identity column index (full column list, before hscroll).
+		identityCol: IdentityColumnIndex(b.columns, b.td),
+		statusCol:   statusCol,
 	}
 }
 
@@ -744,18 +849,26 @@ func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]m
 	c.applyListFieldUpdates(typeName, updates)
 }
 
-// applyFieldUpdatesToSlice merges updates into a resource slice IN PLACE.
-// Safe for a screen's own s.State.List.Rows (screen-owned memory); NOT safe
-// to call on a RowStore snapshot slice, which must go through
-// Core.AmendRows' copy-on-write contract instead — see applyListFieldUpdates.
+// applyFieldUpdatesToSlice merges updates into a resource slice, replacing
+// each touched row's Fields map rather than writing into it — so it is equally
+// correct on a screen's own rows and on the copy Core.AmendRows hands the
+// RowStore, and both callers below share it.
 func applyFieldUpdatesToSlice(rows []resource.Resource, updates map[string]map[string]string) {
 	for i := range rows {
-		if kvMap, ok := updates[rows[i].ID]; ok {
-			if rows[i].Fields == nil {
-				rows[i].Fields = make(map[string]string, len(kvMap))
-			}
-			maps.Copy(rows[i].Fields, kvMap)
+		kvMap, ok := updates[rows[i].ID]
+		if !ok {
+			continue
 		}
+		// Replace the map, never write into it — the same copy-on-write the
+		// RowStore amend below states. A row's Fields map is shared with every
+		// other holder of that row value: the store's own snapshot, a stacked
+		// screen's slice, and the off-lock list-body build (listBodyBuild),
+		// which reads these maps while this runs. Writing a key in place is a
+		// mutation none of them can see coming.
+		fresh := make(map[string]string, len(rows[i].Fields)+len(kvMap))
+		maps.Copy(fresh, rows[i].Fields)
+		maps.Copy(fresh, kvMap)
+		rows[i].Fields = fresh
 	}
 }
 
@@ -790,26 +903,16 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 	}
 	// Also update the RowStore-backed type cache so GetListAllResources etc.
 	// see the same values. Amend's copy-on-write contract (RowStore.Amend's
-	// doc comment) means a touched row's Fields map must be cloned before
-	// writing into it — mutating the shared map in place would corrupt every
-	// other snapshot/screen still holding a reference to the store's
-	// pre-Amend row value.
+	// doc comment) is the same rule applyFieldUpdatesToSlice already follows,
+	// so this walks the fresh slice through it rather than spelling the
+	// per-row map clone a second time.
 	c.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
 		if len(rows) == 0 {
 			return rows
 		}
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
-		for i := range out {
-			kvMap, ok := updates[out[i].ID]
-			if !ok {
-				continue
-			}
-			fresh := make(map[string]string, len(out[i].Fields)+len(kvMap))
-			maps.Copy(fresh, out[i].Fields)
-			maps.Copy(fresh, kvMap)
-			out[i].Fields = fresh
-		}
+		applyFieldUpdatesToSlice(out, updates)
 		return out
 	})
 }

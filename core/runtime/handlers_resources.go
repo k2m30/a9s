@@ -67,7 +67,8 @@ type ResourcesLoadedEvent struct {
 	// type's global population, and treating it as one would let a narrow
 	// drill's subset silently replace (or appear to seed) the canonical
 	// per-type cache, and enrich against rows that were never observed into
-	// RowStore in the first place (see observeResourcesLoadedRows, which
+	// RowStore in the first place (see the canonical-provenance gate in
+	// core/app.Controller.handleResourcesLoadedEvent, which
 	// gates the RowStore write itself on the same predicate).
 	Provenance messages.FetchProvenance
 }
@@ -136,7 +137,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	// population — seeding PatchResourceCache from it would let that
 	// narrower subset masquerade as "this type is already cached" for every
 	// other, not-yet-visited view of the same type (mirrors
-	// observeResourcesLoadedRows' identical RowStore-write gate). ev.Err == nil
+	// the identical RowStore-write gate in core/app). ev.Err == nil
 	// is required too: a partial-success composite error (some resources
 	// landed AND something failed — e.g. the IAM policy fetcher's inline-group
 	// enumeration failing while managed-policy pagination still reports

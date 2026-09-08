@@ -1,5 +1,9 @@
 ## Fixed
 
+- A large list no longer freezes the interface while it lands. Absorbing a
+  6000-row result blocked every key press for about 50 ms and a 12000-row one
+  for about 80; the wait is now a few milliseconds and no longer grows with
+  the number of rows.
 - A list that could not finish loading no longer records its rows as the
   complete set of that type, and no longer offers "more" when there is none.
 - Load-more and Ctrl+R on a related drill now act on the drill, not on the

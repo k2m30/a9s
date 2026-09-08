@@ -24,24 +24,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// observeResourcesLoadedRows feeds RowStore the same canonicalization +
-// Fetch-origin write HandleResourcesLoaded's ProbeResources reseed performs,
-// without applying any of HandleResourcesLoaded's intents/tasks. Only
-// msg.Provenance.CanonicalList() is eligible: a filtered drill, a by-ID
-// lookup, or a child fetch shares this same message shape but is never the
-// type's global population, and must not replace (append=false) or extend
-// (append=true) the shared per-type RowStore entry a canonical fetch owns.
-func (c *Core) observeResourcesLoadedRows(msg messages.ResourcesLoaded) {
-	if msg.ResourceType == "" || !msg.Provenance.CanonicalList() {
-		return
-	}
-	canon := msg.ResourceType
-	if td := resource.FindResourceType(msg.ResourceType); td != nil {
-		canon = td.ShortName
-	}
-	c.ObserveRows(canon, msg.Resources, msg.Pagination, session.OriginFetch, msg.Append)
-}
-
 // observeRelatedCheckResultRows feeds RowStore the same CachedPages
 // (full first-page results, Fetch-origin) and LazyAddedResources (sparse
 // FetchByIDs adds, Partial) dual-write HandleRelatedCheckResult's intents
