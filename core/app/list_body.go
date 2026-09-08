@@ -816,7 +816,12 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	if td.ExcludeFromIssueBadge {
 		return 0
 	}
-	all := c.listScreenResources(ls, typeName)
+	// A related drill's badge counts the drill's own rows, through the same
+	// prefilter its count and its rows read (relatedIDSubset). Counting the
+	// screen's whole row set instead titles ten instances built from one AMI
+	// with the account's issue total, so the badge says more issues than the
+	// list has rows.
+	all := relatedIDSubset(ls, c.listScreenResources(ls, typeName))
 	findings := c.listEnrichmentFindings(typeName)
 	ic := 0
 	for _, r := range all {
