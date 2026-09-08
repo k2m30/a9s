@@ -439,7 +439,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "Kinesis Streams",
 		ShortName:      "kinesis",
-		HumanizeFields: []string{"stream_mode", "stream_status"},
+		HumanizeFields: []string{"stream_mode", "StreamModeDetails.StreamMode", "stream_status"},
 		Aliases:        []string{"kinesis", "streams"},
 		Category:       "MESSAGING",
 		CloudTrailKey:  "ResourceName:ID",

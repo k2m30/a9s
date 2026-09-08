@@ -211,7 +211,7 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
 		{"athena", realisticAthena(), []string{"analytics-wg", "enabled"}},
 		{"codeartifact", realisticCodeArtifact(), []string{"shared-libs", "my-domain"}},
-		{"cb", realisticCodeBuild(), []string{"build-project", "CODECOMMIT"}},
+		{"cb", realisticCodeBuild(), []string{"build-project", "codecommit"}},
 		{"opensearch", realisticOpenSearch(), []string{"search-prod", "OpenSearch_2.11"}},
 		{"kms", realisticKMS(), []string{"12345678-1234-1234-1234-123456789012", "enabled"}},
 		{"msk", realisticMSK(), []string{"events-kafka", "provisioned", "active"}},

@@ -75,6 +75,14 @@ func buildResourceWithFields(id, name string, fields map[string]string) resource
 // configForType returns a ViewsConfig containing only the ViewDef for the given
 // resource type. This avoids non-deterministic map iteration over the full
 // config matching a wrong ViewDef whose paths extract values from the struct.
+//
+// The config is built from the built-in defaults on purpose, and that IS the
+// production shape: internal/tui/app.go hands the controller config.Load()'s
+// answer, falling back to config.SharedDefaultConfig() when nothing is on
+// disk, so the controller always holds a non-nil ViewsConfig and
+// ResolveListColumnCascade always takes its "the loaded file wins whole" arm.
+// Building this from the catalog-merged set instead would make the harness
+// render cells no installation renders.
 func configForType(typeName string) *config.ViewsConfig {
 	full := config.DefaultConfig()
 	vd, ok := full.Views[typeName]

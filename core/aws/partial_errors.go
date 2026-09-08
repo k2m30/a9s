@@ -53,41 +53,89 @@ import (
 // read them say so in their own words. Folding them in here would mark a
 // healthy row data-incomplete.
 func IsNotFoundErr(err error) bool {
-	return ErrCodeIs(err,
-		"NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException", "InvalidInstanceID.NotFound",
-		// RDS and DocumentDB spell the same race with their own codes; a
-		// snapshot deleted between the list call and a per-snapshot
-		// describe answers one of these.
-		"DBSnapshotNotFound", "DBClusterSnapshotNotFoundFault",
-		// IAM spells it for every entity it owns — role, user, group, policy,
-		// instance profile. Both spellings: the modeled
-		// *NoSuchEntityException answers ErrorCode() "NoSuchEntity", while a
-		// response the SDK could not bind to it carries the exception name.
-		"NoSuchEntity", "NoSuchEntityException",
-		// One entry per service that spells the race with a code of its own.
-		// The demo fakes answer these same codes for a key the fixtures never
-		// registered, so a refusal reaches production in the one spelling
-		// every caller already branches on.
-		"NotFoundException",             // apigw, apigw v1, kms, msk, ses
-		"ValidationError",               // asg, cfn — a group or stack that no longer exists
-		"InvalidRequestException",       // athena
-		"NoSuchDistribution",            // cloudfront
-		"TrailNotFoundException",        // cloudtrail
-		"ResourceNotFound",              // cloudwatch
-		"PipelineNotFoundException",     // codepipeline
-		"DBSubnetGroupNotFoundFault",    // rds, docdb
-		"RepositoryNotFoundException",   // ecr
-		"ClusterNotFoundException",      // ecs
-		"FileSystemNotFound",            // efs
-		"CacheSubnetGroupNotFoundFault", // elasticache
-		"LoadBalancerNotFound",          // elb — the wire code; the SDK type is named LoadBalancerNotFoundException
-		"EntityNotFoundException",       // glue
-		"ClusterNotFound",               // redshift — the wire code; the SDK type is named ClusterNotFoundFault
-		"StateMachineDoesNotExist",      // sfn
-		"QueueDoesNotExist",             // sqs
-		"ParameterNotFound",             // ssm
-		"WAFNonexistentItemException",   // waf
-	)
+	code, message, _ := ClassifyAWSError(err)
+	shapes, known := notFoundCodes[code]
+	if !known {
+		return false
+	}
+	if len(shapes) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(shapes, func(shape string) bool {
+		return strings.Contains(message, shape)
+	})
+}
+
+// notFoundCodes is the one table: each code a9s reads as "the resource is
+// gone", and — for a code whose service ALSO uses it for a request it could
+// not parse — the shapes of the sentence that service writes when the resource
+// really is gone.
+//
+// Nearly every entry has no shape, and that is deliberate: a code that means
+// one thing carries the whole fact, and demanding a message from it would make
+// classification depend on wording AWS is free to change under us.
+//
+// Three do not mean one thing. autoscaling and cloudformation both answer
+// ValidationError and athena answers InvalidRequestException for a resource
+// that is gone AND for a request that was malformed. Reading the code alone
+// there turns a call a9s built wrong into a resource that went away, and
+// MarkSkipped then swallows it — the row is marked uninspected and no failure
+// is recorded, so the operator is told nothing went wrong while nothing was
+// inspected. Those three carry the service's own sentence, which is why the
+// shapes are fragments of real AWS wording and not the bare words "not found":
+// a malformed autoscaling request says "parameter 'X' not found in the
+// request", and it is describing the request, not a resource.
+var notFoundCodes = map[string][]string{ //nolint:gochecknoglobals // static AWS error-code table
+	"NoSuchBucket":               nil,
+	"NotFound":                   nil,
+	"NoSuchHostedZone":           nil,
+	"ResourceNotFoundException":  nil,
+	"InvalidInstanceID.NotFound": nil,
+	// RDS and DocumentDB spell the same race with their own codes; a
+	// snapshot deleted between the list call and a per-snapshot describe
+	// answers one of these.
+	"DBSnapshotNotFound":             nil,
+	"DBClusterSnapshotNotFoundFault": nil,
+	// IAM spells it for every entity it owns — role, user, group, policy,
+	// instance profile. Both spellings: the modeled *NoSuchEntityException
+	// answers ErrorCode() "NoSuchEntity", while a response the SDK could not
+	// bind to it carries the exception name.
+	"NoSuchEntity":          nil,
+	"NoSuchEntityException": nil,
+	// One entry per service that spells the race with a code of its own. The
+	// demo fakes answer these same codes — and, for the ambiguous three, these
+	// same sentences — for a key the fixtures never registered, so a refusal
+	// reaches production in the one spelling every caller already branches on.
+	"NotFoundException":             nil, // apigw, apigw v1, kms, msk, ses
+	"NoSuchDistribution":            nil, // cloudfront
+	"TrailNotFoundException":        nil, // cloudtrail
+	"ResourceNotFound":              nil, // cloudwatch
+	"PipelineNotFoundException":     nil, // codepipeline
+	"DBSubnetGroupNotFoundFault":    nil, // rds, docdb
+	"RepositoryNotFoundException":   nil, // ecr
+	"ClusterNotFoundException":      nil, // ecs
+	"FileSystemNotFound":            nil, // efs
+	"CacheSubnetGroupNotFoundFault": nil, // elasticache
+	"LoadBalancerNotFound":          nil, // elb — the wire code; the SDK type is named LoadBalancerNotFoundException
+	"EntityNotFoundException":       nil, // glue
+	"ClusterNotFound":               nil, // redshift — the wire code; the SDK type is named ClusterNotFoundFault
+	"StateMachineDoesNotExist":      nil, // sfn
+	"QueueDoesNotExist":             nil, // sqs
+	"ParameterNotFound":             nil, // ssm
+	"WAFNonexistentItemException":   nil, // waf
+
+	// The ambiguous three. asg writes "AutoScalingGroup name not found -
+	// AutoScalingGroup: <name> not found", cfn "Stack with id <name> does not
+	// exist", athena "WorkGroup <name> is not found."
+	//
+	// Each shape is the part of that sentence the malformed answer cannot
+	// borrow, which is its SUBJECT and not its verb: a validation failure says
+	// "parameter 'X' not found in the request" and "Value 'x' at 'y' does not
+	// exist in the template", so "not found" and "does not exist" both match
+	// the wrong thing. What only the not-found sentence carries is the words
+	// the service writes before the resource's name.
+	"ValidationError":         {"AutoScalingGroup name not found", "Stack with id"},
+	"InvalidRequestException": {"is not found"},
 }
 
 // aggregateFailuresCap is the maximum number of distinct causes

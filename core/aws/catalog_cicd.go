@@ -229,7 +229,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "ECR Repositories",
 		ShortName:      "ecr",
-		HumanizeFields: []string{"tag_mutability"},
+		HumanizeFields: []string{"tag_mutability", "ImageTagMutability"},
 		Aliases:        []string{"ecr", "container-registry"},
 		Category:       "CI/CD",
 		CloudTrailKey:  "ResourceName:ID",

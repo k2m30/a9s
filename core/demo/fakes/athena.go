@@ -35,8 +35,12 @@ func (f *AthenaFake) GetWorkGroup(_ context.Context, input *athena.GetWorkGroupI
 		return &athena.GetWorkGroupOutput{}, nil
 	}
 	if !f.hasWorkGroup(*input.WorkGroup) {
+		// Not the shared wording: InvalidRequestException is also what athena
+		// answers for a query it could not parse, so the classifier reads this
+		// sentence and not the code alone (core/aws/partial_errors.go's
+		// notFoundCodes). It is athena's own.
 		return nil, &athenatypes.InvalidRequestException{
-			Message: notFoundMessage("WorkGroup", *input.WorkGroup),
+			Message: aws.String("WorkGroup " + *input.WorkGroup + " is not found."),
 		}
 	}
 	if out, ok := f.fix.WorkGroupDetails[*input.WorkGroup]; ok && out != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -226,7 +227,13 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 	if !ok {
 		return c.snapshot(), nil
 	}
+	// Child types are not in the top-level catalog, so a lookup that stops
+	// there cannot see a grandchild drill's parent at all — the S3 object
+	// browser's folder-into-folder step starts from an s3_objects row.
 	td := resource.FindResourceType(typeName)
+	if td == nil {
+		td = resource.GetChildType(typeName)
+	}
 	if td == nil {
 		return c.snapshot(), nil
 	}
@@ -255,18 +262,16 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 	if childTD := resource.GetChildType(matchedChild.ChildType); childTD != nil {
 		c.registerFallbackTypeDefLocked(*childTD)
 	}
-	// Build the parent context from ContextKeys.
-	ctx := make(map[string]string, len(matchedChild.ContextKeys))
-	for param, source := range matchedChild.ContextKeys {
-		switch source {
-		case "ID":
-			ctx[param] = r.ID
-		case "Name":
-			ctx[param] = r.Name
-		default:
-			ctx[param] = r.Fields[source]
-		}
+	// The one resolver. A copy of this switch here dropped the "@parent."
+	// source, so a grandchild view read its grandparent's context as a Fields
+	// key no row carries; core/resource/types.go says in so many words that
+	// every path entering a child view calls this rather than re-deriving it.
+	var grandparentCtx map[string]string
+	if ls := c.topListState(); ls != nil {
+		grandparentCtx = ls.ParentContext
 	}
+	dr := domain.Resource(r)
+	ctx := resource.ResolveChildContext(*matchedChild, &dr, grandparentCtx)
 	displayName := ctx[matchedChild.DisplayNameKey]
 	ev := runtime.EnterChildViewEvent{
 		ChildType:     matchedChild.ChildType,

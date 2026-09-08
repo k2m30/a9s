@@ -41,6 +41,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Each now refuses with its own service's not-found error, and a9s recognises
   all of them.
 
+- A folder inside an S3 folder now opens. The drill kept its own copy of the
+  child-context resolver, and the copy could neither look up a child type nor
+  read a grandparent's context, so the second level of the object browser
+  dispatched nothing at all and the screen stayed where it was.
+
+- A request a9s builds wrong is no longer reported as a resource that went
+  away. Auto Scaling and CloudFormation answer a missing group or stack with
+  the same error code they use for a malformed request, and Athena does the
+  same, so a bad call was silently marked "not inspected" and the operator was
+  told nothing had failed. Those three codes now also have to carry the
+  sentence the service writes when the resource is really gone.
+
+- Three more fields read as words in the list for anyone who has run a9s
+  before: a CodeBuild project's source type, an ECR repository's tag
+  mutability and a Kinesis stream's mode. They read correctly in the demo and
+  as raw constants on a real account, because the per-resource view files an
+  installation carries name those columns by their AWS field path, and the
+  readable-wording declaration did not recognise that spelling.
+
 - An AMI row no longer carries its id under four field names, and a Transfer
   agreement no longer carries each resolved partner profile under two. One
   fact under two names is a fact that can disagree with itself.

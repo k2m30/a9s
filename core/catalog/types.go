@@ -217,8 +217,8 @@ type FindingDef struct {
 }
 
 // HumanizeFieldKey normalizes a field identifier to the FACT it names: case
-// and underscores dropped, so "ClusterType", "cluster_type" and "Cluster Type"
-// are one key.
+// and the separators between words dropped, so "ClusterType", "cluster_type",
+// "Cluster Type" and the dotted path "Source.Type" are one key.
 //
 // One fact is reached by more than one spelling — a list column reads it by
 // its RawStruct path, a fetcher writes it in snake_case, a detail row labels
@@ -226,8 +226,20 @@ type FindingDef struct {
 // humanize the surface that happens to use that spelling and leave the others
 // showing the constant. That is the same fact in two words, which is the
 // shape the declaration exists to remove.
+//
+// The dot matters because of which spelling an installation actually reads.
+// ResolveListColumnCascade merges the catalog's Key onto the defaults only
+// when no view config is loaded; with one loaded it returns that file's
+// columns verbatim, and those files are written on first start. So the
+// Key-less, Path-only column is the normal case, not the exception.
+//
+// Only separators are dropped. A path whose leaf is the fact but whose
+// ancestors are not ("StreamModeDetails.StreamMode") does not fold to its
+// leaf, because dropping a word is not normalizing a spelling — it would make
+// "role_name_arn" and "role" one key. Such a path is declared on the type
+// alongside the leaf's own spelling.
 func HumanizeFieldKey(s string) string {
-	return strings.ToLower(strings.NewReplacer("_", "", " ", "").Replace(s))
+	return strings.ToLower(strings.NewReplacer("_", "", " ", "", ".", "").Replace(s))
 }
 
 // HumanizedFields returns HumanizeFields as a lookup set keyed by
