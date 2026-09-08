@@ -140,6 +140,35 @@ type FetchCostsPayload struct {
 
 func (FetchCostsPayload) isTaskPayload() {}
 
+// listSeedEntry builds the cache-first seed for a list from the rows a source
+// retained, that source's own pagination, and the population it knows the
+// type has. A seed holding fewer rows than the population is truncated
+// whatever its pagination claimed: a file or a store entry can know a count
+// wider than the rows it kept, and a seed that reports itself complete while
+// short of that count renders a finished list with rows missing from it.
+//
+// Everything else on the incoming pagination (the continuation token, the
+// page size, the total hint) is carried through untouched — only the
+// truncation verdict is the seed's to decide. A caller with no pagination at
+// all keeps none unless the population itself proves truncation.
+func listSeedEntry(rows []resource.Resource, pagination *resource.PaginationMeta, population int) *domain.ListViewCacheEntry {
+	truncated := (pagination != nil && pagination.IsTruncated) || len(rows) < population
+	meta := pagination
+	switch {
+	case pagination != nil:
+		copied := *pagination
+		copied.IsTruncated = truncated
+		meta = &copied
+	case truncated:
+		meta = &resource.PaginationMeta{IsTruncated: true}
+	}
+	return &domain.ListViewCacheEntry{
+		Resources:  rows,
+		Pagination: meta,
+		TotalCount: population,
+	}
+}
+
 // HandleNavigate resolves the navigation kind for ev, mutating session
 // state the runtime owns (canonical-type resolution), and returns the
 // decision plus any fetch tasks the adapter should start.
@@ -255,19 +284,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		tr := c.session.RowStore.Snapshot(canon)
 		if tr.Gen != 0 {
 			if len(tr.Rows) > 0 {
-				result.CachedEntry = &domain.ListViewCacheEntry{
-					Resources: tr.Rows,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: tr.Pagination != nil && tr.Pagination.IsTruncated,
-					},
-					// TotalCount: RowStore.Observe's own shrink guard already
-					// guarantees tr.TotalCount >= len(tr.Rows) (never the reverse,
-					// unlike the disk-store fallback's tf.Count below), so a bare
-					// pass-through is enough to carry a count wider than this
-					// seeded page (e.g. handleAvailabilityCacheLoaded's
-					// ObserveCountRows call) through to the first rendered frame.
-					TotalCount: tr.TotalCount,
-				}
+				result.CachedEntry = listSeedEntry(tr.Rows, tr.Pagination, tr.Population())
 			}
 		} else {
 			_ = c.ReadCacheStore(func(store *cache.Store) error {
@@ -275,22 +292,15 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 					return nil
 				}
 				if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
-					// The file's population is what the type is known to have;
-					// its rows are only what fitted. Teaching the store the
-					// population before the seed's own rows land is what keeps
-					// the shrink guard from letting a shallower page shrink it
-					// (RowStore.Observe), and what makes a page that stops short
-					// of the population honestly truncated rather than a page
-					// claiming to be the whole list.
-					population := tf.Population()
-					c.session.RowStore.ObserveCount(canon, population)
-					result.CachedEntry = &domain.ListViewCacheEntry{
-						Resources: rowsFromCacheRows(canon, tf.Rows),
-						Pagination: &resource.PaginationMeta{
-							IsTruncated: !tf.Exact || len(tf.Rows) < population,
-						},
-						TotalCount: population,
-					}
+					// Teaching the store the population before the seed's own
+					// rows land is what keeps the shrink guard from letting a
+					// shallower page shrink it (RowStore.Observe).
+					c.session.RowStore.ObserveCount(canon, tf.Population())
+					result.CachedEntry = listSeedEntry(
+						rowsFromCacheRows(canon, tf.Rows),
+						&resource.PaginationMeta{IsTruncated: !tf.Exact},
+						tf.Population(),
+					)
 				}
 				return nil
 			})

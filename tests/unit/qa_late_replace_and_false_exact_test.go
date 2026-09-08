@@ -216,10 +216,14 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 // list must REMAIN at 55 rows/exact — the late replace must be rejected,
 // not silently accepted as a fresher truth.
 //
-// RED today: core/app/list_body.go's applyResourcesLoaded replaces
-// ls.Rows unconditionally on append=false (`ls.Rows = resources`), with no
-// check for whether the incoming page is an older, shallower subset of
-// what is already on screen.
+// ADAPTED (listgen row 5): the guarantee is unchanged, the mechanism under it
+// is not. This used to be enforced by a content heuristic — a smaller,
+// still-truncated, strict-ID-subset replace was guessed to be a straggler —
+// which could recognise only that one shape and got a legitimate Ctrl+R reset
+// wrong. Each result now carries the per-type request sequence it was
+// dispatched at, so the test stamps its three results in dispatch order the
+// way every production fetch does. Do not restore the unstamped form: it
+// asserts a guess the code no longer makes.
 func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -234,6 +238,9 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
+	// The entry fetch is dispatched and lands.
+	page1Seq := core.NextListFetchSeq("s3")
+
 	page1 := page1Resources(50)
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: "s3",
@@ -244,10 +251,16 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 			TotalHint:   -1,
 			PageSize:    50,
 		},
-		Append: false,
-		Gen:    0, Provenance: // AcceptZeroGen=true
-		messages.FetchProvenanceCanonicalList,
+		Append:     false,
+		Gen:        0, // AcceptZeroGen=true
+		ListSeq:    page1Seq,
+		Provenance: messages.FetchProvenanceCanonicalList,
 	})
+
+	// The verify-refetch is dispatched next and the load-more after it, so the
+	// verify's own result is a straggler by the time it arrives.
+	verifySeq := core.NextListFetchSeq("s3")
+	page2Seq := core.NextListFetchSeq("s3")
 
 	page2 := page2Resources(50, 5)
 	ctrl.Handle(messages.ResourcesLoaded{
@@ -259,8 +272,10 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 			TotalHint:   55,
 			PageSize:    5,
 		},
-		Append: true,
-		Gen:    0, Provenance: messages.FetchProvenanceCanonicalList,
+		Append:     true,
+		Gen:        0,
+		ListSeq:    page2Seq,
+		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	preSnap := ctrl.Snapshot()
@@ -289,8 +304,10 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 			TotalHint:   -1,
 			PageSize:    50,
 		},
-		Append: false,
-		Gen:    0, Provenance: messages.FetchProvenanceCanonicalList,
+		Append:     false,
+		Gen:        0,
+		ListSeq:    verifySeq,
+		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	snap := ctrl.Snapshot()

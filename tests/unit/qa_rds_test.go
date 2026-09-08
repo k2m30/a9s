@@ -41,13 +41,11 @@ func rdsLoadedModel(t *testing.T) views.ResourceListModel {
 
 	td := rdsTypeDef()
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(160, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "dbi",
-		Resources:    fixtureRDSInstances(),
-	})
+	ctrl.ApplyResourcesLoaded("dbi", fixtureRDSInstances(), nil, false)
 	return m
 }
 

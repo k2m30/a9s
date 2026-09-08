@@ -32,17 +32,15 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 		}},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
 	// Load buckets
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3",
-		Resources: []resource.Resource{
-			{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
+		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
+	}, nil, false)
 
 	// Press Enter
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -82,16 +80,14 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "r53",
-		Resources: []resource.Resource{
-			{ID: "/hostedzone/ZTEST", Name: "example.com.", Fields: map[string]string{"zone_id": "/hostedzone/ZTEST", "name": "example.com."}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("r53", []resource.Resource{
+		{ID: "/hostedzone/ZTEST", Name: "example.com.", Fields: map[string]string{"zone_id": "/hostedzone/ZTEST", "name": "example.com."}},
+	}, nil, false)
 
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -132,17 +128,15 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewChildResourceList(td, map[string]string{"bucket": "b1"}, "b1", nil, k)
+	ctrl := newChildListViewCtrl(t, td)
+	m := views.NewChildResourceList(td, map[string]string{"bucket": "b1"}, "b1", nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
 	// Load a file (not a folder)
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3_objects",
-		Resources: []resource.Resource{
-			{ID: "data/file.txt", Name: "data/file.txt", Fields: map[string]string{"status": "file", "key": "data/file.txt"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{
+		{ID: "data/file.txt", Name: "data/file.txt", Fields: map[string]string{"status": "file", "key": "data/file.txt"}},
+	}, nil, false)
 
 	// Press Enter — should fall through to detail view (not child drill)
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -174,17 +168,15 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewChildResourceList(td, map[string]string{"bucket": "b1"}, "b1", nil, k)
+	ctrl := newChildListViewCtrl(t, td)
+	m := views.NewChildResourceList(td, map[string]string{"bucket": "b1"}, "b1", nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
 	// Load a folder
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3_objects",
-		Resources: []resource.Resource{
-			{ID: "data/", Name: "data/", Fields: map[string]string{"status": "folder", "key": "data/"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{
+		{ID: "data/", Name: "data/", Fields: map[string]string{"status": "folder", "key": "data/"}},
+	}, nil, false)
 
 	// Press Enter — should produce EnterChildViewMsg
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -218,16 +210,14 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 		},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "ec2",
-		Resources: []resource.Resource{
-			{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("ec2", []resource.Resource{
+		{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
+	}, nil, false)
 
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -260,16 +250,14 @@ func TestBuildChildContext_ID(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3",
-		Resources: []resource.Resource{
-			{ID: "test-bucket", Name: "test-bucket", Fields: map[string]string{}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
+		{ID: "test-bucket", Name: "test-bucket", Fields: map[string]string{}},
+	}, nil, false)
 
 	// Press Enter, verify context
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -293,16 +281,14 @@ func TestBuildChildContext_Name(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "r53",
-		Resources: []resource.Resource{
-			{ID: "/hostedzone/Z1", Name: "test.com.", Fields: map[string]string{}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("r53", []resource.Resource{
+		{ID: "/hostedzone/Z1", Name: "test.com.", Fields: map[string]string{}},
+	}, nil, false)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
@@ -327,16 +313,14 @@ func TestBuildChildContext_AtParent(t *testing.T) {
 	}
 	k := keys.Default()
 	parentCtx := map[string]string{"bucket": "my-bucket"}
-	m := views.NewChildResourceList(td, parentCtx, "my-bucket", nil, k)
+	ctrl := newChildListViewCtrl(t, td)
+	m := views.NewChildResourceList(td, parentCtx, "my-bucket", nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3_objects",
-		Resources: []resource.Resource{
-			{ID: "folder1/", Name: "folder1/", Fields: map[string]string{"status": "folder", "key": "folder1/"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{
+		{ID: "folder1/", Name: "folder1/", Fields: map[string]string{"status": "folder", "key": "folder1/"}},
+	}, nil, false)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
@@ -363,16 +347,14 @@ func TestBuildChildContext_FieldsKey(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "test",
-		Resources: []resource.Resource{
-			{ID: "1", Name: "one", Fields: map[string]string{"custom_field": "custom-value"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("test", []resource.Resource{
+		{ID: "1", Name: "one", Fields: map[string]string{"custom_field": "custom-value"}},
+	}, nil, false)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
@@ -404,17 +386,15 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 		}},
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
 	// Load a resource
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "test_parent_events",
-		Resources: []resource.Resource{
-			{ID: "res-123", Name: "my-resource", Fields: map[string]string{"status": "active", "id": "res-123", "name": "my-resource"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("test_parent_events", []resource.Resource{
+		{ID: "res-123", Name: "my-resource", Fields: map[string]string{"status": "active", "id": "res-123", "name": "my-resource"}},
+	}, nil, false)
 
 	// Press "e" key — triggers keys.Events which calls handleChildKey("e", ...)
 	m, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
@@ -449,16 +429,14 @@ func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
 		// No Children defined — pressing "e" should be a no-op
 	}
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "ec2_no_events",
-		Resources: []resource.Resource{
-			{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
-		},
-	})
+	ctrl.ApplyResourcesLoaded("ec2_no_events", []resource.Resource{
+		{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
+	}, nil, false)
 
 	// Press "e" key — no child defined, should return nil cmd (no-op)
 	_, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})

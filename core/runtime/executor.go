@@ -116,6 +116,21 @@ func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
 	return c.session.ListFetchSeqLatest(canonShortName(shortName))
 }
 
+// ListResultSuperseded reports whether a canonical list result has been
+// overtaken by a later request for the same list — its ListSeq is no longer
+// the newest value StampListFetchSeq handed out for its type. The single
+// staleness rule for list ordering, read at each lane's own door so a
+// superseded result reaches neither the screen nor the shared row store: the
+// TUI's ResourcesLoaded shim, HandleEvent's own case (the headless lane and
+// any direct caller), and the controller's apply seam.
+//
+// ListSeq zero carries no ordering claim — a cache-seed replay, a
+// filtered/child/by-ID result, a synthetic construction — and is never
+// superseded.
+func (c *Core) ListResultSuperseded(msg messages.ResourcesLoaded) bool {
+	return msg.ListSeq != 0 && msg.ListSeq != c.LatestListFetchSeq(msg.ResourceType)
+}
+
 // ExecuteTask runs a task using a snapshot captured now. Synchronous callers
 // (DrainSync, non-TUI hosts) have no dispatch/execute gap. Async callers (the
 // TUI's executeTaskCmd) MUST capture via CaptureDispatch at dispatch time and

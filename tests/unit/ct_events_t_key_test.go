@@ -35,13 +35,11 @@ func ctEventsLoadedEC2List(t *testing.T) views.ResourceListModel {
 		t.Fatal("resource type 'ec2' not registered")
 	}
 	k := keys.Default()
-	m := views.NewResourceList(*td, nil, k)
+	ctrl := newListViewCtrl(t, *td)
+	m := views.NewResourceList(*td, nil, k, ctrl)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "ec2",
-		Resources:    []resource.Resource{ctEventsEC2Resource()},
-	})
+	ctrl.ApplyResourcesLoaded("ec2", []resource.Resource{ctEventsEC2Resource()}, nil, false)
 	return m
 }
 
@@ -79,7 +77,8 @@ func TestResourceList_TKey_NoopWhenEmpty(t *testing.T) {
 		t.Fatal("resource type 'ec2' not registered")
 	}
 	k := keys.Default()
-	m := views.NewResourceList(*td, nil, k)
+	ctrl := newListViewCtrl(t, *td)
+	m := views.NewResourceList(*td, nil, k, ctrl)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
 
@@ -97,21 +96,19 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 		t.Fatal("resource type 'iam-user' not registered")
 	}
 	k := keys.Default()
-	m := views.NewResourceList(*td, nil, k)
+	ctrl := newListViewCtrl(t, *td)
+	m := views.NewResourceList(*td, nil, k, ctrl)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "iam-user",
-		Resources: []resource.Resource{
-			{
-				ID:   "test-user",
-				Name: "test-user",
-				Fields: map[string]string{
-					"user_name": "test-user",
-				},
+	ctrl.ApplyResourcesLoaded("iam-user", []resource.Resource{
+		{
+			ID:   "test-user",
+			Name: "test-user",
+			Fields: map[string]string{
+				"user_name": "test-user",
 			},
 		},
-	})
+	}, nil, false)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
 	if cmd == nil {
@@ -135,17 +132,15 @@ func TestResourceList_TKey_NoopOnCtEventsList(t *testing.T) {
 	if td == nil {
 		t.Fatal("ct-events type not found")
 	}
-	rl := views.NewResourceList(*td, nil, keys.Default())
+	ctrl := newListViewCtrl(t, *td)
+	rl := views.NewResourceList(*td, nil, keys.Default(), ctrl)
 	rl.SetSize(120, 40)
 	// Load one event
-	rl, _ = rl.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "ct-events",
-		Resources: []resource.Resource{{
-			ID:     "evt-001",
-			Name:   "DescribeInstances",
-			Fields: map[string]string{"event_name": "DescribeInstances"},
-		}},
-	})
+	ctrl.ApplyResourcesLoaded("ct-events", []resource.Resource{{
+		ID:     "evt-001",
+		Name:   "DescribeInstances",
+		Fields: map[string]string{"event_name": "DescribeInstances"},
+	}}, nil, false)
 	_, cmd := rl.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
 	if cmd != nil {
 		t.Fatal("t key should be no-op on ct-events list")
@@ -170,12 +165,10 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 		if td == nil {
 			t.Fatal("ec2 type not found")
 		}
-		rl := views.NewResourceList(*td, nil, k)
+		ctrl := newListViewCtrl(t, *td)
+		rl := views.NewResourceList(*td, nil, k, ctrl)
 		rl.SetSize(120, 40)
-		rl, _ = rl.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-			ResourceType: "ec2",
-			Resources:    []resource.Resource{res},
-		})
+		ctrl.ApplyResourcesLoaded("ec2", []resource.Resource{res}, nil, false)
 		_, cmd := rl.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
 		if cmd == nil {
 			t.Fatal("ResourceList: t key returned nil cmd")
@@ -215,16 +208,14 @@ func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 	if td == nil {
 		t.Skip("s3_objects child type not registered")
 	}
-	rl := views.NewChildResourceList(*td, map[string]string{"bucket": "my-bucket"}, "my-bucket", nil, keys.Default())
+	ctrl := newChildListViewCtrl(t, *td)
+	rl := views.NewChildResourceList(*td, map[string]string{"bucket": "my-bucket"}, "my-bucket", nil, keys.Default(), ctrl)
 
 	// Key should be no-op
 	rl.SetSize(120, 40)
-	rl, _ = rl.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3_objects",
-		Resources: []resource.Resource{{
-			ID: "file.txt", Name: "file.txt", Fields: map[string]string{},
-		}},
-	})
+	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{{
+		ID: "file.txt", Name: "file.txt", Fields: map[string]string{},
+	}}, nil, false)
 	_, cmd := rl.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
 	if cmd != nil {
 		t.Fatal("t key should be no-op on child resource list")

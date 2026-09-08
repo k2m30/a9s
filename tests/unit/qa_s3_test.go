@@ -72,21 +72,21 @@ func s3LoadedObjectModel() tui.Model {
 }
 
 // s3RLBucketModel creates a standalone ResourceListModel for S3 buckets with data loaded.
-func s3RLBucketModel() views.ResourceListModel {
+func s3RLBucketModel(t *testing.T) views.ResourceListModel {
+	t.Helper()
 	td := s3BucketTypeDef()
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "s3",
-		Resources:    fixtureS3Buckets(),
-	})
+	ctrl.ApplyResourcesLoaded("s3", fixtureS3Buckets(), nil, false)
 	return m
 }
 
 // s3RLObjectModel creates a standalone ResourceListModel for S3 objects inside a bucket.
-func s3RLObjectModel(bucket string) views.ResourceListModel {
+func s3RLObjectModel(t *testing.T, bucket string) views.ResourceListModel {
+	t.Helper()
 	k := keys.Default()
 	childDef := resource.ResourceTypeDef{
 		Name:      "S3 Objects",
@@ -100,13 +100,11 @@ func s3RLObjectModel(bucket string) views.ResourceListModel {
 			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
-	m := views.NewChildResourceList(childDef, map[string]string{"bucket": bucket}, bucket, nil, k)
+	ctrl := newChildListViewCtrl(t, childDef)
+	m := views.NewChildResourceList(childDef, map[string]string{"bucket": bucket}, bucket, nil, k, ctrl)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild,
-		ResourceType: "s3_objects",
-		Resources:    fixtureS3Objects(),
-	})
+	ctrl.ApplyResourcesLoaded("s3_objects", fixtureS3Objects(), nil, false)
 	return m
 }
 
@@ -122,7 +120,7 @@ func s3KeyPress(char string) tea.KeyPressMsg {
 // A.8 Enter Key (Drill Into Bucket)
 
 func TestQA_S3_A8_1_EnterOnBucket_SendsEnterChildViewMsg(t *testing.T) {
-	m := s3RLBucketModel()
+	m := s3RLBucketModel(t)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -145,7 +143,7 @@ func TestQA_S3_A8_1_EnterOnBucket_SendsEnterChildViewMsg(t *testing.T) {
 }
 
 func TestQA_S3_A8_2_EnterOnBucket_DoesNotSendTargetDetail(t *testing.T) {
-	m := s3RLBucketModel()
+	m := s3RLBucketModel(t)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -219,7 +217,7 @@ func TestQA_S3_B14_1_Escape_FromObjects_DoesNotReturnToMainMenu(t *testing.T) {
 // C.1 Bucket Detail (via d from bucket list — d always opens detail view)
 
 func TestQA_S3_C1_BucketDetail_ViaDetailCommand(t *testing.T) {
-	m := s3RLBucketModel()
+	m := s3RLBucketModel(t)
 
 	// The 'd' key always opens the detail view (never drills into S3).
 	_, cmd := m.Update(s3KeyPress("d"))
@@ -240,7 +238,7 @@ func TestQA_S3_C1_BucketDetail_ViaDetailCommand(t *testing.T) {
 // C.2 Object Detail (via Enter or d from object list)
 
 func TestQA_S3_C2_ObjectDetail_EnterSendsDetail(t *testing.T) {
-	m := s3RLObjectModel("test-app-state")
+	m := s3RLObjectModel(t, "test-app-state")
 
 	// For objects inside a bucket (s3_objects), Enter sends TargetDetail
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -490,7 +488,7 @@ func TestQA_S3_CommandMode_NavigateToEC2(t *testing.T) {
 // Test YAML view from S3 object list
 
 func TestQA_S3_YAML_FromObjectList(t *testing.T) {
-	m := s3RLObjectModel("test-app-state")
+	m := s3RLObjectModel(t, "test-app-state")
 
 	_, cmd := m.Update(s3KeyPress("y"))
 	if cmd == nil {

@@ -14,7 +14,7 @@
 //
 // Semantics mirror the two in-memory reconciliation rules that already exist
 // independently for the per-screen ListState (core/app/list_body.go:
-// dedupAgainstExisting, isStaleReplace) and the on-disk TypeFile
+// dedupAgainstExisting) and the on-disk TypeFile
 // (core/runtime/probes.go: reconcileTypeFile, rowIDsAreSubset) so a
 // future caller can safely retire either without behavior drift. RowStore
 // does not implement C6b Wave-2 carry — that remains reconcileTypeFile's
@@ -112,6 +112,16 @@ type TypeRows struct {
 	ViewState ListViewState
 }
 
+// Population is how many resources the session knows this type has: its
+// TotalCount, which is authoritative and may exceed the rows retained (C6a —
+// a counts-only observation never touches Rows), or the row depth when that
+// is larger. The in-memory counterpart of cache.TypeFile.Population, so a
+// seed built from the session and one built from the file cannot disagree
+// about how big the type is.
+func (t TypeRows) Population() int {
+	return max(t.TotalCount, len(t.Rows))
+}
+
 // ListViewState is the renderer-owned interactive state of a top-level
 // resource list, retained alongside its rows so a warm re-entry restores
 // the exact view the user left (filter text, ctrl+z attention-only toggle,
@@ -154,24 +164,6 @@ func dedupAgainstExistingRows(existing, incoming []resource.Resource) []resource
 	return resource.DedupByID(existing, incoming)
 }
 
-// rowIDsAreSubsetRows mirrors core/runtime/probes.go's rowIDsAreSubset:
-// reports whether every ID in candidate also appears in superset.
-func rowIDsAreSubsetRows(candidate, superset []resource.Resource) bool {
-	if len(candidate) == 0 {
-		return true
-	}
-	known := make(map[string]struct{}, len(superset))
-	for _, r := range superset {
-		known[r.ID] = struct{}{}
-	}
-	for _, r := range candidate {
-		if _, ok := known[r.ID]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 // cloneRows returns a defensive copy of rows: a fresh slice, and for each
 // row whose Fields map is non-nil, a fresh Fields map — so a caller that
 // mutates a Snapshot/SnapshotAll result in place (rows[i].Name = ...,
@@ -192,22 +184,6 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 		out[i] = r
 	}
 	return out
-}
-
-// isStaleReplaceRows mirrors core/app/list_body.go's isStaleReplace: a
-// non-append replace is treated as a stale, out-of-order straggler only when
-// incoming is BOTH smaller than existing AND still truncated AND a strict ID
-// subset of existing — the same conservative, false-negative-biased shape
-// the per-screen ListState guard uses (the stale verify-refetch discard,
-// list_body.go).
-func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *resource.PaginationMeta) bool {
-	if len(incoming) == 0 || len(incoming) >= len(existing) {
-		return false
-	}
-	if pagination == nil || !pagination.IsTruncated {
-		return false
-	}
-	return rowIDsAreSubsetRows(incoming, existing)
 }
 
 // Observe applies a rows-carrying observation for canon (the caller's
@@ -242,15 +218,15 @@ func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *reso
 //     never regress rows a live top-level fetch already accumulated via
 //     load-more. Probe replacing Probe, or Probe replacing Disk, is still
 //     allowed; Fetch replacing Fetch is untouched by this rule.
-//  2. Stale replace (append=false only): mirrors isStaleReplace — a smaller,
-//     still-truncated, strict-ID-subset replace is rejected as an
-//     out-of-order straggler.
-//  3. Append: incoming is deduped against the existing rows by stable ID
+//  2. Append: incoming is deduped against the existing rows by stable ID
 //     (mirrors dedupAgainstExisting) and appended. Append always accepts —
 //     dedup happens to the row set, not to the observation.
-//  4. Replace (append=false, not stale): incoming rows replace the existing
-//     rows wholesale.
-//  5. TotalCount shrink guard (applies to both append and replace): a
+//  3. Replace (append=false): incoming rows replace the existing rows
+//     wholesale. Ordering between two fetch results for one list is decided
+//     before the store sees them, by the request sequence
+//     (runtime.Core.ListResultSuperseded); a content-shape guess about which
+//     of two accepted results is older would only disagree with it.
+//  4. TotalCount shrink guard (applies to both append and replace): a
 //     non-exact incoming pagination (IsTruncated=true, or nil — nil is never
 //     exact per C5/D14) only ever RAISES TotalCount to at least len(newRows);
 //     it never shrinks a wider TotalCount already known (e.g. seeded by an
@@ -275,22 +251,6 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	}
 
 	if !appendPage && origin == OriginProbe && len(existing.Rows) > 0 && existing.Origin == OriginFetch {
-		return cloneRows(existing.Rows), existing.Gen
-	}
-
-	// C5 + the stale verify-refetch discard: the stale-shaped-replace rejection below only
-	// applies while the EXISTING entry has not yet reached a confirmed exact
-	// total (mirrors core/app/list_body.go's applyResourcesLoaded, which
-	// gates its own isStaleReplace call on !ls.HasPagination). A Ctrl+R full
-	// reset legitimately replays the exact same page-1 IDs with
-	// IsTruncated=true while the existing entry is ALSO still truncated
-	// (never confirmed exact) — that reset must win, matching
-	// TestStoryF1_CtrlR_ResetsPagination. Once existing.Pagination reports
-	// IsTruncated=false (C5: exact only ever advances), a smaller,
-	// still-truncated, ID-subset replace can only be an out-of-order
-	// straggler and IS rejected (TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact).
-	existingIsExact := existing.Pagination != nil && !existing.Pagination.IsTruncated
-	if !appendPage && !existing.Partial && existingIsExact && isStaleReplaceRows(existing.Rows, rows, pagination) {
 		return cloneRows(existing.Rows), existing.Gen
 	}
 

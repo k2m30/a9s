@@ -22,6 +22,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -81,31 +82,28 @@ func pgKeyPress(char string) tea.KeyPressMsg {
 }
 
 // pgNewModel creates a fresh ResourceListModel, calls Init, and sets size.
-func pgNewModel(t *testing.T) views.ResourceListModel {
+func pgNewModel(t *testing.T) (views.ResourceListModel, *app.Controller) {
 	t.Helper()
 	tuitest.ForceColor(t)
 
 	td := pgTestTypeDef()
 	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
+	ctrl := newListViewCtrl(t, td)
+	m := views.NewResourceList(td, nil, k, ctrl)
 	m.SetSize(120, 30)
 	m, _ = m.Init()
-	return m
+	return m, ctrl
 }
 
 // pgLoadResources sends a ResourcesLoadedMsg to the model with the given options.
 func pgLoadResources(
+	ctrl *app.Controller,
 	m views.ResourceListModel,
 	resources []resource.Resource,
 	pagination *resource.PaginationMeta,
 	appendMode bool,
 ) views.ResourceListModel {
-	m, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
-		ResourceType: "ec2",
-		Resources:    resources,
-		Pagination:   pagination,
-		Append:       appendMode,
-	})
+	ctrl.ApplyResourcesLoaded("ec2", resources, pagination, appendMode)
 	return m
 }
 
@@ -116,10 +114,10 @@ func pgLoadResources(
 // TestResourceList_LoadMore_WhenTruncated_SendsMsg verifies that pressing M
 // on a truncated list returns a command (which will produce a LoadMoreMsg).
 func TestResourceList_LoadMore_WhenTruncated_SendsMsg(t *testing.T) {
-	m := pgNewModel(t)
+	m, ctrl := pgNewModel(t)
 
 	// Load truncated page
-	m = pgLoadResources(m, pgTestResources(200), &resource.PaginationMeta{
+	m = pgLoadResources(ctrl, m, pgTestResources(200), &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "token-abc",
 	}, false)
@@ -142,8 +140,8 @@ func TestResourceList_LoadMore_WhenTruncated_SendsMsg(t *testing.T) {
 // on a non-truncated list (all pages loaded) does nothing.
 func TestResourceList_LoadMore_WhenNotTruncated_Noop(t *testing.T) {
 	t.Run("nil pagination", func(t *testing.T) {
-		m := pgNewModel(t)
-		m = pgLoadResources(m, pgTestResources(50), nil, false)
+		m, ctrl := pgNewModel(t)
+		m = pgLoadResources(ctrl, m, pgTestResources(50), nil, false)
 
 		_, cmd := m.Update(pgKeyPress("M"))
 		if cmd != nil {
@@ -152,8 +150,8 @@ func TestResourceList_LoadMore_WhenNotTruncated_Noop(t *testing.T) {
 	})
 
 	t.Run("IsTruncated=false", func(t *testing.T) {
-		m := pgNewModel(t)
-		m = pgLoadResources(m, pgTestResources(50), &resource.PaginationMeta{
+		m, ctrl := pgNewModel(t)
+		m = pgLoadResources(ctrl, m, pgTestResources(50), &resource.PaginationMeta{
 			IsTruncated: false,
 		}, false)
 
@@ -167,10 +165,10 @@ func TestResourceList_LoadMore_WhenNotTruncated_Noop(t *testing.T) {
 // TestResourceList_LoadMore_WhenAlreadyLoading_Noop verifies that pressing M
 // while a page is already being fetched does nothing (prevents double-fetching).
 func TestResourceList_LoadMore_WhenAlreadyLoading_Noop(t *testing.T) {
-	m := pgNewModel(t)
+	m, ctrl := pgNewModel(t)
 
 	// Load truncated page
-	m = pgLoadResources(m, pgTestResources(200), &resource.PaginationMeta{
+	m = pgLoadResources(ctrl, m, pgTestResources(200), &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "token-abc",
 	}, false)

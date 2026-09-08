@@ -115,14 +115,16 @@ func TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded(t *testing.T) {
 // Pin 2 — stale truncated ID-subset replace rejected once exact (D14).
 // -----------------------------------------------------------------------
 
-// TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact mirrors
-// isStaleReplaceRows (which mirrors core/app/list_body.go's
-// isStaleReplace and core/runtime/probes.go's reconcileTypeFile rule 1):
-// a non-append, truncated replay whose row IDs are a strict subset of the
-// already-stored fuller set must be REJECTED — the existing (fuller) rows
-// come back unchanged and the store's own state is untouched — the
-// in-memory analogue of D14 ("a stale page-1 replace landing after a deeper
-// load-more stomped the 55-row list back to 50+").
+// INVERTED (listgen row 5): the store does not decide which of two results is
+// older. It used to guess from content shape — a smaller, still-truncated,
+// strict-ID-subset replace was rejected — and that guess could only see one
+// shape while getting a legitimate Ctrl+R reset to page 1 wrong. Ordering is
+// now decided before the store is reached, by the per-type request sequence
+// (runtime.Core.ListResultSuperseded), so a replace that gets this far has
+// already been established as the newest one and is applied. The guarantee
+// the old assertion protected is pinned end to end by
+// TestLateReplace_DoesNotStompDeeperList. Do not restore the rejection: a
+// second, disagreeing opinion about staleness is what this row removed.
 func TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -138,19 +140,21 @@ func TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact(t *testing.T) {
 	// (append=false — a fresh fetch result, not a load-more page).
 	stalePage1 := full[:50]
 	accepted, genAfterStale := store.Observe("s3", stalePage1, &resource.PaginationMeta{IsTruncated: true}, session.OriginFetch, false)
-	if len(accepted) != 55 {
-		t.Errorf("Observe(stale truncated ID-subset replace) returned %d rows, want 55 (existing rows unchanged, rejected) — D14", len(accepted))
+	if len(accepted) != 50 {
+		t.Errorf("Observe(truncated ID-subset replace) returned %d rows, want the 50 it carried — the store applies what reaches it", len(accepted))
 	}
-	if genAfterStale != genAfterFull {
-		t.Errorf("Gen after rejected stale replace = %d, want unchanged %d — a rejected observation must not bump Gen", genAfterStale, genAfterFull)
+	if genAfterStale == genAfterFull {
+		t.Errorf("Gen after the replace = %d, want a bump from %d — an applied observation is a write", genAfterStale, genAfterFull)
 	}
 
 	snap := store.Snapshot("s3")
-	if len(snap.Rows) != 55 {
-		t.Fatalf("len(Rows) = %d, want 55 — a rejected stale replay must not shrink the stored rows", len(snap.Rows))
+	if len(snap.Rows) != 50 {
+		t.Fatalf("len(Rows) = %d, want 50", len(snap.Rows))
 	}
-	if snap.Pagination == nil || snap.Pagination.IsTruncated {
-		t.Errorf("Pagination = %+v, want IsTruncated=false preserved — the rejected stale replay must not downgrade exactness", snap.Pagination)
+	// The wider total survives: a truncated page does not claim to be the
+	// whole list, so Observe's shrink guard keeps the 55 it already knew.
+	if snap.TotalCount != 55 {
+		t.Errorf("TotalCount = %d, want 55 — a truncated replace must not shrink the known population", snap.TotalCount)
 	}
 }
 

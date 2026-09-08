@@ -279,16 +279,10 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	if td := resource.FindResourceType(msg.ResourceType); td != nil {
 		canon = td.ShortName
 	}
-	// Superseded-dispatch discard: a canonical list fetch carries the per-type
-	// sequence it was dispatched at (runtime.Core.StampListFetchSeq), and only
-	// the newest one handed out may land. An on-entry verification that a
-	// later Ctrl+R, load-more or refresh has already overtaken is discarded
-	// whole here, before any screen sees it — the ordering fact the content
-	// heuristic in applyResourcesLoaded cannot observe, since a superseded
-	// result may be the same size, exact, or carry entirely different rows.
-	// ListSeq zero carries no ordering claim (a cache-seed replay, a
-	// filtered/child/by-ID result, a synthetic construction) and is applied.
-	if msg.ListSeq != 0 && msg.ListSeq != c.core.LatestListFetchSeq(canon) {
+	// Superseded-dispatch discard, the same rule each lane's door applies —
+	// this seam is called directly by the TUI as well as by Handle, so it
+	// carries its own check rather than trusting its callers.
+	if c.core.ListResultSuperseded(msg) {
 		return
 	}
 	// A fetch result belongs to a single list — the active (topmost) one of its

@@ -224,90 +224,13 @@ func (m ResourceListModel) Init() (ResourceListModel, tea.Cmd) {
 	return m, m.spinner.Tick
 }
 
-// Update handles messages: ResourcesLoaded seeds the controller cache; spinner
-// ticks drive the loading animation; key events are translated to controller
-// Actions or emitted as navigation messages.
+// Update handles messages: spinner ticks drive the loading animation; key
+// events are translated to controller Actions or emitted as navigation
+// messages. A list result is not among them — every one reaches the screen
+// through the controller, where the request sequence is checked, and a view
+// that applied one itself would be a second apply point past that check.
 func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case messages.ResourcesLoaded:
-		// Drop loads for a different active resource type.
-		if msg.ResourceType != "" {
-			canon := msg.ResourceType
-			if td := resource.FindResourceType(msg.ResourceType); td != nil {
-				canon = td.ShortName
-			}
-			if canon != m.typeDef.ShortName {
-				return m, nil
-			}
-		}
-		m.ctrl.ApplyResourcesLoaded(m.typeDef.ShortName, msg.Resources, msg.Pagination, msg.Append)
-		m.styledRowCache = nil
-
-		// Auto-open single detail: mirrors the old logic reading m.filteredResources.
-		snap := m.ctrl.Snapshot()
-		ls := snap.Body.List
-		if ls != nil && m.ctrl.GetListAutoOpenSingle() {
-			if len(ls.Rows) == 1 {
-				r, ok := m.ctrl.ListSelected()
-				if ok {
-					m.ctrl.ClearListAutoOpenSingle()
-					if enterChild := m.enterChildFor(r); enterChild != nil {
-						ctx := m.buildChildContext(*enterChild, &r)
-						displayName := ctx[enterChild.DisplayNameKey]
-						childType := enterChild.ChildType
-						return m, func() tea.Msg {
-							return messages.EnterChildView{
-								ChildType:     childType,
-								ParentContext: ctx,
-								DisplayName:   displayName,
-							}
-						}
-					}
-					rCopy := r
-					return m, func() tea.Msg {
-						return messages.Navigate{
-							Target:         messages.TargetDetail,
-							ResourceType:   m.typeDef.ShortName,
-							Resource:       &rCopy,
-							ReplaceCurrent: true,
-						}
-					}
-				}
-			}
-			// Zero rows, paginated, single target ID → load more.
-			if len(ls.Rows) == 0 && ls.Truncated && !ls.LoadingMore {
-				if _, ok := m.ctrl.GetListExactRelatedTargetID(); ok {
-					m.ctrl.SetListLoadingMore(true)
-					rt := m.typeDef.ShortName
-					token := m.ctrl.GetListPaginationCursor()
-					pc := m.ctrl.GetListParentContext()
-					return m, func() tea.Msg {
-						return messages.LoadMore{
-							ResourceType:      rt,
-							ContinuationToken: token,
-							ParentContext:     pc,
-						}
-					}
-				}
-			}
-			// Zero rows, StubCreator available → synthesise stub.
-			if len(ls.Rows) == 0 && m.typeDef.StubCreator != nil {
-				if targetID, ok := m.ctrl.GetListExactRelatedTargetID(); ok {
-					m.ctrl.ClearListAutoOpenSingle()
-					stub := m.typeDef.StubCreator(targetID)
-					return m, func() tea.Msg {
-						return messages.Navigate{
-							Target:         messages.TargetDetail,
-							ResourceType:   m.typeDef.ShortName,
-							Resource:       &stub,
-							ReplaceCurrent: true,
-						}
-					}
-				}
-			}
-		}
-		return m, nil
-
 	case spinner.TickMsg:
 		snap := m.ctrl.Snapshot()
 		if snap.Body.List != nil && snap.Body.List.Loading {

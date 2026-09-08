@@ -133,6 +133,9 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// via its own direct HandleResourcesLoaded call in
 		// runtime_adapter_resources.go, so this task is emitted exactly
 		// once per lane per list load.
+		if c.ListResultSuperseded(msg) {
+			return nil, nil
+		}
 		c.observeResourcesLoadedRows(msg)
 		_, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 			ResourceType: msg.ResourceType,

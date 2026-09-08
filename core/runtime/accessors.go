@@ -351,17 +351,14 @@ func (c *Core) AnyLaneResourceByID(rt, id string) (domain.Resource, bool) {
 // AnyOriginResourceCache so both cache-hit paths restore the exact same
 // warm-reentry view state a list was left in.
 func listViewCacheEntryFromTypeRows(tr session.TypeRows) *domain.ListViewCacheEntry {
-	return &domain.ListViewCacheEntry{
-		Resources:     tr.Rows,
-		Pagination:    tr.Pagination,
-		TotalCount:    tr.TotalCount,
-		FilterText:    tr.ViewState.FilterText,
-		AttentionOnly: tr.ViewState.AttentionOnly,
-		SortColIdx:    tr.ViewState.SortColIdx,
-		SortAsc:       tr.ViewState.SortAsc,
-		CursorPos:     tr.ViewState.CursorPos,
-		HScrollOffset: tr.ViewState.HScrollOffset,
-	}
+	e := listSeedEntry(tr.Rows, tr.Pagination, tr.Population())
+	e.FilterText = tr.ViewState.FilterText
+	e.AttentionOnly = tr.ViewState.AttentionOnly
+	e.SortColIdx = tr.ViewState.SortColIdx
+	e.SortAsc = tr.ViewState.SortAsc
+	e.CursorPos = tr.ViewState.CursorPos
+	e.HScrollOffset = tr.ViewState.HScrollOffset
+	return e
 }
 
 // SetResourceCache stores the cached top-level resource-list entry for the
@@ -464,12 +461,7 @@ func (c *Core) FetchOriginCacheKeys() []string {
 // the read side only; the write-back is now explicit, not implicit).
 func (c *Core) ForEachResourceCache(fn func(rt string, entry *domain.ListViewCacheEntry)) {
 	for rt, tr := range c.session.RowStore.SnapshotAll(false) {
-		entry := &domain.ListViewCacheEntry{
-			Resources:  tr.Rows,
-			Pagination: tr.Pagination,
-			TotalCount: tr.TotalCount,
-		}
-		fn(rt, entry)
+		fn(rt, listSeedEntry(tr.Rows, tr.Pagination, tr.Population()))
 	}
 }
 
