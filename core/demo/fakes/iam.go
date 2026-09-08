@@ -7,6 +7,7 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -23,6 +24,29 @@ type IAMFake struct {
 // NewIAM constructs an IAMFake backed by fixture data from the fixtures package.
 func NewIAM() *IAMFake {
 	return &IAMFake{fix: fixtures.NewIAMFixtures()}
+}
+
+// noSuchEntity is the modeled refusal every lookup below answers with. The
+// fake holds a whole account, so a key it does not hold is a key the account
+// does not have — and answering an empty result for one makes a fixture gap
+// read as "this principal has none", the confident zero demo mode exists to
+// disprove. The code, not the Go type name, is what IsNotFoundErr reads.
+func noSuchEntity(kind, name string) error {
+	return &iamtypes.NoSuchEntityException{
+		Message: aws.String(kind + " " + name + " cannot be found."),
+	}
+}
+
+func (f *IAMFake) hasRole(name string) bool {
+	return slices.ContainsFunc(f.fix.Roles, func(r iamtypes.Role) bool { return aws.ToString(r.RoleName) == name })
+}
+
+func (f *IAMFake) hasUser(name string) bool {
+	return slices.ContainsFunc(f.fix.Users, func(u iamtypes.User) bool { return aws.ToString(u.UserName) == name })
+}
+
+func (f *IAMFake) hasGroup(name string) bool {
+	return slices.ContainsFunc(f.fix.Groups, func(g iamtypes.Group) bool { return aws.ToString(g.GroupName) == name })
 }
 
 func (f *IAMFake) ListRoles(_ context.Context, _ *iam.ListRolesInput, _ ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
@@ -63,40 +87,50 @@ func (f *IAMFake) ListAttachedRolePolicies(_ context.Context, input *iam.ListAtt
 	if input.RoleName == nil {
 		return nil, fmt.Errorf("ListAttachedRolePolicies: role name is required")
 	}
-	policies := f.fix.AttachedRolePolicies[*input.RoleName]
-	return &iam.ListAttachedRolePoliciesOutput{AttachedPolicies: policies}, nil
+	if !f.hasRole(*input.RoleName) {
+		return nil, noSuchEntity("Role with name", *input.RoleName)
+	}
+	return &iam.ListAttachedRolePoliciesOutput{AttachedPolicies: f.fix.AttachedRolePolicies[*input.RoleName]}, nil
 }
 
 func (f *IAMFake) ListRolePolicies(_ context.Context, input *iam.ListRolePoliciesInput, _ ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
 	if input.RoleName == nil {
 		return nil, fmt.Errorf("ListRolePolicies: role name is required")
 	}
-	names := f.fix.InlineRolePolicies[*input.RoleName]
-	return &iam.ListRolePoliciesOutput{PolicyNames: names}, nil
+	if !f.hasRole(*input.RoleName) {
+		return nil, noSuchEntity("Role with name", *input.RoleName)
+	}
+	return &iam.ListRolePoliciesOutput{PolicyNames: f.fix.InlineRolePolicies[*input.RoleName]}, nil
 }
 
 func (f *IAMFake) ListAttachedUserPolicies(_ context.Context, input *iam.ListAttachedUserPoliciesInput, _ ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error) {
 	if input.UserName == nil {
 		return nil, fmt.Errorf("ListAttachedUserPolicies: user name is required")
 	}
-	policies := f.fix.AttachedUserPolicies[*input.UserName]
-	return &iam.ListAttachedUserPoliciesOutput{AttachedPolicies: policies}, nil
+	if !f.hasUser(*input.UserName) {
+		return nil, noSuchEntity("User with name", *input.UserName)
+	}
+	return &iam.ListAttachedUserPoliciesOutput{AttachedPolicies: f.fix.AttachedUserPolicies[*input.UserName]}, nil
 }
 
 func (f *IAMFake) ListAttachedGroupPolicies(_ context.Context, input *iam.ListAttachedGroupPoliciesInput, _ ...func(*iam.Options)) (*iam.ListAttachedGroupPoliciesOutput, error) {
 	if input.GroupName == nil {
 		return nil, fmt.Errorf("ListAttachedGroupPolicies: group name is required")
 	}
-	policies := f.fix.AttachedGroupPolicies[*input.GroupName]
-	return &iam.ListAttachedGroupPoliciesOutput{AttachedPolicies: policies}, nil
+	if !f.hasGroup(*input.GroupName) {
+		return nil, noSuchEntity("Group with name", *input.GroupName)
+	}
+	return &iam.ListAttachedGroupPoliciesOutput{AttachedPolicies: f.fix.AttachedGroupPolicies[*input.GroupName]}, nil
 }
 
 func (f *IAMFake) ListGroupsForUser(_ context.Context, input *iam.ListGroupsForUserInput, _ ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error) {
 	if input.UserName == nil {
 		return nil, fmt.Errorf("ListGroupsForUser: user name is required")
 	}
-	groups := f.fix.GroupsForUser[*input.UserName]
-	return &iam.ListGroupsForUserOutput{Groups: groups}, nil
+	if !f.hasUser(*input.UserName) {
+		return nil, noSuchEntity("User with name", *input.UserName)
+	}
+	return &iam.ListGroupsForUserOutput{Groups: f.fix.GroupsForUser[*input.UserName]}, nil
 }
 
 func (f *IAMFake) ListEntitiesForPolicy(_ context.Context, input *iam.ListEntitiesForPolicyInput, _ ...func(*iam.Options)) (*iam.ListEntitiesForPolicyOutput, error) {
@@ -106,9 +140,9 @@ func (f *IAMFake) ListEntitiesForPolicy(_ context.Context, input *iam.ListEntiti
 	if err := validateARN(*input.PolicyArn); err != nil {
 		return nil, err
 	}
-	entities := f.fix.EntitiesForPolicy[*input.PolicyArn]
-	if entities == nil {
-		return &iam.ListEntitiesForPolicyOutput{}, nil
+	entities, ok := f.fix.EntitiesForPolicy[*input.PolicyArn]
+	if !ok {
+		return nil, noSuchEntity("Policy", *input.PolicyArn)
 	}
 	return &iam.ListEntitiesForPolicyOutput{
 		PolicyRoles:  entities.Roles,
@@ -136,15 +170,17 @@ func (f *IAMFake) GetGroup(_ context.Context, input *iam.GetGroupInput, _ ...fun
 		}
 	}
 	if group == nil {
-		return nil, fmt.Errorf("group %q not found", *input.GroupName)
+		return nil, noSuchEntity("Group with name", *input.GroupName)
 	}
 	return &iam.GetGroupOutput{Group: group, Users: users}, nil
 }
 
 func (f *IAMFake) ListGroupPolicies(_ context.Context, input *iam.ListGroupPoliciesInput, _ ...func(*iam.Options)) (*iam.ListGroupPoliciesOutput, error) {
 	name := aws.ToString(input.GroupName)
-	policies := f.fix.InlineGroupPolicies[name]
-	return &iam.ListGroupPoliciesOutput{PolicyNames: policies}, nil
+	if !f.hasGroup(name) {
+		return nil, noSuchEntity("Group with name", name)
+	}
+	return &iam.ListGroupPoliciesOutput{PolicyNames: f.fix.InlineGroupPolicies[name]}, nil
 }
 
 func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...func(*iam.Options)) (*iam.GetPolicyOutput, error) {
@@ -160,7 +196,7 @@ func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...f
 			return &iam.GetPolicyOutput{Policy: &p}, nil
 		}
 	}
-	return &iam.GetPolicyOutput{}, nil
+	return nil, noSuchEntity("Policy", *input.PolicyArn)
 }
 
 func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
@@ -172,11 +208,7 @@ func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersio
 	}
 	doc, ok := f.fix.PolicyDocuments[*input.PolicyArn]
 	if !ok {
-		return &iam.GetPolicyVersionOutput{
-			PolicyVersion: &iamtypes.PolicyVersion{
-				VersionId: input.VersionId,
-			},
-		}, nil
+		return nil, noSuchEntity("Policy", *input.PolicyArn)
 	}
 	return &iam.GetPolicyVersionOutput{
 		PolicyVersion: &iamtypes.PolicyVersion{
@@ -251,6 +283,9 @@ func (f *IAMFake) GetLoginProfile(_ context.Context, input *iam.GetLoginProfileI
 // EnrichIAMUserMFA's Wave-2 issue check.
 func (f *IAMFake) ListMFADevices(_ context.Context, input *iam.ListMFADevicesInput, _ ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error) {
 	userName := aws.ToString(input.UserName)
+	if !f.hasUser(userName) {
+		return nil, noSuchEntity("User with name", userName)
+	}
 	return &iam.ListMFADevicesOutput{MFADevices: f.fix.MFADevicesByUser[userName]}, nil
 }
 
@@ -259,6 +294,9 @@ func (f *IAMFake) ListMFADevices(_ context.Context, input *iam.ListMFADevicesInp
 // EnrichIAMUserMFA's Wave-2 stale-key issue check.
 func (f *IAMFake) ListAccessKeys(_ context.Context, input *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
 	userName := aws.ToString(input.UserName)
+	if !f.hasUser(userName) {
+		return nil, noSuchEntity("User with name", userName)
+	}
 	return &iam.ListAccessKeysOutput{AccessKeyMetadata: f.fix.AccessKeysByUser[userName]}, nil
 }
 
@@ -282,8 +320,9 @@ func (f *IAMFake) GetAccessKeyLastUsed(_ context.Context, input *iam.GetAccessKe
 // checkEbRole via asgInstanceProfileToRoles).
 func (f *IAMFake) GetInstanceProfile(_ context.Context, input *iam.GetInstanceProfileInput, _ ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
 	name := aws.ToString(input.InstanceProfileName)
-	if profile, ok := f.fix.InstanceProfiles[name]; ok {
-		return &iam.GetInstanceProfileOutput{InstanceProfile: &profile}, nil
+	profile, ok := f.fix.InstanceProfiles[name]
+	if !ok {
+		return nil, noSuchEntity("Instance Profile", name)
 	}
-	return &iam.GetInstanceProfileOutput{InstanceProfile: &iamtypes.InstanceProfile{}}, nil
+	return &iam.GetInstanceProfileOutput{InstanceProfile: &profile}, nil
 }

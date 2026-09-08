@@ -36,6 +36,33 @@ var adminManagedPolicyResources = []string{ //nolint:gochecknoglobals // static 
 	"policy/AdministratorAccess",
 }
 
+// broadPowerManagedPolicyResources are the AWS-managed policies that grant
+// far more than any one job needs without amounting to administrator. They
+// are worth showing where the operator is reading a principal's policy list,
+// but they are NOT administrator-equivalent and never feed the admin-attached
+// finding — that is the distinction PowerUserAccess used to blur.
+var broadPowerManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
+	"policy/PowerUserAccess",
+}
+
+// awsManagedPolicyIn reports whether policyARN names an AWS-managed policy
+// belonging to one of the given sets. It is the only test of that question:
+// the ARN is parsed, so a customer-managed policy an operator happened to
+// name "AdministratorAccess" is not one of AWS's, and every partition's
+// spelling of AWS's own is.
+func awsManagedPolicyIn(policyARN string, sets ...[]string) bool {
+	a, awsOwned := awsManagedPolicy(policyARN)
+	if !awsOwned {
+		return false
+	}
+	for _, set := range sets {
+		if slices.Contains(set, a.Resource) {
+			return true
+		}
+	}
+	return false
+}
+
 // listAttachedRolePolicies walks every page of a role's attached managed
 // policies. IAM caps a principal at 20 managed policies today, which fits one
 // page, but a quota is not a contract and the group sweep already paginates
@@ -97,8 +124,7 @@ func AdminAttachedPolicyNameForTest(attached []iamtypes.AttachedPolicy) string {
 // managed policy in the attachment list, or "" when none is attached.
 func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 	for _, p := range attached {
-		if a, awsOwned := awsManagedPolicy(aws.ToString(p.PolicyArn)); awsOwned &&
-			slices.Contains(adminManagedPolicyResources, a.Resource) {
+		if awsManagedPolicyIn(aws.ToString(p.PolicyArn), adminManagedPolicyResources) {
 			name := aws.ToString(p.PolicyName)
 			if name == "" {
 				name = aws.ToString(p.PolicyArn)

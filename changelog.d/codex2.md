@@ -1,3 +1,7 @@
+## Changed
+
+- On a large account the public-snapshot check now reads up to 50 pages instead of 10, so fewer snapshots fall past it and read `?`.
+
 ## Fixed
 
 - Two AWS profiles whose names differ only around a hyphen (`team-` with `us-east-1`, `team` with `-us-east-1`) shared one cache directory and overwrote each other's cached rows. Each pair now gets its own directory.
@@ -10,3 +14,5 @@
 - `PowerUserAccess` is no longer reported as an administrator policy. AWS's definition of it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
 - S3 throttling (`SlowDown`) is now shown as throttling, and EC2's `UnauthorizedOperation` as access denied, on every surface that phrases a failure. Both used to read as a generic error.
 - A list column whose title matches two stored field names differing only by case now shows the same value on every start instead of one at random.
+- The role's policy list no longer highlights a customer-managed policy in red just because someone named it `AdministratorAccess`. AWS's own policies are matched by their ARN, in every partition.
+- A role's inline policy written with a single `Statement` object no longer loses the resources it names, so the pivots that read them resolve.

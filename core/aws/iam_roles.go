@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -373,14 +372,19 @@ func enumerateRoleInlinePolicies(
 				UnusableAnswer(roleName, "GetRolePolicy returned no document for "+policyName))
 			continue
 		}
-		doc := iampolicy.Decode(*getOut.PolicyDocument)
-		allResources = append(allResources, extractPolicyResources(doc)...)
-		if scan.finding != nil {
-			continue
-		}
-		parsed, perr := iampolicy.Parse(doc)
+		parsed, perr := iampolicy.Parse(*getOut.PolicyDocument)
 		if perr != nil {
 			scan.failures = append(scan.failures, UnusableAnswer(roleName, "unreadable inline policy "+policyName))
+			continue
+		}
+		// Read off the document the escalation check below reads. A second
+		// walk of the same JSON is a second answer waiting to disagree — the
+		// one this replaced bound Statement to an array and so lost every
+		// resource of a policy written with a bare Statement object.
+		for _, st := range parsed.Statement {
+			allResources = append(allResources, st.Resource...)
+		}
+		if scan.finding != nil {
 			continue
 		}
 		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
@@ -418,37 +422,4 @@ func addInlinePrivEsc(
 	}
 	details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: capRows(nil, inline.rows)}
 	return findings, details
-}
-
-// extractPolicyResources parses a policy-document JSON string and returns
-// every Resource entry across all Statements, flattening string and []string
-// forms.
-func extractPolicyResources(doc string) []string {
-	if doc == "" {
-		return nil
-	}
-	var parsed struct {
-		Statement []struct {
-			Resource any `json:"Resource"`
-		} `json:"Statement"`
-	}
-	if err := json.Unmarshal([]byte(doc), &parsed); err != nil {
-		return nil
-	}
-	var out []string
-	for _, stmt := range parsed.Statement {
-		switch v := stmt.Resource.(type) {
-		case string:
-			if v != "" {
-				out = append(out, v)
-			}
-		case []any:
-			for _, item := range v {
-				if s, ok := item.(string); ok && s != "" {
-					out = append(out, s)
-				}
-			}
-		}
-	}
-	return out
 }

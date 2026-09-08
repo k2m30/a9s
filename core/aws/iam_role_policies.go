@@ -12,12 +12,19 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// rolePolicyFindings returns wave1 findings derived from a managed-policy
-// name. AdministratorAccess and PowerUserAccess emit a broken finding so the
-// row renders red. Other managed-policy names emit no finding (healthy).
-func rolePolicyFindings(policyName string) []domain.Finding {
-	switch policyName {
-	case "AdministratorAccess", "PowerUserAccess":
+// rolePolicyFindings returns the wave1 findings for one attached managed
+// policy. An AWS-managed policy in either dangerous set — administrator
+// (policy_findings.go's adminManagedPolicyResources) or broad power
+// (broadPowerManagedPolicyResources) — emits a broken finding so the row
+// renders red; every other managed policy is healthy.
+//
+// The ARN decides, not the name. Matching "AdministratorAccess" as a bare
+// string rendered a customer-managed policy an operator happened to give that
+// name red while carrying whatever its own document allows, and missed
+// nothing AWS returns, since AWS names its own policies in the partition the
+// session is connected to.
+func rolePolicyFindings(policyARN string) []domain.Finding {
+	if awsManagedPolicyIn(policyARN, adminManagedPolicyResources, broadPowerManagedPolicyResources) {
 		return []domain.Finding{wave1Finding(CodeRolePolicyOverPrivileged)}
 	}
 	return nil
@@ -77,7 +84,7 @@ func FetchRolePolicies(
 		managed = append(managed, resource.Resource{
 			ID:       policyArn,
 			Name:     policyName,
-			Findings: rolePolicyFindings(policyName),
+			Findings: rolePolicyFindings(policyArn),
 			Fields: map[string]string{
 				"policy_name": policyName,
 				"policy_arn":  policyArn,
