@@ -118,15 +118,15 @@ func cfnStackFindings(status string) []domain.Finding {
 	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
 		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
 		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
-		return []domain.Finding{wave1Finding(CodeCFNStackRollback, domain.SevBroken, cfnStatusWords(status))}
+		return []domain.Finding{wave1Finding(CodeCFNStackRollback, cfnStatusWords(status))}
 	case "DELETE_COMPLETE":
-		return []domain.Finding{wave1Finding(CodeCFNStackDeleted, domain.SevDim, cfnStatusWords(status))}
+		return []domain.Finding{wave1Finding(CodeCFNStackDeleted, cfnStatusWords(status))}
 	}
 	if strings.HasSuffix(status, "_FAILED") {
-		return []domain.Finding{wave1Finding(CodeCFNStackFailed, domain.SevBroken, cfnStatusWords(status))}
+		return []domain.Finding{wave1Finding(CodeCFNStackFailed, cfnStatusWords(status))}
 	}
 	if strings.HasSuffix(status, "_IN_PROGRESS") {
-		return []domain.Finding{wave1Finding(CodeCFNStackInProgress, domain.SevWarn, cfnStatusWords(status))}
+		return []domain.Finding{wave1Finding(CodeCFNStackInProgress, cfnStatusWords(status))}
 	}
 	return nil
 }
@@ -187,10 +187,10 @@ func cfnStackOutputs(stack cfntypes.Stack) map[string]string {
 func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
 	var out []domain.Finding
 	if protection == cfnProtectionOff {
-		out = append(out, wave1Finding(CodeCFNTerminationProtectionOff, domain.SevWarn))
+		out = append(out, wave1Finding(CodeCFNTerminationProtectionOff))
 	}
 	if outputSecret == cfnOutputSecretPresent {
-		out = append(out, wave1Finding(CodeCFNOutputSecret, domain.SevBroken))
+		out = append(out, wave1Finding(CodeCFNOutputSecret))
 	}
 	return out
 }

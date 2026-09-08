@@ -44,6 +44,10 @@ const (
 	// true. Severity depends on the CIDR list: SevBroken when it contains
 	// 0.0.0.0/0, SevWarn when the public access is scoped to named ranges.
 	CodeEKSPublicEndpoint domain.FindingCode = "eks.public-endpoint"
+	// CodeEKSPublicEndpointRestricted — the endpoint is public but only the
+	// listed CIDRs may reach it. A separate code because it is a separate
+	// severity, and a code declares one.
+	CodeEKSPublicEndpointRestricted domain.FindingCode = "eks.public-endpoint-restricted"
 
 	// CodeEKSControlPlaneLoggingOff — the enabled control-plane log types do
 	// not cover all five AWS emits.

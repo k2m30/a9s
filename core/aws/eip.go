@@ -90,7 +90,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 		// emit CodeEIPUnassociated Finding when the EIP is
 		// allocated but not associated with any instance, ENI, or NAT gateway.
 		if unassociated {
-			r.Findings = []domain.Finding{wave1Finding(CodeEIPUnassociated, domain.SevWarn)}
+			r.Findings = []domain.Finding{wave1Finding(CodeEIPUnassociated)}
 		}
 
 		resources = append(resources, r)

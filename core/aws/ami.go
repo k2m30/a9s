@@ -198,15 +198,15 @@ func imageResource(img ec2types.Image) resource.Resource {
 	// otherwise a passed DeprecationTime bumps an available AMI to warning.
 	switch img.State {
 	case ec2types.ImageStatePending, ec2types.ImageStateTransient:
-		r.Findings = []domain.Finding{wave1Finding(CodeAMIStatePending, domain.SevWarn)}
+		r.Findings = []domain.Finding{wave1Finding(CodeAMIStatePending)}
 	case ec2types.ImageStateFailed, ec2types.ImageStateError, ec2types.ImageStateInvalid:
-		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateFailed, domain.SevBroken)}
+		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateFailed)}
 	case ec2types.ImageStateDeregistered, ec2types.ImageStateDisabled:
-		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateDim, domain.SevDim, string(img.State))}
+		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateDim, string(img.State))}
 	default:
 		if img.DeprecationTime != nil && *img.DeprecationTime != "" {
 			if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
-				r.Findings = []domain.Finding{wave1Finding(CodeAMIDeprecated, domain.SevWarn)}
+				r.Findings = []domain.Finding{wave1Finding(CodeAMIDeprecated)}
 			}
 		}
 	}
@@ -216,7 +216,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 	// exposes nothing, however open its permission reads. The fetcher asks
 	// for Owners=self, so a public image here is one this account owns.
 	if amiLaunchable(img.State) && img.Public != nil && *img.Public {
-		r.Findings = append(r.Findings, wave1Finding(CodeAMIPublic, domain.SevBroken))
+		r.Findings = append(r.Findings, wave1Finding(CodeAMIPublic))
 		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "yes", Tier: "!"})
 	}
 

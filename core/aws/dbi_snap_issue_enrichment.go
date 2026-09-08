@@ -71,7 +71,6 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	},
 	ParentRowLabel:    "Source DB",
 	RetentionEnabled:  true,
-	Severity:          "!",
 	ShortName:         "dbi-snap",
 	OrphanCode:        dbiSnapOrphanCode,
 	PastRetentionCode: dbiSnapPastRetentionCode,

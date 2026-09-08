@@ -5,8 +5,8 @@
 // frame title issue count: "N uses the same aggregation as the menu badge:
 // Wave 1 issue-colored rows plus Wave 2 `!`-severity findings for the
 // resources in the list. `~` findings do not bump." "~" findings are
-// glyphToSeverity("~") == domain.SevWarn (core/aws/snapshot_cross_ref.go);
-// "!" findings are glyphToSeverity("!") == domain.SevBroken
+// domain.SevWarn, as their catalog.FindingDef declares; "!" findings are
+// domain.SevBroken
 // (core/aws/issue_enrichment.go setWave2Finding docstring).
 //
 // Root cause: listIssueCount's Wave-2 fallback branch only checks map

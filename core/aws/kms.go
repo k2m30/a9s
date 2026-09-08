@@ -262,7 +262,7 @@ func kmsAccessDeniedResource(keyID string) resource.Resource {
 	return resource.Resource{
 		ID: keyID,
 		Findings: []domain.Finding{
-			wave1Finding(CodeKMSAccessDenied, domain.SevBroken),
+			wave1Finding(CodeKMSAccessDenied),
 		},
 		Fields: map[string]string{
 			"key_id": keyID,
@@ -285,10 +285,10 @@ func kmsStateFindings(state kmstypes.KeyState, stateStr string) []domain.Finding
 	case kmstypes.KeyStateEnabled:
 		return nil
 	case kmstypes.KeyStatePendingDeletion:
-		return []domain.Finding{wave1Finding(CodeKMSStatePendingDeletion, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeKMSStatePendingDeletion)}
 	case kmstypes.KeyStateDisabled:
-		return []domain.Finding{wave1Finding(CodeKMSStateDisabled, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeKMSStateDisabled)}
 	default:
-		return []domain.Finding{wave1Finding(CodeKMSStateUnavailable, domain.SevBroken, stateStr)}
+		return []domain.Finding{wave1Finding(CodeKMSStateUnavailable, stateStr)}
 	}
 }

@@ -107,7 +107,7 @@ One bullet per distinct signal.
   - **Cost shape**: per-resource.
 
 - **Signal**: latest image `imageScanFindingsSummary.findingSeverityCounts.HIGH>0` (and `CRITICAL==0`) → HIGH-severity vulnerabilities present.
-  - **State bucket**: Broken.
+  - **State bucket**: Warning.
   - **API call**: same `DescribeImages` response as above — no extra call.
   - **Cost shape**: per-resource.
   - Note: `imageScanFindingsSummary` is present only when a scan has run; if absent, no finding is surfaced for this signal.
@@ -142,7 +142,7 @@ One row per signal from §3:
 | `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `scan on push off` |
 | `ImageTagMutability == MUTABLE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `tags are mutable` |
 | latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
-| latest image `HIGH>0` (no CRITICAL) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
+| latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S3, S4, S5 | `<N> high vulnerabilities` |
 | the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `repository policy open to anyone` |
 | `GetLifecyclePolicy` reports no policy | 2 | Warning | `~` | S2, S3, S4, S5 | `no lifecycle policy` |
 
@@ -150,7 +150,7 @@ Rules applied:
 
 - `scanOnPush==false` is a Wave 1 Warning and paints the row yellow; S4 carries the cause, and the Attention section carries `~` and the sentence like any other Warning finding.
 - `CRITICAL>0` is a Wave 2 Broken finding; the row is repainted red and the full cause appears in S4/S5. S1 counts this `!` finding.
-- `CRITICAL>0` and `HIGH>0` are the same finding, `ecr.vulnerabilities`, and it is Broken: the phrase counts both severities, so a repository with high findings and no critical ones reaches the menu count like any other.
+- `CRITICAL>0` and `HIGH>0` are two findings, because they are two tiers and a code declares one severity: `ecr.vulnerabilities` is Broken and counts both severities, `ecr.vulnerabilities-high` is a Warning naming the high count alone. Both reach the menu count.
 - When multiple signals fire on the same repo, the highest-severity bucket wins the row color (Broken > Warning) and S4 shows the Broken cause; secondary causes go to S5.
 
 ## 4.1 UX review (two sentences)
@@ -208,6 +208,7 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 | — |
+| ecr.vulnerabilities-high | <N> high vulnerabilities | warn | wave2 | — |
 | ecr.public-policy | repository policy open to anyone | broken | wave2 | The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained. |
 | ecr.scan-on-push-off | scan on push off | warn | wave1 | Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives. |

@@ -181,21 +181,21 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 // untagged (dangling) image. Healthy/unscanned images carry no finding.
 func ecrImageFindings(img ecrtypes.ImageDetail) []domain.Finding {
 	if img.ImageScanStatus != nil && img.ImageScanStatus.Status == ecrtypes.ScanStatusFailed {
-		return []domain.Finding{wave1Finding(CodeECRImageScanFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeECRImageScanFailed)}
 	}
 
 	if img.ImageScanFindingsSummary != nil {
 		counts := img.ImageScanFindingsSummary.FindingSeverityCounts
 		if c, ok := counts["CRITICAL"]; ok && c > 0 {
-			return []domain.Finding{wave1Finding(CodeECRImageCritical, domain.SevBroken, strconv.Itoa(int(c)))}
+			return []domain.Finding{wave1Finding(CodeECRImageCritical, strconv.Itoa(int(c)))}
 		}
 		if h, ok := counts["HIGH"]; ok && h > 0 {
-			return []domain.Finding{wave1Finding(CodeECRImageHigh, domain.SevWarn, strconv.Itoa(int(h)))}
+			return []domain.Finding{wave1Finding(CodeECRImageHigh, strconv.Itoa(int(h)))}
 		}
 	}
 
 	if len(img.ImageTags) == 0 {
-		return []domain.Finding{wave1Finding(CodeECRImageUntagged, domain.SevDim)}
+		return []domain.Finding{wave1Finding(CodeECRImageUntagged)}
 	}
 
 	return nil

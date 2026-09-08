@@ -150,7 +150,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 
-		setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "!", "dbc", rows)
+		setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "dbc", rows)
 	}
 
 	SetTruncated(&result, cut)

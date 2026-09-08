@@ -606,25 +606,24 @@ func ctEventFindings(status, cause, errorCode, eventName string) []domain.Findin
 	switch status {
 	case "ct-danger":
 		if cause == ctCauseError {
-			return []domain.Finding{wave1Finding(CodeCTEventFailedCall, domain.SevBroken,
-				domain.HumanizeStatusPhrase(errorCode))}
+			return []domain.Finding{wave1Finding(CodeCTEventFailedCall, domain.HumanizeStatusPhrase(errorCode))}
 		}
-		return []domain.Finding{wave1Finding(CodeCTEventDanger, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeCTEventDanger)}
 	case "ct-attention":
 		switch cause {
 		case ctCauseWrite:
-			return []domain.Finding{wave1Finding(CodeCTEventWrite, domain.SevWarn)}
+			return []domain.Finding{wave1Finding(CodeCTEventWrite)}
 		case ctCauseCrossAccount:
-			return []domain.Finding{wave1Finding(CodeCTEventCrossAccount, domain.SevWarn)}
+			return []domain.Finding{wave1Finding(CodeCTEventCrossAccount)}
 		case ctCauseSensitiveRead:
-			return []domain.Finding{wave1Finding(CodeCTEventSensitiveRead, domain.SevWarn, eventName)}
+			return []domain.Finding{wave1Finding(CodeCTEventSensitiveRead, eventName)}
 		}
-		return []domain.Finding{wave1Finding(CodeCTEventAttention, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeCTEventAttention)}
 	}
 	// ct-info (or any unrecognized tier) — colorCTEvents has no healthy
 	// bucket for events, so the routine/no-signal tier still needs a
 	// Finding to explain its Dim color on the list/detail surfaces.
-	return []domain.Finding{wave1Finding(CodeCTEventInfo, domain.SevDim)}
+	return []domain.Finding{wave1Finding(CodeCTEventInfo)}
 }
 
 // computeCTStatus implements the §1.2 severity ladder, returning the tier

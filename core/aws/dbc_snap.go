@@ -22,31 +22,31 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 	rawStatus := aws.ToString(snap.Status)
 
 	if rawStatus == "failed" {
-		return []domain.Finding{wave1Finding(CodeDBCSnapFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeDBCSnapFailed)}
 	}
 	if strings.HasPrefix(rawStatus, "incompatible-") {
-		return []domain.Finding{wave1Finding(CodeDBCSnapIncompatible, domain.SevBroken, rawStatus)}
+		return []domain.Finding{wave1Finding(CodeDBCSnapIncompatible, rawStatus)}
 	}
 
 	var findings []domain.Finding
 	switch {
 	case rawStatus == "creating":
-		findings = append(findings, wave1Finding(CodeDBCSnapCreating, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeDBCSnapCreating))
 	case rawStatus != "" && rawStatus != "available":
 		// Any other state AWS reports is one the snapshot cannot be restored
 		// from yet — copying, pending, and whatever the API adds next. Passing
 		// the keyword through keeps a new state visible instead of silently
 		// ready, the way computeDBCFindings does for a cluster.
-		findings = append(findings, wave1Finding(CodeDBCSnapTransitional, domain.SevWarn, rawStatus))
+		findings = append(findings, wave1Finding(CodeDBCSnapTransitional, rawStatus))
 	}
 	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
 		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
 		if ageD > 365 {
-			findings = append(findings, wave1Finding(CodeDBCSnapManualUnused, domain.SevWarn, strconv.Itoa(ageD)))
+			findings = append(findings, wave1Finding(CodeDBCSnapManualUnused, strconv.Itoa(ageD)))
 		}
 	}
 	if snap.StorageEncrypted != nil && !*snap.StorageEncrypted {
-		findings = append(findings, wave1Finding(CodeDBCSnapUnencrypted, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeDBCSnapUnencrypted))
 	}
 	return findings
 }

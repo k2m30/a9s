@@ -113,8 +113,7 @@ func sfnHistoryEventFindings(eventType string) []domain.Finding {
 	if ClassifyEventStatus(eventType) != "failed" {
 		return nil
 	}
-	return []domain.Finding{wave1Finding(CodeSFNHistoryEventFailed, domain.SevBroken,
-		strings.ToLower(HumanizeEventType(eventType)))}
+	return []domain.Finding{wave1Finding(CodeSFNHistoryEventFailed, strings.ToLower(HumanizeEventType(eventType)))}
 }
 
 // resolveStateName determines the state name for a history event.

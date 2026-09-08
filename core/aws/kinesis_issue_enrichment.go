@@ -96,10 +96,10 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 		// AWS omits EncryptionType for an unencrypted stream and returns
 		// NONE for others; both are the same fact.
 		if sum.EncryptionType == "" || sum.EncryptionType == kinesistypes.EncryptionTypeNone {
-			setWave2Finding(&result, r.ID, kinesisCodeUnencrypted, "~", "kinesis", []domain.DetailRow{{Label: "Encryption key", Value: "none", Tier: "~"}})
+			setWave2Finding(&result, r.ID, kinesisCodeUnencrypted, "kinesis", []domain.DetailRow{{Label: "Encryption key", Value: "none", Tier: tierOf(kinesisCodeUnencrypted)}})
 		}
 		if h := sum.RetentionPeriodHours; h != nil && *h <= kinesisDefaultRetentionHours {
-			setWave2Finding(&result, r.ID, kinesisCodeMinRetention, "~", "kinesis", []domain.DetailRow{{Label: "Records kept", Value: fmt.Sprintf("%dh", *h), Tier: "~"}})
+			setWave2Finding(&result, r.ID, kinesisCodeMinRetention, "kinesis", []domain.DetailRow{{Label: "Records kept", Value: fmt.Sprintf("%dh", *h), Tier: tierOf(kinesisCodeMinRetention)}})
 		}
 	})
 

@@ -138,16 +138,16 @@ func subnetFindings(state, autoPublicIP string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "pending":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStatePending, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStatePending)}
 	case "unavailable":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStateUnavailable, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStateUnavailable)}
 	case "failed":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailed, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailed)}
 	case "failed-insufficient-capacity":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailedInsufficientCapacity, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailedInsufficientCapacity)}
 	}
 	if autoPublicIP == "yes" {
-		findings = append(findings, wave1Finding(CodeSubnetAutoPublicIP, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeSubnetAutoPublicIP))
 	}
 	return findings
 }

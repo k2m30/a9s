@@ -86,7 +86,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			// phrase (e.g. "archived: kms key lost") is computed at render time
 			// by domain.StatusPhrase(r.Findings) — not by writing
 			// FieldUpdates["status"] here.
-			setWave2Finding(&result, r.ID, ddbCodePITROff, "~", "ddb", nil)
+			setWave2Finding(&result, r.ID, ddbCodePITROff, "ddb", nil)
 		}
 	})
 	// AggregateFailures rather than Finish: this pass emits only "~", so a
@@ -147,7 +147,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		}
 		ex := iampolicy.Evaluate(doc, ownAccount)
 		if ex.Public {
-			setWave2Finding(result, r.ID, ddbCodePublicPolicy, "!", "ddb", []domain.DetailRow{
+			setWave2Finding(result, r.ID, ddbCodePublicPolicy, "ddb", []domain.DetailRow{
 				{Label: "Principal", Value: "*", Tier: "!"},
 				{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
 			})
@@ -157,7 +157,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		// Without a resolved own-account ID every principal reads as foreign,
 		// which would report the account's own roles as an outside grant.
 		if ownAccount != "" && len(ex.CrossAccount) > 0 {
-			setWave2Finding(result, r.ID, ddbCodeCrossAccountPolicy, "~", "ddb", []domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: "~"}})
+			setWave2Finding(result, r.ID, ddbCodeCrossAccountPolicy, "ddb", []domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: tierOf(ddbCodeCrossAccountPolicy)}})
 
 		}
 	})

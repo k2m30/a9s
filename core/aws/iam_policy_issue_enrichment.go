@@ -84,7 +84,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 		if isAdminStarPolicy(doc) {
 			riskVal = riskAdminPolicy
-			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "!", "iam-policy", []domain.DetailRow{
+			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "iam-policy", []domain.DetailRow{
 				{Label: "Allowed actions", Value: "all (*)", Tier: "!"},
 				{Label: "On resources", Value: "all (*)", Tier: "!"},
 			})
@@ -93,7 +93,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			// An admin policy matches nearly every combination; reporting it
 			// twice would say the same thing in two voices, so admin wins.
 			riskVal = riskPrivEsc
-			setWave2Finding(&result, r.ID, iamPolicyCodePrivEsc, "!", "iam-policy", privEscComboRows(combos))
+			setWave2Finding(&result, r.ID, iamPolicyCodePrivEsc, "iam-policy", privEscComboRows(combos))
 
 		}
 		result.FieldUpdates[r.ID] = map[string]string{

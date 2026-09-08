@@ -77,7 +77,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 			MarkSkipped(&result, r.ID, &failures, statusErr)
 		}
 		if public {
-			setWave2Finding(&result, r.ID, CodeTrailLogBucketPublic, "!", "trail", []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "!"}})
+			setWave2Finding(&result, r.ID, CodeTrailLogBucketPublic, "trail", []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: tierOf(CodeTrailLogBucketPublic)}})
 		}
 
 		switch {
@@ -87,7 +87,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		case loggingErr != nil:
 			MarkSkipped(&result, r.ID, &failures, loggingErr)
 		case logging.LoggingEnabled == nil:
-			setWave2Finding(&result, r.ID, CodeTrailLogBucketNoAccessLogging, "~", "trail", []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: "~"}})
+			setWave2Finding(&result, r.ID, CodeTrailLogBucketNoAccessLogging, "trail", []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: tierOf(CodeTrailLogBucketNoAccessLogging)}})
 		}
 	})
 	return result, AggregateFailures("log bucket posture", failures, n)

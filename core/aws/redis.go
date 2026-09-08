@@ -158,28 +158,28 @@ func computeRedisFindings(status string, multiAZ bool, autoFailover bool, rg ela
 	case "available":
 		// healthy
 	case "creating":
-		warnings = append(warnings, wave1Finding(CodeRedisCreating, domain.SevWarn))
+		warnings = append(warnings, wave1Finding(CodeRedisCreating))
 	case "deleting":
-		warnings = append(warnings, wave1Finding(CodeRedisDeleting, domain.SevWarn))
+		warnings = append(warnings, wave1Finding(CodeRedisDeleting))
 	case "create-failed":
-		broken = append(broken, wave1Finding(CodeRedisCreateFailed, domain.SevBroken))
+		broken = append(broken, wave1Finding(CodeRedisCreateFailed))
 	case "modifying", "snapshotting":
 		shardIssues := computeShardIssues(nodeGroups)
 		if len(shardIssues) > 0 {
 			for _, si := range shardIssues {
-				warnings = append(warnings, wave1Finding(CodeRedisShardIssue, domain.SevWarn, si.id, si.status))
+				warnings = append(warnings, wave1Finding(CodeRedisShardIssue, si.id, si.status))
 			}
 		} else {
 			code := CodeRedisModifying
 			if status == "snapshotting" {
 				code = CodeRedisSnapshotting
 			}
-			warnings = append(warnings, wave1Finding(code, domain.SevWarn))
+			warnings = append(warnings, wave1Finding(code))
 		}
 	}
 
 	if multiAZ && !autoFailover {
-		warnings = append(warnings, wave1Finding(CodeRedisMultiAZWithoutAutoFailover, domain.SevWarn))
+		warnings = append(warnings, wave1Finding(CodeRedisMultiAZWithoutAutoFailover))
 	}
 
 	sort.Slice(warnings, func(i, j int) bool { return warnings[i].Phrase < warnings[j].Phrase })
@@ -204,7 +204,7 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	details := map[domain.FindingCode]domain.AttentionDetail{}
 
 	add := func(code domain.FindingCode, sev domain.Severity, rows []domain.DetailRow) {
-		findings = append(findings, wave1Finding(code, sev))
+		findings = append(findings, wave1Finding(code))
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 

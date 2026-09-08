@@ -168,14 +168,14 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 	// Unset defaults to optional (SDK-confirmed) — absence of
 	// MetadataOptions IS the signal, not its negation.
 	if !endpointDisabled && (data.MetadataOptions == nil || data.MetadataOptions.HttpTokens != ec2types.LaunchTemplateHttpTokensStateRequired) {
-		findings = append(findings, wave1Finding(ltCodeIMDSv1, domain.SevWarn))
+		findings = append(findings, wave1Finding(ltCodeIMDSv1))
 	}
 
 	// nil Encrypted is UNKNOWN, not unencrypted — never flag nil. Only an
 	// explicit Encrypted=false fires; one mapping is enough to flag the row.
 	for _, bdm := range data.BlockDeviceMappings {
 		if bdm.Ebs != nil && bdm.Ebs.Encrypted != nil && !*bdm.Ebs.Encrypted {
-			findings = append(findings, wave1Finding(ltCodeUnencrypted, domain.SevWarn))
+			findings = append(findings, wave1Finding(ltCodeUnencrypted))
 			break
 		}
 	}

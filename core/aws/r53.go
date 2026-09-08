@@ -29,7 +29,7 @@ func r53ZoneFindings(recordCount string) []domain.Finding {
 		return nil
 	}
 	// Two or fewer records means only the default NS+SOA remain.
-	return []domain.Finding{wave1Finding(r53CodeUnusedZone, domain.SevWarn)}
+	return []domain.Finding{wave1Finding(r53CodeUnusedZone)}
 }
 
 // FetchHostedZonesPage fetches a single page of Route53 hosted zones.

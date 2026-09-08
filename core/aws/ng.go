@@ -46,18 +46,7 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 // state name. issueCodes is the already-humanized list from
 // Health.Issues, one Attention row each.
 func healthIssueFinding(code domain.FindingCode, issueCodes []string) (domain.Finding, []domain.DetailRow) {
-	return healthIssueFindingSev(code, issueCodes, domain.SevBroken)
-}
-
-// healthIssueFindingSev returns the code's own finding plus one Attention row
-// per reported issue code: a node group with three issues has three to read,
-// and promoting the first into the phrase left the others unsayable.
-func healthIssueFindingSev(code domain.FindingCode, issueCodes []string, sev domain.Severity) (domain.Finding, []domain.DetailRow) {
-	f := wave1Finding(code, sev)
-	tier := "~"
-	if sev == domain.SevBroken {
-		tier = "!"
-	}
+	f, tier := wave1Finding(code), tierOf(code)
 	rows := make([]domain.DetailRow, 0, len(issueCodes))
 	for _, c := range issueCodes {
 		rows = append(rows, domain.DetailRow{Label: "Issue", Value: c, Tier: tier})
@@ -145,21 +134,21 @@ func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]do
 	}
 	switch status {
 	case "CREATING":
-		return []domain.Finding{wave1Finding(CodeNGStateCreating, domain.SevWarn)}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateCreating)}, nil
 	case "UPDATING":
-		return []domain.Finding{wave1Finding(CodeNGStateUpdating, domain.SevWarn)}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateUpdating)}, nil
 	case "DELETING":
-		return []domain.Finding{wave1Finding(CodeNGStateDeleting, domain.SevWarn)}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateDeleting)}, nil
 	case "CREATE_FAILED":
-		return []domain.Finding{wave1Finding(CodeNGStateCreateFailed, domain.SevBroken)}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateCreateFailed)}, nil
 	case "DELETE_FAILED":
-		return []domain.Finding{wave1Finding(CodeNGStateDeleteFailed, domain.SevBroken)}, nil
+		return []domain.Finding{wave1Finding(CodeNGStateDeleteFailed)}, nil
 	case "DEGRADED":
 		f, rows := healthIssueFinding(CodeNGStateDegraded, issueCodes)
 		return []domain.Finding{f}, rows
 	}
 	if healthIssuesCount > 0 {
-		f, rows := healthIssueFindingSev(CodeNGHealthIssue, issueCodes, domain.SevWarn)
+		f, rows := healthIssueFinding(CodeNGHealthIssue, issueCodes)
 		return []domain.Finding{f}, rows
 	}
 	return nil, nil

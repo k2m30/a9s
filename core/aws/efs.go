@@ -24,17 +24,17 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 
 	switch lcs {
 	case efstypes.LifeCycleStateError:
-		findings = append(findings, wave1Finding(CodeEFSError, domain.SevBroken))
+		findings = append(findings, wave1Finding(CodeEFSError))
 	case efstypes.LifeCycleStateCreating:
-		findings = append(findings, wave1Finding(CodeEFSCreating, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeEFSCreating))
 	case efstypes.LifeCycleStateUpdating:
-		findings = append(findings, wave1Finding(CodeEFSUpdating, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeEFSUpdating))
 	case efstypes.LifeCycleStateDeleting:
-		findings = append(findings, wave1Finding(CodeEFSDeleting, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeEFSDeleting))
 	}
 
 	if numMT == 0 && lcs != efstypes.LifeCycleStateDeleted {
-		noMTFinding := wave1Finding(CodeEFSNoMountTargets, domain.SevBroken)
+		noMTFinding := wave1Finding(CodeEFSNoMountTargets)
 		if len(findings) > 0 && findings[0].Code == CodeEFSError {
 			findings = append([]domain.Finding{findings[0], noMTFinding}, findings[1:]...)
 		} else {
@@ -48,7 +48,7 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 	if aws.ToBool(encrypted) {
 		return findings, nil
 	}
-	return append(findings, wave1Finding(CodeEFSUnencrypted, domain.SevWarn)), map[domain.FindingCode]domain.AttentionDetail{
+	return append(findings, wave1Finding(CodeEFSUnencrypted)), map[domain.FindingCode]domain.AttentionDetail{
 		CodeEFSUnencrypted: {Rows: []domain.DetailRow{
 			{Label: "Encryption at rest", Value: "off", Tier: "~"},
 		}},

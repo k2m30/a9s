@@ -61,13 +61,13 @@ const (
 // DescribeTrails payload alone, and attaches each one's supporting rows.
 func trailPostureFindings(r *resource.Resource, trail cttypes.Trail) {
 	if aws.ToString(trail.CloudWatchLogsLogGroupArn) == "" {
-		addWave1Finding(r, CodeTrailNoCloudWatchLogs, domain.SevWarn)
+		addWave1Finding(r, CodeTrailNoCloudWatchLogs)
 		addWave1Rows(r, CodeTrailNoCloudWatchLogs, domain.DetailRow{
 			Label: "Log group", Value: "none", Tier: "~",
 		})
 	}
 	if aws.ToString(trail.KmsKeyId) == "" {
-		addWave1Finding(r, CodeTrailNoKMS, domain.SevWarn)
+		addWave1Finding(r, CodeTrailNoKMS)
 		addWave1Rows(r, CodeTrailNoKMS, domain.DetailRow{
 			Label: "KMS key", Value: "none", Tier: "~",
 		})
@@ -98,16 +98,16 @@ func trailDeliveryIsStale(isLogging, latestDeliveryTime string) bool {
 func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logFileValidationEnabled string) []domain.Finding {
 	var findings []domain.Finding
 	if isLogging == "false" {
-		findings = append(findings, wave2Finding(CodeTrailNotLogging, domain.SevBroken, ""))
+		findings = append(findings, wave2Finding(CodeTrailNotLogging, ""))
 	}
 	if latestDeliveryError != "" && latestDeliveryError != "-" {
-		findings = append(findings, wave2Finding(CodeTrailDeliveryError, domain.SevBroken, "", latestDeliveryError))
+		findings = append(findings, wave2Finding(CodeTrailDeliveryError, "", latestDeliveryError))
 	}
 	if trailDeliveryIsStale(isLogging, latestDeliveryTime) {
-		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, domain.SevBroken, "", latestDeliveryTime))
+		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, "", latestDeliveryTime))
 	}
 	if logFileValidationEnabled == "false" {
-		findings = append(findings, wave1Finding(CodeTrailLogFileValidationDisabled, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeTrailLogFileValidationDisabled))
 	}
 	return findings
 }

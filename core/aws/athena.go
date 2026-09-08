@@ -117,7 +117,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 // runs it over Fields for rows built outside the fetcher.
 func athenaStateFindings(state string) []domain.Finding {
 	if state == "DISABLED" {
-		return []domain.Finding{wave1Finding(athenaCodeWorkgroupDisabled, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(athenaCodeWorkgroupDisabled)}
 	}
 	return nil
 }

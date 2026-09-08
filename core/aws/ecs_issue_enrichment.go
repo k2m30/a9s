@@ -99,7 +99,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 				continue
 			}
 
-			setWave2Finding(&result, name, ecsCodeClusterIssue, "~", "ecs", rows)
+			setWave2Finding(&result, name, ecsCodeClusterIssue, "ecs", rows)
 		}
 	}
 

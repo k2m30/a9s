@@ -24,7 +24,7 @@ const iamPolicyCodeOrphanUnattached domain.FindingCode = "iam-policy.orphan-unat
 // policy with zero attachments, or nil when the policy doesn't match.
 func orphanUnattachedPolicyFinding(attachmentCount string, isAttachable bool) []domain.Finding {
 	if attachmentCount == "0" && isAttachable {
-		return []domain.Finding{wave1Finding(iamPolicyCodeOrphanUnattached, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(iamPolicyCodeOrphanUnattached)}
 	}
 	return nil
 }

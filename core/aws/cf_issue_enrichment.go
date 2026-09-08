@@ -92,8 +92,8 @@ func cfBucketGoneFunc(clients *ServiceClients) func(context.Context, string) boo
 // absent. It is nil when the session has no S3 client to ask, and an
 // unanswerable question raises nothing.
 func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig, knownBuckets map[string]bool, bucketGone func(context.Context, string) bool) {
-	emit := func(code domain.FindingCode, tier string, rows ...domain.DetailRow) {
-		setWave2Finding(result, distID, code, tier, "cf", rows)
+	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
+		setWave2Finding(result, distID, code, "cf", rows)
 	}
 
 	var origins []cftypes.Origin
@@ -113,7 +113,7 @@ func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID s
 		// about this session's access, which it can only do after finding the
 		// bucket.
 		if knownBuckets != nil && !knownBuckets[bucket] && bucketGone != nil && bucketGone(ctx, bucket) {
-			emit(CodeCFOriginBucketMissing, "!",
+			emit(CodeCFOriginBucketMissing,
 				domain.DetailRow{Label: "Origin", Value: domainName, Tier: "!"})
 		}
 		// An origin access identity is deprecated, not absent: a distribution
@@ -121,20 +121,20 @@ func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID s
 		hasOAC := aws.ToString(origin.OriginAccessControlId) != ""
 		hasOAI := origin.S3OriginConfig != nil && aws.ToString(origin.S3OriginConfig.OriginAccessIdentity) != ""
 		if !hasOAC && !hasOAI {
-			emit(CodeCFS3OriginNoOAC, "~",
+			emit(CodeCFS3OriginNoOAC,
 				domain.DetailRow{Label: "Origin", Value: domainName, Tier: "~"})
 		}
 	}
 
 	if vc := cfg.ViewerCertificate; vc != nil {
 		if word := cfTLSBelow12Word(vc.MinimumProtocolVersion); word != "" {
-			emit(CodeCFDeprecatedTLS, "~",
+			emit(CodeCFDeprecatedTLS,
 				domain.DetailRow{Label: "Minimum TLS version", Value: word, Tier: "~"})
 		}
 		// A distribution with no alias legitimately serves on its
 		// cloudfront.net name with the default certificate.
 		if aws.ToBool(vc.CloudFrontDefaultCertificate) && cfg.Aliases != nil && len(cfg.Aliases.Items) > 0 {
-			emit(CodeCFDefaultCertificate, "~",
+			emit(CodeCFDefaultCertificate,
 				domain.DetailRow{Label: "Alias", Value: cfg.Aliases.Items[0], Tier: "~"})
 		}
 	}
@@ -142,18 +142,18 @@ func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID s
 	// CloudFront omits the logging block entirely when logging was never
 	// configured, so absent is off rather than unknown.
 	if cfg.Logging == nil || !aws.ToBool(cfg.Logging.Enabled) {
-		emit(CodeCFLoggingOff, "~",
+		emit(CodeCFLoggingOff,
 			domain.DetailRow{Label: "Log bucket", Value: "none", Tier: "~"})
 	}
 
 	if aws.ToString(cfg.DefaultRootObject) == "" {
-		emit(CodeCFNoDefaultRootObject, "~",
+		emit(CodeCFNoDefaultRootObject,
 			domain.DetailRow{Label: "Default root object", Value: "none", Tier: "~"})
 	}
 
 	if cfg.Restrictions != nil && cfg.Restrictions.GeoRestriction != nil &&
 		cfg.Restrictions.GeoRestriction.RestrictionType == cftypes.GeoRestrictionTypeNone {
-		emit(CodeCFNoGeoRestriction, "~",
+		emit(CodeCFNoGeoRestriction,
 			domain.DetailRow{Label: "Countries", Value: "none", Tier: "~"})
 	}
 }
@@ -253,7 +253,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, distID, cfCodeInsecureProtocol, "~", "cf", rows)
+		setWave2Finding(&result, distID, cfCodeInsecureProtocol, "cf", rows)
 	})
 	return result, AggregateFailures("GetDistributionConfig", failures, n)
 }

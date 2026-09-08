@@ -40,6 +40,9 @@ const (
 	ECRMutableTags = "acme/frontend"
 	// ECRNoLifecycle — no lifecycle policy is configured.
 	ECRNoLifecycle = "acme/batch-processor"
+	// ECRHighVulnerabilities — the latest image has high findings and no
+	// critical one, which is the warning tier of the vulnerability signal.
+	ECRHighVulnerabilities = "acme/reporting"
 )
 
 // APIServiceRepoPolicyRoleName is the IAM role name granted pull access via
@@ -106,6 +109,20 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			CreatedAt: aws.Time(mustParseECRTime("2025-01-15T08:30:00+00:00")),
 		},
 		{
+			// ECRHighVulnerabilities witness: high findings, no critical.
+			RepositoryName:             aws.String(ECRHighVulnerabilities),
+			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRHighVulnerabilities),
+			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRHighVulnerabilities),
+			RegistryId:                 aws.String("123456789012"),
+			ImageTagMutability:         ecrtypes.ImageTagMutabilityImmutable,
+			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
+			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+				EncryptionType: ecrtypes.EncryptionTypeKms,
+				KmsKey:         aws.String(prodKMSKeyID),
+			},
+			CreatedAt: aws.Time(mustParseECRTime("2025-07-04T09:00:00+00:00")),
+		},
+		{
 			// ECRNoLifecycle witness: absent from the LifecyclePolicies map
 			// below, so every image it has ever held is kept forever.
 			RepositoryName:             aws.String("acme/batch-processor"),
@@ -155,6 +172,24 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 	}
 
 	images := map[string][]ecrtypes.ImageDetail{
+		ECRHighVulnerabilities: {
+			// ECRHighVulnerabilities witness: highs only, so the repository
+			// carries the warning tier of the vulnerability signal rather
+			// than the broken one acme/api-service carries.
+			{
+				ImageTags:        []string{"v1.4.0", "latest"},
+				ImageDigest:      aws.String("sha256:5c1f0a9b7e2d"),
+				ImageSizeInBytes: aws.Int64(61_000_000),
+				ImagePushedAt:    aws.Time(mustParseECRTime("2026-03-19T11:00:00+00:00")),
+				RegistryId:       aws.String("123456789012"),
+				RepositoryName:   aws.String(ECRHighVulnerabilities),
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: map[string]int32{
+						string(ecrtypes.FindingSeverityHigh): 3,
+					},
+				},
+			},
+		},
 		"acme/api-service": {
 			// Issue: CRITICAL vulnerability findings on the latest image —
 			// required for EnrichECRRepository's Wave-2 "!" issue check.
@@ -197,11 +232,12 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 	// Every repository but ECRNoLifecycle expires its untagged layers.
 	const expireUntagged = `{"rules":[{"rulePriority":1,"description":"expire untagged after 14 days","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":14},"action":{"type":"expire"}}]}`
 	lifecyclePolicies := map[string]string{
-		"acme/api-service":    expireUntagged,
-		"acme/frontend":       expireUntagged,
-		"acme/base-images":    expireUntagged,
-		ECRPublicPolicy:       expireUntagged,
-		"acme/internal-tools": expireUntagged,
+		"acme/api-service":     expireUntagged,
+		"acme/frontend":        expireUntagged,
+		"acme/base-images":     expireUntagged,
+		ECRPublicPolicy:        expireUntagged,
+		"acme/internal-tools":  expireUntagged,
+		ECRHighVulnerabilities: expireUntagged,
 	}
 
 	return &ECRFixtures{
@@ -218,5 +254,5 @@ func NewECRFixtures() *ECRFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "ecr", Rows: 6, Issues: 2, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ecr", Rows: 7, Issues: 2, CoverageGaps: []string{"dim"}})
 }

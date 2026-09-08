@@ -81,13 +81,6 @@ type SnapshotCrossRefConfig struct {
 	// rule fires; GetParentRetention/GetSnapshotType/GetCreatedAt may be nil.
 	RetentionEnabled bool
 
-	// Severity is the severity tier emitted on every FindingRow and on the
-	// domain.Finding.Severity for this enricher's output. "!" for the
-	// existing snapshot consumers (orphan + past-retention are operator-
-	// actionable). Future consumers may use "~" for informational signals.
-	// Internally mapped to domain.Severity via glyphToSeverity.
-	Severity string
-
 	// OrphanCode is the canonical FindingCode emitted when the orphan rule
 	// fires (e.g. "dbi-snap.orphan"). Required.
 	OrphanCode domain.FindingCode
@@ -142,11 +135,6 @@ func restoreSharedWithAll(attrs []snapshotAttribute) bool {
 // per resource ID).
 func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 	return func(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
-		// Default severity to "!" (operator-actionable) when callers omit the field.
-		severity := cfg.Severity
-		if severity == "" {
-			severity = "!"
-		}
 
 		result := IssueEnricherResult{
 			Findings:         make(map[string][]domain.Finding),
@@ -194,7 +182,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID + " (not in loaded list)",
-					Tier:  severity,
+					Tier:  tierOf(code),
 				})
 			case cfg.RetentionEnabled:
 				// Past-retention rule: only for "automated" snapshots whose
@@ -218,17 +206,17 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID,
-					Tier:  severity,
+					Tier:  tierOf(code),
 				})
 				rows = append(rows, domain.DetailRow{
 					Label: "Retention",
 					Value: fmt.Sprintf("%d days", retention),
-					Tier:  severity,
+					Tier:  tierOf(code),
 				})
 				rows = append(rows, domain.DetailRow{
 					Label: "Created",
 					Value: createdAt.Format("2006-01-02"),
-					Tier:  severity,
+					Tier:  tierOf(code),
 				})
 			default:
 				// Parent found but retention rule disabled — nothing to emit.
@@ -243,7 +231,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			// and AttentionDetails (core/aws/issue_enrichment.go) — it
 			// drives the detail-view Attention section AND the S4 status
 			// column at render time via domain.StatusPhrase(r.Findings).
-			setWave2Finding(&result, res.ID, code, severity, cfg.ShortName, rows, values...)
+			setWave2Finding(&result, res.ID, code, cfg.ShortName, rows, values...)
 		}
 
 		return result, publicErr
@@ -292,23 +280,8 @@ func enrichSnapshotPublicShare(
 		if !restoreSharedWithAll(attrs) {
 			return
 		}
-		setWave2Finding(result, res.ID, cfg.PublicCode, "!", cfg.ShortName,
-			[]domain.DetailRow{{Label: "Restore", Value: "all", Tier: "!"}})
+		setWave2Finding(result, res.ID, cfg.PublicCode, cfg.ShortName, []domain.DetailRow{{Label: "Restore", Value: "all", Tier: tierOf(cfg.PublicCode)}})
 
 	})
 	return Finish(result, failures, n, "snapshot share attributes")
-}
-
-// glyphToSeverity maps a legacy "!" / "~" / "" severity glyph to the canonical
-// domain.Severity. Used by snapshot_cross_ref.go (and any other enricher
-// callsite that still parameterizes via glyph strings).
-func glyphToSeverity(s string) domain.Severity {
-	switch s {
-	case "!":
-		return domain.SevBroken
-	case "~":
-		return domain.SevWarn
-	default:
-		return domain.SevDim
-	}
 }

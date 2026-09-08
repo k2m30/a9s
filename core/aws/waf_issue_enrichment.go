@@ -146,15 +146,15 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		}
 
 		if noRules {
-			setWave2Finding(&result, r.ID, wafCodeNoRules, "~", "waf", []domain.DetailRow{{Label: "Rules", Value: "0", Tier: "~"}})
+			setWave2Finding(&result, r.ID, wafCodeNoRules, "waf", []domain.DetailRow{{Label: "Rules", Value: "0", Tier: tierOf(wafCodeNoRules)}})
 
 		}
 
 		if len(loggingRows) > 0 {
-			setWave2Finding(&result, r.ID, wafCodeNoLogging, "~", "waf", loggingRows)
+			setWave2Finding(&result, r.ID, wafCodeNoLogging, "waf", loggingRows)
 		}
 		if len(orphanRows) > 0 {
-			setWave2Finding(&result, r.ID, wafCodeOrphan, "~", "waf", orphanRows)
+			setWave2Finding(&result, r.ID, wafCodeOrphan, "waf", orphanRows)
 		}
 	})
 

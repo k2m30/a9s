@@ -31,10 +31,10 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 	rawStatus := aws.ToString(snap.Status)
 
 	if rawStatus == "failed" {
-		return []domain.Finding{wave1Finding(CodeDBISnapFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeDBISnapFailed)}
 	}
 	if strings.HasPrefix(rawStatus, "incompatible-") {
-		return []domain.Finding{wave1Finding(CodeDBISnapIncompatible, domain.SevBroken, rawStatus)}
+		return []domain.Finding{wave1Finding(CodeDBISnapIncompatible, rawStatus)}
 	}
 
 	var findings []domain.Finding
@@ -44,15 +44,15 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 		if snap.PercentProgress != nil {
 			pct = *snap.PercentProgress
 		}
-		findings = append(findings, wave1Finding(CodeDBISnapCreating, domain.SevWarn, strconv.Itoa(int(pct))))
+		findings = append(findings, wave1Finding(CodeDBISnapCreating, strconv.Itoa(int(pct))))
 	case rawStatus != "" && rawStatus != "available":
 		// Any other state AWS reports is one the snapshot cannot be restored
 		// from yet — copying, pending, and whatever RDS adds next. Passing the
 		// keyword through keeps a new state visible instead of silently ready.
-		findings = append(findings, wave1Finding(CodeDBISnapTransitional, domain.SevWarn, rawStatus))
+		findings = append(findings, wave1Finding(CodeDBISnapTransitional, rawStatus))
 	}
 	if isSnapUnencrypted(snap) {
-		findings = append(findings, wave1Finding(CodeDBISnapUnencrypted, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeDBISnapUnencrypted))
 	}
 	return findings
 }

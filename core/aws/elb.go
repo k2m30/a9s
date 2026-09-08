@@ -108,11 +108,11 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 func elbStateFindings(state string) []domain.Finding {
 	switch state {
 	case "provisioning":
-		return []domain.Finding{wave1Finding(CodeELBStateProvisioning, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeELBStateProvisioning)}
 	case "active_impaired":
-		return []domain.Finding{wave1Finding(CodeELBStateActiveImpaired, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeELBStateActiveImpaired)}
 	case "failed":
-		return []domain.Finding{wave1Finding(CodeELBStateFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeELBStateFailed)}
 	}
 	return nil
 }

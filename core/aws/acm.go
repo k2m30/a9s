@@ -216,7 +216,7 @@ func acmFindings(statusWords, notAfter, inUse, keyAlgorithmWords string, now tim
 		out = acmStatusFindings(statusWords)
 	}
 	if acmKeyIsWeak(keyAlgorithmWords) {
-		out = append(out, wave1Finding(CodeACMWeakKey, domain.SevWarn))
+		out = append(out, wave1Finding(CodeACMWeakKey))
 	}
 	return out
 }
@@ -231,17 +231,15 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 		switch {
 		case remaining < 7*24*time.Hour:
 			if remaining < 0 {
-				return []domain.Finding{wave1Finding(acmCodeExpired, domain.SevBroken)}
+				return []domain.Finding{wave1Finding(acmCodeExpired)}
 			}
-			return []domain.Finding{wave1Finding(acmCodeExpiresCritical, domain.SevBroken,
-				strconv.Itoa(int(remaining.Hours()/24)))}
+			return []domain.Finding{wave1Finding(acmCodeExpiresCritical, strconv.Itoa(int(remaining.Hours()/24)))}
 		case remaining < 30*24*time.Hour:
-			return []domain.Finding{wave1Finding(acmCodeExpiresSoon, domain.SevWarn,
-				strconv.Itoa(int(remaining.Hours()/24)))}
+			return []domain.Finding{wave1Finding(acmCodeExpiresSoon, strconv.Itoa(int(remaining.Hours()/24)))}
 		}
 	}
 	if inUse == "false" {
-		return []domain.Finding{wave1Finding(acmCodeOrphan, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(acmCodeOrphan)}
 	}
 	return nil
 }
@@ -253,11 +251,11 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 func acmStatusFindings(statusWords string) []domain.Finding {
 	switch statusWords {
 	case acmStatusPendingValidation:
-		return []domain.Finding{wave1Finding(acmCodeStatusPendingValidation, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(acmCodeStatusPendingValidation)}
 	case acmStatusExpired, acmStatusRevoked, acmStatusFailed, acmStatusValidationTimedOut:
-		return []domain.Finding{wave1Finding(acmCodeStatusFailed, domain.SevBroken, statusWords)}
+		return []domain.Finding{wave1Finding(acmCodeStatusFailed, statusWords)}
 	case acmStatusInactive:
-		return []domain.Finding{wave1Finding(acmCodeStatusInactive, domain.SevDim)}
+		return []domain.Finding{wave1Finding(acmCodeStatusInactive)}
 	}
 	return nil
 }

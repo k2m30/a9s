@@ -51,31 +51,31 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 		// A domain being torn down has no actionable posture left; the
 		// background signals would only add issue-severity noise to a row
 		// that is on its way out.
-		return []domainpkg.Finding{wave1Finding(CodeOpenSearchDeleting, domainpkg.SevDim)}
+		return []domainpkg.Finding{wave1Finding(CodeOpenSearchDeleting)}
 	}
 	if d.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated {
-		findings = append(findings, wave1Finding(CodeOpenSearchIsolated, domainpkg.SevBroken))
+		findings = append(findings, wave1Finding(CodeOpenSearchIsolated))
 	}
 	if (d.Processing != nil && *d.Processing) || (d.UpgradeProcessing != nil && *d.UpgradeProcessing) {
-		findings = append(findings, wave1Finding(CodeOpenSearchProcessing, domainpkg.SevWarn))
+		findings = append(findings, wave1Finding(CodeOpenSearchProcessing))
 	}
 	if openSearchUpdateForcedSoon(d, now) {
-		findings = append(findings, wave1Finding(opensearchCodeUpdateForced, domainpkg.SevWarn))
+		findings = append(findings, wave1Finding(opensearchCodeUpdateForced))
 	}
 	if d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled {
-		findings = append(findings, wave1Finding(opensearchCodeEncryptionOff, domainpkg.SevWarn))
+		findings = append(findings, wave1Finding(opensearchCodeEncryptionOff))
 	}
 	// Reachable outside a VPC only counts when the access policy also lets
 	// anyone in: a public endpoint fronted by a scoped policy is a deliberate,
 	// defended design.
 	if d.VPCOptions == nil && openSearchPolicyIsPublic(d) {
-		findings = append(findings, wave1Finding(opensearchCodePublic, domainpkg.SevBroken))
+		findings = append(findings, wave1Finding(opensearchCodePublic))
 	}
 	if d.DomainEndpointOptions == nil || !aws.ToBool(d.DomainEndpointOptions.EnforceHTTPS) {
-		findings = append(findings, wave1Finding(opensearchCodeHTTPSNotForced, domainpkg.SevWarn))
+		findings = append(findings, wave1Finding(opensearchCodeHTTPSNotForced))
 	}
 	if d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled) {
-		findings = append(findings, wave1Finding(opensearchCodeN2NOff, domainpkg.SevWarn))
+		findings = append(findings, wave1Finding(opensearchCodeN2NOff))
 	}
 	return findings
 }

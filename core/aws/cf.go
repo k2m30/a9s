@@ -140,10 +140,10 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 // two never disagree.
 func cfWave1Findings(enabled, status string) []domain.Finding {
 	if enabled == "false" {
-		return []domain.Finding{wave1Finding(cfCodeDisabled, domain.SevDim)}
+		return []domain.Finding{wave1Finding(cfCodeDisabled)}
 	}
 	if status == "InProgress" {
-		return []domain.Finding{wave1Finding(cfCodeInProgress, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(cfCodeInProgress)}
 	}
 	return nil
 }

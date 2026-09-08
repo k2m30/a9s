@@ -123,7 +123,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 
-		setWave2Finding(&result, key, dbiCodePendingMaintenance, "~", "dbi", rows)
+		setWave2Finding(&result, key, dbiCodePendingMaintenance, "dbi", rows)
 	}
 
 	enrichDBIEngineVersions(ctx, clients, resources, &result)
@@ -178,7 +178,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 		if !deprecated {
 			continue
 		}
-		setWave2Finding(result, r.ID, dbiCodeEngineDeprecated, "!", "dbi", []domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: "!"}})
+		setWave2Finding(result, r.ID, dbiCodeEngineDeprecated, "dbi", []domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: tierOf(dbiCodeEngineDeprecated)}})
 
 	}
 

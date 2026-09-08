@@ -126,12 +126,12 @@ func ssmColorFindings(paramName, paramType string, lastModifiedDate *time.Time) 
 	if paramType == "String" {
 		for _, suffix := range ssmSensitiveSuffixes {
 			if strings.HasSuffix(name, suffix) {
-				return []domain.Finding{wave1Finding(ssmCodePlaintextSensitive, domain.SevBroken)}
+				return []domain.Finding{wave1Finding(ssmCodePlaintextSensitive)}
 			}
 		}
 	}
 	if lastModifiedDate != nil && time.Since(*lastModifiedDate) > 365*24*time.Hour {
-		return []domain.Finding{wave1Finding(ssmCodeStaleValue, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(ssmCodeStaleValue)}
 	}
 	return nil
 }

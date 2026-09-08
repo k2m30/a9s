@@ -138,14 +138,14 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 
 		if noTargets {
-			setWave2Finding(&result, ruleName, ebRuleCodeNoTargets, "!", "eb-rule", []domain.DetailRow{{Label: "Targets", Value: "none", Tier: "!"}})
+			setWave2Finding(&result, ruleName, ebRuleCodeNoTargets, "eb-rule", []domain.DetailRow{{Label: "Targets", Value: "none", Tier: tierOf(ebRuleCodeNoTargets)}})
 
 		}
 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, "~", "eb-rule", rows)
+		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, "eb-rule", rows)
 	})
 
 	SetTruncated(&result, truncated)

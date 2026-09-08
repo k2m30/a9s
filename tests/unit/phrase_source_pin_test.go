@@ -29,6 +29,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -344,12 +345,12 @@ func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 	}
 
 	// A finding's Phrase is also writable by assignment, which no
-	// KeyValueExpr scan sees; and setWave2Finding once took the wording as an
-	// argument, which is how a hundred wave-2 hand phrases lived outside the
-	// catalog. Both are pinned here, the second against the helper's own
-	// declared parameter names so re-adding a phrase parameter re-arms the
-	// check instead of silently escaping it.
-	assigns, w2Args := phraseAssignments(t, fset, files), wave2PhraseArguments(t, fset, files)
+	// KeyValueExpr scan sees; and the constructors once took the wording and
+	// the severity as arguments, which is how a hundred hand phrases and a
+	// two-tier code lived outside the catalog. Both are pinned here, the
+	// second against the constructors' own declared parameter names so
+	// re-adding such a parameter re-arms the check instead of escaping it.
+	assigns, dictated := phraseAssignments(t, fset, files), dictatedArguments(t, fset, files)
 
 	sort.Strings(literals)
 	sort.Strings(phrases)
@@ -369,10 +370,10 @@ func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 			"wave1Finding/wave2Finding; overwriting it afterwards is the same second copy the "+
 			"literal gate refuses", o)
 	}
-	for _, o := range w2Args {
-		t.Errorf("wave-2 phrase passed in at the call site: %s — setWave2Finding builds the "+
-			"wording from the code's declaration; a phrase argument is a hand phrase wearing a "+
-			"parameter name", o)
+	for _, o := range dictated {
+		t.Errorf("finding dictated at the call site: %s — a constructor builds the wording and "+
+			"the severity from the code's own declaration; a phrase or severity argument is a "+
+			"second owner wearing a parameter name", o)
 	}
 }
 
@@ -403,25 +404,36 @@ func phraseAssignments(t *testing.T, fset *token.FileSet, files map[string]*ast.
 	return out
 }
 
-// wave2PhraseArguments reports every setWave2Finding call that hands the
-// helper a wording, resolving the argument position from the helper's own
-// parameter list. When setWave2Finding has no phrase parameter there is
-// nothing to report and nothing a call site could pass; the check exists so
-// that re-adding one is caught rather than assumed impossible.
-func wave2PhraseArguments(t *testing.T, fset *token.FileSet, files map[string]*ast.File) []string {
+// findingConstructors are the four functions that build a finding, and
+// dictatedArgs the parameter names that would let a call site dictate what
+// the finding says instead of reading it off the code's declaration.
+var (
+	findingConstructors = []string{"wave1Finding", "addWave1Finding", "wave2Finding", "setWave2Finding"}
+	dictatedArgs        = map[string]bool{"phrase": true, "severity": true, "severityGlyph": true}
+)
+
+// dictatedArguments reports every call site that hands a constructor one of
+// those values, resolving the argument position from the constructor's own
+// parameter list. With no such parameter there is nothing to report and
+// nothing a call site could pass; the check exists so that re-adding one is
+// caught rather than assumed impossible.
+func dictatedArguments(t *testing.T, fset *token.FileSet, files map[string]*ast.File) []string {
 	t.Helper()
-	idx := -1
+	// fn name -> the lowest argument index that is a dictated value.
+	watched := map[string]int{}
 	for _, src := range files {
 		ast.Inspect(src, func(n ast.Node) bool {
 			fn, ok := n.(*ast.FuncDecl)
-			if !ok || fn.Name.Name != "setWave2Finding" || fn.Recv != nil {
+			if !ok || fn.Recv != nil || !slices.Contains(findingConstructors, fn.Name.Name) {
 				return true
 			}
 			at := 0
 			for _, field := range fn.Type.Params.List {
 				for _, name := range field.Names {
-					if name.Name == "phrase" {
-						idx = at
+					if dictatedArgs[name.Name] {
+						if prior, seen := watched[fn.Name.Name]; !seen || at < prior {
+							watched[fn.Name.Name] = at
+						}
 					}
 					at++
 				}
@@ -429,7 +441,7 @@ func wave2PhraseArguments(t *testing.T, fset *token.FileSet, files map[string]*a
 			return true
 		})
 	}
-	if idx < 0 {
+	if len(watched) == 0 {
 		return nil
 	}
 
@@ -442,10 +454,14 @@ func wave2PhraseArguments(t *testing.T, fset *token.FileSet, files map[string]*a
 				return true
 			}
 			id, isIdent := call.Fun.(*ast.Ident)
-			if !isIdent || id.Name != "setWave2Finding" || len(call.Args) <= idx {
+			if !isIdent {
 				return true
 			}
-			out = append(out, fmt.Sprintf("%s:%d", base, fset.Position(call.Pos()).Line))
+			idx, isWatched := watched[id.Name]
+			if !isWatched || len(call.Args) <= idx {
+				return true
+			}
+			out = append(out, fmt.Sprintf("%s:%d %s", base, fset.Position(call.Pos()).Line, id.Name))
 			return true
 		})
 	}

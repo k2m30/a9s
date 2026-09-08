@@ -35,14 +35,6 @@ const (
 	ec2CodeUserDataSecret domain.FindingCode = "ec2.user-data-secret"
 )
 
-// ec2StatusFinding is the (code, tier) pair for a
-// single SystemStatus/InstanceStatus value, per docs/resources/ec2.md §4
-// rows "impaired" / "initializing" / "insufficient-data" (lines 225-227).
-type ec2StatusFinding struct {
-	code domain.FindingCode
-	tier string
-}
-
 // classifyEC2Status maps an AWS instance/system status-check value to its
 // FindingCode and severity per docs/resources/ec2.md §4. Only "impaired" is Broken;
 // "initializing" and "insufficient-data" are Warning and must never carry
@@ -50,17 +42,17 @@ type ec2StatusFinding struct {
 // "not-applicable" produce no finding — "not-applicable" is explicitly out
 // of scope per docs/resources/ec2.md §5 (line 244): AWS classifies it as
 // Healthy/informational, not surfaced.
-func classifyEC2Status(status ec2types.SummaryStatus) (ec2StatusFinding, bool) {
+func classifyEC2Status(status ec2types.SummaryStatus) (domain.FindingCode, bool) {
 	switch status {
 	case ec2types.SummaryStatusImpaired:
-		return ec2StatusFinding{code: ec2CodeInstanceStatusImpaired, tier: "!"}, true
+		return ec2CodeInstanceStatusImpaired, true
 	case ec2types.SummaryStatusInitializing:
-		return ec2StatusFinding{code: ec2CodeInstanceStatusInitializing, tier: "~"}, true
+		return ec2CodeInstanceStatusInitializing, true
 	case ec2types.SummaryStatusInsufficientData:
-		return ec2StatusFinding{code: ec2CodeInstanceStatusInsufficient, tier: "~"}, true
+		return ec2CodeInstanceStatusInsufficient, true
 	default:
 		// "ok" and "not-applicable" — no finding.
-		return ec2StatusFinding{}, false
+		return "", false
 	}
 }
 
@@ -153,17 +145,17 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 
 		// Check instance status (docs/resources/ec2.md §4 lines 225-227).
 		if is.InstanceStatus != nil {
-			if sf, ok := classifyEC2Status(is.InstanceStatus.Status); ok {
+			if code, ok := classifyEC2Status(is.InstanceStatus.Status); ok {
 				statusStr := domain.HumanizeStatusPhrase(string(is.InstanceStatus.Status))
-				addRow(sf.code, sf.tier, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: sf.tier})
+				addRow(code, tierOf(code), domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: tierOf(code)})
 			}
 		}
 
 		// Check system status (docs/resources/ec2.md §4 lines 225-227).
 		if is.SystemStatus != nil {
-			if sf, ok := classifyEC2Status(is.SystemStatus.Status); ok {
+			if code, ok := classifyEC2Status(is.SystemStatus.Status); ok {
 				statusStr := domain.HumanizeStatusPhrase(string(is.SystemStatus.Status))
-				addRow(sf.code, sf.tier, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: sf.tier})
+				addRow(code, tierOf(code), domain.DetailRow{Label: "System Status", Value: statusStr, Tier: tierOf(code)})
 			}
 		}
 
@@ -202,7 +194,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		slices.Sort(codes)
 		for _, code := range codes {
 			c := conditions[code]
-			setWave2Finding(&result, id, code, c.tier, "ec2", c.rows)
+			setWave2Finding(&result, id, code, "ec2", c.rows)
 		}
 	}
 
@@ -278,12 +270,11 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 			portList = strings.Join(ports, ", ")
 		}
 		sort.Strings(groupIDs)
-		setWave2Finding(result, r.ID, ec2CodeInternetExposed, "!", "ec2",
-			[]domain.DetailRow{
-				{Label: "Public address", Value: publicIP, Tier: "!"},
-				{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
-				{Label: "Ports", Value: portList, Tier: "!"},
-			}, portList)
+		setWave2Finding(result, r.ID, ec2CodeInternetExposed, "ec2", []domain.DetailRow{
+			{Label: "Public address", Value: publicIP, Tier: "!"},
+			{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
+			{Label: "Ports", Value: portList, Tier: "!"},
+		}, portList)
 
 	}
 }
@@ -341,7 +332,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "!", "ec2", rows)
+		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "ec2", rows)
 
 	})
 

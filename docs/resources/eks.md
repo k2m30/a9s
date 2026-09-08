@@ -150,8 +150,13 @@ One bullet per distinct signal.
   - **API call**: `DescribeCluster` per cluster (same call — `Health` is on the Describe shape). Each `ClusterIssue` carries `Code` (enum, e.g. `AccessDenied`), `Message` (human sentence), and `ResourceIds[]`; every reported code becomes a row under the finding.
   - **Cost shape**: per-resource.
 
-- **Signal**: the cluster's Kubernetes endpoint answers from the public internet.
+- **Signal**: the cluster's Kubernetes endpoint answers from the whole public internet (`PublicAccessCidrs` contains a `/0`).
   - **State bucket**: Broken.
+  - **API call**: same `DescribeCluster` — `ResourcesVpcConfig.EndpointPublicAccess` with `PublicAccessCidrs`.
+  - **Cost shape**: per-resource.
+
+- **Signal**: the endpoint is public but scoped to the listed address ranges.
+  - **State bucket**: Warning.
   - **API call**: same `DescribeCluster` — `ResourcesVpcConfig.EndpointPublicAccess` with `PublicAccessCidrs`.
   - **Cost shape**: per-resource.
 
@@ -210,6 +215,7 @@ One row per signal from §3. The fetcher's own `DescribeCluster` sets the row co
 | `Status == FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
 | `Health.Issues[]` non-empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `health issue` |
 | endpoint open to the internet | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `cluster endpoint reachable from the internet` |
+| endpoint public but scoped to named ranges | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `cluster endpoint reachable from listed networks` |
 | control-plane log types missing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `control plane logging incomplete` |
 | no KMS key over secrets | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `secrets not encrypted with KMS` |
 | Kubernetes minor past standard support | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `Kubernetes <version> is out of standard support` |
@@ -267,6 +273,7 @@ eks — CONTAINERS. Lifecycle key: `status`.
 | eks.state.failed | failed | broken | wave1 | The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster. |
 | eks.health-issue | health issue | warn | wave1 | The control plane reports at least one health issue; every reported code is a row under this finding, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
 | eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |
+| eks.public-endpoint-restricted | cluster endpoint reachable from listed networks | warn | wave1 | The cluster's Kubernetes endpoint is public but only the listed address ranges may reach it, so the exposure is bounded by a list somebody has to keep correct. Check the ranges are still the ones you meant, and prefer reaching the cluster over the VPC. |
 | eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 | Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster. |
 | eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 | Kubernetes secrets in this cluster are stored in etcd with only the AWS-managed default protection and no envelope encryption of their own. Attach a KMS key to the cluster's secrets encryption configuration so a copy of etcd is useless without that key. |
 | eks.version-unsupported | Kubernetes <version> is out of standard support | broken | wave1 | This Kubernetes minor is past standard support, so it no longer receives the full patch stream and AWS will upgrade it on its own schedule if you do not. Plan an upgrade to a version in standard support before the automatic one lands during business hours. |

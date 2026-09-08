@@ -108,7 +108,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 // nothing. colorVPC runs it over Fields for rows built outside the fetcher.
 func vpcStateFindings(state string) []domain.Finding {
 	if state == "pending" {
-		return []domain.Finding{wave1Finding(CodeVPCStatePending, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeVPCStatePending)}
 	}
 	return nil
 }

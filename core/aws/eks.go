@@ -325,21 +325,19 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 	}
 	var findings []domain.Finding
 	switch p.PublicEndpoint {
-	case eksEndpointOpen, eksEndpointRestricted:
-		severity := domain.SevWarn
-		if p.PublicEndpoint == eksEndpointOpen {
-			severity = domain.SevBroken
-		}
-		findings = append(findings, wave1Finding(CodeEKSPublicEndpoint, severity))
+	case eksEndpointOpen:
+		findings = append(findings, wave1Finding(CodeEKSPublicEndpoint))
+	case eksEndpointRestricted:
+		findings = append(findings, wave1Finding(CodeEKSPublicEndpointRestricted))
 	}
 	if p.ControlPlaneLogging == eksLoggingIncomplete {
-		findings = append(findings, wave1Finding(CodeEKSControlPlaneLoggingOff, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeEKSControlPlaneLoggingOff))
 	}
 	if p.SecretsEncryption == eksSecretsNone {
-		findings = append(findings, wave1Finding(CodeEKSSecretsNotKMS, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeEKSSecretsNotKMS))
 	}
 	if p.VersionSupport == eksSupportEnded {
-		findings = append(findings, wave1Finding(CodeEKSVersionUnsupported, domain.SevBroken, version))
+		findings = append(findings, wave1Finding(CodeEKSVersionUnsupported, version))
 	}
 	return findings
 }
@@ -349,12 +347,15 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 // support dates, none of which Fields carries — a detail row is the fetcher's
 // alone, and only the colour has to survive a stripped row.
 func addEKSPostureRows(r *resource.Resource, cluster *ekstypes.Cluster, versions map[string]ekstypes.ClusterVersionInformation) {
-	if hasFinding(r.Findings, CodeEKSPublicEndpoint) {
+	for _, code := range []domain.FindingCode{CodeEKSPublicEndpoint, CodeEKSPublicEndpointRestricted} {
+		if !hasFinding(r.Findings, code) {
+			continue
+		}
 		ranges := "0.0.0.0/0"
 		if vpc := cluster.ResourcesVpcConfig; vpc != nil && len(vpc.PublicAccessCidrs) > 0 {
 			ranges = strings.Join(vpc.PublicAccessCidrs, ", ")
 		}
-		addWave1Rows(r, CodeEKSPublicEndpoint, domain.DetailRow{Label: "Reachable from", Value: ranges, Tier: "!"})
+		addWave1Rows(r, code, domain.DetailRow{Label: "Reachable from", Value: ranges, Tier: tierOf(code)})
 	}
 	if hasFinding(r.Findings, CodeEKSControlPlaneLoggingOff) {
 		addWave1Rows(r, CodeEKSControlPlaneLoggingOff, domain.DetailRow{
@@ -388,16 +389,16 @@ func eksClusterFindings(status string, healthIssuesCount int, issueCodes []strin
 		f, r := healthIssueFinding(CodeEKSStateFailed, issueCodes)
 		findings, rows = []domain.Finding{f}, r
 	case string(ekstypes.ClusterStatusCreating):
-		findings = []domain.Finding{wave1Finding(CodeEKSStateCreating, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeEKSStateCreating)}
 	case string(ekstypes.ClusterStatusUpdating):
-		findings = []domain.Finding{wave1Finding(CodeEKSStateUpdating, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeEKSStateUpdating)}
 	case string(ekstypes.ClusterStatusDeleting):
-		findings = []domain.Finding{wave1Finding(CodeEKSStateDeleting, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeEKSStateDeleting)}
 	case string(ekstypes.ClusterStatusPending):
-		findings = []domain.Finding{wave1Finding(CodeEKSStatePending, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeEKSStatePending)}
 	default:
 		if healthIssuesCount > 0 {
-			f, r := healthIssueFindingSev(CodeEKSHealthIssue, issueCodes, domain.SevWarn)
+			f, r := healthIssueFinding(CodeEKSHealthIssue, issueCodes)
 			findings, rows = []domain.Finding{f}, r
 		}
 	}

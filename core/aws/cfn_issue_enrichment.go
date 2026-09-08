@@ -106,7 +106,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		if key == "" {
 			key = stackName
 		}
-		setWave2Finding(&result, key, cfnCodeRecentResourceFailure, "!", "cfn", failedRows)
+		setWave2Finding(&result, key, cfnCodeRecentResourceFailure, "cfn", failedRows)
 
 	})
 
@@ -220,7 +220,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 				"drift_status": domain.HumanizeStatusPhrase(driftStatus),
 			}
 			if driftStatus == "DRIFTED" {
-				setWave2Finding(&result, key, cfnCodeStackDrifted, "~", "cfn", []domain.DetailRow{
+				setWave2Finding(&result, key, cfnCodeStackDrifted, "cfn", []domain.DetailRow{
 					{Label: "Drift Status", Value: domain.HumanizeStatusPhrase(driftStatus), Tier: "~"},
 				})
 

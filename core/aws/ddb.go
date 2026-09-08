@@ -28,17 +28,17 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 	switch table.TableStatus {
 	case ddbtypes.TableStatusActive:
 	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBKMSKeyInaccessible, domain.SevBroken)}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBKMSKeyInaccessible)}
 	case ddbtypes.TableStatusArchived:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchivedKMSLost, domain.SevBroken)}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchivedKMSLost)}
 	case ddbtypes.TableStatusCreating:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBCreating, domain.SevWarn)}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBCreating)}
 	case ddbtypes.TableStatusUpdating:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBUpdating, domain.SevWarn)}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBUpdating)}
 	case ddbtypes.TableStatusDeleting:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBDeleting, domain.SevWarn)}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBDeleting)}
 	case ddbtypes.TableStatusArchiving:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchiving, domain.SevWarn)}
+		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchiving)}
 	}
 
 	if resourceIsTearingDown(table) {
@@ -47,7 +47,7 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 	if aws.ToBool(table.DeletionProtectionEnabled) {
 		return lifecycle, nil
 	}
-	return append(lifecycle, wave1Finding(CodeDDBDeletionProtectionOff, domain.SevWarn)), nil
+	return append(lifecycle, wave1Finding(CodeDDBDeletionProtectionOff)), nil
 }
 
 // FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get

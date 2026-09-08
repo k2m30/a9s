@@ -54,12 +54,12 @@ func logsGroupFindings(retention, storedBytes, creationTime, encryption string) 
 	var out []domain.Finding
 	switch {
 	case retention == logsRetentionNeverExpires:
-		out = append(out, wave1Finding(logsCodeRetentionNeverExpire, domain.SevWarn))
+		out = append(out, wave1Finding(logsCodeRetentionNeverExpire))
 	case storedBytes == "0 B" && olderThan(creationTime, logsStaleEmptyAge):
-		out = append(out, wave1Finding(logsCodeStaleEmpty, domain.SevWarn))
+		out = append(out, wave1Finding(logsCodeStaleEmpty))
 	}
 	if encryption == logsEncryptionNone {
-		out = append(out, wave1Finding(CodeLogsNoKMS, domain.SevWarn))
+		out = append(out, wave1Finding(CodeLogsNoKMS))
 	}
 	return out
 }

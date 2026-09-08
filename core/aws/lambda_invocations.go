@@ -229,7 +229,7 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 // error/status signal for a successful-vs-failed invocation split).
 func lambdaInvocationFindings(status string) []domain.Finding {
 	if status == "TIMEOUT" {
-		return []domain.Finding{wave1Finding(CodeLambdaInvocationTimeout, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeLambdaInvocationTimeout)}
 	}
 	return nil
 }

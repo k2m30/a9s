@@ -158,24 +158,24 @@ func vpceFindings(state, policyExposure string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "PendingAcceptance":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStatePendingAcceptance, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStatePendingAcceptance)}
 	case "Pending":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStatePending, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStatePending)}
 	case "Deleting":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleting, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleting)}
 	case "Failed":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateFailed, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStateFailed)}
 	case "Rejected":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateRejected, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStateRejected)}
 	case "Expired":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateExpired, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStateExpired)}
 	case "Partial":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStatePartial, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStatePartial)}
 	case "Deleted":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleted, domain.SevDim)}
+		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleted)}
 	}
 	if policyExposure == "open" && state != "Deleting" && state != "Deleted" {
-		findings = append(findings, wave1Finding(CodeVPCEPolicyOpen, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeVPCEPolicyOpen))
 	}
 	return findings
 }

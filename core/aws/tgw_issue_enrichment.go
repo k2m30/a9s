@@ -110,15 +110,15 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			state := string(att.State)
 			humanState := domain.HumanizeStatusPhrase(state)
 			code := domain.FindingCode("")
-			tier := ""
 			switch state {
 			case "failed", "failing":
-				code, tier = tgwCodeAttachmentFailed, "!"
+				code = tgwCodeAttachmentFailed
 			case "modifying", "pendingAcceptance", "rollingBack":
-				code, tier = tgwCodeAttachmentTransitional, "~"
+				code = tgwCodeAttachmentTransitional
 			default:
 				continue
 			}
+			tier := tierOf(code)
 			issueCount++
 			attRows[code] = append(attRows[code],
 				domain.DetailRow{Label: "Attachment", Value: attID, Tier: tier},
@@ -139,7 +139,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			tier string
 		}{{tgwCodeAttachmentFailed, "!"}, {tgwCodeAttachmentTransitional, "~"}} {
 			if rows := attRows[c.code]; len(rows) > 0 {
-				setWave2Finding(&result, tgwID, c.code, c.tier, "tgw", rows)
+				setWave2Finding(&result, tgwID, c.code, "tgw", rows)
 			}
 		}
 	})

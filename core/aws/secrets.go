@@ -113,17 +113,17 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 func secretFindings(status, rotationEnabled, lastChanged string) []domain.Finding {
 	switch status {
 	case "DELETED":
-		return []domain.Finding{wave1Finding(CodeSecretStateDeleted, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeSecretStateDeleted)}
 	case "OVERDUE":
-		return []domain.Finding{wave1Finding(CodeSecretStateRotationOverdue, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeSecretStateRotationOverdue)}
 	case "DORMANT":
-		return []domain.Finding{wave1Finding(CodeSecretStateDormant, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeSecretStateDormant)}
 	}
 	if rotationEnabled == "No" {
-		return []domain.Finding{wave1Finding(CodeSecretRotationDisabled, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeSecretRotationDisabled)}
 	}
 	if t, err := time.Parse("2006-01-02", lastChanged); err == nil && time.Since(t) > 365*24*time.Hour {
-		return []domain.Finding{wave1Finding(CodeSecretStaleValue, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeSecretStaleValue)}
 	}
 	return nil
 }

@@ -49,7 +49,7 @@ func DetailsDeniedCode(shortName string) domain.FindingCode {
 // detailsDeniedFinding builds the shared details-denied Finding for shortName.
 func detailsDeniedFinding(shortName string) domain.Finding {
 	code := DetailsDeniedCode(shortName)
-	return wave1Finding(code, domain.SevWarn)
+	return wave1Finding(code)
 }
 
 // DetailsUnavailableCode returns the per-type FindingCode for the neutral
@@ -62,7 +62,7 @@ func DetailsUnavailableCode(shortName string) domain.FindingCode {
 // for shortName.
 func detailsUnavailableFinding(shortName string) domain.Finding {
 	code := DetailsUnavailableCode(shortName)
-	return wave1Finding(code, domain.SevWarn)
+	return wave1Finding(code)
 }
 
 // degradedStatusFindings recovers the degraded row's finding for a row rebuilt

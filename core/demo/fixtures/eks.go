@@ -145,6 +145,34 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "dev",
 			},
 		},
+		// EKSPublicEndpointRestricted witness: public, but scoped to the
+		// ranges below rather than to the whole internet.
+		{
+			Name:     aws.String(EKSPublicEndpointRestricted),
+			Arn:      aws.String("arn:aws:eks:us-east-1:123456789012:cluster/" + EKSPublicEndpointRestricted),
+			Version:  aws.String("1.30"),
+			Status:   ekstypes.ClusterStatusActive,
+			Endpoint: aws.String("https://QA0123456789ABCDEF.gr7.us-east-1.eks.amazonaws.com"),
+			RoleArn:  aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:                 aws.String(eksVPCID),
+				SubnetIds:             []string{eksSubnetA, eksSubnetB},
+				EndpointPublicAccess:  true,
+				EndpointPrivateAccess: true,
+				PublicAccessCidrs:     []string{"203.0.113.0/24", "198.51.100.0/24"},
+			},
+			KubernetesNetworkConfig: &ekstypes.KubernetesNetworkConfigResponse{
+				ServiceIpv4Cidr: aws.String("172.20.0.0/16"),
+				IpFamily:        ekstypes.IpFamilyIpv4,
+			},
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2025-09-12T08:00:00Z")),
+			PlatformVersion:  aws.String("eks.5"),
+			Tags: map[string]string{
+				"Environment": "qa",
+			},
+		},
 		// Witness for eks.state.pending.
 		{
 			Name:    aws.String("acme-sandbox-pending"),
@@ -529,13 +557,12 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 // Witness clusters for the eks posture findings. Each names the ONE demo
 // cluster that carries its finding; every other cluster is set to the
 // healthy value for that condition.
-// The scoped-CIDR variant of the public endpoint has no witness of its own:
-// the demo bench requires exactly one row per finding code, and both the open
-// and the scoped case carry eks.public-endpoint. The severity split is pinned
-// by the unit tests instead.
 const (
 	// EKSPublicEndpoint — the Kubernetes endpoint is open to 0.0.0.0/0.
 	EKSPublicEndpoint = "acme-dev"
+	// EKSPublicEndpointRestricted — the endpoint is public but only the
+	// listed office and build ranges may reach it.
+	EKSPublicEndpointRestricted = "acme-qa"
 	// EKSLoggingIncomplete — not all control-plane log types are enabled.
 	EKSLoggingIncomplete = "acme-staging-failed"
 	// EKSSecretsNoKMS — no encryption configuration covers secrets.
@@ -584,6 +611,6 @@ var EKSVersionSupport = map[string]ekstypes.VersionStatus{ //nolint:gochecknoglo
 var EKSEndOfStandardSupport = time.Date(2025, 11, 26, 0, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // static demo data
 
 func init() {
-	Register(Pin{ShortName: "eks", Rows: 10, Issues: 8, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "eks", Rows: 11, Issues: 9, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ng", Rows: 11, Issues: 9, CoverageGaps: []string{"dim"}})
 }

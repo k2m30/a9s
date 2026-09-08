@@ -148,12 +148,12 @@ func eniFindings(status, requesterManaged string) []domain.Finding {
 	switch status {
 	case "available":
 		if requesterManaged != "true" {
-			return []domain.Finding{wave1Finding(CodeENIStateAvailable, domain.SevWarn)}
+			return []domain.Finding{wave1Finding(CodeENIStateAvailable)}
 		}
 	case "attaching":
-		return []domain.Finding{wave1Finding(CodeENIStateAttaching, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeENIStateAttaching)}
 	case "detaching":
-		return []domain.Finding{wave1Finding(CodeENIStateDetaching, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeENIStateDetaching)}
 	}
 	return nil
 }

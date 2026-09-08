@@ -118,17 +118,17 @@ func FetchLambdaFunctionsPageWithEventSources(
 		// deprecated runtime, then lifecycle state, then no-DLQ fallback.
 		switch {
 		case fn.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaLastUpdateFailed, domain.SevBroken)}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaLastUpdateFailed)}
 		case isDeprecatedLambdaRuntime(runtime):
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaDeprecatedRuntime, domain.SevBroken)}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaDeprecatedRuntime)}
 		case fn.State == lambdatypes.StatePending:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStatePending, domain.SevWarn)}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStatePending)}
 		case fn.State == lambdatypes.StateFailed:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStateFailed, domain.SevBroken)}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStateFailed)}
 		case fn.State == lambdatypes.StateInactive:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaInactive, domain.SevDim)}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaInactive)}
 		case dlqTargetARN == "":
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaNoDLQ, domain.SevWarn)}
+			r.Findings = []domain.Finding{wave1Finding(CodeLambdaNoDLQ)}
 		}
 
 		// Independent of the lifecycle switch above: ListFunctions already

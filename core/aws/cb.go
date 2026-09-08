@@ -181,16 +181,16 @@ func cbSourceLocationCredential(src *cbtypes.ProjectSource) (string, bool) {
 // findings.
 func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 	if project.ProjectVisibility == cbtypes.ProjectVisibilityTypePublicRead {
-		addWave1Finding(r, CodeCBPublicBuilds, domain.SevBroken)
+		addWave1Finding(r, CodeCBPublicBuilds)
 	}
 
 	if spec, ok := cbBuildspecFromSource(project.Source); ok {
-		addWave1Finding(r, CodeCBBuildspecFromSource, domain.SevWarn)
+		addWave1Finding(r, CodeCBBuildspecFromSource)
 		addWave1Rows(r, CodeCBBuildspecFromSource, domain.DetailRow{Label: "Buildspec", Value: spec, Tier: "~"})
 	}
 
 	if redacted, ok := cbSourceLocationCredential(project.Source); ok {
-		addWave1Finding(r, CodeCBSourceURLCredential, domain.SevBroken)
+		addWave1Finding(r, CodeCBSourceURLCredential)
 		addWave1Rows(r, CodeCBSourceURLCredential, domain.DetailRow{Label: "Repository", Value: redacted, Tier: "!"})
 	}
 

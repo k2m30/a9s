@@ -142,17 +142,17 @@ func ecsSvcFindings(status string, desiredCount, runningCount int32) []domain.Fi
 	var findings []domain.Finding
 	switch status {
 	case "DRAINING":
-		findings = append(findings, wave1Finding(CodeECSSvcStateDraining, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeECSSvcStateDraining))
 	case "INACTIVE":
-		findings = append(findings, wave1Finding(CodeECSSvcStateInactive, domain.SevBroken))
+		findings = append(findings, wave1Finding(CodeECSSvcStateInactive))
 	}
 	// A service that asks for nothing is idle by design, not short of capacity.
 	switch {
 	case desiredCount <= 0:
 	case runningCount == 0:
-		findings = append(findings, wave1Finding(CodeECSSvcNoTasksRunning, domain.SevBroken))
+		findings = append(findings, wave1Finding(CodeECSSvcNoTasksRunning))
 	case runningCount < desiredCount:
-		findings = append(findings, wave1Finding(CodeECSSvcTasksBelowDesired, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeECSSvcTasksBelowDesired))
 	}
 	return findings
 }

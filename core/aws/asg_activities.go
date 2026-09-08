@@ -120,9 +120,9 @@ func convertAsgActivity(activity asgtypes.Activity, asgName string) resource.Res
 func asgActivityFindings(statusCode asgtypes.ScalingActivityStatusCode) []domain.Finding {
 	switch statusCode {
 	case asgtypes.ScalingActivityStatusCodeFailed:
-		return []domain.Finding{wave1Finding(CodeAsgActivityFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeAsgActivityFailed)}
 	case asgtypes.ScalingActivityStatusCodeCancelled:
-		return []domain.Finding{wave1Finding(CodeAsgActivityCancelled, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeAsgActivityCancelled)}
 	}
 	return nil
 }

@@ -146,7 +146,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 		if hasConsolePassword && !hasMFA {
 			riskLabel = riskNoMFA
-			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, "!", "iam-user", []domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: "!"}})
+			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, "iam-user", []domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: tierOf(iamUserCodeNoMFA)}})
 
 		}
 
@@ -154,8 +154,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskConsoleDormant
 			}
-			setWave2Finding(&result, r.ID, f.Code, "~", "iam-user",
-				[]domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: "~"}})
+			setWave2Finding(&result, r.ID, f.Code, "iam-user", []domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: tierOf(f.Code)}})
 
 		}
 
@@ -164,7 +163,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskConsoleNeverUsed
 			}
-			setWave2Finding(&result, r.ID, iamUserCodeConsoleNeverUsed, "~", "iam-user", []domain.DetailRow{{Label: "Created", Value: r.Fields["create_date"], Tier: "~"}})
+			setWave2Finding(&result, r.ID, iamUserCodeConsoleNeverUsed, "iam-user", []domain.DetailRow{{Label: "Created", Value: r.Fields["create_date"], Tier: tierOf(iamUserCodeConsoleNeverUsed)}})
 
 		}
 
@@ -175,7 +174,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskKeyTooOld
 			}
-			setWave2Finding(&result, r.ID, iamUserCodeOldKey, "~", "iam-user", []domain.DetailRow{{Label: "Access key", Value: lastFourOfKeyID(aws.ToString(key.AccessKeyId)), Tier: "~"}})
+			setWave2Finding(&result, r.ID, iamUserCodeOldKey, "iam-user", []domain.DetailRow{{Label: "Access key", Value: lastFourOfKeyID(aws.ToString(key.AccessKeyId)), Tier: tierOf(iamUserCodeOldKey)}})
 
 		}
 
@@ -183,7 +182,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskKeyUnused
 			}
-			setWave2Finding(&result, r.ID, iamUserCodeKeyUnused, "~", "iam-user", []domain.DetailRow{
+			setWave2Finding(&result, r.ID, iamUserCodeKeyUnused, "iam-user", []domain.DetailRow{
 				{Label: "Key", Value: k.suffix, Tier: "~"},
 				{Label: "Last used", Value: k.lastUsed, Tier: "~"},
 				{Label: "Idle", Value: fmt.Sprintf("%d days", k.idleDays), Tier: "~"},
@@ -195,7 +194,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskTwoActiveKeys
 			}
-			setWave2Finding(&result, r.ID, iamUserCodeTwoActiveKeys, "~", "iam-user", []domain.DetailRow{{Label: "Keys", Value: "2 active", Tier: "~"}})
+			setWave2Finding(&result, r.ID, iamUserCodeTwoActiveKeys, "iam-user", []domain.DetailRow{{Label: "Keys", Value: "2 active", Tier: tierOf(iamUserCodeTwoActiveKeys)}})
 
 		}
 
@@ -203,8 +202,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskAdminPolicy
 			}
-			setWave2Finding(&result, r.ID, iamUserCodeAdminAttached, "~", "iam-user",
-				adminAttachedRows(adminPolicy))
+			setWave2Finding(&result, r.ID, iamUserCodeAdminAttached, "iam-user", adminAttachedRows(adminPolicy))
 
 		}
 
@@ -323,5 +321,5 @@ func iamUserConsoleDormantFindings(hasConsolePassword, passwordLastUsed string) 
 	if hasConsolePassword != "true" || !olderThan(passwordLastUsed, unusedCredentialAge) {
 		return nil
 	}
-	return []domain.Finding{wave2Finding(iamUserCodeConsoleDormant, domain.SevWarn, "iam-user")}
+	return []domain.Finding{wave2Finding(iamUserCodeConsoleDormant, "iam-user")}
 }

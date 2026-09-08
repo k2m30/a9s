@@ -54,10 +54,10 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 	}
 	if iampolicy.EvaluateTrust(doc, "").Public {
 		out.wildcard, out.summary = "true", "WILDCARD"
-		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust, domain.SevBroken))
+		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust))
 	}
 	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {
-		out.findings = append(out.findings, wave1Finding(roleCodeConfusedDeputy, domain.SevWarn))
+		out.findings = append(out.findings, wave1Finding(roleCodeConfusedDeputy))
 		out.details = map[domain.FindingCode]domain.AttentionDetail{
 			roleCodeConfusedDeputy: {Rows: []domain.DetailRow{
 				{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
@@ -352,7 +352,7 @@ func enumerateRoleInlinePolicies(
 			continue
 		}
 		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
-			f := wave1Finding(roleCodeInlinePrivEsc, domain.SevBroken)
+			f := wave1Finding(roleCodeInlinePrivEsc)
 			scan.finding = &f
 			scan.rows = append(
 				[]domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "!"}},

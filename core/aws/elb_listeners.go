@@ -142,7 +142,7 @@ func elbListenerFindings(listener elbtypes.Listener) []domain.Finding {
 	switch listener.Protocol {
 	case elbtypes.ProtocolEnumHttps, elbtypes.ProtocolEnumTls:
 		if len(listener.Certificates) == 0 {
-			return []domain.Finding{wave1Finding(CodeELBListenerNoCertificate, domain.SevBroken)}
+			return []domain.Finding{wave1Finding(CodeELBListenerNoCertificate)}
 		}
 	}
 	return nil

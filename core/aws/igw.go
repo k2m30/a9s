@@ -103,12 +103,12 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 func igwFindings(state string, attachmentsCount int) []domain.Finding {
 	switch state {
 	case "attaching":
-		return []domain.Finding{wave1Finding(CodeIGWStateAttaching, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeIGWStateAttaching)}
 	case "detaching":
-		return []domain.Finding{wave1Finding(CodeIGWStateDetaching, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeIGWStateDetaching)}
 	}
 	if attachmentsCount == 0 {
-		return []domain.Finding{wave1Finding(CodeIGWNoAttachments, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeIGWNoAttachments)}
 	}
 	return nil
 }

@@ -105,10 +105,6 @@ var Wave2EmissionObserver func(resourceID string, f domain.Finding)
 // helper rather than re-implementing the glyph→Severity mapping and the
 // AttentionDetail{Rows: …} packing in every file.
 //
-// severityGlyph: "!" → SevBroken, "~" → SevWarn, otherwise → SevDim. Matches
-// the legacy EnrichmentFinding.Severity glyph contract used by per-enricher
-// docstrings — view code now consumes domain.Severity directly.
-//
 // The wording is the one the code's catalog.FindingDef declares; values fill
 // its "<…>" slots left to right, so an enricher measuring a count passes the
 // count and never a sentence. The S5 detail sentence comes from the same
@@ -153,12 +149,11 @@ func setWave2Finding(
 	r *IssueEnricherResult,
 	resourceID string,
 	code domain.FindingCode,
-	severityGlyph string,
 	shortName string,
 	rows []domain.DetailRow,
 	values ...string,
 ) {
-	f := wave2Finding(code, glyphToSeverity(severityGlyph), shortName, values...)
+	f := wave2Finding(code, shortName, values...)
 	if Wave2EmissionObserver != nil {
 		Wave2EmissionObserver(resourceID, f)
 	}
@@ -187,8 +182,8 @@ func setWave2Finding(
 // shortName stamps Source = "wave2:<shortName>". Pass "" for a predicate that
 // recomputes a Wave-2 finding from a row's Fields, where the enricher that
 // originally emitted it is not in hand. values fill the declared phrase's
-// "<…>" slots left to right.
-func wave2Finding(code domain.FindingCode, severity domain.Severity, shortName string, values ...string) domain.Finding {
+// "<…>" slots left to right, and the severity is the code's own.
+func wave2Finding(code domain.FindingCode, shortName string, values ...string) domain.Finding {
 	source := "wave2"
 	if shortName != "" {
 		source += ":" + shortName
@@ -197,7 +192,7 @@ func wave2Finding(code domain.FindingCode, severity domain.Severity, shortName s
 		Code:     code,
 		Phrase:   fillPhrase(catalog.Phrase(code), values...),
 		Detail:   catalog.Detail(code),
-		Severity: severity,
+		Severity: catalog.Severity(code),
 		Source:   source,
 	}
 }

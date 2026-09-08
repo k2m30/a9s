@@ -34,18 +34,22 @@ import (
 
 const (
 	w6bEKSCodePublicEndpoint = domain.FindingCode("eks.public-endpoint")
-	w6bEKSCodeLoggingOff     = domain.FindingCode("eks.control-plane-logging-off")
-	w6bEKSCodeSecretsNotKMS  = domain.FindingCode("eks.secrets-not-kms")
-	w6bEKSCodeVersionOld     = domain.FindingCode("eks.version-unsupported")
+	// Inverted for the spec row that gave severity one owner: the scoped
+	// exposure is its own code at its own declared tier.
+	w6bEKSCodePublicEndpointScoped = domain.FindingCode("eks.public-endpoint-restricted")
+	w6bEKSCodeLoggingOff           = domain.FindingCode("eks.control-plane-logging-off")
+	w6bEKSCodeSecretsNotKMS        = domain.FindingCode("eks.secrets-not-kms")
+	w6bEKSCodeVersionOld           = domain.FindingCode("eks.version-unsupported")
 )
 
 // Registered phrases. eks.public-endpoint does not read "API endpoint …" as
 // the batch table first wrote it: "API" is a bare uppercase token the
 // rendered-surface ruling bans.
 const (
-	w6bEKSPhrasePublicEndpoint = "cluster endpoint reachable from the internet"
-	w6bEKSPhraseLoggingOff     = "control plane logging incomplete"
-	w6bEKSPhraseSecretsNotKMS  = "secrets not encrypted with KMS"
+	w6bEKSPhrasePublicEndpoint       = "cluster endpoint reachable from the internet"
+	w6bEKSPhrasePublicEndpointScoped = "cluster endpoint reachable from listed networks"
+	w6bEKSPhraseLoggingOff           = "control plane logging incomplete"
+	w6bEKSPhraseSecretsNotKMS        = "secrets not encrypted with KMS"
 )
 
 // w6bEKSFake serves the fetcher's ListClusters/DescribeCluster pair plus the
@@ -199,9 +203,9 @@ func TestW6BEKS_PublicEndpoint_ScopedToNamedRanges_IsWarn(t *testing.T) {
 	c.ResourcesVpcConfig.PublicAccessCidrs = []string{"203.0.113.0/24"}
 	r := w6bEKSFetchOne(t, c)
 
-	pw1RequireFinding(t, r.Findings, w6bEKSCodePublicEndpoint,
-		w6bEKSPhrasePublicEndpoint, domain.SevWarn, "wave1")
-	w6bRequireRowValue(t, w6bWave1Rows(r, w6bEKSCodePublicEndpoint), "203.0.113.0/24")
+	pw1RequireFinding(t, r.Findings, w6bEKSCodePublicEndpointScoped,
+		w6bEKSPhrasePublicEndpointScoped, domain.SevWarn, "wave1")
+	w6bRequireRowValue(t, w6bWave1Rows(r, w6bEKSCodePublicEndpointScoped), "203.0.113.0/24")
 }
 
 // An open range anywhere in the list is an open endpoint; a scoped range

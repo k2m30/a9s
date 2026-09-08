@@ -128,18 +128,18 @@ func tgwFindings(state, autoAccept string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
 	case "pending":
-		findings = []domain.Finding{wave1Finding(CodeTGWStatePending, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeTGWStatePending)}
 	case "modifying":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateModifying, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateModifying)}
 	case "deleting":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleting, domain.SevWarn)}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleting)}
 	case "failed":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateFailed, domain.SevBroken)}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateFailed)}
 	case "deleted":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleted, domain.SevDim)}
+		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleted)}
 	}
 	if autoAccept == "yes" && state != "deleting" && state != "deleted" {
-		findings = append(findings, wave1Finding(CodeTGWAutoAccept, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeTGWAutoAccept))
 	}
 	return findings
 }

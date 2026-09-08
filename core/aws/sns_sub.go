@@ -125,7 +125,7 @@ func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Findin
 	if subscriptionArn == "Deleted" || protocol != "http" {
 		return findings, nil
 	}
-	findings = append(findings, wave1Finding(CodeSNSSubPlainHTTP, domain.SevWarn))
+	findings = append(findings, wave1Finding(CodeSNSSubPlainHTTP))
 	return findings, map[domain.FindingCode]domain.AttentionDetail{
 		CodeSNSSubPlainHTTP: {Rows: []domain.DetailRow{
 			// Scheme and host only. A webhook path is routinely the shared
@@ -151,9 +151,9 @@ func snsSubEndpointOrigin(endpoint string) string {
 func snsSubStateFindings(subscriptionArn string) []domain.Finding {
 	switch subscriptionArn {
 	case "PendingConfirmation":
-		return []domain.Finding{wave1Finding(CodeSNSSubPendingConfirmation, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeSNSSubPendingConfirmation)}
 	case "Deleted":
-		return []domain.Finding{wave1Finding(CodeSNSSubDeleted, domain.SevDim)}
+		return []domain.Finding{wave1Finding(CodeSNSSubDeleted)}
 	}
 	return nil
 }

@@ -111,7 +111,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 
 	var findings []domain.Finding
 	if agreement.Status == transfertypes.AgreementStatusTypeInactive {
-		findings = append(findings, wave1Finding(transferCodeAgreementInactive, domain.SevWarn))
+		findings = append(findings, wave1Finding(transferCodeAgreementInactive))
 	}
 
 	return resource.Resource{
@@ -241,14 +241,14 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 		expired = true
 	}
 	if expired {
-		return wave1Finding(transferCodeCertExpired, domain.SevBroken), true
+		return wave1Finding(transferCodeCertExpired), true
 	}
 
 	if cert.InactiveDate != nil {
 		remaining := time.Until(*cert.InactiveDate)
 		if remaining > 0 && remaining <= transferCertExpiringWindow {
 			days := int(remaining.Hours() / 24)
-			return wave1Finding(transferCodeCertExpiring, domain.SevWarn, strconv.Itoa(days)), true
+			return wave1Finding(transferCodeCertExpiring, strconv.Itoa(days)), true
 		}
 	}
 	return domain.Finding{}, false

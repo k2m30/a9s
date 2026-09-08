@@ -22,6 +22,9 @@ import (
 // ecr canonical FindingCodes.
 const (
 	ecrCodeVulnerabilities domain.FindingCode = "ecr.vulnerabilities"
+	// ecrCodeHighVulnerabilities — highs but no critical. A separate code
+	// because it is a separate severity, and a code declares one.
+	ecrCodeHighVulnerabilities domain.FindingCode = "ecr.vulnerabilities-high"
 
 	// ecrCodePublicPolicy — the repository's resource policy grants a
 	// wildcard principal (GetRepositoryPolicy, evaluated by iampolicy).
@@ -124,14 +127,14 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, policyErr)
 		case exposure.Public:
-			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "!", "ecr", publicPolicyRows(exposure))
+			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "ecr", publicPolicyRows(exposure))
 		}
 		switch {
 		case lifecycleErr != nil:
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, lifecycleErr)
 		case noLifecyclePolicy:
-			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "~", "ecr", nil)
+			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "ecr", nil)
 		}
 
 		scannedCount := 0
@@ -164,9 +167,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		}
 
 		var rows []domain.DetailRow
-		tier := "~"
 		if criticalTotal > 0 {
-			tier = "!"
 			rows = append(rows, domain.DetailRow{
 				Label: "Critical",
 				Value: fmt.Sprintf("%d critical findings across %d image(s)", criticalTotal, scannedCount),
@@ -180,8 +181,15 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 				Tier:  "~",
 			})
 		}
-		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, tier, "ecr", rows,
-			strconv.Itoa(int(criticalTotal)), strconv.Itoa(int(highTotal)))
+		// A repository with a critical is a different signal from one with
+		// highs alone, and a code declares one severity.
+		if criticalTotal > 0 {
+			setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, "ecr", rows,
+				strconv.Itoa(int(criticalTotal)), strconv.Itoa(int(highTotal)))
+			return
+		}
+		setWave2Finding(&result, r.ID, ecrCodeHighVulnerabilities, "ecr", rows,
+			strconv.Itoa(int(highTotal)))
 	})
 
 	SetTruncated(&result, truncated)

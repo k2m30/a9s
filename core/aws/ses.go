@@ -109,16 +109,16 @@ func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {
 	var findings []domain.Finding
 	switch identity.VerificationStatus {
 	case sesv2types.VerificationStatusFailed:
-		findings = append(findings, wave1Finding(CodeSESVerificationFailed, domain.SevBroken))
+		findings = append(findings, wave1Finding(CodeSESVerificationFailed))
 	case sesv2types.VerificationStatusTemporaryFailure:
-		findings = append(findings, wave1Finding(CodeSESVerificationTempFail, domain.SevBroken))
+		findings = append(findings, wave1Finding(CodeSESVerificationTempFail))
 	case sesv2types.VerificationStatusNotStarted:
-		findings = append(findings, wave1Finding(CodeSESVerificationNotStarted, domain.SevBroken))
+		findings = append(findings, wave1Finding(CodeSESVerificationNotStarted))
 	case sesv2types.VerificationStatusPending:
-		findings = append(findings, wave1Finding(CodeSESVerificationPending, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeSESVerificationPending))
 	}
 	if !identity.SendingEnabled {
-		findings = append(findings, wave1Finding(CodeSESSendingDisabled, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeSESSendingDisabled))
 	}
 	return findings
 }

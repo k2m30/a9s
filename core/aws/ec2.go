@@ -160,32 +160,32 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 	// Healthy ("running") has no Finding.
 	switch state {
 	case "pending":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StatePending, domain.SevWarn)}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StatePending)}
 	case "shutting-down":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateShuttingDown, domain.SevWarn)}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateShuttingDown)}
 	case "stopping":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopping, domain.SevWarn)}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopping)}
 	case "stopped":
 		if strings.HasPrefix(stateReasonCode, "Server.") {
-			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStoppedServer, domain.SevBroken)}
+			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStoppedServer)}
 		} else {
-			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopped, domain.SevWarn)}
+			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopped)}
 		}
 	case "terminated":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateTerminated, domain.SevDim)}
+		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateTerminated)}
 	}
 
 	// Posture signals. Independently evaluated and appended, so an instance
 	// that is both IMDSv1-permissive and publicly addressed carries both.
 	if !ec2InstanceGone(state) {
 		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional {
-			r.Findings = append(r.Findings, wave1Finding(CodeEC2IMDSv1Allowed, domain.SevWarn))
+			r.Findings = append(r.Findings, wave1Finding(CodeEC2IMDSv1Allowed))
 			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
 				Label: "Metadata tokens", Value: "optional", Tier: "~",
 			})
 		}
 		if publicIP != "" {
-			r.Findings = append(r.Findings, wave1Finding(CodeEC2PublicIP, domain.SevWarn))
+			r.Findings = append(r.Findings, wave1Finding(CodeEC2PublicIP))
 			addWave1Rows(&r, CodeEC2PublicIP, domain.DetailRow{
 				Label: "Public address", Value: publicIP, Tier: "~",
 			})

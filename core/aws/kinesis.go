@@ -18,11 +18,11 @@ import (
 func computeKinesisFindings(state kinesistypes.StreamStatus) []domain.Finding {
 	switch state {
 	case kinesistypes.StreamStatusCreating:
-		return []domain.Finding{wave1Finding(CodeKinesisCreating, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeKinesisCreating)}
 	case kinesistypes.StreamStatusUpdating:
-		return []domain.Finding{wave1Finding(CodeKinesisUpdating, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeKinesisUpdating)}
 	case kinesistypes.StreamStatusDeleting:
-		return []domain.Finding{wave1Finding(CodeKinesisDeleting, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeKinesisDeleting)}
 	default:
 		return nil
 	}

@@ -151,25 +151,25 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 	}
 
 	if policy := aws.ToString(server.SecurityPolicyName); transferLegacySecurityPolicies[policy] {
-		findings = append(findings, wave1Finding(transferCodeLegacyPolicy, domain.SevWarn))
+		findings = append(findings, wave1Finding(transferCodeLegacyPolicy))
 	}
 
 	if server.LoggingRole == nil && len(server.StructuredLogDestinations) == 0 {
-		findings = append(findings, wave1Finding(transferCodeNoLogging, domain.SevWarn))
+		findings = append(findings, wave1Finding(transferCodeNoLogging))
 	}
 
 	return findings
 }
 
 // transferStateFindings maps ListedServer/DescribedServer.State to its
-// docs/resources/transfer.md §4 state-bucket Finding. ONLINE has no entry
+// docs/resources/transfer.md §4 state-bucket code. ONLINE has no entry
 // (Healthy — no finding).
-var transferStateFindings = map[transfertypes.State]stateFinding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
-	transfertypes.StateOffline:     {code: transferCodeOffline, severity: domain.SevWarn},
-	transfertypes.StateStarting:    {code: transferCodeStarting, severity: domain.SevWarn},
-	transfertypes.StateStopping:    {code: transferCodeStopping, severity: domain.SevWarn},
-	transfertypes.StateStartFailed: {code: transferCodeStartFailed, severity: domain.SevBroken},
-	transfertypes.StateStopFailed:  {code: transferCodeStopFailed, severity: domain.SevWarn},
+var transferStateFindings = map[transfertypes.State]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+	transfertypes.StateOffline:     transferCodeOffline,
+	transfertypes.StateStarting:    transferCodeStarting,
+	transfertypes.StateStopping:    transferCodeStopping,
+	transfertypes.StateStartFailed: transferCodeStartFailed,
+	transfertypes.StateStopFailed:  transferCodeStopFailed,
 }
 
 // transferStateFinding maps ListedServer/DescribedServer.State to its
@@ -177,11 +177,11 @@ var transferStateFindings = map[transfertypes.State]stateFinding{ //nolint:goche
 // ONLINE (Healthy — no finding). Shared by the healthy-row and degraded-row
 // builders since State is present on both ListedServer and DescribedServer.
 func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
-	sf, ok := transferStateFindings[state]
+	code, ok := transferStateFindings[state]
 	if !ok {
 		return domain.Finding{}, false
 	}
-	return wave1Finding(sf.code, sf.severity), true
+	return wave1Finding(code), true
 }
 
 // buildTransferDegradedResource builds the RICH degraded row for a server

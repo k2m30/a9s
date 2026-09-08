@@ -119,7 +119,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			return
 		}
 
-		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "~", "logs", []domain.DetailRow{
+		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "logs", []domain.DetailRow{
 			{Label: "Log Group", Value: logGroupName, Tier: "~"},
 			{Label: "Metric Filters", Value: "none", Tier: "~"},
 		})

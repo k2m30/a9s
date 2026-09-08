@@ -21,23 +21,23 @@ import (
 func glueRunFindings(state gluetypes.JobRunState) []domain.Finding {
 	switch state {
 	case gluetypes.JobRunStateFailed:
-		return []domain.Finding{wave1Finding(CodeGlueRunFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeGlueRunFailed)}
 	case gluetypes.JobRunStateTimeout:
-		return []domain.Finding{wave1Finding(CodeGlueRunTimeout, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeGlueRunTimeout)}
 	case gluetypes.JobRunStateError:
-		return []domain.Finding{wave1Finding(CodeGlueRunError, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeGlueRunError)}
 	case gluetypes.JobRunStateExpired:
-		return []domain.Finding{wave1Finding(CodeGlueRunExpired, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeGlueRunExpired)}
 	case gluetypes.JobRunStateRunning:
-		return []domain.Finding{wave1Finding(CodeGlueRunRunning, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeGlueRunRunning)}
 	case gluetypes.JobRunStateStarting:
-		return []domain.Finding{wave1Finding(CodeGlueRunStarting, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeGlueRunStarting)}
 	case gluetypes.JobRunStateStopping:
-		return []domain.Finding{wave1Finding(CodeGlueRunStopping, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeGlueRunStopping)}
 	case gluetypes.JobRunStateWaiting:
-		return []domain.Finding{wave1Finding(CodeGlueRunWaiting, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeGlueRunWaiting)}
 	case gluetypes.JobRunStateStopped:
-		return []domain.Finding{wave1Finding(CodeGlueRunStopped, domain.SevDim)}
+		return []domain.Finding{wave1Finding(CodeGlueRunStopped)}
 	}
 	return nil
 }

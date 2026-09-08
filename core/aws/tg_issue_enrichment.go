@@ -136,11 +136,9 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 				unhealthyRows[i].Tier = tier
 			}
 			if allDown {
-				setWave2Finding(&result, r.ID, tgCodeAllTargetsUnhealthy, "!", "tg", unhealthyRows,
-					strconv.Itoa(targetCount))
+				setWave2Finding(&result, r.ID, tgCodeAllTargetsUnhealthy, "tg", unhealthyRows, strconv.Itoa(targetCount))
 			} else {
-				setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, "~", "tg", unhealthyRows,
-					strconv.Itoa(literalUnhealthy), strconv.Itoa(targetCount))
+				setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, "tg", unhealthyRows, strconv.Itoa(literalUnhealthy), strconv.Itoa(targetCount))
 			}
 		}
 	})

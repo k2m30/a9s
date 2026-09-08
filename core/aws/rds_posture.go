@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -85,7 +84,7 @@ func rdsPostureFindings(p rdsPosture, c rdsPostureCodes) ([]domain.Finding, map[
 	details := map[domain.FindingCode]domain.AttentionDetail{}
 
 	add := func(code domain.FindingCode, rows []domain.DetailRow) {
-		findings = append(findings, wave1Finding(code, domain.SevWarn))
+		findings = append(findings, wave1Finding(code))
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
@@ -142,11 +141,7 @@ func rdsCACertFinding(caID string, validTill *time.Time, now time.Time) (*domain
 	if days <= rdsCACertUrgentDays {
 		code = CodeDBICACertExpiringUrgent
 	}
-	f := wave1Finding(code, catalog.Severity(code), strconv.Itoa(days))
-	tier := "~"
-	if f.Severity == domain.SevBroken {
-		tier = "!"
-	}
+	f, tier := wave1Finding(code, strconv.Itoa(days)), tierOf(code)
 	rows := []domain.DetailRow{
 		{Label: "Certificate authority", Value: caID, Tier: tier},
 		{Label: "Valid till", Value: validTill.Format("2006-01-02"), Tier: tier},

@@ -38,21 +38,24 @@ func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.
 //
 // values fill the declared phrase's "<…>" slots left to right — a code whose
 // wording carries a measurement ("expires in <N> days") passes the
-// measurement, never a sentence it assembled itself.
-func wave1Finding(code domain.FindingCode, severity domain.Severity, values ...string) domain.Finding {
+// measurement, never a sentence it assembled itself. The severity is the
+// code's own too: an emitter that needs two tiers needs two codes, so that a
+// row's colour and the tier the generated signals page prints have one owner.
+func wave1Finding(code domain.FindingCode, values ...string) domain.Finding {
 	return domain.Finding{
 		Code: code, Phrase: fillPhrase(catalog.Phrase(code), values...),
-		Detail: catalog.Detail(code), Severity: severity, Source: "wave1",
+		Detail: catalog.Detail(code), Severity: catalog.Severity(code), Source: "wave1",
 	}
 }
 
-// stateFinding is one row of a lifecycle lookup table: the code a state maps
-// to and the severity it carries. The wording is not here — wave1Finding
-// reads it from the code's declaration, so a table cannot become a second
-// phrase list.
-type stateFinding struct {
-	code     domain.FindingCode
-	severity domain.Severity
+// tierOf is the detail-row glyph for a finding's supporting rows: "!" when
+// the code is declared Broken, "~" otherwise. The rows wear the tier the code
+// declares, so a row cannot claim an urgency the finding does not have.
+func tierOf(code domain.FindingCode) string {
+	if catalog.Severity(code) == domain.SevBroken {
+		return "!"
+	}
+	return "~"
 }
 
 // fillPhrase substitutes values into the "<…>" slots of a declared phrase, in
@@ -82,8 +85,8 @@ func fillPhrase(phrase string, values ...string) string {
 }
 
 // addWave1Finding appends the Wave-1 posture Finding for code to r.
-func addWave1Finding(r *resource.Resource, code domain.FindingCode, severity domain.Severity, values ...string) {
-	r.Findings = append(r.Findings, wave1Finding(code, severity, values...))
+func addWave1Finding(r *resource.Resource, code domain.FindingCode, values ...string) {
+	r.Findings = append(r.Findings, wave1Finding(code, values...))
 }
 
 // secretScanRows and secretScanTextRows scan the two shapes a credential
@@ -121,6 +124,6 @@ func addSecretScanFinding(r *resource.Resource, code domain.FindingCode, kv map[
 	if len(rows) == 0 {
 		return
 	}
-	addWave1Finding(r, code, domain.SevBroken)
+	addWave1Finding(r, code)
 	addWave1Rows(r, code, rows...)
 }

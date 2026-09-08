@@ -18,7 +18,7 @@ import (
 func rolePolicyFindings(policyName string) []domain.Finding {
 	switch policyName {
 	case "AdministratorAccess", "PowerUserAccess":
-		return []domain.Finding{wave1Finding(CodeRolePolicyOverPrivileged, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeRolePolicyOverPrivileged)}
 	}
 	return nil
 }
@@ -26,7 +26,7 @@ func rolePolicyFindings(policyName string) []domain.Finding {
 // inlineRolePolicyFindings returns the wave1 finding for an inline role
 // policy — always dim to distinguish from managed-policy rows.
 func inlineRolePolicyFindings() []domain.Finding {
-	return []domain.Finding{wave1Finding(CodeRolePolicyInline, domain.SevDim)}
+	return []domain.Finding{wave1Finding(CodeRolePolicyInline)}
 }
 
 // RolePolicyRow is the RawStruct for each role policy row.

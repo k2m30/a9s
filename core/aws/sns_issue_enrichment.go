@@ -85,7 +85,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		// unencrypted.
 		snsTopicPosture(ctx, clients, &result, &failures, r.ID, ownAccount)
 		if len(subs) == 0 {
-			setWave2Finding(&result, r.ID, snsCodeNoSubscribers, "~", "sns", nil)
+			setWave2Finding(&result, r.ID, snsCodeNoSubscribers, "sns", nil)
 			return
 		}
 		allPending := true
@@ -100,7 +100,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			}
 		}
 		if allPending {
-			setWave2Finding(&result, r.ID, snsCodeAllPending, "~", "sns", nil)
+			setWave2Finding(&result, r.ID, snsCodeAllPending, "sns", nil)
 		}
 	})
 	return result, AggregateFailures("topic posture and subscriptions", failures, n)
@@ -121,12 +121,12 @@ func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *Issue
 	}
 	if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
 		if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
-			setWave2Finding(result, topicARN, snsCodePublicPolicy, "!", "sns", publicPolicyRows(ex))
+			setWave2Finding(result, topicARN, snsCodePublicPolicy, "sns", publicPolicyRows(ex))
 		}
 	}
 	// AWS omits the attribute entirely for an unencrypted topic and returns
 	// it empty in some responses; both are the same fact.
 	if out.Attributes["KmsMasterKeyId"] == "" {
-		setWave2Finding(result, topicARN, snsCodeNoKMS, "~", "sns", []domain.DetailRow{{Label: "Encryption key", Value: "none", Tier: "~"}})
+		setWave2Finding(result, topicARN, snsCodeNoKMS, "sns", []domain.DetailRow{{Label: "Encryption key", Value: "none", Tier: tierOf(snsCodeNoKMS)}})
 	}
 }

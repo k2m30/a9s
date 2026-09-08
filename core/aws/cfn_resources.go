@@ -25,13 +25,13 @@ func cfnResourceFindings(status cfntypes.ResourceStatus) []domain.Finding {
 	}
 	switch s {
 	case "DELETE_COMPLETE":
-		return []domain.Finding{wave1Finding(CodeCfnResourceDeleted, domain.SevDim)}
+		return []domain.Finding{wave1Finding(CodeCfnResourceDeleted)}
 	}
 	if strings.HasSuffix(s, "_FAILED") {
-		return []domain.Finding{wave1Finding(CodeCfnResourceFailed, domain.SevBroken, cfnStatusWords(s))}
+		return []domain.Finding{wave1Finding(CodeCfnResourceFailed, cfnStatusWords(s))}
 	}
 	if strings.HasSuffix(s, "_IN_PROGRESS") {
-		return []domain.Finding{wave1Finding(CodeCfnResourceInProgress, domain.SevWarn, cfnStatusWords(s))}
+		return []domain.Finding{wave1Finding(CodeCfnResourceInProgress, cfnStatusWords(s))}
 	}
 	return nil
 }

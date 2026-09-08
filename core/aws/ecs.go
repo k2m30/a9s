@@ -107,13 +107,13 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 func ecsClusterFindings(status string) []domain.Finding {
 	switch status {
 	case "PROVISIONING":
-		return []domain.Finding{wave1Finding(CodeECSStateProvisioning, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeECSStateProvisioning)}
 	case "DEPROVISIONING":
-		return []domain.Finding{wave1Finding(CodeECSStateDeprovisioning, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeECSStateDeprovisioning)}
 	case "FAILED":
-		return []domain.Finding{wave1Finding(CodeECSStateFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeECSStateFailed)}
 	case "INACTIVE":
-		return []domain.Finding{wave1Finding(CodeECSStateInactive, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeECSStateInactive)}
 	}
 	return nil
 }

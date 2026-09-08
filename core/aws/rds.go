@@ -193,7 +193,7 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 	}
 
 	if code, ok := brokenMap[status]; ok {
-		lead := []domain.Finding{wave1Finding(code, domain.SevBroken)}
+		lead := []domain.Finding{wave1Finding(code)}
 		return append(lead, postureFindings...), postureDetails
 	}
 	if _, ok := transitionalStatusSet[status]; ok {
@@ -202,22 +202,22 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 		if key != "" {
 			phrase = status + ": " + key
 		}
-		lead := []domain.Finding{wave1Finding(CodeDBITransitional, domain.SevWarn, phrase)}
+		lead := []domain.Finding{wave1Finding(CodeDBITransitional, phrase)}
 		return append(lead, postureFindings...), postureDetails
 	}
 	if status == "available" {
 		var findings []domain.Finding
 		if db.BackupRetentionPeriod != nil && *db.BackupRetentionPeriod == 0 {
-			findings = append(findings, wave1Finding(CodeDBINoAutomatedBackups, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBINoAutomatedBackups))
 		}
 		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
-			findings = append(findings, wave1Finding(CodeDBIPubliclyAccessible, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBIPubliclyAccessible))
 		}
 		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
-			findings = append(findings, wave1Finding(CodeDBIUnencryptedStorage, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBIUnencryptedStorage))
 		}
 		if db.DeletionProtection != nil && !*db.DeletionProtection {
-			findings = append(findings, wave1Finding(CodeDBIDeletionProtectionOff, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBIDeletionProtectionOff))
 		}
 		return append(findings, postureFindings...), postureDetails
 	}

@@ -189,7 +189,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 // its actions is). Succeeded/InProgress/Abandoned/unset carry no finding.
 func pipelineActionFindings(status cptypes.ActionExecutionStatus) []domain.Finding {
 	if status == cptypes.ActionExecutionStatusFailed {
-		return []domain.Finding{wave1Finding(CodePipelineActionFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodePipelineActionFailed)}
 	}
 	return nil
 }

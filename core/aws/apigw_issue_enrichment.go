@@ -177,7 +177,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			// Only emitted when stage fetch succeeded (no error, no page cap).
 			// The phrase says there are none; the row says what kind of API
 			// is sitting undeployed, which the phrase cannot.
-			setWave2Finding(&result, apiID, apigwCodeNoDeployedStages, "~", "apigw", []domain.DetailRow{{
+			setWave2Finding(&result, apiID, apigwCodeNoDeployedStages, "apigw", []domain.DetailRow{{
 				Label: "Protocol",
 				Value: strings.ToLower(r.Fields["protocol"]),
 				Tier:  "~",
@@ -188,7 +188,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, "~", "apigw", rows)
+		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, "apigw", rows)
 	})
 	return result, AggregateFailures("authorizers and stages", failures, n)
 }
@@ -207,8 +207,8 @@ type apigwV1API interface {
 // than reporting an API whose posture it could not read as clean.
 func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) error {
 	apiID := r.ID
-	emit := func(code domain.FindingCode, tier string, rows ...domain.DetailRow) {
-		setWave2Finding(result, apiID, code, tier, "apigw", rows)
+	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
+		setWave2Finding(result, apiID, code, "apigw", rows)
 	}
 
 	authorizers, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigateway.GetAuthorizersOutput, error) {
@@ -232,11 +232,11 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 			// The endpoint type is unknown, and the common contract's nil rule
 			// makes an unread field unknown rather than misconfigured.
 		case endpoint == "private":
-			emit(CodeAPIGWNoAuthorizer, "~",
+			emit(CodeAPIGWNoAuthorizer,
 				domain.DetailRow{Label: "Authorizers", Value: "0", Tier: "~"},
 				domain.DetailRow{Label: "Endpoint", Value: endpoint, Tier: "~"})
 		default:
-			emit(CodeAPIGWNoAuthorizerPublic, "!",
+			emit(CodeAPIGWNoAuthorizerPublic,
 				domain.DetailRow{Label: "Authorizers", Value: "0", Tier: "!"},
 				domain.DetailRow{Label: "Endpoint", Value: endpoint, Tier: "!"})
 		}
@@ -251,16 +251,16 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 	for _, st := range stages.Item {
 		name := aws.ToString(st.StageName)
 		if st.AccessLogSettings == nil {
-			emit(CodeAPIGWNoAccessLogs, "~",
+			emit(CodeAPIGWNoAccessLogs,
 				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
 		}
 		if !st.TracingEnabled {
-			emit(CodeAPIGWTracingOff, "~",
+			emit(CodeAPIGWTracingOff,
 				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
 		}
 		// Rows carry where and what kind, never the value itself.
 		if rows := secretScanRows(st.Variables); len(rows) > 0 {
-			emit(CodeAPIGWStageVariableSecret, "!",
+			emit(CodeAPIGWStageVariableSecret,
 				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
 		}
 	}
@@ -293,7 +293,7 @@ func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result 
 		case len(out.Items) > 0:
 			return nil
 		case out.NextToken == nil:
-			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, "~", "apigw", []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: "~"}})
+			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, "apigw", []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: tierOf(CodeAPIGWNoAuthorizer)}})
 			return nil
 		}
 		input.NextToken = out.NextToken

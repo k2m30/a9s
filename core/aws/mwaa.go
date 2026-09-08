@@ -223,7 +223,7 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 			errCode = aws.ToString(env.LastUpdate.Error.ErrorCode)
 			errMessage = aws.ToString(env.LastUpdate.Error.ErrorMessage)
 		}
-		findings = append(findings, wave1Finding(mwaaCodeLastUpdateFailed, domain.SevWarn))
+		findings = append(findings, wave1Finding(mwaaCodeLastUpdateFailed))
 		attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 			mwaaCodeLastUpdateFailed: {
 				Rows: []domain.DetailRow{
@@ -236,7 +236,7 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 
 	switch env.WebserverAccessMode {
 	case mwaatypes.WebserverAccessModePublicOnly, mwaatypes.WebserverAccessModePublicAndPrivate:
-		findings = append(findings, wave1Finding(mwaaCodeWebserverPublic, domain.SevWarn))
+		findings = append(findings, wave1Finding(mwaaCodeWebserverPublic))
 		if attentionDetails == nil {
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{}
 		}
@@ -249,29 +249,29 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 }
 
 // mwaaStateFindings maps Environment.Status to its docs/resources/mwaa.md §4
-// state-bucket Finding. AVAILABLE has no entry (Healthy — no finding).
-var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]stateFinding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
-	mwaatypes.EnvironmentStatusCreating:         {code: mwaaCodeCreating, severity: domain.SevWarn},
-	mwaatypes.EnvironmentStatusCreatingSnapshot: {code: mwaaCodeCreatingSnapshot, severity: domain.SevWarn},
-	mwaatypes.EnvironmentStatusPending:          {code: mwaaCodePending, severity: domain.SevWarn},
-	mwaatypes.EnvironmentStatusUpdating:         {code: mwaaCodeUpdating, severity: domain.SevWarn},
-	mwaatypes.EnvironmentStatusRollingBack:      {code: mwaaCodeRollingBack, severity: domain.SevWarn},
-	mwaatypes.EnvironmentStatusMaintenance:      {code: mwaaCodeMaintenance, severity: domain.SevWarn},
-	mwaatypes.EnvironmentStatusCreateFailed:     {code: mwaaCodeCreateFailed, severity: domain.SevBroken},
-	mwaatypes.EnvironmentStatusUpdateFailed:     {code: mwaaCodeUpdateFailed, severity: domain.SevBroken},
-	mwaatypes.EnvironmentStatusUnavailable:      {code: mwaaCodeUnavailable, severity: domain.SevBroken},
-	mwaatypes.EnvironmentStatusDeleting:         {code: mwaaCodeDeleting, severity: domain.SevDim},
-	mwaatypes.EnvironmentStatusDeleted:          {code: mwaaCodeDeleted, severity: domain.SevDim},
+// state-bucket code. AVAILABLE has no entry (Healthy — no finding).
+var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+	mwaatypes.EnvironmentStatusCreating:         mwaaCodeCreating,
+	mwaatypes.EnvironmentStatusCreatingSnapshot: mwaaCodeCreatingSnapshot,
+	mwaatypes.EnvironmentStatusPending:          mwaaCodePending,
+	mwaatypes.EnvironmentStatusUpdating:         mwaaCodeUpdating,
+	mwaatypes.EnvironmentStatusRollingBack:      mwaaCodeRollingBack,
+	mwaatypes.EnvironmentStatusMaintenance:      mwaaCodeMaintenance,
+	mwaatypes.EnvironmentStatusCreateFailed:     mwaaCodeCreateFailed,
+	mwaatypes.EnvironmentStatusUpdateFailed:     mwaaCodeUpdateFailed,
+	mwaatypes.EnvironmentStatusUnavailable:      mwaaCodeUnavailable,
+	mwaatypes.EnvironmentStatusDeleting:         mwaaCodeDeleting,
+	mwaatypes.EnvironmentStatusDeleted:          mwaaCodeDeleted,
 }
 
 // mwaaStateFinding maps Environment.Status to its docs/resources/mwaa.md §4
 // state-bucket Finding. ok is false for AVAILABLE (Healthy — no finding).
 func mwaaStateFinding(status mwaatypes.EnvironmentStatus) (domain.Finding, bool) {
-	sf, ok := mwaaStateFindings[status]
+	code, ok := mwaaStateFindings[status]
 	if !ok {
 		return domain.Finding{}, false
 	}
-	return wave1Finding(sf.code, sf.severity), true
+	return wave1Finding(code), true
 }
 
 // mwaaUpdateErrorText formats a LastUpdate.Error as a single detail-view

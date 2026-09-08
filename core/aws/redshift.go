@@ -155,15 +155,15 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 		"storage-full":            CodeRedshiftStorageFull,
 	}
 	if code, ok := brokenByStatus[clusterStatus]; ok {
-		return []domain.Finding{wave1Finding(code, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(code)}
 	}
 
 	// Broken: ClusterAvailabilityStatus-driven
 	switch clusterAvailStatus {
 	case "Unavailable":
-		return []domain.Finding{wave1Finding(CodeRedshiftUnavailable, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeRedshiftUnavailable)}
 	case "Failed":
-		return []domain.Finding{wave1Finding(CodeRedshiftFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeRedshiftFailed)}
 	}
 
 	// Transitional (Warning, ClusterStatus-driven)
@@ -176,7 +176,7 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 		"deleting":  CodeRedshiftDeleting,
 	}
 	if code, ok := transitionalByStatus[clusterStatus]; ok {
-		return []domain.Finding{wave1Finding(code, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(code)}
 	}
 
 	// Warning bucket — stack all active warnings
@@ -184,22 +184,22 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 
 	switch clusterAvailStatus {
 	case "Maintenance":
-		findings = append(findings, wave1Finding(CodeRedshiftMaintenance, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeRedshiftMaintenance))
 	case "Modifying":
-		findings = append(findings, wave1Finding(CodeRedshiftAvailabilityModifying, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeRedshiftAvailabilityModifying))
 	}
 
 	if hasPendingRedshiftModifiedValues(cluster.PendingModifiedValues) {
-		findings = append(findings, wave1Finding(CodeRedshiftPendingChange, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeRedshiftPendingChange))
 	}
 	if hasActiveDeferredMaintenanceWindow(cluster.DeferredMaintenanceWindows, time.Now().UTC()) {
-		findings = append(findings, wave1Finding(CodeRedshiftMaintenanceDeferred, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeRedshiftMaintenanceDeferred))
 	}
 	if cluster.PubliclyAccessible != nil && *cluster.PubliclyAccessible {
-		findings = append(findings, wave1Finding(CodeRedshiftPubliclyAccessible, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeRedshiftPubliclyAccessible))
 	}
 	if cluster.Encrypted != nil && !*cluster.Encrypted {
-		findings = append(findings, wave1Finding(CodeRedshiftUnencryptedAtRest, domain.SevWarn))
+		findings = append(findings, wave1Finding(CodeRedshiftUnencryptedAtRest))
 	}
 
 	return findings

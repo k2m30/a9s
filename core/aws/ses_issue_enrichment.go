@@ -58,10 +58,10 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 
 	// Decide the single account-level finding using §4 precedence, then
 	// replicate it onto every identity row.
-	code, severityGlyph, rows, hasFinding := sesAccountFinding(out)
+	code, rows, hasFinding := sesAccountFinding(out)
 	if hasFinding {
 		for _, res := range resources {
-			setWave2Finding(&result, res.ID, code, severityGlyph, "ses", rows)
+			setWave2Finding(&result, res.ID, code, "ses", rows)
 		}
 	}
 
@@ -104,7 +104,7 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		if out.DkimAttributes != nil && out.DkimAttributes.SigningEnabled {
 			return
 		}
-		setWave2Finding(result, r.ID, sesCodeDKIMOff, "~", "ses", []domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: "~"}})
+		setWave2Finding(result, r.ID, sesCodeDKIMOff, "ses", []domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: tierOf(sesCodeDKIMOff)}})
 	})
 	return AggregateFailures("GetEmailIdentity", failures, n)
 }
@@ -115,9 +115,9 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 //
 // U11 contract: phrase is the short S4 phrase only; per-account context lives in
 // rows (Enforcement Status / Sent Last 24h / Max 24h Send). strings.Contains(phrase, rowValue) == false.
-func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, string, []domain.DetailRow, bool) {
+func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, []domain.DetailRow, bool) {
 	if out == nil {
-		return "", "", nil, false
+		return "", nil, false
 	}
 
 	enforcementStatus := ""
@@ -127,11 +127,11 @@ func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, string,
 
 	switch enforcementStatus {
 	case "SHUTDOWN":
-		return sesCodeShutdown, "!", []domain.DetailRow{
+		return sesCodeShutdown, []domain.DetailRow{
 			{Label: "Action", Value: "Open an AWS support case after fixing the underlying issue", Tier: "!"},
 		}, true
 	case "PROBATION":
-		return sesCodeProbation, "!", []domain.DetailRow{
+		return sesCodeProbation, []domain.DetailRow{
 			{Label: "Action", Value: "Reduce bounce/complaint rate before AWS suspends sending", Tier: "!"},
 		}, true
 	}
@@ -143,12 +143,12 @@ func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, string,
 		if sent > 0.8*max {
 			sentStr := strconv.FormatFloat(sent, 'f', -1, 64)
 			maxStr := strconv.FormatFloat(max, 'f', -1, 64)
-			return sesCodeQuota, "~", []domain.DetailRow{
+			return sesCodeQuota, []domain.DetailRow{
 				{Label: "Sent Last 24h", Value: sentStr, Tier: "~"},
 				{Label: "Max 24h Send", Value: maxStr},
 			}, true
 		}
 	}
 
-	return "", "", nil, false
+	return "", nil, false
 }

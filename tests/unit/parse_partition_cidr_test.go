@@ -143,23 +143,30 @@ func parseEKSCluster(t *testing.T, publicAccess bool, cidrs []string) resource.R
 // one open to every IPv4 address, and reporting it as "restricted" tells the
 // operator a narrowing exists that does not.
 func TestEKSPublicEndpoint_OpenIsDecidedByThePrefixNotTheSpelling(t *testing.T) {
-	const code = domain.FindingCode("eks.public-endpoint")
-	const phrase = "cluster endpoint reachable from the internet"
+	const openCode = domain.FindingCode("eks.public-endpoint")
+	const openPhrase = "cluster endpoint reachable from the internet"
+	// Inverted for the spec row that gave severity one owner: the scoped case
+	// is its own code, because it is its own tier and a code declares one.
+	// Do not restore a second severity under eks.public-endpoint.
+	const scopedCode = domain.FindingCode("eks.public-endpoint-restricted")
+	const scopedPhrase = "cluster endpoint reachable from listed networks"
 
 	tests := []struct {
 		name         string
 		cidrs        []string
 		wantWord     string
+		wantCode     domain.FindingCode
+		wantPhrase   string
 		wantSeverity domain.Severity
 	}{
-		{name: "IPv6 default route", cidrs: []string{"::/0"}, wantWord: "open", wantSeverity: domain.SevBroken},
-		{name: "IPv4 default route", cidrs: []string{"0.0.0.0/0"}, wantWord: "open", wantSeverity: domain.SevBroken},
-		{name: "both families open", cidrs: []string{"0.0.0.0/0", "::/0"}, wantWord: "open", wantSeverity: domain.SevBroken},
-		{name: "IPv6 open beside a narrowed IPv4 range", cidrs: []string{"10.0.0.0/8", "::/0"}, wantWord: "open", wantSeverity: domain.SevBroken},
-		{name: "narrowed in both families", cidrs: []string{"10.0.0.0/8", "2001:db8::/32"}, wantWord: "restricted", wantSeverity: domain.SevWarn},
+		{name: "IPv6 default route", cidrs: []string{"::/0"}, wantWord: "open", wantCode: openCode, wantPhrase: openPhrase, wantSeverity: domain.SevBroken},
+		{name: "IPv4 default route", cidrs: []string{"0.0.0.0/0"}, wantWord: "open", wantCode: openCode, wantPhrase: openPhrase, wantSeverity: domain.SevBroken},
+		{name: "both families open", cidrs: []string{"0.0.0.0/0", "::/0"}, wantWord: "open", wantCode: openCode, wantPhrase: openPhrase, wantSeverity: domain.SevBroken},
+		{name: "IPv6 open beside a narrowed IPv4 range", cidrs: []string{"10.0.0.0/8", "::/0"}, wantWord: "open", wantCode: openCode, wantPhrase: openPhrase, wantSeverity: domain.SevBroken},
+		{name: "narrowed in both families", cidrs: []string{"10.0.0.0/8", "2001:db8::/32"}, wantWord: "restricted", wantCode: scopedCode, wantPhrase: scopedPhrase, wantSeverity: domain.SevWarn},
 		// AWS omits the list when it was never narrowed, which is the open
 		// case and is decided at the site, not by the range rule.
-		{name: "AWS omitted the list", cidrs: nil, wantWord: "open", wantSeverity: domain.SevBroken},
+		{name: "AWS omitted the list", cidrs: nil, wantWord: "open", wantCode: openCode, wantPhrase: openPhrase, wantSeverity: domain.SevBroken},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -167,7 +174,7 @@ func TestEKSPublicEndpoint_OpenIsDecidedByThePrefixNotTheSpelling(t *testing.T) 
 			if r.Fields["public_endpoint"] != tc.wantWord {
 				t.Errorf("Fields[public_endpoint] = %q, want %q", r.Fields["public_endpoint"], tc.wantWord)
 			}
-			w4AssertFinding(t, r.Findings, code, phrase, tc.wantSeverity, "wave1")
+			w4AssertFinding(t, r.Findings, tc.wantCode, tc.wantPhrase, tc.wantSeverity, "wave1")
 		})
 	}
 
@@ -177,7 +184,8 @@ func TestEKSPublicEndpoint_OpenIsDecidedByThePrefixNotTheSpelling(t *testing.T) 
 	if private.Fields["public_endpoint"] != "no" {
 		t.Errorf("Fields[public_endpoint] = %q, want %q", private.Fields["public_endpoint"], "no")
 	}
-	w4AssertNoCode(t, private.Findings, code)
+	w4AssertNoCode(t, private.Findings, openCode)
+	w4AssertNoCode(t, private.Findings, scopedCode)
 }
 
 // TestEKSPublicEndpoint_ReachableFromRowNamesTheRangesAWSSent pins the

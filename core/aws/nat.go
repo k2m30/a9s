@@ -114,13 +114,13 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 func natStateFindings(state string) []domain.Finding {
 	switch state {
 	case "pending":
-		return []domain.Finding{wave1Finding(CodeNATStatePending, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeNATStatePending)}
 	case "deleting":
-		return []domain.Finding{wave1Finding(CodeNATStateDeleting, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeNATStateDeleting)}
 	case "failed":
-		return []domain.Finding{wave1Finding(CodeNATStateFailed, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeNATStateFailed)}
 	case "deleted":
-		return []domain.Finding{wave1Finding(CodeNATStateDeleted, domain.SevDim)}
+		return []domain.Finding{wave1Finding(CodeNATStateDeleted)}
 	}
 	return nil
 }

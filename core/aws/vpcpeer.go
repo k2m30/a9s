@@ -136,25 +136,25 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding
 	}
 	switch code {
 	case ec2types.VpcPeeringConnectionStateReasonCodeProvisioning:
-		findings = append(findings, wave1Finding(vpcPeerCodeProvisioning, domain.SevWarn))
+		findings = append(findings, wave1Finding(vpcPeerCodeProvisioning))
 	case ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest:
-		findings = append(findings, wave1Finding(vpcPeerCodeInitiating, domain.SevWarn))
+		findings = append(findings, wave1Finding(vpcPeerCodeInitiating))
 	case ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance:
 		f, rows := vpcPeerPendingAcceptanceFinding(pc.ExpirationTime)
 		findings = append(findings, f)
 		attention[vpcPeerCodePendingAcceptance] = domain.AttentionDetail{Rows: rows}
 	case ec2types.VpcPeeringConnectionStateReasonCodeExpired:
-		findings = append(findings, wave1Finding(vpcPeerCodeExpired, domain.SevWarn))
+		findings = append(findings, wave1Finding(vpcPeerCodeExpired))
 	case ec2types.VpcPeeringConnectionStateReasonCodeRejected:
-		findings = append(findings, wave1Finding(vpcPeerCodeRejected, domain.SevBroken))
+		findings = append(findings, wave1Finding(vpcPeerCodeRejected))
 		statusRow(vpcPeerCodeRejected)
 	case ec2types.VpcPeeringConnectionStateReasonCodeFailed:
-		findings = append(findings, wave1Finding(vpcPeerCodeFailed, domain.SevBroken))
+		findings = append(findings, wave1Finding(vpcPeerCodeFailed))
 		statusRow(vpcPeerCodeFailed)
 	case ec2types.VpcPeeringConnectionStateReasonCodeDeleting:
-		findings = append(findings, wave1Finding(vpcPeerCodeDeleting, domain.SevWarn))
+		findings = append(findings, wave1Finding(vpcPeerCodeDeleting))
 	case ec2types.VpcPeeringConnectionStateReasonCodeDeleted:
-		findings = append(findings, wave1Finding(vpcPeerCodeDeleted, domain.SevDim))
+		findings = append(findings, wave1Finding(vpcPeerCodeDeleted))
 	}
 
 	// CIDR overlap is active-only: CidrBlock/CidrBlockSet are nil for every
@@ -162,7 +162,7 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding
 	// docs/resources/vpc-peer.md §3.1.
 	if code == ec2types.VpcPeeringConnectionStateReasonCodeActive {
 		if ranges, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
-			findings = append(findings, wave1Finding(vpcPeerCodeCidrOverlap, domain.SevWarn))
+			findings = append(findings, wave1Finding(vpcPeerCodeCidrOverlap))
 			attention[vpcPeerCodeCidrOverlap] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Overlapping range", Value: ranges, Tier: "~"}}}
 		}
 	}
@@ -187,7 +187,7 @@ func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []d
 		}
 		rows = []domain.DetailRow{{Label: "Expires", Value: expiration.Format("2006-01-02"), Tier: "~"}}
 	}
-	return wave1Finding(vpcPeerCodePendingAcceptance, domain.SevWarn, strconv.Itoa(days)), rows
+	return wave1Finding(vpcPeerCodePendingAcceptance, strconv.Itoa(days)), rows
 }
 
 // vpcPeerCIDROverlapDetail reports whether any IPv4 prefix in requester's

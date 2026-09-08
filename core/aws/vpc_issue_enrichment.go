@@ -97,7 +97,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		flowLogsVal := "yes"
 		if !hasActive {
 			flowLogsVal = "no"
-			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "~", "vpc", nil)
+			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "vpc", nil)
 		}
 		result.FieldUpdates[vpcID] = map[string]string{
 			"flow_logs": flowLogsVal,

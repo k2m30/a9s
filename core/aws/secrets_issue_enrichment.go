@@ -93,10 +93,10 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		ex := iampolicy.Evaluate(doc, ownAccount)
 		switch {
 		case ex.Public:
-			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, "!", "secrets", publicPolicyRows(ex))
+			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, "secrets", publicPolicyRows(ex))
 
 		case len(ex.CrossAccount) > 0:
-			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, "~", "secrets", crossAccountPolicyRows(ex))
+			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, "secrets", crossAccountPolicyRows(ex))
 
 		}
 	})

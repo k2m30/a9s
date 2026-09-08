@@ -226,9 +226,9 @@ func sgPortsFromRiskSummary(summary string) string {
 func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.Finding {
 	switch {
 	case wideOpen == "true":
-		return []domain.Finding{wave1Finding(sgCodeWideOpen, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(sgCodeWideOpen)}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
-		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, domain.SevBroken, sgPortsSlot(riskSummary))}
+		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, sgPortsSlot(riskSummary))}
 	}
 	return nil
 }
@@ -306,7 +306,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		findings := sgRiskFindings(wideOpen, dangerousCount, riskSummary)
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
 		if sgDefaultAllowsTraffic(sg) {
-			findings = append(findings, wave1Finding(sgCodeDefaultWithRules, domain.SevWarn))
+			findings = append(findings, wave1Finding(sgCodeDefaultWithRules))
 			attentionDetails = map[domain.FindingCode]domain.AttentionDetail{
 				sgCodeDefaultWithRules: {Rows: []domain.DetailRow{
 					{Label: "Ingress rules", Value: strconv.Itoa(len(sg.IpPermissions)), Tier: "~"},

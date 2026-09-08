@@ -70,7 +70,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				if run.ErrorMessage != nil && *run.ErrorMessage != "" {
 					rows = append(rows, domain.DetailRow{Label: "Error", Value: *run.ErrorMessage, Tier: "!"})
 				}
-				setWave2Finding(&result, key, glueCodeLatestRunFailed, "!", "glue", rows, statePhrase)
+				setWave2Finding(&result, key, glueCodeLatestRunFailed, "glue", rows, statePhrase)
 				result.FieldUpdates[key] = map[string]string{"last_run": stateVal}
 			} else {
 				result.FieldUpdates[key] = map[string]string{"last_run": "OK"}

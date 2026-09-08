@@ -100,7 +100,7 @@ func convertEventBridgeTarget(target ebtypes.Target, ruleName, eventBus string) 
 // this is a Wave-1 (no extra API call) structural check.
 func ebRuleTargetFindings(target ebtypes.Target) []domain.Finding {
 	if target.DeadLetterConfig == nil || target.DeadLetterConfig.Arn == nil || *target.DeadLetterConfig.Arn == "" {
-		return []domain.Finding{wave1Finding(CodeEBRuleTargetNoDLQ, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeEBRuleTargetNoDLQ)}
 	}
 	return nil
 }

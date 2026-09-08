@@ -120,22 +120,22 @@ func targetHealthFindings(health, humanizedReason string) []domain.Finding {
 		if phrase == "" {
 			phrase = "unhealthy"
 		}
-		return []domain.Finding{wave1Finding(CodeTGHealthUnhealthy, domain.SevBroken, phrase)}
+		return []domain.Finding{wave1Finding(CodeTGHealthUnhealthy, phrase)}
 	case string(elbv2types.TargetHealthStateEnumUnavailable):
 		if phrase == "" {
 			phrase = "target unavailable"
 		}
-		return []domain.Finding{wave1Finding(CodeTGHealthUnavailable, domain.SevWarn, phrase)}
+		return []domain.Finding{wave1Finding(CodeTGHealthUnavailable, phrase)}
 	case string(elbv2types.TargetHealthStateEnumDraining):
 		if phrase == "" {
 			phrase = "draining"
 		}
-		return []domain.Finding{wave1Finding(CodeTGHealthDraining, domain.SevWarn, phrase)}
+		return []domain.Finding{wave1Finding(CodeTGHealthDraining, phrase)}
 	case string(elbv2types.TargetHealthStateEnumInitial):
 		if phrase == "" {
 			phrase = "initial health check pending"
 		}
-		return []domain.Finding{wave1Finding(CodeTGHealthInitial, domain.SevDim, phrase)}
+		return []domain.Finding{wave1Finding(CodeTGHealthInitial, phrase)}
 	default:
 		return nil
 	}

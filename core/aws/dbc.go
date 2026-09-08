@@ -174,13 +174,13 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 		"incompatible-parameters":             CodeDBCIncompatibleParameters,
 	}
 	if code, ok := brokenCode[status]; ok {
-		lead := []domain.Finding{wave1Finding(code, domain.SevBroken)}
+		lead := []domain.Finding{wave1Finding(code)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
 	// No writer on an available cluster — reads only (Broken; beats warnings).
 	if status == "available" && countWriters(cluster.DBClusterMembers) == 0 {
-		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter, domain.SevBroken)}
+		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
@@ -191,7 +191,7 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 
 	// Transitional statuses.
 	if _, ok := transitionalDBCStatusSet[status]; ok {
-		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, domain.SevWarn, status)}
+		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
@@ -199,19 +199,19 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 	if status == "available" {
 		var findings []domain.Finding
 		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
-			findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff))
 		}
 		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
-			findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest))
 		}
 		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
-			findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups, domain.SevWarn))
+			findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups))
 		}
 		return append(findings, postureFindings...), postureDetails
 	}
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, domain.SevWarn, status)}
+	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
 	return append(lead, postureFindings...), postureDetails
 }
 

@@ -124,20 +124,20 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			continue
 		}
 		if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-			r.Findings = append(r.Findings, wave1Finding(CodeASGLegacyLaunchConfig, domain.SevWarn))
+			r.Findings = append(r.Findings, wave1Finding(CodeASGLegacyLaunchConfig))
 			addWave1Rows(&r, CodeASGLegacyLaunchConfig, domain.DetailRow{
 				Label: "Launch configuration", Value: *asg.LaunchConfigurationName, Tier: "~",
 			})
 		}
 		if len(asg.AvailabilityZones) < 2 {
-			r.Findings = append(r.Findings, wave1Finding(CodeASGSingleAZ, domain.SevWarn))
+			r.Findings = append(r.Findings, wave1Finding(CodeASGSingleAZ))
 			addWave1Rows(&r, CodeASGSingleAZ, domain.DetailRow{
 				Label: "Availability zones", Value: strings.Join(asg.AvailabilityZones, ", "), Tier: "~",
 			})
 		}
 		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&
 			aws.ToString(asg.HealthCheckType) != "ELB" {
-			r.Findings = append(r.Findings, wave1Finding(CodeASGNoELBHealthCheck, domain.SevWarn))
+			r.Findings = append(r.Findings, wave1Finding(CodeASGNoELBHealthCheck))
 			// The API spells the type "EC2"/"ELB"; the row says which check the
 			// group runs, not how the SDK spells it.
 			addWave1Rows(&r, CodeASGNoELBHealthCheck, domain.DetailRow{
@@ -178,17 +178,15 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 func asgHealthFindings(status string, inServiceCount, unhealthyCount, minSize int, suspendedProcesses string) []domain.Finding {
 	switch {
 	case asgDeleting(status):
-		return []domain.Finding{wave1Finding(CodeASGStateDeleting, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeASGStateDeleting)}
 	case inServiceCount < minSize:
-		return []domain.Finding{wave1Finding(CodeASGUnderprovisioned, domain.SevBroken,
-			strconv.Itoa(inServiceCount), strconv.Itoa(minSize))}
+		return []domain.Finding{wave1Finding(CodeASGUnderprovisioned, strconv.Itoa(inServiceCount), strconv.Itoa(minSize))}
 	case unhealthyCount > 0:
-		return []domain.Finding{wave1Finding(CodeASGUnhealthyInstances, domain.SevWarn,
-			strconv.Itoa(unhealthyCount))}
+		return []domain.Finding{wave1Finding(CodeASGUnhealthyInstances, strconv.Itoa(unhealthyCount))}
 	case strings.Contains(suspendedProcesses, "Launch") ||
 		strings.Contains(suspendedProcesses, "Terminate") ||
 		strings.Contains(suspendedProcesses, "HealthCheck"):
-		return []domain.Finding{wave1Finding(CodeASGScalingSuspended, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeASGScalingSuspended)}
 	}
 	return nil
 }

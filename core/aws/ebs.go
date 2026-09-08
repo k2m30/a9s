@@ -298,9 +298,9 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	// error / recoverable / recovering → SevBroken.
 	switch snap.State {
 	case ec2types.SnapshotStatePending:
-		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending, domain.SevWarn)}
+		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending)}
 	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
-		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateError, domain.SevBroken)}
+		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateError)}
 	}
 
 	if len(r.Findings) == 0 {
@@ -326,7 +326,7 @@ const ebsSnapAge = 365 * 24 * time.Hour
 // per-item helper does not have access to.
 func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	if snap.Encrypted == nil || !*snap.Encrypted {
-		return []domain.Finding{wave1Finding(CodeEBSSnapUnencrypted, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeEBSSnapUnencrypted)}
 	}
 	if snap.StartTime != nil {
 		if age := time.Since(*snap.StartTime); age > ebsSnapAge {
@@ -338,7 +338,7 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 				strings.Contains(strings.ToLower(desc), "automated")
 			if isAutomated {
 				days := int(age.Hours() / 24)
-				return []domain.Finding{wave1Finding(CodeEBSSnapAgedAutomated, domain.SevWarn, strconv.Itoa(days))}
+				return []domain.Finding{wave1Finding(CodeEBSSnapAgedAutomated, strconv.Itoa(days))}
 			}
 		}
 	}
@@ -353,22 +353,22 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 func ebsFindings(state, attachedTo, created, encrypted string) []domain.Finding {
 	switch state {
 	case "creating":
-		return []domain.Finding{wave1Finding(CodeEBSStateCreating, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeEBSStateCreating)}
 	case "deleting":
-		return []domain.Finding{wave1Finding(CodeEBSStateDeleting, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeEBSStateDeleting)}
 	case "error":
-		return []domain.Finding{wave1Finding(CodeEBSStateError, domain.SevBroken)}
+		return []domain.Finding{wave1Finding(CodeEBSStateError)}
 	}
 	if state == "available" && attachedTo == "" {
 		if t, err := time.Parse("2006-01-02 15:04", created); err == nil {
 			if age := time.Since(t); age > ebsOrphanAge {
 				days := int(age.Hours() / 24)
-				return []domain.Finding{wave1Finding(CodeEBSOrphanUnattached, domain.SevWarn, strconv.Itoa(days))}
+				return []domain.Finding{wave1Finding(CodeEBSOrphanUnattached, strconv.Itoa(days))}
 			}
 		}
 	}
 	if encrypted == "false" {
-		return []domain.Finding{wave1Finding(CodeEBSUnencrypted, domain.SevWarn)}
+		return []domain.Finding{wave1Finding(CodeEBSUnencrypted)}
 	}
 	return nil
 }

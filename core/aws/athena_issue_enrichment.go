@@ -77,7 +77,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		// No supporting row: the phrase already says the setting is overridable,
 		// and U11 forbids restating it underneath.
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
-			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced, "~", "athena", nil)
+			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced, "athena", nil)
 
 		}
 		// Missing encryption on result configuration is a security concern.
@@ -86,7 +86,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 			if loc := aws.ToString(resultOutputLocation(cfg)); loc != "" {
 				rows = append(rows, domain.DetailRow{Label: "Results written to", Value: loc, Tier: "~"})
 			}
-			setWave2Finding(&result, key, athenaCodeResultsUnencrypted, "~", "athena", rows)
+			setWave2Finding(&result, key, athenaCodeResultsUnencrypted, "athena", rows)
 
 		}
 	})
