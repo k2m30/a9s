@@ -361,8 +361,8 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 // for an enrichment-error FlashIntent, so flash.gen was never bumped — a
 // tick already pending from an EARLIER flash (stamped with the OLD gen)
 // could then clear the brand-new error almost immediately, and no
-// error-history entry was ever recorded (AppendErrorHistoryIntent only
-// fires by routing through Core.HandleFlash). It now bumps m.flash.gen and
+// error-history entry was ever recorded (the entry is made where the flash is
+// applied to the controller, which only the routed path does). It now bumps m.flash.gen and
 // routes through Core.HandleFlash + dispatchHandlerResult — the same path
 // messages.Flash itself takes.
 func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *testing.T) {
@@ -430,7 +430,7 @@ func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *t
 	}
 	afterBang := stripANSI(rootViewContent(m))
 	if strings.Contains(afterBang, "No errors this session") {
-		t.Error("no error-history entry recorded for the enrichment failure — dispatchDetailOpResultIntents must route through Core.HandleFlash (which emits AppendErrorHistoryIntent), not a direct m.flash mutation")
+		t.Error("no error-history entry recorded for the enrichment failure — dispatchDetailOpResultIntents must route through Core.HandleFlash, whose applied FlashIntent is what the controller logs, not a direct m.flash mutation")
 	}
 }
 

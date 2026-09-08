@@ -13,7 +13,7 @@
 //
 // What lives here:
 //
-//	HandleFlash          — flash gen bump + history; schedules ClearFlash tick.
+//	HandleFlash          — flash gen bump; schedules ClearFlash tick.
 //	HandleClearFlash     — flash auto-clear honouring the session-owned gen.
 //	HandleAPIError       — AWS error classification + flash with [code] message.
 //	HandleClientsReady   — clients/identity wiring + post-connect refresh / boot.
@@ -119,14 +119,11 @@ type RegionSelectedEvent struct {
 	NewGen domain.Gen
 }
 
-// HandleFlash bumps the flash generation, appends an error-history entry
-// when the flash carries an error, and schedules the auto-clear tick at
-// the default 2 s window.
+// HandleFlash bumps the flash generation and schedules the auto-clear tick at
+// the default 2 s window. The error-history entry is the controller's, made
+// when it applies the FlashIntent.
 func (c *Core) HandleFlash(ev FlashEvent) ([]UIIntent, []TaskRequest) {
 	intents := []UIIntent{FlashIntent{Text: ev.Text, IsError: ev.IsError}}
-	if ev.IsError {
-		intents = append(intents, appendErrorHistory(ev.Text))
-	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},
 		Payload: FlashTickPayload{Gen: ev.NewGen, Duration: flashDuration},
@@ -148,9 +145,9 @@ func (c *Core) HandleClearFlash(ev ClearFlashEvent) ([]UIIntent, []TaskRequest) 
 	return intents, nil
 }
 
-// HandleAPIError phrases the AWS error through the one formatter, records it
-// to history, clears the active list's loading indicator, and schedules the
-// longer 5 s clear tick used for AWS errors.
+// HandleAPIError phrases the AWS error through the one formatter, clears the
+// active list's loading indicator, and schedules the longer 5 s clear tick
+// used for AWS errors.
 func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 	text := "unknown API error"
 	if ev.Err != nil {
@@ -159,7 +156,6 @@ func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 	}
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},
-		appendErrorHistory(text),
 		ClearActiveListLoadingIntent{Err: text},
 	}
 	tasks := []TaskRequest{{
@@ -190,7 +186,7 @@ func (c *Core) HandleClientsReady(ev ClientsReadyEvent) ([]UIIntent, []TaskReque
 }
 
 // handleClientsReadyFailure rolls Profile / Region back to the captured
-// rollback target, emits the error flash + history entry, schedules the
+// rollback target, emits the error flash, schedules the
 // 5 s clear tick, and — when there are still valid clients (rollback to
 // the old session) — refires identity and availability tasks against the
 // retained transport so the post-rollback UI is consistent.
@@ -208,7 +204,6 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	errText := failureLine("connect", ev.Err, region)
 	intents := []UIIntent{
 		FlashIntent{Text: errText, IsError: true},
-		appendErrorHistory(errText),
 	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},

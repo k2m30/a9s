@@ -68,10 +68,9 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 // repeated calls replace rather than accumulate. A nil finding clears wave-2
 // data. No-op when the top screen is not ScreenDetail.
 //
-// Cursor stability: mirrors DetailModel.SetEnrichmentFinding — computes the old
-// and new attention-prepend sizes and adjusts FieldCursor by the delta so that
-// the cursor continues to point at the same logical field after the Attention
-// block is injected or removed.
+// Cursor stability: an Attention entry the cursor is on is followed by
+// identity, and a content field below the block by the change in the block's
+// size, so the operator keeps their place across an enrichment result.
 func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -374,8 +373,13 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	// truncated-ID set as it is NOW, which the runtime already updated before
 	// this intent, and so describe a block the user never saw.
 	oldPrepend := ds.AttentionPrepend
+	// The entry the cursor is reading, named rather than numbered: the block is
+	// about to be rebuilt and a more severe finding sorts above the ones
+	// already there, so the index moves even though the entry does not.
+	oldCursorKey := c.attentionEntryKeyAt(ds, ds.FieldCursor, oldPrepend)
 
-	// Strip prior wave-2 findings (same strip semantics as DetailModel.SetEnrichmentFinding).
+	// Strip prior wave-2 findings: a second result for this resource replaces
+	// the first rather than accumulating beside it.
 	if len(ds.Findings) > 0 {
 		kept := ds.Findings[:0:0]
 		for _, fi := range ds.Findings {
@@ -407,35 +411,59 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 		}
 	}
 
-	// Adjust FieldCursor by the change in attention-prepend size so the cursor
-	// continues to point at the same logical field (mirrors SetEnrichmentFinding's
-	// snapshot/relocate sequence).
+	// Keep the cursor on what the operator was reading:
 	//
-	// The TUI's SetEnrichmentFinding only relocates the cursor when haveSnapshot=true,
-	// which requires the pre-injection fieldList to be non-empty and the cursor to
-	// point at a non-Attention item. This means:
-	//   1. If cursor was inside the old attention block (< oldPrepend): reset to 0.
+	//   1. If cursor was inside the old attention block (< oldPrepend): follow
+	//      the entry it was on to wherever the rebuild put it, and land on the
+	//      section header only when that entry is gone.
 	//   2. If cursor was in content (>= oldPrepend): shift by delta, but only when
-	//      content items actually exist after injection — mirrors haveSnapshot=false
-	//      for resources with no content fields (empty resource).
+	//      content items actually exist after injection — mirrors the empty-resource
+	//      case, a resource with no content fields at all.
 	// Building the new layout is what re-records ds.AttentionPrepend, so this
 	// one build supplies both the new prepend size and the new item total.
-	newTotalItems := len(c.buildDetailFieldItems(ds))
+	newItems := c.buildDetailFieldItems(ds)
+	newTotalItems := len(newItems)
 	newPrepend := ds.AttentionPrepend
-	if newPrepend != oldPrepend {
-		if ds.FieldCursor < oldPrepend {
-			// Cursor was inside the old attention block — land on new section header.
-			ds.FieldCursor = 0
-		} else {
-			// Cursor was pointing at a content item; shift it to track the same item
-			// in the new layout. Skip if no content exists beyond the attention block
-			// (empty resource case), matching SetEnrichmentFinding's haveSnapshot=false.
-			if adjusted := ds.FieldCursor - oldPrepend + newPrepend; adjusted < newTotalItems {
-				ds.FieldCursor = adjusted
+	switch {
+	case ds.FieldCursor < oldPrepend:
+		// Inside the block, whether or not the block changed length: a finding
+		// that outranks the ones already there sorts above them and moves every
+		// entry below it down, at a length the block can arrive at two ways.
+		ds.FieldCursor = 0
+		for i := 0; i < newPrepend && i < newTotalItems; i++ {
+			if oldCursorKey != "" && newItems[i].Key == oldCursorKey {
+				ds.FieldCursor = i
+				break
 			}
-			// else: only attention items, no content — cursor stays at 0.
+		}
+	case newPrepend != oldPrepend:
+		// Cursor was pointing at a content item; shift it to track the same item
+		// in the new layout. Skip if no content exists beyond the attention block
+		// (empty resource case), the same no-content case the cursor stays at 0 for.
+		if adjusted := ds.FieldCursor - oldPrepend + newPrepend; adjusted < newTotalItems {
+			ds.FieldCursor = adjusted
 		}
 	}
+}
+
+// attentionEntryKeyAt names the Attention item at cursor in the block whose
+// size the last build recorded as prepend, or "" when the cursor is outside
+// that block or the block cannot be reproduced. Reproducing it means building
+// it again from the state the cursor was positioned against; a rebuild of a
+// different size is a block the operator never saw, and it is not used.
+// Callers must hold c.mu (write) — the rebuild writes ds.AttentionPrepend,
+// which is restored here.
+func (c *Controller) attentionEntryKeyAt(ds *DetailState, cursor, prepend int) string {
+	if cursor <= 0 || cursor >= prepend {
+		return ""
+	}
+	saved := ds.AttentionPrepend
+	block := injectAttentionSectionDetail(nil, ds, resource.FindResourceType(ds.ResourceType), c.detailNotInspected(ds))
+	ds.AttentionPrepend = saved
+	if len(block) != prepend {
+		return ""
+	}
+	return block[cursor].Key
 }
 
 // ApplyDetailRelated replaces the RelatedRows slice on the top detail screen's

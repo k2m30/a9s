@@ -9,7 +9,7 @@
 //     adapters in app_flash.go and app_session.go) AND any future
 //     handler that wires through this file. It mutates the *Model in
 //     place (flash state, showErrorHint, …), forwards to the controller
-//     where the controller is the source of truth (AppendErrorHistoryIntent),
+//     where the controller is the source of truth (FlashIntent),
 //     and returns a single tea.Cmd for intents that need follow-up work,
 //     such as RefreshActiveListIntent.
 //
@@ -38,9 +38,9 @@ import (
 // Model state. Returns a tea.Cmd when the intent triggers follow-up
 // work (e.g. RefreshActiveListIntent), nil otherwise.
 //
-// FlashIntent is applied DIRECTLY here (set flashState text/isError/active)
-// rather than being dispatched back as messages.Flash the way app.go's
-// multi-intent applyIntents path does. The per-handler adapters in
+// FlashIntent's renderer half is applied DIRECTLY here (set flashState
+// text/isError/active) rather than being dispatched back as messages.Flash the
+// way app.go's multi-intent applyIntents path does. The per-handler adapters in
 // app_flash.go / app_session.go pre-bump m.flash.gen before invoking the
 // Core, so by the time we get here the gen is already in sync with the
 // FlashTickPayload the Core returned.
@@ -55,15 +55,26 @@ import (
 // and the renderer stack must be a strict mirror (see StackInSync in
 // app_stack_invariant.go).
 //
-// AppendErrorHistoryIntent also forwards to m.ctrl.ApplyIntents (single-intent
-// slice, not the caller's whole batch) so the controller's errorHistory stays
-// in sync with this adapter's — see that case for why a single-intent forward
-// is safe here where a blanket forward of the whole intents slice would not be.
+// FlashIntent also forwards to m.ctrl.ApplyIntents (single-intent slice, not
+// the caller's whole batch) so the controller records the session error-log
+// entry — see that case for why a single-intent forward is safe here where a
+// blanket forward of the whole intents slice would not be.
 //
 // Unknown intent types are silently dropped for forward compatibility.
 func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	switch v := intent.(type) {
 	case runtime.FlashIntent:
+		// Controller first: it is the single source of truth for the session
+		// error log, and it makes that entry when it applies an error flash.
+		// The two bulk-forward sites (app_dispatch.go's applyIntents,
+		// runtime_adapter_resources.go's dispatchDetailOpResultIntents)
+		// therefore withhold FlashIntent from their forward and re-emit it
+		// through handleFlash, which lands back here — one application per
+		// flash, one entry.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
+		if v.LogOnly {
+			break
+		}
 		m.flash.text = v.Text
 		m.flash.isError = v.IsError
 		m.flash.active = true
@@ -71,16 +82,6 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		m.flash.active = false
 	case runtime.SetErrorHintIntent:
 		m.showErrorHint = v.Show
-	case runtime.AppendErrorHistoryIntent:
-		// The controller (core/app/controller.go) is the single source of
-		// truth for session error history as of goal-4 wave 4a — Header.
-		// ErrorHintVisible, HasErrorHistory, and the ctrl-backed ScreenErrorLog
-		// text screen all read c.errorHistory. This adapter has no local copy to
-		// update; forward only this single-intent slice (rather than the whole
-		// `intents` slice dispatchHandlerResult received) to avoid double-applying
-		// PopSelectorIntent/PushScreen/PopScreen, whose controller-first forwards
-		// are handled by their own cases below.
-		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 	case runtime.ClearActiveListLoadingIntent:
 		if m.activeRS().kind == rsKindList {
 			m.ctrl.ClearListLoading()

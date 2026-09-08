@@ -56,16 +56,6 @@ func findSetErrorHint(xs []UIIntent) (SetErrorHintIntent, bool) {
 	return SetErrorHintIntent{}, false
 }
 
-// findAppendErrorHistory returns true when xs contains AppendErrorHistoryIntent.
-func findAppendErrorHistory(xs []UIIntent) bool {
-	for _, x := range xs {
-		if _, ok := x.(AppendErrorHistoryIntent); ok {
-			return true
-		}
-	}
-	return false
-}
-
 // findClearActiveListLoading returns true when xs contains ClearActiveListLoadingIntent.
 func findClearActiveListLoading(xs []UIIntent) bool {
 	for _, x := range xs {
@@ -140,8 +130,8 @@ func findConnectPayload(tasks []TaskRequest) (ConnectPayload, bool) {
 
 // ---- HandleFlash tests -----------------------------------------------------
 
-// TestHandleFlash_NotError: IsError=false → single FlashIntent, no
-// AppendErrorHistoryIntent, one FlashTick with the right gen and 2 s duration.
+// TestHandleFlash_NotError: IsError=false → single FlashIntent, one FlashTick
+// with the right gen and 2 s duration.
 func TestHandleFlash_NotError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleFlash(FlashEvent{Text: "hello", IsError: false, NewGen: 3})
@@ -158,11 +148,6 @@ func TestHandleFlash_NotError(t *testing.T) {
 		t.Error("FlashIntent.IsError = true, want false")
 	}
 
-	// no AppendErrorHistoryIntent
-	if findAppendErrorHistory(intents) {
-		t.Error("unexpected AppendErrorHistoryIntent for non-error flash")
-	}
-
 	// FlashTick with correct gen and 2 s
 	tick, ok := findFlashTick(tasks)
 	if !ok {
@@ -176,8 +161,13 @@ func TestHandleFlash_NotError(t *testing.T) {
 	}
 }
 
-// TestHandleFlash_IsError: IsError=true → FlashIntent + AppendErrorHistoryIntent
-// + FlashTick with 2 s.
+// TestHandleFlash_IsError: IsError=true → FlashIntent + FlashTick with 2 s.
+//
+// INVERTED by spec row 1 (task "boundary"): the handler used to emit a second,
+// history-carrying intent beside the flash, which is what let the two hosts
+// disagree about whether a failure was logged. The error flash is now the
+// record, and the entry is made where the flash is applied. Do not restore an
+// assertion that a separate history intent is emitted here.
 func TestHandleFlash_IsError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleFlash(FlashEvent{Text: "bad thing", IsError: true, NewGen: 7})
@@ -191,10 +181,6 @@ func TestHandleFlash_IsError(t *testing.T) {
 	}
 	if !fi.IsError {
 		t.Error("FlashIntent.IsError = false, want true")
-	}
-
-	if !findAppendErrorHistory(intents) {
-		t.Error("expected AppendErrorHistoryIntent for error flash, got none")
 	}
 
 	tick, ok := findFlashTick(tasks)
@@ -281,9 +267,6 @@ func TestHandleAPIError_UnknownError(t *testing.T) {
 		t.Error("FlashIntent.IsError = false, want true")
 	}
 
-	if !findAppendErrorHistory(intents) {
-		t.Error("expected AppendErrorHistoryIntent")
-	}
 	if !findClearActiveListLoading(intents) {
 		t.Error("expected ClearActiveListLoadingIntent")
 	}
@@ -301,16 +284,17 @@ func TestHandleAPIError_UnknownError(t *testing.T) {
 }
 
 // TestHandleAPIError_AlwaysEmitsThreeIntents: regardless of error type, the
-// three mandatory intents must always be present.
+// mandatory intents must always be present.
+//
+// INVERTED by spec row 1 (task "boundary"): the history intent this used to
+// count is gone — an error flash IS the history entry, made where it is
+// applied. Do not restore it.
 func TestHandleAPIError_AlwaysEmitsThreeIntents(t *testing.T) {
 	c := newCore()
 	intents, _ := c.HandleAPIError(APIErrorEvent{Err: errors.New("any"), NewGen: 1})
 
 	if _, ok := findFlashIntent(intents); !ok {
 		t.Error("missing FlashIntent")
-	}
-	if !findAppendErrorHistory(intents) {
-		t.Error("missing AppendErrorHistoryIntent")
 	}
 	if !findClearActiveListLoading(intents) {
 		t.Error("missing ClearActiveListLoadingIntent")
@@ -388,7 +372,7 @@ func TestHandleClientsReady_Failure_RollsBackPrevState(t *testing.T) {
 }
 
 // TestHandleClientsReady_Failure_EmitsErrorIntents: failure path emits
-// FlashIntent(IsError=true) + AppendErrorHistoryIntent + FlashTick(5s).
+// FlashIntent(IsError=true) + FlashTick(5s).
 func TestHandleClientsReady_Failure_EmitsErrorIntents(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -414,10 +398,6 @@ func TestHandleClientsReady_Failure_EmitsErrorIntents(t *testing.T) {
 	if fi.Text != "connect: no route to host" {
 		t.Errorf("FlashIntent.Text = %q, want %q", fi.Text, "connect: no route to host")
 	}
-	if !findAppendErrorHistory(intents) {
-		t.Error("expected AppendErrorHistoryIntent")
-	}
-
 	tick, ok := findFlashTick(tasks)
 	if !ok {
 		t.Fatal("expected FlashTickPayload task")
@@ -1132,6 +1112,3 @@ func TestHandleClientsReady_StaleGen_ReturnsEmpty(t *testing.T) {
 		t.Errorf("stale Gen must return empty tasks, got %d", len(tasks))
 	}
 }
-
-// Sentinel to ensure the time import is used (AppendErrorHistoryIntent carries time.Time).
-var _ = time.Now

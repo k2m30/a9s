@@ -309,7 +309,11 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 	// rows already render with their degraded-state findings; a blocking
 	// banner would double-shout what the list is honestly showing.
 	if msg.PrefetchSoftErr != nil {
-		intents = append(intents, appendErrorHistory(failureLine("availability", msg.PrefetchSoftErr, region)))
+		intents = append(intents, FlashIntent{
+			Text:    failureLine("availability", msg.PrefetchSoftErr, region),
+			IsError: true,
+			LogOnly: true,
+		})
 	}
 
 	return intents, enrichTasks
@@ -390,11 +394,9 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// guards against a type's AvailabilityChecked message being delivered
 	// more than once within the same sweep — a pre-existing double-delivery
 	// path elsewhere in dispatch — re-adding the entry or re-flashing the
-	// banner on the redundant delivery. The banner branch's FlashIntent is
-	// the ONLY source of that branch's entry (the adapter re-emits it as
-	// messages.Flash, which routes through HandleFlash and appends the
-	// history entry there — see runtime_adapter.go's applyIntents), so
-	// gating that emission on the guard is sufficient to gate the entry too.
+	// banner on the redundant delivery. Both branches below emit one
+	// FlashIntent and the entry is made where that intent is applied, so
+	// gating the emission on the guard gates the entry too.
 	if msg.Err != nil && !c.session.ScanHealthLogged[msg.ResourceType] {
 		if c.session.ScanHealthLogged == nil {
 			c.session.ScanHealthLogged = make(map[string]bool)
@@ -405,7 +407,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		_, region := c.session.CurrentPair()
 		line := failureLine("availability "+msg.ResourceType, msg.Err, region)
 		if softFailure(msg.Err, len(msg.Resources) > 0) {
-			intents = append(intents, appendErrorHistory(line))
+			intents = append(intents, FlashIntent{Text: line, IsError: true, LogOnly: true})
 		} else {
 			intents = append(intents, FlashIntent{Text: line, IsError: true})
 			raisedBanner = true

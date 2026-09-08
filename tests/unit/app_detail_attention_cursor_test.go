@@ -219,3 +219,150 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo
 		)
 	}
 }
+
+// TestApplyDetailFinding_CursorFollowsItsAttentionEntry pins the third case of
+// the same class, from the other side of the block: a cursor INSIDE the
+// Attention block used to be sent back to the section header whenever the
+// block changed, so an operator reading the second finding lost their place
+// the moment an enrichment result arrived. The entry the cursor is on is the
+// thing to keep, and it is still there — it has only moved down to make room
+// for a more severe one.
+func TestApplyDetailFinding_CursorFollowsItsAttentionEntry(t *testing.T) {
+	const secondPhrase = "public ingress on port 22 from 0.0.0.0/0"
+	res := resource.Resource{
+		ID:   "i-0bbb222222222222b",
+		Name: "batch-runner",
+		Type: "ec2",
+		Fields: map[string]string{
+			"instance_id": "i-0bbb222222222222b",
+			"state":       "running",
+		},
+		Findings: []domain.Finding{
+			{
+				Code:     "ec2.long-stopped",
+				Phrase:   "instance stopped 42d ago",
+				Detail:   "Instance stopped more than 30 days ago — review whether it is still needed.",
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			},
+			{
+				Code:     "ec2.open-ssh",
+				Phrase:   secondPhrase,
+				Detail:   "A security group attached to this instance allows SSH from the whole internet.",
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			},
+		},
+	}
+
+	c := newAttentionCursorController(t, res, "ec2")
+
+	// Walk the cursor down onto the second Attention entry's own line.
+	preCursor := -1
+	for step := 0; step < 40; step++ {
+		body := c.Snapshot().Body.Detail
+		if body == nil {
+			t.Fatal("precondition: Body.Detail is nil")
+		}
+		if row := fieldRowAt(t, body, body.FieldCursor); row.Path == "Attention" && row.Key == secondPhrase {
+			preCursor = body.FieldCursor
+			break
+		}
+		c.Apply(app.Action{Kind: app.ActionMoveDown})
+	}
+	if preCursor < 0 {
+		t.Fatalf("precondition: never reached the second Attention entry %q with the cursor", secondPhrase)
+	}
+
+	// A more severe finding lands and sorts above both warnings, pushing the
+	// entry the cursor is on one row further down.
+	c.ApplyDetailFinding(&domain.Finding{
+		Code:     "ec2.instance-status-impaired",
+		Phrase:   "impaired: system checks failing",
+		Severity: domain.SevBroken,
+		Source:   "wave2:ec2",
+	}, nil)
+
+	after := c.Snapshot().Body.Detail
+	postRow := fieldRowAt(t, after, after.FieldCursor)
+	if postRow.Path != "Attention" || postRow.Key != secondPhrase {
+		t.Errorf(
+			"the cursor left the entry the operator was reading when a new finding arrived above it:\n"+
+				"  before: FieldCursor=%d Key=%q\n"+
+				"  after:  FieldCursor=%d Key=%q Path=%q\n"+
+				"want the cursor still on %q.",
+			preCursor, secondPhrase,
+			after.FieldCursor, postRow.Key, postRow.Path, secondPhrase,
+		)
+	}
+}
+
+// TestApplyDetailFinding_CursorFollowsItsEntryWhenTheBlockOnlyReorders is the
+// same rule at the size that hides it: a wave-2 finding replaced by a more
+// severe one of the same shape leaves the block exactly as long as it was, and
+// sorts to the top, so every entry below it moves down one row while the block
+// size says nothing changed. A cursor kept by index reads a different finding
+// than the one the operator was on.
+func TestApplyDetailFinding_CursorFollowsItsEntryWhenTheBlockOnlyReorders(t *testing.T) {
+	const secondPhrase = "public ingress on port 22 from 0.0.0.0/0"
+	res := resource.Resource{
+		ID:   "i-0ccc333333333333c",
+		Name: "queue-worker",
+		Type: "ec2",
+		Fields: map[string]string{
+			"instance_id": "i-0ccc333333333333c",
+			"state":       "running",
+		},
+		Findings: []domain.Finding{
+			{Code: "ec2.long-stopped", Phrase: "instance stopped 42d ago", Detail: "Stopped for a long time.", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: "ec2.open-ssh", Phrase: secondPhrase, Detail: "SSH is open to the internet.", Severity: domain.SevWarn, Source: "wave1"},
+		},
+	}
+
+	c := newAttentionCursorController(t, res, "ec2")
+
+	seekAttentionEntry := func() int {
+		for step := 0; step < 40; step++ {
+			body := c.Snapshot().Body.Detail
+			if body == nil {
+				t.Fatal("precondition: Body.Detail is nil")
+			}
+			if row := fieldRowAt(t, body, body.FieldCursor); row.Path == "Attention" && row.Key == secondPhrase {
+				return body.FieldCursor
+			}
+			c.Apply(app.Action{Kind: app.ActionMoveDown})
+		}
+		t.Fatalf("precondition: never reached the Attention entry %q with the cursor", secondPhrase)
+		return -1
+	}
+
+	preCursor := seekAttentionEntry()
+	// A wave-2 warning of the same shape as the broken finding that replaces
+	// it below: one phrase line, one detail line, sorted after the warnings.
+	c.ApplyDetailFinding(&domain.Finding{
+		Code: "ec2.slow-disk", Phrase: "volume queue depth is high", Detail: "One sentence.",
+		Severity: domain.SevWarn, Source: "wave2:ec2",
+	}, nil)
+	beforePrepend := len(c.Snapshot().Body.Detail.Fields)
+
+	c.ApplyDetailFinding(&domain.Finding{
+		Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing", Detail: "One sentence.",
+		Severity: domain.SevBroken, Source: "wave2:ec2",
+	}, nil)
+
+	after := c.Snapshot().Body.Detail
+	if len(after.Fields) != beforePrepend {
+		t.Fatalf("fixture no longer holds the block length constant (%d then %d) — the reorder-only case is what this pins", beforePrepend, len(after.Fields))
+	}
+	postRow := fieldRowAt(t, after, after.FieldCursor)
+	if postRow.Path != "Attention" || postRow.Key != secondPhrase {
+		t.Errorf(
+			"the block reordered without changing length and the cursor kept its index instead of its entry:\n"+
+				"  before: FieldCursor=%d Key=%q\n"+
+				"  after:  FieldCursor=%d Key=%q Path=%q\n"+
+				"want the cursor still on %q.",
+			preCursor, secondPhrase,
+			after.FieldCursor, postRow.Key, postRow.Path, secondPhrase,
+		)
+	}
+}

@@ -237,6 +237,20 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			c.identityErrMsg = ""
 
 		case runtime.FlashIntent:
+			// The one place a failure becomes a session record. Every host
+			// applies its flashes here, so which host is rendering cannot
+			// decide whether the operator can still read the failure after the
+			// banner has gone. A log-only flash skips the banner and keeps the
+			// entry; a non-error flash is neither.
+			if v.IsError {
+				c.errorHistory = append(c.errorHistory, controllerErrorEntry{
+					t:       Now(),
+					message: v.Text,
+				})
+			}
+			if v.LogOnly {
+				break
+			}
 			// Surface the transient notification (e.g. the API-error flash from
 			// HandleAPIError) as Header.Flash; cleared at the start of the next Apply.
 			c.flash = Flash{Text: v.Text, IsError: v.IsError}
@@ -261,12 +275,6 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 
 		case runtime.SetErrorHintIntent:
 			c.showErrorHint = v.Show
-
-		case runtime.AppendErrorHistoryIntent:
-			c.errorHistory = append(c.errorHistory, controllerErrorEntry{
-				t:       v.Time,
-				message: v.Message,
-			})
 
 		case runtime.PatchResourceCache:
 			c.core.SetResourceCache(v.ResourceType, v.Entry)

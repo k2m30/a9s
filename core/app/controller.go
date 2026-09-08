@@ -121,7 +121,7 @@ type Controller struct {
 	// the start of each user Apply so it persists until the next action.
 	flash Flash
 
-	// errorHistory records each error entry appended via AppendErrorHistoryIntent.
+	// errorHistory records one entry per error flash the controller applies.
 	// The '!' / open-error-log action renders these newest-first as a text screen.
 	errorHistory []controllerErrorEntry
 

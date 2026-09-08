@@ -54,9 +54,9 @@
 //     "mirror the headless applyIntents case"). TestErrorLog_TUIViewMatches
 //     ControllerErrorHistoryExactCount drives messages.APIError through the
 //     TUI's real Update() loop (which appends to m.errorHistory via
-//     m.core.HandleAPIError -> AppendErrorHistoryIntent) and asserts the '!'
+//     m.core.HandleAPIError -> an applied error FlashIntent) and asserts the '!'
 //     overlay's rendered line count exactly matches the number of
-//     AppendErrorHistoryIntent-shaped events dispatched — a resurrected or
+//     error-flash events dispatched — a resurrected or
 //     drifted dual-store (e.g. one store double-appending, or the collapse
 //     wiring the '!' key to a stale/partial source) would produce a mismatch.
 //
@@ -276,7 +276,7 @@ func TestOverlayParity_ErrorLog_NoErrors_RoundTripStaysInSync(t *testing.T) {
 
 // TestErrorLog_TUIViewMatchesControllerErrorHistoryExactCount drives N
 // distinct messages.APIError events through the TUI's real Update() loop
-// (each appends one AppendErrorHistoryIntent-derived entry to BOTH
+// (each appends one error-flash-derived entry to BOTH
 // m.errorHistory, the TUI-local store, and — via the same Core.HandleAPIError
 // call — whatever store the post-refactor '!' overlay is wired to read from)
 // then opens the '!' overlay and asserts the rendered line count is EXACTLY N,

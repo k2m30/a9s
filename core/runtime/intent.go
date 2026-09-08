@@ -3,8 +3,6 @@
 package runtime
 
 import (
-	"time"
-
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -223,10 +221,18 @@ type PatchMenuEnrichProgress struct {
 
 func (PatchMenuEnrichProgress) isIntent() {}
 
-// FlashIntent emits a transient notification to the adapter's status bar.
+// FlashIntent emits a transient notification to the adapter's status bar. An
+// error flash is also the session's record of the failure: the controller
+// writes the "!" log entry when it applies one, so a failure cannot be
+// announced on one host and forgotten on another.
 type FlashIntent struct {
 	Text    string
 	IsError bool
+	// LogOnly asks for the log entry without the banner. A failure whose rows
+	// are already on screen saying what they are — a partial batch, a region
+	// gap — has nothing a banner can add, but it is still a failure the
+	// operator can go and read.
+	LogOnly bool
 }
 
 func (FlashIntent) isIntent() {}
@@ -244,17 +250,6 @@ type SetErrorHintIntent struct {
 }
 
 func (SetErrorHintIntent) isIntent() {}
-
-// AppendErrorHistoryIntent appends one entry to the adapter's per-session
-// error log used by the `!` overlay. HandleFlash / HandleAPIError /
-// HandleClientsReady emit this in error paths so the history matches the
-// flash text the user saw.
-type AppendErrorHistoryIntent struct {
-	Time    time.Time
-	Message string
-}
-
-func (AppendErrorHistoryIntent) isIntent() {}
 
 // ClearActiveListLoadingIntent tells the adapter to clear the loading
 // indicator on the currently-active resource-list view (if any). Emitted by

@@ -4,14 +4,11 @@ package app
 
 import (
 	"context"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -149,17 +146,13 @@ func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *Li
 			return sortStrings(a.Fields[col.SortKey], b.Fields[col.SortKey], sortAsc)
 		}
 
-		// Raw struct comparison (numeric/time) when a path is present.
-		if col.Path != "" && a.RawStruct != nil && b.RawStruct != nil {
-			if cmp, ok := listCompareRaw(a.RawStruct, b.RawStruct, col.Path); ok {
-				if sortAsc {
-					return cmp < 0
-				}
-				return cmp > 0
-			}
-		}
-
-		// Display-value fallback.
+		// The cell, on every frame. A live row still carries its SDK struct and
+		// a replayed one does not, so a comparator that read the struct where
+		// it was there answered from a representation the cached frame cannot
+		// reach — and the list re-ordered under the operator the moment the
+		// fetch landed. sortStrings reads a number as a number, so the orders
+		// a struct comparison used to add are the ones the cache cannot
+		// express anyway.
 		return sortStrings(ExtractCellValue(col, td, a), ExtractCellValue(col, td, b), sortAsc)
 	})
 	return out
@@ -181,61 +174,6 @@ func sortStrings(va, vb string, asc bool) bool {
 		return va < vb
 	}
 	return va > vb
-}
-
-// listCompareRaw compares one RawStruct path across two rows numerically or
-// chronologically, reporting false when either side cannot be read.
-func listCompareRaw(a, b any, path string) (int, bool) {
-	va, errA := fieldpath.ExtractValue(a, path)
-	vb, errB := fieldpath.ExtractValue(b, path)
-	if errA != nil || errB != nil {
-		return 0, false
-	}
-	// Dereference pointers.
-	for va.Kind() == reflect.Pointer {
-		if va.IsNil() {
-			return 0, false
-		}
-		va = va.Elem()
-	}
-	for vb.Kind() == reflect.Pointer {
-		if vb.IsNil() {
-			return 0, false
-		}
-		vb = vb.Elem()
-	}
-	// time.Time comparison.
-	if va.Type() == reflect.TypeFor[time.Time]() && vb.Type() == reflect.TypeFor[time.Time]() {
-		return va.Interface().(time.Time).Compare(vb.Interface().(time.Time)), true
-	}
-	// Numeric comparison.
-	fa, okA := listToFloat(va)
-	fb, okB := listToFloat(vb)
-	if okA && okB {
-		if fa < fb {
-			return -1, true
-		}
-		if fa > fb {
-			return 1, true
-		}
-		return 0, true
-	}
-	return 0, false
-}
-
-// listToFloat reads a reflected value as a float when it is a number, a time
-// or a duration, so listCompareRaw can order it.
-func listToFloat(v reflect.Value) (float64, bool) {
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return float64(v.Int()), true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return float64(v.Uint()), true
-	case reflect.Float32, reflect.Float64:
-		return v.Float(), true
-	default:
-		return 0, false
-	}
 }
 
 // reapplyCheckerAgainst re-runs THIS list screen's own reapply checker against

@@ -32,7 +32,8 @@ import (
 // follow-up tea.Cmds the intents themselves require (flash re-emit,
 // screen-builder closures, theme-apply errors).
 //
-// The ENTIRE slice is forwarded to m.ctrl.ApplyIntents in one call, first —
+// The slice is forwarded to m.ctrl.ApplyIntents in one call, first, minus the
+// FlashIntents the local switch re-emits (see withoutBannerFlashes) —
 // the controller (core/app/intents.go) is the single source of truth for
 // every intent it knows about (menu/list/enrichment patches, stack ops,
 // identity, flash, error-log, and the cache-cross-write intents
@@ -48,18 +49,23 @@ import (
 // already applied. See each case comment for which half is being applied
 // here to avoid double-application.
 func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
-	m.ctrl.ApplyIntents(intents)
+	m.ctrl.ApplyIntents(withoutBannerFlashes(intents))
 
 	var cmds []tea.Cmd
 	for _, intent := range intents {
 		switch v := intent.(type) {
 		case runtime.FlashIntent:
+			if v.LogOnly {
+				// No banner to raise, so nothing to re-emit: the forward above
+				// carried it to the controller, which made the log entry.
+				break
+			}
 			// Re-emit as messages.Flash so the flash routes through
-			// HandleFlash and picks up the auto-clear tick + history
-			// entry. The controller half (c.flash, used by the web renderer's
-			// snapshot) was already set by the forward above. The h3
-			// direct-mutate path is in runtime_adapter.go's applyIntent
-			// (singular) used by dispatchHandlerResult only.
+			// HandleFlash and picks up the auto-clear tick. That route ends in
+			// runtime_adapter.go's applyIntent (singular), which forwards the
+			// flash to the controller — hence withoutBannerFlashes above: a
+			// flash forwarded here as well would be applied twice, and the
+			// controller records one error-log entry per application.
 			text, isErr := v.Text, v.IsError
 			cmds = append(cmds, func() tea.Msg {
 				return messages.Flash{Text: text, IsError: isErr}
@@ -371,4 +377,21 @@ func (m Model) coreUpdate(msg messages.Event) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tc)
 	}
 	return m, tea.Batch(cmds...)
+}
+
+// withoutBannerFlashes returns intents minus the flashes that raise a banner.
+// Both bulk-forward sites re-emit those through handleFlash, whose own
+// application reaches the controller; forwarding them here as well would apply
+// each flash to the controller twice, and one flash owes the session exactly
+// one error-log entry. A log-only flash is never re-emitted, so it stays in
+// the forward — that is the only place it is ever applied.
+func withoutBannerFlashes(intents []runtime.UIIntent) []runtime.UIIntent {
+	out := make([]runtime.UIIntent, 0, len(intents))
+	for _, in := range intents {
+		if fi, isFlash := in.(runtime.FlashIntent); isFlash && !fi.LogOnly {
+			continue
+		}
+		out = append(out, in)
+	}
+	return out
 }

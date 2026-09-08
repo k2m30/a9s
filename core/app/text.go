@@ -191,8 +191,8 @@ func (c *Controller) TextFrameTitle() string {
 // format the TUI's error-log viewer (! key) has always shown. Used to seed
 // ScreenErrorLog's TextState via EnsureTextState so the error-log screen
 // renders from Snapshot().Body.Text like every other ctrl-backed text screen,
-// with the controller's errorHistory as the single source of truth (goal-4
-// wave 4a — see AppendErrorHistoryIntent in intents.go for how entries land).
+// with the controller's errorHistory as the single source of truth — see the
+// FlashIntent case in intents.go for how entries land.
 func (c *Controller) ErrorHistoryLines() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

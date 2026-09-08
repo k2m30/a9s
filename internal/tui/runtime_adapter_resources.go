@@ -295,24 +295,25 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 // three and would silently drop them, since its only callers today — the 6
 // ported handlers in app_flash.go/app_session.go — never emit them).
 //
-// Any FlashIntent present is then routed through the SAME path
-// messages.Flash takes (handleFlash, app_flash.go), not direct-mutated: this
-// bumps m.flash.gen before rendering the new text, so an auto-clear tick
-// already in flight for a PREVIOUS flash (which still carries the
-// pre-bump gen) cannot match the new one and clear it early; it also
-// produces the AppendErrorHistoryIntent and schedules this flash's own
-// FlashTickPayload auto-clear tick, both of which a direct field mutation
-// skipped entirely — the two ported handlers here are the only Handle*
-// callers that construct a FlashIntent without ever going through
-// handleFlash, so this is the one seam that needs to call out to it. Calls
-// the same helpers handleFlash itself calls (Core.HandleFlash,
-// dispatchHandlerResult) rather than duplicating either body.
+// Any banner-raising FlashIntent present is withheld from that forward
+// (withoutBannerFlashes) and routed through the SAME path messages.Flash takes (handleFlash,
+// app_flash.go), not direct-mutated: this bumps m.flash.gen before rendering
+// the new text, so an auto-clear tick already in flight for a PREVIOUS flash
+// (which still carries the pre-bump gen) cannot match the new one and clear it
+// early, and it schedules this flash's own FlashTickPayload auto-clear tick,
+// both of which a direct field mutation skipped entirely — the two ported
+// handlers here are the only Handle* callers that construct a FlashIntent
+// without ever going through handleFlash, so this is the one seam that needs
+// to call out to it. That route applies the flash to the controller once,
+// which is where the error-log entry is made. Calls the same helpers
+// handleFlash itself calls (Core.HandleFlash, dispatchHandlerResult) rather
+// than duplicating either body.
 func (m *Model) dispatchDetailOpResultIntents(intents []runtime.UIIntent) tea.Cmd {
-	m.ctrl.ApplyIntents(intents)
+	m.ctrl.ApplyIntents(withoutBannerFlashes(intents))
 	var cmds []tea.Cmd
 	for _, in := range intents {
 		fi, ok := in.(runtime.FlashIntent)
-		if !ok {
+		if !ok || fi.LogOnly {
 			continue
 		}
 		m.flash.gen++

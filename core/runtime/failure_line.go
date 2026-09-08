@@ -2,13 +2,12 @@
 
 package runtime
 
-// failure_line.go — one voice for a failed call. Every error-history entry is
-// built here, so a partial result, a region gap and a connect failure cannot
-// read as three different kinds of event.
+// failure_line.go — one voice for a failed call. Every sentence a failure is
+// announced with is built here, so a partial result, a region gap and a
+// connect failure cannot read as three different kinds of event.
 
 import (
 	"strings"
-	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
@@ -38,13 +37,6 @@ func failureLine(subject string, err error, region string) string {
 		return cause
 	}
 	return subject + ": " + cause
-}
-
-// appendErrorHistory is the only construction of an error-history entry. A
-// caller that built the intent itself would be free to stamp a different time
-// or phrase the same failure a second way.
-func appendErrorHistory(message string) AppendErrorHistoryIntent {
-	return AppendErrorHistoryIntent{Time: time.Now(), Message: message}
 }
 
 // softFailure reports whether a failed per-type call belongs in the `!` error
