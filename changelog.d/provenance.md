@@ -38,9 +38,9 @@
   restart during a refresh no longer opens the list empty.
 - Load-more and Ctrl+R on a related drill now act on the drill, not on the
   list underneath it. A refreshed drill keeps showing what it found instead of
-  the type's whole list, and its title counts the drill, not the account The issue count beside that
-  title counts the drill too: a refreshed drill no longer reports the
-  account's issue total over the ten rows it is showing.
+  the type's whole list, and its title counts the drill, not the account. The
+  issue count beside that title counts the drill too, so a refreshed drill no
+  longer reports the account's issue total over the rows it is showing.
 - A page cap inside one check no longer hides the findings the same check
   already established: the capped number is marked with a "+", and the
   resource keeps its other answers. Affects SNS subscriptions, CodeArtifact

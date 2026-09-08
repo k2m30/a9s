@@ -519,6 +519,20 @@ func MessageOf(err error) string {
 	return err.Error()
 }
 
+// LocalConfigFailure is the whole sentence for a failed read of the local AWS
+// config file: the file named, then its own words. Callers flash exactly what
+// it returns and add nothing — two surfaces each gluing their own prefix onto
+// a shared fragment is how one unreadable file came to read two different ways
+// depending on which lane the operator met it through.
+//
+// MessageOf, not CauseOf: CauseOf answers from the AWS error-class table,
+// which has no word for a local file. An *fs.PathError satisfies net.Error, so
+// that table calls a missing or unreadable config a "transport failure" and
+// sends the operator to the network instead of to the file.
+func LocalConfigFailure(err error) string {
+	return "local AWS config: " + MessageOf(err)
+}
+
 // CauseOf is what an operator can act on, read from the error's own fields.
 // Every surface that renders a failure — a flash, a log line, a menu row —
 // phrases it through here.

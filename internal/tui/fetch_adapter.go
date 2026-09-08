@@ -208,10 +208,10 @@ func (m *Model) fetchProfiles() tea.Cmd {
 	return func() tea.Msg {
 		profiles, err := m.core.FetchProfiles()
 		if err != nil {
-			// The error's own words, through the one extraction — the same
-			// one the controller's profile selector uses, so a failed local
-			// config read reads the same on both lanes.
-			return messages.Flash{Text: awsclient.MessageOf(err), IsError: true}
+			// The whole sentence from the one formatter, the same call the
+			// controller's profile selector makes, so a failed local config
+			// read reads the same on both lanes.
+			return messages.Flash{Text: awsclient.LocalConfigFailure(err), IsError: true}
 		}
 		return profilesLoadedMsg{profiles: profiles}
 	}

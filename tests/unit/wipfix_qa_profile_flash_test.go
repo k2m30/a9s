@@ -57,7 +57,10 @@ func TestFailedProfileRead_ReadsTheSameOnBothLanes(t *testing.T) {
 			vs, _ := c.OpenProfileSelector()
 			fromController := vs.Header.Flash.Text
 
-			m := tui.New("", "")
+			// WithNoCache: the construction-discipline gate's own remedy. A
+			// bare tui.New reads and writes the developer's real cache
+			// directory, which this test has no business touching.
+			m := tui.New("", "", tui.WithNoCache(true))
 			_, cmd := m.Update(messages.Navigate{Target: messages.TargetProfile})
 			flash, ok := walkForFlash(cmd)
 			if !ok {
