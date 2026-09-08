@@ -41,13 +41,19 @@ var humanizedDetailWitnesses = []struct {
 	statusColumnShowsAFinding bool
 }{
 	// The field row 4 is about: mwaa declares no column for it, so the
-	// column-owned opt-in cannot reach it at all.
-	{"mwaa", "prod-airflow-etl", "endpoint_management", "SERVICE", "service", false},
-	{"mwaa", "prod-airflow-etl", "last_update_status", "SUCCESS", "success", false},
+	// column-owned opt-in cannot reach it at all. The path is the SDK's,
+	// because that is the row the detail projector renders once the view
+	// config is loaded — which production always loads.
+	//
+	// mwaa's LastUpdate.Status is NOT here: it renders as a nested line under
+	// a struct rather than a row of its own, which is the shape rows 23-24
+	// cover, and it is watched by the ratchet in
+	// aws6_humanize_declared_fields_test.go instead.
+	{"mwaa", "prod-airflow-etl", "EndpointManagement", "SERVICE", "service", false},
 
 	// The three other demo detail screens showing a raw constant.
 	{"apigw", "efg567hij8", "protocol", "WEBSOCKET", "websocket", false},
-	{"ecs-svc", "api-gateway", "launch_type", "FARGATE", "fargate", false},
+	{"ecs-svc", "api-gateway", "LaunchType", "FARGATE", "fargate", false},
 	{"ecs-svc", "api-gateway", "status", "ACTIVE", "active", true},
 	{"ng", "acme-prod-degraded-pool", "status", "DEGRADED", "degraded", false},
 }
@@ -184,6 +190,49 @@ var verbatimDetailPaths = map[string]string{
 	"role/Attention":                    "identifier: the attached policy's own name",
 	"role/role_id":                      "identifier: the IAM role id",
 	"role/role_name":                    "identifier: the role's own name",
+
+	// The same identifiers reached by the SDK path the detail projector reads
+	// off RawStruct, which the flat Fields pass never saw.
+	"alarm/MetricName":        "identifier: the CloudWatch metric's own name",
+	"alarm/Namespace":         "identifier: the CloudWatch namespace",
+	"ami/UsageOperation":      "identifier: the EC2 API operation the AMI bills under",
+	"cf/Id":                   "identifier: the CloudFront distribution id",
+	"iam-group/GroupId":       "identifier: the IAM group id",
+	"iam-user/UserId":         "identifier: the IAM user id",
+	"msk/CurrentVersion":      "identifier: the MSK configuration revision",
+	"policy/PolicyId":         "identifier: the IAM policy id",
+	"policy/PolicyName":       "identifier: the policy's own name",
+	"role/RoleId":             "identifier: the IAM role id",
+	"role/RoleName":           "identifier: the role's own name",
+	"sns-sub/SubscriptionArn": "verbatim: SNS puts the literal \"PendingConfirmation\" in the ARN field of an unconfirmed subscription; the field holds an ARN a person copies, so its contents are never reworded",
+}
+
+// rawEnumDetailDebt is backlog w198: fields that render an SDK constant on a
+// demo detail row and are not this task's to fix. It is a ratchet, not an
+// allowlist — TestRawEnumDebtNeitherGrowsNorGoesStale fails when a NEW raw
+// constant appears anywhere and when a listed one stops rendering raw, so the
+// list can only shrink, and w198 empties it.
+//
+// Every entry is a fact an operator reads, so every entry is a defect. It is
+// recorded rather than fixed here because fixing it is w198's scope, and
+// recorded as one line per field so w198 has its worklist rather than a count.
+var rawEnumDetailDebt = map[string]string{
+	"acm/RenewalEligibility":     "w198",
+	"alarm/ComparisonOperator":   "w198",
+	"asg/HealthCheckType":        "w198",
+	"ddb/TableStatus":            "w198",
+	"ecs-svc/SchedulingStrategy": "w198",
+	"ecs-task/Connectivity":      "w198",
+	"kms/KeyManager":             "w198",
+	"kms/KeySpec":                "w198",
+	"kms/KeyState":               "w198",
+	"kms/KeyUsage":               "w198",
+	"kms/Origin":                 "w198",
+	"logs/DataProtectionStatus":  "w198",
+	"logs/LogGroupClass":         "w198",
+	"mwaa/Status":                "w198",
+	"pipeline/ExecutionMode":     "w198",
+	"tg/ProtocolVersion":         "w198",
 }
 
 // TestNoDemoDetailRowIsARawConstant sweeps every demo detail screen for a row
@@ -214,6 +263,16 @@ func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 				if _, ok := verbatimDetailPaths[key]; ok {
 					continue
 				}
+				if _, ok := rawEnumDetailDebt[key]; ok {
+					continue
+				}
+				if declaredHumanizedPaths[key] {
+					// Declared fields have an owner already — the ratchet in
+					// aws6_humanize_declared_fields_test.go, which reports them
+					// with the declaration to restore. Two owners for one field
+					// means two failures for one fix.
+					continue
+				}
 				offenders = append(offenders, fmt.Sprintf("%s (row %s) = %q", key, r.ID, f.Value))
 			}
 		}
@@ -221,7 +280,9 @@ func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 	sort.Strings(offenders)
 	for _, o := range offenders {
 		t.Errorf("demo detail row shows a raw SDK constant: %s — declare the field's readable wording on its type, "+
-			"or add the pair to verbatimDetailPaths with the reason it must stay verbatim", o)
+			"or, if the value must reach the screen exactly as AWS wrote it, add the pair to "+
+			"verbatimDetailPaths with that reason. A new entry in rawEnumDetailDebt is not an option: "+
+			"that list is w198's worklist and only shrinks", o)
 	}
 }
 
@@ -380,4 +441,46 @@ func demoLogEvents(t *testing.T, clients *awsclient.ServiceClients) []resource.R
 	}
 	walk(*groups, groupRows, nil, 0)
 	return out
+}
+
+// TestRawEnumDebtNeitherGrowsNorGoesStale is what keeps the debt list a ratchet.
+//
+// A list of known-bad fields is only honest while it is exactly the known-bad
+// fields. One entry too few and the sweep above goes red, which is the point.
+// One entry too many and the list quietly excuses a field that has since been
+// fixed — the shape an allowlist decays into, and the reason this test looks
+// for stale entries as hard as it looks for new ones.
+func TestRawEnumDebtNeitherGrowsNorGoesStale(t *testing.T) {
+	clients := demo.NewServiceClients()
+	byType, cache := buildVisibilityTypeCache(t)
+
+	stillRaw := map[string]string{}
+	for _, td := range resource.AllResourceTypes() {
+		for _, r := range mergeWave2Findings(t, td, byType[td.ShortName], cache, clients) {
+			for _, f := range aws6DetailRows(t, r, td.ShortName) {
+				if f.Value == "" {
+					continue
+				}
+				if !rawEnumCellPattern.MatchString(f.Value) && !rawCamelEnumCellPattern.MatchString(f.Value) {
+					continue
+				}
+				key := td.ShortName + "/" + f.Path
+				if _, ok := stillRaw[key]; !ok {
+					stillRaw[key] = fmt.Sprintf("(row %s) = %q", r.ID, f.Value)
+				}
+			}
+		}
+	}
+
+	var stale []string
+	for key, id := range rawEnumDetailDebt {
+		if _, raw := stillRaw[key]; !raw {
+			stale = append(stale, key+" ("+id+")")
+		}
+	}
+	sort.Strings(stale)
+	for _, k := range stale {
+		t.Errorf("%s no longer renders a raw SDK constant, so its debt entry excuses nothing — "+
+			"delete the line; a list that outlives what it records is an allowlist", k)
+	}
 }

@@ -20,63 +20,57 @@ import (
 	"strings"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/core/aws"
-
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// humanizedDeclaredFields are (type, detail path) pairs that MUST render as
-// words. A key is removed from here only when the field itself is gone.
+// humanizedDeclaredFields are the detail rows that MUST render as words: one
+// per fact a type declares readable, named by the path the detail projector
+// actually renders it under.
 //
-// A fact reaches the detail under two spellings — the fetcher's key and the
-// SDK path the projector reads off RawStruct — and they are not always the
-// same word (the alarm's state is Fields["state"] and RawStruct's StateValue).
-// Watching only the fetcher spelling let INSUFFICIENT_DATA sit on the alarm
-// screen while this ratchet reported the field readable, so the RawStruct
-// spellings are listed alongside it and rendered through the view config the
-// app loads at startup.
+// That path is the SDK's, not the fetcher's key. A declaration names a FACT and
+// the fact reaches the detail off RawStruct, so "state" is watched as
+// StateValue and "status" as StackStatus. Watching the fetcher spelling instead
+// watched rows the configured detail does not render at all, which is how
+// INSUFFICIENT_DATA sat on the alarm screen while this ratchet reported the
+// field readable.
+//
+// An entry is removed only when the field itself is gone; the second half of
+// the test below fails if one stops rendering, so the list cannot rot.
 var humanizedDeclaredFields = []string{
-	"alarm/state",
-	"athena/state",
-	"cb/source_type",
-	"cf/status",
-	"cfn/status",
-	"eb-rule/state",
-	"ecr/tag_mutability",
-	"ecs/status",
-	"ecs-task/launch_type",
-	"ecs-task/status",
-	"eip/status",
-	"eks/status",
-	"kinesis/stream_mode",
-	"kinesis/stream_status",
-	"kms/status",
-	"lambda/last_update_status",
-	"msk/cluster_type",
-	"msk/state",
-	"opensearch/domain_processing_status",
-	"pipeline/pipeline_type",
-	"role/trust_summary",
-	"secrets/status",
-	"ses/verification_status",
-	"sfn/type",
-	"ssm/type",
-	"tg/protocol",
-	"transfer/domain",
-	"vpce/state",
-	"waf/scope",
-}
-
-// humanizedDeclaredRawStructFields are the SDK paths under which the same
-// declared facts reach the detail. They are listed separately because they are
-// rendered by a different projector arm and only appear once the view config
-// is loaded.
-var humanizedDeclaredRawStructFields = []string{
+	"acm/Type",
 	"alarm/StateValue",
+	"apigw/protocol",
+	"athena/State",
+	"cf/Status",
 	"cfn/StackStatus",
+	"eb-rule/State",
+	"ecr/ImageTagMutability",
+	"ecs-svc/LaunchType",
+	"ecs-svc/Status",
+	"ecs-task/DesiredStatus",
 	"ecs-task/LastStatus",
+	"ecs-task/LaunchType",
+	"ecs/Status",
+	"eks/Status",
 	"kinesis/StreamModeDetails",
+	"kinesis/StreamStatus",
+	"lambda/LastUpdateStatus",
+	"msk/ClusterType",
+	"msk/State",
+	"mwaa/EndpointManagement",
+	"mwaa/LastUpdate",
+	"mwaa/WebserverAccessMode",
+	"ng/Status",
+	"pipeline/PipelineType",
+	"ses/VerificationStatus",
+	"sfn/Type",
+	"ssm/Type",
+	"tg/Protocol",
+	"transfer/Domain",
+	"transfer/EndpointType",
+	"transfer/IdentityProviderType",
+	"vpce/State",
 }
 
 func TestDeclaredFieldsGoOnRenderingAsWords(t *testing.T) {
@@ -88,77 +82,14 @@ func TestDeclaredFieldsGoOnRenderingAsWords(t *testing.T) {
 		watched[k] = true
 	}
 
-	var raw []string
+	// One example per key: a constant on a field shows on every row of its
+	// type, and one field is one thing to fix.
+	example := map[string]string{}
 	seen := map[string]bool{}
 	for _, td := range resource.AllResourceTypes() {
 		rows := mergeWave2Findings(t, td, byType[td.ShortName], cache, clients)
 		for _, r := range rows {
 			for _, f := range aws6DetailRows(t, r, td.ShortName) {
-				key := td.ShortName + "/" + f.Path
-				if !watched[key] || f.Value == "" {
-					continue
-				}
-				seen[key] = true
-				if rawEnumCellPattern.MatchString(f.Value) || rawCamelEnumCellPattern.MatchString(f.Value) {
-					raw = append(raw, key+" (row "+r.ID+") = "+f.Value)
-				}
-			}
-		}
-	}
-
-	sort.Strings(raw)
-	for i, s := range raw {
-		if i > 0 && s == raw[i-1] {
-			continue
-		}
-		t.Errorf("%s renders an SDK constant again — its type declared it readable and something dropped "+
-			"that; restore the declaration on the type (ResourceTypeDef.HumanizeFields) rather than "+
-			"recording the field anywhere", s)
-	}
-
-	// The ratchet cannot pass by not looking: every watched key has to be a
-	// detail row the demo bench actually renders. A key that stops appearing
-	// is a field that was renamed or removed, and the entry goes with it.
-	var missing []string
-	for _, k := range humanizedDeclaredFields {
-		if !seen[k] {
-			missing = append(missing, k)
-		}
-	}
-	missing = append(missing, rawStructRatchetViolations(t, byType, cache, clients, seen)...)
-	sort.Strings(missing)
-	for _, k := range missing {
-		t.Errorf("no demo detail row renders %q, so this entry watches nothing — if the field is gone, "+
-			"drop the entry with it; if it is only missing from the bench, the fixture that showed it went "+
-			"away", k)
-	}
-}
-
-// rawStructRatchetViolations runs the same ratchet over the RawStruct detail
-// rows, which the flat pass above never reaches: without the view config the
-// controller projects Fields only, so a constant on an SDK path is invisible
-// to it. Reports a raw value directly and returns the keys that watch nothing.
-func rawStructRatchetViolations(
-	t *testing.T,
-	byType map[string][]resource.Resource,
-	cache resource.ResourceCache,
-	clients *awsclient.ServiceClients,
-	_ map[string]bool,
-) []string {
-	t.Helper()
-	watched := make(map[string]bool, len(humanizedDeclaredRawStructFields))
-	for _, k := range humanizedDeclaredRawStructFields {
-		watched[k] = true
-	}
-
-	seen := map[string]bool{}
-	// One example per key: a constant on a field shows on every row of its
-	// type, and one field is one thing to fix.
-	example := map[string]string{}
-	for _, td := range resource.AllResourceTypes() {
-		rows := mergeWave2Findings(t, td, byType[td.ShortName], cache, clients)
-		for _, r := range rows {
-			for _, f := range aws6DetailRowsWithViews(t, r, td.ShortName) {
 				key := td.ShortName + "/" + f.Path
 				if !watched[key] || f.Value == "" {
 					continue
@@ -182,18 +113,27 @@ func rawStructRatchetViolations(
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		t.Errorf("%s %s renders an SDK constant on the row the projector reads off RawStruct — the type "+
-			"declares this fact readable under its fetcher key, and a declaration names a fact, not a "+
-			"spelling", k, example[k])
+		t.Errorf("%s %s renders an SDK constant — a declaration names a fact, and this is the row the "+
+			"projector renders that fact under; declare the spelling on the type "+
+			"(ResourceTypeDef.HumanizeFields) rather than recording the field anywhere",
+			k, example[k])
 	}
 
+	// The ratchet cannot pass by not looking: every watched key has to be a
+	// detail row the demo bench actually renders. A key that stops appearing
+	// is a field that was renamed or removed, and the entry goes with it.
 	var missing []string
-	for _, k := range humanizedDeclaredRawStructFields {
+	for _, k := range humanizedDeclaredFields {
 		if !seen[k] {
 			missing = append(missing, k)
 		}
 	}
-	return missing
+	sort.Strings(missing)
+	for _, k := range missing {
+		t.Errorf("no demo detail row renders %q, so this entry watches nothing — if the field is gone, "+
+			"drop the entry with it; if it is only missing from the bench, the fixture that showed it went "+
+			"away", k)
+	}
 }
 
 // scalarAfterLabel returns the value part of a nested subtree row, which the
@@ -205,3 +145,14 @@ func scalarAfterLabel(v string) string {
 	}
 	return strings.TrimSpace(after)
 }
+
+// declaredHumanizedPaths is humanizedDeclaredFields as a set, so the sweep in
+// aws6_humanize_owner_test.go can leave these to the ratchet above rather than
+// reporting the same field twice.
+var declaredHumanizedPaths = func() map[string]bool {
+	out := make(map[string]bool, len(humanizedDeclaredFields))
+	for _, k := range humanizedDeclaredFields {
+		out[k] = true
+	}
+	return out
+}()

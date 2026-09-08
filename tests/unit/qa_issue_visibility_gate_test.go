@@ -53,6 +53,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -214,6 +215,12 @@ func newVisibilityDetailController(t *testing.T) *app.Controller {
 	core := runtime.New(s, nil)
 	c := app.New(core)
 	t.Cleanup(c.Close)
+	// Production always sets one — internal/tui/app.go:144 and
+	// core/web/construct.go:31 — and without it the detail projection falls
+	// back to flat alphabetical Fields rows and never reads RawStruct at all.
+	// A harness that skipped it could not see the surface half these sweeps
+	// exist to check.
+	c.SetViewConfig(config.DefaultConfig())
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
 	})
