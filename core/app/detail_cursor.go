@@ -107,16 +107,9 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 
 	case ActionMoveBottom:
 		if !ds.RelatedFocus {
-			// The last row an operator can read, not the last row: the
-			// Attention block ends in a spacer, and on a resource whose
-			// projection yields no content rows that spacer is the last row.
 			items := c.buildDetailFieldItems(ds).items
 			if len(items) > 0 {
-				ds.FieldCursor = len(items) - 1
-				for ds.FieldCursor > 0 &&
-					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
-					ds.FieldCursor--
-				}
+				ds.FieldCursor = selectableRowAtOrAbove(items, len(items)-1)
 			}
 			reconcileDetailScrollToCursor(ds, ds.ViewportHeight)
 		} else {

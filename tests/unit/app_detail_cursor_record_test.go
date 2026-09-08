@@ -252,4 +252,63 @@ func TestDetailCursor_BottomOfAFindingsOnlyDetailIsNotABlankLine(t *testing.T) {
 			body.FieldCursor, len(body.Fields),
 		)
 	}
+
+	// The move itself has to land where the body shows the cursor, not one
+	// row below it: a bottom that stops on the spacer and a body that paints
+	// the row above leaves the next Up press with nowhere to go, and the
+	// cursor appears stuck.
+	bottom := body.FieldCursor
+	c.Apply(app.Action{Kind: app.ActionMoveUp})
+	up := c.Snapshot().Body.Detail.FieldCursor
+	if up == bottom {
+		t.Errorf(
+			"Up did not move the cursor off the bottom row (FieldCursor stayed %d of %d)\n"+
+				"the jump to the bottom and the body's clamp must land on the same row.",
+			bottom, len(body.Fields),
+		)
+	}
+}
+
+// TestDetailCursor_SameCodeEntriesKeepTheirIdentityWhenSeverityReorders: two
+// findings of one code are told apart by a number, and that number has to
+// come from the order the enricher reported them in. Numbering them by their
+// position in the sorted block makes the number mean "where you are", so the
+// two exchange identities the moment one of them outranks the other.
+func TestDetailCursor_SameCodeEntriesKeepTheirIdentityWhenSeverityReorders(t *testing.T) {
+	const (
+		code   = "ec2.open-ingress"
+		first  = "port 22 open"
+		second = "port 3389 open"
+	)
+	row := resource.Resource{
+		ID: "i-0999999999999999a", Name: "batch-runner", Type: "ec2",
+		Fields: map[string]string{"instance_id": "i-0999999999999999a", "state": "running"},
+	}
+	c, core := openDetailWithSweptRow(t, row)
+
+	deliverEnrichment(t, c, core, row.ID, false, []domain.Finding{
+		{Code: code, Phrase: first, Severity: domain.SevWarn, Source: "wave2:ec2"},
+		{Code: code, Phrase: second, Severity: domain.SevWarn, Source: "wave2:ec2"},
+	})
+	preCursor := seekAttentionEntry(t, c, second)
+
+	// The same two findings, the second one now the more severe: it sorts to
+	// the top of the block and the first moves down past it.
+	deliverEnrichment(t, c, core, row.ID, false, []domain.Finding{
+		{Code: code, Phrase: first, Severity: domain.SevWarn, Source: "wave2:ec2"},
+		{Code: code, Phrase: second, Severity: domain.SevBroken, Source: "wave2:ec2"},
+	})
+
+	after := c.Snapshot().Body.Detail
+	postRow := fieldRowAt(t, after, after.FieldCursor)
+	if postRow.Key != second {
+		t.Errorf(
+			"the two entries of one code exchanged identities when the second outranked the first:\n"+
+				"  before: FieldCursor=%d Key=%q\n"+
+				"  after:  FieldCursor=%d Key=%q\n"+
+				"want the cursor still on %q — a repeat is numbered by the order the enricher "+
+				"reported it in, not by where the sort happens to put it.",
+			preCursor, second, after.FieldCursor, postRow.Key, second,
+		)
+	}
 }

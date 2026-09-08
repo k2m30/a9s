@@ -64,20 +64,7 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		related = buildDetailRelatedLoadingBlocks(ds.ResourceType)
 	}
 
-	// Clamp FieldCursor, then walk back off a spacer: the Attention block ends
-	// in one, and a resource whose projection yields no content rows has that
-	// spacer as its last row, so a cursor sent to the bottom would sit on a
-	// blank line.
-	fc := ds.FieldCursor
-	if len(fields) > 0 && fc >= len(fields) {
-		fc = len(fields) - 1
-	}
-	if fc < 0 {
-		fc = 0
-	}
-	for fc > 0 && fc < len(fields) && fields[fc].IsSpacer {
-		fc--
-	}
+	fc := selectableRowAtOrAbove(items, ds.FieldCursor)
 
 	// Name the row the cursor is on. This build is the layout the operator
 	// sees, so it is the only honest place to take that identity from.
@@ -128,6 +115,26 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		FieldCursor:         fc,
 		KeyWidth:            keyWidth,
 	}, layout
+}
+
+// selectableRowAtOrAbove returns the index at or above i of the first row a
+// cursor can rest on, clamping i into the list first. A spacer is a blank line
+// and a section header is a label, so neither is a place to leave a cursor:
+// the Attention block ends in a spacer, and on a resource whose projection
+// yields no content rows that spacer is the last row. The jump to the bottom
+// and the body's clamp both land through here, so the row the move chooses and
+// the row the screen shows cannot be different rows.
+func selectableRowAtOrAbove(items []fieldpath.FieldItem, i int) int {
+	if i >= len(items) {
+		i = len(items) - 1
+	}
+	for i > 0 && (items[i].IsSection || items[i].IsSpacer) {
+		i--
+	}
+	if i < 0 {
+		return 0
+	}
+	return i
 }
 
 // buildDetailRelatedLoadingBlocks constructs loading-state RelatedBlocks from
@@ -325,7 +332,11 @@ type attentionEntry struct {
 	tier string
 	// code is the finding this entry came from, and the stem of every one of
 	// its rows' identities. The prose is not usable for that: two findings
-	// can carry the same Detail sentence word for word.
+	// can carry the same Detail sentence word for word. A resource can report
+	// two findings under one code, so a repeat carries the ordinal of the
+	// order it was REPORTED in — the sort that follows moves entries, and a
+	// number that meant "where you are in the block" would be exchanged
+	// between the two the moment one outranked the other.
 	code    string
 	primary string
 	// detailLines is the S5 operator sentence (Finding.Detail) already
@@ -426,6 +437,14 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 	if len(entries) == 0 {
 		return entries
 	}
+	seen := make(map[string]int, len(entries))
+	for i := range entries {
+		code := entries[i].code
+		if n := seen[code]; n > 0 {
+			entries[i].code = fmt.Sprintf("%s#%d", code, n)
+		}
+		seen[code]++
+	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].tier == "!" && entries[j].tier != "!"
 	})
@@ -457,11 +476,6 @@ func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, 
 	}
 	injected := make([]fieldpath.FieldItem, 0, 1+len(entries)*2)
 	keys := make([]string, 0, cap(injected))
-	// A resource can carry two findings under one code (two open ports, two
-	// rules), and they are two rows. The first keeps the bare code so a stable
-	// finding's rows keep a stable identity; later ones are numbered in the
-	// order the sorted block puts them, which is stable among equal severities.
-	seenCode := make(map[string]int, len(entries))
 	emit := func(item fieldpath.FieldItem, key string) {
 		injected = append(injected, item)
 		keys = append(keys, key)
@@ -495,10 +509,6 @@ func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, 
 			itemValue = line
 		}
 		stem := "attention:" + e.code
-		if n := seenCode[e.code]; n > 0 {
-			stem = fmt.Sprintf("%s#%d", stem, n)
-		}
-		seenCode[e.code]++
 		emit(fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
