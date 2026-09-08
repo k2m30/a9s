@@ -39,7 +39,6 @@ const logsStaleEmptyAge = 90 * 24 * time.Hour
 // neither word — or a word from no vocabulary — is reported on for neither.
 const (
 	logsRetentionNeverExpires = "never expire"
-	logsRetentionExpires      = "expires"
 
 	logsEncryptionKMS  = "kms"
 	logsEncryptionNone = "none"
@@ -92,11 +91,6 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			storedBytesRaw = strconv.FormatInt(*lg.StoredBytes, 10)
 		}
 
-		retentionDays := ""
-		if lg.RetentionInDays != nil {
-			retentionDays = fmt.Sprintf("%d", *lg.RetentionInDays)
-		}
-
 		creationTime := ""
 		if lg.CreationTime != nil {
 			creationTime = formatEpochMillis(*lg.CreationTime)
@@ -107,9 +101,9 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			kmsKeyID = *lg.KmsKeyId
 		}
 
-		retention := logsRetentionExpires
-		if lg.RetentionInDays == nil {
-			retention = logsRetentionNeverExpires
+		retention := logsRetentionNeverExpires
+		if lg.RetentionInDays != nil {
+			retention = fmt.Sprintf("%d days", *lg.RetentionInDays)
 		}
 		encryption := logsEncryptionNone
 		if kmsKeyID != "" {
@@ -123,7 +117,6 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 				"log_group_name":   logGroupName,
 				"stored_bytes":     storedBytes,
 				"stored_bytes_raw": storedBytesRaw,
-				"retention_days":   retentionDays,
 				"creation_time":    creationTime,
 				"kms_key_id":       kmsKeyID,
 				"retention":        retention,

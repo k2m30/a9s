@@ -323,8 +323,15 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	if bucket == "" {
 		return resource.KnownRelated("backup", nil, false)
 	}
-	// An S3 bucket ARN names no region, but it does name a partition.
-	bucketARN := "arn:" + PartitionForRegion(sessionRegion(clients)) + ":s3:::" + bucket
+	// An S3 bucket ARN names no region, but it does name a partition, and the
+	// partition comes from the session's region. Without one there is no ARN
+	// to match on, and a commercial guess would read as a proven "no plan
+	// covers this bucket" in every other partition.
+	region := sessionRegion(clients)
+	if region == "" {
+		return resource.UnknownRelated("backup")
+	}
+	bucketARN := "arn:" + PartitionForRegion(region) + ":s3:::" + bucket
 	bkList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)

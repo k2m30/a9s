@@ -31,12 +31,12 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
 				{Title: "Status", Width: 12},
 				{Title: "Size", Key: "stored_bytes", SortKey: "stored_bytes_raw", Width: 14},
-				// Keyed as well as Path-based: without the key this column fell
-				// through to a title match on Fields["retention"] whenever the
-				// path was empty, so a group with no policy read "never expire"
-				// here and blank on the built-in list. The warning itself is the
-				// Status cell's (logs.retention-never-expire).
-				{Title: "Retention", Key: "retention_days", Path: "RetentionInDays", Width: 10},
+				// Key only: Fields["retention"] carries the policy in words
+				// ("30 days", "never expire") and RetentionInDays carries a bare
+				// number that is absent for exactly the groups the never-expire
+				// warning fires on, so a path fallback would render two shapes
+				// in one column and blank the warned rows.
+				{Title: "Retention", Key: "retention", Width: 12},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Last Event", Key: "last_event_at", Width: 22},
 				{Title: "Created", Path: "", Key: "creation_time", Width: 16},

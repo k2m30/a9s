@@ -430,6 +430,14 @@ func TestPartitionForRegion_EveryRegionNamesItsPartition(t *testing.T) {
 		{region: "cn-northwest-1", want: "aws-cn"},
 		{region: "us-gov-west-1", want: "aws-us-gov"},
 		{region: "us-gov-east-1", want: "aws-us-gov"},
+		// The rest of the partitions the SDK's own catalogue names
+		// (core/aws/data/partitions.json). A region in one of these built a
+		// commercial ARN, which matches nothing AWS returned there.
+		{region: "us-iso-east-1", want: "aws-iso"},
+		{region: "us-isob-east-1", want: "aws-iso-b"},
+		{region: "eu-isoe-west-1", want: "aws-iso-e"},
+		{region: "us-isof-south-1", want: "aws-iso-f"},
+		{region: "eusc-de-east-1", want: "aws-eusc"},
 		{region: "us-east-1", want: "aws"},
 		{region: "eu-west-1", want: "aws"},
 		{region: "ap-southeast-2", want: "aws"},

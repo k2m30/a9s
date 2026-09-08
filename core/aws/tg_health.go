@@ -82,7 +82,6 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn 
 			"target_id":        targetID,
 			"port":             port,
 			"az":               az,
-			"status":           health,
 			"health":           health,
 			"reason":           reason,
 			"reason_human":     reasonHuman,

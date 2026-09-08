@@ -176,7 +176,6 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Wave2: IssueEnricher{Fn: EnrichS3Posture, Priority: 100},
 		FieldKeys: []string{
 			"name",
-			"bucket_name",
 			"creation_date",
 			"notification_lambda",
 			"notification_sqs",

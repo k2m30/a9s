@@ -523,7 +523,10 @@ func CauseOf(err error) string {
 		return ""
 	}
 	if isPhrased(err) {
-		return err.Error()
+		// Two aggregates can arrive joined; errors.Join puts a newline between
+		// them, and a newline is not a separator a one-line surface can
+		// render, so the separator here is this package's own.
+		return strings.ReplaceAll(err.Error(), "\n", "; ")
 	}
 	if cause := CauseForClass(ErrClass(err)); cause != "" {
 		return cause
@@ -535,7 +538,7 @@ func CauseOf(err error) string {
 		// caller has already named. Reading the error it carries drops that
 		// preamble by structure rather than by trimming text.
 		if opErr, wrapped := errors.AsType[*smithy.OperationError](err); wrapped && opErr.Unwrap() != nil {
-			return opErr.Unwrap().Error()
+			return firstClause(opErr.Unwrap().Error())
 		}
 		return err.Error()
 	}
@@ -560,6 +563,24 @@ func CauseOf(err error) string {
 		return message
 	}
 	return apiErr.ErrorCode() + ": " + message
+}
+
+// firstClause is how a9s renders the words of a service response the SDK could
+// not model: whatever the service chose to write, which may be a host, a
+// socket address or a path, and whose failure is in the clause that leads. It
+// is applied there and not to every unclassed error, because a9s's own
+// composites are unclassed too and their second clause is the whole
+// diagnostic — "fetch ec2: partial failure: one item timed out" cut at the
+// first colon says only that a fetch went wrong.
+func firstClause(s string) string {
+	if i := strings.IndexAny(s, ":;\n\r"); i >= 0 {
+		if head := strings.TrimRight(strings.TrimSpace(s[:i]), " ,."); head != "" {
+			return head
+		}
+		// A response whose text leads with the separator has no first clause;
+		// its whole text says more than nothing at all.
+	}
+	return strings.TrimRight(strings.TrimSpace(s), " ,.")
 }
 
 // CauseInRegion is CauseOf with the region named when — and only when — the

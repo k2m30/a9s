@@ -278,7 +278,9 @@ func TestPartialAttackEBS_ARNCoverageStillDecidesAReplayedRow(t *testing.T) {
 // every row on screen, so its failure leaves all of them uninspected — and
 // each keeps whatever the cache-only joins already decided about it.
 func TestPartialAttackEBS_StatusFailureMarksEveryVolumeInTheBatch(t *testing.T) {
-	clients := &awsclient.ServiceClients{EC2: &partialEBSStatusFake{}}
+	// The backup-coverage join builds a volume ARN from the session's region;
+	// a session with none answers "cannot tell" (aws5 row 2).
+	clients := &awsclient.ServiceClients{Region: "us-east-1", EC2: &partialEBSStatusFake{}}
 	store := session.NewIdentityStore()
 	store.Set(w7Account, nil)
 	clients.SetIdentityStore(store)

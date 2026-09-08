@@ -69,7 +69,6 @@ func FetchS3BucketsPageWithNotifications(
 			Name: bucketName,
 			Fields: map[string]string{
 				"name":                bucketName,
-				"bucket_name":         bucketName,
 				"creation_date":       creationDate,
 				"notification_lambda": lambdaArn,
 				"notification_sqs":    sqsArn,

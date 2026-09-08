@@ -185,7 +185,7 @@ func TestS3_Related_Backup_PrefixCollisionDoesNotOvermatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "backup")
 	// Query for bucket "prod" — its ARN is a strict prefix of the plan's
 	// "prod-logs" ARN. Must return 0.
-	result := checker(context.Background(), nil, emptyBucketResource("prod"), cache)
+	result := checker(context.Background(), s3BackupSession(), emptyBucketResource("prod"), cache)
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — a plan covering arn:aws:s3:::prod-logs must not match the \"prod\" bucket (prefix-collision over-match in the current implementation)",
 			result.Count())
@@ -211,7 +211,7 @@ func TestS3_Related_Backup_ExactMatchStillResolves(t *testing.T) {
 		},
 	}
 	checker := s3CheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, emptyBucketResource(bucket), cache)
+	result := checker(context.Background(), s3BackupSession(), emptyBucketResource(bucket), cache)
 	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 — exact ARN match must still resolve after the prefix-collision fix",
 			result.Count())

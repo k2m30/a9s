@@ -77,23 +77,30 @@ func awsManagedPolicy(policyARN string) (arn.ARN, bool) {
 	return a, true
 }
 
-// PartitionForRegion returns the ARN partition a region belongs to: "aws-cn"
-// for the China regions, "aws-us-gov" for GovCloud, "aws" otherwise. The
-// prefix is a whole segment, so us-west-2 is commercial and only us-gov- is
+// PartitionForRegion returns the ARN partition a region belongs to, read from
+// the SDK's own partition catalogue (core/aws/data/partitions.json): "aws-cn"
+// for the China regions, "aws-us-gov" for GovCloud, "aws-iso"/"aws-iso-b"/
+// "aws-iso-e"/"aws-iso-f" for the isolated partitions, "aws-eusc" for the
+// European Sovereign Cloud, "aws" otherwise. The catalogue's patterns are
+// anchored on whole segments, so us-west-2 is commercial and only us-gov- is
 // GovCloud.
 //
-// It is the only place this package decides a partition. An ARN built with a
-// hard-coded "aws" is not malformed in the other two — it simply never
-// matches anything AWS returned, so the failure reads as a confident zero.
+// It is the only place this package decides a partition, and it decides it
+// from the same list the SDK builds its endpoints from. An ARN built with a
+// hard-coded "aws" is not malformed outside the commercial partition — it
+// simply never matches anything AWS returned, so the failure reads as a
+// confident zero.
+//
+// A region the catalogue does not recognise, including the empty string, is
+// commercial: the caller has a region it can name, and refusing to build an
+// ARN for a region AWS has not yet listed would lose every row in it.
 func PartitionForRegion(region string) string {
-	switch {
-	case strings.HasPrefix(region, "cn-"):
-		return "aws-cn"
-	case strings.HasPrefix(region, "us-gov-"):
-		return "aws-us-gov"
-	default:
-		return "aws"
+	for _, p := range partitionRegexes {
+		if p.re.MatchString(region) {
+			return p.id
+		}
 	}
+	return "aws"
 }
 
 // ARNForService parses an ARN AWS returned and reports whether it names the

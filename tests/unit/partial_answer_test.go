@@ -668,7 +668,9 @@ func (f *partialEBSStatusFake) DescribeVolumeStatus(_ context.Context, _ *ec2svc
 // their findings because a later, unrelated call failed loses facts a9s
 // already had, and leaves the volume looking healthier than it is.
 func TestPartialEBS_StatusFailureKeepsTheCoverageFindings(t *testing.T) {
-	clients := &awsclient.ServiceClients{EC2: &partialEBSStatusFake{}}
+	// The backup-coverage join builds a volume ARN from the session's region;
+	// a session with none answers "cannot tell" (aws5 row 2).
+	clients := &awsclient.ServiceClients{Region: "us-east-1", EC2: &partialEBSStatusFake{}}
 	store := session.NewIdentityStore()
 	store.Set(w7Account, nil)
 	clients.SetIdentityStore(store)

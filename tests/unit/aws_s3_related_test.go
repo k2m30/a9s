@@ -55,6 +55,16 @@ func s3CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
+// s3BackupSession is a session that recorded the region its buckets were read
+// in. The backup pivot builds a bucket ARN, and the partition in it comes from
+// that region; a session with none declines instead of guessing commercial
+// (aws5 row 2), so these walks name one. The old nil argument leant on the
+// ambient config's us-east-1, which is the guess the row removed — do not
+// restore it.
+func s3BackupSession() *awsclient.ServiceClients {
+	return &awsclient.ServiceClients{Region: "us-east-1"}
+}
+
 // healthyBucketResource returns a resource.Resource pre-populated with all
 // fields that the healthy-bucket fixture would have after a full fetch with
 // notifications enabled. Used by forward-lookup pivot tests.
@@ -596,7 +606,7 @@ func TestS3_Related_Backup_NoMatch(t *testing.T) {
 		},
 	}
 	checker := s3CheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, healthyBucketResource(), cache)
+	result := checker(context.Background(), s3BackupSession(), healthyBucketResource(), cache)
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 for backup pivot with non-matching ARN", result.Count())
 	}
@@ -618,7 +628,7 @@ func TestS3_Related_Backup_Found(t *testing.T) {
 		},
 	}
 	checker := s3CheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, healthyBucketResource(), cache)
+	result := checker(context.Background(), s3BackupSession(), healthyBucketResource(), cache)
 	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 for backup pivot when entry references %q", result.Count(), bucketARN)
 	}
@@ -652,7 +662,7 @@ func TestS3_Related_EBRule_NoMatch(t *testing.T) {
 		},
 	}
 	checker := s3CheckerByTarget(t, "eb-rule")
-	result := checker(context.Background(), nil, healthyBucketResource(), cache)
+	result := checker(context.Background(), s3BackupSession(), healthyBucketResource(), cache)
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 for eb-rule pivot with non-matching EventPattern", result.Count())
 	}
@@ -676,7 +686,7 @@ func TestS3_Related_EBRule_Found(t *testing.T) {
 		},
 	}
 	checker := s3CheckerByTarget(t, "eb-rule")
-	result := checker(context.Background(), nil, healthyBucketResource(), cache)
+	result := checker(context.Background(), s3BackupSession(), healthyBucketResource(), cache)
 	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 for eb-rule pivot when EventPattern sources from aws.s3 and names bucket %q",
 			result.Count(), fixtures.HealthyBucketName)
@@ -875,7 +885,7 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Name:   "prod-logs",
 			Fields: map[string]string{"name": "prod-logs"},
 		}
-		result := checker(context.Background(), nil, res, cache)
+		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 2 {
 			t.Errorf("Count = %d, want 2 (plan-prefix + plan-catchall-except-quarantine)", result.Count())
 		}
@@ -893,7 +903,7 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Name:   "staging-data",
 			Fields: map[string]string{"name": "staging-data"},
 		}
-		result := checker(context.Background(), nil, res, cache)
+		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 1 {
 			t.Errorf("Count = %d, want 1 (only plan-catchall-except-quarantine)", result.Count())
 		}
@@ -908,7 +918,7 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Name:   "quarantine-pii",
 			Fields: map[string]string{"name": "quarantine-pii"},
 		}
-		result := checker(context.Background(), nil, res, cache)
+		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 0 {
 			t.Errorf("Count = %d, want 0 (plan-catchall excludes quarantine-*, others miss the prefix)", result.Count())
 		}
@@ -920,7 +930,7 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 			Name:   "specific-bucket",
 			Fields: map[string]string{"name": "specific-bucket"},
 		}
-		result := checker(context.Background(), nil, res, cache)
+		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 2 {
 			t.Errorf("Count = %d, want 2 (plan-catchall-except-quarantine + plan-specific)", result.Count())
 		}

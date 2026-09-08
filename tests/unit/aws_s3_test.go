@@ -83,12 +83,11 @@ func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 			t.Errorf("Resource.Name = %q, want %q", r.Name, fixtures.HealthyBucketName)
 		}
 
-		// Fields["name"] and Fields["bucket_name"] must match the bucket name.
+		// Fields["name"] must match the bucket name. bucket_name was a second
+		// key carrying the same string and nothing read it (aws5 row 1); do not
+		// restore the pair.
 		if r.Fields["name"] != fixtures.HealthyBucketName {
 			t.Errorf("Fields[name] = %q, want %q", r.Fields["name"], fixtures.HealthyBucketName)
-		}
-		if r.Fields["bucket_name"] != fixtures.HealthyBucketName {
-			t.Errorf("Fields[bucket_name] = %q, want %q", r.Fields["bucket_name"], fixtures.HealthyBucketName)
 		}
 
 		// Fields["creation_date"] must be a non-empty formatted date string.

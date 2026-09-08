@@ -77,10 +77,11 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	region := sessionRegion(c)
 	account := accountIDFromClients(ctx, c, c.IdentityStore())
-	if account == "" {
-		// Identity unresolved (STS GetCallerIdentity failed or is unavailable):
-		// the ARN this checker needs cannot be constructed, so the result is
-		// unknown, not a real zero.
+	if account == "" || region == "" {
+		// Identity or region unresolved (STS GetCallerIdentity failed or is
+		// unavailable; the session recorded no region): a job ARN carries both
+		// in segments of its own, so the ARN this checker needs cannot be
+		// constructed and the result is unknown, not a real zero.
 		return resource.UnknownRelated("cfn")
 	}
 	jobARN := "arn:" + PartitionForRegion(region) + ":glue:" + region + ":" + account + ":job/" + jobName

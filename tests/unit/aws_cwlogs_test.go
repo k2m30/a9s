@@ -54,7 +54,11 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 	}
 
 	// Verify required fields exist
-	requiredFields := []string{"log_group_name", "stored_bytes", "retention_days", "creation_time"}
+	// "retention" replaced "retention_days": the policy is one field now
+	// (aws5 row 1), carrying "30 days" or "never expire" rather than a number
+	// that was empty for exactly the groups the never-expire warning fires on.
+	// Do not restore the number-only key.
+	requiredFields := []string{"log_group_name", "stored_bytes", "retention", "creation_time"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
 			if _, ok := r.Fields[key]; !ok {
@@ -77,8 +81,8 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 	if r0.Fields["stored_bytes"] != "1 MB" {
 		t.Errorf("resource[0].Fields[\"stored_bytes\"]: expected %q, got %q", "1 MB", r0.Fields["stored_bytes"])
 	}
-	if r0.Fields["retention_days"] != "30" {
-		t.Errorf("resource[0].Fields[\"retention_days\"]: expected %q, got %q", "30", r0.Fields["retention_days"])
+	if r0.Fields["retention"] != "30 days" {
+		t.Errorf("resource[0].Fields[\"retention\"]: expected %q, got %q", "30 days", r0.Fields["retention"])
 	}
 	if r0.Fields["creation_time"] == "" {
 		t.Error("resource[0].Fields[\"creation_time\"] should not be empty")
@@ -92,8 +96,8 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 	if r1.Fields["stored_bytes"] != "512 KB" {
 		t.Errorf("resource[1].Fields[\"stored_bytes\"]: expected %q, got %q", "512 KB", r1.Fields["stored_bytes"])
 	}
-	if r1.Fields["retention_days"] != "7" {
-		t.Errorf("resource[1].Fields[\"retention_days\"]: expected %q, got %q", "7", r1.Fields["retention_days"])
+	if r1.Fields["retention"] != "7 days" {
+		t.Errorf("resource[1].Fields[\"retention\"]: expected %q, got %q", "7 days", r1.Fields["retention"])
 	}
 }
 

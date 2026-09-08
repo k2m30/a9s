@@ -49,36 +49,48 @@ type sdkRegionDescriptor struct {
 //
 //nolint:gochecknoglobals // process-scope region catalogue: parsed once at package load
 var (
-	allRegionsCache = loadCommercialPartition()
+	allRegionsCache, partitionRegexes = loadPartitions()
 )
 
-// loadCommercialPartition parses the embedded partitions.json and returns the
-// commercial-partition region slice (sorted by code, with each AWSRegion's
+// partitionRegex is one partition of the SDK catalogue: its ARN id and the
+// pattern its region codes match.
+type partitionRegex struct {
+	id string
+	re *regexp.Regexp
+}
+
+// loadPartitions parses the embedded partitions.json once and returns both
+// facts read off it: the commercial-partition region slice (sorted by code, with each AWSRegion's
 // DisplayName already populated from the SDK description). Panics on
 // malformed input — the embedded JSON is vendored at build time so any parse
 // failure is a build-time bug.
 //
 // AllRegions() copies the returned slice on every call (caller-mutable). Gov-cloud
-// (`aws-us-gov`) and China (`aws-cn`) partitions are skipped intentionally —
-// `TestAllRegions_NoGovOrChinaLeaks` pins the behavior.
-func loadCommercialPartition() []AWSRegion {
+// (`aws-us-gov`) and China (`aws-cn`) partitions are skipped from the REGION
+// slice intentionally — `TestAllRegions_NoGovOrChinaLeaks` pins the behavior.
+// They are not skipped from the matcher slice: PartitionForRegion has to name
+// the partition of a region a9s does not offer in its selector, because a
+// profile can be configured for one.
+func loadPartitions() ([]AWSRegion, []partitionRegex) {
 	var parsed sdkPartitions
 	if err := json.Unmarshal(partitionsJSON, &parsed); err != nil {
 		panic(fmt.Sprintf("aws regions: parse embedded partitions.json: %v", err))
 	}
 
 	var regions []AWSRegion
-	var regex *regexp.Regexp
+	var commercial *regexp.Regexp
+	matchers := make([]partitionRegex, 0, len(parsed.Partitions))
 
 	for _, p := range parsed.Partitions {
-		if p.ID != "aws" {
-			continue
-		}
 		re, err := regexp.Compile(p.RegionRegex)
 		if err != nil {
 			panic(fmt.Sprintf("aws regions: compile region regex %q: %v", p.RegionRegex, err))
 		}
-		regex = re
+		matchers = append(matchers, partitionRegex{id: p.ID, re: re})
+		if p.ID != "aws" {
+			continue
+		}
+		commercial = re
 
 		regions = make([]AWSRegion, 0, len(p.Regions))
 		for code, desc := range p.Regions {
@@ -99,10 +111,10 @@ func loadCommercialPartition() []AWSRegion {
 		// deterministic ordering independent of map iteration.
 		sort.Slice(regions, func(i, j int) bool { return regions[i].Code < regions[j].Code })
 	}
-	if regex == nil {
+	if commercial == nil {
 		panic("aws regions: embedded partitions.json has no 'aws' partition")
 	}
-	return regions
+	return regions, matchers
 }
 
 // AllRegions returns the list of commercial-partition AWS regions in a stable
@@ -120,14 +132,21 @@ func AllRegions() []AWSRegion {
 const maxSourceProfileDepth = 5
 
 // sessionRegion is the region a row's ARN belongs to: the one the session was
-// opened with, falling back to the profile's default when the session did not
-// record one. Every site that builds or matches a region-bearing value reads
-// it here, so none of them can disagree about which region a row is in.
+// opened with, and empty when the session recorded none. Every site that
+// builds or matches a region-bearing value reads it here, so none of them can
+// disagree about which region a row is in.
+//
+// It answers nothing rather than the ambient AWS config's region, because the
+// rows were read through this session's clients and not through the ambient
+// one: a session in China or GovCloud that lost its region would otherwise
+// build commercial identifiers and match nothing, which every caller renders
+// as a proven zero. Callers guard on the empty answer and leave the identifier
+// off the row.
 func sessionRegion(clients any) string {
-	if c, ok := clients.(*ServiceClients); ok && c != nil && c.Region != "" {
+	if c, ok := clients.(*ServiceClients); ok && c != nil {
 		return c.Region
 	}
-	return GetDefaultRegion("", "")
+	return ""
 }
 
 // GetDefaultRegion resolves the effective region for a given profile the same

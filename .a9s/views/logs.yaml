@@ -10,9 +10,8 @@ list:
     width: 14
     sort_key: stored_bytes_raw
   Retention:
-    path: RetentionInDays
-    key: retention_days
-    width: 10
+    key: retention
+    width: 12
   Metric Filters:
     path: MetricFilterCount
     width: 8

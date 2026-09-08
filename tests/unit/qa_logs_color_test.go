@@ -21,6 +21,11 @@ package unit
 // `retention_days` and no `retention` word says nothing, which is what proves
 // the classifier stopped reading it. The row naming the word wants the colour
 // the word earns.
+//
+// `retention_days` is a key no fetcher writes anymore — aws5 row 1 collapsed
+// the log group's retention into one field, `retention`, carrying words. It
+// stays in this table on purpose: a key colorLogs does not know must still
+// leave the row healthy, and this is the only place that is pinned.
 
 import (
 	"testing"

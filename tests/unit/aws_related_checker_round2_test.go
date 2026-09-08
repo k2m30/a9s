@@ -902,10 +902,12 @@ func (f *fakeECRGetRepositoryPolicy) GetRepositoryPolicy(_ context.Context, _ *e
 // 10. checkGlueCFN — region resolves from clients/config, not env; account
 // comes from the session-scoped identity store, not a live STS call.
 //
-// checkGlueCFN (core/aws/glue_related.go:126) resolves region from
-// c.Region (falling back to GetDefaultRegion) rather than os.Getenv, so it
+// checkGlueCFN resolves region from c.Region rather than os.Getenv, so it
 // is immune to AWS_REGION/AWS_DEFAULT_REGION being unset in this test
-// process. The remaining dependency is accountIDFromClients, which reads
+// process. The session names the region here because a session that recorded
+// none declines rather than falling back to the ambient config (aws5 row 2);
+// the empty-Region form this test used pinned that fallback and must not be
+// restored. The remaining dependency is accountIDFromClients, which reads
 // c.IdentityStore() — this test seeds that store directly (the honest
 // in-session path: STS GetCallerIdentity is memoized there for the
 // lifetime of one Session) instead of relying on a live STS call or a
@@ -947,7 +949,7 @@ func TestGlue_Related_CFN_ResolvesRegionWithoutEnvVar(t *testing.T) {
 			"arn:aws:glue:us-east-1:123456789012:job/etl-nightly-job": {"aws:cloudformation:stack-name": "data-pipeline-stack"},
 		},
 	}
-	clients := &awsclient.ServiceClients{Glue: fake}
+	clients := &awsclient.ServiceClients{Region: "us-east-1", Glue: fake}
 	identity := session.NewIdentityStore()
 	identity.Set("123456789012", nil)
 	clients.SetIdentityStore(identity)

@@ -118,7 +118,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Columns: []domain.Column{
 			{Key: "log_group_name", Title: "Log Group Name", Width: 48, Sortable: true},
 			{Key: "stored_bytes", Title: "Size", Width: 14, Sortable: true},
-			{Key: "retention_days", Title: "Retention", Width: 10, Sortable: true},
+			{Key: "retention", Title: "Retention", Width: 12, Sortable: true},
 			{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
@@ -132,7 +132,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
-		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention_days", "creation_time", "kms_key_id"},
+		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention", "creation_time", "kms_key_id"},
 		IssueEnricherFieldKeys: []string{"last_event_at"},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true, Truncated: true},
@@ -246,7 +246,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		FilteredFetcher: filteredFetcherWithClients(func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken)
 		}),
-		FieldKeys: []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"},
+		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: false},
 			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: false},

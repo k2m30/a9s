@@ -101,7 +101,6 @@ func convertAsgActivity(activity asgtypes.Activity, asgName string) resource.Res
 		Name: name,
 		Fields: map[string]string{
 			"start_time":  startTime,
-			"status":      statusCode,
 			"status_code": statusCode,
 			"description": description,
 			"cause":       cause,

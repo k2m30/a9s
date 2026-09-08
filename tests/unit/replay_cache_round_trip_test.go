@@ -189,7 +189,9 @@ var replayShadowedCells = []replayShadowedCell{
 	// reports the threshold at rather than the %g the reflect formatter left.
 	{"alarm", "cf-e1a2b3c4d5e6f7-error-rate", "Threshold", "5.00"},
 	// int over a phrase: the fetcher's Fields value is not a retention at all.
-	{"logs", "/aws/lambda/process-orders", "Retention", "30"},
+	// The retention policy is one field carrying words (aws5 row 1): "30 days"
+	// where the number-only key used to render "30".
+	{"logs", "/aws/lambda/process-orders", "Retention", "30 days"},
 	// timestamp: the fetcher's value loses the time of day.
 	{"secrets", "prod/app/long-lived-signing-key", "Last Changed", "2024-12-01 00:00"},
 	{"secrets", "prod/payments/stripe-webhook-secret", "Last Accessed", "2026-04-28 00:00"},

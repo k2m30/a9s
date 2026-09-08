@@ -19,6 +19,9 @@ import (
 
 // TestFetchTargetHealth_Basic verifies parsing of 4 targets with varied health
 // states, checking ID, Name, Status, all Fields, and RawStruct.
+// The target's health is one field: "health" is the type's LifecycleKey and
+// its column key, and "status" was the same string under a second name (aws5
+// row 1). These assertions moved to "health"; do not restore the pair.
 func TestFetchTargetHealth_Basic(t *testing.T) {
 	port80 := int32(80)
 	port443 := int32(443)
@@ -106,8 +109,8 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 	})
 
 	t.Run("target_0_Status", func(t *testing.T) {
-		if resources[0].Fields["status"] != "healthy" {
-			t.Errorf("Fields[\"status\"]: expected %q, got %q", "healthy", resources[0].Fields["status"])
+		if resources[0].Fields["health"] != "healthy" {
+			t.Errorf("Fields[\"health\"]: expected %q, got %q", "healthy", resources[0].Fields["health"])
 		}
 	})
 
@@ -149,8 +152,8 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 
 	t.Run("target_2_unhealthy", func(t *testing.T) {
 		r := resources[2]
-		if r.Fields["status"] != "unhealthy" {
-			t.Errorf("Fields[\"status\"]: expected %q, got %q", "unhealthy", r.Fields["status"])
+		if r.Fields["health"] != "unhealthy" {
+			t.Errorf("Fields[\"health\"]: expected %q, got %q", "unhealthy", r.Fields["health"])
 		}
 		if r.Fields["reason"] != "Target.FailedHealthChecks" {
 			t.Errorf("Fields[reason]: expected %q, got %q", "Target.FailedHealthChecks", r.Fields["reason"])
@@ -162,8 +165,8 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 
 	t.Run("target_3_draining", func(t *testing.T) {
 		r := resources[3]
-		if r.Fields["status"] != "draining" {
-			t.Errorf("Fields[\"status\"]: expected %q, got %q", "draining", r.Fields["status"])
+		if r.Fields["health"] != "draining" {
+			t.Errorf("Fields[\"health\"]: expected %q, got %q", "draining", r.Fields["health"])
 		}
 		if r.Fields["reason"] != "Target.DeregistrationInProgress" {
 			t.Errorf("Fields[reason]: expected %q, got %q", "Target.DeregistrationInProgress", r.Fields["reason"])
@@ -279,8 +282,8 @@ func TestFetchTargetHealth_AllStates(t *testing.T) {
 
 	for i, s := range states {
 		t.Run(s.expected, func(t *testing.T) {
-			if resources[i].Fields["status"] != s.expected {
-				t.Errorf("Fields[\"status\"]: expected %q, got %q", s.expected, resources[i].Fields["status"])
+			if resources[i].Fields["health"] != s.expected {
+				t.Errorf("Fields[\"health\"]: expected %q, got %q", s.expected, resources[i].Fields["health"])
 			}
 			if resources[i].Fields["health"] != s.expected {
 				t.Errorf("Fields[health]: expected %q, got %q", s.expected, resources[i].Fields["health"])
@@ -362,8 +365,8 @@ func TestFetchTargetHealth_IPTargets(t *testing.T) {
 		if r.ID != "10.0.2.103" {
 			t.Errorf("ID: expected %q, got %q", "10.0.2.103", r.ID)
 		}
-		if r.Fields["status"] != "unhealthy" {
-			t.Errorf("Fields[\"status\"]: expected %q, got %q", "unhealthy", r.Fields["status"])
+		if r.Fields["health"] != "unhealthy" {
+			t.Errorf("Fields[\"health\"]: expected %q, got %q", "unhealthy", r.Fields["health"])
 		}
 		if r.Fields["reason"] != "Target.Timeout" {
 			t.Errorf("Fields[reason]: expected %q, got %q", "Target.Timeout", r.Fields["reason"])
