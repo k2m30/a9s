@@ -207,11 +207,29 @@ var verbatimDetailPaths = map[string]string{
 	"sns-sub/SubscriptionArn": "verbatim: SNS puts the literal \"PendingConfirmation\" in the ARN field of an unconfirmed subscription; the field holds an ARN a person copies, so its contents are never reworded",
 }
 
+// rawEnumDetailDebtCeiling is how many entries rawEnumDetailDebt is allowed to
+// hold. It is lowered by the change that empties an entry and never raised: a
+// field belongs on this list only because it was already broken when the list
+// was written, and nothing broken later qualifies.
+//
+// Without it "only shrinks" was a claim and not a gate. Moving a field into the
+// map left both other checks green — the sweep skips whatever the map names,
+// and the stale check only asks whether listed fields still render raw — so the
+// list could grow silently, which is exactly how an allowlist starts.
+const rawEnumDetailDebtCeiling = 16
+
 // rawEnumDetailDebt is backlog w198: fields that render an SDK constant on a
-// demo detail row and are not this task's to fix. It is a ratchet, not an
-// allowlist — TestRawEnumDebtNeitherGrowsNorGoesStale fails when a NEW raw
-// constant appears anywhere and when a listed one stops rendering raw, so the
-// list can only shrink, and w198 empties it.
+// demo detail row and are not this task's to fix.
+//
+// Three checks hold it to a ratchet, and between them the list can only shrink:
+//
+//   - a raw constant on neither this list nor verbatimDetailPaths fails
+//     TestNoDemoDetailRowIsARawConstant, so a new one cannot be shipped;
+//   - adding an entry here fails the ceiling above, so it cannot be silenced
+//     by recording it instead;
+//   - an entry that no longer renders raw fails
+//     TestRawEnumDebtNeitherGrowsNorGoesStale, so a fixed field cannot keep its
+//     line — and the fix lowers the ceiling with it.
 //
 // Every entry is a fact an operator reads, so every entry is a defect. It is
 // recorded rather than fixed here because fixing it is w198's scope, and
@@ -458,6 +476,19 @@ func demoLogEvents(t *testing.T, clients *awsclient.ServiceClients) []resource.R
 // fixed — the shape an allowlist decays into, and the reason this test looks
 // for stale entries as hard as it looks for new ones.
 func TestRawEnumDebtNeitherGrowsNorGoesStale(t *testing.T) {
+	if len(rawEnumDetailDebt) > rawEnumDetailDebtCeiling {
+		t.Errorf("rawEnumDetailDebt holds %d entries against a ceiling of %d — a field is on this list "+
+			"only because it was already broken when the list was written. Fix the field, or if it must "+
+			"render exactly as AWS wrote it, record it in verbatimDetailPaths with that reason",
+			len(rawEnumDetailDebt), rawEnumDetailDebtCeiling)
+	}
+	if len(rawEnumDetailDebt) < rawEnumDetailDebtCeiling {
+		t.Errorf("rawEnumDetailDebt is down to %d entries and the ceiling still reads %d — lower "+
+			"rawEnumDetailDebtCeiling to %d in the change that emptied the entry, so the room it freed "+
+			"cannot be spent on a new one",
+			len(rawEnumDetailDebt), rawEnumDetailDebtCeiling, len(rawEnumDetailDebt))
+	}
+
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
 
