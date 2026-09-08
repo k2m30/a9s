@@ -179,22 +179,14 @@ type Session struct {
 	// HandleRegionSelected/handleClientsReadyFailure/
 	// handleClientsReadySuccess in core/runtime/handlers.go) — all via
 	// SetProfileRegion, never by direct field assignment. They are read
-	// cross-goroutine by EnsureCacheStore/WithCacheStore/WithCacheStoreSave/
-	// ReadCacheStore's own callers, which historically read
-	// c.session.Profile/Region at the Core accessor call site BEFORE
-	// entering this lock — that pre-lock read was the actual data race (a
-	// profile switch's field write interleaving with the detached
-	// availability-cache-save writer goroutine's read, caught by -race on CI
-	// run 28839454135: Core.HandleProfileSelected's write at
-	// handlers.go:418 against a pre-lock Profile/Region read at the Core
-	// accessor call site — that call site now goes through
-	// Core.WithCacheStoreSave instead, see its own doc comment — reached via
-	// the single-writer goroutine runAvailabilitySaveLoop spawns in
-	// core/app/menu.go).
-	// EnsureCacheStore/WithCacheStoreSave/ReadCacheStore now
-	// read the pair
-	// via CurrentPair while already holding pairMu, closing that gap for
-	// every caller in one place rather than one at a time.
+	// cross-goroutine by EnsureCacheStore/WithCacheStoreSave/ReadCacheStore's
+	// own callers. A caller that reads c.session.Profile/Region at the Core
+	// accessor call site BEFORE entering this lock races a profile switch's
+	// field write — the detached availability-cache-save writer goroutine
+	// against HandleProfileSelected is the reachable pairing, and -race
+	// caught it. EnsureCacheStore/WithCacheStoreSave/ReadCacheStore therefore
+	// read the pair via CurrentPair while already holding pairMu, closing
+	// that gap for every caller in one place rather than one at a time.
 	//
 	// TUI tea.Cmd goroutines and concurrent web drains both reach
 	// EnsureCacheStore/CacheStore, and Rotate clears CacheStore from the

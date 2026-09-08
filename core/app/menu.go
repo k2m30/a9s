@@ -371,8 +371,8 @@ func applyAvailabilityObservation(ms *MenuState, key string, count int, truncate
 // applyEnrichmentState (list_filter.go) — which used to each carry their own
 // verbatim copy of the save block. Caller must hold c.mu (at least read).
 //
-// The menu state the callers pass is what the badge now shows, not what gets
-// written: the counts on disk are derived from RowStore by the one producer
+// What the badge shows is not what gets written: the counts on disk are
+// derived from RowStore by the one producer
 // (Core.SaveAvailabilityFromRows), the same derivation the sweep's own save
 // uses. This lane used to freeze a clone of the menu's five maps and write
 // EVERY type's count from that snapshot, which made the rendered menu a
@@ -396,7 +396,7 @@ func applyAvailabilityObservation(ms *MenuState, key string, count int, truncate
 // a live key event. Every real Controller owner (TUI, web session) must call
 // Close on its own shutdown path — see Close's doc comment for the current
 // wiring.
-func (c *Controller) persistMenuAvailabilityCache(_ *MenuState) {
+func (c *Controller) persistMenuAvailabilityCache() {
 	pair := c.core.Pair()
 	if pair.Profile == "" || pair.Region == "" {
 		return

@@ -390,7 +390,7 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	// Persist the updated availability to disk, mirroring the "survives an
 	// app restart" half of the exact-total menu sync-back. Best-effort — a write failure here
 	// must not surface as a controller error.
-	c.persistMenuAvailabilityCache(ms)
+	c.persistMenuAvailabilityCache()
 }
 
 // maybeSaveResourceListCache persists ls.Rows for canon's canonical

@@ -248,13 +248,8 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered); err != nil {
 			flashErr = err
 		}
-		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
-		if entries != nil {
-			if err := c.SaveAvailabilityCache(
-				dispatchPair, entries, truncated, issueCounts, issueTruncated, issueKnown,
-			); err != nil && flashErr == nil {
-				flashErr = err
-			}
+		if err := c.SaveAvailabilityFromRows(dispatchPair); err != nil && flashErr == nil {
+			flashErr = err
 		}
 		if flashErr != nil {
 			return messages.Flash{Text: fmt.Sprintf("cache save: %v", flashErr), IsError: true}, nil

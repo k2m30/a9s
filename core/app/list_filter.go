@@ -262,7 +262,7 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 		// RowStore and never reaches store.SaveType, so without this call the
 		// badge this function just raised would be lost on the next launch
 		// even though it is visible for the rest of the session.
-		c.persistMenuAvailabilityCache(ms)
+		c.persistMenuAvailabilityCache()
 	}
 }
 
