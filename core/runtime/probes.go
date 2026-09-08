@@ -237,6 +237,55 @@ type reconcileInput struct {
 	Wave2Authoritative bool
 }
 
+// saveObservation is what a save knows about the population it is recording,
+// before any file is consulted: how many rows it counted, whether that count
+// was cut short, whether the numbers were read back out of the row store
+// rather than observed from AWS, and whether the file it is about to write
+// already exists.
+type saveObservation struct {
+	Count     int
+	Truncated bool
+	Derived   bool
+	HadStored bool
+}
+
+// incomingTypeFile derives the Count and Exact a save hands reconcileTypeFile.
+// Both lanes that write a type file call it, so the two can no longer answer
+// the same question differently, and a third lane cannot copy the reasoning a
+// third time. Rows are the caller's to attach: they are the one thing the two
+// lanes genuinely differ about.
+//
+// C5, exactness sticks: a truncated observation never downgrades a stored
+// exact total — Exact advances only on an observation that is itself
+// untruncated. reconcileTypeFile's rule 0 overrides that stickiness when the
+// raw (truncated, count) observation CONTRADICTS the stored exactness, which
+// is why the raw values travel to it untouched.
+//
+// A derived observation adopts the file's exactness instead of arguing with
+// it: it read the row store back, so its truncation flag describes the
+// screen's last observation and not the persisted population, and it has
+// nothing with which to change what the file already decided. A file that
+// does not exist yet has no answer to adopt, and the row store's own view is
+// then the only one there is.
+//
+// Neither kind lowers a count the file calls exact: a shallower lower bound
+// knows less than the exact total already stored, it does not contradict it
+// (when it does, rule 0 is what says so).
+func incomingTypeFile(existing cache.TypeFile, obs saveObservation) cache.TypeFile {
+	adopt := obs.Derived && obs.HadStored
+	incoming := cache.TypeFile{
+		Count: obs.Count,
+		Exact: existing.Exact || !obs.Truncated,
+	}
+	if adopt {
+		incoming.Exact = existing.Exact
+	}
+	if existing.Exact && (obs.Truncated || adopt) && existing.Count > obs.Count {
+		incoming.Count = existing.Count
+	}
+	return incoming
+}
+
 func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFile {
 	incoming := in.Incoming
 	if existing.Exact && !in.Derived && in.RawTruncated && in.RawCount >= existing.Count && (existing.Count > 0 || in.RawCount > 0) {
@@ -404,31 +453,12 @@ func (c *Core) saveAvailabilityCache(
 				trunc = truncated[rawName]
 			}
 			existing, hadExisting := store.Type(name)
-			incoming := cache.TypeFile{
-				Count: count,
-				// C5: a truncated first-page probe never downgrades a stored
-				// exact total — only replace Exact when this observation is
-				// itself untruncated (a genuine exact observation).
-				// reconcileTypeFile's rule 0 overrides this stickiness when
-				// the raw observation (trunc, count) itself CONTRADICTS the
-				// stored exactness (a self-heal for a poisoned pair — see
-				// rule 0's doc comment).
-				Exact: existing.Exact || !trunc,
-			}
-			if derived && hadExisting {
-				// Adopt, never raise or lower: this write read the row store
-				// back, so it has no observation with which to change what
-				// the file already decided. A file that does not exist yet
-				// has no answer to adopt, and the row store's own view is
-				// then the only one there is.
-				incoming.Exact = existing.Exact
-			}
-			if existing.Exact && (trunc || (derived && hadExisting)) && existing.Count > count {
-				// Preserve the previously-observed exact count rather than
-				// letting a smaller truncated lower-bound regress it. Rule 0
-				// overrides this too when the contradiction condition holds.
-				incoming.Count = existing.Count
-			}
+			incoming := incomingTypeFile(existing, saveObservation{
+				Count:     count,
+				Truncated: trunc,
+				Derived:   derived,
+				HadStored: hadExisting,
+			})
 			tf := reconcileTypeFile(existing, reconcileInput{
 				Incoming:     incoming,
 				RawTruncated: trunc,
@@ -683,21 +713,11 @@ func (c *Core) saveResourceListCache(pair session.Pair, shortName string, rows [
 			return nil, nil
 		}
 		existing, _ := store.Type(canon)
-		incoming := cache.TypeFile{
-			Count: count,
-			Exact: exact,
-			Rows:  rows,
-		}
-		if !exact && existing.Exact {
-			// C5: exactness only ever advances — a truncated observation
-			// never downgrades an already-exact stored total. reconcileTypeFile's
-			// rule 0 overrides this stickiness when the raw (exact, count)
-			// observation itself contradicts the stored exactness — e.g. the
-			// verify-depth walk (D7) reaching the stored-exact depth while
-			// AWS still reports truncation (a self-heal for a poisoned pair).
-			incoming.Exact = true
-			incoming.Count = existing.Count
-		}
+		incoming := incomingTypeFile(existing, saveObservation{
+			Count:     count,
+			Truncated: !exact,
+		})
+		incoming.Rows = rows
 		tf := reconcileTypeFile(existing, reconcileInput{
 			Incoming:           incoming,
 			RowsProvided:       true,
