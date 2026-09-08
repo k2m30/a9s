@@ -17,10 +17,8 @@ package unit_test
 // a dotted declaration matches nothing and humanizing the line would reword the
 // label with it.
 //
-// These render through the view config the app loads at startup
-// (internal/tui/app.go:144, core/web/construct.go:31). Without it the
-// controller's detail projection falls back to flat Fields rows and never
-// projects RawStruct at all, so a pin that skips it cannot see either defect.
+// Both rows come off RawStruct, which the shared detail helper renders because
+// the controller it builds carries the view config production carries.
 
 import (
 	"strings"
@@ -33,27 +31,8 @@ import (
 	kintypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	"github.com/k2m30/a9s/v3/core/app"
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// aws6DetailRowsWithViews drives the real detail build with the view config
-// loaded, which is what makes the projector render the RawStruct paths each
-// type's Detail section declares.
-func aws6DetailRowsWithViews(t *testing.T, res resource.Resource, shortName string) []app.FieldRow {
-	t.Helper()
-	c := newVisibilityDetailController(t)
-	// The only difference from the flat helper, and the whole point: without a
-	// view config the projection falls back to alphabetical Fields rows and
-	// never reads RawStruct at all (internal/tui/app.go:143).
-	c.SetViewConfig(config.DefaultConfig())
-	c.EnsureDetailState(res, shortName)
-	body := c.Snapshot().Body.Detail
-	if body == nil {
-		return nil
-	}
-	return body.Fields
-}
 
 // rawStructDetailWitness is one resource carrying only the SDK struct, so the
 // row under test can only come from the RawStruct projection.
@@ -103,7 +82,7 @@ func TestRawStructDetailRowReadsAsWords(t *testing.T) {
 			res := resource.Resource{
 				ID: "acme-probe", Name: "acme-probe", Type: w.shortName, RawStruct: w.raw,
 			}
-			rows := aws6DetailRowsWithViews(t, res, w.shortName)
+			rows := aws6DetailRows(t, res, w.shortName)
 			if len(rows) == 0 {
 				t.Fatalf("%s: the detail rendered no rows at all", w.shortName)
 			}
@@ -154,7 +133,7 @@ func TestDottedDeclarationHumanizesTheNestedScalar(t *testing.T) {
 			StreamModeDetails: &kintypes.StreamModeDetails{StreamMode: kintypes.StreamModeOnDemand},
 		},
 	}
-	rows := aws6DetailRowsWithViews(t, res, kinesisShortName)
+	rows := aws6DetailRows(t, res, kinesisShortName)
 	if len(rows) == 0 {
 		t.Fatal("kinesis: the detail rendered no rows at all")
 	}

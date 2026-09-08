@@ -237,8 +237,15 @@ var rawEnumDetailDebt = map[string]string{
 
 // TestNoDemoDetailRowIsARawConstant sweeps every demo detail screen for a row
 // whose whole value is an SDK constant. It is the standing half of rows 4 to 6:
-// the four fields fixed here stay fixed, and a new one has to be argued for in
-// the allowlist above rather than shipped silently.
+// the fields fixed here stay fixed, and a new one is red rather than shipped
+// silently.
+//
+// There are two places a constant on a screen may be recorded instead, and
+// neither is an exemption. verbatimDetailPaths is for a value that must reach
+// the screen exactly as AWS wrote it, and every entry carries the reason.
+// rawEnumDetailDebt is backlog w198's worklist, which only shrinks — its own
+// ratchet fails when an entry stops rendering raw, and this sweep fails when
+// something not on either list appears.
 func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
