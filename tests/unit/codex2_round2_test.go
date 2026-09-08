@@ -132,6 +132,10 @@ func TestDemoIAMFake_RefusesAKeyTheFixturesNeverRegistered(t *testing.T) {
 			_, err := f.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{InstanceProfileName: aws.String("no-such-profile")})
 			return err
 		}},
+		{"GetRolePolicy for a document the fixture never registered", func() error {
+			_, err := f.GetRolePolicy(ctx, &iam.GetRolePolicyInput{RoleName: aws.String("no-such-role"), PolicyName: aws.String("no-such-policy")})
+			return err
+		}},
 		{"ListRolePolicies for an unknown role", func() error {
 			_, err := f.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{RoleName: aws.String("no-such-role")})
 			return err
