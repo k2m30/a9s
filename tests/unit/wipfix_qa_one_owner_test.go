@@ -541,20 +541,35 @@ func wipfixFuncBody(t *testing.T, rel, signature string) string {
 }
 
 // TestOneOwner_SupersessionIsCheckedOncePerMessage pins the first half of row
-// 36: both hosts already ask whether a list result has been superseded before
-// they hand it on, and the controller asks again at its own door. Core's
-// handler asking a third time for the same message is a fourth answer to one
-// question, and a fourth place to get the guard wrong.
+// 36. The runtime's handler is the owner of re-entry verification: it is the
+// seam the terminal host and every direct caller go through, so it stamps the
+// canonical short name onto the message and drops a superseded one. The
+// controller then reads what it was handed. Asking the same two questions a
+// second time at the controller's door is a second answer to each, and a
+// second place to get either wrong.
 func TestOneOwner_SupersessionIsCheckedOncePerMessage(t *testing.T) {
-	body := wipfixFuncBody(t, "core/runtime/handlers_resources.go",
+	owner := wipfixFuncBody(t, "core/runtime/handlers_resources.go",
 		"func (c *Core) HandleResourcesLoaded(")
-	if strings.Contains(body, "ListResultSuperseded(") {
-		t.Error("HandleResourcesLoaded re-checks ListResultSuperseded for a message its " +
-			"caller has already dropped on that answer — one check per message, at one seam")
+	if !strings.Contains(owner, "ListResultSuperseded(") {
+		t.Error("Core.HandleResourcesLoaded does not check ListResultSuperseded — it is the " +
+			"one seam that verifies re-entry, and a direct caller has nothing else to rely on")
 	}
-	if strings.Contains(body, "CanonicalShortName(") || strings.Contains(body, "FindResourceType(") {
-		t.Error("HandleResourcesLoaded re-canonicalises the resource type its caller " +
-			"already canonicalised for the same message")
+	if !strings.Contains(owner, "FindResourceType(") && !strings.Contains(owner, "CanonicalShortName(") {
+		t.Error("Core.HandleResourcesLoaded does not canonicalise the resource type — an " +
+			"alias-opened list must key the gen guard, the reseed and the task scope by the " +
+			"same short name everything else uses")
+	}
+
+	if strings.Contains(wipfixReadRepoFile(t, "core/app/handle.go"), "ListResultSuperseded(") {
+		t.Error("core/app/handle.go re-checks ListResultSuperseded for a message the runtime " +
+			"has already dropped on that answer — the controller reads what it is handed")
+	}
+	screenLookup := wipfixFuncBody(t, "core/app/handle.go",
+		"func (c *Controller) findResourceListScreen(")
+	if strings.Contains(screenLookup, "FindResourceType(") ||
+		strings.Contains(screenLookup, "CanonicalShortName(") {
+		t.Error("findResourceListScreen canonicalises the resource type a second time — " +
+			"the message arrives carrying the canonical short name the runtime stamped")
 	}
 }
 

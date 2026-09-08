@@ -15,6 +15,7 @@
 package unit
 
 import (
+	"math"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -118,11 +119,27 @@ func wipfixLockHoldDuringAbsorb(t *testing.T, n int) time.Duration {
 	return held
 }
 
+// wipfixMinLockHold is the shortest hold observed across a few absorptions.
+// A blocked reader's wait is the writer's hold plus whatever the scheduler
+// added, never less, so the minimum is the closest reading to the hold itself
+// — and the whole suite running beside this one only ever adds. One sample
+// flaked about once in four full-suite runs; three do not.
+func wipfixMinLockHold(t *testing.T, n int) time.Duration {
+	t.Helper()
+	shortest := time.Duration(math.MaxInt64)
+	for range 3 {
+		if d := wipfixLockHoldDuringAbsorb(t, n); d < shortest {
+			shortest = d
+		}
+	}
+	return shortest
+}
+
 // TestLargeFetchAbsorb_HoldsTheLockOnlyForTheSwap pins row 23.
 func TestLargeFetchAbsorb_HoldsTheLockOnlyForTheSwap(t *testing.T) {
 	budget, growth := wipfixAbsorbBudgets()
-	small := wipfixLockHoldDuringAbsorb(t, 6000)
-	large := wipfixLockHoldDuringAbsorb(t, 12000)
+	small := wipfixMinLockHold(t, 6000)
+	large := wipfixMinLockHold(t, 12000)
 
 	if small > budget {
 		t.Errorf("absorbing 6000 rows held the controller lock for %v, budget %v (race=%v) — "+
