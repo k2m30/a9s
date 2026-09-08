@@ -50,7 +50,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/demo"
@@ -75,7 +74,7 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 	sort.Slice(types, func(i, j int) bool { return types[i].ShortName < types[j].ShortName })
 
 	skippedTargets := make(map[string]bool)
-	var orphans []string
+	var orphans []relatedOrphan
 
 	for _, td := range types {
 		defs := resource.GetRelated(td.ShortName)
@@ -112,17 +111,21 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 				for _, id := range result.ResourceIDs() {
 					resolved, err := fn(ctx, clients, []string{id})
 					if err != nil {
-						orphans = append(orphans, fmt.Sprintf(
-							"%s:%s %s -> %s %s (FetchByIDs error: %v)",
-							td.ShortName, def.TargetType, res.ID, def.TargetType, id, err,
-						))
+						orphans = append(orphans, relatedOrphan{
+							targetType: def.TargetType,
+							id:         id,
+							line: fmt.Sprintf("%s:%s %s -> %s %s (FetchByIDs error: %v)",
+								td.ShortName, def.TargetType, res.ID, def.TargetType, id, err),
+						})
 						continue
 					}
 					if !containsResourceID(resolved, id) {
-						orphans = append(orphans, fmt.Sprintf(
-							"%s:%s %s -> %s %s",
-							td.ShortName, def.TargetType, res.ID, def.TargetType, id,
-						))
+						orphans = append(orphans, relatedOrphan{
+							targetType: def.TargetType,
+							id:         id,
+							line: fmt.Sprintf("%s:%s %s -> %s %s",
+								td.ShortName, def.TargetType, res.ID, def.TargetType, id),
+						})
 					}
 				}
 			}
@@ -132,11 +135,14 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 	var real []string
 	sawRetiredPolicy := false
 	for _, orphan := range orphans {
-		if strings.Contains(orphan, fixtures.RetiredManagedPolicyName) {
+		// The exemption matches the TARGET ID exactly, not the formatted line:
+		// a substring test would also swallow a genuinely broken pivot whose
+		// source id happened to contain the retired policy's name.
+		if orphan.targetType == "policy" && orphan.id == fixtures.RetiredManagedPolicyName {
 			sawRetiredPolicy = true
 			continue
 		}
-		real = append(real, orphan)
+		real = append(real, orphan.line)
 	}
 
 	if !sawRetiredPolicy {
@@ -154,6 +160,15 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 			t.Errorf("  %s", orphan)
 		}
 	}
+}
+
+// relatedOrphan is one witnessed related ID that does not resolve: the target
+// it points at, kept apart from the human-readable line so the one named
+// exception below can match an id rather than a substring of a sentence.
+type relatedOrphan struct {
+	targetType string
+	id         string
+	line       string
 }
 
 // containsResourceID reports whether resolved (the output of a FetchByIDs

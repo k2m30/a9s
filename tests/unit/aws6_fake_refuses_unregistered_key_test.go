@@ -88,6 +88,14 @@ const unregisteredKey = "acme-not-in-any-fixture"
 // The code is the SERVICE's, not a uniform one: AWS spells this differently per
 // API, and a fake answering a code its own SDK never emits would be a shape
 // production code has no reason to handle.
+//
+// It is the WIRE code — what the modelled exception's ErrorCode() returns —
+// which is not always the Go type's name. elasticloadbalancingv2 spells
+// LoadBalancerNotFoundException as "LoadBalancerNotFound" and redshift spells
+// ClusterNotFoundFault as "ClusterNotFound". Reading the type name off the SDK
+// and writing it here produces a fake nothing in production recognizes, so each
+// entry is checked against `return "<code>"` in that service's
+// types/errors.go.
 type fakeNotFoundPin struct {
 	name     string
 	wantCode string
@@ -201,7 +209,7 @@ func fakeNotFoundPins() []fakeNotFoundPin {
 			_, err := fakes.NewElastiCache().DescribeCacheSubnetGroups(ctx, &elasticache.DescribeCacheSubnetGroupsInput{CacheSubnetGroupName: aws.String(id)})
 			return err
 		}},
-		{"elb", "LoadBalancerNotFoundException", "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-not-in-any-fixture/0000000000000000", func(ctx context.Context, id string) error {
+		{"elb", "LoadBalancerNotFound", "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-not-in-any-fixture/0000000000000000", func(ctx context.Context, id string) error {
 			_, err := fakes.NewELB().DescribeLoadBalancerAttributes(ctx, &elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: aws.String(id)})
 			return err
 		}},
@@ -249,7 +257,7 @@ func fakeNotFoundPins() []fakeNotFoundPin {
 			_, err := fakes.NewRDS().DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{DBSubnetGroupName: aws.String(id)})
 			return err
 		}},
-		{"redshift", "ClusterNotFoundFault", "", func(ctx context.Context, id string) error {
+		{"redshift", "ClusterNotFound", "", func(ctx context.Context, id string) error {
 			_, err := fakes.NewRedshift().DescribeLoggingStatus(ctx, &redshift.DescribeLoggingStatusInput{ClusterIdentifier: aws.String(id)})
 			return err
 		}},
