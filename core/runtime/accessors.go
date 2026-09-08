@@ -33,8 +33,9 @@ import (
 // core/session.
 func Bootstrap(profile, region string, types []catalog.ResourceTypeDef) *Core {
 	s := session.New()
-	s.Profile = profile
-	s.Region = region
+	// Through the setter: a session that boots straight onto a pair is on a
+	// numbered visit to it, like every pair the operator switches to later.
+	s.SetProfileRegion(profile, region)
 	return New(s, types)
 }
 

@@ -210,8 +210,9 @@ type Session struct {
 
 	// pairGen counts pair changes. It is what distinguishes one visit to a
 	// profile/region from the next visit to the same one, so a save frozen
-	// during the first cannot land during the second (see Pair.Gen). Guarded
-	// by pairMu, like the pair itself.
+	// during the first cannot land during the second (see Pair.Gen). Zero
+	// until the session enters its first visit, which is generation 1.
+	// Guarded by pairMu, like the pair itself.
 	pairGen domain.Gen
 
 	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
@@ -504,9 +505,15 @@ func (s *Session) CurrentPair() (profile, region string) {
 // to A. A save frozen in A's first epoch names the pair the session is on
 // again, so a guard comparing names alone lets it through and B's numbers land
 // in A's files. Every pair change takes the next generation, so a save frozen
-// before the round trip no longer matches. Zero means the value was built
-// without one (a hand-constructed pair in a test, a caller predating this) and
-// is checked on names alone, as it was.
+// before the round trip no longer matches.
+//
+// Zero is a generation like any other and is compared like one: it is the
+// value a pair carries when it was read before the session entered any visit,
+// and a save prepared then answers for no visit once one has been entered. The
+// first resolved visit is generation 1. There is no "unset" reading — a zero
+// that meant "do not check" would be a second answer to the question this
+// field exists to settle, and the guard would have an escape hatch shaped
+// exactly like the defect it closes.
 type Pair struct {
 	Profile string
 	Region  string
@@ -530,10 +537,18 @@ func (s *Session) CurrentPairValue() Pair {
 func (s *Session) SetProfileRegion(profile, region string) {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
+	s.enterVisitLocked(profile, region)
+}
+
+// enterVisitLocked installs the pair and opens a new visit for it — a new
+// generation even when the names are the ones it just had, because what a
+// frozen save has to match is the visit and not the name (see Pair). Every
+// path that establishes or changes the session's pair goes through it, so
+// there is no way to be on a pair without being on a numbered visit to it.
+// Callers hold pairMu.
+func (s *Session) enterVisitLocked(profile, region string) {
 	s.Profile = profile
 	s.Region = region
-	// A new epoch for the pair, even when the names are the ones it just had:
-	// what a frozen save has to match is the visit, not the name (see Pair).
 	s.pairGen++
 }
 
@@ -620,15 +635,24 @@ func (s *Session) EnsureCacheStore() *cache.Store {
 func (s *Session) ResolvePair(profile, region string) {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
-	if s.Profile == "" {
+	resolvedProfile, resolvedRegion := s.Profile, s.Region
+	if resolvedProfile == "" {
 		if profile == "" {
 			profile = "default"
 		}
-		s.Profile = profile
+		resolvedProfile = profile
 	}
-	if s.Region == "" {
-		s.Region = region
+	if resolvedRegion == "" {
+		resolvedRegion = region
 	}
+	if resolvedProfile == s.Profile && resolvedRegion == s.Region {
+		return
+	}
+	// Resolving the pair IS entering the first visit to it. Leaving the
+	// generation at zero here would make "no visit yet" and "the visit the
+	// session booted into" the same value, which is the second answer
+	// Pair.Gen exists to remove.
+	s.enterVisitLocked(resolvedProfile, resolvedRegion)
 }
 
 // ensureCacheStoreLocked is EnsureCacheStore's shared body, factored out so
@@ -703,13 +727,13 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // NoCache is set.
 func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
 	s.pairMu.Lock()
-	if pair.Profile != s.Profile || pair.Region != s.Region ||
-		(pair.Gen != 0 && pair.Gen != s.pairGen) {
-		// C9: this save was prepared for a pair the session has since left —
-		// including one it has since come back to, which the names alone
-		// cannot tell apart (see Pair.Gen). Rejected here, inside the same
-		// critical section that resolves the store, so no switch can slip
-		// between the check and the write.
+	if pair.Profile != s.Profile || pair.Region != s.Region || pair.Gen != s.pairGen {
+		// C9: this save was prepared for a visit the session has since left —
+		// including one to the pair it is on again, which the names alone
+		// cannot tell apart, and including the pre-visit state a pair read
+		// before the first SetProfileRegion carries (see Pair.Gen). Rejected
+		// here, inside the same critical section that resolves the store, so
+		// no switch can slip between the check and the write.
 		s.pairMu.Unlock()
 		return nil
 	}
