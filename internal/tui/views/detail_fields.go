@@ -146,15 +146,12 @@ func (m DetailModel) renderFromFieldList() string {
 				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
 				if item.Key != item.Value {
 					// Attention phrase rows (IndentLevel == 1) use splitKeyValue:
-					// Key = raw phrase (for search/clipboard), Value = glyph +
-					// capitalized phrase (for display). In TUI mode (plainMode=false)
-					// render only the Value — the short form fits the viewport without
-					// truncation. In plainMode (PlainContent/clipboard) render Key: Value
-					// so the raw lowercase phrase is present alongside the capitalized
-					// display form. IndentLevel == 1 distinguishes phrase rows from
+					// Key = raw phrase, Value = glyph + capitalized phrase. Only the
+					// Value is painted — the short form fits the viewport without
+					// truncation. IndentLevel == 1 distinguishes phrase rows from
 					// AttentionDetails rows (IndentLevel == 3) which must always render
 					// as Key: Value to preserve their labels (e.g. "Action: reboot").
-					if item.Path == "Attention" && item.IndentLevel == 1 && !m.plainMode {
+					if item.Path == "Attention" && item.IndentLevel == 1 {
 						val := item.Value
 						if item.ColorTier != "" {
 							val = styles.TierColorStyle(item.ColorTier).Render(val)
@@ -195,7 +192,7 @@ func (m DetailModel) renderFromFieldList() string {
 			// Ensure selection background spans full viewport width, not just text width.
 			if m.ready {
 				targetW := m.viewport.Width()
-				if w := lipgloss.Width(line); targetW > 0 && w < targetW {
+				if w := text.Width(line); targetW > 0 && w < targetW {
 					line += strings.Repeat(" ", targetW-w)
 				}
 			}

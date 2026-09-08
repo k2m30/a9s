@@ -105,10 +105,23 @@ func (m HelpModel) View() string {
 	hkStyle := styles.HelpKeyStyle
 	descStyle := styles.HelpDescStyle
 
+	groups := m.buildGroups()
+
+	// The key column is as wide as the widest key this context actually binds,
+	// plus the gap that keeps it off its own description — measured, so a key
+	// written in wide runes reserves the columns it paints rather than losing
+	// its tail to an ellipsis.
+	keyW := 1
+	for _, g := range groups {
+		for _, b := range g.bindings {
+			keyW = max(keyW, text.Width(b.key)+1)
+		}
+	}
+
 	bind := func(k, d string) string {
 		// Keep descriptors intact; truncation of ANSI-styled cells can clip
 		// important help words in narrow layouts.
-		return hkStyle.Render(text.PadOrTrunc(k, 9)) + descStyle.Render(d)
+		return hkStyle.Render(text.PadOrTrunc(k, keyW)) + descStyle.Render(d)
 	}
 	// padCell always appends at least a two-space gap, even when s already
 	// meets or exceeds w — without it, a cell whose content is as wide as
@@ -116,14 +129,12 @@ func (m HelpModel) View() string {
 	// column's "ctrl+c") fuses directly into the next column with zero
 	// separation.
 	padCell := func(s string, w int) string {
-		visible := lipgloss.Width(s)
+		visible := text.Width(s)
 		if visible >= w {
 			return s + "  "
 		}
 		return s + strings.Repeat(" ", w-visible)
 	}
-
-	groups := m.buildGroups()
 
 	// Determine number of columns from groups
 	numCols := len(groups)

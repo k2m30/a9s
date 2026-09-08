@@ -49,8 +49,15 @@ func (m HelpModel) ctEventsLegend() string {
 		{"N", verbStyle(styles.ColTerminated, false), "NetworkActivity (eventCategory=NetworkActivity)"},
 		{"?", verbStyle(styles.ColTerminated, false), "Ambiguous (no classifier match)"},
 	}
+	// The glyph column is as wide as the widest glyph plus the gap before the
+	// description — measured off the rows themselves, so a glyph that takes
+	// two terminal columns does not paint over the text beside it.
+	glyphW := 1
 	for _, row := range verbRows {
-		glyph := row.style.Render(text.PadOrTrunc(row.glyph, 3))
+		glyphW = max(glyphW, text.Width(row.glyph)+2)
+	}
+	for _, row := range verbRows {
+		glyph := row.style.Render(text.PadOrTrunc(row.glyph, glyphW))
 		sb.WriteString(" " + glyph + descStyle.Render(row.desc) + "\n")
 	}
 
@@ -68,8 +75,12 @@ func (m HelpModel) ctEventsLegend() string {
 		{"ct-attention", styles.ColPending, "worth a glance — writes, ROOT, sensitive reads, cross-account"},
 		{"ct-danger", styles.ColStopped, "worth investigating — destructive ops or failures"},
 	}
+	labelW := 1
 	for _, row := range tintRows {
-		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, 14))
+		labelW = max(labelW, text.Width(row.label)+2)
+	}
+	for _, row := range tintRows {
+		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, labelW))
 		sb.WriteString(" " + label + descStyle.Render(row.desc) + "\n")
 	}
 

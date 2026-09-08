@@ -130,7 +130,7 @@ func CostsViewportCols(width int) int {
 // rendered row (header, data, TOTAL) is exactly the frame's inner width —
 // a shorter row would leave the right border unclosed.
 func padCostsRowToWidth(line string, width int) string {
-	w := lipgloss.Width(line)
+	w := text.Width(line)
 	if w >= width {
 		return line
 	}
@@ -289,7 +289,7 @@ func padLeft(s string, w int) string {
 	if w <= 0 {
 		return ""
 	}
-	vw := lipgloss.Width(s)
+	vw := text.Width(s)
 	if vw >= w {
 		return text.PadOrTrunc(s, w)
 	}

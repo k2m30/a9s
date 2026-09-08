@@ -320,7 +320,7 @@ func renderRelatedPanel(rows []app.RelatedBlock, filterActive bool, cursor, scro
 
 // renderDetailFieldsFromBody renders the field list from body.Fields, mirroring
 // renderFromFieldList but reading state from body (FieldCursor, KeyWidth) and
-// m (viewport width for cursor-row padding, ready flag, plainMode).
+// m (viewport width for cursor-row padding, ready flag).
 func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
 	if len(body.Fields) == 0 {
 		return styles.DimText.Render("  No detail data available")
@@ -348,7 +348,7 @@ func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
 
 	// Build a temporary model snapshot with fieldList and fieldCursor from body
 	// so renderFromFieldList (which reads m.fieldList / m.fieldCursor / m.rightCol
-	// / m.ready / m.plainMode / m.viewport) produces byte-identical output.
+	// / m.ready / m.viewport) produces byte-identical output.
 	tmp := *m
 	tmp.fieldList = items
 	tmp.fieldCursor = body.FieldCursor

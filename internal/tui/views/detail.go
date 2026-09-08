@@ -39,7 +39,6 @@ type DetailModel struct {
 	pendingRelatedDispatch bool                  // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
 	fieldList              []fieldpath.FieldItem // structured field data; nil = not yet computed
 	fieldCursor            int                   // index into fieldList for navigable cursor
-	plainMode              bool                  // true only during PlainContent(); causes Attention entries to render Key: Value (full text for clipboard/search)
 }
 
 // NewDetailWithCtrl creates a DetailModel backed by the given controller.
