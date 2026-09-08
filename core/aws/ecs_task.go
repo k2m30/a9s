@@ -127,7 +127,6 @@ func fetchECSTasksPageWithJoin(
 				"task_id":             taskID,
 				"cluster":             clusterName,
 				"status":              status,
-				"last_status":         status,
 				"stop_code":           stopCode,
 				"health_status":       healthStatus,
 				"task_definition":     taskDefinition,

@@ -593,7 +593,6 @@ func TestECSTask_PostureSignalsSilentThroughoutTeardown(t *testing.T) {
 
 			r := pw1ECSTaskResource(id, pw1TaskDefARN)
 			r.Fields["status"] = state
-			r.Fields["last_status"] = state
 
 			fake := &pw1ECSTaskFake{
 				tasks: map[string]ecstypes.Task{id: task},

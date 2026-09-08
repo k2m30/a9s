@@ -96,9 +96,12 @@ func TestEcsTaskColor(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// "status", not "last_status": the fetcher wrote one variable
+			// under both names and the classifier read the one the column
+			// does not persist (aws5 round 6). Do not restore the pair.
 			fields := map[string]string{}
 			if tc.lastStatus != "" {
-				fields["last_status"] = tc.lastStatus
+				fields["status"] = tc.lastStatus
 			}
 			if tc.stopCode != "" {
 				fields["stop_code"] = tc.stopCode
@@ -108,7 +111,7 @@ func TestEcsTaskColor(t *testing.T) {
 			}
 			got := td.Color(resource.Resource{Fields: fields, Findings: tc.findings})
 			if got != tc.want {
-				t.Errorf("Color(last_status=%q, stop_code=%q, health_status=%q, findings=%v) = %v, want %v",
+				t.Errorf("Color(status=%q, stop_code=%q, health_status=%q, findings=%v) = %v, want %v",
 					tc.lastStatus, tc.stopCode, tc.healthStatus, tc.findings, got, tc.want)
 			}
 		})

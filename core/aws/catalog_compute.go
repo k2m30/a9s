@@ -72,7 +72,7 @@ func colorECSTask(r domain.Resource) domain.Color {
 		return c
 	}
 	return colorFromFindings(ecsTaskStructuralFindings(
-		r.Fields["last_status"], r.Fields["stop_code"], r.Fields["health_status"]))
+		r.Fields["status"], r.Fields["stop_code"], r.Fields["health_status"]))
 }
 
 func colorLambda(r domain.Resource) domain.Color {
@@ -504,7 +504,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
-		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "container_images", "arn"},
+		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "container_images", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
