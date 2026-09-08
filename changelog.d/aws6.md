@@ -1,9 +1,9 @@
 ## Fixed
 
 - Detail screens no longer show a raw AWS constant beside the readable form of
-  the same fact. Thirty-five fields across thirty-two resource types now read
-  as words wherever they appear, including the ones no list column shows and
-  which therefore had no way to ask: a Managed Airflow environment's endpoint
+  the same fact. Every declared field now reads as words wherever it appears,
+  including the ones no list column shows and which therefore had no way to
+  ask: a Managed Airflow environment's endpoint
   management and last update status, an API Gateway API's protocol, an ECS
   service's launch type and status, and a node group's status. A field reads
   the same way in its column and in its detail row, because both read one
