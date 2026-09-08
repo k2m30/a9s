@@ -62,7 +62,7 @@
 //     The legacy mechanic existed only to defer a fetch the controller never
 //     defers in the first place, so there is no live behavior left to pin.
 //  10. Wave2 S4/S5 full-detail-sentence + falls-back-to-phrase. PORTED below
-//     directly against injectAttentionSectionDetail's live output
+//     directly against buildAttentionSectionDetail's live output
 //     (detail_body.go:330) — app_detail_attention_cursor_test.go only pins
 //     FieldCursor stability across a mixed-severity sort, never the rendered
 //     Detail-sentence row's presence/absence.
@@ -810,7 +810,7 @@ func Test_DetailController_MoveUp_ClampsAtFirstField(t *testing.T) {
 
 // wave3AttentionRowsForCode returns the Path=="Attention" IndentLevel==1
 // FieldRow(s) for the given finding phrase, in the order buildAttentionEntries
-// / injectAttentionSectionDetail emit them: the phrase row, then one row per
+// / buildAttentionSectionDetail emit them: the phrase row, then one row per
 // wrapped line of the Detail sentence. The match is case-insensitive because
 // the phrase row's Value is capitalizeFirstDetail(Phrase), not Phrase
 // verbatim.
@@ -839,7 +839,7 @@ func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.
 }
 
 // Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase pins
-// that when Finding.Detail is non-empty, injectAttentionSectionDetail
+// that when Finding.Detail is non-empty, buildAttentionSectionDetail
 // (detail_body.go:330) emits further Attention sub-rows carrying the full S5
 // operator sentence, in addition to the S4 Phrase row — the live replacement
 // for wave2_risk_text_s4_s5_test.go's

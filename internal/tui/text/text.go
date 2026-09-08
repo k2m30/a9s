@@ -9,6 +9,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// Width returns the number of terminal columns s occupies. It is the measure
+// PadOrTrunc pads and truncates to, exported so that a caller reserving room
+// for a string cannot disagree with the renderer that fills it: a rune-count
+// reservation is half the room a CJK title needs.
+func Width(s string) int {
+	return lipgloss.Width(s)
+}
+
 // PadOrTrunc pads s to exactly w visible columns, or truncates with "...".
 // Uses a fast path for plain ASCII strings (no ANSI escapes) to avoid
 // lipgloss.Width overhead. Falls back to ANSI-aware measurement otherwise.
@@ -33,7 +41,7 @@ func PadOrTrunc(s string, w int) string {
 		return s + strings.Repeat(" ", w-len(s))
 	}
 	// Slow path: ANSI-aware measurement
-	visible := lipgloss.Width(s)
+	visible := Width(s)
 	if visible == w {
 		return s
 	}

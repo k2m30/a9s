@@ -67,7 +67,11 @@ func (c *Controller) snapshot() ViewState {
 		vs.Footer = c.buildTextFooterHints(top.ID, top.Ctx)
 	}
 	if top.State.Detail != nil {
-		vs.Body.Detail = c.buildDetailBody(top.State.Detail)
+		// The one build the operator actually sees, so the one whose layout is
+		// recorded for the next cursor relocation.
+		detail, layout := c.buildDetailBody(top.State.Detail)
+		vs.Body.Detail = detail
+		top.State.Detail.cursorLayout = layout
 		vs.FrameTitle = c.detailFrameTitleLocked()
 		vs.Footer = c.buildDetailFooterHints(top.State.Detail)
 	}

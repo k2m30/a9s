@@ -86,6 +86,12 @@ func (m DetailModel) renderFromFieldList() string {
 				line = " " + item.Key + ":"
 			case item.IsSubField:
 				indent := subFieldIndent(item.IndentLevel)
+				// A row the projection gave no label is a whole line: there is
+				// no key to put a colon after.
+				if item.Key == "" {
+					line = indent + item.Value
+					break
+				}
 				// Navigable or injected sub-fields have Key != Value (pre-split by
 				// projection.buildItems).
 				// General sub-fields have Key == Value (raw YAML line).
@@ -122,6 +128,16 @@ func (m DetailModel) renderFromFieldList() string {
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
 				indent := subFieldIndent(item.IndentLevel)
+				// A row the projection gave no label is a whole line: there is
+				// no key to put a colon after.
+				if item.Key == "" {
+					val := item.Value
+					if item.ColorTier != "" {
+						val = styles.TierColorStyle(item.ColorTier).Render(val)
+					}
+					line = indent + val
+					break
+				}
 				// Navigable sub-fields have Key != Value (pre-split by projection.buildItems).
 				if item.IsNavigable && item.Key != item.Value {
 					line = indent + styles.DetailKey.Render(item.Key+":") + " " + styles.NavigableField.Render(item.Value)

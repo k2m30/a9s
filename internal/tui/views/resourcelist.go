@@ -42,13 +42,6 @@ type ResourceListModel struct {
 	styledRowCache map[int]string
 
 	ctrl *app.Controller
-
-	// Ephemeral render-time fields — populated from ctrl.Snapshot().Body.List
-	// during RenderList and renderHeaderRow only. Never written by Update();
-	// they carry zero values at all other times.
-	sortColKey    string
-	sortAsc       bool
-	hScrollOffset int
 }
 
 // newResourceListCtrl creates a stub controller for a top-level resource-list
@@ -414,8 +407,8 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 //     ScrollState field; VisibleWindow below builds a synthetic ScrollState
 //     from body.Selected instead of storing a cursor)
 //   - body.Columns            → resolved listCol slice (width/title/key from body)
-//   - body.Sort               → m.sortColKey / m.sortAsc
-//   - body.ScrollX            → m.hScrollOffset
+//   - body.Sort               → renderHeaderRow's sortColKey / sortAsc
+//   - body.ScrollX            → renderHeaderRow's hScrollOffset
 //   - body.Truncated          → m.pagination.IsTruncated
 //   - body.LoadingMore        → m.loadingMore
 //   - body.Filter             → m.filterText (for load-more hint text)
@@ -475,16 +468,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		return "No resources found"
 	}
 
-	// Populate ephemeral render-time fields from body for header rendering,
-	// then restore after. These fields exist only to satisfy renderHeaderRow's
-	// value-receiver reads; they carry no state between frames.
-	m.sortColKey = body.Sort.Col
-	m.sortAsc = body.Sort.Dir != "desc"
-	m.hScrollOffset = scrollX
-	headerLine := m.renderHeaderRow(cols)
-	m.sortColKey = ""
-	m.sortAsc = false
-	m.hScrollOffset = 0
+	headerLine := renderHeaderRow(cols, body.Sort.Col, body.Sort.Dir != "desc", scrollX)
 
 	// Translate full-column marker index to visible (post-hscroll, post-fit) index.
 	markerColIdx := -1

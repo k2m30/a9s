@@ -221,7 +221,7 @@ func TestDetailParity_PatchDetail_TUIEqualsHeadless(t *testing.T) {
 	}
 
 	// --- Single-application pin: exactly ONE attention entry, not two. ---
-	// injectAttentionSectionDetail emits, for a single issue-severity finding
+	// buildAttentionSectionDetail emits, for a single issue-severity finding
 	// with no Detail text and exactly 1 AttentionDetail row: 1 section-header
 	// row ("Attention (N)"), 1 phrase row, 1 AttentionDetail row, and (unless
 	// the entry is "bare") 1 trailing spacer — 4 Path=="Attention" rows total

@@ -24,7 +24,7 @@ package unit
 //     applyEnrichmentState) is issue-severity (SevWarn/SevBroken), the
 //     Status/lifecycle cell must show that Finding's Phrase — not just a
 //     glyph prefix on the identity column (no glyph prefix is produced any more).
-//   - core/app/detail_body.go (injectAttentionSectionDetail): each Attention
+//   - core/app/detail_body.go (buildAttentionSectionDetail): each Attention
 //     entry must render both the short Phrase line (capitalized for display)
 //     AND — on lines of its own below it — the full Detail sentence, wrapped
 //     to the panel, falling back to Phrase alone when Detail == "".
@@ -86,7 +86,7 @@ import (
 // Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase /
 // Test_DetailAttention_FallsBackToPhrase_WhenDetailEmpty
 // (tests/unit/detail_ports_test.go) now pin on the live
-// injectAttentionSectionDetail path — removed here, wave3 detail-family
+// buildAttentionSectionDetail path — removed here, wave3 detail-family
 // cleanup (specs/022-codebase-cleanup).
 // ---------------------------------------------------------------------------
 

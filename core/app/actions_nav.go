@@ -564,7 +564,8 @@ func (c *Controller) handleActionFieldSelect(a Action) (ViewState, []runtime.Tas
 	}
 	// Build the fields list using the same pipeline as buildDetailBody so
 	// $i in the template aligns with the slice index here.
-	fields := c.buildDetailBody(ds).Fields
+	body, _ := c.buildDetailBody(ds)
+	fields := body.Fields
 	if fieldIdx >= len(fields) {
 		return c.snapshot(), nil
 	}

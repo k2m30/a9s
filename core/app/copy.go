@@ -91,7 +91,7 @@ func (c *Controller) copyContentDetail() (string, string) {
 		}
 		return row.DisplayName, "Copied: " + row.DisplayName
 	}
-	body := c.buildDetailBody(ds)
+	body, _ := c.buildDetailBody(ds)
 	if fc := body.FieldCursor; fc >= 0 && fc < len(body.Fields) {
 		item := body.Fields[fc]
 		val := item.Value

@@ -5,6 +5,7 @@ package app
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -17,13 +18,29 @@ import (
 	"github.com/k2m30/a9s/v3/core/semantics/projection"
 )
 
+// detailLayout is what one body build observed about the layout the operator
+// is looking at: the identity of the item under the cursor and the size of
+// the Attention block that cursor was indexed against. A build returns it
+// rather than writing it, so the one caller that renders — snapshot() — is
+// the one that records it, and the several callers that build a body for
+// something else (a copy, a navigation lookup) cannot overwrite the record
+// for a layout nobody saw.
+type detailLayout struct {
+	CursorKey string
+	Prepend   int
+}
+
 // buildDetailBody constructs a DetailBody from a DetailState, mirroring the
 // data that DetailModel.View() + renderFromFieldList() consume. The body is
 // renderer-agnostic: scroll, width, and height remain owned by the renderer.
 // The projection config and the "could not inspect this row" fact are both
 // read from the controller, so no caller has to carry them.
-func (c *Controller) buildDetailBody(ds *DetailState) *DetailBody {
-	items := c.buildDetailFieldItems(ds)
+//
+// The returned detailLayout describes THIS build; see DetailState.cursorLayout
+// for who stores it.
+func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout) {
+	built := c.buildDetailFieldItems(ds)
+	items := built.items
 
 	// Convert []fieldpath.FieldItem → []FieldRow for the body.
 	fields := fieldItemsToFieldRows(items)
@@ -56,15 +73,11 @@ func (c *Controller) buildDetailBody(ds *DetailState) *DetailBody {
 		fc = 0
 	}
 
-	// Record which Attention line the cursor is on, if any. This build is the
-	// layout the operator sees, so it is the only honest place to take that
-	// identity from — see DetailState.CursorAttentionKey. The section header
-	// is recorded too, under the line that counts the findings: that string
-	// changes whenever the count does, so a cursor there finds no match and
-	// lands back on the header, which is where it was.
-	ds.CursorAttentionKey = ""
-	if fc < len(items) && items[fc].Path == "Attention" {
-		ds.CursorAttentionKey = items[fc].Key
+	// Name the row the cursor is on. This build is the layout the operator
+	// sees, so it is the only honest place to take that identity from.
+	layout := detailLayout{Prepend: built.prepend}
+	if fc < len(built.keys) {
+		layout.CursorKey = built.keys[fc]
 	}
 
 	// Clamp RelatedCursor.
@@ -108,7 +121,7 @@ func (c *Controller) buildDetailBody(ds *DetailState) *DetailBody {
 		ScrollY:             ds.ScrollY,
 		FieldCursor:         fc,
 		KeyWidth:            keyWidth,
-	}
+	}, layout
 }
 
 // buildDetailRelatedLoadingBlocks constructs loading-state RelatedBlocks from
@@ -131,12 +144,24 @@ func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
 	return blocks
 }
 
+// detailItems is one build of the detail field list: the items the renderer
+// paints, one stable identity per item, and the number of items the Attention
+// block contributed at the front. keys is index-aligned with items — an
+// Attention row's identity is not the text painted on it (two findings can
+// wrap to the same sentence), so it cannot be recovered from the item later.
+type detailItems struct {
+	items   []fieldpath.FieldItem
+	keys    []string
+	prepend int
+}
+
 // buildDetailFieldItems runs the projector pipeline (projection.buildItems,
 // core/semantics/projection/generic.go) and returns the []fieldpath.FieldItem
-// that both the TUI renderer and buildDetailBody consume.
+// that both the TUI renderer and buildDetailBody consume, alongside the
+// identities the cursor is relocated by. Reads ds; writes nothing to it.
 // c.viewConfig may be nil; projection.GenericWithConfig(nil) uses built-in
 // defaults.
-func (c *Controller) buildDetailFieldItems(ds *DetailState) []fieldpath.FieldItem {
+func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 	vc := c.viewConfig
 	r := ds.Resource
 	if r.Type == "" {
@@ -173,9 +198,39 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) []fieldpath.FieldIte
 	if td != nil && td.Augment != nil {
 		sections = td.Augment(r, sections)
 	}
-	items := sectionsToFieldItemsDetail(sections)
-	items = injectAttentionSectionDetail(items, ds, td, c.detailNotInspected(ds))
-	return items
+	content := sectionsToFieldItemsDetail(sections)
+	attention, keys := buildAttentionSectionDetail(ds, td, c.detailNotInspected(ds))
+	built := detailItems{
+		items:   append(attention, content...),
+		keys:    keys,
+		prepend: len(attention),
+	}
+	for _, it := range content {
+		// A content row is identified by its path and its label, which
+		// together survive the rebuild a finding or an enrichment triggers
+		// while a bare index does not.
+		built.keys = append(built.keys, it.Path+"\x1f"+it.Key)
+	}
+	return built
+}
+
+// relocateDetailCursor returns the index the cursor takes in a freshly built
+// layout: the row carrying the same identity, wherever the rebuild put it.
+// Both cursor cases go through here — an Attention entry that sorted down
+// under a more severe finding, and a content field the block pushed along —
+// so neither can be relocated by a rule the other does not use. When the row
+// is gone (its finding cleared), the cursor keeps its distance below the
+// Attention block instead.
+func relocateDetailCursor(was detailLayout, cursor int, built detailItems) int {
+	if was.CursorKey != "" {
+		if i := slices.Index(built.keys, was.CursorKey); i >= 0 {
+			return i
+		}
+	}
+	if adjusted := cursor - was.Prepend + built.prepend; adjusted >= 0 && adjusted < len(built.items) {
+		return adjusted
+	}
+	return cursor
 }
 
 // detailNotInspected reports whether this detail's row is one the Wave-2
@@ -247,12 +302,16 @@ func domainItemToFieldItemDetail(it domain.Item, sectionTitle string) fieldpath.
 }
 
 // attentionEntry is one rendered Attention-block entry, built and sorted by
-// buildAttentionEntries and rendered by injectAttentionSectionDetail, which is
-// also what records the block's size on the DetailState. The FieldCursor delta
-// in applyFindingToState reads that record, so no second walk of these entries
+// buildAttentionEntries and rendered by buildAttentionSectionDetail, which is
+// also what reports the block's size. The cursor relocation in
+// applyFindingToState reads that report, so no second walk of these entries
 // can disagree with the layout on screen about count, order or bareness.
 type attentionEntry struct {
-	tier    string
+	tier string
+	// code is the finding this entry came from, and the stem of every one of
+	// its rows' identities. The prose is not usable for that: two findings
+	// can carry the same Detail sentence word for word.
+	code    string
 	primary string
 	// detailLines is the S5 operator sentence (Finding.Detail) already
 	// wrapped to the panel, one rendered line per element; empty ⇒
@@ -315,7 +374,7 @@ func wrapSentence(s string, width int) []string {
 
 // buildAttentionEntries converts issue-severity findings into sorted
 // attentionEntry values, mirroring the entry construction + sort that
-// injectAttentionSectionDetail renders. Sort: "!" (broken) before "~"
+// buildAttentionSectionDetail renders. Sort: "!" (broken) before "~"
 // (warning), stable otherwise — the SAME order both the renderer and the
 // prepend-count calculation must observe, so they extract from this one
 // function rather than deriving the order independently in two places.
@@ -324,6 +383,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 	if notInspected {
 		entries = append(entries, attentionEntry{
 			tier:          "~",
+			code:          "not-inspected",
 			primary:       domain.NotInspectedPhrase,
 			detailLines:   wrapSentence("The attention checks for this row did not answer (a cap or an API error), so its posture is unknown rather than clean.", width),
 			splitKeyValue: true,
@@ -346,7 +406,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 				rows = det.Rows
 			}
 		}
-		entries = append(entries, attentionEntry{tier: tier, primary: f.Phrase, detailLines: wrapSentence(f.Detail, width), rows: rows, splitKeyValue: true})
+		entries = append(entries, attentionEntry{tier: tier, code: string(f.Code), primary: f.Phrase, detailLines: wrapSentence(f.Detail, width), rows: rows, splitKeyValue: true})
 	}
 	if len(entries) == 0 {
 		return entries
@@ -357,14 +417,14 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 	return entries
 }
 
-// injectAttentionSectionDetail prepends the Attention block when the resource
-// has issue-severity findings. It is the only place the block is built: the
-// renderer paints the rows it emits.
-func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef, notInspected bool) []fieldpath.FieldItem {
+// buildAttentionSectionDetail builds the Attention block for a resource with
+// issue-severity findings, and one identity per row it emits. It is the only
+// place the block is built: the renderer paints the rows it returns. Returns
+// nil, nil when there is nothing to attend to.
+func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, notInspected bool) ([]fieldpath.FieldItem, []string) {
 	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, notInspected)
 	if len(entries) == 0 {
-		ds.AttentionPrepend = 0
-		return items
+		return nil, nil
 	}
 	// Resolve S2 color bucket for the cap invariant.
 	var rowBucket resource.Color
@@ -381,12 +441,24 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 		}
 	}
 	injected := make([]fieldpath.FieldItem, 0, 1+len(entries)*2)
-	injected = append(injected, fieldpath.FieldItem{
+	keys := make([]string, 0, cap(injected))
+	// A resource can carry two findings under one code (two open ports, two
+	// rules), and they are two rows. The first keeps the bare code so a stable
+	// finding's rows keep a stable identity; later ones are numbered in the
+	// order the sorted block puts them, which is stable among equal severities.
+	seenCode := make(map[string]int, len(entries))
+	emit := func(item fieldpath.FieldItem, key string) {
+		injected = append(injected, item)
+		keys = append(keys, key)
+	}
+	// The header's line counts the findings, so its text changes whenever the
+	// count does; its identity does not, and a cursor parked on it stays on it.
+	emit(fieldpath.FieldItem{
 		IsSection: true,
 		Key:       fmt.Sprintf("Attention (%d)", len(entries)),
 		Path:      "Attention",
 		ColorTier: capTierToRowBucketDetail(headerTier, rowBucket),
-	})
+	}, "attention:header")
 	// lastEntryBare tracks whether the final entry rendered no Detail sentence
 	// and no AttentionDetail rows — its Phrase line is then the last line of
 	// the block, and the trailing spacer below would read as a stray blank
@@ -407,57 +479,56 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 			itemKey = e.primary
 			itemValue = line
 		}
-		injected = append(injected, fieldpath.FieldItem{
+		stem := "attention:" + e.code
+		if n := seenCode[e.code]; n > 0 {
+			stem = fmt.Sprintf("%s#%d", stem, n)
+		}
+		seenCode[e.code]++
+		emit(fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
 			Key:         itemKey,
 			Value:       itemValue,
 			Path:        "Attention",
 			ColorTier:   entryColor,
-		})
+		}, stem)
 		// S5 operator sentence, one item per wrapped line. The wrap lives here
 		// rather than in the renderer so the body and the screen carry the same
 		// rows.
-		for _, dl := range e.detailLines {
-			injected = append(injected, fieldpath.FieldItem{
+		for i, dl := range e.detailLines {
+			emit(fieldpath.FieldItem{
 				IsSubField:  true,
 				IndentLevel: 1,
 				Key:         dl,
 				Value:       dl,
 				Path:        "Attention",
 				ColorTier:   entryColor,
-			})
+			}, fmt.Sprintf("%s:sentence:%d", stem, i))
 		}
-		for _, row := range e.rows {
+		for i, row := range e.rows {
 			tier := row.Tier
 			if tier == "" {
 				tier = e.tier
 			}
 			// A row with no label is a whole line rather than a labelled fact
 			// — the "… +K more" row that closes a capped list is the only one
-			// today. Key == Value is how this projection already asks the
-			// renderer for a value-only line; leaving the key empty instead
-			// would paint a bare ":" in front of it.
-			key := row.Label
-			if key == "" {
-				key = row.Value
-			}
-			injected = append(injected, fieldpath.FieldItem{
+			// today. The empty label is passed through: how a row without one
+			// is painted is the renderer's to decide.
+			emit(fieldpath.FieldItem{
 				IsSubField:  true,
 				IndentLevel: 3,
-				Key:         key,
+				Key:         row.Label,
 				Value:       row.Value,
 				Path:        "Attention",
 				ColorTier:   capTierToRowBucketDetail(tier, rowBucket),
-			})
+			}, fmt.Sprintf("%s:row:%d", stem, i))
 		}
 		lastEntryBare = e.bare()
 	}
 	if !lastEntryBare {
-		injected = append(injected, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
+		emit(fieldpath.FieldItem{IsSpacer: true, Path: "Attention"}, "attention:spacer")
 	}
-	ds.AttentionPrepend = len(injected)
-	return append(injected, items...)
+	return injected, keys
 }
 
 // capTierToRowBucketDetail returns the effective color tier for an Attention

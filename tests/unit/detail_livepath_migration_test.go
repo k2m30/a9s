@@ -79,7 +79,7 @@ import (
 // flat-field fallback — no RawStruct, so the ec2-specific fieldpath projector
 // yields no sections — so this seeds an Attention block via
 // Controller.ApplyDetailFinding (mirroring TestDetailRenderParity_EC2Attention),
-// which injectAttentionSectionDetail (core/app/detail_body.go) always
+// which buildAttentionSectionDetail (core/app/detail_body.go) always
 // prepends as exactly one IsSection header ("Attention (N)") followed by the
 // finding rows and a trailing IsSpacer — the same field-item shape the skip
 // loop in applyDetailActions must skip over regardless of whether the section

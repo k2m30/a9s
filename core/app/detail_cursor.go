@@ -57,7 +57,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 			if ds.FieldCursor > 0 {
 				ds.FieldCursor--
 				// Skip section headers and spacers — mirrors the TUI legacy path.
-				items := c.buildDetailFieldItems(ds)
+				items := c.buildDetailFieldItems(ds).items
 				for ds.FieldCursor > 0 && ds.FieldCursor < len(items) &&
 					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
 					ds.FieldCursor--
@@ -74,7 +74,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 
 	case ActionMoveDown:
 		if !ds.RelatedFocus {
-			items := c.buildDetailFieldItems(ds)
+			items := c.buildDetailFieldItems(ds).items
 			fieldCount := len(items)
 			if ds.FieldCursor < fieldCount-1 {
 				ds.FieldCursor++
@@ -236,7 +236,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 // resource by running the projector pipeline. Used by cursor clamping in
 // applyDetailActions without building a full body.
 func (c *Controller) detailFieldCount(ds *DetailState) int {
-	return len(c.buildDetailFieldItems(ds))
+	return len(c.buildDetailFieldItems(ds).items)
 }
 
 // detailRelatedVisibleCount returns the number of visible related rows after

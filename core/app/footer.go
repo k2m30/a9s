@@ -152,7 +152,7 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 	}
 
 	// Left column focused: check navigable field under cursor.
-	items := c.buildDetailFieldItems(ds)
+	items := c.buildDetailFieldItems(ds).items
 	fc := ds.FieldCursor
 	if fc >= 0 && fc < len(items) {
 		item := items[fc]

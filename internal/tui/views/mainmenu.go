@@ -168,11 +168,15 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		item := body.Entries[rl.itemIndex]
 		// A refused probe replaces the alias with its cause: the alias is
 		// recoverable from the type name, the reason the count is stale is not.
+		// It carries the theme's warn colour too — dim is what the row says
+		// when there is nothing to report, and a refused probe is something.
 		aliasText := item.Alias
+		aliasStyle := styles.DimText
 		if item.Cause != "" {
 			aliasText = item.Cause
+			aliasStyle = styles.TierColorStyle("~")
 		}
-		aliasPadded := text.PadOrTrunc(aliasText, aliasW)
+		aliasPadded := aliasStyle.Render(text.PadOrTrunc(aliasText, aliasW))
 		nameFieldW := max(m.width-4-aliasW-3, 10)
 
 		nameStr := item.Display
@@ -187,21 +191,19 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		namePadded := text.PadOrTrunc(nameStr, nameFieldW)
 
 		if rl.itemIndex == body.Selected {
-			dimAlias := styles.DimText.Render(aliasPadded)
 			selectedName := "    " + namePadded + " "
-			sb.WriteString(styles.RowSelected.Width(m.width).Render(selectedName + dimAlias))
+			sb.WriteString(styles.RowSelected.Width(m.width).Render(selectedName + aliasPadded))
 			continue
 		}
 
-		dimAlias := styles.DimText.Render(aliasPadded)
 		// Only a confirmed-empty type dims. A cache-seeded count is a real
 		// count from the last session and its list opens on Enter, so it
 		// renders like any other row until the live probe replaces it. The
 		// verdict comes from the body, never recomputed here.
 		if item.ConfirmedEmpty {
-			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + dimAlias)
+			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + aliasPadded)
 		} else {
-			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + dimAlias)
+			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + aliasPadded)
 		}
 	}
 

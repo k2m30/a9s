@@ -177,25 +177,20 @@ type DetailState struct {
 	Findings []domain.Finding `json:"findings,omitempty"`
 	// AttentionDetails holds per-finding detail rows (set by ApplyDetailFinding).
 	AttentionDetails map[domain.FindingCode]domain.AttentionDetail `json:"attention_details,omitempty"`
-	// AttentionPrepend is the number of items the LAST built layout prepended
-	// for the Attention block, written by injectAttentionSectionDetail — the
-	// one place that block is built. The cursor arithmetic in
-	// applyFindingToState reads it rather than recomputing the size, because
-	// the block depends on more than ds.Findings: the "not inspected" entry
-	// comes from the session truncated-ID set, which the runtime writes before
-	// the controller applies the intent. A recomputed size therefore describes
-	// a layout that was never on screen. Not serialised: it is a record of what
-	// the builder emitted, not state a client supplies.
-	AttentionPrepend int `json:"-"`
-	// CursorAttentionKey names the Attention entry the cursor was on in the
-	// LAST built body, or "" when it was anywhere else. Written by
-	// buildDetailBody, which is the one place the layout the operator is
-	// looking at is produced, so it is an identity recorded from what was on
-	// screen rather than one reconstructed later from state that has since
-	// moved. applyFindingToState reads it to put the cursor back on the same
-	// entry after a rebuild reorders the block. Not serialised, for the same
-	// reason as AttentionPrepend.
-	CursorAttentionKey string `json:"-"`
+	// cursorLayout is what the LAST BUILD of the body — the one the operator
+	// is looking at — observed about the row under the cursor and the size of
+	// the Attention block it was indexed against. snapshot() is the only writer,
+	// because it is the only build that reaches a screen; applyFindingToState is
+	// the only reader, relocating the cursor into the rebuilt layout by the
+	// identity recorded here.
+	//
+	// Recorded rather than recomputed: the block depends on more than
+	// ds.Findings — the "not inspected" entry comes from the session
+	// truncated-ID set, which the runtime writes before the controller applies
+	// the intent — so anything derived later describes a layout that was never
+	// on screen. Unexported, and so never serialised: it is a record of what a
+	// builder emitted, not state a client supplies.
+	cursorLayout detailLayout
 }
 
 // DetailRelatedRow is one row in the detail screen's related panel, mirroring

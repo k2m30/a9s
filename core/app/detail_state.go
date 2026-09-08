@@ -68,9 +68,9 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 // repeated calls replace rather than accumulate. A nil finding clears wave-2
 // data. No-op when the top screen is not ScreenDetail.
 //
-// Cursor stability: an Attention entry the cursor is on is followed by
-// identity, and a content field below the block by the change in the block's
-// size, so the operator keeps their place across an enrichment result.
+// Cursor stability: the row the cursor is on — an Attention entry or a content
+// field alike — is followed by identity, so the operator keeps their place
+// across an enrichment result.
 func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -368,19 +368,14 @@ func newlyReportedFindings(current, candidates []domain.Finding) []domain.Findin
 // method once per finding (which would strip the previous iteration's
 // just-appended entry). Callers must hold c.mu (write).
 func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
-	// The prepend size the LAST BUILD produced — the layout the cursor is
-	// actually positioned against. Recomputing it here would read the session
-	// truncated-ID set as it is NOW, which the runtime already updated before
-	// this intent, and so describe a block the user never saw.
-	oldPrepend := ds.AttentionPrepend
-	// The entry the cursor is reading, named rather than numbered: the block is
+	// The row the cursor is reading, named rather than numbered: the block is
 	// about to be rebuilt and a more severe finding sorts above the ones
-	// already there, so the index moves even though the entry does not. The
-	// name was recorded from the body the operator is looking at, so it holds
-	// on every path that rebuilds the block — including the sweep's, where the
+	// already there, so the index moves even though the row does not. The name
+	// was recorded from the body the operator is looking at, so it holds on
+	// every path that rebuilds the block — including the sweep's, where the
 	// session truncated-ID set has already moved and no reconstruction of the
 	// old block can be trusted.
-	oldCursorKey := ds.CursorAttentionKey
+	was := ds.cursorLayout
 
 	// Strip prior wave-2 findings: a second result for this resource replaces
 	// the first rather than accumulating beside it.
@@ -415,39 +410,10 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 		}
 	}
 
-	// Keep the cursor on what the operator was reading:
-	//
-	//   1. On an Attention entry (the last build recorded its name): follow that
-	//      entry to wherever the rebuild put it, and land on the section header
-	//      only when the entry is gone.
-	//   2. On a content field: shift by the change in the block's size, but only
-	//      when content items actually exist after injection — the empty-resource
-	//      case, a resource with no content fields at all.
-	// Building the new layout is what re-records ds.AttentionPrepend, so this
-	// one build supplies both the new prepend size and the new item total.
-	newItems := c.buildDetailFieldItems(ds)
-	newTotalItems := len(newItems)
-	newPrepend := ds.AttentionPrepend
-	switch {
-	case oldCursorKey != "":
-		// Inside the block, whether or not the block changed length: a finding
-		// that outranks the ones already there sorts above them and moves every
-		// entry below it down, at a length the block can arrive at two ways.
-		ds.FieldCursor = 0
-		for i := 0; i < newPrepend && i < newTotalItems; i++ {
-			if newItems[i].Key == oldCursorKey {
-				ds.FieldCursor = i
-				break
-			}
-		}
-	case newPrepend != oldPrepend:
-		// Cursor was pointing at a content item; shift it to track the same item
-		// in the new layout. Skip if no content exists beyond the attention block
-		// (empty resource case), the same no-content case the cursor stays at 0 for.
-		if adjusted := ds.FieldCursor - oldPrepend + newPrepend; adjusted < newTotalItems {
-			ds.FieldCursor = adjusted
-		}
-	}
+	// Keep the cursor on the row the operator was reading, wherever the
+	// rebuild put it — an Attention entry a more severe finding sorted down,
+	// or a content field the block pushed along, by the one rule.
+	ds.FieldCursor = relocateDetailCursor(was, ds.FieldCursor, c.buildDetailFieldItems(ds))
 }
 
 // ApplyDetailRelated replaces the RelatedRows slice on the top detail screen's

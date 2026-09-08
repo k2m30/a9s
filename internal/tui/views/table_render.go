@@ -50,8 +50,8 @@ func applySortKeyPrefixWidths(cols []listCol) []listCol {
 			displayNum = 0
 		}
 		prefix := fmt.Sprintf("%d:", displayNum)
-		glyph := max(len([]rune(sortAscGlyph)), len([]rune(sortDescGlyph)))
-		minWidth := len([]rune(prefix)) + len([]rune(cols[i].title)) + glyph
+		glyph := max(text.Width(sortAscGlyph), text.Width(sortDescGlyph))
+		minWidth := text.Width(prefix) + text.Width(cols[i].title) + glyph
 		if cols[i].width < minWidth {
 			cols[i].width = minWidth
 		}
@@ -88,11 +88,14 @@ func (m ResourceListModel) fitColumns(cols []listCol) []listCol {
 }
 
 // renderHeaderRow renders the column header line with sort indicators.
-// Uses m.hScrollOffset to compute the absolute column index for position numbering.
-func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
+// hScrollOffset turns a visible column index into the absolute one the
+// position number is taken from; sortColKey and sortAsc name the sorted
+// column and its direction. All three come from the body the caller is
+// rendering, so no render-time state has to be parked on the model first.
+func renderHeaderRow(cols []listCol, sortColKey string, sortAsc bool, hScrollOffset int) string {
 	parts := make([]string, len(cols))
 	for i, c := range cols {
-		parts[i] = m.colHeaderCell(c, i+m.hScrollOffset)
+		parts[i] = colHeaderCell(c, i+hScrollOffset, sortColKey, sortAsc)
 	}
 	headerText := " " + strings.Join(parts, "  ")
 	return styles.TableHeader.Render(headerText)
@@ -112,11 +115,11 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 // knows which column is sorted. Fitting the title around the arrow instead of
 // truncating the two together means no width on either path can drop it, and a
 // column cut down by a narrow terminal still says the list is sorted.
-func (m ResourceListModel) colHeaderCell(c listCol, absIdx int) string {
+func colHeaderCell(c listCol, absIdx int, sortColKey string, sortAsc bool) string {
 	glyph := ""
-	if m.sortColKey != "" && c.sortKey == m.sortColKey {
+	if sortColKey != "" && c.sortKey == sortColKey {
 		glyph = sortDescGlyph
-		if m.sortAsc {
+		if sortAsc {
 			glyph = sortAscGlyph
 		}
 	}
@@ -131,7 +134,7 @@ func (m ResourceListModel) colHeaderCell(c listCol, absIdx int) string {
 	// Only the truncation happens before the indicator is appended, never the
 	// padding: on a column with room to spare the arrow stays beside its
 	// title, and on one without, the ellipsis eats the title instead.
-	if fit := c.width - len([]rune(glyph)); len([]rune(title)) > fit {
+	if fit := c.width - text.Width(glyph); text.Width(title) > fit {
 		title = text.PadOrTrunc(title, fit)
 	}
 	return text.PadOrTrunc(title+glyph, c.width)

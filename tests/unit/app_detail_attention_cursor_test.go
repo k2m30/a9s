@@ -8,9 +8,10 @@
 // Finding A because it walked them UNSORTED while the renderer sorts "!"
 // before "~" (so it picked the wrong "last entry" and dropped the trailing
 // spacer from its count), Finding B because it read session state the runtime
-// had already moved. injectAttentionSectionDetail now records the size it
-// emitted on the DetailState and the cursor math reads that record, so the
-// class is closed by construction: there is no second walk left to disagree.
+// had already moved. buildAttentionSectionDetail now reports the size it
+// emitted, snapshot() records it with the identity of the row under the
+// cursor, and the relocation reads that record — so the class is closed by
+// construction: there is no second walk left to disagree.
 package unit_test
 
 import (
@@ -111,7 +112,7 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSo
 	// Wave-2 "!" (broken) finding that is BARE: no Detail text, no
 	// AttentionDetail rows. Appended AFTER the wave-1 "~" finding in
 	// ds.Findings (unsorted order), but sorts BEFORE it ("!" first) in
-	// injectAttentionSectionDetail's rendered order.
+	// buildAttentionSectionDetail's rendered order.
 	broken := &domain.Finding{
 		Code:     "ec2.instance-status-impaired",
 		Phrase:   "impaired: system checks failing",
@@ -132,7 +133,7 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSo
 			"cursor did not stay on the same logical field after mixed-severity Attention sort:\n"+
 				"  before enrichment: FieldCursor=%d Key=%q Path=%q\n"+
 				"  after  enrichment: FieldCursor=%d Key=%q Path=%q\n"+
-				"the prepend size must be the one injectAttentionSectionDetail actually emitted: "+
+				"the prepend size must be the one buildAttentionSectionDetail actually emitted: "+
 				"it sorts \"!\" before \"~\", so the last RENDERED entry here is the non-bare warning "+
 				"finding (spacer included), not the bare broken one appended last. A size derived "+
 				"from the unsorted order is one lower and shifts FieldCursor by the wrong delta.",
