@@ -99,6 +99,12 @@ type APIErrorEvent struct {
 	// fallback).
 	ResourceType string
 	Provenance   messages.FetchProvenance
+	// ScreenID, ListSeq and Superseded mirror messages.APIError's own fields,
+	// stamped by StampListFailure — the same seam the paired success goes
+	// through.
+	ScreenID   domain.Gen
+	ListSeq    domain.Gen
+	Superseded bool
 }
 
 // ClientsReadyEvent mirrors the fields of messages.ClientsReady the
@@ -173,15 +179,27 @@ func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 		_, region := c.session.CurrentPair()
 		text = failureLine("", ev.Err, region)
 	}
+	clear := ClearActiveListLoadingIntent{
+		Err:          text,
+		Append:       ev.Append,
+		LoadingMore:  ev.LoadingMore,
+		ResourceType: ev.ResourceType,
+		Provenance:   ev.Provenance,
+		ScreenID:     ev.ScreenID,
+		ListSeq:      ev.ListSeq,
+	}
+	if ev.Superseded {
+		// A later request for this list is already out. The failure still
+		// retires the flag its own request raised — nothing else will come to
+		// clear it — but it installs no marker and says nothing: the screen is
+		// waiting on a fetch that has not answered yet, and an error from the
+		// one it replaced is not that fetch's answer.
+		clear.Err = ""
+		return []UIIntent{clear}, nil
+	}
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},
-		ClearActiveListLoadingIntent{
-			Err:          text,
-			Append:       ev.Append,
-			LoadingMore:  ev.LoadingMore,
-			ResourceType: ev.ResourceType,
-			Provenance:   ev.Provenance,
-		},
+		clear,
 	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},

@@ -38,7 +38,7 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	canon := resource.CanonicalShortName(typeName)
 	ls := c.topListState()
 	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)
-	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, appendPage, topLevelCanonical, nil)
+	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, appendPage, topLevelCanonical, nil, 0)
 	if topLevelCanonical && len(c.stack) > 0 {
 		// The same second step the real lane takes (handleResourcesLoadedEvent):
 		// the menu observation and then the save that records it. Calling only

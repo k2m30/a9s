@@ -416,7 +416,11 @@ func (c *Controller) resolveColumnsLocked(typeName string) []ColumnDef {
 // internal/tui's app_stack and views/resourcelist both reach the column
 // resolver with a ShortName that may be a child's, and a child that resolves
 // no typeDef resolves no columns, so the column a sort names is never found.
-// Callers MUST already hold c.mu.
+//
+// It is the ONE resolution a screen gets. The columns it renders, the columns
+// its filter compares, the classifier its issue count asks and the child key
+// its footer offers all come from this typeDef, so a screen cannot render one
+// type's columns and filter with another's. Callers MUST already hold c.mu.
 func (c *Controller) typeDefForLocked(shortName string) *resource.ResourceTypeDef {
 	if fv, ok := c.fallbackTypeDefs[shortName]; ok {
 		return &fv

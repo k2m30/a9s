@@ -19,12 +19,7 @@ func (c *Controller) buildListFooterHints(ctx runtime.ScreenContext, ls *ListSta
 		hints = append(hints, KeyHint{Key: "esc", Help: "Back"})
 	}
 
-	td := resource.FindResourceType(ctx.ResourceType)
-	if td == nil {
-		if fv, ok := c.fallbackTypeDefs[ctx.ResourceType]; ok {
-			td = &fv
-		}
-	}
+	td := c.typeDefForLocked(ctx.ResourceType)
 	if td != nil {
 		var enterChild *resource.ChildViewDef
 		for i := range td.Children {

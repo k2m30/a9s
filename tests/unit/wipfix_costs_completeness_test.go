@@ -186,7 +186,7 @@ func TestCostsStore_PartialAnomalyOverlayLeavesAuthoritativeCacheAlone(t *testin
 	if _, ok := store.Anomalies(fixedCostsNow); ok {
 		t.Errorf("the authoritative anomaly cache accepted a page-capped result — a lower bound must never masquerade as CE's complete list for the window")
 	}
-	marks, partial := store.AnomalyOverlay(fixedCostsNow)
+	marks, partial := store.AnomalyOverlay(window, fixedCostsNow)
 	if !partial || len(marks) != 1 {
 		t.Errorf("AnomalyOverlay = (%d marks, partial=%v), want (1, true) — the marks a capped walk did find are still real", len(marks), partial)
 	}
@@ -198,7 +198,7 @@ func TestCostsStore_PartialAnomalyOverlayLeavesAuthoritativeCacheAlone(t *testin
 		Coverage:  window,
 		Anomalies: costs.AnomalyResult{Requested: true, Marks: []costs.AnomalyMark{}},
 	}, fixedCostsNow)
-	if marks, partial := store.AnomalyOverlay(fixedCostsNow); partial || len(marks) != 0 {
+	if marks, partial := store.AnomalyOverlay(window, fixedCostsNow); partial || len(marks) != 0 {
 		t.Errorf("AnomalyOverlay after an authoritative zero-anomaly fetch = (%d marks, partial=%v), want (0, false)", len(marks), partial)
 	}
 }

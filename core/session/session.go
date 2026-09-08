@@ -194,6 +194,26 @@ type Session struct {
 	// serialize on this lock (Codex P1 / CodeRabbit race).
 	pairMu sync.Mutex
 
+	// typeSaveGenMu guards typeSaveGen.
+	typeSaveGenMu sync.Mutex
+	// typeSaveGen is the newest row-store observation generation already
+	// written to each type's file for the CURRENT pair. Two lanes write those
+	// files from snapshots frozen at different moments — a list screen's own
+	// save and the sweep's completion save, which freezes the whole row store
+	// at dispatch and lands whenever its goroutine gets there — and nothing
+	// orders the two. The generation makes the order stop mattering: a
+	// snapshot older than what is already on disk is not written, so a sweep
+	// that froze 100 rows cannot overwrite the 90 a later foreground
+	// observation recorded. Cleared by Rotate with the rest of the pair's
+	// state.
+	typeSaveGen map[string]domain.Gen
+
+	// pairGen counts pair changes. It is what distinguishes one visit to a
+	// profile/region from the next visit to the same one, so a save frozen
+	// during the first cannot land during the second (see Pair.Gen). Guarded
+	// by pairMu, like the pair itself.
+	pairGen domain.Gen
+
 	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
 	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDirIn has run for a
 	// pair (either at startup via TaskKindLoadAvailCache, or after a pair
@@ -478,16 +498,27 @@ func (s *Session) CurrentPair() (profile, region string) {
 
 // Pair is one profile/region pair as a single value, so a save frozen now
 // can be checked against the session's pair when it finally reaches disk.
+//
+// Gen is what makes it an identity rather than a name. The operator can leave
+// a pair and come back: switch from A to B, let B's rows populate, switch back
+// to A. A save frozen in A's first epoch names the pair the session is on
+// again, so a guard comparing names alone lets it through and B's numbers land
+// in A's files. Every pair change takes the next generation, so a save frozen
+// before the round trip no longer matches. Zero means the value was built
+// without one (a hand-constructed pair in a test, a caller predating this) and
+// is checked on names alone, as it was.
 type Pair struct {
 	Profile string
 	Region  string
+	Gen     domain.Gen
 }
 
 // CurrentPairValue is CurrentPair as one value — what a caller stamps onto a
 // payload it is about to hand to another goroutine.
 func (s *Session) CurrentPairValue() Pair {
-	profile, region := s.CurrentPair()
-	return Pair{Profile: profile, Region: region}
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return Pair{Profile: s.Profile, Region: s.Region, Gen: s.pairGen}
 }
 
 // SetProfileRegion sets the live Profile/Region pair while holding pairMu.
@@ -501,6 +532,9 @@ func (s *Session) SetProfileRegion(profile, region string) {
 	defer s.pairMu.Unlock()
 	s.Profile = profile
 	s.Region = region
+	// A new epoch for the pair, even when the names are the ones it just had:
+	// what a frozen save has to match is the visit, not the name (see Pair).
+	s.pairGen++
 }
 
 // sweptPairKey returns the SweptPairs key for a profile/region pair — always
@@ -669,10 +703,13 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // NoCache is set.
 func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
 	s.pairMu.Lock()
-	if pair.Profile != s.Profile || pair.Region != s.Region {
-		// C9: this save was prepared for a pair the session has since left.
-		// Rejected here, inside the same critical section that resolves the
-		// store, so no switch can slip between the check and the write.
+	if pair.Profile != s.Profile || pair.Region != s.Region ||
+		(pair.Gen != 0 && pair.Gen != s.pairGen) {
+		// C9: this save was prepared for a pair the session has since left —
+		// including one it has since come back to, which the names alone
+		// cannot tell apart (see Pair.Gen). Rejected here, inside the same
+		// critical section that resolves the store, so no switch can slip
+		// between the check and the write.
 		s.pairMu.Unlock()
 		return nil
 	}
@@ -950,6 +987,10 @@ func (s *Session) Rotate() {
 	s.cacheStoreRegion = ""
 	s.pairMu.Unlock()
 
+	s.typeSaveGenMu.Lock()
+	s.typeSaveGen = nil
+	s.typeSaveGenMu.Unlock()
+
 	s.Identity = nil
 	s.IdentityFetching = false
 	s.PendingRefresh = false
@@ -1011,4 +1052,30 @@ func (s *Session) Rotate() {
 
 	// SweptPairs: deliberately NOT cleared — session-lifetime by design, see
 	// SweptPairs doc.
+}
+
+// AcceptTypeSave reports whether a save carrying observation generation gen
+// for shortName may be written, and records it when it may. A save frozen at
+// an older generation than one already written for the same type describes a
+// row set the file has since moved past, so writing it would undo a newer
+// observation with an older one — the shape a sweep's frozen snapshot has
+// against a foreground save that landed while it was queued.
+//
+// gen == 0 means the caller has no observation generation to offer (a
+// hand-built save, a lane that predates this) and is accepted as before,
+// without moving the recorded generation.
+func (s *Session) AcceptTypeSave(shortName string, gen domain.Gen) bool {
+	if gen == 0 {
+		return true
+	}
+	s.typeSaveGenMu.Lock()
+	defer s.typeSaveGenMu.Unlock()
+	if s.typeSaveGen == nil {
+		s.typeSaveGen = make(map[string]domain.Gen)
+	}
+	if written, ok := s.typeSaveGen[shortName]; ok && gen < written {
+		return false
+	}
+	s.typeSaveGen[shortName] = gen
+	return true
 }

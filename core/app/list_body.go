@@ -48,7 +48,7 @@ import (
 // unrelated failure may have left behind); a hard failure (no resources at
 // all) never reaches this method, routing through
 // messages.APIError/ClearActiveListLoadingIntent instead.
-func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, loadingMore bool, topLevelCanonical bool, fetchErr error) {
+func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, loadingMore bool, topLevelCanonical bool, fetchErr error, listSeq domain.Gen) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
 	// Silent-swap findings carry: a silent swap (a non-append replace — the common cold-boot shape
@@ -164,7 +164,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// seed rows from a cache-first source set Refreshing=true themselves
 		// AFTER calling this method, so this clear only ever fires for a
 		// genuine fetch-result swap, never undoing the seed-time flag.
-		ls.clearFetchInFlight(loadingMore)
+		ls.clearFetchInFlight(loadingMore, listSeq)
 		// Seed-time provisional total: a fetch result retires the seed's
 		// population only when it actually supersedes it — an EXACT result
 		// (authoritative proof of the new total, C5), or one that already
@@ -206,7 +206,10 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			ls.HasPagination = false
 			ls.PaginationCursor = ""
 		}
-		ls.PopulationUnconfirmed = ls.HasPagination || fetchErr != nil
+		// The incompleteness is sticky across one list's pages; the pagination
+		// answer is this page's alone.
+		ls.FetchIncomplete = (appendPage && ls.FetchIncomplete) || fetchErr != nil
+		ls.PopulationUnconfirmed = ls.HasPagination || ls.FetchIncomplete
 	}
 
 	// Fresh rows arrive without Wave-2 findings; re-apply the latest known
@@ -445,7 +448,11 @@ func (c *Controller) installListBodyMemo(build listBodyBuild, memo listBodyMemo)
 	}
 	top := c.stack[len(c.stack)-1]
 	ls := top.State.List
-	if ls == nil || top.Ctx.ResourceType != build.typeName {
+	// The instance, not the type: two screens of one type have equal memo keys
+	// whenever their rows, filter and sort agree, so a body built for a screen
+	// that has since been popped would install into the one underneath and
+	// render its predecessor's rows.
+	if ls == nil || ls.instance != build.instance {
 		return
 	}
 	if c.listBodyMemoStale(memo, ls, build.fallbackRowsGen) {
@@ -501,6 +508,7 @@ type listBodyBuild struct {
 	ls              *ListState
 	typeName        string
 	td              *resource.ResourceTypeDef
+	instance        domain.Gen
 	filterTD        *resource.ResourceTypeDef
 	filterColumns   []ColumnDef
 	columns         []ColumnDef
@@ -514,17 +522,12 @@ type listBodyBuild struct {
 func (c *Controller) captureListBodyBuild(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyBuild {
 	// Build the row set from the per-screen store (Bug 1 fix: uses ls.Rows when
 	// available so two stacked same-type screens see their own independent rows).
-	src := c.listScreenResources(ls, typeName)
-	filterTD := c.filterTypeDefLocked(typeName)
-	detached := *ls
-	// The previous generation's memo is not an input to the next one, and
-	// carrying it would keep that generation's rows alive for the build.
-	detached.bodyMemo = listBodyMemo{}
-	detached.Rows = make([]resource.Resource, len(src))
-	copy(detached.Rows, src)
+	filterTD := c.typeDefForLocked(typeName)
+	detached := ls.cloneForBuild(c.listScreenResources(ls, typeName))
 	return listBodyBuild{
 		ls:       &detached,
 		typeName: typeName,
+		instance: ls.instance,
 		td:       td,
 		filterTD: filterTD,
 		// The filter resolves its columns from the filter's own typeDef, the
@@ -793,20 +796,11 @@ func (c *Controller) GetListIssueCount() int {
 // taking the lock again would self-deadlock the non-reentrant RWMutex.
 // Mirrors the ListSelected()/listSelected() split in this file.
 func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
-	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
-	// the model constructor) over the catalog: the model's typeDef is the
-	// authoritative Color classifier for issue counting. This is critical for
-	// test typeDefs that share a ShortName with a catalog type but have a nil
-	// Color (falls back to colorFallback(r.Fields["status"])) or a different
-	// Color implementation.
-	var td resource.ResourceTypeDef
-	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
-		td = ftd
-	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
-		td = *catalogTD
-	} else {
+	tdp := c.typeDefForLocked(typeName)
+	if tdp == nil {
 		return 0
 	}
+	td := *tdp
 	// S1 contract: the list-title suffix and the menu sync-back use the SAME
 	// aggregation as the menu badge — and the badge never counts types with
 	// ExcludeFromIssueBadge (e.g. ct-events, where "issue-colored" rows are

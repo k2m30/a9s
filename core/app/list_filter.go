@@ -30,23 +30,8 @@ func relatedIDSubset(ls *ListState, base []resource.Resource) []resource.Resourc
 	return subset
 }
 
-// filterTypeDefLocked prefers the fallback typeDef (registered via
-// RegisterFallbackTypeDef from the model constructor) over the catalog: the
-// model's typeDef is the authoritative Color classifier, matching
-// listIssueCount/GetListIssueCount. Test typeDefs frequently share a ShortName
-// with a catalog type (e.g. "ec2") but use a different Color implementation (or
-// none, falling back to colorFallback(r.Fields["status"])) — using the catalog
-// type here would silently disagree with the issue count the title/badge
-// report. Callers must hold c.mu.
-func (c *Controller) filterTypeDefLocked(typeName string) *resource.ResourceTypeDef {
-	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
-		return &fv
-	}
-	return resource.FindResourceType(typeName)
-}
-
 func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
-	td := c.filterTypeDefLocked(typeName)
+	td := c.typeDefForLocked(typeName)
 	return applyListFiltersWith(ls, td, resolveListColumnsForBuild(c.viewConfig, typeName, td),
 		c.listEnrichmentFindings(typeName), base)
 }

@@ -220,6 +220,25 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	return intents, tasks
 }
 
+// StampListFailure is the failure lane's half of StampListResult: it
+// canonicalises the type the failed request named and answers, once, whether a
+// later request for that list has already superseded it. A failure is the
+// other outcome of the same request, so it is routed and discarded by the same
+// rules its paired success would have been — an alias failure that cannot find
+// its canonical screen leaves that screen loading for ever, and a stale one
+// that installs its error marks a screen already waiting on a newer fetch.
+//
+// A message the seam never saw keeps the caller's own type, which is what a
+// hand-built failure with no paired fetch hands in.
+func (c *Core) StampListFailure(msg messages.APIError) messages.APIError {
+	if msg.ResourceType == "" {
+		return msg
+	}
+	msg.ResourceType = resource.CanonicalShortName(msg.ResourceType)
+	msg.Superseded = c.ListResultSuperseded(msg.ResourceType, msg.ListSeq)
+	return msg
+}
+
 // StampListResult writes HandleResourcesLoaded's verdict onto the message the
 // hosts hand on to their screen state: the canonical short name that seam
 // keyed its work by, and whether the result was superseded. Both hosts route a

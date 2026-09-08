@@ -59,21 +59,27 @@ type DispatchSnapshot struct {
 	EnrichmentTypeGen map[string]domain.Gen
 	Profile           string
 	Region            string
-	NoCache           bool
+	// PairGen is the pair's generation at dispatch time. Carried alongside the
+	// two names so a save frozen here can be rejected after the operator
+	// leaves the pair AND comes back to it, which the names alone cannot tell
+	// apart (session.Pair.Gen).
+	PairGen domain.Gen
+	NoCache bool
 }
 
 // CaptureDispatch snapshots the session generations and clients. Call it
 // synchronously at task-dispatch time (NOT inside a goroutine).
 func (c *Core) CaptureDispatch() DispatchSnapshot {
-	profile, region := c.session.CurrentPair()
+	pair := c.session.CurrentPairValue()
 	return DispatchSnapshot{
 		Clients:           c.session.Clients,
 		AvailabilityGen:   c.session.AvailabilityGen,
 		EnrichmentGen:     c.session.EnrichmentGen,
 		ConnectGen:        c.session.ConnectGen,
 		EnrichmentTypeGen: c.session.EnrichmentTypeGenSnapshot(),
-		Profile:           profile,
-		Region:            region,
+		Profile:           pair.Profile,
+		Region:            pair.Region,
+		PairGen:           pair.Gen,
 		NoCache:           c.session.NoCache,
 	}
 }
@@ -85,9 +91,9 @@ func (c *Core) CaptureDispatch() DispatchSnapshot {
 // preserve.
 //
 // A task is a canonical-list fetch when its result will carry
-// messages.FetchProvenanceCanonicalList: KindFetchResources always, and
-// KindFetchMore only when it continues the type's own top-level list rather
-// than a child or filtered drill. Anything else keeps ListSeq zero — those
+// messages.FetchProvenanceCanonicalList — for both KindFetchResources and
+// KindFetchMore that is what the payload's own lane says, with an undeclared
+// lane meaning the canonical list (the legacy default). Anything else keeps ListSeq zero — those
 // results never reach a canonical list screen, and stamping them would let a
 // child list's load-more supersede an in-flight verification of the list
 // beneath it.
@@ -97,6 +103,17 @@ func (c *Core) StampListFetchSeq(task *TaskRequest) {
 	}
 	switch task.Key.Kind {
 	case KindFetchResources:
+		// A filtered or child fetch produces a result no canonical screen will
+		// accept, so a sequence drawn here orders nothing — it only moves the
+		// type's latest value on, which supersedes the canonical refresh
+		// already in flight and is itself superseded by the next one. A
+		// payload that declares no lane keeps the legacy default: every
+		// production dispatch stamps its provenance, and an unstamped one is
+		// the canonical list.
+		if p, ok := task.Payload.(FetchResourcesPayload); ok &&
+			p.Provenance != messages.FetchProvenanceUnknown && !p.Provenance.CanonicalList() {
+			return
+		}
 	case KindFetchMore:
 		p, ok := task.Payload.(FetchMorePayload)
 		if !ok || !p.Lane().CanonicalList() {
@@ -218,7 +235,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// to the one save chokepoint, which drops it if the operator has
 		// switched pairs in the meantime — a queued save must never write one
 		// account's rows into another's directory.
-		dispatchPair := session.Pair{Profile: snap.Profile, Region: snap.Region}
+		dispatchPair := session.Pair{Profile: snap.Profile, Region: snap.Region, Gen: snap.PairGen}
 		var flashErr error
 		// Per C7/C8: an availability-sweep + Wave-2 enrichment completion
 		// must persist that type's per-row rows/findings (SaveResourceListCache)
@@ -242,15 +259,16 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// The reverse order let the row-derived, potentially-incomplete count
 		// computed here unconditionally clobber a more accurate aggregate.
 		saveResources, saveTruncated := c.rowStoreResourcesAndTruncated()
+		saveGens := c.rowStoreGens()
 		var wave2Answered map[string]bool
 		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
-			saveResources, saveTruncated = p.Resources, p.Truncated
+			saveResources, saveTruncated, saveGens = p.Resources, p.Truncated, p.Gens
 			wave2Answered = p.Wave2Answered
 		}
 		// A nil-Payload dispatch answers for no type (C6b): only
 		// handleEnrichmentChecked's "all done" branch names Wave-2-answered
 		// types, and it always carries a SaveCachePayload.
-		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered); err != nil {
+		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered, saveGens); err != nil {
 			flashErr = err
 		}
 		if err := c.SaveAvailabilityFromRows(dispatchPair); err != nil && flashErr == nil {
@@ -375,7 +393,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: provenance}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: provenance, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
 		}
 		// C1: a verify-refetch must verify the content actually being shown,
 		// not just page 1 — so page up to the previously-cached depth. C5: a
@@ -412,6 +430,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Gen:          gen,
 			TypeGen:      typeGen,
 			ListSeq:      req.ListSeq,
+			ScreenID:     req.ScreenID,
 			Provenance:   provenance,
 		}, nil
 
@@ -425,7 +444,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		gen := snap.AvailabilityGen
 		res, err := c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceFilteredList}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceFilteredList, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -452,7 +471,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		})
 		provenance := p.Lane()
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Append: true, LoadingMore: !p.ContinuesInitialLoad, Provenance: provenance}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Append: true, LoadingMore: !p.ContinuesInitialLoad, Provenance: provenance, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -463,6 +482,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      req.ListSeq,
+			ScreenID:     req.ScreenID,
 			Provenance:   provenance,
 		}, nil
 
@@ -475,7 +495,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		gen := snap.AvailabilityGen
 		res, err := c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceChild}, nil
+			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceChild, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: p.ChildType,
@@ -731,7 +751,10 @@ func (c *Core) availabilityFromResourceCache() (
 // failed is absent from it — is a bare rows-carrying observation that must
 // carry forward the Wave-2 data the on-disk rows already have
 // (reconcileTypeFile's carry step).
-func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Answered map[string]bool) error {
+// gens carries the row-store observation generation each type's rows were
+// frozen at, so a snapshot this save was queued behind cannot overwrite a
+// newer observation that landed while it waited.
+func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Answered map[string]bool, gens map[string]domain.Gen) error {
 	if len(probeResources) == 0 {
 		return nil
 	}
@@ -751,7 +774,7 @@ func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources m
 		if issuesKnown {
 			issues = unifiedIssueCount(resources, *td, nil)
 		}
-		err := c.SaveTypeRows(pair, shortName, resources, len(resources), exact, issues, issuesKnown, truncated, wave2Answered[shortName])
+		err := c.SaveTypeRows(pair, gens[shortName], shortName, resources, len(resources), exact, issues, issuesKnown, truncated, wave2Answered[shortName])
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}

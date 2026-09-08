@@ -120,6 +120,11 @@ type Controller struct {
 	// Guarded by cacheWriteMu, not c.mu.
 	pendingCacheWrites []cacheWrite
 
+	// nextListInstance hands out ListState.instance ids. Monotonic for the
+	// life of the controller, so an id is never reused by a later screen of
+	// the same type — which is the whole point of it.
+	nextListInstance domain.Gen
+
 	// identityResult holds the resolved caller identity received via
 	// messages.IdentityLoaded so snapshot can build IdentityBody without
 	// importing core/aws or touching the TUI view stack.
@@ -366,8 +371,31 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 		}
 		tasks[i].Snap = snap
 	}
+	top := c.topListState()
+	screen := domain.Gen(0)
+	if top != nil {
+		screen = top.instance
+	}
 	for i := range tasks {
 		c.core.StampListFetchSeq(&tasks[i])
+		// The flag this dispatch raised on the screen belongs to this request:
+		// record which, so a completion that no longer owns it leaves it up
+		// (a Ctrl+R issued while an earlier refresh is still out).
+		if top != nil && tasks[i].ListSeq != 0 && runtime.TaskProducesListResult(tasks[i].Key.Kind) {
+			if tasks[i].Key.Kind == runtime.KindFetchMore {
+				top.loadingMoreSeq = tasks[i].ListSeq
+			} else {
+				top.loadingSeq = tasks[i].ListSeq
+			}
+		}
+		// The list screen on top is the one whose action produced these tasks,
+		// so its own fetches carry its identity and their results come back to
+		// it rather than to whichever screen of that type is topmost when they
+		// land. A task no list screen owns keeps zero and is routed by type and
+		// lane as before.
+		if tasks[i].ScreenID == 0 && runtime.TaskProducesListResult(tasks[i].Key.Kind) {
+			tasks[i].ScreenID = screen
+		}
 	}
 	return tasks
 }

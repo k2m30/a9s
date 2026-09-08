@@ -189,6 +189,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// this event). The FlashTick task is dropped: it is only meaningful
 		// to a running event loop (TUI/web timer), and a headless/orchestrator
 		// caller has no loop to process it.
+		msg = c.StampListFailure(msg)
 		intents, _ := c.HandleAPIError(APIErrorEvent{
 			Err:          msg.Err,
 			NewGen:       c.session.ConnectGen,
@@ -196,6 +197,9 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 			LoadingMore:  msg.LoadingMore,
 			ResourceType: msg.ResourceType,
 			Provenance:   msg.Provenance,
+			ScreenID:     msg.ScreenID,
+			ListSeq:      msg.ListSeq,
+			Superseded:   msg.Superseded,
 		})
 		return intents, nil
 	}

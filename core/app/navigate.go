@@ -133,7 +133,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// HandleNavigate returned for both kinds is still on its way, and
 		// cache-first seeding never skips it.
 		if res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, false, isTopLevelCanonicalList(intent.ID, top.State.List), nil)
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, false, isTopLevelCanonicalList(intent.ID, top.State.List), nil, 0)
 			top.State.List.Refreshing = true
 			// Set after the seeding call, per SetListTotalCount's ordering note;
 			// lock-free here because applyNavResult already runs under c.mu.
@@ -662,7 +662,7 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 				top.Ctx.ResourceType = res.TargetType
 				if top.State.List == nil {
 					top.State.List = &ListState{Loading: true}
-					applyListDefaults(top.State.List, top.Ctx.ResourceType)
+					c.initListState(top.State.List, top.Ctx.ResourceType)
 				}
 				if res.FetchFilter != nil {
 					top.State.List.ParentContext = res.FetchFilter

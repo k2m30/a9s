@@ -885,12 +885,24 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 //
 // wave2Answered is stamped onto the returned payload as-is (C6b) — see
 // SaveCachePayload's doc comment for what it drives at execute time.
+// rowStoreGens is the row-store observation generation of every type it
+// holds — the stamp a frozen save carries so a later observation of the same
+// type cannot be overwritten by it.
+func (c *Core) rowStoreGens() map[string]domain.Gen {
+	all := c.session.RowStore.SnapshotAll(true)
+	out := make(map[string]domain.Gen, len(all))
+	for canon, tr := range all {
+		out[canon] = tr.Gen
+	}
+	return out
+}
+
 func (c *Core) snapshotRowStoreForSave(wave2Answered map[string]bool) *SaveCachePayload {
 	resources, truncated := c.rowStoreResourcesAndTruncated()
 	if len(resources) == 0 {
 		return nil
 	}
-	return &SaveCachePayload{Resources: resources, Truncated: truncated, Wave2Answered: wave2Answered}
+	return &SaveCachePayload{Resources: resources, Truncated: truncated, Gens: c.rowStoreGens(), Wave2Answered: wave2Answered}
 }
 
 // rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) (task

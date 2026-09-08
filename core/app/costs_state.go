@@ -343,7 +343,7 @@ func costsGridForFrame(cs *CostsState, drill costs.DrillLevel) costs.Grid {
 	// AnomalyOverlay, not Anomalies: a page-capped result is a lower bound
 	// the cache refuses, but the marks it did find are real and belong on
 	// the grid — under the warning costsAnomalyOverlayPartial raises.
-	marks, _ := cs.Store.AnomalyOverlay(cs.Now)
+	marks, _ := cs.Store.AnomalyOverlay(drill.Window, cs.Now)
 	grid = costs.ApplyAnomalies(grid, marks)
 	if drill.RowDim == costs.DimensionService {
 		for i := range grid.Rows {

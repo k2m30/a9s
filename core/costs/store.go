@@ -129,6 +129,19 @@ func (b *anomalyBucket) coversWindow(window []Period) bool {
 	return b.Covered.Start <= start && end <= b.Covered.End
 }
 
+// coveredBy reports whether p's range spans everything b claims to cover — the
+// question "does this authoritative answer speak for everything this capped
+// walk found". A zero Period on either side means "no range resolved": an
+// unranged authoritative answer speaks for everything, and an unranged capped
+// walk claims everything and is replaced by any ranged answer, which is the
+// behaviour that held before ranges were tracked at all.
+func (b *anomalyBucket) coveredBy(p Period) bool {
+	if p == (Period{}) || b.Covered == (Period{}) {
+		return true
+	}
+	return p.Start <= b.Covered.Start && b.Covered.End <= p.End
+}
+
 // fileSchema is the on-disk shape of one profile's cost cache file. Version
 // MUST stay first so a future format change is detected before the rest of
 // the file is parsed.
@@ -413,9 +426,15 @@ func (s *Store) merge(q Query, recs []Record, now time.Time, truncated bool) {
 //     stale, and refreshing FetchedAt alone can never promote it past its
 //     own settlementLag immutability check (fetchedWhileOpen can only be
 //     true for a bucket immutableAt would call false).
+//   - An existing bucket written by a page-capped fetch, when THIS fetch was
+//     complete: the lower bound is replaced, records and all. A capped bucket
+//     is never immutable (it has to stay repairable), so it expires out of
+//     Lookup on its own TTL; without this case nothing can ever replace one
+//     that was written after its period closed, and the period is refetched
+//     every time the screen opens.
 //   - Anything else — a bucket Merge DID just write this round
-//     (FetchedAt==now), or one fetched AFTER its own period closed, even
-//     one still within settlementLag ("closed but still settling") — is
+//     (FetchedAt==now), or a complete one fetched AFTER its own period closed,
+//     even one still within settlementLag ("closed but still settling") — is
 //     left exactly as Merge set it. Merge is the only call that knows
 //     whether THIS bucket's records were actually replaced this round;
 //     touching a still-settling closed-period bucket here would wrongly
@@ -445,6 +464,15 @@ func (s *Store) mergeCoverage(q Query, covered []Period, now time.Time, truncate
 		case existing.FetchedAt.Equal(now):
 			// Merge wrote this bucket in the same round; it already carries
 			// this fetch's own completeness, records and all.
+		case existing.Truncated && !truncated:
+			// A complete answer replaces a lower bound, records and all —
+			// including a complete answer that found nothing, which Merge
+			// cannot express because it learns a period was fetched only from
+			// records that name it. Without this the capped bucket outlives
+			// every fetch that could repair it: it is never immutable (a lower
+			// bound must stay repairable), so it expires out of Lookup and the
+			// period is refetched every time the screen opens.
+			entry.Periods[pk] = periodEntry{FetchedAt: now, Truncated: false}
 		case existing.fetchedWhileOpen(p):
 			entry.Periods[pk] = periodEntry{FetchedAt: now, Truncated: truncated}
 		}
@@ -575,8 +603,14 @@ func (s *Store) PutAnomalies(marks []AnomalyMark, now time.Time, covered Period)
 	defer s.mu.Unlock()
 	s.revision++
 	s.data.Anomalies = &anomalyBucket{FetchedAt: now, Marks: marks, Covered: covered}
-	// An authoritative answer supersedes whatever a capped walk had found.
-	s.partialAnomalies = nil
+	// An authoritative answer supersedes a capped walk only over the range it
+	// actually looked at. A complete trailing-twelve-months fetch says nothing
+	// about the years a capped multi-year walk did cover, and dropping that
+	// walk's marks there loses confirmed anomalies with nothing said — the one
+	// outcome worse than showing them with a caveat.
+	if s.partialAnomalies == nil || s.partialAnomalies.coveredBy(covered) {
+		s.partialAnomalies = nil
+	}
 }
 
 // putPartialAnomalies keeps the marks a page-capped GetAnomalies did find.
@@ -591,16 +625,24 @@ func (s *Store) putPartialAnomalies(marks []AnomalyMark, now time.Time, covered 
 	s.partialAnomalies = &anomalyBucket{FetchedAt: now, Marks: marks, Covered: covered}
 }
 
-// AnomalyOverlay returns the marks to overlay on the grid and whether they are
-// a lower bound: the authoritative snapshot when one is fresh, otherwise the
-// page-capped set a truncated fetch left behind. Dropping the capped set
-// instead would make a confirmed anomaly disappear from the grid with nothing
-// said, which is the one outcome worse than showing it with a caveat.
-func (s *Store) AnomalyOverlay(now time.Time) (marks []AnomalyMark, partial bool) {
-	if marks, ok := s.Anomalies(now); ok {
+// AnomalyOverlay returns the marks to overlay on the grid for window, and
+// whether they are a lower bound: the authoritative snapshot when one is fresh
+// AND answers for that window, otherwise the page-capped set a truncated fetch
+// left behind, when that covers the window. Dropping the capped set instead
+// would make a confirmed anomaly disappear from the grid with nothing said,
+// which is the one outcome worse than showing it with a caveat.
+//
+// The window is what makes the preference between the two meaningful. A fresh
+// authoritative snapshot cached under the default trailing twelve months does
+// not answer for a multi-year zoom-out, and preferring it there returns no
+// marks at all for the years it never looked at — while a capped walk that DID
+// cover them is sitting unused. Freshness alone cannot tell those apart.
+func (s *Store) AnomalyOverlay(window []Period, now time.Time) (marks []AnomalyMark, partial bool) {
+	if marks, ok := s.AnomaliesCoverage(window, now); ok {
 		return marks, false
 	}
-	if s.partialAnomalies == nil || now.Sub(s.partialAnomalies.FetchedAt) >= anomalyTTL {
+	if s.partialAnomalies == nil || now.Sub(s.partialAnomalies.FetchedAt) >= anomalyTTL ||
+		!s.partialAnomalies.coversWindow(window) {
 		return nil, false
 	}
 	return s.partialAnomalies.Marks, true

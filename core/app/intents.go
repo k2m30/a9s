@@ -269,7 +269,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// clearActiveListLoadingTarget — rather than unconditionally the
 			// top-of-stack list screen.
 			if ls := c.clearActiveListLoadingTarget(v); ls != nil {
-				ls.clearFetchInFlight(v.LoadingMore)
+				ls.clearFetchInFlight(v.LoadingMore, v.ListSeq)
 				// Per cache contract C4: a fetch failure over cached content stops the
 				// refreshing marker and swaps in an error marker instead —
 				// nothing goes blank, rows stay on screen.

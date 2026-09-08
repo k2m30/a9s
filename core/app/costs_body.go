@@ -91,7 +91,7 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 	}
 
 	footerNote := costsFooterNote(vm)
-	_, anomaliesPartial := cs.Store.AnomalyOverlay(cs.Now)
+	_, anomaliesPartial := cs.Store.AnomalyOverlay(top.Window, cs.Now)
 	switch {
 	case cs.Store.Partial(costsQueryForFrame(top, cs.Metric), top.Window, cs.Now):
 		// FR-017: partial dollars rendered as complete dollars is a

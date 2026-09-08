@@ -106,6 +106,13 @@ type ResourcesLoaded struct {
 	// renders Resources as usual AND routes Err through Flash so the `!`
 	// log records the partial failure.
 	Err error
+	// ScreenID names the list screen instance whose own fetch produced this
+	// result (runtime.TaskRequest.ScreenID). The apply point routes by it, so
+	// a continuation always returns to the screen that asked for it even when
+	// another list of the same type and lane has since opened on top. Zero
+	// means the result carries no screen claim — a cache-seed replay, a
+	// synthetic construction — and is routed by type and lane as before.
+	ScreenID domain.Gen
 	// Superseded is the runtime seam's answer about this message: a later
 	// request for the same list was already handed out, so nothing this
 	// result carries may land. Core.HandleResourcesLoaded is the one place
@@ -173,6 +180,14 @@ type APIError struct {
 	// back to the pre-existing "active list screen" behavior for those,
 	// exactly like FetchResourcesPayload.Provenance's own zero-value grace.
 	Provenance FetchProvenance
+	// ListSeq, ScreenID and Superseded carry the same facts they carry on
+	// ResourcesLoaded, for the same reason: a failure is the other outcome of
+	// the same request, and routing or discarding it by a different rule than
+	// its paired success is how a stale failure marks a live screen. Stamped
+	// by the same runtime seam (StampListFailure).
+	ListSeq    domain.Gen
+	ScreenID   domain.Gen
+	Superseded bool
 }
 
 func (APIError) isEvent()               {}

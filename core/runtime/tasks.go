@@ -178,6 +178,13 @@ type TaskRequest struct {
 	// point can reject a result a later dispatch has already superseded. Zero
 	// for every task that does not produce a canonical top-level list result.
 	ListSeq domain.Gen
+	// ScreenID identifies the list screen that dispatched this task, stamped
+	// by the Controller boundary that produced it. The executor echoes it onto
+	// the resulting messages.ResourcesLoaded or messages.APIError so the apply
+	// point returns the page to the screen that asked for it, rather than to
+	// whichever screen of that type happens to be topmost when it lands. Zero
+	// for a task no list screen owns.
+	ScreenID domain.Gen
 }
 
 // ConnectPayload carries the profile/region/gen the adapter must use when
@@ -310,8 +317,14 @@ func (SaveThemeConfigPayload) isTaskPayload() {}
 // (D17). A type-scoped tag, not a payload-wide flag: one failed probe in a
 // sweep must not let that sweep's save persist its rows as clean.
 type SaveCachePayload struct {
-	Resources     map[string][]resource.Resource
-	Truncated     map[string]bool
+	Resources map[string][]resource.Resource
+	Truncated map[string]bool
+	// Gens is the row-store observation generation each type's rows were
+	// frozen at. The save may run long after the freeze, and a foreground
+	// observation of the same type may land in between; carrying the
+	// generation is what lets the chokepoint drop this snapshot instead of
+	// writing the older row set over the newer one.
+	Gens          map[string]domain.Gen
 	Wave2Answered map[string]bool
 }
 
@@ -344,4 +357,15 @@ func TaskOpID(p TaskPayload) domain.Gen {
 	default:
 		return 0
 	}
+}
+
+// TaskProducesListResult reports whether a task of this kind resolves to a
+// messages.ResourcesLoaded or messages.APIError that a list screen applies —
+// the kinds whose result has to find its way back to the screen that asked.
+func TaskProducesListResult(kind TaskKind) bool {
+	switch kind {
+	case KindFetchResources, KindFetchMore, KindFetchFiltered, TaskKindFetchChildResources:
+		return true
+	}
+	return false
 }

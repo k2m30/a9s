@@ -3,6 +3,8 @@
 package app
 
 import (
+	"maps"
+
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -67,9 +69,43 @@ type ListState struct {
 	// disk-cache exactness flag and the menu's count sync-back. Carrying both
 	// on one field titled a fully-loaded list as "N+" and offered a load-more
 	// with no cursor to follow.
-	PopulationUnconfirmed bool                `json:"population_unconfirmed,omitempty"`
-	AutoOpenSingle        bool                `json:"auto_open_single,omitempty"`
-	RelatedIDSet          map[string]struct{} `json:"related_id_set,omitempty"`
+	PopulationUnconfirmed bool `json:"population_unconfirmed,omitempty"`
+
+	// instance identifies THIS list screen for the length of its life on the
+	// stack. Two screens of one resource type are otherwise indistinguishable
+	// to a result coming back: an AMI's EC2 drill stacked on another drill of
+	// the same type share their type and their lane, so a continuation the
+	// deeper one asked for lands on whichever is topmost. Every fetch a screen
+	// dispatches carries this id, and the result and the failure carry it
+	// back, so a page always returns to the screen that asked for it — and a
+	// body built off the lock for one screen cannot install into another.
+	//
+	// Session-local and never serialised: a screen restored from a snapshot is
+	// a new instance, and nothing outside this process can name one.
+	instance domain.Gen
+
+	// loadingSeq and loadingMoreSeq name the request that raised each of the
+	// two activity flags — Loading/Refreshing on one lane, LoadingMore on the
+	// other. A completion retires the flag it owns and no other: a Ctrl+R
+	// issued while an earlier refresh is still out supersedes it, and when the
+	// older one returns it is discarded, so letting it clear the marker would
+	// tell the operator the loading is over while the newer fetch is still in
+	// flight. Zero means the flag was raised without a sequence (a lane that
+	// draws none, a synthetic seed), and any completion may retire it.
+	loadingSeq     domain.Gen
+	loadingMoreSeq domain.Gen
+
+	// FetchIncomplete records that some component of this list's fetch did not
+	// enumerate everything it was asked for — a partial-success result, where
+	// rows landed AND something failed. It is STICKY across the pages of one
+	// list: a non-append fetch starts the list over and so resets it, an
+	// appended page ORs its own answer in. Page two saying "no more pages" is
+	// a different fact from page one's failure to enumerate, and letting it
+	// overwrite the failure recorded the list as the type's exact population
+	// on the strength of a page that never saw what was missing.
+	FetchIncomplete bool                `json:"fetch_incomplete,omitempty"`
+	AutoOpenSingle  bool                `json:"auto_open_single,omitempty"`
+	RelatedIDSet    map[string]struct{} `json:"related_id_set,omitempty"`
 
 	// reapplyChecker + reapplySource belong to THIS related-list screen: for a
 	// truncated reverse-scan pivot, each loaded page is re-run through the checker
@@ -309,6 +345,30 @@ func (ms *MenuState) ClearAvailability() {
 	ms.AvailTotal = 0
 	ms.EnrichChecked = 0
 	ms.EnrichTotal = 0
+}
+
+// cloneForBuild returns a detached copy of ls for an off-lock body build,
+// with rows as its row set. Every reference-typed field is copied, so nothing
+// the build reads can be written by a locked caller while it runs — a result
+// landing under the lock inserts into RelatedIDSet through
+// reapplyCheckerAgainst, and a build iterating the same map is a data race Go
+// ends the process on.
+//
+// A new map or slice field on ListState belongs here. Copying the struct
+// alone shares it, and the detector only reports it when a reapply and a
+// build happen to overlap.
+//
+// The memo is dropped: the previous generation is not an input to the next,
+// and carrying it would keep that generation's rows alive for the build.
+func (ls *ListState) cloneForBuild(rows []resource.Resource) ListState {
+	out := *ls
+	out.bodyMemo = listBodyMemo{}
+	out.Rows = make([]resource.Resource, len(rows))
+	copy(out.Rows, rows)
+	out.RelatedIDSet = maps.Clone(ls.RelatedIDSet)
+	out.FetchFilter = maps.Clone(ls.FetchFilter)
+	out.ParentContext = maps.Clone(ls.ParentContext)
+	return out
 }
 
 // canonicalScreenType is the canonical short name of the screen's own

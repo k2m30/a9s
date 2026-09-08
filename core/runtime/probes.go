@@ -654,16 +654,7 @@ func saveFieldKey(col config.ListColumn, fields map[string]string, lifecycleKey 
 // SaveCachePayload.Wave2Answered set — never through this exported entry
 // point.
 func (c *Core) SaveResourceListCache(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
-	return c.saveResourceListCache(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
-}
-
-// saveResourceListCacheWave2Complete is saveResourceListCache's counterpart
-// for the Wave-2-completion save (handleEnrichmentChecked's "all done"
-// branch): this observation IS the fresh enrichment result, so it must
-// supersede any carried Wave-2 data wholesale for the rows it replaces —
-// otherwise a healed/resolved issue could never clear (C6b).
-func (c *Core) saveResourceListCacheWave2Complete(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
-	return c.saveResourceListCache(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
+	return c.saveResourceListCache(pair, 0, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
 }
 
 // SaveTypeRows is the single per-type save chokepoint (task #17 wave 1 stage
@@ -682,7 +673,7 @@ func (c *Core) saveResourceListCacheWave2Complete(pair session.Pair, shortName s
 // snapshot) and must keep computing issues/issuesKnown/issuesTruncated
 // themselves; unifying that computation here would silently change either
 // lane's counted total.
-func (c *Core) SaveTypeRows(pair session.Pair, shortName string, resources []resource.Resource, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
+func (c *Core) SaveTypeRows(pair session.Pair, obsGen domain.Gen, shortName string, resources []resource.Resource, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
 	materialized := c.materializeListFieldsForSave(shortName, resources)
 	rows := make([]cache.Row, len(materialized))
 	for i, r := range materialized {
@@ -694,17 +685,25 @@ func (c *Core) SaveTypeRows(pair session.Pair, shortName string, resources []res
 		}
 	}
 	if wave2Authoritative {
-		return c.saveResourceListCacheWave2Complete(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated)
+		return c.saveResourceListCache(pair, obsGen, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
 	}
-	return c.saveResourceListCache(pair, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
+	return c.saveResourceListCache(pair, obsGen, shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
 }
 
-func (c *Core) saveResourceListCache(pair session.Pair, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
+// obsGen is the row-store observation generation the rows were frozen at.
+// A save older than one already written for this type is dropped: two lanes
+// write these files from snapshots frozen at different moments and nothing
+// orders them, so without this a sweep's frozen 100 rows land on top of the 90
+// a later foreground observation already recorded (session.AcceptTypeSave).
+func (c *Core) saveResourceListCache(pair session.Pair, obsGen domain.Gen, shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
 	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
 	// canonShortName lookup always agree on the stored key — an
 	// uncanonicalized Put here would silently miss the depth lookup for
 	// every alias caller.
 	canon := resource.CanonicalShortName(shortName)
+	if !c.session.AcceptTypeSave(canon, obsGen) {
+		return nil
+	}
 	if rows == nil {
 		rows = []cache.Row{}
 	}

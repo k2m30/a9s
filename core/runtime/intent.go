@@ -305,6 +305,13 @@ type ClearActiveListLoadingIntent struct {
 	// FetchResourcesPayload.Provenance's own zero-value grace.
 	ResourceType string
 	Provenance   messages.FetchProvenance
+	// ScreenID and ListSeq name the list screen instance and the request this
+	// failure answers, forwarded from messages.APIError. Routing and flag
+	// retirement read them for exactly the reasons the paired success does:
+	// two lists of one type are otherwise indistinguishable, and a flag may
+	// only be retired by the request that raised it.
+	ScreenID domain.Gen
+	ListSeq  domain.Gen
 }
 
 func (ClearActiveListLoadingIntent) isIntent() {}

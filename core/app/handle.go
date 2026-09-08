@@ -317,7 +317,22 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 // the two paths cannot drift apart and reintroduce the asymmetry where a
 // failure lands on whatever screen happens to be on top instead of the one
 // that actually issued the failed request.
-func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance) (screen *Screen, ok bool) {
+func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance, screenID domain.Gen) (screen *Screen, ok bool) {
+	// A result that names the screen instance that asked for it goes to that
+	// screen or nowhere. Two lists of one type share their type AND their
+	// lane, so the scan below cannot tell them apart: it returns whichever is
+	// topmost, and a continuation the deeper one is still waiting for lands on
+	// the newer one instead. When the named screen has been popped there is
+	// nothing to strand — its rows went with it.
+	if screenID != 0 {
+		for i := len(c.stack) - 1; i >= 0; i-- {
+			s := &c.stack[i]
+			if s.State.List != nil && s.State.List.instance == screenID {
+				return s, true
+			}
+		}
+		return nil, false
+	}
 	if resourceType == "" || provenance == messages.FetchProvenanceUnknown {
 		return nil, false
 	}
@@ -343,7 +358,7 @@ func (c *Controller) findResourceListScreen(resourceType string, provenance mess
 // drops stale ResourcesLoaded via messages.IsStale before invoking this.
 func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	canon := msg.ResourceType
-	s, ok := c.findResourceListScreen(canon, msg.Provenance)
+	s, ok := c.findResourceListScreen(canon, msg.Provenance, msg.ScreenID)
 	if !ok {
 		// No screen owns this result — it arrived after its list was popped,
 		// or none was ever opened. A canonical one still speaks for the type's
@@ -369,12 +384,12 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	// rest of the session and the "m" key with it.
 	if msg.Superseded {
 		if ls := s.State.List; ls != nil {
-			ls.clearFetchInFlight(msg.LoadingMore)
+			ls.clearFetchInFlight(msg.LoadingMore, msg.ListSeq)
 		}
 		return
 	}
 	topLevelCanonical := isTopLevelCanonicalList(s.ID, s.State.List)
-	c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, msg.LoadingMore, topLevelCanonical, msg.Err)
+	c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, msg.LoadingMore, topLevelCanonical, msg.Err, msg.ListSeq)
 	// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
 	// availability badge here, at the controller level, so both the TUI and
 	// web renderer get it — this replaces the TUI-only sync-back that used
@@ -426,7 +441,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 // those, mirroring FetchResourcesPayload.Provenance's own zero-value grace.
 func (c *Controller) clearActiveListLoadingTarget(v runtime.ClearActiveListLoadingIntent) *ListState {
 	if v.ResourceType != "" && v.Provenance != messages.FetchProvenanceUnknown {
-		s, ok := c.findResourceListScreen(v.ResourceType, v.Provenance)
+		s, ok := c.findResourceListScreen(v.ResourceType, v.Provenance, v.ScreenID)
 		if !ok {
 			return nil
 		}
@@ -540,13 +555,17 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	truncated := ls.HasPagination
 	rows := append([]resource.Resource(nil), ls.Rows...)
 	pair := c.core.Pair()
+	// The observation these rows belong to. A save frozen at an older
+	// generation than one already written for this type is dropped rather
+	// than allowed to undo it (Core.SaveTypeRows).
+	obsGen := c.core.AnyOriginResourceCacheGen(canon)
 	// C4: every input is frozen here, under the lock; the write itself runs
 	// after the caller releases it, so a slow filesystem can never stall the
 	// next key or a web snapshot behind this save. The frozen pair is what
 	// lets the write still be rejected if the operator switches profile
 	// before it lands.
 	c.stageCacheWrite(cacheWrite{run: func() {
-		_ = c.core.SaveTypeRows(pair, canon, rows, len(rows), exact, issues, issuesKnown, truncated, false)
+		_ = c.core.SaveTypeRows(pair, obsGen, canon, rows, len(rows), exact, issues, issuesKnown, truncated, false)
 	}})
 }
 

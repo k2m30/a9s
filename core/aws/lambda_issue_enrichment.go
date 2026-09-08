@@ -80,16 +80,27 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
 
 		}
-		switch realErr := lambdaRealErr(policyErr, urlErr); {
+		realErr := lambdaRealErr(policyErr, urlErr)
+		switch {
 		case realErr != nil:
 			MarkSkipped(&result, r.ID, &failures, realErr)
-		case (policyErr != nil || urlErr != nil) && lambdaFunctionGone(ctx, api, r.ID):
-			// The function went away between the list call and this one: a
-			// race, not a failure to log — and nothing about its posture was
-			// inspected, so the row must not read as clean. The healthy case
-			// answers the same wire code and lands here with the function
-			// still there, recording nothing.
-			result.TruncatedIDs[r.ID] = true
+		case policyErr != nil || urlErr != nil:
+			// One of the two answered the absent-resource code, which means
+			// either "no policy / no URL config" (healthy) or "the function is
+			// gone" (a race). Only GetFunction can tell them apart.
+			absent, verifyErr := lambdaFunctionAbsent(ctx, api, r.ID)
+			switch {
+			case verifyErr != nil:
+				// The question was not settled. Nothing about this function's
+				// posture was established, so the row is uninspected — reading
+				// a failed verification as "still there" reports it clean on
+				// the strength of a call that never succeeded.
+				MarkSkipped(&result, r.ID, &failures, verifyErr)
+			case absent:
+				// Gone between the list call and this one: a race, not a
+				// failure to log, and nothing was inspected either.
+				result.TruncatedIDs[r.ID] = true
+			}
 		}
 	})
 
@@ -170,13 +181,26 @@ func lambdaRealErr(errs ...error) error {
 	return nil
 }
 
-// lambdaFunctionGone reports whether the function is absent, which is the one
+// lambdaFunctionAbsent reports whether the function is absent, the one
 // question GetPolicy's and ListFunctionUrlConfigs' shared error code cannot
 // answer. Asked only after one of them reported absence, so a healthy
 // function costs no extra call.
-func lambdaFunctionGone(ctx context.Context, api LambdaGetFunctionAPI, name string) bool {
+//
+// Three answers, not two. A successful GetFunction says the function is there
+// (false, nil); the absent-resource code says it is gone (true, nil); any
+// other failure — denied, throttled, a reset connection — settles nothing and
+// is returned, because a verification that did not happen is not the same
+// answer as one that came back "present".
+func lambdaFunctionAbsent(ctx context.Context, api LambdaGetFunctionAPI, name string) (bool, error) {
 	_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 		return api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(name)})
 	})
-	return isLambdaNoPolicy(err)
+	switch {
+	case err == nil:
+		return false, nil
+	case isLambdaNoPolicy(err):
+		return true, nil
+	default:
+		return false, err
+	}
 }

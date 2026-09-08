@@ -3,6 +3,7 @@
 package app
 
 import (
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -144,8 +145,18 @@ func (c *Controller) ensureListState() {
 	}
 	if top.State.List == nil {
 		top.State.List = &ListState{Loading: true}
-		applyListDefaults(top.State.List, top.Ctx.ResourceType)
+		c.initListState(top.State.List, top.Ctx.ResourceType)
 	}
+}
+
+// initListState prepares a freshly-created ListState: it takes the next
+// instance id and applies the type's defaults. Every path that creates a list
+// screen's state goes through it, so no screen can end up without an identity
+// for its own fetches to carry. Callers hold c.mu (write).
+func (c *Controller) initListState(ls *ListState, resourceType string) {
+	c.nextListInstance++
+	ls.instance = c.nextListInstance
+	applyListDefaults(ls, resourceType)
 }
 
 // applyListDefaults seeds per-type defaults on a freshly-created ListState.
@@ -511,13 +522,31 @@ func (c *Controller) SetListLoadingMore(v bool) {
 // (Refreshing only ever starts on an already-loaded list, i.e. after Loading
 // has already cleared) — at most one of the pair is true for any given
 // non-append completion.
-func (ls *ListState) clearFetchInFlight(loadMore bool) {
+// seq is the completing request's own list sequence; a completion whose
+// sequence is not the one that raised the flag leaves it alone (row 47). Zero
+// on either side means "no ordering claim" and retires the flag as before.
+func (ls *ListState) clearFetchInFlight(loadMore bool, seq domain.Gen) {
 	if loadMore {
+		if !ls.ownsFlag(ls.loadingMoreSeq, seq) {
+			return
+		}
 		ls.LoadingMore = false
+		ls.loadingMoreSeq = 0
+		return
+	}
+	if !ls.ownsFlag(ls.loadingSeq, seq) {
 		return
 	}
 	ls.Loading = false
 	ls.Refreshing = false
+	ls.loadingSeq = 0
+}
+
+// ownsFlag reports whether a completion at seq may retire a flag raised at
+// owner. An unstamped completion, or a flag raised before sequences existed,
+// retires as it always did.
+func (ls *ListState) ownsFlag(owner, seq domain.Gen) bool {
+	return owner == 0 || seq == 0 || owner == seq
 }
 
 // ClearListLoading clears the top list screen's in-flight fetch flag for the
@@ -533,7 +562,7 @@ func (c *Controller) ClearListLoading(loadMore bool) {
 	if ls == nil {
 		return
 	}
-	ls.clearFetchInFlight(loadMore)
+	ls.clearFetchInFlight(loadMore, 0)
 }
 
 // SetListFetchError records a failed fetch's error text on the top list

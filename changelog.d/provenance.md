@@ -11,6 +11,26 @@
   the number of rows.
 - A list that could not finish loading no longer records its rows as the
   complete set of that type, and no longer offers "more" when there is none.
+- A page loaded on one list no longer lands on another list of the same type
+  opened on top of it. Each list screen now owns the fetches it starts.
+- A refresh started while an earlier one is still running no longer clears the
+  "refreshing" marker when the earlier one returns.
+- A failed fetch for a type opened under an alias now reaches its own screen
+  instead of leaving it loading for ever, and a failure that a newer request
+  has already replaced no longer marks the screen.
+- A list whose first page came back incomplete is no longer recorded as the
+  type's complete population when a later page reports there are no more.
+- Switching away from a profile and back no longer lets a save prepared before
+  the switch write the other profile's numbers into this one's cache.
+- A background sweep's saved snapshot no longer overwrites newer rows that
+  arrived while it was queued.
+- Cost anomaly marks now follow the range on screen: zooming out past the
+  cached range shows the marks that cover it, with the partial warning,
+  instead of showing none.
+- A closed month whose costs came from a capped fetch is now repaired by the
+  next complete fetch instead of being re-fetched every time the screen opens.
+- A Lambda whose permission check could not be completed is reported as
+  unchecked rather than healthy.
 - The cached row count for a type no longer flips between "exact" and
   "at least" depending on which of two background saves happened to finish
   first. A restart now reads the same number the session ended with.
