@@ -442,6 +442,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pressing Ctrl+R on a fully loaded list now shows the refreshed first page instead of silently keeping the old rows.
 - A list opened from retained rows no longer renders as a finished list when more rows are known to exist than were kept. It says it has more to load.
 - Pressing Ctrl+R and then loading more before the refresh answers no longer loses the extra page when the refresh finally lands.
+- A cached main menu loaded for one profile could briefly seed the screen of another. On startup the app resolves a region from the local AWS config so the cache can render before the connection settles, but it kept that resolution to itself, so until the connection landed there was nothing to compare an incoming cache read against. The resolved profile and region are now the session's from the moment the cache is read, and a read that answers for any other pair is discarded.
+- The main menu's saved counts and issue badges could go backwards. Two places wrote them: the background scan, from the rows the session had actually observed, and the menu itself, from a copy of what it was showing when the save was queued. The menu's copy could land last and put the older numbers back. Both now write the same answer, derived from the observed rows.
+- A scan failure for a type reachable under two names (`rds` and `dbi` are the same type) could raise its banner and log its error twice in one sweep. One type is now one entry per sweep whichever name the result arrives under.
 
 ### Added
 
@@ -915,6 +918,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An Aurora or DocumentDB cluster in a status a9s does not recognise now reads
   `<status>: in progress` like every other transitional status, instead of the
   bare keyword.
+- `make test-race` allows 900 seconds instead of 300. Under the race detector the unit tests take around 200 seconds on an idle machine, so the old ceiling reported a timeout whenever the machine was busy.
 
 ### Fixed (security)
 
