@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -108,19 +107,13 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 }
 
 // computeSGRiskFields inspects the ingress rules of a security group and
-// returns (dangerous_open_count, wide_open, risk_summary).
+// returns (dangerous_open_count, wide_open, open_ports). All three are machine
+// fields: the ec2 internet-exposure signal reads wide_open and open_ports
+// through the sg cache, and no consumer reads a rendered sentence.
 //
-//	dangerous_open_count and wide_open are the machine fields the ec2
-//	internet-exposure signal reads through the sg cache; they are never
-//	rewritten by the humanizer.
-//
-//	risk_summary is a display-only, owner-worded phrase for the list Risk
-//	column and the detail "Risk Summary" row:
-//	  ""                                  — no internet exposure on dangerous ports
-//	  "all ports open to 0.0.0.0/0"        — at least one rule with all-protocols (-1) open to 0.0.0.0/0
-//	  "ports 22, 3306 open to 0.0.0.0/0"   — specific dangerous ports open to 0.0.0.0/0
-//	When both wide-open and specific ports are present, the wide-open phrase
-//	wins (it's the more severe signal) — mirrors sgRiskFindings' precedence.
+// open_ports is the sorted, comma-separated list of sensitive ports the group
+// leaves open to the internet, empty when it leaves none. A wide-open group
+// reports no list: every port is open, which wide_open already says.
 func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
 	dangerousCount := 0
 	wideOpen := false
@@ -157,11 +150,8 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 	if wideOpen {
 		wideOpenStr = "true"
 	}
-	riskSummary := ""
-	switch {
-	case wideOpen:
-		riskSummary = sgWideOpenPhrase
-	case dangerousCount > 0:
+	openPorts := ""
+	if !wideOpen && len(portSet) > 0 {
 		ports := make([]int, 0, len(portSet))
 		for p := range portSet {
 			ports = append(ports, int(p))
@@ -171,64 +161,26 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 		for i, p := range ports {
 			parts[i] = strconv.Itoa(p)
 		}
-		if len(parts) > 0 {
-			riskSummary = sgDangerousPortsPhrase(strings.Join(parts, ", "))
-		} else {
-			// dangerousCount > 0 but no specific port captured (large-range case).
-			riskSummary = sgDangerousPortsPhrase("unspecified")
-		}
+		openPorts = strings.Join(parts, ", ")
 	}
-	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
+	return strconv.Itoa(dangerousCount), wideOpenStr, openPorts
 }
 
-// sgWideOpenPhrase is the single owner-worded source for the all-protocols
-// exposure phrase, shared by risk_summary (display) and sgRiskFindings
-// (the Broken-color explanation) so the two never drift.
-const sgWideOpenPhrase = "all ports open to 0.0.0.0/0"
-
-// sgDangerousPortsPhrase renders the specific-ports exposure wording for the
-// risk_summary field. The wording itself is the one sgCodeDangerousPorts
-// declares, so the field and the finding cannot drift apart.
-func sgDangerousPortsPhrase(ports string) string {
-	return fillPhrase(catalog.Phrase(sgCodeDangerousPorts), ports)
-}
-
-// sgPortsSlot recovers whatever sgDangerousPortsPhrase put in the declared
-// phrase's slot, including the "unspecified" stand-in a large port range
-// yields. It reads the declaration rather than restating it, so renaming the
-// wording cannot leave the inverse behind.
-func sgPortsSlot(summary string) string {
-	pre, post, ok := strings.Cut(catalog.Phrase(sgCodeDangerousPorts), "<list>")
-	if !ok || !strings.HasPrefix(summary, pre) || !strings.HasSuffix(summary, post) {
-		return ""
-	}
-	return summary[len(pre) : len(summary)-len(post)]
-}
-
-// sgPortsFromRiskSummary is the inverse of sgDangerousPortsPhrase: it recovers
-// the comma-separated port list a security group's risk_summary field encodes.
-// It lives beside the formatter so the two can never drift, and it is the only
-// way a consumer outside sg.go (the ec2 internet-exposure cross-ref) learns
-// which ports a group leaves open — the sensitive-port set stays owned here.
-// Returns "" for a summary that names no specific ports.
-func sgPortsFromRiskSummary(summary string) string {
-	if ports := sgPortsSlot(summary); ports != "unspecified" {
-		return ports
-	}
-	return ""
-}
-
-// sgRiskFindings ranks wide-open ahead of dangerous ports so the list Status
-// cell / detail Attention block explain the Broken color with the same
-// owner-worded phrase risk_summary carries for display. The row color derives
-// from these findings alone (colorAnyFindingOrHealthy) — wide_open and
-// dangerous_open_count are consumed by other types, never by the classifier.
-func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.Finding {
+// sgRiskFindings ranks wide-open ahead of dangerous ports: a rule opening every
+// port says everything the specific list would. The row colour derives from
+// these findings alone (colorAnyFindingOrHealthy), and risk_summary is the
+// phrase they carry, so the Status cell and the Attention block cannot word one
+// verdict two ways.
+//
+// The ports arrive as the list, never as a sentence to take apart: an empty one
+// beside a non-zero count reaches the slot filler, which refuses it, rather than
+// quietly rendering a group with an open port as clean.
+func sgRiskFindings(wideOpen, dangerousOpenCount, openPorts string) []domain.Finding {
 	switch {
 	case wideOpen == "true":
 		return []domain.Finding{wave1Finding(sgCodeWideOpen)}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
-		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, sgPortsSlot(riskSummary))}
+		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, openPorts)}
 	}
 	return nil
 }
@@ -301,9 +253,14 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 			description = *sg.Description
 		}
 
-		dangerousCount, wideOpen, riskSummary := computeSGRiskFields(sg.IpPermissions)
+		dangerousCount, wideOpen, openPorts := computeSGRiskFields(sg.IpPermissions)
 
-		findings := sgRiskFindings(wideOpen, dangerousCount, riskSummary)
+		findings := sgRiskFindings(wideOpen, dangerousCount, openPorts)
+		// The Status cell is the risk verdict's own phrase, read back off the
+		// finding rather than assembled a second time. Taken before the
+		// default-group finding is appended, which is a separate fact and does
+		// not belong in the risk cell.
+		riskSummary := domain.StatusPhrase(findings)
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
 		if sgDefaultAllowsTraffic(sg) {
 			findings = append(findings, wave1Finding(sgCodeDefaultWithRules))
@@ -325,6 +282,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 				"description":          description,
 				"dangerous_open_count": dangerousCount,
 				"wide_open":            wideOpen,
+				"open_ports":           openPorts,
 				"risk_summary":         riskSummary,
 			},
 			Findings:         findings,

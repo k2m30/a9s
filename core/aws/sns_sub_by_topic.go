@@ -84,13 +84,22 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 		topicArn = *sub.TopicArn
 	}
 
-	// A pending subscription has no ARN to be identified by — AWS puts the
-	// state where the ARN goes — so the row is keyed on what it does have.
+	// The child view has its own words for the confirmation state, but not its
+	// own reading of it: snsSubConfirmation is the one place the ARN is
+	// interpreted, so this column and the subscription list's Confirmed column
+	// cannot disagree about the same subscription.
 	confirmationStatus := "Confirmed"
 	id := subscriptionArn
-	if subscriptionArn == snsSubArnPending {
+	switch snsSubConfirmation(subscriptionArn) {
+	case snsSubPending:
 		confirmationStatus = snsSubArnPending
+		// A pending subscription has no ARN to be identified by, so the row is
+		// keyed on what it does have.
 		id = fmt.Sprintf("pending/%s/%s", protocol, endpoint)
+	case snsSubDeleted:
+		confirmationStatus = snsSubArnDeleted
+	case snsSubUnknown:
+		confirmationStatus = "Unknown"
 	}
 
 	findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)

@@ -168,7 +168,7 @@ Badge aggregation for `asg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `Status == "Delete in progress"` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delete in progress` |
-| Any `Instances[].HealthStatus == Unhealthy` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<N> unhealthy instance(s)` |
+| Any `Instances[].HealthStatus == Unhealthy` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<N unhealthy instance(s)>` |
 | `InService < MinSize` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> of <M> instances in service` |
 | `SuspendedProcesses` contains `Launch`/`Terminate`/`HealthCheck` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `scaling suspended` |
 | `LaunchConfigurationName` set | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `uses a launch configuration` |
@@ -186,7 +186,7 @@ Notes:
 
 ### 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every Warning/Broken row carries a specific cause in the Status column (`delete in progress`, `<N> unhealthy instance(s)`, `<N> of <M> instances in service`, `scaling suspended`, `latest scaling activity failed`), so triage decisions ("which ASG do I open first?") are possible directly from the list.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every Warning/Broken row carries a specific cause in the Status column (`delete in progress`, `<N unhealthy instance(s)>`, `<N> of <M> instances in service`, `scaling suspended`, `latest scaling activity failed`), so triage decisions ("which ASG do I open first?") are possible directly from the list.
 
 ## 5. Out of Scope
 
@@ -221,7 +221,7 @@ asg — COMPUTE. Lifecycle key: `status`.
 | --- | --- | --- | --- | --- |
 | asg.state.deleting | delete in progress | warn | wave1 | — |
 | asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 | — |
-| asg.instances.unhealthy | <N> unhealthy instance(s) | warn | wave1 | — |
+| asg.instances.unhealthy | <N unhealthy instance(s)> | warn | wave1 | — |
 | asg.scaling.suspended | scaling suspended | warn | wave1 | — |
 | asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 | — |
 | asg.launch-config.legacy | uses a launch configuration | warn | wave1 | The group launches from a launch configuration, an immutable legacy resource AWS no longer develops — it cannot carry IMDSv2 defaults, newer instance types, or versioned edits. Copy it to a launch template and point the group at that. |

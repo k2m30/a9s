@@ -138,7 +138,7 @@ conditions no code emits are lines under "Not yet implemented".
 | `lambda` | Lambda Functions | wave2 | `lambda.function-url-public` | function endpoint open without authentication | broken | The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it. |
 | `asg` | Auto Scaling Groups | wave1 | `asg.state.deleting` | delete in progress | warn | — |
 | `asg` | Auto Scaling Groups | wave1 | `asg.instances.underprovisioned` | <N> of <M> instances in service | broken | — |
-| `asg` | Auto Scaling Groups | wave1 | `asg.instances.unhealthy` | <N> unhealthy instance(s) | warn | — |
+| `asg` | Auto Scaling Groups | wave1 | `asg.instances.unhealthy` | <N unhealthy instance(s)> | warn | — |
 | `asg` | Auto Scaling Groups | wave1 | `asg.scaling.suspended` | scaling suspended | warn | — |
 | `asg` | Auto Scaling Groups | wave2 | `asg.scaling-activity-failed` | latest scaling activity failed | broken | — |
 | `asg` | Auto Scaling Groups | wave1 | `asg.launch-config.legacy` | uses a launch configuration | warn | The group launches from a launch configuration, an immutable legacy resource AWS no longer develops — it cannot carry IMDSv2 defaults, newer instance types, or versioned edits. Copy it to a launch template and point the group at that. |
@@ -215,7 +215,7 @@ conditions no code emits are lines under "Not yet implemented".
 | `tg` | Target Groups | wave2 | `tg.all-targets-unhealthy` | all <N target(s)> unhealthy | broken | Every registered target is failing its health check, so the load balancer has nowhere to send a request and whatever sits in front of this group is down. Check the targets themselves, then the health-check path, port and matcher the group is configured with. |
 | `tg` | Target Groups | wave2 | `tg.unhealthy-targets` | unhealthy targets: <N>/<M> | warn | Some of this group's targets are failing their health checks, so every request is landing on the ones that are left. Each failing target is listed with the reason its health check gave; fix or replace them before the remaining targets run out of headroom. |
 | `sg` | Security Groups | wave1 | `sg.ingress.wide-open` | all ports open to 0.0.0.0/0 | broken | One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them. |
-| `sg` | Security Groups | wave1 | `sg.ingress.dangerous-ports` | ports <list> open to 0.0.0.0/0 | broken | An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link. |
+| `sg` | Security Groups | wave1 | `sg.ingress.dangerous-ports` | <port(s) LIST> open to 0.0.0.0/0 | broken | An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link. |
 | `sg` | Security Groups | wave1 | `sg.default-with-rules` | default group allows traffic | warn | The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group. |
 | `sg` | Security Groups | wave2 | `sg.unused` | not attached to anything | warn | No network interface in this account references this group, so its rules protect nothing and its name still gets picked from the console list. Delete it, or attach it to the workload it was written for. |
 | `vpc` | VPCs | wave1 | `vpc.state.pending` | pending | warn | — |
@@ -630,7 +630,7 @@ conditions no code emits are lines under "Not yet implemented".
 | shortName | Name | Wave | Code | Phrase | Severity | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
 | `backup` | Backup Plans | wave2 | `backup.job-failed` | <N job(s)> failed in last 24h | broken | — |
-| `backup` | Backup Plans | wave2 | `backup.job-partial` | partial: <N> of <M> resources skipped | warn | — |
+| `backup` | Backup Plans | wave2 | `backup.job-partial` | partial: <N> of <M resource(s)> skipped | warn | — |
 
 ### Other
 

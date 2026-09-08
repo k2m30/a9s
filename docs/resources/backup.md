@@ -94,7 +94,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N job(s)> failed in last 24h` |
-| recent job `PARTIAL` | 2 | Warning | `~` | S2, S3, S4, S5 | `partial: <N> of <M> resources skipped` |
+| recent job `PARTIAL` | 2 | Warning | `~` | S2, S3, S4, S5 | `partial: <N> of <M resource(s)> skipped` |
 
 Rules for filling list and detail text:
 
@@ -150,7 +150,7 @@ backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field)
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | backup.job-failed | <N job(s)> failed in last 24h | broken | wave2 | — |
-| backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 | — |
+| backup.job-partial | partial: <N> of <M resource(s)> skipped | warn | wave2 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

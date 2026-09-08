@@ -77,7 +77,7 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 				"protocol":         protocol,
 				"endpoint":         endpoint,
 				"subscription_arn": subscriptionArn,
-				"confirmed":        snsSubConfirmed(subscriptionArn),
+				"confirmed":        snsSubConfirmedWord(subscriptionArn),
 			},
 			Findings:         findings,
 			AttentionDetails: details,
@@ -165,21 +165,37 @@ func snsSubStateFindings(subscriptionArn string) []domain.Finding {
 	return nil
 }
 
-// snsSubConfirmed is the Confirmed column's own value. The column cannot read
-// it off the SubscriptionArn: an unconfirmed subscription has the state where
-// the ARN goes, and a confirmed one has an ARN, so the cell showed a slice of
-// an ARN for every healthy row and a state word for the rest.
-func snsSubConfirmed(subscriptionArn string) string {
+// The four states a subscription can be in as far as confirmation goes.
+const (
+	snsSubConfirmed = "confirmed"
+	snsSubPending   = "pending"
+	snsSubDeleted   = "deleted"
+	snsSubUnknown   = "unknown"
+)
+
+// snsSubConfirmation is the one reading of whether an endpoint confirmed. The
+// SubscriptionArn is the only evidence either surface has — AWS puts the state
+// there instead of an ARN — and a subscription that came back with neither has
+// confirmed nothing. Both the subscription list and the by-topic child call
+// this and then word the answer for their own column; neither reads the ARN
+// for itself, so the two lists cannot disagree about the same subscription.
+func snsSubConfirmation(subscriptionArn string) string {
 	switch subscriptionArn {
 	case snsSubArnPending:
-		return "pending"
+		return snsSubPending
 	case snsSubArnDeleted:
-		return "deleted"
+		return snsSubDeleted
 	case "":
-		// No ARN and no state word: the subscription came back without the
-		// field, and a row that says "yes" here claims a confirmation nobody
-		// reported.
-		return "unknown"
+		return snsSubUnknown
+	}
+	return snsSubConfirmed
+}
+
+// snsSubConfirmedWord is the subscription list's Confirmed column: under that
+// heading the confirmed state is a plain "yes".
+func snsSubConfirmedWord(subscriptionArn string) string {
+	if state := snsSubConfirmation(subscriptionArn); state != snsSubConfirmed {
+		return state
 	}
 	return "yes"
 }

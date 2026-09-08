@@ -88,13 +88,26 @@ func fillPhrase(phrase string, values ...string) string {
 }
 
 // pluralMarker marks a noun inside a slot that agrees with the slot's value.
-// slotCountToken and slotListToken say where the value lands and what it
-// counts: a count of its own, or a comma-separated list whose length counts.
+// The tokens say where the value lands and what it counts: slotCountTokens are
+// numbers, slotListToken is a comma-separated list whose length is the count.
+// The count tokens are the two the declared wordings already spell, in
+// "<N> of <M>".
 const (
-	pluralMarker   = "(s)"
-	slotCountToken = "N"
-	slotListToken  = "LIST"
+	pluralMarker  = "(s)"
+	slotListToken = "LIST"
 )
+
+var slotCountTokens = []string{"N", "M"}
+
+// countTokenIn returns the count token slot names, or "" when it names none.
+func countTokenIn(slot string) string {
+	for _, tok := range slotCountTokens {
+		if strings.Contains(slot, tok) {
+			return tok
+		}
+	}
+	return ""
+}
 
 // fillSlot renders one "<…>" slot's content with value.
 //
@@ -118,13 +131,13 @@ func fillSlot(slot, value string) string {
 		return value
 	}
 	var singular bool
-	switch {
+	switch tok := countTokenIn(slot); {
 	case strings.Contains(slot, slotListToken):
 		singular = !strings.Contains(value, ",")
 		slot = strings.Replace(slot, slotListToken, value, 1)
-	case strings.Contains(slot, slotCountToken):
+	case tok != "":
 		singular = value == "1"
-		slot = strings.Replace(slot, slotCountToken, value, 1)
+		slot = strings.Replace(slot, tok, value, 1)
 	default:
 		// The declaration marked a noun for agreement and named no token, so
 		// there is nowhere to put the value. The value is what the reader is

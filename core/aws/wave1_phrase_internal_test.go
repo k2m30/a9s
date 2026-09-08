@@ -111,9 +111,9 @@ func TestEveryAgreeingSlotNamesItsToken(t *testing.T) {
 				if !strings.Contains(slot, pluralMarker) {
 					continue
 				}
-				if !strings.Contains(slot, slotCountToken) && !strings.Contains(slot, slotListToken) {
-					t.Errorf("%s declares slot <%s>: it agrees a noun but names neither %s nor %s, so the value has nowhere to land",
-						def.Code, slot, slotCountToken, slotListToken)
+				if countTokenIn(slot) == "" && !strings.Contains(slot, slotListToken) {
+					t.Errorf("%s declares slot <%s>: it agrees a noun but names neither a count token %v nor %s, so the value has nowhere to land",
+						def.Code, slot, slotCountTokens, slotListToken)
 				}
 			}
 		}

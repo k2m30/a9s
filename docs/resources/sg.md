@@ -88,7 +88,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `IpPermissions[]` with `IpRanges[].CidrIp == 0.0.0.0/0` (or `Ipv6Ranges[].CidrIpv6 == ::/0`) covering any port in the set {20, 21, 22, 23, 25, 445, 1433, 1521, 2483, 3306, 3389, 5432, 5601, 6379, 7199, 8888, 9092, 9160, 9200, 11211, 27017}. An all-protocols (`-1`) rule open to the internet is the same signal one step wider.
-  - **Finding**: `sg.ingress.dangerous-ports`, phrase `ports <list> open to 0.0.0.0/0`; the all-protocols case is `sg.ingress.wide-open`, phrase `all ports open to 0.0.0.0/0`.
+  - **Finding**: `sg.ingress.dangerous-ports`, phrase `<port(s) LIST> open to 0.0.0.0/0`; the all-protocols case is `sg.ingress.wide-open`, phrase `all ports open to 0.0.0.0/0`.
   - **State bucket**: Broken.
   - **How obtained**: read `IpPermissions[]` on the SG, inspect each rule's `FromPort`/`ToPort`/`IpProtocol` against `IpRanges[].CidrIp` — the list API returns the full ingress rule set, no extra call. a9s-devops: port list is the standard "admin/database exposed to the internet" set. 8080 and 8443 are deliberately excluded — they front ordinary public applications far more often than anything worth paging on.
 
@@ -127,7 +127,7 @@ One row per signal from §3:
 | `0.0.0.0/0` on any port in `sensitivePorts` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `all ports open to 0.0.0.0/0` |
 | an all-protocols (`-1`) rule open to `0.0.0.0/0` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `all ports open to 0.0.0.0/0` |
 | `GroupName == "default"` carrying ingress rules, or egress beyond the AWS-created allow-all | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default group allows traffic` |
-| ingress opens a sensitive port (SSH, RDP, a database port) to `0.0.0.0/0` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `ports <list> open to 0.0.0.0/0` |
+| ingress opens a sensitive port (SSH, RDP, a database port) to `0.0.0.0/0` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<port(s) LIST> open to 0.0.0.0/0` |
 | Not referenced by any ENI in the loaded, untruncated ENI list (non-default groups only) | 2 | Warning | `~` | S2, S3, S4, S5 | `not attached to anything` |
 
 Rules for filling list and detail text:
@@ -139,7 +139,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `ports <list> open to 0.0.0.0/0` tells the on-call engineer immediately which port is the problem, a red `all ports open to 0.0.0.0/0` row says the group is wide open, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. IPv6 is covered the same way: the all-addresses IPv6 range counts as open to the internet, so an IPv6-only exposure on port 22 renders identically.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for all four signals — a red row with `<port(s) LIST> open to 0.0.0.0/0` tells the on-call engineer immediately which port is the problem, a red `all ports open to 0.0.0.0/0` row says the group is wide open, a yellow `default group allows traffic` row says the group AWS attaches by default is not empty, and a yellow `not attached to anything` row says the group is cruft. IPv6 is covered the same way: the all-addresses IPv6 range counts as open to the internet, so an IPv6-only exposure on port 22 renders identically.
 
 ## 5. Out of Scope
 
@@ -179,7 +179,7 @@ sg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 | One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them. |
-| sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 | An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link. |
+| sg.ingress.dangerous-ports | <port(s) LIST> open to 0.0.0.0/0 | broken | wave1 | An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link. |
 | sg.default-with-rules | default group allows traffic | warn | wave1 | The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group. |
 | sg.unused | not attached to anything | warn | wave2 | No network interface in this account references this group, so its rules protect nothing and its name still gets picked from the console list. Delete it, or attach it to the workload it was written for. |
 <!-- END GENERATED: findings -->

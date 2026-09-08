@@ -150,7 +150,11 @@ func TestW3SGDangerousPorts_FlagsSensitivePortOpenToInternet(t *testing.T) {
 				t.Fatalf("port %d (%s) open to 0.0.0.0/0 produced no %s; findings=%+v",
 					tc.port, tc.service, w3CodeSGDangerousPorts, rows[0].Findings)
 			}
-			wantPhrase := "ports " + strconv.Itoa(int(tc.port)) + " open to 0.0.0.0/0"
+			// Inverted for aws3 round 2's row on the sg port list: the
+			// declaration now agrees its noun with the list it names, so one
+			// open port reads "port 22", not "ports 22". Do not restore the
+			// unconditional plural — it is the defect the row removed.
+			wantPhrase := "port " + strconv.Itoa(int(tc.port)) + " open to 0.0.0.0/0"
 			if f.Phrase != wantPhrase {
 				t.Errorf("Phrase = %q, want %q", f.Phrase, wantPhrase)
 			}

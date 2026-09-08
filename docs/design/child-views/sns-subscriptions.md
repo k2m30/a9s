@@ -39,7 +39,7 @@ sns_subscriptions:
 ```
 
 Note on computed fields:
-- `confirmation_status`: "Confirmed" if `SubscriptionArn` is a real ARN, "PendingConfirmation" if `SubscriptionArn` equals `"PendingConfirmation"`. This is how AWS signals unconfirmed subscriptions — through the ARN field itself.
+- `confirmation_status`: "Confirmed" if `SubscriptionArn` is a real ARN, "PendingConfirmation" or "Deleted" if `SubscriptionArn` equals that word, "Unknown" if the subscription came back with no `SubscriptionArn` at all. This is how AWS signals unconfirmed and deleted subscriptions — through the ARN field itself — so an absent value is not a confirmation. The reading is shared with the subscription list, which words the same four states for its own Confirmed column.
 
 Source struct: `snstypes.Subscription`
 

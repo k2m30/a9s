@@ -229,7 +229,10 @@ func parseSGIngress(ipv4, ipv6 []string) ec2types.IpPermission {
 // rule permits.
 func TestSGInternetFacing_AnyZeroLengthPrefixIsTheInternet(t *testing.T) {
 	const code = domain.FindingCode("sg.ingress.dangerous-ports")
-	const phrase = "ports 22 open to 0.0.0.0/0"
+	// Inverted for aws3 round 2's row on the sg port list: the declaration
+	// agrees its noun with the list it names, and this fixture opens one port.
+	// Do not restore the unconditional plural.
+	const phrase = "port 22 open to 0.0.0.0/0"
 
 	tests := []struct {
 		name        string

@@ -156,7 +156,8 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 			}
 			result.FieldUpdates[planID]["status"] = summary
 		} else if partialCount >= 1 {
-			summary := fmt.Sprintf("partial: %d of %d resources skipped", partialCount, totalCount)
+			summary := fillPhrase(catalog.Phrase(backupCodeJobPartial),
+				strconv.Itoa(partialCount), strconv.Itoa(totalCount))
 			rows := []domain.DetailRow{
 				{Label: "Partial jobs", Value: fmt.Sprintf("%d", partialCount), Tier: "~"},
 				{Label: "Total jobs", Value: fmt.Sprintf("%d", totalCount), Tier: "~"},

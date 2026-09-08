@@ -7,3 +7,7 @@
 - A node group or cluster whose details could not be read keeps its warning colour after a cache reload, even if the wording of the status cell changes.
 - The SNS list's Topic Name column shows the topic's name instead of its ARN, and the subscription list's Confirmed column shows whether the endpoint confirmed instead of repeating the subscription ARN.
 - A DocumentDB cluster AWS reported no status for no longer renders a bare ": in progress", and an EKS cluster past standard support says so even when the version number is missing from a restored row.
+- A security group opening one sensitive port now reads "port 22 open to 0.0.0.0/0" instead of "ports 22", and the instance exposure check reads the group's port list from a field of its own rather than by taking that sentence apart.
+- A backup plan with one job in the window reads "partial: 1 of 1 resource skipped" instead of "1 resources".
+- An auto scaling group with one unhealthy instance reads "1 unhealthy instance" instead of "1 unhealthy instance(s)".
+- An SNS subscription AWS returned no ARN for no longer shows as confirmed on the by-topic subscription list, and a deleted one says so; both subscription lists now read the confirmation state the same way.

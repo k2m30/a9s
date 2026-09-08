@@ -228,7 +228,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichSGUsage, Priority: 100},
-		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "risk_summary"},
+		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "open_ports", "risk_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkSGVPC, NeedsTargetCache: false},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSGEC2, NeedsTargetCache: true, Truncated: true},
@@ -244,7 +244,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: sgCodeWideOpen, Phrase: "all ports open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1", Detail: "One ingress rule opens every port and protocol to the whole internet, so nothing this group protects is reachable only from where you intended. Replace it with rules naming the ports each workload actually serves and the addresses allowed to reach them."},
-			{Code: sgCodeDangerousPorts, Phrase: "ports <list> open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1", Detail: "An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link."},
+			{Code: sgCodeDangerousPorts, Phrase: "<port(s) LIST> open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1", Detail: "An administrative or database port on this group accepts connections from any address on the internet, which is how credential-stuffing and direct database access start. Narrow the rule to the addresses that need it, or move the access behind a bastion or private link."},
 			{Code: sgCodeDefaultWithRules, Phrase: sgDefaultWithRulesPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC's default security group still carries rules, and AWS attaches it to any resource launched without an explicit group. Remove every ingress rule and every egress rule other than the AWS-created allow-all, and give each workload its own group."},
 			{Code: sgCodeUnused, Phrase: sgUnusedPhrase, Severity: domain.SevWarn, Source: "wave2", Detail: "No network interface in this account references this group, so its rules protect nothing and its name still gets picked from the console list. Delete it, or attach it to the workload it was written for."},
 		},

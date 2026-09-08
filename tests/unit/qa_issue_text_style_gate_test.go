@@ -604,9 +604,8 @@ func findWholeCellEnumViolation(cell, resourceID, resourceName string, col app.C
 // (or a follow-up PR) must fix. sg's Risk column ("WIDE_OPEN") and ng's
 // Status/Issues columns ("CREATE_FAILED", "InsufficientFreeAddresses") were
 // the two verified-RED violations this gate's extension was written to
-// catch (see core/aws/sg.go's sgWideOpenPhrase/sgDangerousPortsPhrase
-// and core/aws/ng.go's domain.HumanizeStatusPhrase(string(issue.Code))
-// fix) — neither entry below is that pair; both were already fixed at
+// catch (sg's Status cell is now the risk finding's own phrase, and
+// core/aws/ng.go humanizes the issue code) — neither entry below is that pair; both were already fixed at
 // write time and never needed allowlisting.
 var cellStyleGateAllowlist = map[string]string{
 	"ecs-task:f6a1b2c3d4e5f60102030405:Stop Code": "ECS task StopCode is fetched via fieldpath.ExtractScalar from the raw RawStruct.StopCode field (no Wave-1/Wave-2 finding path humanizes it) — the Stop Code column has no HumanizeStatusPhrase chokepoint today; needs a dedicated cause-text builder or CellDecorator, out of scope for this wave's sg/ng/lambda fix.",

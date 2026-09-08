@@ -221,7 +221,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 	for _, sg := range sgEntry.Resources {
 		risk[sg.ID] = sgRisk{
 			wideOpen: sg.Fields["wide_open"] == "true",
-			ports:    sgPortsFromRiskSummary(sg.Fields["risk_summary"]),
+			ports:    sg.Fields["open_ports"],
 		}
 	}
 

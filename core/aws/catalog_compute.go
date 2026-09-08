@@ -676,7 +676,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeASGStateDeleting, Phrase: "delete in progress", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeASGUnderprovisioned, Phrase: "<N> of <M> instances in service", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeASGUnhealthyInstances, Phrase: "<N> unhealthy instance(s)", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeASGUnhealthyInstances, Phrase: "<N unhealthy instance(s)>", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeASGScalingSuspended, Phrase: "scaling suspended", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: asgCodeScalingActivityFailed, Phrase: "latest scaling activity failed", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: CodeASGLegacyLaunchConfig, Phrase: "uses a launch configuration", Severity: domain.SevWarn, Source: "wave1", Detail: "The group launches from a launch configuration, an immutable legacy resource AWS no longer develops — it cannot carry IMDSv2 defaults, newer instance types, or versioned edits. Copy it to a launch template and point the group at that."},

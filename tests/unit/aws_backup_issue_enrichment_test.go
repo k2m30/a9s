@@ -945,3 +945,33 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 		}
 	}
 }
+
+// TestBackup_Enricher_PartialOfOne_ReadsAsOneResource pins spec row (b) of
+// task aws3 round 2 at this site: the partial phrase and the status cell come
+// from the code's own declaration, and the declaration agrees its noun with
+// the total it names — one job in the window is "of 1 resource skipped", not
+// "of 1 resources skipped".
+func TestBackup_Enricher_PartialOfOne_ReadsAsOneResource(t *testing.T) {
+	const planID = "plan-partial-of-one"
+	fake := &backupJobsOnlyFake{
+		jobs: []backuptypes.BackupJob{
+			inWindowJobAt("job-solo", backuptypes.BackupJobStatePartial, planID, -1*time.Hour),
+		},
+	}
+
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
+	findings, ok := result.Findings[planID]
+	if !ok || len(findings) == 0 {
+		t.Fatalf("expected a finding for plan %s", planID)
+	}
+	const want = "partial: 1 of 1 resource skipped"
+	if findings[0].Phrase != want {
+		t.Errorf("Phrase = %q, want %q", findings[0].Phrase, want)
+	}
+	if got := result.FieldUpdates[planID]["status"]; got != want {
+		t.Errorf("FieldUpdates[status] = %q, want %q — the cell reads the same declaration the phrase does", got, want)
+	}
+}
