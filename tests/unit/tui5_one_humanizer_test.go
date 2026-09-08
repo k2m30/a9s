@@ -136,25 +136,15 @@ type humanizerSecretRaw struct {
 	LastChangedDate  time.Time
 }
 
-// detailRowsFor renders one resource's scalar detail rows as label → value.
-// It uses the built-in view config, which is what decides a type has detail
-// paths at all; without one the projector falls back to flat Fields rendering
-// and the struct lane never runs.
+// detailRowsFor renders one resource's scalar detail rows as label → value,
+// flattened across sections.
 func detailRowsFor(t *testing.T, res resource.Resource, shortName string) map[string]string {
 	t.Helper()
-	c := newAttentionCursorController(t, res, shortName)
-	c.SetViewConfig(config.DefaultConfig())
-	c.EnsureDetailState(res, shortName)
-	body := c.Snapshot().Body.Detail
-	if body == nil {
-		t.Fatalf("no detail body for %s", shortName)
-	}
-	out := make(map[string]string, len(body.Fields))
-	for _, f := range body.Fields {
-		if f.IsSection || f.IsSpacer || f.IsHeader || f.IsSubField {
-			continue
+	out := map[string]string{}
+	for _, rows := range detailRowsBySection(t, res, shortName) {
+		for k, v := range rows {
+			out[k] = v
 		}
-		out[f.Key] = f.Value
 	}
 	return out
 }
@@ -197,8 +187,49 @@ func TestOneHumanizer_DetailRowOffTheStructFollowsTheConventions(t *testing.T) {
 	}
 }
 
+// detailRowsBySection renders one resource's scalar detail rows grouped by the
+// section heading above them, which is what says whether a row is a9s's own
+// presentation of a fact or a line of a document a9s is quoting.
+//
+// It uses the built-in view config, which is what decides a type has detail
+// paths at all; without one the projector falls back to flat Fields rendering
+// and the struct lane never runs.
+func detailRowsBySection(t *testing.T, res resource.Resource, shortName string) map[string]map[string]string {
+	t.Helper()
+	c := newAttentionCursorController(t, res, shortName)
+	c.SetViewConfig(config.DefaultConfig())
+	c.EnsureDetailState(res, shortName)
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatalf("no detail body for %s", shortName)
+	}
+	out := map[string]map[string]string{}
+	section := ""
+	for _, f := range body.Fields {
+		if f.IsSection {
+			section = f.Key
+			continue
+		}
+		if f.IsSpacer || f.IsHeader || f.IsSubField {
+			continue
+		}
+		if out[section] == nil {
+			out[section] = map[string]string{}
+		}
+		out[section][f.Key] = f.Value
+	}
+	return out
+}
+
 // TestOneHumanizer_DetailBoolStringOffTheStruct pins the other spelling AWS
-// uses: a CloudTrail event's ReadOnly is the string "false", not a bool.
+// uses — a CloudTrail event's ReadOnly is the string "false", not a bool —
+// and, in the same sweep, where the conventions stop.
+//
+// RAW EVENT is the event exactly as AWS sent it. Quoting a document and
+// editing the words inside it are different things, and the section is what
+// says which one a row is: a top-level scalar of that block is as much part of
+// the quotation as a key nested three lines below it. Everywhere else, a9s is
+// presenting the fact in its own words and the conventions apply.
 func TestOneHumanizer_DetailBoolStringOffTheStruct(t *testing.T) {
 	td := resource.FindResourceType("ct-events")
 	if td == nil {
@@ -209,19 +240,37 @@ func TestOneHumanizer_DetailBoolStringOffTheStruct(t *testing.T) {
 		t.Skip("ct-events has no demo fixtures")
 	}
 
-	var checked int
+	const rawSection = "RAW EVENT"
+	var presented, quoted int
 	for _, res := range page.Resources {
-		for label, value := range detailRowsFor(t, res, "ct-events") {
-			if value == "true" || value == "false" {
-				t.Errorf("ct-events %s detail row %q = %q, want Yes or No", res.ID, label, value)
-			}
-			if label == "ReadOnly" {
-				checked++
+		for section, rows := range detailRowsBySection(t, res, "ct-events") {
+			for label, value := range rows {
+				if section == rawSection {
+					// The document, verbatim.
+					if value == "Yes" || value == "No" {
+						t.Errorf("ct-events %s: %s row %q = %q — a quoted document is not reworded",
+							res.ID, section, label, value)
+					}
+					if value == "true" || value == "false" {
+						quoted++
+					}
+					continue
+				}
+				if value == "true" || value == "false" {
+					t.Errorf("ct-events %s: %s row %q = %q, want Yes or No",
+						res.ID, section, label, value)
+				}
+				if label == "ReadOnly" {
+					presented++
+				}
 			}
 		}
 	}
-	if checked == 0 {
-		t.Error("no ct-events fixture rendered a ReadOnly row; the pin proves nothing")
+	if presented == 0 {
+		t.Error("no fixture rendered a presented ReadOnly row; the pin proves nothing")
+	}
+	if quoted == 0 {
+		t.Error("no fixture rendered a raw-event bool; the quoting half proves nothing")
 	}
 }
 
@@ -266,5 +315,64 @@ func TestOneHumanizer_ListCellOffTheStructFollowsTheConventions(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("list cell for %s = %q, want %q", tc.path, got, tc.want)
 		}
+	}
+}
+
+// TestOneHumanizer_DetailRowReadsTheColumnsWords pins the other direction of
+// the same panel inconsistency: a column that opts its field into readable
+// wording is stating something about the fact, not about the list. The detail
+// row for that field says the same words, so the two panels of one screen
+// cannot describe one value two ways.
+func TestOneHumanizer_DetailRowReadsTheColumnsWords(t *testing.T) {
+	for _, tc := range []struct {
+		shortName string
+		id        string
+		label     string // the detail row's label, which is the column's Path
+		want      string
+	}{
+		{"nat", "nat-0failed111111111d", "FailureCode", "insufficient free addresses in subnet"},
+		{"ecs-task", "f6a1b2c3d4e5f60102030405", "StopCode", "task failed to start"},
+	} {
+		t.Run(tc.shortName, func(t *testing.T) {
+			td := resource.FindResourceType(tc.shortName)
+			if td == nil {
+				t.Skipf("%s is not registered", tc.shortName)
+			}
+			page, _ := td.Fetcher(context.Background(), demo.NewServiceClients(), "")
+			var res resource.Resource
+			for _, r := range page.Resources {
+				if r.ID == tc.id {
+					res = r
+				}
+			}
+			if res.ID == "" {
+				t.Fatalf("%s has no fixture %q", tc.shortName, tc.id)
+			}
+
+			// The list cell is the words the operator has just read.
+			cols := resource.ResolveListColumnCascade(nil, tc.shortName, td)
+			var cell string
+			for _, lc := range cols {
+				if lc.Path != tc.label {
+					continue
+				}
+				cell = app.ExtractCellValue(app.ColumnDef{
+					Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize,
+				}, td, res)
+			}
+			if cell != tc.want {
+				t.Fatalf("test sanity: the %s cell renders %q, not %q", tc.label, cell, tc.want)
+			}
+
+			rows := detailRowsFor(t, res, tc.shortName)
+			got, ok := rows[tc.label]
+			if !ok {
+				t.Fatalf("no detail row labelled %q; rows: %v", tc.label, rows)
+			}
+			if got != cell {
+				t.Errorf("detail %s = %q while the cell above reads %q — one fact, two words",
+					tc.label, got, cell)
+			}
+		})
 	}
 }

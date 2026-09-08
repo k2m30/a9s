@@ -202,7 +202,7 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 	if td != nil && td.Augment != nil {
 		sections = td.Augment(r, sections)
 	}
-	content := sectionsToFieldItemsDetail(sections)
+	content := sectionsToFieldItemsDetail(sections, humanizedDetailPaths(vc, ds.ResourceType, td))
 	attention, keys := buildAttentionSectionDetail(ds, td, c.detailNotInspected(ds))
 	built := detailItems{
 		items:   append(attention, content...),
@@ -257,9 +257,23 @@ func (c *Controller) detailNotInspected(ds *DetailState) bool {
 	return c.listUninspectedIDs(ds.ResourceType)[ds.Resource.ID]
 }
 
+// quotedSections name the sections that reproduce a document a9s did not
+// write. Their lines are a quotation: reproducing one and rewording what is
+// inside it are different things, and a top-level scalar of the block is as
+// much part of the quotation as a key nested three lines below it. Everywhere
+// else a9s is presenting a fact in its own words, and the value conventions
+// apply. The SECTION decides, never the shape of one line.
+var quotedSections = map[string]bool{"RAW EVENT": true}
+
 // sectionsToFieldItemsDetail converts []domain.Section → []fieldpath.FieldItem,
 // the single implementation (the TUI renders from these items, not its own).
-func sectionsToFieldItemsDetail(sections []domain.Section) []fieldpath.FieldItem {
+//
+// It is also the one place a projected value becomes detail-row text, which is
+// why the conventions are applied here and in neither projector: this is the
+// only point that knows both the value and the section it sits under.
+// humanizePaths carries the fields whose own type asks for readable wording;
+// see humanizedDetailPaths.
+func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[string]bool) []fieldpath.FieldItem {
 	if len(sections) == 0 {
 		return nil
 	}
@@ -272,11 +286,48 @@ func sectionsToFieldItemsDetail(sections []domain.Section) []fieldpath.FieldItem
 				Path:      sec.Title,
 			})
 		}
+		quoted := quotedSections[sec.Title]
 		for _, it := range sec.Items {
+			if !quoted {
+				if humanizePaths[strings.ToLower(it.Path)] || humanizePaths[strings.ToLower(it.Label)] {
+					it.Value = domain.HumanizeStatusPhrase(it.Value)
+				}
+				it.Value = config.CanonicalValue(it.Value)
+			}
 			items = append(items, domainItemToFieldItemDetail(it, sec.Title))
 		}
 	}
 	return items
+}
+
+// humanizedDetailPaths is the set of fields the type's own columns opt into
+// readable wording, keyed by path and by key, lowercased.
+//
+// The opt-in is declared once, on the column (config.ListColumn.Humanize), and
+// read by both surfaces. It says something about the FACT — this field carries
+// an AWS constant an operator should not have to read — not about the list, so
+// a detail row for the same field owes the same words. Moving the flag onto a
+// second declaration for the detail view would put the fact in two places to
+// disagree, which is the shape of the bug it was added to fix.
+func humanizedDetailPaths(vc *config.ViewsConfig, typeName string, td *resource.ResourceTypeDef) map[string]bool {
+	var out map[string]bool
+	for _, lc := range resource.ResolveListColumnCascade(vc, typeName, td) {
+		if !lc.Humanize {
+			continue
+		}
+		if out == nil {
+			out = map[string]bool{}
+		}
+		// Path and key only. The column's TITLE is prose for a header and can
+		// name a different field than the one it reads ("Endpoint" over
+		// EndpointType), so matching on it would opt a field in by coincidence.
+		for _, k := range []string{lc.Path, lc.Key} {
+			if k != "" {
+				out[strings.ToLower(k)] = true
+			}
+		}
+	}
+	return out
 }
 
 // domainItemToFieldItemDetail maps a domain.Item back to a fieldpath.FieldItem.
@@ -574,18 +625,9 @@ func capitalizeFirstDetail(s string) string {
 func fieldItemsToFieldRows(items []fieldpath.FieldItem) []FieldRow {
 	rows := make([]FieldRow, 0, len(items))
 	for _, item := range items {
-		// The one place a projected value becomes detail-row text, so the
-		// conventions are applied here rather than in either projector. A
-		// sub-field carries a whole line of a raw document in Key and repeats
-		// it in Value; that line is the document's own text and is left as it
-		// is, which is why only a scalar row's Value is settled.
-		value := item.Value
-		if !item.IsSubField {
-			value = config.CanonicalValue(value)
-		}
 		rows = append(rows, FieldRow{
 			Key:         item.Key,
-			Value:       value,
+			Value:       item.Value,
 			IsSection:   item.IsSection,
 			IsHeader:    item.IsHeader,
 			IsSubField:  item.IsSubField,
