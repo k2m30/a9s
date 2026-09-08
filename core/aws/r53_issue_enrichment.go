@@ -200,7 +200,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		}
 		// The zone identifier is the row's whole job: the phrase already says
 		// what is wrong, so a second row repeating it prints one fact twice.
-		setWave2Finding(&result, r.ID, r53CodeOrphanPrivateZone, "private zone with no VPC associations (orphan)", "~", "r53", []domain.DetailRow{
+		setWave2Finding(&result, r.ID, r53CodeOrphanPrivateZone, "~", "r53", []domain.DetailRow{
 			{Label: "Zone ID", Value: zoneID, Tier: "~"},
 		})
 	})
@@ -233,11 +233,10 @@ func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result 
 		if len(rec.ResourceRecords) > 0 {
 			target = aws.ToString(rec.ResourceRecords[0].Value)
 		}
-		setWave2Finding(result, r.ID, CodeR53DanglingRecord, "record points at an unassociated elastic IP", "!", "r53",
-			[]domain.DetailRow{
-				{Label: "Record", Value: name, Tier: "!"},
-				{Label: "Target", Value: target, Tier: "!"},
-			})
+		setWave2Finding(result, r.ID, CodeR53DanglingRecord, "!", "r53", []domain.DetailRow{
+			{Label: "Record", Value: name, Tier: "!"},
+			{Label: "Target", Value: target, Tier: "!"},
+		})
 	}
 }
 
@@ -257,8 +256,7 @@ func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result
 		case len(logs.QueryLoggingConfigs) > 0:
 			return
 		case logs.NextToken == nil:
-			setWave2Finding(result, r.ID, CodeR53QueryLoggingOff, "query logging off", "~", "r53",
-				[]domain.DetailRow{{Label: "Zone type", Value: "public", Tier: "~"}})
+			setWave2Finding(result, r.ID, CodeR53QueryLoggingOff, "~", "r53", []domain.DetailRow{{Label: "Zone type", Value: "public", Tier: "~"}})
 			return
 		}
 		input.NextToken = logs.NextToken

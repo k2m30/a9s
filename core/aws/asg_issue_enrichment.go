@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -89,8 +88,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if act.StartTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
 		}
-		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed,
-			catalog.Phrase(asgCodeScalingActivityFailed), "!", "asg", rows)
+		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, "!", "asg", rows)
 	})
 
 	SetTruncated(&result, truncated)
@@ -206,19 +204,16 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 		tokens = string(lc.MetadataOptions.HttpTokens)
 	}
 	if lc.MetadataOptions == nil || lc.MetadataOptions.HttpTokens != asgtypes.InstanceMetadataHttpTokensStateRequired {
-		setWave2Finding(result, groupID, asgCodeLaunchConfigIMDSv1, "launch configuration allows IMDSv1", "~", "asg",
-			[]domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: "~"}})
+		setWave2Finding(result, groupID, asgCodeLaunchConfigIMDSv1, "~", "asg", []domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: "~"}})
 
 	}
 	if lc.AssociatePublicIpAddress != nil && *lc.AssociatePublicIpAddress {
-		setWave2Finding(result, groupID, asgCodeLaunchConfigPublicIP, "launch configuration assigns public IPs", "~", "asg",
-			[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}})
+		setWave2Finding(result, groupID, asgCodeLaunchConfigPublicIP, "~", "asg", []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}})
 
 	}
 	if userData := aws.ToString(lc.UserData); userData != "" {
 		if rows := secretScanTextRows(decodeUserData(userData)); len(rows) > 0 {
-			setWave2Finding(result, groupID, asgCodeLaunchConfigSecret, "credential in launch configuration user data", "!", "asg",
-				rows)
+			setWave2Finding(result, groupID, asgCodeLaunchConfigSecret, "!", "asg", rows)
 		}
 	}
 }

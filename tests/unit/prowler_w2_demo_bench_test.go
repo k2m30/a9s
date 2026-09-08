@@ -45,6 +45,7 @@ var w2BenchWitnesses = []struct {
 	{"dbi", "dbi.iam-auth-off"},
 	{"dbi", "dbi.default-master-user"},
 	{"dbi", "dbi.ca-cert-expiring"},
+	{"dbi", "dbi.ca-cert-expiring-urgent"},
 	{"dbi", "dbi.engine-deprecated"},
 
 	{"dbc", "dbc.single-az"},

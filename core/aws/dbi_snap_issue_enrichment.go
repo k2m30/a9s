@@ -19,7 +19,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -70,9 +69,7 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 		}
 		return *db.BackupRetentionPeriod, true
 	},
-	OrphanPhrase:      "orphan: source DB deleted",
 	ParentRowLabel:    "Source DB",
-	RetentionPhrase:   func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
 	RetentionEnabled:  true,
 	Severity:          "!",
 	ShortName:         "dbi-snap",
@@ -80,7 +77,6 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	PastRetentionCode: dbiSnapPastRetentionCode,
 	PublicAttr:        dbiSnapShareAttributes,
 	PublicCode:        dbiSnapPublicCode,
-	PublicPhrase:      "shared with all AWS accounts",
 })
 
 // dbiSnapShareAttributes reads one DB snapshot's share attributes.

@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -71,7 +70,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				if run.ErrorMessage != nil && *run.ErrorMessage != "" {
 					rows = append(rows, domain.DetailRow{Label: "Error", Value: *run.ErrorMessage, Tier: "!"})
 				}
-				setWave2Finding(&result, key, glueCodeLatestRunFailed, fmt.Sprintf("latest run %s", statePhrase), "!", "glue", rows)
+				setWave2Finding(&result, key, glueCodeLatestRunFailed, "!", "glue", rows, statePhrase)
 				result.FieldUpdates[key] = map[string]string{"last_run": stateVal}
 			} else {
 				result.FieldUpdates[key] = map[string]string{"last_run": "OK"}

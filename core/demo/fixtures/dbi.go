@@ -136,6 +136,11 @@ const (
 	// DBICACertExpiring has a server certificate inside the 90-day window.
 	DBICACertExpiring    = "warn-dbi-ca-cert-expiring"
 	dbiCACertExpiringARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-ca-cert-expiring"
+	// DBICACertUrgent has one inside the 30-day window, where the same
+	// countdown stops being a task to schedule and becomes an outage on a
+	// clock — a separate code and a separate row colour.
+	DBICACertUrgent    = "broken-dbi-ca-cert-urgent"
+	dbiCACertUrgentARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-ca-cert-urgent"
 	// DBIEngineDeprecated runs an engine version AWS no longer supports.
 	DBIEngineDeprecated    = "broken-dbi-engine-deprecated"
 	dbiEngineDeprecatedARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-engine-deprecated"
@@ -351,6 +356,12 @@ func buildDBIInstances() []rdstypes.DBInstance {
 		ValidTill:    aws.Time(time.Now().Add(60*24*time.Hour + time.Hour)),
 	}
 
+	caCertUrgent := dbiBaselineHealthy(DBICACertUrgent, dbiCACertUrgentARN)
+	caCertUrgent.CertificateDetails = &rdstypes.CertificateDetails{
+		CAIdentifier: aws.String("rds-ca-2019"),
+		ValidTill:    aws.Time(time.Now().Add(20*24*time.Hour + time.Hour)),
+	}
+
 	engineDeprecated := dbiBaselineHealthy(DBIEngineDeprecated, dbiEngineDeprecatedARN)
 	engineDeprecated.EngineVersion = aws.String(DBIDeprecatedEngineVersion)
 
@@ -377,6 +388,7 @@ func buildDBIInstances() []rdstypes.DBInstance {
 		iamAuthOff,
 		defaultMasterUser,
 		caCertExpiring,
+		caCertUrgent,
 		engineDeprecated,
 	}
 }

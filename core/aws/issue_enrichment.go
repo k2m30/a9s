@@ -109,9 +109,10 @@ var Wave2EmissionObserver func(resourceID string, f domain.Finding)
 // the legacy EnrichmentFinding.Severity glyph contract used by per-enricher
 // docstrings — view code now consumes domain.Severity directly.
 //
-// detail is the S5 "concrete operator sentence" stamped onto Finding.Detail.
-// Pass "" for enrichers that have not yet been given real S5 text — the
-// detail view falls back to rendering Phrase alone.
+// The wording is the one the code's catalog.FindingDef declares; values fill
+// its "<…>" slots left to right, so an enricher measuring a count passes the
+// count and never a sentence. The S5 detail sentence comes from the same
+// declaration.
 //
 // rows MAY be nil; the helper omits the AttentionDetail entry when empty so a
 // nil-row finding does not surface an empty Attention section.
@@ -152,13 +153,12 @@ func setWave2Finding(
 	r *IssueEnricherResult,
 	resourceID string,
 	code domain.FindingCode,
-	phrase string,
 	severityGlyph string,
 	shortName string,
 	rows []domain.DetailRow,
+	values ...string,
 ) {
-	f := wave2Finding(code, glyphToSeverity(severityGlyph), shortName)
-	f.Phrase = phrase
+	f := wave2Finding(code, glyphToSeverity(severityGlyph), shortName, values...)
 	if Wave2EmissionObserver != nil {
 		Wave2EmissionObserver(resourceID, f)
 	}

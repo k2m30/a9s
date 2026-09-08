@@ -126,10 +126,24 @@ func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	// Inverted for the spec row that gave a wave-2 phrase one owner: the
+	// declared wording is "latest build <status>", so the build's end date is
+	// a supporting row rather than a second shape of the phrase. The old
+	// assertion described a wording no declaration carried when EndTime was
+	// nil; do not restore it.
 	summary := result.Findings["proj-a"][0].Phrase
-	wantSummary := "latest build failed (2026-04-14)"
+	wantSummary := "latest build failed"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	var endedRow string
+	for _, row := range result.AttentionDetails["proj-a"]["cb.latest-build-failed"].Rows {
+		if row.Label == "Ended" {
+			endedRow = row.Value
+		}
+	}
+	if endedRow != "2026-04-14" {
+		t.Errorf("Ended row = %q, want the build's end date %q", endedRow, "2026-04-14")
 	}
 	if strings.Contains(summary, "FAILED") {
 		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "FAILED")

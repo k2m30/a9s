@@ -18,7 +18,6 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -203,7 +202,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		slices.Sort(codes)
 		for _, code := range codes {
 			c := conditions[code]
-			setWave2Finding(&result, id, code, catalog.Phrase(code), c.tier, "ec2", c.rows)
+			setWave2Finding(&result, id, code, c.tier, "ec2", c.rows)
 		}
 	}
 
@@ -279,13 +278,12 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 			portList = strings.Join(ports, ", ")
 		}
 		sort.Strings(groupIDs)
-		setWave2Finding(result, r.ID, ec2CodeInternetExposed,
-			"port(s) "+portList+" reachable from the internet", "!", "ec2",
+		setWave2Finding(result, r.ID, ec2CodeInternetExposed, "!", "ec2",
 			[]domain.DetailRow{
 				{Label: "Public address", Value: publicIP, Tier: "!"},
 				{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
 				{Label: "Ports", Value: portList, Tier: "!"},
-			})
+			}, portList)
 
 	}
 }
@@ -343,8 +341,7 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "credential in user data", "!", "ec2",
-			rows)
+		setWave2Finding(result, r.ID, ec2CodeUserDataSecret, "!", "ec2", rows)
 
 	})
 

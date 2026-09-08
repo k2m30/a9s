@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -158,8 +157,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 					continue
 				}
 
-				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed,
-					catalog.Phrase(ecsTaskCodeTaskFailed), "!", "ecs-task", rows)
+				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, "!", "ecs-task", rows)
 			}
 		}
 	}
@@ -254,8 +252,7 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 	}
 
 	if len(privileged) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodePrivileged, "privileged container", "!", "ecs-task",
-			privileged)
+		setWave2Finding(result, taskID, ecsTaskCodePrivileged, "!", "ecs-task", privileged)
 
 	}
 	var nsRows []domain.DetailRow
@@ -266,23 +263,19 @@ func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td 
 		nsRows = append(nsRows, domain.DetailRow{Label: "Process namespace", Value: "host", Tier: "~"})
 	}
 	if len(nsRows) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeHostNamespace, "shares the host network or process namespace", "~", "ecs-task",
-			nsRows)
+		setWave2Finding(result, taskID, ecsTaskCodeHostNamespace, "~", "ecs-task", nsRows)
 
 	}
 	if len(writableRoot) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeWritableRoot, "writable root filesystem", "~", "ecs-task",
-			writableRoot)
+		setWave2Finding(result, taskID, ecsTaskCodeWritableRoot, "~", "ecs-task", writableRoot)
 
 	}
 	if len(noLogging) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeNoLogging, "container without log driver", "~", "ecs-task",
-			noLogging)
+		setWave2Finding(result, taskID, ecsTaskCodeNoLogging, "~", "ecs-task", noLogging)
 
 	}
 	if len(secretRows) > 0 {
-		setWave2Finding(result, taskID, ecsTaskCodeEnvSecret, "credential in container environment", "!", "ecs-task",
-			secretRows)
+		setWave2Finding(result, taskID, ecsTaskCodeEnvSecret, "!", "ecs-task", secretRows)
 
 	}
 }

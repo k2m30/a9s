@@ -707,7 +707,7 @@ func init() {
 	// warn-dbi-unprotected carries dbi.warn.deletion_protection_off and the
 	// fourteen rows that had no other issue left the badge.
 	// TestD4_DeletionProtectionHasOneWitness fails on a restored 42.
-	Register(Pin{ShortName: "dbi", Rows: 50, Issues: 28, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi", Rows: 51, Issues: 29, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 12, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues is 14 here and 15 in scenario_dbc_visual_test.go:
 	// healthy-dbc-maint-overdue is a Wave-2-only finding, uncounted at Wave 1.

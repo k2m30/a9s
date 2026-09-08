@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -95,7 +94,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					break
 				}
 			}
-			setWave2Finding(&result, key, pipelineCodeStageFailed, catalog.Phrase(pipelineCodeStageFailed), "!", "pipeline", rows)
+			setWave2Finding(&result, key, pipelineCodeStageFailed, "!", "pipeline", rows)
 		}
 		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	})

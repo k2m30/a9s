@@ -55,8 +55,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		case policyErr != nil:
 			MarkSkipped(&result, keyID, &failures, policyErr)
 		case public:
-			setWave2Finding(&result, keyID, kmsCodePublicPolicy, "key policy open to anyone", "!", "kms",
-				publicPolicyRows(ex))
+			setWave2Finding(&result, keyID, kmsCodePublicPolicy, "!", "kms", publicPolicyRows(ex))
 
 		}
 		mu.Unlock()
@@ -81,7 +80,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			"rotation_enabled": rotationVal,
 		}
 		if !out.KeyRotationEnabled {
-			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil)
+			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "~", "kms", nil)
 		}
 	})
 	return result, AggregateFailures("key policy and rotation", failures, n)

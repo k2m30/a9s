@@ -31,6 +31,7 @@ const (
 	w2DBICodeIAMAuthOff       = "dbi.iam-auth-off"
 	w2DBICodeDefaultMaster    = "dbi.default-master-user"
 	w2DBICodeCACertExpiring   = "dbi.ca-cert-expiring"
+	w2DBICodeCACertUrgent     = "dbi.ca-cert-expiring-urgent"
 	w2DBICodeEngineDeprecated = "dbi.engine-deprecated"
 )
 
@@ -226,6 +227,11 @@ func TestW2DBICACertExpiringWarn(t *testing.T) {
 
 // Inside 30 days the operator has a rotation window measured in weeks, not
 // months — the row escalates so it sorts above the ordinary warnings.
+//
+// Inverted for the spec row that gave severity one owner: the escalation is
+// now a second code carrying the catalog's broken severity, not the same code
+// emitted at a severity its declaration does not have. Do not restore the
+// dbi.ca-cert-expiring assertion here.
 func TestW2DBICACertExpiringBroken(t *testing.T) {
 	db := w2DBIInstance("acme-orders-db")
 	db.CertificateDetails = &rdstypes.CertificateDetails{
@@ -234,7 +240,7 @@ func TestW2DBICACertExpiringBroken(t *testing.T) {
 	}
 
 	got := w2DBIFetch(t, w2DBINow, db)
-	w2AssertFinding(t, got["acme-orders-db"].Findings, w2DBICodeCACertExpiring, "server certificate expires in 15 days", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-orders-db"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 15 days", domain.SevBroken, "wave1")
 }
 
 // Exactly 30 days out is still the escalated tier; exactly 90 is still inside
@@ -258,9 +264,10 @@ func TestW2DBICACertBoundaries(t *testing.T) {
 
 	got := w2DBIFetch(t, w2DBINow, at30, at90, at91)
 
-	w2AssertFinding(t, got["acme-db-30"].Findings, w2DBICodeCACertExpiring, "server certificate expires in 30 days", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-db-30"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 30 days", domain.SevBroken, "wave1")
 	w2AssertFinding(t, got["acme-db-90"].Findings, w2DBICodeCACertExpiring, "server certificate expires in 90 days", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-db-91"].Findings, w2DBICodeCACertExpiring)
+	w2AssertNoCode(t, got["acme-db-91"].Findings, w2DBICodeCACertUrgent)
 }
 
 // No CertificateDetails means the expiry is unknown, which is not the same as

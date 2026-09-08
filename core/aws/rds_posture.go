@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -118,7 +119,13 @@ const (
 // rdsCACertFinding returns the CA-certificate-expiry finding for validTill,
 // or nil when the certificate is absent or expires beyond the reporting
 // window. now is injected so tests can pin the boundary (the acm.go pattern).
-func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code domain.FindingCode) (*domain.Finding, []domain.DetailRow) {
+//
+// Inside rdsCACertUrgentDays the signal is a different one — an outage on a
+// clock rather than a task to schedule — so it is a different code carrying
+// its own declared severity, the way acm splits expires-soon from
+// expires-critical. The severity and the row tier are read back from that
+// declaration rather than chosen here.
+func rdsCACertFinding(caID string, validTill *time.Time, now time.Time) (*domain.Finding, []domain.DetailRow) {
 	if validTill == nil {
 		return nil, nil
 	}
@@ -131,13 +138,15 @@ func rdsCACertFinding(caID string, validTill *time.Time, now time.Time, code dom
 	if days < 0 {
 		days = 0
 	}
-	sev := domain.SevWarn
-	tier := "~"
+	code := CodeDBICACertExpiring
 	if days <= rdsCACertUrgentDays {
-		sev = domain.SevBroken
+		code = CodeDBICACertExpiringUrgent
+	}
+	f := wave1Finding(code, catalog.Severity(code), strconv.Itoa(days))
+	tier := "~"
+	if f.Severity == domain.SevBroken {
 		tier = "!"
 	}
-	f := wave1Finding(code, sev, strconv.Itoa(days))
 	rows := []domain.DetailRow{
 		{Label: "Certificate authority", Value: caID, Tier: tier},
 		{Label: "Valid till", Value: validTill.Format("2006-01-02"), Tier: tier},

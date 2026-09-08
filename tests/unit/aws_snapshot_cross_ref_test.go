@@ -21,10 +21,13 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -77,10 +80,12 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 			}
 			return p.BackupRetentionPeriod, p.BackupRetentionPeriod > 0
 		},
-		OrphanPhrase:     "orphan: source parent deleted",
-		ParentRowLabel:   "Source Parent",
-		RetentionPhrase:  func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
-		RetentionEnabled: retentionEnabled,
+		// Real declared codes rather than the zero value: the wording now
+		// comes from the catalog, so a config with no codes emits nothing.
+		OrphanCode:        "dbi-snap.orphan",
+		PastRetentionCode: "dbi-snap.past-retention",
+		ParentRowLabel:    "Source Parent",
+		RetentionEnabled:  retentionEnabled,
 	}
 }
 
@@ -236,8 +241,11 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
 	}
-	if finding.Phrase != "orphan: source parent deleted" {
-		t.Errorf("expected Phrase=%q, got %q", "orphan: source parent deleted", finding.Phrase)
+	// Inverted for the spec row that gave a wave-2 phrase one owner: the
+	// wording is the code's, declared once in the catalog, not a string this
+	// config carries. Do not restore a per-config phrase here.
+	if want := catalog.Phrase("dbi-snap.orphan"); finding.Phrase != want {
+		t.Errorf("expected Phrase=%q, got %q", want, finding.Phrase)
 	}
 
 	// Must contain a row with Label="Source Parent" and Value containing "p1" and the hint.
@@ -294,9 +302,11 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
 	}
 
-	// Phrase should match "automated, <N>d past retention" where N ≈ ageDays - retentionDays.
+	// The declared wording with the days-over count in its slot; the count is
+	// the only thing the enricher supplies.
 	expectedDaysOver := ageDays - retentionDays
-	expectedPhrase := fmt.Sprintf("automated, %dd past retention", expectedDaysOver)
+	expectedPhrase := strings.Replace(catalog.Phrase("dbi-snap.past-retention"),
+		"<N>", strconv.Itoa(expectedDaysOver), 1)
 	if finding.Phrase != expectedPhrase {
 		t.Errorf("expected Phrase=%q, got %q", expectedPhrase, finding.Phrase)
 	}

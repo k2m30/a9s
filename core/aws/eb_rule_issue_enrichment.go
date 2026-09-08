@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -139,16 +138,14 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 
 		if noTargets {
-			setWave2Finding(&result, ruleName, ebRuleCodeNoTargets, catalog.Phrase(ebRuleCodeNoTargets), "!", "eb-rule",
-				[]domain.DetailRow{{Label: "Targets", Value: "none", Tier: "!"}})
+			setWave2Finding(&result, ruleName, ebRuleCodeNoTargets, "!", "eb-rule", []domain.DetailRow{{Label: "Targets", Value: "none", Tier: "!"}})
 
 		}
 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue,
-			catalog.Phrase(ebRuleCodeTargetIssue), "~", "eb-rule", rows)
+		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, "~", "eb-rule", rows)
 	})
 
 	SetTruncated(&result, truncated)

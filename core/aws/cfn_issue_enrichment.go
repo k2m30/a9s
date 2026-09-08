@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -107,8 +106,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		if key == "" {
 			key = stackName
 		}
-		setWave2Finding(&result, key, cfnCodeRecentResourceFailure,
-			catalog.Phrase(cfnCodeRecentResourceFailure), "!", "cfn", failedRows)
+		setWave2Finding(&result, key, cfnCodeRecentResourceFailure, "!", "cfn", failedRows)
 
 	})
 
@@ -222,10 +220,9 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 				"drift_status": domain.HumanizeStatusPhrase(driftStatus),
 			}
 			if driftStatus == "DRIFTED" {
-				setWave2Finding(&result, key, cfnCodeStackDrifted, "stack drifted from template", "~", "cfn",
-					[]domain.DetailRow{
-						{Label: "Drift Status", Value: domain.HumanizeStatusPhrase(driftStatus), Tier: "~"},
-					})
+				setWave2Finding(&result, key, cfnCodeStackDrifted, "~", "cfn", []domain.DetailRow{
+					{Label: "Drift Status", Value: domain.HumanizeStatusPhrase(driftStatus), Tier: "~"},
+				})
 
 			}
 		}

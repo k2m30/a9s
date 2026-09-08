@@ -83,8 +83,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		case !aws.ToBool(logging.LoggingEnabled):
 			// No supporting row: "Audit logging: off" is the phrase split on a
 			// colon, and U11 forbids restating it under the finding it belongs to.
-			setWave2Finding(&result, r.ID, redshiftCodeAuditLoggingOff, "audit logging off", "~", "redshift",
-				nil)
+			setWave2Finding(&result, r.ID, redshiftCodeAuditLoggingOff, "~", "redshift", nil)
 
 		}
 
@@ -98,8 +97,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			// The row exists to name the parameter an operator edits, so the
 			// identifier rides along as an aside beside the value.
 			shown += " (require_ssl)"
-			setWave2Finding(&result, r.ID, redshiftCodeRequireSSLOff, "SSL not required", "~", "redshift",
-				[]domain.DetailRow{{Label: "Requires encrypted connections", Value: shown, Tier: "~"}})
+			setWave2Finding(&result, r.ID, redshiftCodeRequireSSLOff, "~", "redshift", []domain.DetailRow{{Label: "Requires encrypted connections", Value: shown, Tier: "~"}})
 
 		}
 	})

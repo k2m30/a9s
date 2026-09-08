@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -163,8 +162,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				if nc := svc.NetworkConfiguration; ecsServiceScheduling(aws.ToString(svc.Status)) &&
 					nc != nil && nc.AwsvpcConfiguration != nil &&
 					nc.AwsvpcConfiguration.AssignPublicIp == ecstypes.AssignPublicIpEnabled {
-					setWave2Finding(&result, svcName, ecsSvcCodePublicIP, "tasks get public IPs", "~", "ecs-svc",
-						[]domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}})
+					setWave2Finding(&result, svcName, ecsSvcCodePublicIP, "~", "ecs-svc", []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: "~"}})
 
 				}
 
@@ -187,8 +185,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					rows = append(rows, domain.DetailRow{Label: "Event", Value: issue, Tier: "!"})
 				}
 
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed,
-					catalog.Phrase(ecsSvcCodeDeploymentFailed), "!", "ecs-svc", rows)
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, "!", "ecs-svc", rows)
 			}
 		}
 	}

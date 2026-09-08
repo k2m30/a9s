@@ -7,13 +7,13 @@
 //
 //  1. orphan: snapshot's parent identifier NOT found in the loaded parent
 //     cache, AND the cache is not truncated.
-//     Phrase: configurable per-type (e.g. "orphan: source DB deleted").
+//     Phrase: the code's own, from the catalog.
 //
 //  2. past-retention: automated snapshot older than the parent's
 //     `BackupRetentionPeriod` (1.0× — no multiplier; the operator's
 //     declared retention IS the policy). Only fires when the parent IS in
 //     the cache, the snapshot is "automated", and the parent retention > 0.
-//     Phrase: configurable per-type
+//     Phrase: the code's own, from the catalog
 //     (e.g. "automated, <N>d past retention").
 //
 // Wave classification stays Wave 1 (zero SDK calls) — the helper scans the
@@ -32,6 +32,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,26 +69,16 @@ type SnapshotCrossRefConfig struct {
 	// Required when RetentionEnabled is true; may be nil otherwise.
 	GetParentRetention func(parentRaw any) (int32, bool)
 
-	// OrphanPhrase is the §4 status phrase emitted when the parent is missing
-	// from the loaded cache (and the cache is NOT truncated).
-	OrphanPhrase string
-
 	// ParentRowLabel is the FindingRow label used to cite the parent in the
 	// detail-view Attention section (e.g. "Source DB" for dbi, "Source
 	// Cluster" for dbc). It is reused for both the orphan citation row AND
 	// the past-retention parent-cite row.
 	ParentRowLabel string
 
-	// RetentionPhrase formats the past-retention status phrase given days-over.
-	// Example: func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) }
-	// Required when RetentionEnabled is true; may be nil otherwise.
-	RetentionPhrase func(daysOver int) string
-
 	// RetentionEnabled gates the past-retention rule. Set false for snapshot
 	// types whose parent has no retention concept (e.g. future ebs-snap, where
 	// ec2.Volume has no BackupRetentionPeriod). When false, only the orphan
-	// rule fires; GetParentRetention/GetSnapshotType/GetCreatedAt/RetentionPhrase
-	// may be nil.
+	// rule fires; GetParentRetention/GetSnapshotType/GetCreatedAt may be nil.
 	RetentionEnabled bool
 
 	// Severity is the severity tier emitted on every FindingRow and on the
@@ -115,11 +106,9 @@ type SnapshotCrossRefConfig struct {
 	// attributes are normalized so a single parser answers for the rds and
 	// docdb SDKs alike.
 	PublicAttr func(ctx context.Context, clients *ServiceClients, snap resource.Resource) ([]snapshotAttribute, error)
-	// PublicCode / PublicPhrase describe the finding emitted when PublicAttr
-	// reports a restore grant to the "all" group. Required when PublicAttr is
-	// non-nil.
-	PublicCode   domain.FindingCode
-	PublicPhrase string
+	// PublicCode is the finding emitted when PublicAttr reports a restore
+	// grant to the "all" group. Required when PublicAttr is non-nil.
+	PublicCode domain.FindingCode
 }
 
 // snapshotAttribute is one snapshot share attribute, normalized away from the
@@ -189,8 +178,8 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 			parentRaw, parentFound := parentByID[parentID]
 
-			var phrase string
 			var code domain.FindingCode
+			var values []string
 			var rows []domain.DetailRow
 
 			switch {
@@ -201,7 +190,6 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				if parentEntry.IsTruncated {
 					continue
 				}
-				phrase = cfg.OrphanPhrase
 				code = cfg.OrphanCode
 				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
@@ -226,8 +214,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 					continue
 				}
 				overD := ageD - retentionD
-				phrase = cfg.RetentionPhrase(overD)
-				code = cfg.PastRetentionCode
+				code, values = cfg.PastRetentionCode, []string{strconv.Itoa(overD)}
 				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID,
@@ -248,7 +235,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				continue
 			}
 
-			if phrase == "" {
+			if code == "" {
 				continue
 			}
 
@@ -256,7 +243,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			// and AttentionDetails (core/aws/issue_enrichment.go) — it
 			// drives the detail-view Attention section AND the S4 status
 			// column at render time via domain.StatusPhrase(r.Findings).
-			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows)
+			setWave2Finding(&result, res.ID, code, severity, cfg.ShortName, rows, values...)
 		}
 
 		return result, publicErr
@@ -305,7 +292,7 @@ func enrichSnapshotPublicShare(
 		if !restoreSharedWithAll(attrs) {
 			return
 		}
-		setWave2Finding(result, res.ID, cfg.PublicCode, cfg.PublicPhrase, "!", cfg.ShortName,
+		setWave2Finding(result, res.ID, cfg.PublicCode, "!", cfg.ShortName,
 			[]domain.DetailRow{{Label: "Restore", Value: "all", Tier: "!"}})
 
 	})

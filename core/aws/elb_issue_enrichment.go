@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -192,20 +191,18 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 				}
 			case "routing.http.desync_mitigation_mode":
 				if isALB && *attr.Value == elbDesyncMonitorMode {
-					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, "HTTP desync mitigation off", "~", "elb",
-						[]domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: "~"}})
+					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, "~", "elb", []domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: "~"}})
 
 				}
 			case "routing.http.drop_invalid_header_fields.enabled":
 				if isALB && *attr.Value != "true" {
-					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, "invalid HTTP headers not dropped", "~", "elb",
-						[]domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: "~"}})
+					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, "~", "elb", []domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: "~"}})
 
 				}
 			}
 		}
 		if len(rows) > 0 {
-			setWave2Finding(&result, r.ID, elbCodeMisconfigured, catalog.Phrase(elbCodeMisconfigured), "~", "elb", rows)
+			setWave2Finding(&result, r.ID, elbCodeMisconfigured, "~", "elb", rows)
 		}
 	})
 	// Listener posture needs a second read per load balancer, so it runs as
@@ -239,13 +236,13 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 				elbOffendingListener{port: aws.ToInt32(listener.Port), row: row})
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodePlainHTTPListener]); ports != "" {
-			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener,
-				elbCount(rows, "port ", "ports ")+ports+" in the clear", "~", "elb", rows)
+			setWave2Finding(&result, r.ID, elbCodePlainHTTPListener, "~", "elb", rows,
+				elbCount(rows, "port ", "ports ")+ports)
 
 		}
 		if ports, rows := elbOffendersInPortOrder(offenders[elbCodeWeakTLSPolicy]); ports != "" {
-			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy,
-				"weak TLS policy on "+elbCount(rows, "port ", "ports ")+ports, "~", "elb", rows)
+			setWave2Finding(&result, r.ID, elbCodeWeakTLSPolicy, "~", "elb", rows,
+				elbCount(rows, "port ", "ports ")+ports)
 
 		}
 	})

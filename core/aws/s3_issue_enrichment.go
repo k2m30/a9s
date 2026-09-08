@@ -124,7 +124,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 			MarkSkipped(&result, r.ID, &failures, p.failures[0])
 		}
 		for _, f := range p.findings {
-			setWave2Finding(&result, bucketName, f.code, f.phrase, f.glyph, "s3", f.rows)
+			setWave2Finding(&result, bucketName, f.code, f.glyph, "s3", f.rows)
 		}
 		if p.pabIncomplete {
 			result.FieldUpdates[bucketName] = map[string]string{"status": "public access block incomplete"}
@@ -138,10 +138,9 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 // s3PostureFinding is one emitted condition, held until the shared result
 // maps can be written under the mutex.
 type s3PostureFinding struct {
-	code   domain.FindingCode
-	phrase string
-	glyph  string
-	rows   []domain.DetailRow
+	code  domain.FindingCode
+	glyph string
+	rows  []domain.DetailRow
 }
 
 // s3BucketPosture is the outcome of scanning one bucket: the conditions that
@@ -171,8 +170,8 @@ type s3PostureAPI interface {
 // would fail the same way.
 func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s3BucketPosture {
 	var p s3BucketPosture
-	add := func(code domain.FindingCode, phrase, glyph string, rows []domain.DetailRow) {
-		p.findings = append(p.findings, s3PostureFinding{code: code, phrase: phrase, glyph: glyph, rows: rows})
+	add := func(code domain.FindingCode, glyph string, rows []domain.DetailRow) {
+		p.findings = append(p.findings, s3PostureFinding{code: code, glyph: glyph, rows: rows})
 	}
 
 	pabOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
@@ -182,7 +181,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	case err == nil || isS3APIErrCode(err, "NoSuchPublicAccessBlockConfiguration"):
 		if rows := s3PABRows(pabOut, err); rows != nil {
 			p.pabIncomplete = true
-			add(s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", rows)
+			add(s3CodePublicAccessBlockIncomplete, "~", rows)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true
@@ -197,7 +196,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	switch {
 	case err == nil:
 		if statusOut.PolicyStatus != nil && aws.ToBool(statusOut.PolicyStatus.IsPublic) {
-			add(s3CodePublic, "publicly accessible", "!",
+			add(s3CodePublic, "!",
 				[]domain.DetailRow{{Label: "Policy status", Value: "public", Tier: "!"}})
 		}
 	// A bucket with no policy at all cannot be public by policy.
@@ -220,10 +219,10 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 			if versioningOut.Status != "" {
 				state = strings.ToLower(string(versioningOut.Status))
 			}
-			add(s3CodeVersioningOff, "versioning off", "~",
+			add(s3CodeVersioningOff, "~",
 				[]domain.DetailRow{{Label: "Versioning", Value: state, Tier: "~"}})
 		case versioningOut.MFADelete != s3types.MFADeleteStatusEnabled:
-			add(s3CodeMFADeleteOff, "MFA delete off", "~", nil)
+			add(s3CodeMFADeleteOff, "~", nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true
@@ -238,7 +237,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	switch {
 	case err == nil:
 		if loggingOut.LoggingEnabled == nil {
-			add(s3CodeAccessLoggingOff, "access logging off", "~", nil)
+			add(s3CodeAccessLoggingOff, "~", nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true
@@ -261,7 +260,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 			}
 		}
 		if enabled == 0 {
-			add(s3CodeNoLifecycle, "no lifecycle rules", "~",
+			add(s3CodeNoLifecycle, "~",
 				[]domain.DetailRow{{Label: "Lifecycle rules", Value: strconv.Itoa(enabled), Tier: "~"}})
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
@@ -279,7 +278,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		locked := lockOut != nil && lockOut.ObjectLockConfiguration != nil &&
 			lockOut.ObjectLockConfiguration.ObjectLockEnabled == s3types.ObjectLockEnabledEnabled
 		if !locked {
-			add(s3CodeNoObjectLock, "object lock off", "~", nil)
+			add(s3CodeNoObjectLock, "~", nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = true

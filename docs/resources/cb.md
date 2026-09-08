@@ -167,7 +167,7 @@ One row per signal from §3:
 | buildspec from the source repository | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `buildspec taken from the source repository` |
 | credential in the source address | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in the source repository address` |
 | credential in a plaintext environment variable | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
-| latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest build <status> (<date>)` |
+| latest build `FAILED` / `FAULT` / `TIMED_OUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest build <status>` |
 
 Cause-field sources for S4 / S5: `Build.BuildStatus` (enum) and `Build.EndTime` from the batched `BatchGetBuilds` response (AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, EndTime`). `FAULT` reflects a platform problem, `FAILED` a user-code exit, `TIMED_OUT` the project's `TimeoutInMinutes`; the list line pairs the status with the date so the operator sees whether it is fresh without opening detail.
 
@@ -180,7 +180,7 @@ Rules for filling list and detail text:
 
 ### 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row for a failing project carries `latest build <status> (<date>)` in S4, which names both the outcome and when it happened; the operator knows whether the failure is fresh or stale and can triage the team to investigate without first opening the detail view.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row for a failing project carries `latest build <status>` in S4, which names the outcome; the build's end date is one row down in the detail view, so the operator knows whether the failure is fresh or stale and can triage the team to investigate without first opening the detail view.
 
 ## 5. Out of Scope
 
@@ -218,7 +218,7 @@ cb — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 | — |
+| cb.latest-build-failed | latest build <status> | broken | wave2 | — |
 | cb.public-builds | build results publicly visible | broken | wave1 | Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed. |
 | cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 | The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches. |
 | cb.source-url-credential | credential in the source repository address | broken | wave1 | The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked. |

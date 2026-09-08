@@ -29,7 +29,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -56,9 +55,7 @@ var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	GetCreatedAt:       dbcSnapCreatedAt,
 	GetSnapshotType:    dbcSnapType,
 	GetParentRetention: dbcParentRetention,
-	OrphanPhrase:       "orphan: source cluster deleted",
 	ParentRowLabel:     "Source Cluster",
-	RetentionPhrase:    func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
 	RetentionEnabled:   true,
 	Severity:           "!",
 	ShortName:          "dbc-snap",
@@ -66,7 +63,6 @@ var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	PastRetentionCode:  dbcSnapPastRetentionCode,
 	PublicAttr:         dbcSnapShareAttributes,
 	PublicCode:         dbcSnapPublicCode,
-	PublicPhrase:       "shared with all AWS accounts",
 })
 
 // dbcSnapShareAttributes reads one cluster snapshot's share attributes. The

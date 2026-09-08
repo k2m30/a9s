@@ -71,7 +71,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if adminPolicy != "" {
-			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, adminAttachedPhrase, "~", "iam-role",
+			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, "~", "iam-role",
 				adminAttachedRows(adminPolicy))
 
 		}
@@ -89,7 +89,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			isDormant = true
 		}
 		if isDormant {
-			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil)
+			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "~", "iam-role", nil)
 		}
 	})
 	MarkInformationalOnly(&result)

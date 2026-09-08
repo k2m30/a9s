@@ -13,7 +13,6 @@ import (
 	wafv2svc "github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -147,16 +146,15 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		}
 
 		if noRules {
-			setWave2Finding(&result, r.ID, wafCodeNoRules, "web ACL has no rules", "~", "waf",
-				[]domain.DetailRow{{Label: "Rules", Value: "0", Tier: "~"}})
+			setWave2Finding(&result, r.ID, wafCodeNoRules, "~", "waf", []domain.DetailRow{{Label: "Rules", Value: "0", Tier: "~"}})
 
 		}
 
 		if len(loggingRows) > 0 {
-			setWave2Finding(&result, r.ID, wafCodeNoLogging, catalog.Phrase(wafCodeNoLogging), "~", "waf", loggingRows)
+			setWave2Finding(&result, r.ID, wafCodeNoLogging, "~", "waf", loggingRows)
 		}
 		if len(orphanRows) > 0 {
-			setWave2Finding(&result, r.ID, wafCodeOrphan, catalog.Phrase(wafCodeOrphan), "~", "waf", orphanRows)
+			setWave2Finding(&result, r.ID, wafCodeOrphan, "~", "waf", orphanRows)
 		}
 	})
 

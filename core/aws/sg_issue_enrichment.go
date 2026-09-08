@@ -55,7 +55,7 @@ func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Re
 		if r.ID == "" || referenced[r.ID] || r.Fields["group_name"] == "default" {
 			continue
 		}
-		setWave2Finding(&result, r.ID, sgCodeUnused, sgUnusedPhrase, "~", "sg",
+		setWave2Finding(&result, r.ID, sgCodeUnused, "~", "sg",
 			[]domain.DetailRow{{Label: "Network interfaces referencing", Value: "0", Tier: "~"}})
 
 	}

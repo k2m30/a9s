@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -87,7 +86,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		if key == "" {
 			key = name
 		}
-		setWave2Finding(&result, key, ebCodeEnvironmentCauses, catalog.Phrase(ebCodeEnvironmentCauses), "~", "eb", rows)
+		setWave2Finding(&result, key, ebCodeEnvironmentCauses, "~", "eb", rows)
 	})
 	settingsErr := ebConfigurationPosture(ctx, clients, &result, resources)
 	MarkInformationalOnly(&result)
@@ -146,14 +145,13 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 		// to a value other than the flagged one, so reading an absent option
 		// as the bad one would flag environments nobody misconfigured.
 		if v, ok := ebOptionValue(options, ebNamespaceManagedActions, ebOptionManagedActions); ok && v != "true" {
-			setWave2Finding(result, key, ebCodeManagedUpdatesOff, "managed platform updates off", "~", "eb", nil)
+			setWave2Finding(result, key, ebCodeManagedUpdatesOff, "~", "eb", nil)
 		}
 		if v, ok := ebOptionValue(options, ebNamespaceHealthSystem, ebOptionSystemType); ok && v != "enhanced" {
-			setWave2Finding(result, key, ebCodeEnhancedHealthOff, "enhanced health reporting off", "~", "eb",
-				[]domain.DetailRow{{Label: "Reporting level", Value: v, Tier: "~"}})
+			setWave2Finding(result, key, ebCodeEnhancedHealthOff, "~", "eb", []domain.DetailRow{{Label: "Reporting level", Value: v, Tier: "~"}})
 		}
 		if v, ok := ebOptionValue(options, ebNamespaceCWLogs, ebOptionStreamLogs); ok && v != "true" {
-			setWave2Finding(result, key, ebCodeCWLogsOff, "log streaming to CloudWatch off", "~", "eb", nil)
+			setWave2Finding(result, key, ebCodeCWLogsOff, "~", "eb", nil)
 		}
 	})
 	return AggregateFailures("DescribeConfigurationSettings", failures, n)

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -125,14 +124,14 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, policyErr)
 		case exposure.Public:
-			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "repository policy open to anyone", "!", "ecr", publicPolicyRows(exposure))
+			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, "!", "ecr", publicPolicyRows(exposure))
 		}
 		switch {
 		case lifecycleErr != nil:
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, lifecycleErr)
 		case noLifecyclePolicy:
-			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "no lifecycle policy", "~", "ecr", nil)
+			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, "~", "ecr", nil)
 		}
 
 		scannedCount := 0
@@ -165,11 +164,9 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		}
 
 		var rows []domain.DetailRow
-		var parts []string
 		tier := "~"
 		if criticalTotal > 0 {
 			tier = "!"
-			parts = append(parts, fmt.Sprintf("%d critical", criticalTotal))
 			rows = append(rows, domain.DetailRow{
 				Label: "Critical",
 				Value: fmt.Sprintf("%d critical findings across %d image(s)", criticalTotal, scannedCount),
@@ -177,15 +174,14 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			})
 		}
 		if highTotal > 0 {
-			parts = append(parts, fmt.Sprintf("%d high", highTotal))
 			rows = append(rows, domain.DetailRow{
 				Label: "High",
 				Value: fmt.Sprintf("%d high findings across %d image(s)", highTotal, scannedCount),
 				Tier:  "~",
 			})
 		}
-		summary := strings.Join(parts, ", ") + " vulnerabilities"
-		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, summary, tier, "ecr", rows)
+		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, tier, "ecr", rows,
+			strconv.Itoa(int(criticalTotal)), strconv.Itoa(int(highTotal)))
 	})
 
 	SetTruncated(&result, truncated)

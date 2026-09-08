@@ -74,13 +74,11 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		mu.Lock()
 		defer mu.Unlock()
 		if policyPublic {
-			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, "invokable by anyone", "!", "lambda",
-				policyRows)
+			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, "!", "lambda", policyRows)
 
 		}
 		if urlPublic {
-			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, "function endpoint open without authentication", "!", "lambda",
-				urlRows)
+			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, "!", "lambda", urlRows)
 
 		}
 		if err := cmp.Or(policyErr, urlErr); err != nil {

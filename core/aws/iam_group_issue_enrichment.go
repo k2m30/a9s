@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -207,7 +206,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 
 		if adminPolicy := adminAttachedPolicyName(allAttached); adminPolicy != "" {
-			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, adminAttachedPhrase, "~", "iam-group",
+			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, "~", "iam-group",
 				adminAttachedRows(adminPolicy))
 
 		}
@@ -215,8 +214,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop,
-			catalog.Phrase(iamGroupCodeOrphanOrNoop), "~", "iam-group", rows)
+		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, "~", "iam-group", rows)
 	})
 	MarkInformationalOnly(&result)
 	return result, nil

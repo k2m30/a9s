@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -100,8 +99,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 				continue
 			}
 
-			setWave2Finding(&result, name, ecsCodeClusterIssue,
-				catalog.Phrase(ecsCodeClusterIssue), "~", "ecs", rows)
+			setWave2Finding(&result, name, ecsCodeClusterIssue, "~", "ecs", rows)
 		}
 	}
 

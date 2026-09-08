@@ -216,7 +216,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status> (<date>)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status>", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: CodeCBPublicBuilds, Phrase: "build results publicly visible", Severity: domain.SevBroken, Source: "wave1", Detail: "Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed."},
 			{Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository", Severity: domain.SevWarn, Source: "wave1", Detail: "The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches."},
 			{Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address", Severity: domain.SevBroken, Source: "wave1", Detail: "The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked."},

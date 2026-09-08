@@ -36,13 +36,19 @@ import (
 	"github.com/k2m30/a9s/v3/core/catalog"
 )
 
-// phraseArgIndex gives, per emitter, the argument positions of the finding
-// code and of the phrase.
-var phraseArgIndex = map[string]struct{ code, phrase int }{
-	// setWave2Finding(r, resourceID, code, phrase, glyph, shortName, rows)
-	"setWave2Finding": {code: 2, phrase: 3},
-	// addWave1Finding(r, code, phrase, severity)
-	"addWave1Finding": {code: 1, phrase: 2},
+// slotValueArgIndex gives, per constructor, the argument position of the
+// finding code and the position its variadic slot values start at. No emitter
+// takes a phrase any more — the wording is the catalog's — so what is left to
+// police is the values that fill the declared phrase's slots.
+var slotValueArgIndex = map[string]struct{ code, firstValue int }{
+	// setWave2Finding(r, resourceID, code, glyph, shortName, rows, values...)
+	"setWave2Finding": {code: 2, firstValue: 6},
+	// wave2Finding(code, severity, shortName, values...)
+	"wave2Finding": {code: 0, firstValue: 3},
+	// wave1Finding(code, severity, values...)
+	"wave1Finding": {code: 0, firstValue: 2},
+	// addWave1Finding(r, code, severity, values...)
+	"addWave1Finding": {code: 1, firstValue: 3},
 }
 
 // parseAWSPackage parses every non-test Go file under core/aws.
@@ -211,36 +217,34 @@ func TestNoEmitterBuildsItsPhraseFromAnItem(t *testing.T) {
 			if !ok {
 				return true
 			}
-			idx, watched := phraseArgIndex[fn.Name]
-			if !watched || len(call.Args) <= idx.phrase {
-				return true
-			}
-			kind := builtFromItem(call.Args[idx.phrase], itemNames)
-			if kind == "" {
+			idx, watched := slotValueArgIndex[fn.Name]
+			if !watched || len(call.Args) <= idx.firstValue {
 				return true
 			}
 			pos := fset.Position(call.Pos())
 			site := fmt.Sprintf("%s:%d %s", filepath.Base(path), pos.Line, fn.Name)
 
-			codeIdent, isIdent := call.Args[idx.code].(*ast.Ident)
-			if !isIdent {
-				unresolved = append(unresolved, site+" — code argument is not a constant")
-				return true
+			// Only the indexing shape is a defect now. A value IS assembled
+			// at emit time — that is what a slot is for — but a value read out
+			// of the first element of a collection still makes the wording a
+			// property of whichever item happened to come first.
+			for _, arg := range call.Args[idx.firstValue:] {
+				if builtFromItem(arg, itemNames) != phraseIndexesItem {
+					continue
+				}
+				codeIdent, isIdent := call.Args[idx.code].(*ast.Ident)
+				if !isIdent {
+					unresolved = append(unresolved, site+" — code argument is not a constant")
+					continue
+				}
+				code, known := consts[codeIdent.Name]
+				if !known {
+					unresolved = append(unresolved, site+" — code constant "+codeIdent.Name+" has no string value")
+					continue
+				}
+				offenders = append(offenders, fmt.Sprintf("%s under %s: %s (catalog phrase %q)",
+					site, code, phraseIndexesItem, registered[code]))
 			}
-			code, known := consts[codeIdent.Name]
-			if !known {
-				unresolved = append(unresolved, site+" — code constant "+codeIdent.Name+" has no string value")
-				return true
-			}
-			phrase := registered[code]
-			if kind == phraseAssembled && strings.Contains(phrase, "<") {
-				// The catalog declares this wording as one phrase with a value
-				// the emitter fills in per resource; nothing is dropped, and the
-				// demo-bench gate holds the emitted text to the declared shape.
-				return true
-			}
-			offenders = append(offenders, fmt.Sprintf("%s under %s: %s (catalog phrase %q)",
-				site, code, kind, phrase))
 			return true
 		})
 	}
@@ -248,11 +252,12 @@ func TestNoEmitterBuildsItsPhraseFromAnItem(t *testing.T) {
 	sort.Strings(offenders)
 	sort.Strings(unresolved)
 	for _, o := range offenders {
-		t.Errorf("phrase built from an item: %s — pass the phrase the code declares and put the "+
-			"item in a supporting row", o)
+		t.Errorf("slot value read out of an item: %s — the value filling a declared phrase's slot "+
+			"must speak for the resource, not for whichever element came first; put the item in a "+
+			"supporting row", o)
 	}
 	for _, u := range unresolved {
-		t.Errorf("phrase built from an item, code not statically known: %s — a call site that "+
+		t.Errorf("slot value read out of an item, code not statically known: %s — a call site that "+
 			"picks its code at runtime also picks its wording at runtime; give each condition its "+
 			"own code and its own registered phrase", u)
 	}
@@ -338,6 +343,14 @@ func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 		})
 	}
 
+	// A finding's Phrase is also writable by assignment, which no
+	// KeyValueExpr scan sees; and setWave2Finding once took the wording as an
+	// argument, which is how a hundred wave-2 hand phrases lived outside the
+	// catalog. Both are pinned here, the second against the helper's own
+	// declared parameter names so re-adding a phrase parameter re-arms the
+	// check instead of silently escaping it.
+	assigns, w2Args := phraseAssignments(t, fset, files), wave2PhraseArguments(t, fset, files)
+
 	sort.Strings(literals)
 	sort.Strings(phrases)
 	for _, o := range literals {
@@ -350,4 +363,92 @@ func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 			"catalog.FindingDef and read from there; a phrase spelled at the emit site is a "+
 			"second copy that drifts", o)
 	}
+
+	for _, o := range assigns {
+		t.Errorf("phrase written by assignment: %s — the wording a code declares is read back by "+
+			"wave1Finding/wave2Finding; overwriting it afterwards is the same second copy the "+
+			"literal gate refuses", o)
+	}
+	for _, o := range w2Args {
+		t.Errorf("wave-2 phrase passed in at the call site: %s — setWave2Finding builds the "+
+			"wording from the code's declaration; a phrase argument is a hand phrase wearing a "+
+			"parameter name", o)
+	}
+}
+
+// phraseAssignments finds every `x.Phrase = …` outside the two seam files.
+func phraseAssignments(t *testing.T, fset *token.FileSet, files map[string]*ast.File) []string {
+	t.Helper()
+	var out []string
+	for path, src := range files {
+		base := filepath.Base(path)
+		if findingSeamFiles[base] {
+			continue
+		}
+		ast.Inspect(src, func(n ast.Node) bool {
+			as, ok := n.(*ast.AssignStmt)
+			if !ok {
+				return true
+			}
+			for _, lhs := range as.Lhs {
+				sel, isSel := lhs.(*ast.SelectorExpr)
+				if isSel && sel.Sel.Name == "Phrase" {
+					out = append(out, fmt.Sprintf("%s:%d", base, fset.Position(as.Pos()).Line))
+				}
+			}
+			return true
+		})
+	}
+	sort.Strings(out)
+	return out
+}
+
+// wave2PhraseArguments reports every setWave2Finding call that hands the
+// helper a wording, resolving the argument position from the helper's own
+// parameter list. When setWave2Finding has no phrase parameter there is
+// nothing to report and nothing a call site could pass; the check exists so
+// that re-adding one is caught rather than assumed impossible.
+func wave2PhraseArguments(t *testing.T, fset *token.FileSet, files map[string]*ast.File) []string {
+	t.Helper()
+	idx := -1
+	for _, src := range files {
+		ast.Inspect(src, func(n ast.Node) bool {
+			fn, ok := n.(*ast.FuncDecl)
+			if !ok || fn.Name.Name != "setWave2Finding" || fn.Recv != nil {
+				return true
+			}
+			at := 0
+			for _, field := range fn.Type.Params.List {
+				for _, name := range field.Names {
+					if name.Name == "phrase" {
+						idx = at
+					}
+					at++
+				}
+			}
+			return true
+		})
+	}
+	if idx < 0 {
+		return nil
+	}
+
+	var out []string
+	for path, src := range files {
+		base := filepath.Base(path)
+		ast.Inspect(src, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			id, isIdent := call.Fun.(*ast.Ident)
+			if !isIdent || id.Name != "setWave2Finding" || len(call.Args) <= idx {
+				return true
+			}
+			out = append(out, fmt.Sprintf("%s:%d", base, fset.Position(call.Pos()).Line))
+			return true
+		})
+	}
+	sort.Strings(out)
+	return out
 }

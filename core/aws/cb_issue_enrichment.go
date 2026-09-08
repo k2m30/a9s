@@ -121,11 +121,10 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 				}
 			}
 		}
-		summary := fmt.Sprintf("latest build %s", statusPhrase)
 		if b.EndTime != nil {
-			summary = fmt.Sprintf("latest build %s (%s)", statusPhrase, b.EndTime.Format("2006-01-02"))
+			rows = append(rows, domain.DetailRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02"), Tier: "!"})
 		}
-		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows)
+		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, "!", "cb", rows, statusPhrase)
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
 	return result, listErr

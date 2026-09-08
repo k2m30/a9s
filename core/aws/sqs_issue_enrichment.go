@@ -84,15 +84,14 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		// Neither carries a supporting row — the phrase is the whole fact,
 		// and a row repeating it is the detail block saying it twice.
 		if !hasDLQ {
-			setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, "no DLQ configured", "~", "sqs", nil)
+			setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, "~", "sqs", nil)
 		}
 		if out.Attributes["KmsMasterKeyId"] == "" {
-			setWave2Finding(&result, r.ID, sqsCodeNoKMS, "not encrypted with KMS", "~", "sqs", nil)
+			setWave2Finding(&result, r.ID, sqsCodeNoKMS, "~", "sqs", nil)
 		}
 		if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
 			if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
-				setWave2Finding(&result, r.ID, sqsCodePublicPolicy, "queue policy open to anyone", "!", "sqs",
-					publicPolicyRows(ex))
+				setWave2Finding(&result, r.ID, sqsCodePublicPolicy, "!", "sqs", publicPolicyRows(ex))
 			}
 		}
 	})

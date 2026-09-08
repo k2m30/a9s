@@ -34,6 +34,9 @@ const (
 	CodeDBIIAMAuthOff        domain.FindingCode = "dbi.iam-auth-off"
 	CodeDBIDefaultMasterUser domain.FindingCode = "dbi.default-master-user"
 	CodeDBICACertExpiring    domain.FindingCode = "dbi.ca-cert-expiring"
+	// CodeDBICACertExpiringUrgent is the inner window: a separate code
+	// because it is a separate severity, and a code declares exactly one.
+	CodeDBICACertExpiringUrgent domain.FindingCode = "dbi.ca-cert-expiring-urgent"
 )
 
 // dbiPostureCodes binds the shared RDS posture predicates to the dbi codes.
