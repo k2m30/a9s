@@ -2,10 +2,16 @@
 
 // wipfix_qa_absorb_latency_test.go pins the C4 latency guarantee for the read
 // half of a list load: absorbing a large fetch result must not hold the
-// controller's write lock for the whole of the row work. The save half
-// already meets this; the absorb half does the same amount of pure in-memory
-// work with no disk in it and blocks every concurrent reader for the
-// duration, which is what a key press feels as a stalled UI.
+// controller's write lock for the row work. The save half already meets this;
+// the absorb half does the same amount of pure in-memory work under the lock,
+// and every key press waits behind it.
+//
+// What is measured is the LOCKED SPAN, not a reader's end-to-end wait: the
+// wait also contains the reader's own body build and the GC assist it pays for
+// the cache-write marshal that already runs outside the lock, neither of which
+// this row is about. The probe is Controller.GetListLane — an RLock, two
+// pointer reads, no allocation — so how long it blocks is how long the writer
+// held the lock, and nothing else.
 package unit
 
 import (
@@ -20,18 +26,23 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// wipfixAbsorbReaderBudget is the longest a reader may wait behind one
-// absorption. Deliberately far above any plausible lock-free hand-off and far
-// below the ~45 ms a 6000-row absorb takes under the lock, so neither a busy
-// machine nor a fast one changes the verdict.
-const wipfixAbsorbReaderBudget = 25 * time.Millisecond
+// wipfixAbsorbHoldBudget is the longest the controller lock may be held while
+// a fetch result is absorbed. Instrumentation on this tree records a 49 ms
+// hold for 6000 rows — about 8 µs per row — because the rows are merged and
+// the body is built under the lock. Once only the built body is swapped under
+// it the hold is a pointer assignment, so 10 ms is generous by three orders of
+// magnitude while sitting five times below what the row work costs today.
+const wipfixAbsorbHoldBudget = 10 * time.Millisecond
 
-// TestLargeFetchAbsorb_DoesNotBlockReadersForItsWholeDuration pins row 23.
-func TestLargeFetchAbsorb_DoesNotBlockReadersForItsWholeDuration(t *testing.T) {
-	c := newTestController(t)
-	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+// wipfixAbsorbGrowthAllowance bounds how much the hold may grow when the
+// result doubles. A hold that scales with row count is row work under the
+// lock however small the constant; a swap does not care how many rows it
+// swaps.
+const wipfixAbsorbGrowthAllowance = 4 * time.Millisecond
 
-	rows := make([]resource.Resource, 6000)
+// wipfixEC2Rows returns n rows in the shape the ec2 fetcher writes.
+func wipfixEC2Rows(n int) []resource.Resource {
+	rows := make([]resource.Resource, n)
 	for i := range rows {
 		id := "i-" + strconv.Itoa(1000000000000000+i)
 		rows[i] = resource.Resource{
@@ -43,24 +54,34 @@ func TestLargeFetchAbsorb_DoesNotBlockReadersForItsWholeDuration(t *testing.T) {
 			},
 		}
 	}
+	return rows
+}
+
+// wipfixLockHoldDuringAbsorb absorbs n rows on a fresh controller and returns
+// the longest a concurrent lock-taking reader was blocked — the writer's hold,
+// since the probe itself does no work worth measuring.
+func wipfixLockHoldDuringAbsorb(t *testing.T, n int) time.Duration {
+	t.Helper()
+	c := newTestController(t)
+	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	rows := wipfixEC2Rows(n)
 
 	var stop atomic.Bool
 	worst := make(chan time.Duration, 1)
 	go func() {
-		var max time.Duration
+		var longest time.Duration
 		for !stop.Load() {
 			start := time.Now()
-			_ = c.Snapshot()
-			if d := time.Since(start); d > max {
-				max = d
+			c.GetListLane()
+			if d := time.Since(start); d > longest {
+				longest = d
 			}
-			time.Sleep(200 * time.Microsecond)
 		}
-		worst <- max
+		worst <- longest
 	}()
 
-	// Let the reader settle so its own first-call costs are not measured as
-	// contention.
+	// Let the probe loop reach steady state so its own first-call costs are
+	// not read as contention.
 	time.Sleep(5 * time.Millisecond)
 
 	_, _ = c.Handle(messages.ResourcesLoaded{
@@ -71,21 +92,35 @@ func TestLargeFetchAbsorb_DoesNotBlockReadersForItsWholeDuration(t *testing.T) {
 	})
 
 	stop.Store(true)
-	got := <-worst
+	held := <-worst
 
-	if got > wipfixAbsorbReaderBudget {
-		t.Errorf("a reader waited %v behind a 6000-row absorption, budget %v — "+
-			"the row work is pure in-memory and belongs outside the lock, with only the "+
-			"built body swapped under it", got, wipfixAbsorbReaderBudget)
-	}
-
-	// The absorption still has to have happened.
-	if body := c.Snapshot().Body.List; body == nil || len(body.Rows) != len(rows) {
+	if body := c.Snapshot().Body.List; body == nil || len(body.Rows) != n {
 		got := 0
 		if body != nil {
 			got = len(body.Rows)
 		}
-		t.Errorf("the list holds %d rows after absorbing %d — moving work off the lock must not lose it",
-			got, len(rows))
+		t.Fatalf("the list holds %d rows after absorbing %d — moving work off the lock must not lose it",
+			got, n)
+	}
+	return held
+}
+
+// TestLargeFetchAbsorb_HoldsTheLockOnlyForTheSwap pins row 23.
+func TestLargeFetchAbsorb_HoldsTheLockOnlyForTheSwap(t *testing.T) {
+	small := wipfixLockHoldDuringAbsorb(t, 6000)
+	large := wipfixLockHoldDuringAbsorb(t, 12000)
+
+	if small > wipfixAbsorbHoldBudget {
+		t.Errorf("absorbing 6000 rows held the controller lock for %v, budget %v — "+
+			"the row work is pure in-memory and belongs outside the lock, with only the "+
+			"built body swapped under it", small, wipfixAbsorbHoldBudget)
+	}
+	if large > wipfixAbsorbHoldBudget {
+		t.Errorf("absorbing 12000 rows held the controller lock for %v, budget %v",
+			large, wipfixAbsorbHoldBudget)
+	}
+	if large-small > wipfixAbsorbGrowthAllowance {
+		t.Errorf("the lock hold grew from %v at 6000 rows to %v at 12000 — a hold that scales "+
+			"with the result is row work under the lock; a swap does not", small, large)
 	}
 }
