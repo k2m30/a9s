@@ -16,6 +16,9 @@ list:
     path: State
     key: state
     width: 10
+  Handler:
+    path: Handler
+    width: 30
   Last Modified:
     path: LastModified
     width: 22

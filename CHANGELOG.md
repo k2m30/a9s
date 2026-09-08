@@ -53,6 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   told nothing had failed. Those three codes now also have to carry the
   sentence the service writes when the resource is really gone.
 
+- A list column now reads the same value in the demo and on a real account.
+  The column set was resolved by two different rules: with per-resource view
+  files present, which is every installation, a column read its value by the
+  AWS field path the file names, and without them it read the key the resource
+  type declares. So a cell could be correct in `--demo` and wrong on screen.
+  Lambda's Handler column was missing entirely for real accounts, and a
+  CloudTrail event's outcome now reads as words rather than the raw error code.
+
 - Three more fields read as words in the list for anyone who has run a9s
   before: a CodeBuild project's source type, an ECR repository's tag
   mutability and a Kinesis stream's mode. They read correctly in the demo and

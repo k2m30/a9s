@@ -883,14 +883,18 @@ detail:
 	if v, present := got.Fields["bucket_owner"]; !present || v != "team-platform" {
 		t.Errorf(`persisted bucket-s4-1.Fields["bucket_owner"] = %q (present=%v), want "team-platform" — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present)
 	}
-	// "bucket_name" here is this scenario's own view config talking, not the
-	// s3 fetcher: the YAML above declares a Key-less column titled "Bucket
-	// Name", and the save projection keys a Key-less column by its title. The
-	// row this test feeds in carries no such field, and no fetcher writes one
-	// for it. Do not "follow" a fetcher key rename here — the projection is
-	// the subject.
-	if v, present := got.Fields["bucket_name"]; !present || v == "" {
-		t.Errorf(`persisted bucket-s4-1.Fields["bucket_name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
+	// "name", matching scenarios 1 and 3 above. INVERTED for aws6 row 16 (one
+	// cascade arm): this scenario's YAML declares a Key-LESS column titled
+	// "Bucket Name", and the save projection used to key such a column by its
+	// title, giving "bucket_name". A loaded view file no longer comes back
+	// without the catalog's Key — the view owns the column set and its order,
+	// the catalog owns what each cell reads, on every path — so the resolved
+	// column carries the catalog's Key and that is the key materialization
+	// writes. The title key nothing reads is not what a cache replay needs.
+	// Do not restore "bucket_name": it would mean a column resolved one way
+	// for this scenario and another for the two above.
+	if v, present := got.Fields["name"]; !present || v == "" {
+		t.Errorf(`persisted bucket-s4-1.Fields["name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
 	}
 }
 

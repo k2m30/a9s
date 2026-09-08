@@ -8,11 +8,21 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
-// ResolveListColumnCascade resolves the list column set for typeName: prefer
-// vc's per-session ViewDef.List when non-empty, else the built-in default
-// ViewDef.List when it is a strict superset of td.Columns, else td.Columns
-// (carrying Path/SortKey/Humanize from the defaults by title match), else the
-// raw built-in defaults.
+// ResolveListColumnCascade resolves the list column set for typeName.
+//
+// One path, whatever the caller holds. The VIEW — the operator's file when one
+// is loaded, the built-in default otherwise, which is what config.GetViewDef
+// already falls back to — owns which columns there are, their order and their
+// widths, because that file is the thing an operator edits. The CATALOG owns
+// what each cell reads: its Key is merged onto every title both declare.
+//
+// It was two paths. A loaded file came back verbatim, so the catalog's Key was
+// dropped for anyone who had ever started a9s (EnsureViewsDir writes those
+// files, and internal/tui/app.go falls back to config.SharedDefaultConfig()
+// when it finds none), while a nil config got the merged set. The demo bench
+// and the account an operator actually looks at therefore resolved cells by
+// different rules, and a cell could be right on the bench acceptance reviews
+// and wrong on every screen — which is what cb's Source Type was.
 //
 // The only resolver of the column-set cascade. core/app's
 // resolveListColumnsForBuild (session-view-config-aware, used for rendering,
@@ -21,50 +31,39 @@ import (
 // lane) both delegate here, so no two callers can disagree about which
 // columns a resource type renders.
 func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *ResourceTypeDef) []config.ListColumn {
-	if vc != nil {
-		if vd := config.GetViewDef(vc, typeName); len(vd.List) > 0 {
-			return copyListColumns(vd.List)
-		}
-	}
-
-	defaultVD := config.GetViewDef(nil, typeName)
-	if td == nil {
-		return copyListColumns(defaultVD.List)
+	// GetViewDef already falls back to the built-in default when vc is nil or
+	// declares nothing for this type, so this is the view whatever the caller
+	// holds.
+	view := config.GetViewDef(vc, typeName)
+	if td == nil || len(td.Columns) == 0 {
+		return copyListColumns(view.List)
 	}
 
 	// Both lookups below are keyed case-insensitively: a catalog column and
-	// the built-in view spell the same title differently often enough ("Time"
-	// against "TIME") that an exact match silently drops what the other
-	// declaration says about that very column.
+	// the view spell the same title differently often enough ("Time" against
+	// "TIME") that an exact match silently drops what the other declaration
+	// says about that very column.
 
-	// The defaults hold columns the catalog does not, so they drive the order
-	// and the widths. They do not drive what a cell reads: mergeListColumn
-	// puts the catalog's Key back on every title both declare.
-	if len(defaultVD.List) > len(td.Columns) {
-		catalogKeyByTitle := make(map[string]string, len(td.Columns))
-		for _, c := range td.Columns {
-			catalogKeyByTitle[strings.ToLower(c.Title)] = c.Key
-		}
-		cols := make([]config.ListColumn, len(defaultVD.List))
-		for i, lc := range defaultVD.List {
-			cols[i] = mergeListColumn(lc.Title, lc.Width, catalogKeyByTitle[strings.ToLower(lc.Title)], lc)
-		}
-		return cols
-	}
-
-	if len(td.Columns) > 0 {
-		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
-		for _, lc := range defaultVD.List {
-			defaultByTitle[strings.ToLower(lc.Title)] = lc
-		}
+	// No view declares this type at all — child types are not in the built-in
+	// views — so the catalog is the whole declaration and there is nothing to
+	// merge onto it.
+	if len(view.List) == 0 {
 		cols := make([]config.ListColumn, len(td.Columns))
 		for i, c := range td.Columns {
-			cols[i] = mergeListColumn(c.Title, c.Width, c.Key, defaultByTitle[strings.ToLower(c.Title)])
+			cols[i] = mergeListColumn(c.Title, c.Width, c.Key, config.ListColumn{})
 		}
 		return cols
 	}
 
-	return copyListColumns(defaultVD.List)
+	catalogKeyByTitle := make(map[string]string, len(td.Columns))
+	for _, c := range td.Columns {
+		catalogKeyByTitle[strings.ToLower(c.Title)] = c.Key
+	}
+	cols := make([]config.ListColumn, len(view.List))
+	for i, lc := range view.List {
+		cols[i] = mergeListColumn(lc.Title, lc.Width, catalogKeyByTitle[strings.ToLower(lc.Title)], lc)
+	}
+	return cols
 }
 
 // mergeListColumn is the one merge of the two declarations of a column, called

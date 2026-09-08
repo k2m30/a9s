@@ -234,16 +234,35 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 
 // ===========================================================================
 // 2. TestListRawStruct_AllTypes_OverridesFields — port of
-// TestQA_ListRawStruct_AllTypes_OverridesFields (RawStruct-over-Fields
-// precedence, plus the documented status-column exception where Fields wins).
+// TestQA_ListRawStruct_AllTypes_OverridesFields.
+//
+// INVERTED for aws6 row 16 (one cascade arm). It pinned RawStruct-over-Fields
+// precedence, which held only for a Key-LESS column, and a column was Key-less
+// only on the arm that returned a loaded view file verbatim without merging
+// the catalog's Key. That arm is gone: the view owns which columns there are
+// and in what order, the catalog owns what each cell reads, on every path. So
+// for a title both declare, the cell reads the Fields key the catalog names,
+// which is ExtractCellValue's documented precedence and the only thing that
+// makes a warm-cache row render like a live one.
+//
+// The old direction is not to be restored — restoring it would mean the demo
+// bench and an operator's screen read cells by different rules again, which is
+// how cb's Source Type stayed wrong on every real account while the bench was
+// green. What this test pins now is the surviving half: a stored value under a
+// catalog-declared key is what the cell shows, even when RawStruct disagrees.
+// RawStruct reads are pinned by TestListRawStruct_AllTypes above, which covers
+// every type in the same table.
 // ===========================================================================
 
 func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 	tests := []struct {
-		shortName   string
-		rawStruct   any
-		wrongFields map[string]string
-		expectInRow []string
+		shortName string
+		rawStruct any
+		// storedFields are the row's own Fields, under the keys the catalog
+		// declares for those columns. They disagree with rawStruct on purpose:
+		// only a cell that reads the key can show them.
+		storedFields map[string]string
+		expectInRow  []string
 	}{
 		{
 			"ec2",
@@ -347,17 +366,40 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.shortName, func(t *testing.T) {
 			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
-			res := resource.Resource{ID: "test-id", Name: "test-name", Fields: tc.wrongFields, RawStruct: tc.rawStruct}
+			res := resource.Resource{ID: "test-id", Name: "test-name", Fields: tc.storedFields, RawStruct: tc.rawStruct}
 			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
 
-			for _, expected := range tc.expectInRow {
-				if !strings.Contains(joined, expected) {
-					t.Errorf("%s row cells should contain %q from RawStruct, got: %q", tc.shortName, expected, joined)
-				}
+			td := resource.FindResourceType(tc.shortName)
+			cols := resource.ResolveListColumnCascade(nil, tc.shortName, td)
+			lifecycleKey := ""
+			if td != nil {
+				lifecycleKey = td.LifecycleKey
 			}
-			for _, wrong := range tc.wrongFields {
-				if strings.Contains(joined, wrong) {
-					t.Errorf("%s row cells should NOT contain %q from Fields when RawStruct is set, got: %q", tc.shortName, wrong, joined)
+
+			for key, stored := range tc.storedFields {
+				column, read := "", false
+				for _, lc := range cols {
+					if lc.Key == key {
+						column, read = lc.Title, true
+						break
+					}
+				}
+				if !read {
+					// A key no column names is a key nothing reads. Those
+					// entries are here as noise the row carries, not as cells.
+					continue
+				}
+				if config.IsStatusColumn(key, column, lifecycleKey) {
+					// The documented exception this test always carried: a
+					// status column answers from findings and the lifecycle
+					// key through the humanizer, so the stored value reaches
+					// the screen reworded rather than verbatim.
+					continue
+				}
+				if !strings.Contains(joined, stored) {
+					t.Errorf("%s row cells should contain %q from Fields[%q] — the catalog declares that key "+
+						"for column %q, so it is what the cell reads and what a warm-cache row will show; "+
+						"got: %q", tc.shortName, stored, key, column, joined)
 				}
 			}
 		})
@@ -371,6 +413,14 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 // config.DefaultConfig() every other test in this file uses — a genuine
 // drift guard between the generated YAML and the Go defaults it's generated
 // from (go run ./cmd/viewsgen/).
+//
+// INVERTED for aws6 row 16, same as the test above and for the same reason: a
+// column whose title the catalog also declares carries the catalog's Key now,
+// on this path as on every other, so a stored Fields value under that key is
+// what the cell shows. The subtests below that fed a deliberately stale Fields
+// value and demanded RawStruct win were pinning the Key-less arm that no
+// longer exists; they now feed no such value and pin only that the RawStruct
+// path still reaches the cell. Do not restore the stale-Fields halves.
 // ===========================================================================
 
 func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
@@ -442,13 +492,10 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			Endpoint:             &rdstypes.Endpoint{Address: new("prod-rds-test.cluster-xyz.us-west-2.rds.amazonaws.com")},
 		}
 		c := openListControllerWithConfig(t, "dbi", cfg)
-		res := resource.Resource{ID: "prod-rds-test", Name: "prod-rds-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: db}
+		res := resource.Resource{ID: "prod-rds-test", Name: "prod-rds-test", RawStruct: db}
 		joined := wave3RowCellsJoined(t, c, "dbi", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-rds-test.cluster-xyz") {
 			t.Errorf("RDS with production config should show endpoint prefix, got: %q", joined)
-		}
-		if strings.Contains(joined, "WRONG-EP") {
-			t.Error("RDS with production config should NOT show WRONG-EP from Fields")
 		}
 	})
 
@@ -461,13 +508,10 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			ConfigurationEndpoint: &elasticachetypes.Endpoint{Address: new("prod-redis-test.clustercfg.usw2.cache.amazonaws.com")},
 		}
 		c := openListControllerWithConfig(t, "redis", cfg)
-		res := resource.Resource{ID: "prod-redis-test", Name: "prod-redis-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: rg}
+		res := resource.Resource{ID: "prod-redis-test", Name: "prod-redis-test", RawStruct: rg}
 		joined := wave3RowCellsJoined(t, c, "redis", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-redis-test.clustercfg") {
 			t.Errorf("Redis with production config should show endpoint prefix, got: %q", joined)
-		}
-		if strings.Contains(joined, "WRONG-EP") {
-			t.Error("Redis with production config should NOT show WRONG-EP from Fields")
 		}
 	})
 
@@ -479,7 +523,7 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			Endpoint:            new("prod-docdb-test.cluster-abc.us-west-2.docdb.amazonaws.com"),
 		}
 		c := openListControllerWithConfig(t, "dbc", cfg)
-		res := resource.Resource{ID: "prod-docdb-test", Name: "prod-docdb-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: cluster}
+		res := resource.Resource{ID: "prod-docdb-test", Name: "prod-docdb-test", RawStruct: cluster}
 		joined := wave3RowCellsJoined(t, c, "dbc", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-docdb-test.cluster-abc") {
 			t.Errorf("DocDB with production config should show endpoint prefix, got: %q", joined)
@@ -495,7 +539,7 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			PlatformVersion: new("eks.9"),
 		}
 		c := openListControllerWithConfig(t, "eks", cfg)
-		res := resource.Resource{ID: "prod-eks-test", Name: "prod-eks-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: cluster}
+		res := resource.Resource{ID: "prod-eks-test", Name: "prod-eks-test", RawStruct: cluster}
 		joined := wave3RowCellsJoined(t, c, "eks", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-eks-test.gr7") {
 			t.Errorf("EKS with production config should show endpoint prefix, got: %q", joined)
@@ -505,26 +549,20 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	t.Run("Secrets", func(t *testing.T) {
 		secret := smtypes.SecretListEntry{Name: new("prod/test/secret"), Description: new("Production test secret")}
 		c := openListControllerWithConfig(t, "secrets", cfg)
-		res := resource.Resource{ID: "prod/test/secret", Name: "prod/test/secret", Fields: map[string]string{"description": "WRONG-DESC"}, RawStruct: secret}
+		res := resource.Resource{ID: "prod/test/secret", Name: "prod/test/secret", RawStruct: secret}
 		joined := wave3RowCellsJoined(t, c, "secrets", []resource.Resource{res})
 		if !strings.Contains(joined, "Production test secret") {
 			t.Errorf("Secrets with production config should show description from RawStruct, got: %q", joined)
-		}
-		if strings.Contains(joined, "WRONG-DESC") {
-			t.Error("Secrets with production config should NOT show WRONG-DESC from Fields")
 		}
 	})
 
 	t.Run("S3", func(t *testing.T) {
 		bucket := s3types.Bucket{Name: new("prod-config-bucket"), CreationDate: new(testTime)}
 		c := openListControllerWithConfig(t, "s3", cfg)
-		res := resource.Resource{ID: "prod-config-bucket", Name: "prod-config-bucket", Fields: map[string]string{"creation_date": "WRONG-DATE"}, RawStruct: bucket}
+		res := resource.Resource{ID: "prod-config-bucket", Name: "prod-config-bucket", RawStruct: bucket}
 		joined := wave3RowCellsJoined(t, c, "s3", []resource.Resource{res})
 		if !strings.Contains(joined, "2025-06-15") {
 			t.Errorf("S3 with production config should show creation date from RawStruct, got: %q", joined)
-		}
-		if strings.Contains(joined, "WRONG-DATE") {
-			t.Error("S3 with production config should NOT show WRONG-DATE from Fields")
 		}
 	})
 }

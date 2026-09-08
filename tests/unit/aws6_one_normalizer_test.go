@@ -17,6 +17,7 @@ package unit_test
 // Key is not merged in on that arm. cb's Source Type is exactly that shape.
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -60,27 +61,25 @@ func TestOneNormalizerFoldsEverySpelling(t *testing.T) {
 	}
 }
 
-// TestAnOperatorsOwnViewFileRendersTheSameCells is the bench half of row 15.
+// TestAnOperatorsOwnViewFileRendersTheSameCells sweeps every type that ships a
+// view file: the cell the bench renders and the cell an installation renders
+// are the same cell.
 //
-// ResolveListColumnCascade has two arms. With no view config it merges the
-// catalog's Key onto the defaults' Path; with one loaded it returns that file's
-// columns verbatim, Key-less where the file is Key-less. Every installation
-// takes the second arm, because EnsureViewsDir writes those files on first
-// start — so a rule that reads a column by Key works on the bench and not on
-// anyone's machine.
+// They were resolved by two different rules. ResolveListColumnCascade merged
+// the catalog's Key onto the view's columns only when no config was loaded,
+// and returned a loaded file verbatim otherwise — so the demo bench, which is
+// what acceptance looks at, read cells by one rule and every real user by
+// another. A defect could therefore be invisible on the bench and on screen
+// for everyone, which is what cb's Source Type was.
 //
-// The comparison is between the two arms rather than against a list of
-// expected words, so it needs no second opinion about which spelling is
-// right: a column that renders one thing under the merged set and another
-// under the shipped file is a fact with two answers, and one of them is
-// reaching an operator.
+// The comparison needs no second opinion about which spelling is right: a
+// column that renders one thing under the built-in defaults and another under
+// the file EnsureViewsDir writes is a fact with two answers, and one of them
+// is reaching an operator.
 func TestAnOperatorsOwnViewFileRendersTheSameCells(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 
 	for _, td := range resource.AllResourceTypes() {
-		if len(td.HumanizeFields) == 0 {
-			continue
-		}
 		rows := byType[td.ShortName]
 		if len(rows) == 0 {
 			continue
@@ -94,37 +93,74 @@ func TestAnOperatorsOwnViewFileRendersTheSameCells(t *testing.T) {
 			fromFile := openListControllerWithConfig(t, td.ShortName, shipped)
 			fromFile.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
-			merged := newVisibilityListController(t, td.ShortName)
-			merged.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
+			bench := newVisibilityListController(t, td.ShortName)
+			bench.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
-			a, b := fromFile.Snapshot().Body.List, merged.Snapshot().Body.List
+			a, b := fromFile.Snapshot().Body.List, bench.Snapshot().Body.List
 			if a == nil || b == nil {
 				t.Fatalf("%s rendered no list body", td.ShortName)
 			}
-			fileHasColumn := map[string]bool{}
+
+			gotTitles := make([]string, 0, len(a.Columns))
 			for _, col := range a.Columns {
-				fileHasColumn[col.Title] = true
+				gotTitles = append(gotTitles, col.Title)
 			}
+			wantTitles := make([]string, 0, len(b.Columns))
 			for _, col := range b.Columns {
-				// A column the shipped file does not declare at all is a
-				// different question — the two declarations disagreeing about
-				// the column SET, not about what one cell says — and it is not
-				// what this test can see. lambda's Handler is that case.
-				if !fileHasColumn[col.Title] {
-					continue
-				}
-				want := aws6CellsByColumn(t, merged, col.Title)
+				wantTitles = append(wantTitles, col.Title)
+			}
+			if strings.Join(gotTitles, "|") != strings.Join(wantTitles, "|") {
+				t.Errorf("%s: an installation renders columns %v and the bench renders %v — "+
+					"one of the two is a screen nobody reviews", td.ShortName, gotTitles, wantTitles)
+			}
+
+			for _, col := range b.Columns {
+				want := aws6CellsByColumn(t, bench, col.Title)
 				got := aws6CellsByColumn(t, fromFile, col.Title)
 				for id, w := range want {
 					if got[id] == w {
 						continue
 					}
-					t.Errorf("%s row %q column %q: an operator's own view file renders %q where the "+
-						"catalog-merged set renders %q — one fact, two answers, and the file is the one "+
-						"every installation reads", td.ShortName, id, col.Title, got[id], w)
+					t.Errorf("%s row %q column %q: an installation renders %q where the bench renders %q — "+
+						"one fact, two answers, and the bench is the one acceptance reads",
+						td.ShortName, id, col.Title, got[id], w)
 				}
 			}
 		})
+	}
+}
+
+// TestLambdaListShowsItsHandler pins row 17. The catalog declares a Handler
+// column and the shipped view file did not, and the view owns which columns
+// there are — so the column existed on the bench, which resolved its own set,
+// and on no operator's screen.
+//
+// Whether a column list should have two owners at all is backlog w197. What
+// this pins is that the two agree for lambda.
+func TestLambdaListShowsItsHandler(t *testing.T) {
+	byType, _ := buildVisibilityTypeCache(t)
+	rows := byType["lambda"]
+	if len(rows) == 0 {
+		t.Fatal("no demo lambda rows")
+	}
+
+	c := openListControllerWithConfig(t, "lambda", shippedViewConfigFor("lambda"))
+	c.ApplyResourcesLoaded("lambda", rows, nil, false)
+
+	cells := aws6CellsByColumn(t, c, "Handler")
+	if cells == nil {
+		t.Fatal("the lambda list has no Handler column — the catalog declares one " +
+			"(core/aws/catalog_compute.go) and the view file is what decides, so it has to declare it too")
+	}
+	shown := 0
+	for _, v := range cells {
+		if v != "" {
+			shown++
+		}
+	}
+	if shown == 0 {
+		t.Errorf("every lambda row renders an empty Handler; a column that shows nothing for every row "+
+			"is a header with no fact behind it (%d rows)", len(cells))
 	}
 }
 

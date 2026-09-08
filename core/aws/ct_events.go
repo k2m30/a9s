@@ -198,7 +198,9 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	errorCode := strFromMap(parsed, "errorCode")
 	outcome := "OK"
 	if errorCode != "" {
-		outcome = errorCode
+		// The OUTCOME column summarizes; the verbatim code an operator
+		// searches for is the detail's own ERROR.errorCode row.
+		outcome = domain.HumanizeStatusPhrase(errorCode)
 	}
 	accountID := ""
 	uiType := ""
