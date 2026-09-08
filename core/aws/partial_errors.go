@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -408,8 +409,17 @@ func ErrClass(err error) string {
 	// A call that never reached a service has no AWS error code to classify;
 	// its own text is a URL and a socket address, which name the endpoint but
 	// not the failure.
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	//
+	// The network types are named rather than the net.Error interface: every
+	// local file error unwraps to a syscall.Errno, which carries Timeout and
+	// Temporary and so satisfies that interface, and a missing config file
+	// read as a transport failure points the operator at the network for a
+	// problem on their own disk. A file error falls through to the unmodeled
+	// class below, where it keeps the operating system's own words.
+	var opErr *net.OpError
+	var addrErr *net.AddrError
+	var urlErr *url.Error
+	if errors.As(err, &opErr) || errors.As(err, &addrErr) || errors.As(err, &urlErr) {
 		return "transport"
 	}
 	code, _, _ := ClassifyAWSError(err)

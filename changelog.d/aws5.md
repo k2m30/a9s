@@ -8,3 +8,4 @@
 - An ECS service that cannot place a task now shows AWS's own reason for it, so the operator can tell insufficient memory from ports in use without leaving a9s; the same applies to a failing load balancer health check, which now shows the codes AWS reported.
 - A failed ECS deployment shows its rollout reason on a row of its own, the same way the service events do, instead of crammed behind a colon with AWS's raw status word in it.
 - The demo account now has an ECS service that cannot place its tasks and one whose tasks fail their health checks, so both read the same as they would against a real account.
+- A local file a9s cannot read no longer reports itself as a network failure; a missing, unreadable or wrong-shaped file now says what the operating system said.

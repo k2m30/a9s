@@ -7,6 +7,7 @@ package fakes
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -19,6 +20,10 @@ import (
 // ECSFake implements aws.ECSAPI against fixture data loaded at construction time.
 type ECSFake struct {
 	fix *fixtures.ECSFixtures
+	// Now is the clock service events are stamped against; nil means
+	// time.Now. Tests set it to prove the witness holds however long the
+	// session has been open.
+	Now func() time.Time
 }
 
 // NewECS constructs an ECSFake backed by fixture data from the fixtures package.
@@ -62,17 +67,40 @@ func (f *ECSFake) ListServices(_ context.Context, input *ecs.ListServicesInput, 
 	return &ecs.ListServicesOutput{ServiceArns: arns}, nil
 }
 
-func (f *ECSFake) DescribeServices(_ context.Context, input *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
-	if len(input.Services) == 0 {
-		return &ecs.DescribeServicesOutput{Services: f.fix.Services}, nil
+// stampEvents dates a service's events against the call rather than against
+// the moment the fixtures were built. The enricher reads a ten-minute window,
+// so a stored timestamp ages out of a session left open longer than that and
+// the witness disappears with the wall clock. Thirty seconds is what a service
+// retrying a placement looks like.
+//
+// The events are copied, never restamped in place: the fixtures are shared by
+// every fake in the process.
+func (f *ECSFake) stampEvents(svc ecstypes.Service) ecstypes.Service {
+	if len(svc.Events) == 0 {
+		return svc
 	}
+	now := time.Now
+	if f.Now != nil {
+		now = f.Now
+	}
+	at := now().Add(-30 * time.Second)
+	events := make([]ecstypes.ServiceEvent, len(svc.Events))
+	copy(events, svc.Events)
+	for i := range events {
+		events[i].CreatedAt = aws.Time(at)
+	}
+	svc.Events = events
+	return svc
+}
+
+func (f *ECSFake) DescribeServices(_ context.Context, input *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
 	wanted := toSet(input.Services)
-	var result []ecstypes.Service
+	result := make([]ecstypes.Service, 0, len(f.fix.Services))
 	for _, svc := range f.fix.Services {
 		arn := aws.ToString(svc.ServiceArn)
 		name := aws.ToString(svc.ServiceName)
-		if wanted[arn] || wanted[name] {
-			result = append(result, svc)
+		if len(input.Services) == 0 || wanted[arn] || wanted[name] {
+			result = append(result, f.stampEvents(svc))
 		}
 	}
 	return &ecs.DescribeServicesOutput{Services: result}, nil
