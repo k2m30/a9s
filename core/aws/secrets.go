@@ -39,6 +39,8 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			description = *secret.Description
 		}
 
+		// Secrets Manager records last access to the day, so the time part of
+		// both stamps carries nothing; the list defaults render the day only.
 		lastAccessed := ""
 		if secret.LastAccessedDate != nil {
 			lastAccessed = secret.LastAccessedDate.Format("2006-01-02")
