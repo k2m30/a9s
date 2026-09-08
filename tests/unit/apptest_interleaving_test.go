@@ -37,9 +37,12 @@ package unit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
+
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/app/apptest"
@@ -54,19 +57,38 @@ import (
 const sfnInterleavingType = "sfn"
 
 // sfnFixtureResource builds a minimal "sfn" resource carrying the "arn" field
-// checkSFNRole/checkSFNKMS/checkSFNLambda and sfnDescribe all key on.
-// RawStruct is deliberately left nil: enrichDetail's own documented
-// contract (core/aws/detail_enrich_engine.go) treats a nil RawStruct as a
-// silent, error-free no-op — sufficient for every test below except the
-// Explorer, which only needs the RELATED checkers' real coalescing, not the
-// enricher's.
+// checkSFNRole/checkSFNKMS/checkSFNLambda and sfnDescribe all key on, PLUS a
+// real RawStruct (sfntypes.StateMachineListItem with StateMachineArn set) so
+// enrichSfn's own id/fetch actually run instead of short-circuiting.
+//
+// RawStruct must NOT be left nil here. It was, once: core/aws/detail_enrich_
+// engine.go's RawStruct==nil branch used to return (res, nil) — a "silent,
+// error-free no-op" that core/runtime.HandleEnrichDetailResult's old success
+// path (Err == nil) could not distinguish from a genuine completed
+// enrichment, so it cleared session.PendingDetailRefresh for an operation
+// that had fetched nothing. That is the exact defect class
+// TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold and
+// TestApptestScheduler_StickyRefreshSupersededByPanelToggle_
+// LatchOnlyClearsOnGenuineFreshFold below exist to catch, via
+// apptest.LatchCleared — and this fixture, by never letting a real fold
+// happen, was calibrated against that broken behavior: LatchCleared always
+// saw a (spuriously) cleared latch and always passed, whatever the code
+// under test did. Now that detail_enrich_engine.go returns the distinguishable
+// awsclient.ErrDetailEnrichSkipped instead (see its own doc comment), a
+// permanently-nil RawStruct here would make the latch permanently unclearable
+// for the wrong reason — never exercising the "genuinely completed" path
+// either test's name promises. Both tests below additionally assert on the
+// fake SFN client's own call counter, not just LatchCleared, so a future nil
+// on this field fails loudly instead of quietly reintroducing this gap.
 func sfnFixtureResource(id string) resource.Resource {
+	arn := "arn:aws:states:us-east-1:123456789012:stateMachine:" + id
 	return resource.Resource{
 		ID:   id,
 		Type: sfnInterleavingType,
 		Fields: map[string]string{
-			"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:" + id,
+			"arn": arn,
 		},
+		RawStruct: sfntypes.StateMachineListItem{StateMachineArn: &arn},
 	}
 }
 
@@ -128,11 +150,32 @@ func sfnInterleavingActions() []apptest.Action {
 // open→refresh→toggle-related→open-yaml against the completion order of the
 // enrich/related tasks those actions spawn must satisfy all five apptest
 // invariants.
+//
+// Historical caveat on that coverage claim: every prior green run of this
+// test (before sfnFixtureResource carried a real RawStruct and before this
+// Check gained the lastFake.describeCalls assertion) proved less than it
+// read. sfnFixtureResource's RawStruct was nil, so every enrich in every
+// explored interleaving hit detail_enrich_engine.go's RawStruct==nil branch
+// and returned early — under that era's semantics (res, nil), indistinguishable
+// from a genuinely completed enrichment. LatchCleared, the one invariant that
+// exists specifically to verify "an enrich fold clears the sticky-refresh
+// demand," was therefore checking a latch that a no-op had already cleared
+// for free on every single replay: it could not have failed regardless of
+// whether the real success-fold path worked, because that path was never
+// entered. The other four invariants (NoOrphanLoadingRelated,
+// MonotonicDetailFold, MonotonicCacheWrites, NoDuplicateAWSCalls) do not
+// depend on a genuine enrich fold the same way and were exercising real
+// coverage throughout — only LatchCleared's specific claim was hollow. This
+// is fixed now (see sfnFixtureResource's doc comment), so a fresh reading of
+// "all invariants hold" is accurate; treat any historical report that quoted
+// this test's LatchCleared result before this fix as unverified for that one
+// invariant.
 func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 	const id = "sfn-explorer-0000001"
 
 	var lastCtrl *app.Controller
 	var lastLedger *awsclient.CallLedger
+	var lastFake *coalesceSfnFake
 
 	explorer := &apptest.Explorer{
 		NewController: func() *app.Controller {
@@ -144,6 +187,7 @@ func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 			}
 			lastCtrl = c
 			lastLedger = ledger
+			lastFake = fake
 			return c
 		},
 		Actions: sfnInterleavingActions(),
@@ -166,6 +210,18 @@ func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 			// refresh's own enrich is still pending would be a false
 			// positive on a merely-not-yet-folded (not stuck) latch.
 			if len(pending) == 0 {
+				// Proves LatchCleared's pass means what it claims: that a
+				// GENUINE enrich fold happened, not that sfnFixtureResource's
+				// RawStruct silently regressed back to nil (which would make
+				// every enrich a no-op ErrDetailEnrichSkipped skip — never
+				// clearing the latch, so this check would fail loudly instead
+				// of LatchCleared quietly passing for the wrong reason).
+				// "open" is every replay's mandatory first action, so by
+				// quiescence its enrich has always at least attempted the
+				// real DescribeStateMachine call.
+				if lastFake.describeCalls.Load() == 0 {
+					return fmt.Errorf("apptest: quiescent but the coalescing SFN fake's DescribeStateMachine never fired — sfnFixtureResource's RawStruct must carry a real StateMachineArn so enrichSfn genuinely completes")
+				}
 				if err := apptest.LatchCleared(lastCtrl, runtime.RelatedCacheKey(sfnInterleavingType, id)); err != nil {
 					return err
 				}
@@ -238,10 +294,21 @@ func TestApptestExplorer_FailureReplay_IsHumanReadable(t *testing.T) {
 // ActionToggleRelated case) — that successor must still inherit
 // SkipCache=true, and the latch must clear only once a genuinely fresh
 // enrichment fold lands, never silently downgrading back to cached data.
+//
+// Same historical caveat as the Explorer test above: before sfnFixtureResource
+// carried a real RawStruct, this test's own LatchCleared assertion at the
+// bottom could never have failed no matter what production code did — every
+// enrich in this test was a nil-RawStruct no-op, so the "genuinely fresh
+// fold" this test's name promises never actually happened. It is a real
+// fresh-fold check now; see the fake.describeCalls assertion immediately
+// above LatchCleared, added specifically so a future regression back to a
+// nil RawStruct here fails loudly instead of quietly reintroducing the gap.
 func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOnGenuineFreshFold(t *testing.T) {
 	const id = "sfn-sticky-0000001"
 	ctx := context.Background()
-	c, _ := newDetailParityHeadlessController(t)
+	c, core := newDetailParityHeadlessController(t)
+	fake := &coalesceSfnFake{}
+	core.Session().Clients = &awsclient.ServiceClients{SFN: fake}
 	sched := apptest.NewScheduler(ctx, c)
 
 	// open(sfn/sticky-1) → op1, drained to quiescence.
@@ -281,6 +348,17 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 
 	if err := sched.DrainRemaining(); err != nil {
 		t.Fatalf("draining the toggle-ON workload (plus the leftover stale op2 enrich): %v", err)
+	}
+
+	// Proves the LatchCleared pass below means what it claims: a GENUINE
+	// enrichment fold reached the real DescribeStateMachine call, not that
+	// sfnFixtureResource's RawStruct regressed back to nil — which would
+	// make every enrich a no-op ErrDetailEnrichSkipped skip that can never
+	// clear the latch (this test's name would then be pinning "always stuck",
+	// not "clears on genuine fresh fold"). At least op1, the leftover stale
+	// op2, and the toggle-ON successor each attempt one real call.
+	if got := fake.describeCalls.Load(); got == 0 {
+		t.Fatal("fake.describeCalls == 0 — DescribeStateMachine never fired; sfnFixtureResource's RawStruct must carry a real StateMachineArn so enrichSfn genuinely completes instead of skipping")
 	}
 
 	if err := apptest.LatchCleared(c, runtime.RelatedCacheKey(sfnInterleavingType, id)); err != nil {

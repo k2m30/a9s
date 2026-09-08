@@ -95,6 +95,17 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 			if output.NextToken != nil {
 				apiNextToken = *output.NextToken
 			}
+			// IsTruncated must only ever claim what apiNextToken can actually
+			// resume: hitting either cap exactly on AWS's terminal page (no
+			// NextToken) means this result IS complete, not truncated — a dead
+			// cursor (IsTruncated=true, NextToken="") would make load-more
+			// restart from page 1 forever instead of recognizing there is
+			// nothing left to fetch.
+			isTruncated := apiNextToken != ""
+			totalHint := len(resources)
+			if isTruncated {
+				totalHint = -1
+			}
 			// Reverse so newest invocations are first
 			for i, j := 0, len(resources)-1; i < j; i, j = i+1, j-1 {
 				resources[i], resources[j] = resources[j], resources[i]
@@ -102,8 +113,9 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 			return resource.FetchResult{
 				Resources: resources,
 				Pagination: &resource.PaginationMeta{
-					IsTruncated: true,
+					IsTruncated: isTruncated,
 					NextToken:   apiNextToken,
+					TotalHint:   totalHint,
 					PageSize:    len(resources),
 				},
 			}, nil

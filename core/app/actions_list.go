@@ -5,6 +5,7 @@ package app
 import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // handleActionToggleAttention handles ActionToggleAttention.
@@ -313,9 +314,20 @@ func (c *Controller) activeListRefreshTasks(typeGen domain.Gen) []runtime.TaskRe
 		return nil
 	}
 	ls.Refreshing = true
+	payload := runtime.FetchResourcesPayload{TypeGen: typeGen}
+	// A Ctrl+R issued while the top-of-stack list is a related-navigation
+	// drill (filtered/child/by-ID placeholder, never the type's canonical
+	// top-level list) must not let the resulting ResourcesLoaded default to
+	// FetchProvenanceCanonicalList — the symmetric gate in handle.go's
+	// handleResourcesLoadedEvent would then reject it on this exact screen,
+	// the same class of defect HandleRelatedNavigate's own drill fetches
+	// had (core/runtime/handlers_related.go).
+	if !isTopLevelCanonicalList(c.topScreenID(), ls) {
+		payload.Provenance = messages.FetchProvenanceFilteredList
+	}
 	return []runtime.TaskRequest{{
 		Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: typeName},
 		Cache:   runtime.CacheNone,
-		Payload: runtime.FetchResourcesPayload{TypeGen: typeGen},
+		Payload: payload,
 	}}
 }

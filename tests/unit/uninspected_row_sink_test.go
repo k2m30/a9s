@@ -383,12 +383,17 @@ func TestEnrichmentCap_FiftyFirstRowRendersNotInspected(t *testing.T) {
 var capBypass = []struct {
 	pattern *regexp.Regexp
 	fix     string
+	// enricherOnly limits the pattern to files that build an
+	// IssueEnricherResult; other result types share the field name but
+	// have one sequential writer and no passes to compose.
+	enricherOnly bool
 }{
 	{
 		// A per-item work list trimmed by hand drops its tail silently;
 		// only capAtEnrichmentCap records the dropped rows in TruncatedIDs.
 		regexp.MustCompile(`min\(len\([^)]*\), EnrichmentCap\)`),
 		"route the work list through capAtEnrichmentCap(result, items, resourceIDsOf)",
+		false,
 	},
 	{
 		// An account-wide walk that compares its own page counter stops at
@@ -396,6 +401,7 @@ var capBypass = []struct {
 		// walkAccountPages marks them. Added by the cap batch's spec row 1.
 		regexp.MustCompile(`pages\s*(>=|<|>|<=)\s*EnrichmentCap`),
 		"drive the walk with walkAccountPages(result, resources, idOf, next)",
+		false,
 	},
 	{
 		// A bare assignment to the flag composes with none of the passes
@@ -403,6 +409,7 @@ var capBypass = []struct {
 		// earlier one found. Added by the cap batch's spec row 3.
 		regexp.MustCompile(`\.Truncated\s*=[^=]`),
 		"raise the flag with SetTruncated(result, cut), or drop it with MarkInformationalOnly(result)",
+		true,
 	},
 	{
 		// A builder that trims its own row list to a number of its own
@@ -413,6 +420,7 @@ var capBypass = []struct {
 		// match. Added by the cap batch's spec row 8.
 		regexp.MustCompile(`\b(min|max)\([^,]*,\s*\d+\)`),
 		"hand every row to setWave2Finding / addWave1Rows and let capRows bound the list",
+		false,
 	},
 }
 
@@ -442,8 +450,12 @@ func TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)
 		}
+		enricher := strings.Contains(string(src), "IssueEnricherResult")
 		for i, line := range strings.Split(string(src), "\n") {
 			for _, b := range capBypass {
+				if b.enricherOnly && !enricher {
+					continue
+				}
 				if b.pattern.MatchString(line) {
 					t.Errorf("%s:%d bypasses the cap it applies — %s\n    %s",
 						name, i+1, b.fix, strings.TrimSpace(line))

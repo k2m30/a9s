@@ -39,12 +39,17 @@ func (m Model) handleClearFlash(msg messages.ClearFlash) (tea.Model, tea.Cmd) {
 }
 
 // handleAPIError bumps the flash gen and defers to runtime.Core.HandleAPIError
-// for the classification + flash text computation. The active resource
-// list's loading spinner is cleared via ClearActiveListLoadingIntent.
+// for the classification + flash text computation. The list screen that
+// issued the failed request has its loading spinner cleared via
+// ClearActiveListLoadingIntent — ResourceType/Provenance are forwarded
+// unchanged so that intent routes to the specific screen the request
+// belongs to (see messages.APIError.Provenance) rather than whatever screen
+// happens to be topmost.
 func (m Model) handleAPIError(msg messages.APIError) (tea.Model, tea.Cmd) {
 	m.flash.gen++
 	intents, tasks := m.core.HandleAPIError(runtime.APIErrorEvent{
-		Err: msg.Err, NewGen: m.flash.gen,
+		Err: msg.Err, NewGen: m.flash.gen, Append: msg.Append,
+		ResourceType: msg.ResourceType, Provenance: msg.Provenance,
 	})
 	cmd := m.dispatchHandlerResult(intents, tasks)
 	return m, cmd

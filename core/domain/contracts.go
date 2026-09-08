@@ -83,6 +83,16 @@ type PaginationMeta struct {
 	TotalHint int
 	// PageSize is the number of items returned in this page.
 	PageSize int
+	// LowerBoundOnly marks an IsTruncated=true, NextToken="" pairing as
+	// deliberate: a fetcher that knows on its own it can never see the full
+	// picture (e.g. a cheap probe that skips an expensive sub-resource
+	// sweep on purpose) and reports a permanent, non-resumable lower-bound
+	// count. Without this flag, that same pairing is indistinguishable from
+	// a fetcher that hit a local cap and forgot to wire a cursor — the
+	// accidental case sanitizeFetchResult (core/resource/accessors.go)
+	// downgrades to exact. Leave false for every ordinary paginated result;
+	// only a one-shot, never-resumed probe sets it true.
+	LowerBoundOnly bool
 }
 
 // FetchResult wraps a resource page with pagination state.

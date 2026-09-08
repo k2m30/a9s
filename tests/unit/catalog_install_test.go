@@ -23,6 +23,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -60,6 +61,89 @@ func TestCatalogSetTypes_PanicsOnDifferentSlice(t *testing.T) {
 	catalog.SetTypes([]catalog.ResourceTypeDef{
 		{ShortName: "test-sentinel", Name: "Sentinel Only", Category: "TEST"},
 	})
+}
+
+// Test 3b — Defensive guard: catalog.SetTypes must panic when a RelatedDef
+// declares an empty TargetType (validateRelatedDefs, catalog.go) — a
+// dangling related pivot would otherwise render as a dimmed, non-navigable
+// "(0)" with no evidence behind it. validateRelatedDefs runs before SetTypes
+// touches any global, so the already-installed catalog (from TestMain's
+// aws.Install()) must survive the rejected call byte-for-byte — a
+// panicking install path leaving corrupted global state behind is exactly
+// the class of bug this branch's isolation fix closed elsewhere.
+func TestCatalogSetTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
+	before := len(catalog.All())
+
+	func() {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Fatal("catalog.SetTypes with an empty RelatedDef.TargetType did not panic")
+			}
+			msg, ok := r.(string)
+			if !ok || !strings.Contains(msg, "empty TargetType") {
+				t.Fatalf("panic value = %v, want a message containing %q", r, "empty TargetType")
+			}
+		}()
+		catalog.SetTypes([]catalog.ResourceTypeDef{
+			{
+				ShortName: "test-orphan-related",
+				Name:      "Orphan Related",
+				Category:  "TEST",
+				Related: []domain.RelatedDef{
+					{TargetType: "", DisplayName: "Dangling Pivot"},
+				},
+			},
+		})
+	}()
+
+	after := len(catalog.All())
+	if after != before {
+		t.Fatalf("catalog.All() count changed from %d to %d after a rejected SetTypes call; the panic must fire before any global mutation", before, after)
+	}
+	if got := catalog.Find("ec2"); got == nil {
+		t.Fatal("catalog.Find(\"ec2\") returned nil after a rejected SetTypes call — the installed catalog must survive an empty-TargetType rejection untouched")
+	}
+}
+
+// Test 3c — Same guard, child-catalog path: catalog.SetChildTypes must
+// panic on an empty RelatedDef.TargetType, and the already-installed child
+// catalog (aws.Install()'s SetChildTypes call) must survive untouched —
+// same rationale and same isolation requirement as
+// TestCatalogSetTypes_PanicsOnEmptyRelatedTargetType above.
+func TestCatalogSetChildTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
+	before := len(catalog.AllChildren())
+
+	func() {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Fatal("catalog.SetChildTypes with an empty RelatedDef.TargetType did not panic")
+			}
+			msg, ok := r.(string)
+			if !ok || !strings.Contains(msg, "empty TargetType") {
+				t.Fatalf("panic value = %v, want a message containing %q", r, "empty TargetType")
+			}
+		}()
+		catalog.SetChildTypes([]catalog.ResourceTypeDef{
+			{
+				ShortName: "test-orphan-related-child",
+				Name:      "Orphan Related Child",
+				Category:  "TEST",
+				Related: []domain.RelatedDef{
+					{TargetType: "", DisplayName: "Dangling Child Pivot"},
+				},
+			},
+		})
+	}()
+
+	after := len(catalog.AllChildren())
+	if after != before {
+		t.Fatalf("catalog.AllChildren() count changed from %d to %d after a rejected SetChildTypes call; the panic must fire before any global mutation", before, after)
+	}
+	if got := catalog.FindChild("s3_objects"); got == nil {
+		t.Fatal("catalog.FindChild(\"s3_objects\") returned nil after a rejected SetChildTypes call — the installed child catalog must survive an empty-TargetType rejection untouched")
+	}
 }
 
 // Test 4 — Panic-before-SetTypes: catalog.Find must panic with a clear message

@@ -28,9 +28,12 @@
 package runtime
 
 import (
+	"errors"
+
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -52,6 +55,19 @@ type ResourcesLoadedEvent struct {
 	// while a later request has already superseded it.
 	ListSeq domain.Gen
 	Err     error
+	// Provenance identifies which fetch pipeline produced this event — mirrors
+	// messages.ResourcesLoaded.Provenance verbatim (every production caller
+	// forwards it unchanged: internal/tui/runtime_adapter_resources.go,
+	// orchestrator.go's HandleEvent). Only a
+	// Provenance.CanonicalList() result may seed the cross-view
+	// PatchResourceCache entry or dispatch the list-open Wave-2 probe below —
+	// a filtered/by-ID/child result sharing this ResourceType is never the
+	// type's global population, and treating it as one would let a narrow
+	// drill's subset silently replace (or appear to seed) the canonical
+	// per-type cache, and enrich against rows that were never observed into
+	// RowStore in the first place (see observeResourcesLoadedRows, which
+	// gates the RowStore write itself on the same predicate).
+	Provenance messages.FetchProvenance
 }
 
 // HandleResourcesLoaded owns the session-state portion of the post-fetch
@@ -112,7 +128,21 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 
 	intents := []UIIntent{ClearFlash{}}
 
-	if resType != "" && !ev.Append {
+	// Cross-view cache seed: only a genuinely canonical top-level result may
+	// seed the shared per-type ResourceCache entry. A filtered/by-ID/child
+	// result sharing this ResourceType is never the type's global
+	// population — seeding PatchResourceCache from it would let that
+	// narrower subset masquerade as "this type is already cached" for every
+	// other, not-yet-visited view of the same type (mirrors
+	// observeResourcesLoadedRows' identical RowStore-write gate). ev.Err == nil
+	// is required too: a partial-success composite error (some resources
+	// landed AND something failed — e.g. the IAM policy fetcher's inline-group
+	// enumeration failing while managed-policy pagination still reports
+	// exact) must never seed the cross-view cache as if it were a complete
+	// population — a later, genuinely complete fetch would then see
+	// HasResourceCache already true and skip reseeding, leaving the
+	// incomplete result authoritative indefinitely.
+	if resType != "" && !ev.Append && ev.Err == nil && ev.Provenance.CanonicalList() {
 		if !c.HasResourceCache(resType) {
 			intents = append(intents, PatchResourceCache{
 				ResourceType: resType,
@@ -144,7 +174,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: resType},
 		})
-	} else if ev.TypeGen == 0 && ev.Err == nil && !ev.Append &&
+	} else if ev.TypeGen == 0 && ev.Err == nil && !ev.Append && ev.Provenance.CanonicalList() &&
 		resource.FindResourceType(resType) != nil && c.HasIssueEnricher(resType) {
 		// List-open Wave-2 dispatch (converges the web/headless and TUI
 		// lanes onto one producer — see HandleEvent's messages.ResourcesLoaded
@@ -158,6 +188,12 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		// caller reaches this method, so no explicit reseed is needed here
 		// (unlike the rerun branch above, which is invoked in a context
 		// where that write-through is not guaranteed to have happened yet).
+		// The Provenance.CanonicalList() gate is what makes that guarantee
+		// hold: a filtered/by-ID/child result never reaches ObserveRows at
+		// all (applyResourcesLoaded only routes a topLevelCanonical call
+		// through it), so dispatching this probe for one would enrich
+		// against whatever the type's RowStore entry already happened to
+		// hold — stale rows, or none.
 		// EnrichListOpenPending marks this dispatch so a concurrently running
 		// sweep's own refill (refillEnrichSweep, handlers_availability.go)
 		// recognizes resType already has an outstanding probe if it later
@@ -281,7 +317,19 @@ type EnrichDetailResultEvent struct {
 // it. A stale-op call cannot mis-clear it: its OperationID is strictly less
 // than the recorded one. An error leaves the demand recorded — a failed
 // refresh must never downgrade the next open back to cache.
+//
+// awsclient.ErrDetailEnrichSkipped is a third, distinct outcome from either
+// success or failure: the enricher fetched nothing at all (a disk-seeded
+// row with no live RawStruct yet) and reports that honestly rather than as a
+// completed success. It must neither flash (this is an expected, self-healing
+// transient, not a failure to surface) nor clear a pending sticky-refresh
+// demand (an operation that did nothing must not consume the demand that
+// would have retried it once live data actually lands) — so it returns
+// early, before both the flash branch and the demand-clearing success path.
 func (c *Core) HandleEnrichDetailResult(ev EnrichDetailResultEvent) ([]UIIntent, []TaskRequest) {
+	if errors.Is(ev.Err, awsclient.ErrDetailEnrichSkipped) {
+		return nil, nil
+	}
 	if ev.Err != nil {
 		_, region := c.session.CurrentPair()
 		return []UIIntent{FlashIntent{

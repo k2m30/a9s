@@ -16,6 +16,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -129,8 +130,10 @@ func TestRelatedFetchTasks_FetchMore_EmptyToken(t *testing.T) {
 }
 
 // TestRelatedFetchTasks_FetchResources_NoPayload — KindFetchResources tasks
-// do not carry a FetchMorePayload; assert Payload is nil so the adapter
-// branch for fetch-resources is never accidentally fed a continuation token.
+// do not carry a FetchMorePayload (the continuation-token payload belongs to
+// KindFetchMore only); assert the payload is a FetchResourcesPayload stamped
+// FetchProvenanceFilteredList — this fetch backs a related-navigation drill,
+// never the type's canonical top-level list.
 func TestRelatedFetchTasks_FetchResources_NoPayload(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
@@ -139,8 +142,12 @@ func TestRelatedFetchTasks_FetchResources_NoPayload(t *testing.T) {
 	if len(tasks) != 1 || tasks[0].Key.Kind != KindFetchResources {
 		t.Fatalf("tasks = %+v, want one KindFetchResources task", tasks)
 	}
-	if tasks[0].Payload != nil {
-		t.Errorf("Payload = %+v, want nil — KindFetchResources must not carry FetchMorePayload", tasks[0].Payload)
+	payload, ok := tasks[0].Payload.(FetchResourcesPayload)
+	if !ok {
+		t.Fatalf("Payload = %T, want FetchResourcesPayload — KindFetchResources must not carry FetchMorePayload", tasks[0].Payload)
+	}
+	if payload.Provenance != messages.FetchProvenanceFilteredList {
+		t.Errorf("Provenance = %v, want FetchProvenanceFilteredList", payload.Provenance)
 	}
 }
 

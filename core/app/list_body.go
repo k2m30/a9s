@@ -40,13 +40,15 @@ import (
 // passing rows with RawStruct==nil) pass through unchanged — see
 // MaterializeListFields's early-return.
 //
-// hadErr is true when this call carries a partial-success composite error
-// (messages.ResourcesLoaded.Err non-nil: some resources returned AND
-// something failed) — never true for a cache-replay seed, which has no fetch
-// error concept. It gates only the LastFetchError clear below; a hard
-// failure (no resources at all) never reaches this method, routing through
+// fetchErr is non-nil when this call carries a partial-success composite
+// error (messages.ResourcesLoaded.Err: some resources returned AND something
+// failed) — always nil for a cache-replay seed, which has no fetch error
+// concept. Per cache contract C4, a non-nil fetchErr installs its own text as
+// the screen's error marker (never just preserves whatever marker a prior,
+// unrelated failure may have left behind); a hard failure (no resources at
+// all) never reaches this method, routing through
 // messages.APIError/ClearActiveListLoadingIntent instead.
-func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, topLevelCanonical bool, hadErr bool) {
+func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, topLevelCanonical bool, fetchErr error) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
 	// Silent-swap findings carry: a silent swap (a non-append replace — the common cold-boot shape
@@ -149,13 +151,16 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	}
 
 	if ls != nil {
-		// Cache-first seeding contract: a fetch result landing clears Loading/LoadingMore/
-		// Refreshing via the shared clearFetchInFlight choke point — the seeded
-		// (or now-replaced) rows are confirmed. Callers that seed rows from a
-		// cache-first source set Refreshing=true themselves AFTER calling this
-		// method, so this unconditional clear only ever fires for a genuine
-		// fetch-result swap, never undoing the seed-time flag.
-		ls.clearFetchInFlight()
+		// Cache-first seeding contract: a fetch result landing clears its own
+		// in-flight flag (LoadingMore when appendPage, otherwise Loading/
+		// Refreshing) via the shared clearFetchInFlight choke point, leaving a
+		// concurrently in-flight sibling request's flag (LoadingMore vs
+		// Refreshing are allowed to overlap) untouched — the seeded (or
+		// now-replaced) rows are confirmed for THIS request only. Callers that
+		// seed rows from a cache-first source set Refreshing=true themselves
+		// AFTER calling this method, so this clear only ever fires for a
+		// genuine fetch-result swap, never undoing the seed-time flag.
+		ls.clearFetchInFlight(appendPage)
 		// Seed-time provisional total: a fetch result retires the seed's
 		// population only when it actually supersedes it — an EXACT result
 		// (authoritative proof of the new total, C5), or one that already
@@ -168,13 +173,35 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		}
 		// Per cache contract C4: a successful fetch result clears any outstanding error
 		// marker from a previous failed attempt. A partial-failure result
-		// (hadErr) leaves any existing marker in place instead — the fetch
-		// that just landed did not actually resolve cleanly, so C4's "keeps
-		// the content, swaps the marker for an error marker" still applies.
-		if !hadErr {
+		// (fetchErr non-nil) installs THIS fetch's own error text instead — the
+		// fetch that just landed did not actually resolve cleanly, so C4's
+		// "keeps the content, swaps the marker for an error marker" applies,
+		// and the marker must reflect the failure that just happened, never a
+		// stale marker (or no marker at all) left over from an unrelated
+		// earlier attempt.
+		if fetchErr != nil {
+			ls.LastFetchError = fetchErr.Error()
+		} else {
 			ls.LastFetchError = ""
 		}
 		switch {
+		case fetchErr != nil:
+			// A partial-success result (some resources landed AND something
+			// failed — e.g. the IAM policy fetcher's inline-group enumeration
+			// failing while managed-policy pagination reports IsTruncated=false)
+			// must never assert an exact/complete population: pagination.
+			// IsTruncated can be false purely because a DIFFERENT component of
+			// the fetch finished cleanly while a sibling enumeration failed.
+			// Trusting it here would let maybeSaveResourceListCache's
+			// exact := !ls.HasPagination persist an incomplete population to
+			// disk as a confirmed total — the same false-confident-answer
+			// class the related-checker fix already closes for
+			// RelatedCheckResult. Force HasPagination=true (never exact) while
+			// still adopting whatever continuation cursor the fetch did return.
+			ls.HasPagination = true
+			if pagination != nil {
+				ls.PaginationCursor = pagination.NextToken
+			}
 		case pagination != nil:
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken

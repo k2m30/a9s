@@ -83,6 +83,7 @@ func TestFieldSelect_ByID_FetchesAndOpensDetail(t *testing.T) {
 		Resources: []resource.Resource{
 			{ID: amiID, Name: "acme-ami", Type: "ami", Fields: map[string]string{"image_id": amiID}},
 		},
+		Provenance: messages.FetchProvenanceByID,
 	})
 
 	snap = c.Snapshot()

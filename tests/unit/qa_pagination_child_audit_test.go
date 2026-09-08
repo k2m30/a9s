@@ -917,12 +917,24 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 
 // TestStory_B3_LambdaInvocations_LoadMore verifies the two-call Load More flow
 // for Lambda invocations (max cap 50). Uses REPORT lines from CW Logs.
+//
+// Fixture has 3 pages (not 2) of 40 events each so that hitting the local cap
+// (after page 0+1 = 80 >= 50) lands on a page that ITSELF still carries an
+// AWS NextToken, leaving a genuine page 2 unconsumed for call 2 to resume
+// into. FetchLambdaInvocations now derives IsTruncated solely from whether
+// AWS's own last-observed NextToken is non-empty (never claiming truncation
+// it cannot resume — a dead cursor with IsTruncated=true, NextToken="" would
+// make Load More restart from page 1 forever). A 2-page fixture where the
+// cap-triggering page happened to also be AWS's terminal page (no NextToken)
+// is a case where the API is genuinely exhausted — IsTruncated=false there
+// is correct, not a bug — so this test now exercises the case it actually
+// intends to: more real data waiting beyond the cap.
 func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 	const maxCap = 50
 
-	// Build mock: 2 pages of 40 REPORT events each (80 total). Cap is 50.
+	// Build mock: 3 pages of 40 REPORT events each (120 total). Cap is 50.
 	var outputs []*cloudwatchlogs.FilterLogEventsOutput
-	for page := range 2 {
+	for page := range 3 {
 		var events []cwlogstypes.FilteredLogEvent
 		for i := range 40 {
 			events = append(events, cwlogstypes.FilteredLogEvent{
@@ -934,13 +946,15 @@ func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 			})
 		}
 		out := &cloudwatchlogs.FilterLogEventsOutput{Events: events}
-		if page < 1 {
+		if page < 2 {
 			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
 		}
 		outputs = append(outputs, out)
 	}
 
-	// Call 1
+	// Call 1: consumes page 0 (40, not yet at cap) then page 1 (40 more ->
+	// 80 >= cap 50, stop). Page 1 itself still carries a NextToken, so this
+	// is a legitimate, resumable truncation.
 	mock := &mockCWLogsFilterLogEventsClient{outputs: outputs}
 	result1, err := awsclient.FetchLambdaInvocations(
 		context.Background(), mock, "my-function", "/aws/lambda/my-function", "")
@@ -959,12 +973,16 @@ func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 			t.Fatal("call 1: Pagination is nil")
 		}
 		if !result1.Pagination.IsTruncated {
-			t.Error("call 1: expected IsTruncated=true")
+			t.Error("call 1: expected IsTruncated=true (page 1 still carries a real AWS NextToken)")
+		}
+		if result1.Pagination.NextToken == "" {
+			t.Error("call 1: expected a non-empty NextToken to resume from")
 		}
 	})
 
-	// Call 2
-	mock2 := &mockCWLogsFilterLogEventsClient{outputs: outputs[1:]}
+	// Call 2: resumes from the untouched page 2 (AWS's terminal page, no
+	// NextToken) using call 1's real cursor — no duplication of page 1.
+	mock2 := &mockCWLogsFilterLogEventsClient{outputs: outputs[2:]}
 	result2, err := awsclient.FetchLambdaInvocations(
 		context.Background(), mock2, "my-function", "/aws/lambda/my-function",
 		result1.Pagination.NextToken)
@@ -983,9 +1001,9 @@ func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 
 	t.Run("total_items_both_calls", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		// With 80 total REPORT events and cap=50, we should get around 80 total
-		if total < 60 {
-			t.Errorf("expected at least 60 total items across 2 calls, got %d", total)
+		// 120 total REPORT events across 3 pages, split 80/40 across the two calls.
+		if total != 120 {
+			t.Errorf("expected 120 total items across 2 calls (no duplication), got %d", total)
 		}
 	})
 }

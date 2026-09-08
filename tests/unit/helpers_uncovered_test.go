@@ -5,18 +5,15 @@ package unit_test
 //  1. checkSQSSQS (exercises sqsRedriveTarget via public related checker)
 //  2. Actor() via IAMUser ARN path (exercises arnLastSegment indirectly)
 //  3. ExtractTarget() via ARN-only resources (exercises labelFromARN indirectly)
-//  4. FetchLambdaFunctionsPageWithEventSources (exercises firstLambdaEventSourceARN)
-//  5. FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
-//  6. buildinfo.ResolveCommit
-//  7. buildinfo.ResolveDate
+//  4. FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
+//  5. buildinfo.ResolveCommit
+//  6. buildinfo.ResolveDate
 
 import (
 	"context"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
@@ -320,153 +317,7 @@ func TestCTDetailExtractTarget_LabelFromARN_UnknownService(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. FetchLambdaFunctionsPageWithEventSources (exercises firstLambdaEventSourceARN)
-// ---------------------------------------------------------------------------
-
-// mockLambdaListEventSourceMappingsClient implements LambdaListEventSourceMappingsAPI.
-type mockLambdaListEventSourceMappingsClient struct {
-	output *lambda.ListEventSourceMappingsOutput
-	err    error
-}
-
-func (m *mockLambdaListEventSourceMappingsClient) ListEventSourceMappings(
-	ctx context.Context,
-	params *lambda.ListEventSourceMappingsInput,
-	optFns ...func(*lambda.Options),
-) (*lambda.ListEventSourceMappingsOutput, error) {
-	return m.output, m.err
-}
-
-// mockLambdaListFunctionsForESM implements LambdaListFunctionsAPI for event-source tests.
-type mockLambdaListFunctionsForESM struct {
-	output *lambda.ListFunctionsOutput
-}
-
-func (m *mockLambdaListFunctionsForESM) ListFunctions(
-	ctx context.Context,
-	params *lambda.ListFunctionsInput,
-	optFns ...func(*lambda.Options),
-) (*lambda.ListFunctionsOutput, error) {
-	return m.output, nil
-}
-
-// TestFetchLambdaFunctionsPageWithEventSources_PopulatesEventSourceARN verifies
-// that firstLambdaEventSourceARN is called and its result lands in event_source_arn.
-func TestFetchLambdaFunctionsPageWithEventSources_PopulatesEventSourceARN(t *testing.T) {
-	const sqsARN = "arn:aws:sqs:us-east-1:123456789012:my-trigger-queue"
-
-	listFuncsMock := &mockLambdaListFunctionsForESM{
-		output: &lambda.ListFunctionsOutput{
-			Functions: []lambdatypes.FunctionConfiguration{
-				{
-					FunctionName: aws.String("my-worker"),
-					Runtime:      lambdatypes.RuntimeProvidedal2023,
-					FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:my-worker"),
-				},
-			},
-		},
-	}
-
-	esmMock := &mockLambdaListEventSourceMappingsClient{
-		output: &lambda.ListEventSourceMappingsOutput{
-			EventSourceMappings: []lambdatypes.EventSourceMappingConfiguration{
-				{EventSourceArn: aws.String(sqsARN)},
-			},
-		},
-	}
-
-	result, err := awsclient.FetchLambdaFunctionsPageWithEventSources(
-		context.Background(),
-		listFuncsMock,
-		esmMock,
-		"",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	got := result.Resources[0].Fields["event_source_arn"]
-	if got != sqsARN {
-		t.Errorf("event_source_arn = %q, want %q", got, sqsARN)
-	}
-}
-
-// TestFetchLambdaFunctionsPageWithEventSources_NilESMAPI verifies that when
-// no event source API is provided, event_source_arn is empty (no panic).
-func TestFetchLambdaFunctionsPageWithEventSources_NilESMAPI(t *testing.T) {
-	listFuncsMock := &mockLambdaListFunctionsForESM{
-		output: &lambda.ListFunctionsOutput{
-			Functions: []lambdatypes.FunctionConfiguration{
-				{
-					FunctionName: aws.String("no-trigger-fn"),
-					Runtime:      lambdatypes.RuntimePython312,
-					FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:no-trigger-fn"),
-				},
-			},
-		},
-	}
-
-	result, err := awsclient.FetchLambdaFunctionsPageWithEventSources(
-		context.Background(),
-		listFuncsMock,
-		nil, // no ESM API
-		"",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	got := result.Resources[0].Fields["event_source_arn"]
-	if got != "" {
-		t.Errorf("event_source_arn = %q, want empty string (no ESM API)", got)
-	}
-}
-
-// TestFetchLambdaFunctionsPageWithEventSources_EmptyMappings verifies that when
-// ListEventSourceMappings returns no mappings, event_source_arn is "".
-func TestFetchLambdaFunctionsPageWithEventSources_EmptyMappings(t *testing.T) {
-	listFuncsMock := &mockLambdaListFunctionsForESM{
-		output: &lambda.ListFunctionsOutput{
-			Functions: []lambdatypes.FunctionConfiguration{
-				{
-					FunctionName: aws.String("fn-no-triggers"),
-					Runtime:      lambdatypes.RuntimeNodejs22x,
-					FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:fn-no-triggers"),
-				},
-			},
-		},
-	}
-
-	esmMock := &mockLambdaListEventSourceMappingsClient{
-		output: &lambda.ListEventSourceMappingsOutput{
-			EventSourceMappings: []lambdatypes.EventSourceMappingConfiguration{},
-		},
-	}
-
-	result, err := awsclient.FetchLambdaFunctionsPageWithEventSources(
-		context.Background(),
-		listFuncsMock,
-		esmMock,
-		"",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	got := result.Resources[0].Fields["event_source_arn"]
-	if got != "" {
-		t.Errorf("event_source_arn = %q, want empty string (no mappings)", got)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// 5. FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
+// 4. FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
 // ---------------------------------------------------------------------------
 
 // mockS3GetBucketNotificationClient implements S3GetBucketNotificationConfigurationAPI.
@@ -688,7 +539,7 @@ func (e *mockAWSError) Error() string {
 }
 
 // ---------------------------------------------------------------------------
-// 6 & 7. buildinfo.ResolveCommit and buildinfo.ResolveDate
+// 5 & 6. buildinfo.ResolveCommit and buildinfo.ResolveDate
 // ---------------------------------------------------------------------------
 
 // TestBuildinfo_ResolveCommit_ExplicitValue verifies that an explicit non-empty,

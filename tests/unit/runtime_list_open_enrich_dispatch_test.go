@@ -1,36 +1,18 @@
-// runtime_list_open_enrich_dispatch_test.go — RED pins for the live-web
-// defect: a normal list-open (TypeGen==0, the common case) never dispatches
-// TaskKindProbeEnrich.
+// runtime_list_open_enrich_dispatch_test.go — pins for the list-open Wave-2
+// dispatch: a normal list-open (TypeGen==0, the common case) must dispatch
+// TaskKindProbeEnrich for an issue-capable type so row flags and the menu
+// badge populate without waiting for a Ctrl+R rerun.
 //
-// Root cause (verified by reading the real call chains, not the dispatch's
-// claim alone):
-//
-//   - core/runtime/handlers_resources.go's HandleResourcesLoaded only
-//     appends a TaskRequest{Kind: TaskKindProbeEnrich} inside the
-//     `if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGen[...]`
-//     branch — the Ctrl+R-for-rerun path. A normal list-open message carries
-//     TypeGen == 0, so that branch never fires and no Wave-2 task is ever
-//     requested for the common case.
-//   - The TUI adapter (internal/tui/runtime_adapter_resources.go's
-//     handleResourcesLoaded) calls Core.HandleResourcesLoaded directly and
-//     forwards intents/tasks via dispatchCoreScreenResult — it has NO
-//     additional list-open Wave-2 dispatch of its own; probeEnrichment
-//     (internal/tui/probe_adapter.go) is never invoked from production code
-//     at all (grep-confirmed: only test files call m.probeEnrichment). So the
-//     TUI's real production behavior for a plain list-open ALSO never fires
-//     Wave-2 today, and pinning "the TUI already does this correctly" would
-//     be pinning a fiction — pins below match the actual (broken) shared
-//     behavior instead of an imagined TUI-only special case.
-//   - The headless/web lane is even more clearly broken: HandleEvent's
-//     messages.ResourcesLoaded case (core/runtime/orchestrator.go) is
-//     explicitly "Row-store dual-write ONLY" — it calls
-//     observeResourcesLoadedRows and returns nil, nil, NEVER reaching
-//     Core.HandleResourcesLoaded. Controller.Handle (core/app/handle.go)
-//     only adds its own append-only branches (refreshTasksForIntents,
-//     autoOpenSingleDetail) on top of HandleEvent's tasks — none of them
-//     request TaskKindProbeEnrich. So a web/headless session that opens a
-//     list gets no row flags and no menu badge, exactly as the live defect
-//     report describes.
+// HandleResourcesLoaded (core/runtime/handlers_resources.go) now has a
+// dedicated `else if ev.TypeGen == 0 && ev.Err == nil && !ev.Append &&
+// ev.Provenance.CanonicalList() && ... c.HasIssueEnricher(resType)` branch
+// for exactly this case, alongside the pre-existing TypeGen!=0 rerun branch.
+// Every event literal that wants to exercise this branch (pin 1, pin 4) MUST
+// set Provenance: messages.FetchProvenanceCanonicalList — the zero value
+// (FetchProvenanceUnknown) fails CanonicalList() and the branch never fires,
+// producing 0 tasks with no other signal of why. The negative-control pins
+// (2: no issue enricher, 3: Append/Err) don't need it — those guards block
+// dispatch regardless of provenance.
 //
 // Harness: mirrors the package-runtime style in handlers_resources_test.go
 // (Core built via runtime.New(session.New(), catalog.All()), findIntent/
@@ -95,13 +77,11 @@ func findNoWave2TypeShortName(t *testing.T, core *runtime.Core) string {
 }
 
 // TestHandleResourcesLoaded_ListOpen_IssueCapableType_DispatchesProbeEnrich
-// is pin 1: a normal (TypeGen==0, Append==false, Err==nil) list-open result
-// for an issue-enricher-capable type must request TaskKindProbeEnrich so Wave
-// 2 row flags and the menu badge populate on a live/headless/web session that
-// never runs the Ctrl+R rerun path.
-//
-// RED today: HandleResourcesLoaded only appends this task inside the
-// TypeGen!=0 rerun-token-match branch; TypeGen==0 short-circuits it entirely.
+// is pin 1: a normal (TypeGen==0, Append==false, Err==nil, Provenance
+// CanonicalList) list-open result for an issue-enricher-capable type must
+// request TaskKindProbeEnrich so Wave 2 row flags and the menu badge
+// populate on a live/headless/web session that never runs the Ctrl+R rerun
+// path.
 func TestHandleResourcesLoaded_ListOpen_IssueCapableType_DispatchesProbeEnrich(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
@@ -114,6 +94,7 @@ func TestHandleResourcesLoaded_ListOpen_IssueCapableType_DispatchesProbeEnrich(t
 		TypeGen:      0,
 		Append:       false,
 		Err:          nil,
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	if !listOpenEnrichHasTask(tasks, runtime.TaskKindProbeEnrich, shortName) {
@@ -193,19 +174,10 @@ func TestHandleResourcesLoaded_ErrorLoad_NoProbeEnrich(t *testing.T) {
 
 // TestControllerHandle_ListOpen_ResourcesLoaded_DispatchesProbeEnrich is pin
 // 4: the exact web-lane surface. A headless Controller in web UI mode
-// receiving a real messages.ResourcesLoaded through Controller.Handle (the
-// same entry point DrainSync and the web renderer use) must return a
-// TaskKindProbeEnrich task among the TaskRequests, for an issue-capable type.
-//
-// RED today: HandleEvent's messages.ResourcesLoaded case
-// (core/runtime/orchestrator.go) is documented "Row-store dual-write
-// ONLY" — it calls observeResourcesLoadedRows and returns nil, nil,
-// NEVER invoking Core.HandleResourcesLoaded. Controller.Handle's only
-// additional task sources for this message (refreshTasksForIntents,
-// autoOpenSingleDetail) do not request TaskKindProbeEnrich either. So a
-// headless/web session opening a list never gets the Wave-2 task at all —
-// worse than the TUI's shared TypeGen==0 gap, this lane doesn't even reach
-// the gate.
+// receiving a real messages.ResourcesLoaded (Provenance: CanonicalList)
+// through Controller.Handle (the same entry point DrainSync and the web
+// renderer use) must return a TaskKindProbeEnrich task among the
+// TaskRequests, for an issue-capable type.
 func TestControllerHandle_ListOpen_ResourcesLoaded_DispatchesProbeEnrich(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, resource.AllResourceTypes())

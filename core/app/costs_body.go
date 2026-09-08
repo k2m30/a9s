@@ -92,6 +92,15 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 
 	footerNote := costsFooterNote(vm)
 	switch {
+	case top.Truncated:
+		// FR-017: partial dollars rendered as complete dollars is a
+		// correctness defect, not a cosmetic one — this frame's own grid
+		// fetch was cut short by the CE pagination cap, so Rows/Totals are
+		// a lower bound. Takes priority over every other footer note
+		// (including DrillRefusedReason/ResourceRowNote below): a data-
+		// completeness warning about the numbers on screen right now
+		// outranks feedback about a past interaction.
+		footerNote = "partial data — CE pagination cap reached, totals are a lower bound, not the full spend"
 	case cs.DrillRefusedReason != "":
 		// The most recent refused drill attempt's honest reason (FR-007)
 		// takes priority over the cursor cell's own delta/anomaly note —

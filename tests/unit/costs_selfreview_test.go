@@ -50,25 +50,23 @@ import (
 // detail navigation. The TUI's own special-cased m.fetchByIDDetail (fixed
 // in an earlier round) is TUI-only and never reached here.
 //
-// RECONCILED: costs_state.go's screen.OpenResource case has since gained
-// the placeholder-list/AutoOpenSingle wiring this finding asked for (it now
-// mirrors navigate.go's applyRelatedNavResult TargetID branch) — but not
-// byte-for-byte: it never sets ls.EscPops = true the way navigate.go's
-// sibling does. Before fix/resourcesloaded-provenance (D) that omission was
-// harmless (nothing read EscPops at row-population time). D's
-// handleResourcesLoadedEvent now requires msg.Provenance.CanonicalList()
-// for any topLevelCanonical screen (EscPops false, ParentContext nil)
-// before applying rows; the real executor tags this delivery
-// Provenance: FetchProvenanceByID (executor.go, correctly), so the gate
-// blocks the placeholder's row-population, ls.Loading never clears, and
-// autoOpenSingleDetail bails before ever reaching the target row. Reverting
-// handle.go's gate makes this test pass again, confirming causation — same
-// root cause as costs_codex_test.go's TestCostsCodex_X1. The one-line fix
-// (out of QA's scope: `ls.EscPops = true` in costs_state.go's
-// screen.OpenResource case) is a coder task. Do not "fix" this test by
-// stamping its ResourcesLoaded literal Provenance: FetchProvenanceCanonicalList
-// — that would be false (a real KindFetchByIDDetail result is never
-// canonical) and would hide the bug instead of pinning it.
+// RECONCILED and FIXED (fix/resourcesloaded-provenance): costs_state.go's
+// screen.OpenResource case has since gained the placeholder-list/
+// AutoOpenSingle wiring this finding asked for, and now mirrors
+// navigate.go's applyRelatedNavResult TargetID branch byte-for-byte: both
+// route through the shared pushByIDPlaceholderList constructor
+// (list_state.go), which always sets ls.EscPops = true. That is what makes
+// D's handleResourcesLoadedEvent gate (isTopLevelCanonicalList requires
+// msg.Provenance.CanonicalList() only for EscPops-false, ParentContext-nil
+// screens) correctly skip this placeholder — the real executor's
+// Provenance: FetchProvenanceByID delivery (executor.go) is applied,
+// ls.Loading clears, and autoOpenSingleDetail reaches the target row. Same
+// fix, same root cause, as costs_codex_test.go's TestCostsCodex_X1. No
+// change to FetchProvenanceByID or to this test was needed — it must not be
+// "fixed" by stamping its ResourcesLoaded literal
+// Provenance: FetchProvenanceCanonicalList, which would be false (a real
+// KindFetchByIDDetail result is never canonical) and would hide a
+// regression instead of pinning it.
 // ===========================================================================
 
 func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.T) {

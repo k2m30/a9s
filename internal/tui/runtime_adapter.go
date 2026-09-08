@@ -83,13 +83,20 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.SetErrorHintIntent:
 		m.showErrorHint = v.Show
 	case runtime.ClearActiveListLoadingIntent:
-		if m.activeRS().kind == rsKindList {
-			m.ctrl.ClearListLoading()
-			// Per cache contract C4: mirror the headless applyIntents case (intents.go) —
-			// a fetch failure over cached content must set the list's error
-			// marker too, or the TUI never renders it (renderer parity).
-			m.ctrl.SetListFetchError(v.Err)
-		}
+		// Controller-first (goal 4): forward to the SAME
+		// core/app/intents.go case the headless/web lane applies, rather than
+		// hand-rolling ClearListLoading+SetListFetchError here. Two
+		// independent mechanisms for one decision could disagree — and did:
+		// this TUI-local pair called ClearListLoading(v.Append) (correctly
+		// per-request) THEN SetListFetchError(v.Err), which unconditionally
+		// cleared Refreshing regardless of Append, defeating the per-request
+		// clear for a load-more failure racing a genuinely in-flight
+		// Refreshing. The rsKindList top-of-stack guard is also gone: the
+		// controller's own case routes by the intent's ResourceType+
+		// Provenance (when set) to the screen that actually owns the failed
+		// request, which is strictly more precise than "is a list screen on
+		// top right now".
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 	case runtime.MenuClearAvailabilityIntent:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 	case runtime.ClearIdentityIntent:

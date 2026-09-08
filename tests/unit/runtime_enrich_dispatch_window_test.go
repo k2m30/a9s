@@ -375,6 +375,7 @@ func TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill(t *t
 	_, dispatchTasks := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listOpenType,
 		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	if got := countProbeEnrichTasks(dispatchTasks); got != 1 {
 		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)
@@ -437,6 +438,7 @@ func TestHandleEnrichmentChecked_ListOpenDuringSweep_NoDoubleDispatchNoCounterOv
 	_, dispatchTasks := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listOpenType,
 		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	for _, name := range probeEnrichScopes(dispatchTasks) {
 		dispatchCount[name]++
@@ -511,6 +513,7 @@ func TestHandleEnrichmentChecked_ListOpenQueuedCompletionBeforeRefill_CoversQueu
 	_, dispatchTasks := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listOpenType,
 		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	if got := countProbeEnrichTasks(dispatchTasks); got != 1 {
 		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)
@@ -699,6 +702,7 @@ func TestHandleEnrichmentChecked_ListOpenDeepInQueue_EarlyCompletionCausesRedund
 	_, listOpenDispatch := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listOpenType,
 		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	if got := countProbeEnrichTasks(listOpenDispatch); got != 1 {
 		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)
@@ -803,6 +807,7 @@ func TestHandleEnrichmentChecked_ListOpenDeepInQueue_StaleCompletionStillDispatc
 	_, listOpenDispatch := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listOpenType,
 		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	if got := countProbeEnrichTasks(listOpenDispatch); got != 1 {
 		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)

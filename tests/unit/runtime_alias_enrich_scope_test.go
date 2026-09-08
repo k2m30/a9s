@@ -9,14 +9,17 @@
 // c.HasIssueEnricher("buckets") resolves true via the same alias lookup and
 // the list-open dispatch condition in HandleResourcesLoaded fires.
 //
-// RED today (HEAD): HandleResourcesLoaded's list-open branch builds
-// TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType} directly from
-// the event's raw ResourceType with no canonicalization through
-// resource.FindResourceType — an alias-opened list ("buckets") dispatches a
-// task scoped to "buckets", a scope no downstream enrichment consumer reads
-// (RowStore/EnrichmentTypeGen/HasIssueEnricher are all keyed by the
-// canonical ShortName "s3" elsewhere in the same file, e.g.
-// canonShortName). The task is scoped to the dead alias, not absent.
+// HandleResourcesLoaded's list-open branch DOES canonicalize
+// (resType := ev.ResourceType; if td := resource.FindResourceType(resType);
+// td != nil { resType = td.ShortName }) before building TaskKey{Scope:
+// resType}, so an alias-opened list ("buckets") already dispatches under the
+// canonical scope "s3" — pin 1 below exercises that this canonicalization
+// holds. The list-open branch is ALSO gated on ev.Provenance.CanonicalList()
+// (the provenance gate), so pin 1's event literal must set
+// Provenance: messages.FetchProvenanceCanonicalList or no task dispatches at
+// all — that gate is orthogonal to the alias-canonicalization this file
+// pins, but every literal driving this branch must satisfy it to reach the
+// scope logic being tested.
 //
 // Harness mirrors tests/unit/runtime_list_open_enrich_dispatch_test.go: pins
 // 1-2 use the package-runtime style (runtime.New(session.New(), catalog.All())),
@@ -74,6 +77,7 @@ func TestHandleResourcesLoaded_AliasOpenedList_ProbeEnrichScopedToCanonical(t *t
 		TypeGen:      0,
 		Append:       false,
 		Err:          nil,
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	var found *runtime.TaskRequest

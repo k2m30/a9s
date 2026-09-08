@@ -23,7 +23,6 @@
 package session
 
 import (
-	"maps"
 	"sync"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -164,24 +163,23 @@ func dedupAgainstExistingRows(existing, incoming []resource.Resource) []resource
 	return resource.DedupByID(existing, incoming)
 }
 
-// cloneRows returns a defensive copy of rows: a fresh slice, and for each
-// row whose Fields map is non-nil, a fresh Fields map — so a caller that
-// mutates a Snapshot/SnapshotAll result in place (rows[i].Name = ...,
-// rows[i].Fields[k] = ...) can never leak that mutation back into the
-// store's own backing array or maps, independent of the store's own
-// internal copy-on-write discipline on writes.
+// cloneRows returns a defensive copy of rows: a fresh slice of Resource.Clone
+// results — so a caller that mutates a Snapshot/SnapshotAll result in place
+// (rows[i].Name = ..., rows[i].Fields[k] = ..., rows[i].Findings =
+// append(rows[i].Findings, ...), rows[i].AttentionDetails[code] = ...) can
+// never leak that mutation back into the store's own backing arrays or maps,
+// independent of the store's own internal copy-on-write discipline on
+// writes. How deep each row's copy goes — which fields are reference-typed
+// and need a fresh allocation, which (RawStruct) are deliberately left
+// aliased — is resource.Resource's own decision (domain.Resource.Clone);
+// this function only maps that decision over the slice.
 func cloneRows(rows []resource.Resource) []resource.Resource {
 	if rows == nil {
 		return nil
 	}
 	out := make([]resource.Resource, len(rows))
 	for i, r := range rows {
-		if r.Fields != nil {
-			fields := make(map[string]string, len(r.Fields))
-			maps.Copy(fields, r.Fields)
-			r.Fields = fields
-		}
-		out[i] = r
+		out[i] = r.Clone()
 	}
 	return out
 }
@@ -192,12 +190,19 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 // is rejected) plus the store's per-type generation after the call — a
 // rejected observation leaves Gen unchanged.
 //
-// rows is deep-copied on entry (cloneRows) before anything is derived from
-// it or stored, and every returned row set is likewise a deep copy: the
-// store's own backing array/Fields maps are never the same allocation as
-// what the caller passed in or receives back. Two independent mutexes
-// otherwise guard the same TypeRows.Rows the caller and the store each hold
-// (the controller's per-screen ListState.Rows and RowStore.mu) — sharing an
+// rows is deep-copied (cloneRows) before it is ever retained in newRows or
+// stored as canon's next row set, and every returned row set is likewise a
+// deep copy: the store's own backing arrays/Fields/Findings/AttentionDetails
+// allocations are never the same allocation as what the caller passed in or
+// receives back. The three rejection gates below (Disk-vs-Fetch/Probe,
+// Probe-vs-Fetch, stale-replace) read rows uncloned — they only inspect IDs,
+// lengths, and pagination, never retain or mutate what they read, so cloning
+// ahead of them would pay a per-row allocation on every gate-rejected
+// observation (including the common warm-restart disk-seed path, where a
+// full row set with populated Fields maps is cloned and then immediately
+// discarded) for a clone nothing keeps. Two independent mutexes otherwise
+// guard the same TypeRows.Rows the caller and the store each hold (the
+// controller's per-screen ListState.Rows and RowStore.mu) — sharing an
 // allocation across that boundary is a data race regardless of which side
 // writes first, and an append into spare capacity on either side would
 // silently mutate the other's content with no corresponding Gen bump. The
@@ -243,7 +248,6 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows = cloneRows(rows)
 	existing := s.types[canon]
 
 	if origin == OriginDisk && existing.Gen != 0 && (existing.Origin == OriginFetch || existing.Origin == OriginProbe) {
@@ -253,6 +257,8 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	if !appendPage && origin == OriginProbe && len(existing.Rows) > 0 && existing.Origin == OriginFetch {
 		return cloneRows(existing.Rows), existing.Gen
 	}
+
+	rows = cloneRows(rows)
 
 	var newRows []resource.Resource
 	if appendPage {
@@ -328,8 +334,8 @@ func (s *RowStore) ObserveCount(canon string, totalCount int) domain.Gen {
 //
 // rows is deep-copied on entry and the returned row set is likewise a deep
 // copy, mirroring Observe's clone-on-ingress/egress contract — the store
-// never shares a backing array or Fields map with the caller in either
-// direction.
+// never shares a backing array, Fields map, Findings slice, or
+// AttentionDetails map with the caller in either direction.
 func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]resource.Resource, domain.Gen) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -359,26 +365,32 @@ func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]res
 }
 
 // Amend applies fn to canon's currently retained row slice via copy-on-write:
-// fn receives a deep copy of the existing []resource.Resource (cloneRows) and
-// returns its replacement, so no caller ever observes a torn or partially
-// mutated row and no previously-returned Snapshot is invalidated by this
-// call. The two enrich-fold implementations that fold Wave-2 findings onto
-// resource rows (core/runtime/helpers.go, internal/tui/app_enrich_fold.go)
-// both reach the store exclusively through Amend, each additionally copying
-// the slice fn receives before mutating it — Amend's own clone makes that
-// redundant but not incorrect. Cloning at this chokepoint, rather than
-// documenting it as every fn's responsibility, means an fn that mutates its
-// input in place still cannot corrupt the store's retained rows or a
-// previously-taken Snapshot/Observe/ObservePartial result. Bumps and returns
-// Gen even when canon has no rows yet, so callers relying on Gen
-// monotonicity are never surprised by a no-op Amend on an absent type.
+// fn receives a deep copy of the existing []resource.Resource (cloneRows),
+// and what fn returns is itself deep-copied (cloneRows again) before being
+// retained as canon's next row set, so no caller ever observes a torn or
+// partially mutated row and no previously-returned Snapshot is invalidated
+// by this call. The two enrich-fold implementations that fold Wave-2
+// findings onto resource rows (core/runtime/helpers.go,
+// internal/tui/app_enrich_fold.go) both reach the store exclusively through
+// Amend, each additionally copying the slice fn receives before mutating it
+// — Amend's own ingress clone makes that redundant but not incorrect.
+// Cloning on both sides of fn, rather than documenting either direction as
+// fn's responsibility, means an fn that mutates its input in place cannot
+// corrupt the store's retained rows or a previously-taken Snapshot/Observe/
+// ObservePartial result, AND an fn that retains its own reference to the
+// slice it returns (e.g. a closure that also stashes it in an outer
+// variable) can never retain a live handle into the store — the allocation
+// Amend stores is never the same one fn (or anything fn shared it with)
+// still holds. Bumps and returns Gen even when canon has no rows yet, so
+// callers relying on Gen monotonicity are never surprised by a no-op Amend
+// on an absent type.
 func (s *RowStore) Amend(canon string, fn func([]resource.Resource) []resource.Resource) domain.Gen {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	existing := s.types[canon]
 	next := existing
-	next.Rows = fn(cloneRows(existing.Rows))
+	next.Rows = cloneRows(fn(cloneRows(existing.Rows)))
 	next.Gen = existing.Gen + 1
 	s.types[canon] = next
 	return next.Gen
@@ -408,8 +420,9 @@ func (s *RowStore) SetViewState(canon string, vs ListViewState) domain.Gen {
 // Snapshot returns the currently retained TypeRows for canon (the zero value
 // when canon has never been observed). The returned Rows is a defensive
 // copy (see cloneRows) — the caller may freely mutate the returned slice,
-// its elements, or any row's Fields map without ever affecting the store's
-// own state or a later Amend/Observe's copy-on-write result.
+// its elements, or any row's Fields/Findings/AttentionDetails without ever
+// affecting the store's own state or a later Amend/Observe's copy-on-write
+// result.
 func (s *RowStore) Snapshot(canon string) TypeRows {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -458,30 +458,46 @@ func (c *Controller) SetListLoadingMore(v bool) {
 	ls.LoadingMore = v
 }
 
-// clearFetchInFlight resets every in-flight fetch-activity flag (Loading,
-// LoadingMore, Refreshing) to false. This is the single point both a landed
-// fetch result (applyResourcesLoaded, success or partial-failure) and a
+// clearFetchInFlight resets the in-flight fetch-activity flag belonging to
+// the completing request. This is the single point both a landed fetch
+// result (applyResourcesLoaded, success or partial-failure) and a
 // fetch-failure path (ClearListLoading, the headless/web
-// ClearActiveListLoadingIntent case in intents.go) route through, so a
-// load-more or refresh failure can never strand a flag the other lane already
-// knew to clear.
-func (ls *ListState) clearFetchInFlight() {
+// ClearActiveListLoadingIntent case in intents.go) route through, so neither
+// lane can forget to clear its flag.
+//
+// LoadingMore and Refreshing are explicitly allowed to be simultaneously in
+// flight on the same screen (a Ctrl+R issued while a load-more continuation
+// is still outstanding — both render on screen at once), so a completion
+// must clear only the flag belonging to the request that actually
+// completed, never every flag unconditionally: loadMore selects LoadingMore
+// alone; !loadMore selects Loading and Refreshing together, which is safe
+// because those two are mutually exclusive with each other by construction
+// (Refreshing only ever starts on an already-loaded list, i.e. after Loading
+// has already cleared) — at most one of the pair is true for any given
+// non-append completion.
+func (ls *ListState) clearFetchInFlight(loadMore bool) {
+	if loadMore {
+		ls.LoadingMore = false
+		return
+	}
 	ls.Loading = false
-	ls.LoadingMore = false
 	ls.Refreshing = false
 }
 
-// ClearListLoading clears the top list screen's in-flight fetch flags. Called
-// when a fetch or load-more operation fails (error handler path) so the title
-// reverts from "name loading..." back to the resource count title.
-func (c *Controller) ClearListLoading() {
+// ClearListLoading clears the top list screen's in-flight fetch flag for the
+// request that failed (error handler path) so the title reverts from "name
+// loading..."/"refreshing..." back to the resource count title — without
+// touching a sibling request's flag that may still be genuinely in flight.
+// loadMore selects which: true clears only LoadingMore, false clears Loading
+// and Refreshing (see clearFetchInFlight).
+func (c *Controller) ClearListLoading(loadMore bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
 	}
-	ls.clearFetchInFlight()
+	ls.clearFetchInFlight(loadMore)
 }
 
 // SetListFetchError records a failed fetch's error text on the top list

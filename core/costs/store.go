@@ -539,19 +539,21 @@ type FetchResult struct {
 // Attrs merge when present (MergeAttrs) — an anomaly-fetch failure
 // (r.Anomalies.Err != nil) never blocks either, since the grid data it
 // accompanies is independently valid. The anomaly cache
-// (PutAnomalies) writes ONLY when r.Anomalies.Requested is true AND
-// r.Anomalies.Err is nil: a skipped attempt (Requested false) neither
-// clears a cached mark nor renews its TTL, and a failed attempt
-// (Requested true, Err set) leaves the cache exactly as it was too — only
-// an authoritative result (requested, no error, possibly zero Marks)
-// replaces it, which is also the case that correctly clears a stale mark
-// when CE now genuinely reports none.
+// (PutAnomalies) writes ONLY when r.Anomalies.Requested is true, r.Anomalies.Err
+// is nil, AND r.Anomalies.Truncated is false: a skipped attempt (Requested
+// false) neither clears a cached mark nor renews its TTL, a failed attempt
+// (Requested true, Err set) leaves the cache exactly as it was too, and a
+// page-capped attempt (Truncated true) must not overwrite the cache with a
+// lower-bound result masquerading as CE's authoritative complete list for
+// the window — only a genuinely complete result (requested, no error, not
+// truncated, possibly zero Marks) replaces it, which is also the case that
+// correctly clears a stale mark when CE now genuinely reports none.
 func (s *Store) ApplyFetchResult(r FetchResult, now time.Time) {
 	s.Merge(r.Query, r.Records, now)
 	if len(r.Attrs) > 0 {
 		s.MergeAttrs(r.Attrs)
 	}
-	if r.Anomalies.Requested && r.Anomalies.Err == nil {
+	if r.Anomalies.Requested && r.Anomalies.Err == nil && !r.Anomalies.Truncated {
 		s.PutAnomalies(r.Anomalies.Marks, now, r.Query.Range)
 	}
 }

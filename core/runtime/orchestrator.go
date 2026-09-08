@@ -114,30 +114,37 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.handleEnrichmentChecked(msg)
 	case messages.ResourcesLoaded:
 		// Row-store dual-write, PLUS the list-open Wave-2 probe task — but
-		// NEVER HandleResourcesLoaded's intents (task #17 wave 1).
-		// The TUI adapter calls Core.HandleResourcesLoaded
+		// NEVER HandleResourcesLoaded's ClearFlash/PatchResourceCache intents
+		// (task #17 wave 1). The TUI adapter calls Core.HandleResourcesLoaded
 		// directly (bypassing HandleEvent entirely, see
 		// runtime_adapter_resources.go) and Controller.Handle
 		// (core/app/handle.go) already runs its own, separate
 		// ResourcesLoaded pipeline (handleResourcesLoadedEvent /
-		// applyResourcesLoaded). Applying HandleResourcesLoaded's intents here
-		// too would double-apply PatchResourceCache/ClearFlash for every
-		// Controller.Handle caller (web/headless/tests) — a real core/app
-		// behavior change this stage must not make. Feed RowStore the same
-		// canonicalization + Fetch-origin write HandleResourcesLoaded performs,
-		// then call HandleResourcesLoaded ourselves and forward ONLY its
-		// tasks: a TaskRequest is not an intent and is never double-applied
-		// by Controller.Handle (only applyIntents(intents) is), so this is
-		// the one shared producer for the Wave-2 list-open dispatch that
-		// reaches the web/headless lane. The TUI reaches the same producer
-		// via its own direct HandleResourcesLoaded call in
-		// runtime_adapter_resources.go, so this task is emitted exactly
-		// once per lane per list load.
+		// applyResourcesLoaded). Applying HandleResourcesLoaded's ClearFlash/
+		// PatchResourceCache intents here too would double-apply them for
+		// every Controller.Handle caller (web/headless/tests) — a real
+		// core/app behavior change this stage must not make. Feed RowStore
+		// the same canonicalization + Fetch-origin write HandleResourcesLoaded
+		// performs, then call HandleResourcesLoaded ourselves and forward its
+		// tasks plus ONLY its FlashIntent (filterFlashIntents): a partial-fetch
+		// composite error (C4) is the one intent HandleResourcesLoaded emits
+		// that has no other producer on this lane — applyResourcesLoaded only
+		// installs the screen's own LastFetchError marker, it never flashes —
+		// so dropping it here left a partial failure completely invisible on
+		// web/headless while the TUI (which applies HandleResourcesLoaded's
+		// intents in full via dispatchCoreScreenResult) already surfaced it.
+		// A TaskRequest is not an intent and is never double-applied by
+		// Controller.Handle (only applyIntents(intents) is), so the tasks are
+		// still forwarded unfiltered: this is the one shared producer for the
+		// Wave-2 list-open dispatch that reaches the web/headless lane. The
+		// TUI reaches the same producer via its own direct
+		// HandleResourcesLoaded call in runtime_adapter_resources.go, so that
+		// task is emitted exactly once per lane per list load.
 		if c.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
 			return nil, nil
 		}
 		c.observeResourcesLoadedRows(msg)
-		_, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
+		intents, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 			ResourceType: msg.ResourceType,
 			Resources:    msg.Resources,
 			Pagination:   msg.Pagination,
@@ -145,8 +152,9 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 			TypeGen:      msg.TypeGen,
 			ListSeq:      msg.ListSeq,
 			Err:          msg.Err,
+			Provenance:   msg.Provenance,
 		})
-		return nil, tasks
+		return filterFlashIntents(intents), tasks
 	case messages.RelatedCheckResult:
 		// Row-store dual-write ONLY — same double-dispatch hazard as
 		// ResourcesLoaded above (Controller.Handle applies its own
@@ -168,8 +176,31 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// this event). The FlashTick task is dropped: it is only meaningful
 		// to a running event loop (TUI/web timer), and a headless/orchestrator
 		// caller has no loop to process it.
-		intents, _ := c.HandleAPIError(APIErrorEvent{Err: msg.Err, NewGen: c.session.ConnectGen})
+		intents, _ := c.HandleAPIError(APIErrorEvent{
+			Err:          msg.Err,
+			NewGen:       c.session.ConnectGen,
+			Append:       msg.Append,
+			ResourceType: msg.ResourceType,
+			Provenance:   msg.Provenance,
+		})
 		return intents, nil
 	}
 	return nil, nil
+}
+
+// filterFlashIntents keeps only the FlashIntent entries from a Core handler's
+// intents slice, dropping every other intent kind. HandleEvent's
+// messages.ResourcesLoaded case uses this to forward HandleResourcesLoaded's
+// partial-fetch-error flash without forwarding the ClearFlash/
+// PatchResourceCache intents Controller.Handle's own ResourcesLoaded pipeline
+// already owns (see that case's doc comment for why double-applying those
+// would be a real behavior change).
+func filterFlashIntents(intents []UIIntent) []UIIntent {
+	var out []UIIntent
+	for _, in := range intents {
+		if _, ok := in.(FlashIntent); ok {
+			out = append(out, in)
+		}
+	}
+	return out
 }

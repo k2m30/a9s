@@ -1492,8 +1492,33 @@ func TestQA_ChildPagination_FetchELBListenerRules_FirstPage(t *testing.T) {
 }
 
 func TestQA_ChildPagination_FetchELBListenerRules_Continuation(t *testing.T) {
-	// DescribeRules has no server pagination; continuationToken is accepted but ignored.
+	// DescribeRules DOES paginate server-side via Marker/NextMarker (unlike
+	// the other 18 child fetchers here that just forward an opaque token),
+	// so continuationToken must be a resumable cursor this fetcher itself
+	// produced — an arbitrary string like the other fetchers accept is
+	// rejected as a foreign cursor rather than silently restarting at page 1.
+	// Round-trip through a real truncated first page instead of a hand-rolled
+	// token.
 	isDefault := true
+	parentCtx := map[string]string{"listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"}
+	firstMock := &mockELBv2DescribeRulesAPIChildPaginated{
+		PageFunc: func(_ int) (*elbv2.DescribeRulesOutput, error) {
+			return &elbv2.DescribeRulesOutput{
+				Rules: []elbtypes.Rule{
+					{RuleArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:111122223333:listener-rule/app/my-alb/abc/def/rule001"), Priority: aws.String("1"), IsDefault: aws.Bool(false)},
+				},
+				NextMarker: aws.String("page2-marker"),
+			}, nil
+		},
+	}
+	first, err := awsclient.FetchELBListenerRules(context.Background(), firstMock, parentCtx, "")
+	if err != nil {
+		t.Fatalf("first page: expected no error, got %v", err)
+	}
+	if first.Pagination == nil || first.Pagination.NextToken == "" {
+		t.Fatal("first page: expected a resumable cursor")
+	}
+
 	mock := &mockELBv2DescribeRulesAPIChildPaginated{
 		PageFunc: func(_ int) (*elbv2.DescribeRulesOutput, error) {
 			return &elbv2.DescribeRulesOutput{
@@ -1503,8 +1528,7 @@ func TestQA_ChildPagination_FetchELBListenerRules_Continuation(t *testing.T) {
 			}, nil
 		},
 	}
-	parentCtx := map[string]string{"listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"}
-	result, err := awsclient.FetchELBListenerRules(context.Background(), mock, parentCtx, "some-ignored-token")
+	result, err := awsclient.FetchELBListenerRules(context.Background(), mock, parentCtx, first.Pagination.NextToken)
 	assertContinuation(t, result, err, []string{"arn:aws:elasticloadbalancing:us-east-1:111122223333:listener-rule/app/my-alb/abc/def/default"})
 }
 

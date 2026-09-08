@@ -250,45 +250,59 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	return vs, tasks
 }
 
-// handleResourcesLoadedEvent routes a ResourcesLoaded event to the matching
-// list screen in the controller stack. It finds the screen by resolving the
-// event's ResourceType (including aliases) against each screen's context,
-// so a late result for type X lands on X's screen regardless of which screen
-// is currently on top. Staleness is the caller's responsibility — Handle drops
-// stale ResourcesLoaded via messages.IsStale before invoking this.
+// findResourceListScreen scans the screen stack from the top for the list
+// screen a result carrying resourceType + provenance belongs to — resolving
+// resourceType (including aliases) against each screen's context, so a late
+// result for type X lands on X's screen regardless of which screen is
+// currently on top. A fetch result belongs to a single list — the active
+// (topmost) one of its type — so the first match wins; fanning it out to
+// every same-type list would overwrite a stacked filtered/child list's rows
+// onto the list beneath it (and vice-versa).
 //
-// A screen match alone is not sufficient: a genuinely canonical top-level
-// list screen (isTopLevelCanonicalList) only ever accepts a result whose
-// msg.Provenance.CanonicalList() is true. A by-ID, filtered, or child result
-// sharing this ResourceType is never that screen's data — its actual target
-// is always a screen pushed AFTER (and therefore found before, in this
-// top-down scan) the canonical list it happens to share a type with, since
-// every by-ID/filtered/child navigation pushes its own screen on top of
-// whatever it navigated from (applyRelatedNavResult). When that mismatch
-// occurs, the canonical screen is skipped — never applied to, never adopted
-// into ls.Rows — and the scan continues deeper in the stack rather than
-// returning immediately: the true target, if its screen is still open, is
-// necessarily found further down, and if it already popped there is nothing
-// to strand — a screen that no longer exists has no Rows left to apply to.
-func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
-	if msg.ResourceType == "" {
-		return
+// A screen-type match alone is not sufficient: the gate is symmetric — a
+// screen only accepts a result whose provenance matches what that screen IS.
+// isTopLevelCanonicalList reports whether the screen IS the type's canonical
+// top-level list; provenance.CanonicalList() reports whether the result IS a
+// canonical-list result. The two must agree:
+//   - A canonical screen never accepts a by-ID/filtered/child result sharing
+//     this ResourceType — that result's actual target is always a screen
+//     pushed AFTER (and therefore found before, in this top-down scan) the
+//     canonical list it happens to share a type with, since every
+//     by-ID/filtered/child navigation pushes its own screen on top of
+//     whatever it navigated from (applyRelatedNavResult).
+//   - Symmetrically, a by-ID/filtered/child screen never accepts a
+//     canonical-list result: a late canonical refresh sharing this
+//     ResourceType is never that drill's data either — its target is the
+//     canonical screen the drill was pushed on top of, found deeper in this
+//     same scan.
+//
+// provenance == FetchProvenanceUnknown never satisfies either side:
+// CanonicalList() is false for it, which would let it slip through the
+// non-canonical branch of the agreement above by accident. An unstamped
+// result fails closed (ok=false) rather than matching whichever
+// non-canonical screen of its type happens to be topmost.
+//
+// On a mismatch the screen is skipped — never returned — and the scan
+// continues deeper in the stack rather than returning immediately: the true
+// target, if its screen is still open, is necessarily found further down,
+// and if it already popped there is nothing to strand — a screen that no
+// longer exists has no Rows left to apply to.
+//
+// Shared by handleResourcesLoadedEvent (the fetch-success path) and
+// clearActiveListLoadingTarget (the paired fetch-FAILURE path, via
+// ClearActiveListLoadingIntent) so a failed request is always routed to the
+// exact same screen its paired success would have landed on — one scan, so
+// the two paths cannot drift apart and reintroduce the asymmetry where a
+// failure lands on whatever screen happens to be on top instead of the one
+// that actually issued the failed request.
+func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance) (screen *Screen, canon string, ok bool) {
+	if resourceType == "" || provenance == messages.FetchProvenanceUnknown {
+		return nil, "", false
 	}
-	// Resolve canonical short name (handles aliases like "rds" → "dbi").
-	canon := msg.ResourceType
-	if td := resource.FindResourceType(msg.ResourceType); td != nil {
+	canon = resourceType
+	if td := resource.FindResourceType(resourceType); td != nil {
 		canon = td.ShortName
 	}
-	// Superseded-dispatch discard, the same rule each lane's door applies —
-	// this seam is called directly by the TUI as well as by Handle, so it
-	// carries its own check rather than trusting its callers.
-	if c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
-		return
-	}
-	// A fetch result belongs to a single list — the active (topmost) one of its
-	// type. Apply it to the FIRST matching list from the top and stop; fanning it
-	// out to every same-type list would overwrite a stacked filtered/child list's
-	// rows onto the list beneath it (and vice-versa).
 	for i := len(c.stack) - 1; i >= 0; i-- {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
@@ -301,39 +315,89 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		if screenType != canon {
 			continue
 		}
-		topLevelCanonical := isTopLevelCanonicalList(s.ID, s.State.List)
-		if topLevelCanonical && !msg.Provenance.CanonicalList() {
+		if isTopLevelCanonicalList(s.ID, s.State.List) != provenance.CanonicalList() {
 			continue
 		}
-		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, topLevelCanonical, msg.Err != nil)
-		// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
-		// availability badge here, at the controller level, so both the TUI and
-		// web renderer get it — this replaces the TUI-only sync-back that used
-		// to run only on pop, in internal/tui/app_stack.go's popRS. Firing on
-		// every ResourcesLoaded (not just a load-more that exhausts pagination)
-		// preserves the pre-existing "non-exhausted visits syncing counts
-		// upward" behavior popRS also provided: the only-increase guard inside
-		// syncExactTotalToMenu makes this safe to call unconditionally — a
-		// truncated or smaller result never regresses a larger known count.
-		// A fetch that came back refused, with nothing to show, observed
-		// nothing: syncing it would overwrite the type's cached count with a
-		// zero and call the type verified. Partial success (rows alongside a
-		// per-item error) IS an observation and still syncs.
-		if msg.Err == nil || len(msg.Resources) > 0 {
-			c.syncExactTotalToMenu(s, canon)
-		}
-		// C6 — a filtered related drill's result is a session view; persisted
-		// under (type + filter) so the next entry into the same drill seeds
-		// instantly (SeedFilteredListFromCache) instead of a bare Loading.
-		// Err results are skipped — a partial page must not replay as
-		// complete. ls.Rows already holds the append-accumulated, materialized
-		// set.
-		if ls := s.State.List; ls != nil && msg.Err == nil && len(ls.FetchFilter) > 0 &&
-			!topLevelCanonical {
-			c.core.FilteredRowsSet(canon, ls.FetchFilter, ls.Rows, ls.HasPagination, ls.PaginationCursor)
-		}
+		return s, canon, true
+	}
+	return nil, canon, false
+}
+
+// handleResourcesLoadedEvent applies a ResourcesLoaded event to the list
+// screen findResourceListScreen resolves it to — see that method for the
+// full matching contract. Staleness is the caller's responsibility — Handle
+// drops stale ResourcesLoaded via messages.IsStale before invoking this.
+func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
+	s, canon, ok := c.findResourceListScreen(msg.ResourceType, msg.Provenance)
+	if !ok {
 		return
 	}
+	// Superseded-dispatch discard, the same rule each lane's door applies —
+	// this seam is called directly by the TUI as well as by Handle, so it
+	// carries its own check rather than trusting its callers.
+	if c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
+		return
+	}
+	topLevelCanonical := isTopLevelCanonicalList(s.ID, s.State.List)
+	c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, topLevelCanonical, msg.Err)
+	// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
+	// availability badge here, at the controller level, so both the TUI and
+	// web renderer get it — this replaces the TUI-only sync-back that used
+	// to run only on pop, in internal/tui/app_stack.go's popRS. Firing on
+	// every ResourcesLoaded (not just a load-more that exhausts pagination)
+	// preserves the pre-existing "non-exhausted visits syncing counts
+	// upward" behavior popRS also provided: the only-increase guard inside
+	// syncExactTotalToMenu makes this safe to call unconditionally — a
+	// truncated or smaller result never regresses a larger known count.
+	// A fetch that came back refused, with nothing to show, observed
+	// nothing: syncing it would overwrite the type's cached count with a
+	// zero and call the type verified. Partial success (rows alongside a
+	// per-item error) IS an observation and still syncs.
+	if msg.Err == nil || len(msg.Resources) > 0 {
+		c.syncExactTotalToMenu(s, canon)
+	}
+	// C6 — a filtered related drill's result is a session view; persisted
+	// under (type + filter) so the next entry into the same drill seeds
+	// instantly (SeedFilteredListFromCache) instead of a bare Loading.
+	// Err results are skipped — a partial page must not replay as
+	// complete. ls.Rows already holds the append-accumulated, materialized
+	// set.
+	if ls := s.State.List; ls != nil && msg.Err == nil && len(ls.FetchFilter) > 0 &&
+		!topLevelCanonical {
+		c.core.FilteredRowsSet(canon, ls.FetchFilter, ls.Rows, ls.HasPagination, ls.PaginationCursor)
+	}
+}
+
+// clearActiveListLoadingTarget resolves the *ListState a
+// ClearActiveListLoadingIntent (emitted by HandleAPIError on a failed fetch)
+// should apply to. When v carries a ResourceType and a non-Unknown
+// Provenance — true of every production HandleAPIError dispatch as of the
+// failure-routing fix (every messages.APIError construction site pairs it
+// with the same Provenance its paired ResourcesLoaded success would carry) —
+// it is routed through the exact same findResourceListScreen scan the
+// success path uses, so the failure lands on the screen that actually owns
+// the request that failed rather than whatever screen happens to be
+// topmost (the defect this exists to close: navigating from list A to list
+// B before A's fetch fails must never mark B with A's error while stranding
+// A's own loading indicator). No match (including an already-popped screen)
+// resolves to nil — fails closed, exactly like a ResourcesLoaded success
+// with no matching screen.
+//
+// A zero ResourceType or Provenance means the producer predates this
+// contract (a hand-built APIError with no paired fetch, or the
+// ClientsReady-wrong-client-type path in internal/tui/runtime_adapter.go's
+// emitAPIErrorCmd, which is not scoped to any particular list at all) —
+// falls back to the pre-existing top-of-stack list screen behavior for
+// those, mirroring FetchResourcesPayload.Provenance's own zero-value grace.
+func (c *Controller) clearActiveListLoadingTarget(v runtime.ClearActiveListLoadingIntent) *ListState {
+	if v.ResourceType != "" && v.Provenance != messages.FetchProvenanceUnknown {
+		s, _, ok := c.findResourceListScreen(v.ResourceType, v.Provenance)
+		if !ok {
+			return nil
+		}
+		return s.State.List
+	}
+	return c.topListState()
 }
 
 // syncExactTotalToMenu applies the load-more-exhaustion exact-total sync-back

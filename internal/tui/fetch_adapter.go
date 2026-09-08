@@ -43,7 +43,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 		// surface the error AND keep the partial Resources; hard failures
 		// (no resources at all) route through APIError.
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceCanonicalList}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -64,7 +64,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 	return func() tea.Msg {
 		res, err := m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceFilteredList}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -122,7 +122,7 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 	return func() tea.Msg {
 		res, err := m.core.FetchChildResources(ctx, clients, childType, parentCtx)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: childType, Err: err, Gen: gen}
+			return messages.APIError{ResourceType: childType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceChild}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: childType,
@@ -154,8 +154,9 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 	}
 	return func() tea.Msg {
 		res, err := m.core.FetchMoreResources(ctx, clients, p)
+		provenance := messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: msg.ResourceType, Err: err, Gen: gen}
+			return messages.APIError{ResourceType: msg.ResourceType, Err: err, Gen: gen, Append: true, Provenance: provenance}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: msg.ResourceType,

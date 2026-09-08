@@ -124,6 +124,35 @@ type APIError struct {
 	// synthetic/unstamped construction — AcceptZeroGen=true so those messages
 	// still pass the guard.
 	Gen domain.Gen
+	// Append mirrors ResourcesLoaded.Append's meaning applied to the failure
+	// path: true when this error is the outcome of a KindFetchMore
+	// continuation, false for every other fetch kind (initial load, refresh,
+	// filtered, child, by-ID). LoadingMore and Refreshing are allowed to be
+	// simultaneously in flight on the same screen (a Ctrl+R issued while a
+	// load-more continuation is still outstanding), so the failure handler
+	// must know which of the two in-flight requests this is, to clear only
+	// that one's indicator rather than stranding or prematurely releasing
+	// the sibling request's flag (core/app/list_state.go's
+	// clearFetchInFlight).
+	Append bool
+	// Provenance mirrors ResourcesLoaded.Provenance's meaning applied to the
+	// failure path: every production construction site pairs an APIError
+	// branch with a ResourcesLoaded success branch and stamps this field with
+	// the exact same value the paired success would have carried (executor.go,
+	// internal/tui/fetch_adapter.go). This lets a failure be routed to the
+	// SAME screen its paired success would have landed on — the scan
+	// handleResourcesLoadedEvent already performs by ResourceType +
+	// CanonicalList() agreement (core/app/handle.go) — instead of blindly
+	// applying to whatever screen happens to be topmost, which would let a
+	// navigate-away-before-failure race mark an unrelated screen with this
+	// request's error. The zero value (FetchProvenanceUnknown) means the
+	// caller predates this contract (e.g. a hand-built APIError with no paired
+	// fetch, or the ClientsReady-wrong-client-type path in
+	// internal/tui/runtime_adapter.go's emitAPIErrorCmd, which carries no
+	// ResourceType either) — ClearActiveListLoadingIntent's consumer falls
+	// back to the pre-existing "active list screen" behavior for those,
+	// exactly like FetchResourcesPayload.Provenance's own zero-value grace.
+	Provenance FetchProvenance
 }
 
 func (APIError) isEvent()               {}
@@ -473,8 +502,16 @@ type CostsLoaded struct {
 	// genuinely returned zero groups for (R2) is remembered as covered.
 	Window    []costs.Period
 	Anomalies []costs.AnomalyMark
-	Requests  int
-	Err       error
+	// AnomaliesTruncated mirrors Grid.Truncated for the anomaly overlay: true
+	// when awsclient.FetchCostAnomalies' page cap fired before GetAnomalies'
+	// own NextPageToken exhaustion, so Anomalies is a lower bound rather than
+	// CE's own authoritative complete list for the window — the same signal
+	// AnomaliesFetchResult.Truncated carries, threaded through so
+	// ApplyCostsLoaded/costsAnomalyResultFromEvent can avoid caching a
+	// page-capped result as an authoritative 24h-TTL snapshot.
+	AnomaliesTruncated bool
+	Requests           int
+	Err                error
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// CostsLoaded (a fetch dispatched under a prior profile/region) is
 	// dropped by the same IsStale guard every other ConnectGen-stamped

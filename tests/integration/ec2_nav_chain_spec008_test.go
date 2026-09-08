@@ -114,6 +114,7 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "tg",
 		Resources:    []resource.Resource{tgRes},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	// Deliver RelatedNavigateMsg with TargetID (count=1 path).
@@ -171,6 +172,7 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources:    alarmResources,
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	// Deliver RelatedNavigateMsg with RelatedIDs (count>1 path)
@@ -215,6 +217,7 @@ func TestEC2_008_NavChain_EscReturnsToEC2Detail(t *testing.T) {
 	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "vpc",
 		Resources:    []resource.Resource{vpcRes},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	// Navigate to VPC detail via RelatedNavigateMsg

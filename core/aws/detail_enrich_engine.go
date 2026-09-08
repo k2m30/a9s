@@ -9,6 +9,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -16,6 +17,19 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/trace"
 )
+
+// ErrDetailEnrichSkipped is the exact error enrichDetail returns (never
+// wrapped, so errors.Is matches it directly) when it skips a disk-cache-seeded
+// row with no live RawStruct yet — see the res.RawStruct == nil branch below.
+// Distinguishes "there was nothing to do yet, this is not a failure" from a
+// genuine fetch/cache error so core/runtime.HandleEnrichDetailResult can skip
+// the user-facing flash AND — the reason this needs to be distinguishable at
+// all — leave any pending sticky-refresh demand (session.PendingDetailRefresh)
+// recorded rather than clearing it: an operation that fetched nothing must
+// not be reported as having satisfied the refresh that demanded it, or a
+// later refresh landing after live data finally arrives silently no-ops
+// forever instead of retrying enrichment.
+var ErrDetailEnrichSkipped = errors.New("detail enrichment skipped: resource has no live data yet")
 
 // docCache is the minimal cache contract shared by PolicyDocumentCache and
 // DetailDocCache — both already satisfy it via their existing Get/Set/
@@ -140,18 +154,23 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 
 	// A disk-cache-seeded row carries Fields only (cache.Row has no
 	// RawStruct field) until the live refetch lands. That's a documented
-	// transient state, not an error: silently skipping beats flashing
-	// "enrich failed" at the operator over something that self-heals within
-	// seconds (the first open after live rows land, or Ctrl+R, re-enriches
-	// normally). Deriving a wrapper from res.ID alone was rejected — it
-	// would embed a zero SDK struct and render misleading empty fields on
-	// the YAML/JSON views instead of just deferring. This must be checked
-	// before requiring dctx.Clients below: session caches (and so a valid
-	// dctx) are constructed before the AWS clients are, so a pre-connect
-	// open of a disk-seeded row has a non-nil dctx with a nil Clients — it
-	// must hit this silent-skip, not the Clients error below.
+	// transient state, not a user-facing error: ErrDetailEnrichSkipped beats
+	// flashing "enrich failed" at the operator over something that self-heals
+	// within seconds (the first open after live rows land, or Ctrl+R,
+	// re-enriches normally) — but it must still be a non-nil, distinguishable
+	// error rather than nil, so the caller (core/runtime.HandleEnrichDetailResult)
+	// can tell "nothing happened yet" apart from "this genuinely succeeded"
+	// and leave any pending sticky-refresh demand recorded instead of
+	// consuming it for an operation that fetched nothing. Deriving a wrapper
+	// from res.ID alone was rejected — it would embed a zero SDK struct and
+	// render misleading empty fields on the YAML/JSON views instead of just
+	// deferring. This must be checked before requiring dctx.Clients below:
+	// session caches (and so a valid dctx) are constructed before the AWS
+	// clients are, so a pre-connect open of a disk-seeded row has a non-nil
+	// dctx with a nil Clients — it must hit this skip, not the Clients error
+	// below.
 	if res.RawStruct == nil {
-		return res, nil
+		return res, ErrDetailEnrichSkipped
 	}
 
 	if dctx.Clients == nil {

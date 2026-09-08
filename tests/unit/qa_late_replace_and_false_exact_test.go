@@ -84,7 +84,12 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 	// Drive the real handler: a page-1 fetch result for "s3", truncated,
 	// with no existing session.ResourceCache entry (!alreadyCached) — the
 	// exact condition that builds Entry{Resources: ev.Resources} at
-	// handlers_resources.go:74-82.
+	// handlers_resources.go:74-82. Provenance must be CanonicalList — the
+	// symmetric provenance gate added alongside ResourcesLoadedEvent.Provenance
+	// only lets a canonical-list result seed PatchResourceCache (a
+	// filtered/by-ID/child result sharing this ResourceType is never the
+	// type's global population); the zero value (FetchProvenanceUnknown)
+	// used to be accepted implicitly before this field existed.
 	intents, _ := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: "s3",
 		Resources:    page1Resources(50),
@@ -94,7 +99,8 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 			TotalHint:   -1,
 			PageSize:    50,
 		},
-		Append: false,
+		Append:     false,
+		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	foundPatch := false
 	for _, in := range intents {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,10 +30,14 @@ type ecsSvcTasksCursor struct {
 
 // decodeEcsSvcTasksCursor decodes a compound continuation token previously
 // produced by ecsSvcTasksCursor.encode(). An empty token legitimately means
-// "first page" and returns the zero cursor. A non-empty token that fails to
-// decode has no legitimate origin other than this same encoder, so it is
-// always a bug elsewhere (a foreign cursor, a caller wiring mistake, a token
-// that outlived a field-tag change) — never external input worth tolerating
+// "first page" and returns the zero cursor. Any other input — one with
+// unknown fields, or one that decodes without error to the exact zero value
+// (a bare "null" or "{}", both of which json.Unmarshal accepts silently but
+// which encode() itself never produces: a token is only ever encoded when
+// there is real state — a non-empty Next or a Done flag — to resume from) —
+// has no legitimate origin other than this same encoder, so it is always a
+// bug elsewhere (a foreign cursor, a caller wiring mistake, a token that
+// outlived a field-tag change) — never external input worth tolerating
 // silently. Restarting from page 1 in that case would duplicate or drop
 // tasks with no signal, so it is reported as an error instead.
 func decodeEcsSvcTasksCursor(token string) (ecsSvcTasksCursor, error) {
@@ -40,8 +45,11 @@ func decodeEcsSvcTasksCursor(token string) (ecsSvcTasksCursor, error) {
 	if token == "" {
 		return cur, nil
 	}
-	if err := json.Unmarshal([]byte(token), &cur); err != nil {
-		return ecsSvcTasksCursor{}, fmt.Errorf("decoding ecs svc tasks continuation token: %w", err)
+	dec := json.NewDecoder(strings.NewReader(token))
+	dec.DisallowUnknownFields()
+	var trailing json.RawMessage
+	if err := dec.Decode(&cur); err != nil || cur == (ecsSvcTasksCursor{}) || dec.Decode(&trailing) != io.EOF {
+		return ecsSvcTasksCursor{}, fmt.Errorf("decoding ecs svc tasks continuation token: invalid or foreign cursor %q", token)
 	}
 	return cur, nil
 }
@@ -56,7 +64,12 @@ func (c ecsSvcTasksCursor) encode() string {
 
 // fetchEcsTaskArnsPage fetches a single ListTasks page for one DesiredStatus,
 // resuming from nextToken when non-empty. done is true when AWS reported no
-// further NextToken for this status.
+// further NextToken for this status — a non-nil but empty NextToken is
+// exhaustion, not "one more page", the same nil-or-empty contract every
+// AWS-generated paginator in this SDK enforces; ListTasks has no generated
+// paginator of its own to inherit it from. Without this, a status that
+// returns a non-nil empty NextToken would never latch done, and the compound
+// cursor's Done flag for that status would never become true.
 func fetchEcsTaskArnsPage(ctx context.Context, listAPI ECSListTasksAPI, cluster, serviceName string, status ecstypes.DesiredStatus, nextToken string) (arns []string, newNextToken string, done bool, err error) {
 	input := &ecs.ListTasksInput{
 		Cluster:       aws.String(cluster),
@@ -71,7 +84,7 @@ func fetchEcsTaskArnsPage(ctx context.Context, listAPI ECSListTasksAPI, cluster,
 	if err != nil {
 		return nil, "", false, err
 	}
-	if output.NextToken != nil {
+	if output.NextToken != nil && *output.NextToken != "" {
 		return output.TaskArns, *output.NextToken, false, nil
 	}
 	return output.TaskArns, "", true, nil

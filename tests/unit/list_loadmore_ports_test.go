@@ -118,8 +118,10 @@ func TestActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *testin
 		t.Fatal("precondition: ActionLoadMore must produce a task before the simulated error")
 	}
 
-	// Simulate the app-level error handler: a load-more fetch failed.
-	c.ClearListLoading()
+	// Simulate the app-level error handler: a load-more fetch failed. loadMore=true
+	// selects the load-more request's own flag (LoadingMore) — this scenario never
+	// started a concurrent refresh, so there is nothing else to preserve here.
+	c.ClearListLoading(true)
 
 	lb := c.Snapshot().Body.List
 	if lb == nil || len(lb.Rows) != len(seed) {
@@ -376,7 +378,10 @@ func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *
 	// Controller.Handle — the same event HandleAPIError/
 	// ClearActiveListLoadingIntent produce for any failed
 	// KindFetchResources/KindFetchMore execution (core/runtime/handlers.go).
-	vs, _ := c.Handle(messages.APIError{ResourceType: "ec2", Err: errLoadMoreAPIFailed{}})
+	// Append: true mirrors executor.go's own KindFetchMore-failure
+	// construction — this failure is the outcome of the load-more
+	// continuation dispatched above, so only LoadingMore may clear.
+	vs, _ := c.Handle(messages.APIError{ResourceType: "ec2", Err: errLoadMoreAPIFailed{}, Append: true})
 
 	got := vs.Body.List
 	if got == nil {
@@ -399,17 +404,21 @@ func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *
 	}
 }
 
-// TestApplyResourcesLoaded_PartialSuccessErr_PreservesExistingLastFetchError
-// is a BUG CATCH. Before applyResourcesLoaded (core/app/list_body.go) gained
-// its hadErr parameter, EVERY landed ResourcesLoaded — including a
-// partial-success composite-error result (some rows came back AND something
-// failed, e.g. one paginated sub-call throttled) — unconditionally cleared
-// ls.LastFetchError. That silently erased a genuine outstanding error marker
-// left by a still-unresolved fetch problem, even though the fetch that just
-// landed did not actually resolve cleanly (cache contract C4: rows stay on
-// screen, the marker is not wiped for a result that itself carries an error).
-// Pins both halves: the new rows still land, AND the marker is not erased.
-func TestApplyResourcesLoaded_PartialSuccessErr_PreservesExistingLastFetchError(t *testing.T) {
+// TestApplyResourcesLoaded_PartialSuccessErr_InstallsCurrentFetchError pins
+// the CURRENT contract: per cache contract C4 ("a fetch failure ... swaps
+// the marker for an error marker" — docs/design/cache-requirements.md), each
+// landed fetch's outcome — success or partial-success — installs ITS OWN
+// marker text, never leaving a stale marker from an unrelated earlier
+// attempt in place. applyResourcesLoaded's hadErr bool became a fetchErr
+// error for exactly this reason: a bare bool could only say "an error
+// happened", not carry which one, so the prior implementation could only
+// ever leave whatever marker was already there. This test previously
+// asserted the opposite — that an existing marker survives a new
+// partial-success error unchanged — which would let a retry's genuinely new
+// failure hide silently behind stale, possibly unrelated error text forever.
+// Pins both halves: the new rows still land, AND the marker reflects the
+// failure that just happened.
+func TestApplyResourcesLoaded_PartialSuccessErr_InstallsCurrentFetchError(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(2, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok",
@@ -437,8 +446,8 @@ func TestApplyResourcesLoaded_PartialSuccessErr_PreservesExistingLastFetchError(
 	if len(lb.Rows) != len(newRows) {
 		t.Errorf("rows must land despite the partial error: got %d rows, want %d", len(lb.Rows), len(newRows))
 	}
-	if lb.LastFetchError != priorErr {
-		t.Errorf("LastFetchError = %q after a partial-success (Err-carrying) result landed, want it preserved as %q — a result that itself carries an error must not erase an outstanding error marker", lb.LastFetchError, priorErr)
+	if lb.LastFetchError != partialErr.Error() {
+		t.Errorf("LastFetchError = %q after a partial-success (Err-carrying) result landed, want it replaced with the fresh failure %q — a stale unrelated marker must not survive a new fetch's own error", lb.LastFetchError, partialErr.Error())
 	}
 }
 
@@ -465,7 +474,11 @@ func TestClearListLoading_AlsoClearsRefreshing_ContractLock(t *testing.T) {
 		t.Fatal("precondition: Refreshing must be true before ClearListLoading")
 	}
 
-	c.ClearListLoading()
+	// loadMore=false: this scenario never started a load-more (only
+	// SetListRefreshing(true) above), so the completing request is a plain
+	// (non-load-more) fetch — false selects the Loading+Refreshing pair,
+	// which is what a real refresh-failure completion would pass.
+	c.ClearListLoading(false)
 
 	lb := c.Snapshot().Body.List
 	if lb == nil {
@@ -473,6 +486,98 @@ func TestClearListLoading_AlsoClearsRefreshing_ContractLock(t *testing.T) {
 	}
 	if lb.Refreshing {
 		t.Error("Refreshing = true after ClearListLoading, want false — ClearListLoading must stop every in-flight fetch indicator, not just Loading/LoadingMore")
+	}
+}
+
+// TestClearListLoading_LoadMoreFailure_LeavesRefreshingSet is a BUG CATCH for
+// the exact regression this branch's clearFetchInFlight choke point fixes:
+// before the loadMore parameter existed, ANY completion (load-more or
+// refresh) cleared all three flags unconditionally, so a failed load-more
+// silently cleared an in-flight Ctrl+R refresh that had not itself completed
+// — stopping its "refreshing..." indicator and, worse, letting a second
+// refresh be dispatched while the first was still genuinely in flight
+// (ActionRefresh has no debounce guard of its own the way ActionLoadMore
+// does). Drives both actions through the real Apply seam (mirrors
+// TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently
+// below) so LoadingMore and Refreshing are both genuinely true before the
+// simulated load-more failure, then asserts ClearListLoading(true) clears
+// only the flag belonging to the request that actually completed.
+func TestClearListLoading_LoadMoreFailure_LeavesRefreshingSet(t *testing.T) {
+	c := openListController(t, "ec2")
+	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
+		IsTruncated: true, NextToken: "tok",
+	}, false)
+
+	_, loadMoreTasks := c.Apply(app.Action{Kind: app.ActionLoadMore})
+	if len(loadMoreTasks) == 0 {
+		t.Fatal("precondition: ActionLoadMore must produce a task")
+	}
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if len(refreshTasks) == 0 {
+		t.Fatal("precondition: ActionRefresh must produce a task even with a load-more in flight")
+	}
+	pre := c.Snapshot().Body.List
+	if pre == nil || !pre.LoadingMore || !pre.Refreshing {
+		t.Fatal("precondition: both LoadingMore and Refreshing must be true before the simulated load-more failure")
+	}
+
+	// The in-flight load-more's own fetch failed — the completing request is
+	// the load-more, not the concurrent Ctrl+R refresh that is still
+	// genuinely outstanding.
+	c.ClearListLoading(true)
+
+	lb := c.Snapshot().Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after ClearListLoading(true)")
+	}
+	if lb.LoadingMore {
+		t.Error("LoadingMore = true after ClearListLoading(true), want false — the failed load-more's own flag must clear")
+	}
+	if !lb.Refreshing {
+		t.Error("Refreshing = false after ClearListLoading(true), want true — a load-more failure must not clobber a concurrent in-flight refresh that has not itself completed")
+	}
+}
+
+// TestClearListLoading_RefreshFailure_LeavesLoadingMoreSet is the mirror-image
+// BUG CATCH: a failed Ctrl+R refresh must not clear a still-outstanding
+// load-more continuation. Before the loadMore parameter existed, this
+// direction was just as broken — a refresh failure would have cleared
+// LoadingMore, and handleActionLoadMore's `if ls.LoadingMore { return nil,
+// nil }` debounce guard would then let a second, duplicate continuation
+// request fire for the same page while the original was still in flight.
+func TestClearListLoading_RefreshFailure_LeavesLoadingMoreSet(t *testing.T) {
+	c := openListController(t, "ec2")
+	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
+		IsTruncated: true, NextToken: "tok",
+	}, false)
+
+	_, loadMoreTasks := c.Apply(app.Action{Kind: app.ActionLoadMore})
+	if len(loadMoreTasks) == 0 {
+		t.Fatal("precondition: ActionLoadMore must produce a task")
+	}
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if len(refreshTasks) == 0 {
+		t.Fatal("precondition: ActionRefresh must produce a task even with a load-more in flight")
+	}
+	pre := c.Snapshot().Body.List
+	if pre == nil || !pre.LoadingMore || !pre.Refreshing {
+		t.Fatal("precondition: both LoadingMore and Refreshing must be true before the simulated refresh failure")
+	}
+
+	// The concurrent Ctrl+R refresh's own fetch failed — the completing
+	// request is the refresh, not the still-outstanding load-more
+	// continuation.
+	c.ClearListLoading(false)
+
+	lb := c.Snapshot().Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after ClearListLoading(false)")
+	}
+	if lb.Refreshing {
+		t.Error("Refreshing = true after ClearListLoading(false), want false — the failed refresh's own flag must clear")
+	}
+	if !lb.LoadingMore {
+		t.Error("LoadingMore = false after ClearListLoading(false), want true — a refresh failure must not clobber a still-outstanding load-more continuation, or a duplicate continuation request could fire while the original is still in flight")
 	}
 }
 
@@ -525,7 +630,7 @@ func TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently(t *tes
 		t.Error("Refreshing = false after ActionRefresh, want true")
 	}
 
-	out := wave3RenderListBody(t, c, "ec2")
+	out := stripAnsi(wave3RenderListBody(t, c, "ec2"))
 	if !strings.Contains(out, "loading...") {
 		t.Errorf("RenderList must show the load-more 'loading...' hint while LoadingMore=true, got:\n%s", out)
 	}

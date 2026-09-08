@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -166,18 +167,34 @@ func (m *markerCapturingELBv2DescribeRulesMock) DescribeRules(_ context.Context,
 	return m.output, nil
 }
 
-// TestFetchELBListenerRules_MarkerForwarded pins that continuationToken is
-// forwarded as DescribeRules' Marker. DescribeRules DOES paginate via
-// Marker/NextMarker like other ELBv2 List/Describe calls — the function's
-// own doc comment used to (wrongly) claim there was no pagination from AWS.
+// TestFetchELBListenerRules_MarkerForwarded pins that a resumable cursor
+// (the fetcher's own NextToken from a truncated first page) decodes back to
+// the AWS Marker it carries and forwards that Marker to DescribeRules.
+// continuationToken is now a compound JSON cursor produced by this fetcher's
+// own encode(), NOT the bare AWS marker string — see elbListenerRulesCursor.
+// DescribeRules DOES paginate via Marker/NextMarker like other ELBv2
+// List/Describe calls, so an arbitrary raw string is no longer accepted
+// as-is (see TestQA_ChildPagination_FetchELBListenerRules_Continuation).
 func TestFetchELBListenerRules_MarkerForwarded(t *testing.T) {
+	firstPage := &mockELBv2DescribeRulesClient{output: &elbv2.DescribeRulesOutput{
+		Rules:      []elbtypes.Rule{{RuleArn: aws.String("arn:rule/page1"), Priority: aws.String("1")}},
+		NextMarker: aws.String("page2-marker-token"),
+	}}
+	first, err := awsclient.FetchELBListenerRules(context.Background(), firstPage, map[string]string{"listener_arn": "arn:listener/marker"}, "")
+	if err != nil {
+		t.Fatalf("first page error: %v", err)
+	}
+	if first.Pagination == nil || first.Pagination.NextToken == "" {
+		t.Fatal("expected a resumable cursor from a truncated first page")
+	}
+
 	mock := &markerCapturingELBv2DescribeRulesMock{output: &elbv2.DescribeRulesOutput{Rules: []elbtypes.Rule{}}}
-	_, err := awsclient.FetchELBListenerRules(context.Background(), mock, map[string]string{"listener_arn": "arn:listener/marker"}, "page2-marker-token")
+	_, err = awsclient.FetchELBListenerRules(context.Background(), mock, map[string]string{"listener_arn": "arn:listener/marker"}, first.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 	if mock.capturedMarker == nil {
-		t.Fatal("expected continuationToken to be forwarded as Marker, got nil")
+		t.Fatal("expected the cursor to decode and forward its Marker, got nil")
 	}
 	if *mock.capturedMarker != "page2-marker-token" {
 		t.Errorf("Marker: expected %q, got %q", "page2-marker-token", *mock.capturedMarker)
@@ -185,7 +202,11 @@ func TestFetchELBListenerRules_MarkerForwarded(t *testing.T) {
 }
 
 // TestFetchELBListenerRules_TruncatedByNextMarker pins that a real AWS-side
-// NextMarker reports IsTruncated=true and round-trips as NextToken.
+// NextMarker reports IsTruncated=true and NextToken carries that marker
+// wrapped in the fetcher's compound JSON cursor (elbListenerRulesCursor),
+// not the bare AWS marker string — a page over maxRules resumes by
+// re-issuing the same AWS Marker and skipping the already-converted prefix,
+// which a bare marker string cannot encode.
 func TestFetchELBListenerRules_TruncatedByNextMarker(t *testing.T) {
 	mock := &mockELBv2DescribeRulesClient{output: &elbv2.DescribeRulesOutput{
 		Rules:      []elbtypes.Rule{{RuleArn: aws.String("arn:rule/page1-only"), Priority: aws.String("1")}},
@@ -201,8 +222,14 @@ func TestFetchELBListenerRules_TruncatedByNextMarker(t *testing.T) {
 	if !result.Pagination.IsTruncated {
 		t.Error("expected IsTruncated=true when AWS returns a NextMarker")
 	}
-	if result.Pagination.NextToken != "next-marker-xyz" {
-		t.Errorf("NextToken: expected %q, got %q", "next-marker-xyz", result.Pagination.NextToken)
+	var cur struct {
+		Marker string `json:"m"`
+	}
+	if err := json.Unmarshal([]byte(result.Pagination.NextToken), &cur); err != nil {
+		t.Fatalf("NextToken is not the expected compound cursor: %v", err)
+	}
+	if cur.Marker != "next-marker-xyz" {
+		t.Errorf("cursor marker: expected %q, got %q", "next-marker-xyz", cur.Marker)
 	}
 }
 

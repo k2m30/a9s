@@ -41,6 +41,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // Flash auto-clear durations. apiErrorFlashDuration is the longer 5 s window
@@ -80,6 +81,20 @@ type ClearFlashEvent struct {
 type APIErrorEvent struct {
 	Err    error
 	NewGen domain.Gen
+	// Append mirrors messages.APIError.Append: true when this failure is the
+	// outcome of a load-more continuation, so ClearActiveListLoadingIntent
+	// clears only the LoadingMore indicator rather than every in-flight flag.
+	Append bool
+	// ResourceType and Provenance mirror messages.APIError's own fields —
+	// every adapter (orchestrator.go's HandleEvent, internal/tui/app_flash.go's
+	// handleAPIError) forwards them unchanged so ClearActiveListLoadingIntent
+	// carries enough to route the failure to the screen that owns the request
+	// that actually failed, mirroring handleResourcesLoadedEvent's
+	// ResourceType+CanonicalList() scan for the success path (see
+	// messages.APIError.Provenance for the full contract and its zero-value
+	// fallback).
+	ResourceType string
+	Provenance   messages.FetchProvenance
 }
 
 // ClientsReadyEvent mirrors the fields of messages.ClientsReady the
@@ -156,7 +171,12 @@ func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 	}
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},
-		ClearActiveListLoadingIntent{Err: text},
+		ClearActiveListLoadingIntent{
+			Err:          text,
+			Append:       ev.Append,
+			ResourceType: ev.ResourceType,
+			Provenance:   ev.Provenance,
+		},
 	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},

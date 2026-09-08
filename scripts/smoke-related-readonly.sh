@@ -44,7 +44,25 @@ trap cleanup EXIT
 
 tmux new-session -d -s "$SESSION" -x 220 -y 50 \
 	"$BIN --profile $PROFILE --region $REGION"
-sleep 5
+
+# A keystroke sent before the menu accepts input is dropped silently. A live
+# sweep is slower and more variable than the demo fixtures, so poll for probe
+# data rather than assuming a duration, and fail loudly instead of driving an
+# uninitialized screen. Mirrors smoke-readonly.sh's own poll.
+i=0
+ready=0
+while [ "$i" -lt 90 ]; do
+	if tmux capture-pane -t "$SESSION" -p 2>/dev/null | grep -qE 'issues:[0-9]+'; then
+		ready=1
+		break
+	fi
+	sleep 1
+	i=$((i + 1))
+done
+if [ "$ready" -ne 1 ]; then
+	echo "smoke-related-readonly: app did not reach a populated menu within 90s" >&2
+	exit 1
+fi
 
 open_and_capture() {
 	tmux send-keys -t "$SESSION" ":$1" Enter

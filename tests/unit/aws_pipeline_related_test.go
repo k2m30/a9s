@@ -154,21 +154,27 @@ func TestRelated_Pipeline_CB_NilClients(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_CB_FailedLookup_ReturnsUnknown pins that
-// pipelineGetDeclaration's nil-to-error signature change did not alter this
-// single-call caller's behavior: a failed GetPipeline still collapses to
-// UnknownRelated, exactly as a nil declaration did before.
-func TestRelated_Pipeline_CB_FailedLookup_ReturnsUnknown(t *testing.T) {
+// TestRelated_Pipeline_CB_FailedLookup_ReturnsError pins the current contract
+// (docs/related-resources.md rule 6): a client that IS wired but whose
+// GetPipeline comes back with no Pipeline in the response (this fake's
+// "misses" behavior — a call that was actually attempted) is a malformed
+// response, not "never attempted" — it must surface as RelatedError so the
+// operator sees the Flash + "!" error log and can retry, not silently
+// collapse to RelatedUnknown (which pipelineGetDeclaration/pipelineRelatedOnErr
+// now reserve for errPipelineNotConfigured — no CodePipeline client wired at
+// all). This test previously asserted RelatedUnknown for this same fixture;
+// that was the pre-rule-6 behavior.
+func TestRelated_Pipeline_CB_FailedLookup_ReturnsError(t *testing.T) {
 	const pipelineName = "missing-pipeline"
 	src := resource.Resource{ID: pipelineName, Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // GetPipeline misses -> fails
+		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // GetPipeline misses -> malformed empty response
 	}
 	checker := pipelineCheckerByTarget(t, "cb")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (failed lookup)", result.State())
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (client wired, call attempted, malformed empty response)", result.State())
 	}
 }
 
@@ -214,21 +220,25 @@ func TestRelated_Pipeline_Role_NoRole(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_Role_FailedLookup_ReturnsUnknown pins that
-// pipelineGetDeclaration's nil-to-error signature change did not alter this
-// single-call caller's behavior: a failed GetPipeline still collapses to
-// UnknownRelated, exactly as a nil declaration did before.
-func TestRelated_Pipeline_Role_FailedLookup_ReturnsUnknown(t *testing.T) {
+// TestRelated_Pipeline_Role_FailedLookup_ReturnsError pins the current
+// contract (docs/related-resources.md rule 6): see
+// TestRelated_Pipeline_CB_FailedLookup_ReturnsError — the same fake/fixture
+// is a wired client whose GetPipeline comes back with no Pipeline (malformed
+// response, an attempted call), which pipelineRelatedOnErr classifies as
+// RelatedError, not RelatedUnknown (reserved for errPipelineNotConfigured —
+// no client wired at all). This test previously asserted RelatedUnknown for
+// this same fixture; that was the pre-rule-6 behavior.
+func TestRelated_Pipeline_Role_FailedLookup_ReturnsError(t *testing.T) {
 	const pipelineName = "missing-pipeline"
 	src := resource.Resource{ID: pipelineName, Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // GetPipeline misses -> fails
+		CodePipeline: newFakeCodePipelineWithDeclarations(nil), // GetPipeline misses -> malformed empty response
 	}
 	checker := pipelineCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (failed lookup)", result.State())
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (client wired, call attempted, malformed empty response)", result.State())
 	}
 }
 

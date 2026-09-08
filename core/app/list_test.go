@@ -1431,12 +1431,16 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 			},
 		},
 	}
+	// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
+	// Provenance is FetchProvenanceChild — this event targets the pushed
+	// ScreenChildList screen, never the canonical top-level list underneath
+	// it, so it must carry the same provenance a real child-list fetch would
+	// (core/runtime/executor.go's TaskKindFetchChildResources case) — the
+	// symmetric provenance gate (handle.go) requires this to reach screen 2
+	// at all instead of being skipped past to canonical screen 1.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "ec2",
-		Resources:    singleRow, Provenance:
-
-		// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
-		messages.FetchProvenanceCanonicalList,
+		Resources:    singleRow, Provenance: messages.FetchProvenanceChild,
 	})
 
 	lb2 := listBodyOrFail(t, c)
@@ -1506,10 +1510,12 @@ func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
 	c.PushChildListScreen("rds")
 
 	// The child screen receives an empty result (simulates a related panel
-	// that found zero matching RDS instances).
+	// that found zero matching RDS instances). Provenance is
+	// FetchProvenanceChild — see the ec2 companion test above for why the
+	// symmetric provenance gate requires this.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "rds",
-		Resources:    []resource.Resource{}, Provenance: messages.FetchProvenanceCanonicalList,
+		Resources:    []resource.Resource{}, Provenance: messages.FetchProvenanceChild,
 	})
 
 	lb2 := listBodyOrFail(t, c)

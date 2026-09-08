@@ -1046,6 +1046,14 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 		cs.Loading = false
 		cs.ErrorMsg = ""
 		cs.AwaitedIdentity = ""
+		if ev.Grid.Fetched {
+			// Only a delivery that actually attempted the grid fetch carries
+			// a meaningful Truncated value — a SkipGrid anomalies-only
+			// delivery (ensureCostsShapeFetched's X3 branch) leaves
+			// ev.Grid.Truncated at its zero value and must never stomp the
+			// frame's last real grid outcome with a false "complete" signal.
+			cs.DrillStack[len(cs.DrillStack)-1].Truncated = ev.Grid.Truncated
+		}
 	}
 
 	cs.Store.ApplyFetchResult(costs.FetchResult{
@@ -1125,7 +1133,7 @@ func (c *Controller) applyCostsGranularityFallback(cs *CostsState, ev messages.C
 // whose anomaly fetch errored), which need no separate skip/error flag on
 // the wire message since both want the identical "preserve" outcome.
 func costsAnomalyResultFromEvent(ev messages.CostsLoaded) costs.AnomalyResult {
-	return costs.AnomalyResult{Requested: ev.Anomalies != nil, Marks: ev.Anomalies}
+	return costs.AnomalyResult{Requested: ev.Anomalies != nil, Marks: ev.Anomalies, Truncated: ev.AnomaliesTruncated}
 }
 
 func clampInt(v, lo, hi int) int {

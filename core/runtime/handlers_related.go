@@ -17,6 +17,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -102,8 +103,20 @@ const (
 // resulting messages.ResourcesLoaded.TypeGen so HandleResourcesLoaded's
 // rerun branch (TypeGen != 0 && TypeGen == current per-type gen) applies this
 // rerun's own result instead of treating it as an ordinary list-open fetch.
+// Provenance overrides the executor's default FetchProvenanceCanonicalList
+// stamp — the zero value (FetchProvenanceUnknown) leaves the default in
+// place, so every existing plain list-open/refresh dispatch (which never
+// sets this field) is unaffected. A related-navigation drill that falls back
+// to a full- or next-page fetch (HandleRelatedNavigate's TargetID-cache-miss,
+// Truncated-scan, and RelatedIDs-cache-miss branches below) sets it to
+// FetchProvenanceFilteredList: that fetch's result lands on a related
+// drill's own screen (ScreenChildList, or a ScreenResourceList pushed via
+// pushByIDPlaceholderList with EscPops=true), never the type's canonical
+// top-level list, even though the underlying fetch mechanically calls the
+// same Core.FetchResources/FetchMoreResources the canonical path uses.
 type FetchResourcesPayload struct {
-	TypeGen domain.Gen
+	TypeGen    domain.Gen
+	Provenance messages.FetchProvenance
 }
 
 func (FetchResourcesPayload) isTaskPayload() {}
@@ -115,11 +128,23 @@ func (FetchResourcesPayload) isTaskPayload() {}
 //
 // ParentContext and FetchFilter are non-nil when the list being paginated is
 // a child list (ParentContext) or a filtered list (FetchFilter). The executor
-// routes to the appropriate child/filtered fetcher when either is set.
+// routes to the appropriate child/filtered fetcher when either is set, and
+// (absent a Provenance override below) derives FetchProvenance from them via
+// messages.ProvenanceForContinuation.
+//
+// Provenance overrides that derivation the same way FetchResourcesPayload's
+// field does — left unset by every ordinary pagination continuation
+// (internal/tui/fetch_adapter.go's messages.LoadMore handler, which supplies
+// the list's own ParentContext/FetchFilter instead), and set to
+// FetchProvenanceFilteredList by a related-navigation drill's own
+// initial-resolution page-2+ fetch (HandleRelatedNavigate's RelatedIDs
+// cache-miss branch below), whose ParentContext/FetchFilter are both empty
+// yet whose result must still land on the drill's own non-canonical screen.
 type FetchMorePayload struct {
 	ContinuationToken string
 	ParentContext     map[string]string
 	FetchFilter       map[string]string
+	Provenance        messages.FetchProvenance
 }
 
 func (FetchMorePayload) isTaskPayload() {}
@@ -165,8 +190,9 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 				}}
 			}
 			return result, []TaskRequest{{
-				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
-				Cache: CacheNone,
+				Key:     TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
+				Cache:   CacheNone,
+				Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
 			}}
 		}
 		if result.Truncated {
@@ -174,8 +200,9 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 			// population so the reapply-checker scopes each page. Distinct from an
 			// exact result (below), which found all its targets and fetches by ID.
 			return result, []TaskRequest{{
-				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
-				Cache: CacheNone,
+				Key:     TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
+				Cache:   CacheNone,
+				Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
 			}}
 		}
 		if len(result.RelatedIDs) > 0 {
@@ -242,16 +269,20 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 	// own pagination state, matching the former ResourceCache-only check.
 	if tr.Gen != 0 && !tr.Partial && tr.Pagination != nil && tr.Pagination.IsTruncated {
 		return []TaskRequest{{
-			Key:     TaskKey{Kind: KindFetchMore, Scope: targetType},
-			Cache:   CacheNone,
-			Payload: FetchMorePayload{ContinuationToken: tr.Pagination.NextToken},
+			Key:   TaskKey{Kind: KindFetchMore, Scope: targetType},
+			Cache: CacheNone,
+			Payload: FetchMorePayload{
+				ContinuationToken: tr.Pagination.NextToken,
+				Provenance:        messages.FetchProvenanceFilteredList,
+			},
 		}}
 	}
 
 	// Cache miss (no entry at all or no further pages) — fetch all resources.
 	return []TaskRequest{{
-		Key:   TaskKey{Kind: KindFetchResources, Scope: targetType},
-		Cache: CacheNone,
+		Key:     TaskKey{Kind: KindFetchResources, Scope: targetType},
+		Cache:   CacheNone,
+		Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
 	}}
 }
 

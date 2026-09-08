@@ -27,15 +27,20 @@ import (
 var errPipelineNotConfigured = errors.New("codepipeline client not configured")
 
 // pipelineGetDeclaration wraps GetPipeline in RetryOnThrottle. A nil error
-// means the declaration was resolved; any non-nil error (errPipelineNotConfigured,
-// a RetryOnThrottle failure, or an empty response) means it was not, and the
-// caller must not treat that the same as a definitive "not found". A checker
-// resolving a single pipeline (its own res.ID) can collapse any error to
-// UnknownRelated, since either reason leaves it unable to answer. A checker
+// means the declaration was resolved; any non-nil error means it was not, and
+// the caller must not treat that the same as a definitive "not found". Per
+// the golden contract (docs/related-resources.md rule 6), the error must be
+// classified — never collapsed wholesale — via pipelineRelatedOnErr:
+// errPipelineNotConfigured means no CodePipeline client was even wired to
+// attempt the call (structurally can't look, ever — UnknownRelated, still
+// navigable); any other error means GetPipeline was actually attempted and
+// failed (AccessDenied, exhausted RetryOnThrottle retries, or a malformed
+// empty response) — a real operational failure that must surface via
+// ErrorRelated (Flash + the "!" error log), never a silent Unknown. A checker
 // looping over many pipelines must instead count failures across the loop:
-// if every lookup in the loop failed, nothing could be determined at all
-// (UnknownRelated); if only some failed, the count found so far is partial,
-// not exact (relatedResultTrunc with truncated=true).
+// if every lookup in the loop failed, nothing could be determined at all; if
+// only some failed, the count found so far is partial, not exact
+// (relatedResultTrunc with truncated=true).
 func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName string) (*cptypes.PipelineDeclaration, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CodePipeline == nil {
@@ -55,6 +60,22 @@ func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName strin
 		return nil, errors.New("codepipeline GetPipeline returned no pipeline declaration")
 	}
 	return out.Pipeline, nil
+}
+
+// pipelineRelatedOnErr classifies a pipelineGetDeclaration failure into the
+// correct RelatedCheckResult, per the golden contract's error rule
+// (docs/related-resources.md rule 6): errPipelineNotConfigured is the one
+// structural "we never even attempted the call" case — no client was wired,
+// retrying changes nothing — and stays UnknownRelated. Every other error
+// means GetPipeline was actually invoked and failed (AccessDenied, exhausted
+// throttle retries, or a malformed empty response), which is a real failure
+// the operator must be able to see and retry (ErrorRelated: surfaced via
+// Flash + the "!" error log, never silently collapsed to Unknown).
+func pipelineRelatedOnErr(targetType string, err error) resource.RelatedCheckResult {
+	if errors.Is(err, errPipelineNotConfigured) {
+		return resource.UnknownRelated(targetType)
+	}
+	return resource.ErrorRelated(targetType, err)
 }
 
 // pipelineActions iterates every action across every stage and invokes fn. The
@@ -88,7 +109,7 @@ func actionProvider(a cptypes.ActionDeclaration) string {
 func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("cb")
+		return pipelineRelatedOnErr("cb", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -107,7 +128,7 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("role")
+		return pipelineRelatedOnErr("role", err)
 	}
 	var names []string
 	if p.RoleArn != nil && *p.RoleArn != "" {
@@ -129,7 +150,7 @@ func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, 
 func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("cfn")
+		return pipelineRelatedOnErr("cfn", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -150,7 +171,7 @@ func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _
 func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("codeartifact")
+		return pipelineRelatedOnErr("codeartifact", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -169,7 +190,7 @@ func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Re
 func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("ecr")
+		return pipelineRelatedOnErr("ecr", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -189,7 +210,7 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("ecs-svc")
+		return pipelineRelatedOnErr("ecs-svc", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -209,7 +230,7 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("kms")
+		return pipelineRelatedOnErr("kms", err)
 	}
 	seen := map[string]struct{}{}
 	addKey := func(st *cptypes.ArtifactStore) {
@@ -232,7 +253,7 @@ func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _
 func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("lambda")
+		return pipelineRelatedOnErr("lambda", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -252,7 +273,7 @@ func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource
 func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("s3")
+		return pipelineRelatedOnErr("s3", err)
 	}
 	seen := map[string]struct{}{}
 	addBucket := func(st *cptypes.ArtifactStore) {
@@ -282,7 +303,7 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
-		return resource.UnknownRelated("sns")
+		return pipelineRelatedOnErr("sns", err)
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {

@@ -16,13 +16,19 @@ package unit
 //     error, resource unchanged, no panic
 //   - nil RawStruct (a disk-cache-seeded row: cache.Row carries only
 //     ID/Name/Fields/Findings, no RawStruct, until the live refetch lands) →
-//     unchanged resource, nil error, no panic — a silent, self-healing skip,
-//     not a flashed error. Uniform across every enricher, including the
+//     unchanged resource, no panic, and — for every engine-based enricher —
+//     errors.Is(err, awsclient.ErrDetailEnrichSkipped): a silent, self-healing
+//     skip, not a flashed error (core/runtime.HandleEnrichDetailResult
+//     special-cases this sentinel to suppress the flash) NOR a completed
+//     success (the sentinel is what stops that same handler from clearing a
+//     pending sticky-refresh demand for an operation that fetched nothing —
+//     see ErrDetailEnrichSkipped's own doc comment in
+//     core/aws/detail_enrich_engine.go). The one documented exception is the
 //     off-engine transfer_agreements (core/aws/transfer_children.go), which
-//     carries the identical guard inline rather than through
-//     core/aws/detail_enrich_engine.go (see nilRawStructWantErrSubstring
-//     below for the one-line override this axis needs if a future enricher
-//     legitimately diverges).
+//     hand-rolls the identical RawStruct==nil guard inline rather than
+//     through core/aws/detail_enrich_engine.go and still returns a plain nil
+//     — see nilRawStructNilErrOverrides below for the one-line table entry
+//     this axis needs if a future enricher legitimately diverges either way.
 //   - registry count sanity: at least 9 enrichers registered (catches a
 //     catalog rewire silently dropping registrations)
 //
@@ -34,6 +40,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -92,15 +99,20 @@ func expectedCtxErrSubstring(shortName string) string {
 	return uniformCtxErrSubstring
 }
 
-// nilRawStructWantErrSubstring holds a per-shortName override for the
-// nil-RawStruct axis, mirroring enricherCtxErrOverrides above. Absent from
-// this map means the uniform contract: nil error (a disk-cache-seeded row is
-// silently deferred, not flashed as an error). Verified empirically: every
-// currently registered enricher, including the off-engine
-// transfer_agreements, honors this — this map starts empty so a future
-// divergent enricher is a one-line table entry here, not a special case in
-// the test logic below.
-var nilRawStructWantErrSubstring = map[string]string{}
+// nilRawStructNilErrOverrides holds the set of shortNames whose nil-RawStruct
+// skip returns a plain nil error rather than the uniform
+// awsclient.ErrDetailEnrichSkipped sentinel every engine-based enricher
+// returns. Verified empirically: transfer_agreements
+// (core/aws/transfer_children.go) is the one currently registered enricher
+// that is off-engine — it hand-rolls the identical RawStruct==nil guard
+// inline instead of routing through core/aws/detail_enrich_engine.go's
+// enrichDetail, so it never gained the sentinel when that engine started
+// returning it. This map exists so a future divergent enricher (in either
+// direction) is a one-line table entry here, not a special case in the test
+// logic below.
+var nilRawStructNilErrOverrides = map[string]bool{
+	"transfer_agreements": true,
+}
 
 // runGuarded runs fn and turns any panic into a t.Fatal with a clear message
 // instead of crashing the whole test binary — a panicking enricher is a
@@ -188,12 +200,12 @@ func TestDetailEnricherContract(t *testing.T) {
 				res := resource.Resource{ID: "contract-test-id", RawStruct: nil}
 				got, err := enricher(context.Background(), ctx, res)
 
-				if wantErrSubstr, override := nilRawStructWantErrSubstring[shortName]; override {
-					if err == nil || !strings.Contains(err.Error(), wantErrSubstr) {
-						t.Errorf("%s: error = %v, want it to contain %q", shortName, err, wantErrSubstr)
+				if nilRawStructNilErrOverrides[shortName] {
+					if err != nil {
+						t.Errorf("%s: expected nil error for nil RawStruct (cache-seeded row, off-engine hand-rolled guard), got %v", shortName, err)
 					}
-				} else if err != nil {
-					t.Errorf("%s: expected nil error for nil RawStruct (cache-seeded row), got %v", shortName, err)
+				} else if !errors.Is(err, awsclient.ErrDetailEnrichSkipped) {
+					t.Errorf("%s: err = %v, want errors.Is(err, awsclient.ErrDetailEnrichSkipped) for nil RawStruct (cache-seeded row) — the sentinel is what lets core/runtime.HandleEnrichDetailResult tell a genuine skip apart from a completed success and leave any pending sticky-refresh demand armed instead of consuming it", shortName, err)
 				}
 				if !reflect.DeepEqual(got, res) {
 					t.Errorf("%s: resource changed on nil RawStruct; got %+v, want unchanged %+v", shortName, got, res)
@@ -203,11 +215,11 @@ func TestDetailEnricherContract(t *testing.T) {
 
 		// The two subtests below pin engine validation order (#261
 		// boundary-sealing wave, item c): a nil RawStruct with a nil Clients
-		// must still silently skip (a pre-connect open of a disk-cache-seeded
-		// row has a non-nil *DetailEnrichmentCtx but a nil Clients — it must
-		// hit the RawStruct-nil skip, not a Clients error), while a non-nil
-		// RawStruct with a nil Clients must still error — Clients is required
-		// once there is real work to do.
+		// must still hit the RawStruct-nil skip before the Clients-nil check
+		// (a pre-connect open of a disk-cache-seeded row has a non-nil
+		// *DetailEnrichmentCtx but a nil Clients), while a non-nil RawStruct
+		// with a nil Clients must still error — Clients is required once
+		// there is real work to do.
 		t.Run(shortName+"/nil_raw_struct_nil_clients", func(t *testing.T) {
 			runGuarded(t, func(t *testing.T) {
 				ctx := &awsclient.DetailEnrichmentCtx{
@@ -217,8 +229,12 @@ func TestDetailEnricherContract(t *testing.T) {
 				res := resource.Resource{ID: "contract-test-id", RawStruct: nil}
 				got, err := enricher(context.Background(), ctx, res)
 
-				if err != nil {
-					t.Errorf("%s: expected nil error for nil RawStruct with nil Clients (pre-connect, cache-seeded row) — the RawStruct-nil check must run before the Clients-nil check in EVERY enricher, engine-based or hand-rolled, got %v", shortName, err)
+				if nilRawStructNilErrOverrides[shortName] {
+					if err != nil {
+						t.Errorf("%s: expected nil error for nil RawStruct with nil Clients (pre-connect, cache-seeded row, off-engine hand-rolled guard), got %v", shortName, err)
+					}
+				} else if !errors.Is(err, awsclient.ErrDetailEnrichSkipped) {
+					t.Errorf("%s: err = %v, want errors.Is(err, awsclient.ErrDetailEnrichSkipped) for nil RawStruct with nil Clients (pre-connect, cache-seeded row) — the RawStruct-nil check must run (and return the sentinel) before the Clients-nil check in EVERY engine-based enricher", shortName, err)
 				}
 				if !reflect.DeepEqual(got, res) {
 					t.Errorf("%s: resource changed on nil-RawStruct/nil-Clients path; got %+v, want unchanged %+v", shortName, got, res)

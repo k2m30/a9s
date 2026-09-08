@@ -284,6 +284,137 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// The SYMMETRIC direction: a genuine CanonicalList result must not overwrite
+// a topmost filtered/child screen, and must fall through to the canonical
+// screen beneath it instead. Before handle.go's gate was made symmetric
+// (topLevelCanonical != msg.Provenance.CanonicalList(), rather than a
+// one-directional "reject non-canonical on a canonical screen" check), a
+// late canonical refresh landing while the user sat in a related-panel drill
+// would have matched the topmost (filtered) screen — the first same-type
+// screen the top-down scan finds — and overwritten the drill the user was
+// actively looking at with the unrelated canonical population. This is the
+// defect CodeRabbit flagged and c6a6755f fixed.
+// ────────────────────────────────────────────────────────────────────────────
+
+// TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsThroughToCanonicalBeneath
+// pushes a stacked related-filtered ec2 drill (same production seam as the
+// FilteredDrill repro above) on top of the 200-row canonical seed, seeds the
+// drill with its OWN distinct 3-row result, then delivers a fresh
+// CanonicalList result (250 rows) while the drill is still topmost. Asserts
+// the drill is untouched and the canonical result instead reaches screen1 —
+// both in the per-screen Snapshot after popping back, and in the shared
+// RowStore/disk TypeFile.
+func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsThroughToCanonicalBeneath(t *testing.T) {
+	ctrl, core, profile, region := newProvenancePinController(t)
+	seedCanonical200(t, ctrl, core, profile, region)
+
+	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
+	ctrl.EnsureDetailState(resource.Resource{ID: "sg-reverse-src", Name: "sg-reverse-src", Type: "sg"}, "sg")
+	ctrl.ApplyDetailRelated([]app.DetailRelatedRow{
+		{TargetType: provenancePinType, DisplayName: "EC2 Instances", Count: 3, ResourceIDs: []string{"i-drill-0", "i-drill-1", "i-drill-2"}},
+	})
+	ctrl.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+	if !ctrl.GetListEscPops() {
+		t.Fatal("test setup problem: the pushed related-filtered ec2 list must have EscPops=true")
+	}
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: provenancePinType,
+		Resources:    provenancePinEC2Rows(3, "i-drill"),
+		Provenance:   messages.FetchProvenanceFilteredList,
+	})
+	drillSnap := ctrl.Snapshot()
+	if drillSnap.Body.List == nil || len(drillSnap.Body.List.Rows) != 3 {
+		got := 0
+		if drillSnap.Body.List != nil {
+			got = len(drillSnap.Body.List.Rows)
+		}
+		t.Fatalf("test setup problem: the drill screen must show its own 3 rows before the reverse pin fires, got %d", got)
+	}
+
+	// A late CanonicalList result for "ec2" lands while the filtered drill is
+	// still topmost — e.g. a stale top-level refresh continuation that was
+	// already in flight when the user navigated into the drill.
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: provenancePinType,
+		Resources:    provenancePinEC2Rows(250, "i-late-canon"),
+		Pagination:   &resource.PaginationMeta{IsTruncated: false},
+		Provenance:   messages.FetchProvenanceCanonicalList,
+	})
+
+	// The drill (still topmost) must be completely untouched.
+	afterSnap := ctrl.Snapshot()
+	if afterSnap.Body.List == nil || len(afterSnap.Body.List.Rows) != 3 {
+		got := 0
+		if afterSnap.Body.List != nil {
+			got = len(afterSnap.Body.List.Rows)
+		}
+		t.Errorf("drill screen (still topmost) rows = %d after a late CanonicalList result landed, want 3 unchanged — a CanonicalList result must never overwrite the filtered drill the user is sitting in", got)
+	}
+
+	// It must instead have fallen through PAST the drill to the canonical
+	// screen beneath it: pop back and confirm screen1 picked up the fresh
+	// 250-row canonical population, both per-screen and on disk.
+	ctrl.Apply(app.Action{Kind: app.ActionBack}) // pop drill -> detail
+	ctrl.Apply(app.Action{Kind: app.ActionBack}) // pop detail -> canonical screen1
+
+	screen1Snap := ctrl.Snapshot()
+	if screen1Snap.Body.List == nil || len(screen1Snap.Body.List.Rows) != 250 {
+		got := 0
+		if screen1Snap.Body.List != nil {
+			got = len(screen1Snap.Body.List.Rows)
+		}
+		t.Errorf("canonical screen1 rows after popping back = %d, want 250 — the late CanonicalList result must fall through past the topmost drill and land on the canonical screen beneath it", got)
+	}
+
+	snap := core.Session().RowStore.Snapshot(provenancePinType)
+	if len(snap.Rows) != 250 || snap.TotalCount != 250 {
+		t.Errorf("RowStore entry after the late CanonicalList result = %d rows, TotalCount=%d, want 250/250", len(snap.Rows), snap.TotalCount)
+	}
+	tf := provenancePinReadTypeFile(t, profile, region, provenancePinType)
+	if len(tf.Rows) != 250 || tf.Count != 250 {
+		t.Errorf("disk TypeFile after the late CanonicalList result = %d rows, Count=%d, want 250/250", len(tf.Rows), tf.Count)
+	}
+}
+
+// TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_DoesNotSeedFilteredCache
+// covers the second half of the symmetric gate: a CanonicalList result must
+// not populate a topmost filtered screen's OWN FilteredRowsSet cache either
+// (handle.go only calls FilteredRowsSet when !topLevelCanonical — a
+// CanonicalList result reaching this screen at all would be the bug). Uses
+// the FetchFilter-carrying drill shape (mirrors
+// TestWebLane_FilteredDrill_SetsEscPops_AndFilteredRowsSetFires) since
+// FilteredRowsSet only fires for that sub-case, not the RelatedIDs one above.
+func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_DoesNotSeedFilteredCache(t *testing.T) {
+	ctrl, core, _, _ := newProvenancePinController(t)
+
+	filter := map[string]string{"Username": "bob-reverse-provenance-test"}
+
+	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
+	ctrl.EnsureDetailState(resource.Resource{ID: "ec2-reverse-src", Name: "ec2-reverse-src", Type: "ec2"}, "ec2")
+	ctrl.ApplyDetailRelated([]app.DetailRelatedRow{
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", State: domain.RelatedDeferred, FetchFilter: filter},
+	})
+	ctrl.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+	if !ctrl.GetListEscPops() {
+		t.Fatal("test setup problem: a FetchFilter-carrying related drill must have EscPops=true")
+	}
+
+	// A CanonicalList-provenance result for "ct-events" lands while the
+	// FetchFilter drill is still topmost.
+	ctrl.Handle(messages.ResourcesLoaded{
+		ResourceType: "ct-events",
+		Resources: []resource.Resource{
+			{ID: "evt-reverse-1", Type: "ct-events"},
+		},
+		Provenance: messages.FetchProvenanceCanonicalList,
+	})
+
+	if _, ok := core.FilteredRowsGet("ct-events", filter); ok {
+		t.Error("FilteredRowsGet(\"ct-events\", filter) ok=true after a CanonicalList-provenance result landed — a canonical result must never populate a filtered drill's own filtered-rows cache")
+	}
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // ByID and Child provenance: same property, but the isolation is DIFFERENT
 // from the filtered-drill case above and that difference is deliberate, not
 // an oversight — see the comment on popTopScreenForProvenancePin.

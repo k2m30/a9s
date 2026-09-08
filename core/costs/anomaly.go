@@ -26,6 +26,12 @@ type AnomalyResult struct {
 	Requested bool
 	Marks     []AnomalyMark
 	Err       error
+	// Truncated is true when the underlying GetAnomalies fetch was cut short
+	// by a page cap with more pages still available (mirrors
+	// GridResult.Truncated) — Marks is then a lower bound, not CE's own
+	// authoritative complete list for the window, and must never be cached as
+	// a confirmed 24h-TTL snapshot (see (*Store).ApplyFetchResult).
+	Truncated bool
 }
 
 // GridResult is the outcome of one grid (GetCostAndUsage[WithResources])
@@ -38,4 +44,9 @@ type GridResult struct {
 	Fetched bool
 	Records []Record
 	Err     error
+	// Truncated is true when the underlying CE grid fetch was cut short by a
+	// pagination page cap with more pages still available — Records is then
+	// a lower bound, not CE's own authoritative complete result, and callers
+	// must render it as partial rather than as complete totals.
+	Truncated bool
 }

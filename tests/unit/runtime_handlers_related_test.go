@@ -22,6 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -210,8 +211,9 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_CacheMiss_FetchResources(t *te
 		t.Errorf("RelatedIDs = %v, want %v", result.RelatedIDs, relatedIDs)
 	}
 	wantTasks := []runtime.TaskRequest{{
-		Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "ec2"},
-		Cache: runtime.CacheNone,
+		Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "ec2"},
+		Cache:   runtime.CacheNone,
+		Payload: runtime.FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
 	}}
 	if !reflect.DeepEqual(tasks, wantTasks) {
 		t.Errorf("tasks = %+v, want %+v", tasks, wantTasks)
@@ -234,9 +236,12 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_Fetc
 		t.Errorf("Kind = %v, want NavigationKindFilteredList", result.Kind)
 	}
 	wantTasks := []runtime.TaskRequest{{
-		Key:     runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: "ec2"},
-		Cache:   runtime.CacheNone,
-		Payload: runtime.FetchMorePayload{ContinuationToken: "next-tok-xyz"},
+		Key:   runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: "ec2"},
+		Cache: runtime.CacheNone,
+		Payload: runtime.FetchMorePayload{
+			ContinuationToken: "next-tok-xyz",
+			Provenance:        messages.FetchProvenanceFilteredList,
+		},
 	}}
 	if !reflect.DeepEqual(tasks, wantTasks) {
 		t.Errorf("tasks = %+v, want %+v", tasks, wantTasks)

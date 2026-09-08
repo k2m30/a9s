@@ -282,7 +282,7 @@ func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (row
 // The already-loaded lambda cache, when present, only enriches: for a
 // FunctionArn the cache has, it resolves to the cached Resource.ID (the bare
 // function name the lambda drill/detail view navigates by — see
-// FetchLambdaFunctionsPageWithEventSources); for any FunctionArn the cache
+// FetchLambdaFunctionsPage); for any FunctionArn the cache
 // lacks (stale/incomplete cache — a cache miss must never drop a
 // API-confirmed mapping), the bare name is instead parsed out of the
 // FunctionArn (arn:aws:lambda:region:account:function:name[:qualifier]). The

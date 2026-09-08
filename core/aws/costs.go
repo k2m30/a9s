@@ -30,6 +30,12 @@ type CostFetchResult struct {
 	Records      []costs.Record
 	Attrs        map[string]string
 	RequestCount int
+	// Truncated is true when drainCostUsagePages stopped at costsGridPageCap
+	// with more pages still available — Records is then a lower bound, never
+	// a discovered-complete zero-group result, and must render as partial
+	// rather than as authoritative totals (FR-017: partial dollars rendered
+	// as complete dollars is a correctness defect).
+	Truncated bool
 }
 
 // Typed sentinel errors surfaced as explicit view states (FR-017): an
@@ -171,6 +177,25 @@ func mapAttrs(dst map[string]string, attrs []cetypes.DimensionValuesWithAttribut
 	}
 }
 
+// costsGridPageCap bounds drainCostUsagePages to at most this many
+// GetCostAndUsage[WithResources] requests per fetch. GetCostAndUsage has no
+// SDK-generated paginator to inherit a stop condition from, every request is
+// a billed $0.01 CE call (RequestCount), and KindFetchCosts runs with no
+// wall-clock backstop of its own (executor.go forwards the caller's ctx
+// unwrapped) — so a page cap is the only thing standing between a
+// misbehaving response and an unbounded bill.
+const costsGridPageCap = 50
+
+// costsAnomalyPageCap bounds FetchCostAnomalies the same way, at a smaller
+// ceiling: GetAnomalies' own generated paginator already treats a
+// nil-or-empty NextPageToken as terminal (the contract this file's hand-rolled
+// loop now matches), so this cap is a pure belt against an account with an
+// unusually large anomaly backlog, not a correctness fix on its own. Firing
+// it sets AnomaliesFetchResult.Truncated rather than silently capping the
+// mark set — the same "lower bound, not a discovered-complete result"
+// distinction CostFetchResult.Truncated already makes for the grid fetch.
+const costsAnomalyPageCap = 20
+
 // costUsagePage is the per-page shape GetCostAndUsage and
 // GetCostAndUsageWithResources responses both carry — drainCostUsagePages
 // drains either one via a caller-supplied fetch-one-page closure, so the
@@ -188,7 +213,7 @@ type costUsagePage struct {
 func drainCostUsagePages(invoiceKey costs.Metric, fetchPage func(nextToken *string) (costUsagePage, error)) (CostFetchResult, error) {
 	result := CostFetchResult{Attrs: make(map[string]string)}
 	var token *string
-	for {
+	for pages := 0; ; pages++ {
 		page, err := fetchPage(token)
 		result.RequestCount++
 		if err != nil {
@@ -207,7 +232,16 @@ func drainCostUsagePages(invoiceKey costs.Metric, fetchPage func(nextToken *stri
 			}
 		}
 
-		if page.NextPageToken == nil {
+		// Matches the stop condition every AWS-generated paginator in this
+		// SDK uses (e.g. kms.ListAliasesPaginator.HasMorePages): a non-nil
+		// but empty NextPageToken is exhaustion, not "one more page" — this
+		// API has no generated paginator of its own to inherit that contract
+		// from, so it is stated explicitly here.
+		if page.NextPageToken == nil || *page.NextPageToken == "" {
+			return result, nil
+		}
+		if pages+1 >= costsGridPageCap {
+			result.Truncated = true
 			return result, nil
 		}
 		token = page.NextPageToken
@@ -258,36 +292,70 @@ func FetchCostAndUsageWithResources(ctx context.Context, api CostsGetCostAndUsag
 	})
 }
 
-// FetchCostAnomaliesCounted paginates GetAnomalies to exhaustion, mapping
-// each anomaly's first root cause into a preformatted RootCause string and a
-// Dimension map for per-cell matching (FR-014), plus the number of
-// GetAnomalies pages actually requested — CostsLoaded.Requests must fold
-// this in alongside the main cost-and-usage fetch's own count, since the
-// anomaly overlay is a separate billed CE call riding alongside it.
-func FetchCostAnomaliesCounted(ctx context.Context, api CostsGetAnomaliesAPI, window costs.Period) ([]costs.AnomalyMark, int, error) {
-	var marks []costs.AnomalyMark
-	requests := 0
+// AnomaliesFetchResult is the outcome of one FetchCostAnomalies call,
+// mirroring CostFetchResult.Truncated for the anomaly overlay: Truncated is
+// true when costsAnomalyPageCap fired before GetAnomalies' own
+// NextPageToken exhaustion, meaning Marks is a lower bound — anomalies past
+// the cap were never requested — rather than CE's own authoritative
+// complete list for the window.
+type AnomaliesFetchResult struct {
+	Marks     []costs.AnomalyMark
+	Requests  int
+	Truncated bool
+}
+
+// FetchCostAnomalies paginates GetAnomalies up to costsAnomalyPageCap,
+// mapping each anomaly's first root cause into a preformatted RootCause
+// string and a Dimension map for per-cell matching (FR-014). Requests is
+// the number of GetAnomalies pages actually requested — CostsLoaded.Requests
+// must fold this in alongside the main cost-and-usage fetch's own count,
+// since the anomaly overlay is a separate billed CE call riding alongside
+// it.
+func FetchCostAnomalies(ctx context.Context, api CostsGetAnomaliesAPI, window costs.Period) (AnomaliesFetchResult, error) {
+	var result AnomaliesFetchResult
 	input := &costexplorer.GetAnomaliesInput{
 		DateInterval: &cetypes.AnomalyDateInterval{StartDate: aws.String(window.Start), EndDate: aws.String(window.End)},
 	}
 
-	for {
+	for pages := 0; ; pages++ {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*costexplorer.GetAnomaliesOutput, error) {
 			return api.GetAnomalies(ctx, input)
 		})
-		requests++
+		result.Requests++
 		if err != nil {
-			return nil, requests, classifyCostsError(err)
+			return result, classifyCostsError(err)
 		}
 		for _, a := range out.Anomalies {
-			marks = append(marks, mapAnomaly(a))
+			result.Marks = append(result.Marks, mapAnomaly(a))
 		}
-		if out.NextPageToken == nil {
-			break
+		// Same nil-or-empty stop condition GetAnomaliesPaginator.HasMorePages
+		// itself uses — this hand-rolled loop now matches its own API's
+		// generated paginator instead of diverging from it.
+		if out.NextPageToken == nil || *out.NextPageToken == "" {
+			return result, nil
+		}
+		if pages+1 >= costsAnomalyPageCap {
+			result.Truncated = true
+			return result, nil
 		}
 		input.NextPageToken = out.NextPageToken
 	}
-	return marks, requests, nil
+}
+
+// FetchCostAnomaliesCounted is FetchCostAnomalies with its result unpacked
+// into the (marks, requests, err) tuple this package's existing callers
+// expect: an error on any page discards whatever marks earlier pages had
+// already collected, the same all-or-nothing behavior FetchCostAnomalies
+// itself has on error. It drops AnomaliesFetchResult.Truncated, so a caller
+// reached through this entry point cannot tell a page-capped fetch apart
+// from a genuinely complete one — FetchCostAnomalies is the entry point
+// that carries that signal through to CostsLoaded.
+func FetchCostAnomaliesCounted(ctx context.Context, api CostsGetAnomaliesAPI, window costs.Period) ([]costs.AnomalyMark, int, error) {
+	result, err := FetchCostAnomalies(ctx, api, window)
+	if err != nil {
+		return nil, result.Requests, err
+	}
+	return result.Marks, result.Requests, nil
 }
 
 // rootCauseDim pairs a RootCause struct field with its costs.Dimension key

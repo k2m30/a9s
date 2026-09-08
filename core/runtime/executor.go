@@ -44,6 +44,11 @@ import (
 // context. See the executor.go package-doc for the complete list.
 var ErrAdapterOnlyTask = errors.New("task kind is adapter-only and cannot be executed by Core.ExecuteTask")
 
+// costsFetchTimeout bounds KindFetchCosts — see the case's own comment for
+// why this fetch lane needs its own deadline instead of inheriting one from
+// a Core.Fetch* wrapper.
+const costsFetchTimeout = 90 * time.Second
+
 // DispatchSnapshot captures the session state ExecuteTask reads, taken at
 // DISPATCH time (synchronously, before the async command goroutine runs).
 type DispatchSnapshot struct {
@@ -361,12 +366,16 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		resourceType := req.Key.Scope
 		gen := snap.AvailabilityGen
 		var typeGen domain.Gen
+		provenance := messages.FetchProvenanceCanonicalList
 		if p, ok := req.Payload.(FetchResourcesPayload); ok {
 			typeGen = p.TypeGen
+			if p.Provenance != messages.FetchProvenanceUnknown {
+				provenance = p.Provenance
+			}
 		}
 		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: provenance}, nil
 		}
 		// C1: a verify-refetch must verify the content actually being shown,
 		// not just page 1 — so page up to the previously-cached depth. C5: a
@@ -403,7 +412,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Gen:          gen,
 			TypeGen:      typeGen,
 			ListSeq:      req.ListSeq,
-			Provenance:   messages.FetchProvenanceCanonicalList,
+			Provenance:   provenance,
 		}, nil
 
 	// --- fetch filtered resources ---
@@ -416,7 +425,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		gen := snap.AvailabilityGen
 		res, err := c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceFilteredList}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -441,8 +450,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			ParentCtx:    p.ParentContext,
 			FetchFilter:  p.FetchFilter,
 		})
+		provenance := p.Provenance
+		if provenance == messages.FetchProvenanceUnknown {
+			provenance = messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter)
+		}
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
+			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Append: true, Provenance: provenance}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -452,7 +465,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      req.ListSeq,
-			Provenance:   messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter),
+			Provenance:   provenance,
 		}, nil
 
 	// --- fetch child resources ---
@@ -464,7 +477,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		gen := snap.AvailabilityGen
 		res, err := c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen}, nil
+			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceChild}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: p.ChildType,
@@ -533,6 +546,18 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 				Gen:    snap.ConnectGen,
 			}, nil
 		}
+		// Unlike every other case in this switch, KindFetchCosts is not
+		// dispatched through a Core.Fetch* method in fetchers.go, so it never
+		// inherited fetchTimeout's 30s backstop — it ran on the caller's raw
+		// ctx (the TUI's own m.pairCtx, cancelled only on profile/region
+		// switch or quit) with nothing to stop a stalled call from hanging
+		// until the user quits. costsFetchTimeout is longer than fetchTimeout
+		// because a grid fetch can legitimately issue up to costsGridPageCap
+		// sequential, billed GetCostAndUsage requests before the page cap
+		// alone would end it.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, costsFetchTimeout)
+		defer cancel()
 		// The grid query and the anomaly overlay (FR-014) depend only on the
 		// payload, never on each other's result — they run concurrently
 		// rather than back to back. Joined below: the grid's own error wins
@@ -546,11 +571,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// it doesn't need. Each half's own request count folds into
 		// Requests: a separate billed CE call, not free.
 		var (
-			result          awsclient.CostFetchResult
-			err             error
-			anomalies       []costs.AnomalyMark
-			anomalyRequests int
-			wg              sync.WaitGroup
+			result             awsclient.CostFetchResult
+			err                error
+			anomalies          []costs.AnomalyMark
+			anomalyRequests    int
+			anomaliesTruncated bool
+			wg                 sync.WaitGroup
 		)
 		if !p.SkipGrid {
 			wg.Go(func() {
@@ -574,8 +600,8 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		if !p.SkipAnomalies {
 			wg.Go(func() {
-				marks, n, aErr := awsclient.FetchCostAnomaliesCounted(ctx, snap.Clients.CostExplorer, p.Query.Range)
-				anomalyRequests = n
+				anomResult, aErr := awsclient.FetchCostAnomalies(ctx, snap.Clients.CostExplorer, p.Query.Range)
+				anomalyRequests = anomResult.Requests
 				if aErr == nil {
 					// A genuinely successful fetch that found zero anomalies
 					// still returns a NON-NIL slice — messages.CostsLoaded's
@@ -583,23 +609,26 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 					// requested" flag, so ApplyCostsLoaded's own discriminator
 					// (ev.Anomalies != nil) must never see the same nil value
 					// a skipped/errored fetch also leaves it at.
+					marks := anomResult.Marks
 					if marks == nil {
 						marks = []costs.AnomalyMark{}
 					}
 					anomalies = marks
+					anomaliesTruncated = anomResult.Truncated
 				}
 			})
 		}
 		wg.Wait()
 		return messages.CostsLoaded{
-			Query:     p.Query,
-			Window:    p.Window,
-			Grid:      costs.GridResult{Fetched: !p.SkipGrid, Records: result.Records, Err: err},
-			Attrs:     result.Attrs,
-			Anomalies: anomalies,
-			Requests:  result.RequestCount + anomalyRequests,
-			Err:       err,
-			Gen:       snap.ConnectGen,
+			Query:              p.Query,
+			Window:             p.Window,
+			Grid:               costs.GridResult{Fetched: !p.SkipGrid, Records: result.Records, Err: err, Truncated: result.Truncated},
+			Attrs:              result.Attrs,
+			Anomalies:          anomalies,
+			AnomaliesTruncated: anomaliesTruncated,
+			Requests:           result.RequestCount + anomalyRequests,
+			Err:                err,
+			Gen:                snap.ConnectGen,
 		}, nil
 
 	// --- adapter-only kinds ---

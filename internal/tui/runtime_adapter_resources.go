@@ -83,6 +83,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 		TypeGen:      msg.TypeGen,
 		ListSeq:      msg.ListSeq,
 		Err:          msg.Err,
+		Provenance:   msg.Provenance,
 	})
 	coreCmd := m.dispatchCoreScreenResult(intents, tasks)
 

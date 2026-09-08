@@ -46,14 +46,12 @@ func s3LoadedBucketModel() tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
-		Resources:    fixtureS3Buckets(), Provenance: messages.
-
-			// s3LoadedObjectModel creates a root TUI model navigated to S3 -> bucket -> objects loaded.
-			FetchProvenanceCanonicalList,
+		Resources:    fixtureS3Buckets(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	return m
 }
 
+// s3LoadedObjectModel creates a root TUI model navigated to S3 -> bucket -> objects loaded.
 func s3LoadedObjectModel() tui.Model {
 	m := s3LoadedBucketModel()
 	// Press Enter to drill into first bucket
@@ -345,7 +343,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
-		Resources:    fixtureS3Objects(), Provenance: messages.FetchProvenanceCanonicalList,
+		Resources:    fixtureS3Objects(), Provenance: messages.FetchProvenanceChild,
 	})
 
 	plain = stripANSI(rootViewContent(m))

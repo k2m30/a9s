@@ -43,15 +43,14 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    fixtureEC2Instances(), Provenance: messages.
-
-			// ===========================================================================
-			// A. EC2 Instance List View
-			// ===========================================================================
-			FetchProvenanceCanonicalList,
+		Resources:    fixtureEC2Instances(), Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	return m
 }
+
+// ===========================================================================
+// A. EC2 Instance List View
+// ===========================================================================
 
 // A.1 Column Layout
 

@@ -51,11 +51,16 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		if topicARN == "" {
 			return
 		}
-		// Walk all pages so subs_count is exact for topics with >100 subscribers.
+		// Walk all pages so subs_count is exact for topics with >100 subscribers,
+		// up to PerParentPageCap: ListSubscriptionsByTopic has no MaxResults
+		// param (page size is a fixed 100), and SNS's own per-topic quota
+		// (12.5M subscriptions) is 125,000 pages — far beyond what a single
+		// enrichment pass can walk.
 		var subs []snstypes.Subscription
 		var nextToken *string
 		var pagedErr error
-		for {
+		pageCapped := false
+		for pages := 0; ; pages++ {
 			out, err := clients.SNS.ListSubscriptionsByTopic(ctx, &snssvc.ListSubscriptionsByTopicInput{
 				TopicArn:  aws.String(topicARN),
 				NextToken: nextToken,
@@ -68,6 +73,10 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			if out.NextToken == nil || *out.NextToken == "" {
 				break
 			}
+			if pages+1 >= PerParentPageCap {
+				pageCapped = true
+				break
+			}
 			nextToken = out.NextToken
 		}
 
@@ -75,6 +84,21 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		defer mu.Unlock()
 		if pagedErr != nil {
 			MarkSkipped(&result, r.ID, &failures, pagedErr)
+			return
+		}
+		if pageCapped {
+			// A page cap, not a failed call: there is no error to record.
+			result.TruncatedIDs[r.ID] = true
+			result.FieldUpdates[r.ID] = map[string]string{
+				"subs_count": resource.FormatTruncated(len(subs)),
+			}
+			// A capped walk can never rule out a confirmed subscriber sitting
+			// beyond the pages inspected — reporting allPending here would be
+			// a FALSE "!"-shaped finding (a real confirmed subscriber on page
+			// 11 misreported as "all pending"), unlike subs_count, which is
+			// an honest lower bound. no-subscribers cannot fire here: subs is
+			// always non-empty by the time the walk runs long enough to hit
+			// the cap.
 			return
 		}
 		result.FieldUpdates[r.ID] = map[string]string{

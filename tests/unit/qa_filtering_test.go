@@ -31,14 +31,12 @@ func loadEC2Resources(m tui.Model, resources []resource.Resource) tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    resources, Provenance: messages.
-
-			// sampleEC2Resources returns a set of test EC2 resources.
-			FetchProvenanceCanonicalList,
+		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 	return m
 }
 
+// sampleEC2Resources returns a set of test EC2 resources.
 func sampleEC2Resources() []resource.Resource {
 	return []resource.Resource{
 		{ID: "i-abc001", Name: "api-prod-01", Fields: map[string]string{"instance_id": "i-abc001", "name": "api-prod-01", "state": "running", "type": "t3.medium"}},

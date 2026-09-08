@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -13,12 +14,59 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// elbListenerRulesCursor encodes both continuation dimensions this fetcher
+// paginates over: Marker is the AWS-native DescribeRules page cursor;
+// Skip is an in-page offset produced by this fetcher's own maxRules cap.
+// DescribeRules' Marker only ever advances across whole AWS pages — it has
+// no concept of "resume this same page from item 201" — so when a single AWS
+// page carries more than maxRules items, resuming means re-issuing the SAME
+// Marker (re-fetching the identical AWS page, which is deterministic for a
+// given ListenerArn+Marker) and skipping the items already converted, rather
+// than jumping straight to AWS's own NextMarker, which would silently drop
+// the remainder of the current page.
+type elbListenerRulesCursor struct {
+	Marker string `json:"m,omitempty"`
+	Skip   int    `json:"s,omitempty"`
+}
+
+// decodeELBListenerRulesCursor decodes a compound continuation token
+// previously produced by elbListenerRulesCursor.encode(), via
+// strictDecodeCursor. An empty token legitimately means "first page" and
+// returns the zero cursor. Any other input that strictDecodeCursor rejects
+// — unknown fields, trailing bytes after the JSON value, or a decode that
+// lands on the exact zero value (a bare "null"/"{}", which encode() never
+// itself produces since a token is only ever encoded when there is real
+// state — a non-empty Marker or a positive Skip — to resume from) — has no
+// legitimate origin other than this same encoder, so it is reported as an
+// error rather than silently restarting from page 1 with no signal.
+func decodeELBListenerRulesCursor(token string) (elbListenerRulesCursor, error) {
+	if token == "" {
+		return elbListenerRulesCursor{}, nil
+	}
+	cur, _, malformed := strictDecodeCursor[elbListenerRulesCursor](token)
+	if malformed {
+		return elbListenerRulesCursor{}, fmt.Errorf("decoding elb listener rules continuation token: invalid or foreign cursor %q", token)
+	}
+	return cur, nil
+}
+
+func (c elbListenerRulesCursor) encode() string {
+	b, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
 // FetchELBListenerRules calls the ELBv2 DescribeRules API for one page of
 // rules and converts the response into a FetchResult. DescribeRules paginates
-// via Marker/NextMarker like other ELBv2 List/Describe calls; continuationToken
-// round-trips through Marker. maxRules additionally caps the resources
-// converted from a single response, independent of whether AWS itself
-// paginated — IsTruncated reports true for either cause.
+// via Marker/NextMarker like other ELBv2 List/Describe calls. maxRules
+// additionally caps the resources converted from a single response,
+// independent of whether AWS itself paginated; continuationToken (see
+// elbListenerRulesCursor) resumes whichever of the two caused the previous
+// call to truncate — the in-page Skip offset takes priority over advancing
+// to AWS's own NextMarker, so a page longer than maxRules is fully consumed
+// before moving on, never partially skipped.
 func FetchELBListenerRules(
 	ctx context.Context,
 	api ELBv2DescribeRulesAPI,
@@ -29,11 +77,16 @@ func FetchELBListenerRules(
 
 	listenerArn := parentCtx["listener_arn"]
 
+	cur, err := decodeELBListenerRulesCursor(continuationToken)
+	if err != nil {
+		return resource.FetchResult{}, err
+	}
+
 	input := &elbv2.DescribeRulesInput{
 		ListenerArn: &listenerArn,
 	}
-	if continuationToken != "" {
-		input.Marker = &continuationToken
+	if cur.Marker != "" {
+		input.Marker = &cur.Marker
 	}
 
 	output, err := api.DescribeRules(ctx, input)
@@ -41,21 +94,31 @@ func FetchELBListenerRules(
 		return resource.FetchResult{}, fmt.Errorf("describing rules for listener %s: %w", listenerArn, err)
 	}
 
+	skip := min(cur.Skip, len(output.Rules))
+	end := min(skip+maxRules, len(output.Rules))
+	cappedLocally := end < len(output.Rules)
+
 	var resources []resource.Resource
-	cappedLocally := false
-	for _, rule := range output.Rules {
-		if len(resources) >= maxRules {
-			cappedLocally = true
-			break
-		}
+	for _, rule := range output.Rules[skip:end] {
 		resources = append(resources, convertRule(rule))
 	}
 
-	nextToken := ""
+	next := elbListenerRulesCursor{Marker: cur.Marker, Skip: end}
 	isTruncated := cappedLocally
-	if output.NextMarker != nil {
-		nextToken = *output.NextMarker
+	// A non-nil but empty NextMarker is exhaustion, not "one more page" — the
+	// same nil-or-empty contract every AWS-generated paginator in this SDK
+	// enforces; DescribeRules has no generated paginator of its own to
+	// inherit it from. Without this check, a non-nil empty NextMarker would
+	// encode a Marker="" cursor that decodeELBListenerRulesCursor rejects as
+	// invalid on the very next request.
+	if !cappedLocally && output.NextMarker != nil && *output.NextMarker != "" {
+		next = elbListenerRulesCursor{Marker: *output.NextMarker}
 		isTruncated = true
+	}
+
+	nextToken := ""
+	if isTruncated {
+		nextToken = next.encode()
 	}
 
 	totalHint := len(resources)

@@ -259,12 +259,17 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			c.flash = Flash{}
 
 		case runtime.ClearActiveListLoadingIntent:
-			// A failed AWS fetch must drop every in-flight indicator on the
-			// active list (Loading, LoadingMore, Refreshing) rather than
-			// stranding one of them set forever (emitted by HandleAPIError;
-			// mirrors ClearListLoading, the TUI-lane equivalent).
-			if ls := c.topListState(); ls != nil {
-				ls.clearFetchInFlight()
+			// A failed AWS fetch must drop the in-flight indicator belonging
+			// to the request that failed, rather than stranding it set
+			// forever — but never a sibling request's indicator that may
+			// still be genuinely in flight (LoadingMore and Refreshing are
+			// allowed to overlap; emitted by HandleAPIError, mirrors
+			// ClearListLoading, the TUI-lane equivalent). Routed to the
+			// specific screen the failed request belongs to — see
+			// clearActiveListLoadingTarget — rather than unconditionally the
+			// top-of-stack list screen.
+			if ls := c.clearActiveListLoadingTarget(v); ls != nil {
+				ls.clearFetchInFlight(v.Append)
 				// Per cache contract C4: a fetch failure over cached content stops the
 				// refreshing marker and swaps in an error marker instead —
 				// nothing goes blank, rows stay on screen.

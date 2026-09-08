@@ -5,6 +5,7 @@ package runtime
 import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // UIIntent is the contract by which the runtime tells an adapter to
@@ -257,13 +258,35 @@ func (SetErrorHintIntent) isIntent() {}
 // than waiting for the next render.
 //
 // Err carries the error-marker text (C4): when non-empty, the adapter
-// must also clear the active list's Refreshing flag and set its
-// LastFetchError to Err, so cached content stays on screen with the marker
-// swapped from "refreshing" to "error" instead of going blank. Empty when
-// the failure is not list-scoped (matches the pre-existing spinner-only
-// behavior for other HandleAPIError call sites).
+// must also set the active list's LastFetchError to Err, so cached content
+// stays on screen with the marker swapped from "refreshing"/"loading" to
+// "error" instead of going blank. Empty when the failure is not list-scoped
+// (matches the pre-existing spinner-only behavior for other HandleAPIError
+// call sites).
+//
+// Append mirrors messages.APIError.Append: LoadingMore and Refreshing are
+// allowed to be simultaneously in flight on the same screen (a Ctrl+R issued
+// while a load-more continuation is still outstanding), so clearing must
+// target only the flag belonging to the request that actually failed —
+// Append true clears LoadingMore only, false clears Loading and Refreshing
+// (mutually exclusive with each other by construction) — never all three
+// unconditionally, or one request's failure strands or prematurely releases
+// the other's still-in-flight indicator.
 type ClearActiveListLoadingIntent struct {
-	Err string
+	Err    string
+	Append bool
+	// ResourceType and Provenance mirror messages.APIError's own fields
+	// (threaded through APIErrorEvent) and let the consumer
+	// (core/app/intents.go's applyIntents) route this clear to the exact
+	// screen the failed request belongs to — the same ResourceType +
+	// CanonicalList() agreement handleResourcesLoadedEvent uses to route a
+	// paired success — rather than the pre-existing "whatever screen is on
+	// top" behavior. A zero Provenance (FetchProvenanceUnknown) means the
+	// producer predates this contract; the consumer falls back to the
+	// top-of-stack list screen for those, matching
+	// FetchResourcesPayload.Provenance's own zero-value grace.
+	ResourceType string
+	Provenance   messages.FetchProvenance
 }
 
 func (ClearActiveListLoadingIntent) isIntent() {}

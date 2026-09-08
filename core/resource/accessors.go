@@ -3,6 +3,7 @@
 package resource
 
 import (
+	"context"
 	"maps"
 	"strings"
 
@@ -284,17 +285,65 @@ func SetPaginatedForTest(shortName string, f PaginatedFetcher) {
 	paginatedRegistry[shortName] = f
 }
 
+// sanitizeFetchResult repairs a fetcher's FetchResult so it never claims a
+// resumable truncation it cannot actually resume: IsTruncated=true paired
+// with an empty NextToken is not a legitimate pagination state anywhere in
+// this codebase's contract — every consumer (RowStore, ListState.HasPagination,
+// the load-more dispatch that round-trips NextToken as the next
+// continuationToken) treats "truncated" as "there is a working cursor to
+// continue from". A fetcher that hits its own local item/page cap on AWS's
+// terminal page (no further NextToken) must report the result as complete,
+// not truncated. Downgrading is always the safe direction — a result can
+// only move from truncated toward exact here, never the reverse, mirroring
+// the "exact never regresses" rule the rest of the cache layer already
+// enforces (RowStore, syncExactTotalToMenu) — so this can never make an
+// already-correct fetcher's result wrong, only repair a broken one.
+//
+// The one deliberate exception is p.LowerBoundOnly: a fetcher that knows on
+// its own it can never confirm an exact total (e.g. core/aws/catalog_security.go's
+// "policy" AvailabilityFetcher, which never checks inline group policies) sets
+// this alongside IsTruncated=true to report an honest, permanent "N+" instead
+// of a wrongly-confirmed exact count. That pairing passes through untouched —
+// downgrading it would recreate the exact-zero bug the flag exists to prevent.
+//
+// Applied at the single seam every registered fetcher's result passes
+// through (GetPaginatedFetcher and its three siblings below), so a fetcher
+// that gets this pairing wrong can never reach a consumer un-sanitized,
+// regardless of which of the many registered fetchers produced it — the
+// same "make the invalid state unrepresentable at the boundary" principle
+// core/resource/related.go's smart constructors (KnownRelated/UnknownRelated/
+// ErrorRelated/DeferredRelated) already apply to RelatedCheckResult.
+func sanitizeFetchResult(res FetchResult, err error) (FetchResult, error) {
+	p := res.Pagination
+	if p == nil || !p.IsTruncated || p.NextToken != "" || p.LowerBoundOnly {
+		return res, err
+	}
+	fixed := *p
+	fixed.IsTruncated = false
+	if fixed.TotalHint < 0 {
+		fixed.TotalHint = len(res.Resources)
+	}
+	res.Pagination = &fixed
+	return res, err
+}
+
 // GetPaginatedFetcher returns the paginated fetcher for the given resource short name.
 // Legacy-first: the runtime map wins so SetPaginatedForTest test overrides take
-// effect. Catalog is the read-only fallback.
+// effect. Catalog is the read-only fallback. The returned function's result
+// always passes through sanitizeFetchResult first.
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
-	if fn, ok := paginatedRegistry[shortName]; ok {
-		return fn
+	fn, ok := paginatedRegistry[shortName]
+	if !ok {
+		if ct := catalog.Find(shortName); ct != nil && ct.Fetcher != nil {
+			fn = ct.Fetcher
+		}
 	}
-	if ct := catalog.Find(shortName); ct != nil && ct.Fetcher != nil {
-		return ct.Fetcher
+	if fn == nil {
+		return nil
 	}
-	return nil
+	return func(ctx context.Context, clients any, continuationToken string) (FetchResult, error) {
+		return sanitizeFetchResult(fn(ctx, clients, continuationToken))
+	}
 }
 
 // CleanupPaginatedForTest removes a paginated fetcher. Used only in tests for cleanup.
@@ -331,15 +380,21 @@ func SetAvailabilityFetcherForTest(shortName string, f AvailabilityFetcher) {
 // test-override map wins so SetAvailabilityFetcherForTest takes effect;
 // catalog.ResourceTypeDef.AvailabilityFetcher (the permanent production
 // registration, e.g. core/aws/catalog_security.go's "policy" entry) is
-// the read-only fallback.
+// the read-only fallback. The returned function's result always passes
+// through sanitizeFetchResult first, mirroring GetPaginatedFetcher.
 func GetAvailabilityFetcher(shortName string) AvailabilityFetcher {
-	if fn, ok := availabilityRegistry[shortName]; ok {
-		return fn
+	fn, ok := availabilityRegistry[shortName]
+	if !ok {
+		if ct := catalog.Find(shortName); ct != nil && ct.AvailabilityFetcher != nil {
+			fn = ct.AvailabilityFetcher
+		}
 	}
-	if ct := catalog.Find(shortName); ct != nil && ct.AvailabilityFetcher != nil {
-		return ct.AvailabilityFetcher
+	if fn == nil {
+		return nil
 	}
-	return nil
+	return func(ctx context.Context, clients any, continuationToken string) (FetchResult, error) {
+		return sanitizeFetchResult(fn(ctx, clients, continuationToken))
+	}
 }
 
 // CleanupAvailabilityFetcherForTest removes a TEST-ONLY availability
@@ -357,15 +412,22 @@ func SetPaginatedChildForTest(shortName string, f PaginatedChildFetcher) {
 
 // GetPaginatedChildFetcher returns the paginated child fetcher for the given short name.
 // Legacy-first: test overrides via SetPaginatedChildForTest take effect;
-// otherwise reads the catalog child-type ChildFetcher field.
+// otherwise reads the catalog child-type ChildFetcher field. The returned
+// function's result always passes through sanitizeFetchResult first,
+// mirroring GetPaginatedFetcher.
 func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
-	if fn, ok := paginatedChildRegistry[shortName]; ok {
-		return fn
+	fn, ok := paginatedChildRegistry[shortName]
+	if !ok {
+		if ct := catalog.FindChild(shortName); ct != nil && ct.ChildFetcher != nil {
+			fn = ct.ChildFetcher
+		}
 	}
-	if ct := catalog.FindChild(shortName); ct != nil && ct.ChildFetcher != nil {
-		return ct.ChildFetcher
+	if fn == nil {
+		return nil
 	}
-	return nil
+	return func(ctx context.Context, clients any, parentCtx ParentContext, continuationToken string) (FetchResult, error) {
+		return sanitizeFetchResult(fn(ctx, clients, parentCtx, continuationToken))
+	}
 }
 
 // CleanupPaginatedChildForTest removes a paginated child fetcher. Used only in tests for cleanup.
@@ -387,15 +449,22 @@ func SetFilteredPaginatedForTest(shortName string, f FilteredPaginatedFetcher) {
 
 // GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name.
 // Legacy-first: test overrides via SetFilteredPaginatedForTest take effect;
-// otherwise reads the catalog FilteredFetcher field.
+// otherwise reads the catalog FilteredFetcher field. The returned function's
+// result always passes through sanitizeFetchResult first, mirroring
+// GetPaginatedFetcher.
 func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
-	if fn, ok := filteredPaginatedRegistry[shortName]; ok {
-		return fn
+	fn, ok := filteredPaginatedRegistry[shortName]
+	if !ok {
+		if ct := catalog.Find(shortName); ct != nil && ct.FilteredFetcher != nil {
+			fn = ct.FilteredFetcher
+		}
 	}
-	if ct := catalog.Find(shortName); ct != nil && ct.FilteredFetcher != nil {
-		return ct.FilteredFetcher
+	if fn == nil {
+		return nil
 	}
-	return nil
+	return func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (FetchResult, error) {
+		return sanitizeFetchResult(fn(ctx, clients, filter, continuationToken))
+	}
 }
 
 // CleanupFilteredPaginatedForTest removes a filtered paginated fetcher. Used only in tests for cleanup.

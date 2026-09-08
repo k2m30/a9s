@@ -17,6 +17,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -66,6 +67,7 @@ func TestHandleResourcesLoaded_NotCachedYet_EmitsPatchResourceCache(t *testing.T
 	intents, _ := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 		ResourceType: "ec2",
 		Resources:    rows,
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	patch, ok := findIntent[PatchResourceCache](intents)
@@ -95,6 +97,7 @@ func TestHandleResourcesLoaded_AlreadyCached_SkipsPatch(t *testing.T) {
 	intents, _ := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-new"}},
+		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
 	if _, ok := findIntent[PatchResourceCache](intents); ok {

@@ -72,11 +72,15 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			key = repoName
 		}
 		// Count packages in this repository (optional — only if the client supports ListPackages).
-		// Walks all pages via NextToken so the count is exact, not first-page only.
+		// Walks all pages via NextToken so the count is exact, not first-page only —
+		// up to PerParentPageCap: no packages-per-repository quota exists at all, and
+		// upstream-connected repos materialize external packages as consumers pull
+		// them, so an account with a heavily-used upstream repo can walk indefinitely.
 		if listPkgAPI, ok := clients.CodeArtifact.(CodeArtifactListPackagesAPI); ok {
 			total := 0
+			pkgTruncated := false
 			var nextToken *string
-			for {
+			for pages := 0; ; pages++ {
 				pkgInput := &codeartifact.ListPackagesInput{
 					Domain:     aws.String(domainName),
 					Repository: aws.String(repoName),
@@ -94,11 +98,21 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				if pkgOut.NextToken == nil || *pkgOut.NextToken == "" {
 					break
 				}
+				if pages+1 >= PerParentPageCap {
+					pkgTruncated = true
+					break
+				}
 				nextToken = pkgOut.NextToken
 			}
 			if total >= 0 {
 				mu.Lock()
-				result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
+				if pkgTruncated {
+					// A page cap, not a failed call: there is no error to record.
+					result.TruncatedIDs[r.ID] = true
+					result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatTruncated(total)}
+				} else {
+					result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
+				}
 				mu.Unlock()
 			}
 		}

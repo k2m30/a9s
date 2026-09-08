@@ -262,3 +262,172 @@ func TestResourcesLoadedMsg_LegacyNilPagination(t *testing.T) {
 		t.Error("Append should be false for unpaginated fetchers")
 	}
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// sanitizeFetchResult boundary (core/resource/accessors.go, unexported): all
+// 4 registered-fetcher accessors route a fetcher's raw result through it. A
+// truncated result with an empty NextToken is not a legitimate pagination
+// state anywhere in this codebase's contract (no working cursor to resume
+// from) and must be downgraded to exact, or "load more" would refetch page 1
+// forever. A truncated result WITH a real cursor is genuine pagination and
+// must pass through completely untouched — an over-broad sanitizer that
+// flattened real pagination would make load-more impossible for every
+// genuinely truncated type, which is worse than the bug it prevents.
+// ═══════════════════════════════════════════════════════════════════════════
+
+func assertSanitizedToExact(t *testing.T, p *resource.PaginationMeta, wantResourceCount int) {
+	t.Helper()
+	if p == nil {
+		t.Fatal("Pagination should not be nil")
+	}
+	if p.IsTruncated {
+		t.Error("IsTruncated should be sanitized to false — truncated with no cursor is a page that can never be resumed")
+	}
+	if p.TotalHint != wantResourceCount {
+		t.Errorf("TotalHint = %d, want %d (len(Resources)) after sanitizing an unresumable truncation", p.TotalHint, wantResourceCount)
+	}
+}
+
+func assertSanitizerPassthrough(t *testing.T, p *resource.PaginationMeta, wantToken string, wantHint int) {
+	t.Helper()
+	if p == nil {
+		t.Fatal("Pagination should not be nil")
+	}
+	if !p.IsTruncated {
+		t.Error("IsTruncated must remain true — a genuine cursor means there IS more to fetch; sanitizing this away would break real pagination")
+	}
+	if p.NextToken != wantToken {
+		t.Errorf("NextToken = %q, want unchanged %q", p.NextToken, wantToken)
+	}
+	if p.TotalHint != wantHint {
+		t.Errorf("TotalHint = %d, want unchanged %d — the sanitizer must not touch a legitimately truncated result's hint", p.TotalHint, wantHint)
+	}
+}
+
+func TestGetPaginatedFetcher_TruncatedEmptyCursor_SanitizedToExact(t *testing.T) {
+	resource.SetPaginatedForTest("_test_sanitize_paginated", func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "r1"}, {ID: "r2"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "", TotalHint: -1},
+		}, nil
+	})
+	defer resource.CleanupPaginatedForTest("_test_sanitize_paginated")
+
+	result, err := resource.GetPaginatedFetcher("_test_sanitize_paginated")(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizedToExact(t, result.Pagination, len(result.Resources))
+}
+
+func TestGetPaginatedFetcher_TruncatedWithCursor_PassesThroughUntouched(t *testing.T) {
+	resource.SetPaginatedForTest("_test_sanitize_paginated_real", func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "r1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-real-cursor", TotalHint: 100},
+		}, nil
+	})
+	defer resource.CleanupPaginatedForTest("_test_sanitize_paginated_real")
+
+	result, err := resource.GetPaginatedFetcher("_test_sanitize_paginated_real")(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizerPassthrough(t, result.Pagination, "tok-real-cursor", 100)
+}
+
+func TestGetAvailabilityFetcher_TruncatedEmptyCursor_SanitizedToExact(t *testing.T) {
+	resource.SetAvailabilityFetcherForTest("_test_sanitize_avail", func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "a1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "", TotalHint: -1},
+		}, nil
+	})
+	defer resource.CleanupAvailabilityFetcherForTest("_test_sanitize_avail")
+
+	result, err := resource.GetAvailabilityFetcher("_test_sanitize_avail")(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizedToExact(t, result.Pagination, len(result.Resources))
+}
+
+func TestGetAvailabilityFetcher_TruncatedWithCursor_PassesThroughUntouched(t *testing.T) {
+	resource.SetAvailabilityFetcherForTest("_test_sanitize_avail_real", func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "a1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-avail-cursor", TotalHint: 42},
+		}, nil
+	})
+	defer resource.CleanupAvailabilityFetcherForTest("_test_sanitize_avail_real")
+
+	result, err := resource.GetAvailabilityFetcher("_test_sanitize_avail_real")(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizerPassthrough(t, result.Pagination, "tok-avail-cursor", 42)
+}
+
+func TestGetPaginatedChildFetcher_TruncatedEmptyCursor_SanitizedToExact(t *testing.T) {
+	resource.SetPaginatedChildForTest("_test_sanitize_child", func(ctx context.Context, clients any, parentCtx resource.ParentContext, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "c1"}, {ID: "c2"}, {ID: "c3"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "", TotalHint: -1},
+		}, nil
+	})
+	defer resource.CleanupPaginatedChildForTest("_test_sanitize_child")
+
+	result, err := resource.GetPaginatedChildFetcher("_test_sanitize_child")(context.Background(), nil, resource.ParentContext{"bucket": "b"}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizedToExact(t, result.Pagination, len(result.Resources))
+}
+
+func TestGetPaginatedChildFetcher_TruncatedWithCursor_PassesThroughUntouched(t *testing.T) {
+	resource.SetPaginatedChildForTest("_test_sanitize_child_real", func(ctx context.Context, clients any, parentCtx resource.ParentContext, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "c1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-child-cursor", TotalHint: 7},
+		}, nil
+	})
+	defer resource.CleanupPaginatedChildForTest("_test_sanitize_child_real")
+
+	result, err := resource.GetPaginatedChildFetcher("_test_sanitize_child_real")(context.Background(), nil, resource.ParentContext{"bucket": "b"}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizerPassthrough(t, result.Pagination, "tok-child-cursor", 7)
+}
+
+func TestGetFilteredPaginatedFetcher_TruncatedEmptyCursor_SanitizedToExact(t *testing.T) {
+	resource.SetFilteredPaginatedForTest("_test_sanitize_filtered", func(ctx context.Context, clients any, filter map[string]string, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "f1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "", TotalHint: -1},
+		}, nil
+	})
+	defer resource.CleanupFilteredPaginatedForTest("_test_sanitize_filtered")
+
+	result, err := resource.GetFilteredPaginatedFetcher("_test_sanitize_filtered")(context.Background(), nil, map[string]string{"vpc-id": "vpc-1"}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizedToExact(t, result.Pagination, len(result.Resources))
+}
+
+func TestGetFilteredPaginatedFetcher_TruncatedWithCursor_PassesThroughUntouched(t *testing.T) {
+	resource.SetFilteredPaginatedForTest("_test_sanitize_filtered_real", func(ctx context.Context, clients any, filter map[string]string, token string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources:  []resource.Resource{{ID: "f1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-filtered-cursor", TotalHint: 12},
+		}, nil
+	})
+	defer resource.CleanupFilteredPaginatedForTest("_test_sanitize_filtered_real")
+
+	result, err := resource.GetFilteredPaginatedFetcher("_test_sanitize_filtered_real")(context.Background(), nil, map[string]string{"vpc-id": "vpc-1"}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertSanitizerPassthrough(t, result.Pagination, "tok-filtered-cursor", 12)
+}

@@ -15,19 +15,13 @@ import (
 )
 
 // FetchLambdaFunctionsPage calls the Lambda ListFunctions API and returns
-// a single page of functions. Pass an empty continuationToken for the first page.
+// a single page of functions. Pass an empty continuationToken for the first
+// page. event_source_arn is always emitted empty (issue #221: a per-function
+// ListEventSourceMappings call here would turn a single-page list into an
+// N+1 fetch — the checker-owned mechanism in related_common.go's
+// lambdaEventSourceMappingLambdaCheck is the sole ListEventSourceMappings
+// caller, one filtered call per open kinesis/msk resource, never per lambda).
 func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, continuationToken string) (resource.FetchResult, error) {
-	return FetchLambdaFunctionsPageWithEventSources(ctx, api, nil, continuationToken)
-}
-
-// FetchLambdaFunctionsPageWithEventSources calls the Lambda ListFunctions API
-// and enriches each function with a first event source ARN when available.
-func FetchLambdaFunctionsPageWithEventSources(
-	ctx context.Context,
-	api LambdaListFunctionsAPI,
-	eventSourceAPI LambdaListEventSourceMappingsAPI,
-	continuationToken string,
-) (resource.FetchResult, error) {
 	input := &lambda.ListFunctionsInput{
 		MaxItems: aws.Int32(DefaultPageSize),
 	}
@@ -81,9 +75,6 @@ func FetchLambdaFunctionsPageWithEventSources(
 
 		packageType := string(fn.PackageType)
 		eventSourceARN := ""
-		if eventSourceAPI != nil {
-			eventSourceARN, _ = firstLambdaEventSourceARN(ctx, eventSourceAPI, functionName)
-		}
 
 		dlqTargetARN := ""
 		if fn.DeadLetterConfig != nil {
@@ -163,29 +154,4 @@ func FetchLambdaFunctionsPageWithEventSources(
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-func firstLambdaEventSourceARN(ctx context.Context, api LambdaListEventSourceMappingsAPI, functionName string) (string, error) {
-	if functionName == "" {
-		return "", nil
-	}
-
-	input := &lambda.ListEventSourceMappingsInput{
-		FunctionName: &functionName,
-	}
-	for {
-		out, err := api.ListEventSourceMappings(ctx, input)
-		if err != nil {
-			return "", err
-		}
-		for _, m := range out.EventSourceMappings {
-			if m.EventSourceArn != nil && *m.EventSourceArn != "" {
-				return *m.EventSourceArn, nil
-			}
-		}
-		if out.NextMarker == nil || *out.NextMarker == "" {
-			return "", nil
-		}
-		input.Marker = out.NextMarker
-	}
 }

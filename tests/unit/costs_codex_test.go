@@ -39,26 +39,19 @@ import (
 // once the coder re-plants the story under CostExplorerServiceNameEC2, this
 // test needs no edit.
 //
-// CONFIRMED REGRESSION (fix/resourcesloaded-provenance, D): this test
-// currently FAILS at the 3rd Enter (Body.Kind stays "list") for a reason
-// unrelated to the above and NOT fixable from this file. handle.go's
-// handleResourcesLoadedEvent now requires msg.Provenance.CanonicalList() for
-// any topLevelCanonical screen (isTopLevelCanonicalList: EscPops false,
-// ParentContext nil) before applying rows — and the real KindFetchByIDDetail
-// executor path correctly tags its result Provenance: FetchProvenanceByID
-// (executor.go), so the gate blocks row-population on the placeholder
-// ScreenResourceList costs_state.go's `case screen.OpenResource:` pushes.
-// That placeholder never sets ls.EscPops = true — unlike the SAME seam's
-// sibling in navigate.go's applyRelatedNavResult, which does, specifically
-// so isTopLevelCanonicalList excludes it. autoOpenSingleDetail (handle.go)
-// then sees ls.Loading still true (row-population never ran) and bails
-// before ever reaching the row it needs. Reverting handle.go's gate makes
-// this test pass again, confirming causation. The one-line production fix
-// (out of QA's scope: adding `ls.EscPops = true` to costs_state.go's
-// screen.OpenResource case, mirroring navigate.go) is a coder task — do not
-// paper over this by stamping a hand-built literal Provenance:CanonicalList
-// anywhere in this file; that would hide the same bug TestCostsSelfReview_C2
-// (costs_selfreview_test.go) independently confirms.
+// FIXED (fix/resourcesloaded-provenance): this test previously failed at the
+// 3rd Enter (Body.Kind stuck on "list") because costs_state.go's
+// `case screen.OpenResource:` pushed its placeholder ScreenResourceList
+// without setting ls.EscPops, so handle.go's isTopLevelCanonicalList gate
+// treated it as a top-level canonical screen and refused to apply rows from
+// the real KindFetchByIDDetail executor path's Provenance: FetchProvenanceByID
+// result — leaving ls.Loading true and autoOpenSingleDetail bailing before it
+// ever reached the row it needed. The fix routes that placeholder through the
+// same pushByIDPlaceholderList constructor navigate.go's applyRelatedNavResult
+// already used (list_state.go), which always sets ls.EscPops = true so
+// isTopLevelCanonicalList excludes it — no change to FetchProvenanceByID or
+// to this test was needed. Verified passing as of this branch; see
+// TestCostsSelfReview_C2 (costs_selfreview_test.go) for the same confirmation.
 // ===========================================================================
 
 // deliverCodexDemoFetch executes payload's KindFetchCosts task against the

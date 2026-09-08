@@ -50,38 +50,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 	// soft-fallback (aliases become empty) but must surface to the operator
 	// via the composite error — silently stopping would hide a permissions
 	// issue or throttling that's actively degrading the view.
-	var failures []Failure
-	aliasMap := make(map[string]string)
-	var aliasMarker *string
-	for {
-		aliasOutput, aliasErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
-			return c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
-				Limit:  aws.Int32(DefaultPageSize),
-				Marker: aliasMarker,
-			})
-		})
-		if aliasErr != nil {
-			failures = append(failures, FailedCall("ListAliases", aliasErr))
-			break
-		}
-		for _, alias := range aliasOutput.Aliases {
-			if alias.TargetKeyId != nil && alias.AliasName != nil {
-				aliasMap[*alias.TargetKeyId] = *alias.AliasName
-			}
-		}
-		if !aliasOutput.Truncated {
-			break
-		}
-		if aliasOutput.NextMarker == nil {
-			// Truncated=true with no marker violates the ListAliases contract.
-			// Restarting from aliasMarker=nil would page 1 forever, so treat
-			// it the same as any other alias-fetch failure: stop and surface
-			// it via the composite error, keeping the (already-fetched) keys.
-			failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
-			break
-		}
-		aliasMarker = aliasOutput.NextMarker
-	}
+	aliasMap, failures := buildKMSAliasMap(ctx, c)
 
 	var resources []resource.Resource
 	for _, key := range listOutput.Keys {
@@ -153,6 +122,46 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 	}, AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys))
 }
 
+// buildKMSAliasMap fully paginates ListAliases and returns the KeyId→
+// AliasName map plus any failures encountered (a ListAliases error, or
+// a Truncated=true response with no NextMarker — which would otherwise
+// restart the page-1 fetch forever). Shared by FetchKMSKeysPage and
+// FetchKMSKeysByIDs so a future contract tweak (retry policy, the
+// no-marker guard) is applied to both callers, not just one.
+func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string]string, []Failure) {
+	var failures []Failure
+	aliasMap := make(map[string]string)
+	var aliasMarker *string
+	for {
+		aliasOutput, aliasErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
+			return c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
+				Limit:  aws.Int32(DefaultPageSize),
+				Marker: aliasMarker,
+			})
+		})
+		if aliasErr != nil {
+			// Soft-fallback: aliases become empty strings, but record the failure
+			// so operators know aliases may be missing.
+			failures = append(failures, FailedCall("ListAliases", aliasErr))
+			break
+		}
+		for _, alias := range aliasOutput.Aliases {
+			if alias.TargetKeyId != nil && alias.AliasName != nil {
+				aliasMap[*alias.TargetKeyId] = *alias.AliasName
+			}
+		}
+		if !aliasOutput.Truncated {
+			break
+		}
+		if aliasOutput.NextMarker == nil {
+			failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
+			break
+		}
+		aliasMarker = aliasOutput.NextMarker
+	}
+	return aliasMap, failures
+}
+
 // FetchKMSKeysByIDs fetches specific KMS keys by their key IDs, bypassing the
 // KeyManager=CUSTOMER filter the paginated fetcher applies. Used by the
 // related-panel lazy-add path so checkers referencing AWS-managed keys
@@ -172,39 +181,9 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		return nil, nil
 	}
 
-	var failures []Failure
-
-	aliasMap := make(map[string]string)
-	var aliasMarker *string
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
-			return c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
-				Limit:  aws.Int32(DefaultPageSize),
-				Marker: aliasMarker,
-			})
-		})
-		if err != nil {
-			// Soft-fallback: aliases become empty strings, but record the failure
-			// so operators know aliases may be missing.
-			failures = append(failures, FailedCall("ListAliases", err))
-			break
-		}
-		for _, a := range out.Aliases {
-			if a.TargetKeyId != nil && a.AliasName != nil {
-				aliasMap[*a.TargetKeyId] = *a.AliasName
-			}
-		}
-		if !out.Truncated {
-			break
-		}
-		if out.NextMarker == nil {
-			// See the identical guard in FetchKMSKeysPage: Truncated=true with
-			// no marker would otherwise restart the page-1 fetch forever.
-			failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
-			break
-		}
-		aliasMarker = out.NextMarker
-	}
+	// Soft-fallback: aliases become empty strings, but any ListAliases
+	// failure is recorded so operators know aliases may be missing.
+	aliasMap, failures := buildKMSAliasMap(ctx, c)
 
 	var resources []resource.Resource
 	for _, id := range ids {
