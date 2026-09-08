@@ -187,25 +187,23 @@ func TestLargeFetchAbsorb_StillWritesTheSameFile(t *testing.T) {
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
+	// Both save lanes drain through the one queue WaitForCacheWrites waits on,
+	// so ask the queue instead of racing it — a poll would pass on whatever
+	// version happened to be on disk when it looked.
+	c.WaitForCacheWrites()
+
 	pattern := filepath.Join(cfg, "cache", "*", "ec2.yaml")
-	var written []byte
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			t.Fatalf("globbing %s: %v", pattern, err)
-		}
-		if len(matches) == 1 {
-			if b, readErr := os.ReadFile(matches[0]); readErr == nil && len(b) > 0 {
-				written = b
-				break
-			}
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("no ec2 type file under %s within 5s — a save moved off the caller's "+
-				"goroutine must still land", pattern)
-		}
-		time.Sleep(5 * time.Millisecond)
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		t.Fatalf("globbing %s: %v", pattern, err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("found %d ec2 type files under %s, want 1 — a save moved off the caller's "+
+			"goroutine must still land", len(matches), pattern)
+	}
+	written, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatalf("reading %s: %v", matches[0], err)
 	}
 
 	golden, err := os.ReadFile(filepath.Join("testdata", "wipfix_ec2_50rows.yaml"))
