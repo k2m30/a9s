@@ -211,3 +211,21 @@ func TestDemoIAMFake_StillAnswersForEveryRegisteredRole(t *testing.T) {
 		}
 	}
 }
+
+// TestDemoIAMFake_StillAnswersForEveryRegisteredPolicy pins the other half of
+// the honesty rule: a policy the fixture lists answers its entities lookup
+// (empty when it is attached to nothing), so the policy → roles pivot never
+// sees a not-found for a policy the list just showed.
+func TestDemoIAMFake_StillAnswersForEveryRegisteredPolicy(t *testing.T) {
+	ctx := context.Background()
+	f := fakes.NewIAM()
+	out, err := f.ListPolicies(ctx, &iam.ListPoliciesInput{})
+	if err != nil {
+		t.Fatalf("ListPolicies: %v", err)
+	}
+	for _, p := range out.Policies {
+		if _, entErr := f.ListEntitiesForPolicy(ctx, &iam.ListEntitiesForPolicyInput{PolicyArn: p.Arn}); entErr != nil {
+			t.Errorf("ListEntitiesForPolicy(%s): a registered policy must answer, got %v", aws.ToString(p.Arn), entErr)
+		}
+	}
+}

@@ -142,13 +142,28 @@ func (f *IAMFake) ListEntitiesForPolicy(_ context.Context, input *iam.ListEntiti
 	}
 	entities, ok := f.fix.EntitiesForPolicy[*input.PolicyArn]
 	if !ok {
-		return nil, noSuchEntity("Policy", *input.PolicyArn)
+		if !f.hasPolicyARN(*input.PolicyArn) {
+			return nil, noSuchEntity("Policy", *input.PolicyArn)
+		}
+		return &iam.ListEntitiesForPolicyOutput{}, nil
 	}
 	return &iam.ListEntitiesForPolicyOutput{
 		PolicyRoles:  entities.Roles,
 		PolicyUsers:  entities.Users,
 		PolicyGroups: entities.Groups,
 	}, nil
+}
+
+// hasPolicyARN reports whether the fixture registers a policy under arn; a
+// registered policy with no entities entry is attached to nothing, which is an
+// answer, while an unregistered ARN is the NoSuchEntity a real account gives.
+func (f *IAMFake) hasPolicyARN(arn string) bool {
+	for i := range f.fix.Policies {
+		if f.fix.Policies[i].Arn != nil && *f.fix.Policies[i].Arn == arn {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *IAMFake) ListAccountAliases(_ context.Context, _ *iam.ListAccountAliasesInput, _ ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error) {
