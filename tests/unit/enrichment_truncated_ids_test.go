@@ -143,8 +143,12 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 	resources := iamGroupResources(firstGroup, secondGroup)
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected top-level error: %v", err)
+	// INVERTED by codex2 round 4: EnrichIAMGroup built a failure list and
+	// returned nil, so a refused GetGroup reached the operator as silence. The
+	// composite error and the Truncated flag are two answers; only the flag is
+	// governed by the "~"-only rule. Do not restore the nil-error assertion.
+	if err == nil {
+		t.Fatal("the simulated GetGroup failure must reach the operator through the composite error")
 	}
 
 	// Global Truncated must stay false: iam-group is a "~"-only enricher, so
@@ -254,8 +258,12 @@ func TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs(t *testing.T) {
 	resources := iamGroupResources(firstGroup, secondGroup)
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// INVERTED by codex2 round 4: EnrichIAMGroup built a failure list and
+	// returned nil, so a refused GetGroup reached the operator as silence. The
+	// composite error and the Truncated flag are two answers; only the flag is
+	// governed by the "~"-only rule. Do not restore the nil-error assertion.
+	if err == nil {
+		t.Fatal("the simulated GetGroup failure must reach the operator through the composite error")
 	}
 
 	// Build the input ID set.

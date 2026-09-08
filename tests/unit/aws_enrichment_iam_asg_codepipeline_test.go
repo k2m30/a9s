@@ -95,11 +95,21 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 
 // TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge verifies
 // that a GetRole API error adds the role to TruncatedIDs (a per-row "?"
-// coverage gap) and does not propagate the error. A second role that is
+// coverage gap), reports the failure, and keeps going. A second role that is
 // dormant still produces a finding — confirming the loop continues past the
 // error. iam-role is a "~"-only enricher (IssueCount always 0), so the
 // coverage gap must never lower-bound the aggregate issue badge — Truncated
 // stays false.
+//
+// INVERTED by codex2 round 4: this asserted "must not propagate GetRole
+// errors", which is how a refused call reached the operator as silence. The
+// aggregate error and the Truncated flag are two different answers — only the
+// flag is governed by the "~"-only rule — and the wave-2 runner
+// (core/runtime/probes.go, "Always populate fields from result regardless of
+// err") keeps every finding when the enricher returns one, so nothing is lost
+// by reporting it. Do not restore the nil-error assertion; a vanished
+// resource is the one error that stays out of the aggregate, and that is
+// pinned in codex2_round4_test.go.
 func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *testing.T) {
 	// broken-role errors on GetRole; dormant-role has nil RoleLastUsed → finding.
 	combo := &iamGetRoleFakeCombo{
@@ -127,8 +137,8 @@ func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *te
 	}
 
 	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("enricher must not propagate GetRole errors: %v", err)
+	if err == nil {
+		t.Fatal("a failed GetRole must reach the operator through the composite error")
 	}
 	if result.Truncated {
 		t.Error("Truncated must stay false: iam-role is a \"~\"-only enricher, so a GetRole error marks the row via TruncatedIDs, never the aggregate issue badge")
@@ -434,8 +444,12 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *te
 	resources := iamGroupResources("broken-group", "ok-group")
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("enricher must not propagate GetGroup errors: %v", err)
+	// INVERTED by codex2 round 4: EnrichIAMGroup built a failure list and
+	// returned nil, so a refused GetGroup reached the operator as silence. The
+	// composite error and the Truncated flag are two answers; only the flag is
+	// governed by the "~"-only rule. Do not restore the nil-error assertion.
+	if err == nil {
+		t.Fatal("a failed GetGroup must reach the operator through the composite error")
 	}
 	if result.Truncated {
 		t.Error("Truncated must stay false: iam-group is a \"~\"-only enricher, so a GetGroup error marks the row via TruncatedIDs, never the aggregate issue badge")

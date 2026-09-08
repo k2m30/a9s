@@ -591,8 +591,12 @@ func TestW4RoleAdminAttachedAPIErrorIsUnknown(t *testing.T) {
 		w4RoleResource("acme-denied-role", "/"),
 		w4RoleResource("acme-ops-admin-role", "/"),
 	}, nil)
-	if err != nil {
-		t.Fatalf("EnrichIAMRoleLastUsed: %v", err)
+	// INVERTED by codex2 round 4: EnrichIAMRoleLastUsed dropped its failure
+	// list, so this asserted nil for a DENIED call. The row is uninspected AND
+	// the denial is reported; only a vanished resource stays out of the
+	// aggregate. Do not restore the nil-error assertion.
+	if err == nil {
+		t.Fatal("a denied ListAttachedRolePolicies must reach the operator through the composite error")
 	}
 	if !res.TruncatedIDs["acme-denied-role"] {
 		t.Errorf("TruncatedIDs[acme-denied-role] = false, want true")

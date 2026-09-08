@@ -198,8 +198,18 @@ func wave2Finding(code domain.FindingCode, values ...string) domain.Finding {
 // failed batch — recording only the aggregate Truncated flag drops the
 // per-row signal the list view needs to distinguish "not inspected" from
 // "inspected and healthy".
+//
+// A resource that went away between the list call and this one is the
+// exception, and it is decided here rather than at each of the call sites:
+// the row is still uninspected — a9s learned nothing about it — but nothing
+// failed, so it is not a failure the operator has to account for. That is
+// IsNotFoundErr's contract, and putting it at one site is what keeps every
+// enricher's aggregate honest without each of them remembering the rule.
 func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, err error) {
 	result.TruncatedIDs[id] = true
+	if IsNotFoundErr(err) {
+		return
+	}
 	*failures = append(*failures, FailedCall(id, err))
 }
 

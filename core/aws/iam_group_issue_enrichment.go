@@ -216,5 +216,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows)
 	})
 	MarkInformationalOnly(&result)
-	return result, nil
+	// See EnrichIAMRoleLastUsed: the flag and the composite error are two
+	// answers, and this lane was returning only the first.
+	return result, AggregateFailures("group membership", failures, n)
 }

@@ -92,5 +92,8 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, nil
+	// After MarkInformationalOnly, which owns the aggregate Truncated flag for
+	// this "~"-only enricher: the composite error is a separate answer, and
+	// dropping it told the operator nothing about a refused call.
+	return result, AggregateFailures("role last-used", failures, n)
 }
