@@ -205,10 +205,12 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 // here.
 //
 // Mirrors the resilience contract of FetchIAMPoliciesByIDsFull: per-id
-// failures (e.g. NoSuchEntity) are collected and returned as a composite
-// error via AggregateFailures, while the resources that did resolve are
-// still returned so the caller gets partial success rather than an
-// all-or-nothing failure.
+// failures are collected and returned as a composite error via
+// AggregateFailures, while the resources that did resolve are still returned
+// so the caller gets partial success rather than an all-or-nothing failure.
+// A role that no longer exists is not one of those failures — it is the
+// deleted-resource race IsNotFoundErr classifies, so it is dropped from the
+// answer and kept out of the aggregate.
 func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -227,6 +229,11 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 		seen[id] = struct{}{}
 
 		output, err := api.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(id)})
+		if IsNotFoundErr(err) {
+			// The role went away between the list call and this one: an
+			// operational race, not a failure to report. See IsNotFoundErr.
+			continue
+		}
 		if err != nil || output == nil || output.Role == nil {
 			if err == nil {
 				err = fmt.Errorf("empty response")

@@ -16,3 +16,4 @@
 - A list column whose title matches two stored field names differing only by case now shows the same value on every start instead of one at random.
 - The role's policy list no longer highlights a customer-managed policy in red just because someone named it `AdministratorAccess`. AWS's own policies are matched by their ARN, in every partition.
 - A role's inline policy written with a single `Statement` object no longer loses the resources it names, so the pivots that read them resolve.
+- An IAM role that is deleted while a9s is looking at it no longer reports as a failed lookup. It is treated as the ordinary race it is, like every other resource type.

@@ -42,13 +42,27 @@ import (
 // by the same match — classification is code-based, never a message substring scan.
 // "NotFound" also covers S3's empty-body-404 synthesis from HTTP status
 // text, which carries no modeled error shape of its own.
+//
+// What it deliberately does NOT cover: the codes a service answers when an
+// optional sub-configuration is unset — NoSuchBucketPolicy, NoSuchTagSet,
+// NoSuchLifecycleConfiguration, ObjectLockConfigurationNotFoundError,
+// RepositoryPolicyNotFoundException, EFS's PolicyNotFound, Lambda's
+// ResourceNotFoundException for an absent function policy. Those are answers
+// ABOUT a live resource ("this bucket has no policy"), and the sites that
+// read them say so in their own words. Folding them in here would mark a
+// healthy row data-incomplete.
 func IsNotFoundErr(err error) bool {
 	return ErrCodeIs(err,
 		"NoSuchBucket", "NotFound", "NoSuchHostedZone", "ResourceNotFoundException", "InvalidInstanceID.NotFound",
 		// RDS and DocumentDB spell the same race with their own codes; a
 		// snapshot deleted between the list call and a per-snapshot
 		// describe answers one of these.
-		"DBSnapshotNotFound", "DBClusterSnapshotNotFoundFault")
+		"DBSnapshotNotFound", "DBClusterSnapshotNotFoundFault",
+		// IAM spells it for every entity it owns — role, user, group, policy,
+		// instance profile. Both spellings: the modeled
+		// *NoSuchEntityException answers ErrorCode() "NoSuchEntity", while a
+		// response the SDK could not bind to it carries the exception name.
+		"NoSuchEntity", "NoSuchEntityException")
 }
 
 // aggregateFailuresCap is the maximum number of distinct causes
