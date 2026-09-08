@@ -401,72 +401,37 @@ func (c *Controller) persistMenuAvailabilityCache() {
 	c.queueAvailabilitySave(pair)
 }
 
-// queueAvailabilitySave hands pair to the single availability-cache writer
-// goroutine, starting it on first use, and coalesces: if the buffer-1 channel
-// already holds an unconsumed request, it is dropped in favor of pair (the
-// writer never blocks a caller by falling behind, and a burst of N calls only
-// ever produces one disk write). Each request names only the pair; the counts
-// are read from RowStore when the write runs, so a coalesced-away request
-// costs nothing — the surviving one writes at least as fresh a picture.
-// Non-blocking by construction — never runs disk I/O itself. A no-op after
-// Close has been called (send on availSaveStop-closed path is guarded by the
-// same select, so a very late call harmlessly drops its request rather than
-// panicking on a closed channel — the writer goroutine has already exited by
-// then, and Close already flushed the last request it had).
+// queueAvailabilitySave stages a counts-only save for pair on the controller's
+// one ordered write queue — the same queue the rows-carrying per-type save
+// uses, so the two writers of a type file land in the order they were decided
+// and a restart never reads whichever finished first. Each request names only
+// the pair; the counts are read from RowStore when the write runs, so a
+// request queued directly behind an identical one adds nothing and is
+// coalesced away (the survivor writes at least as fresh a picture). A
+// rows-carrying save queued in between is a different write, and stops the
+// coalescing rather than reordering around it.
+//
+// Non-blocking by construction — never runs disk I/O itself, and safe to call
+// with c.mu held. A no-op after Close has been called: dropping is safe, since
+// Close's own drain already persisted whatever was queued at the time, and no
+// path depends on a save queued strictly after Close (the restart guarantee
+// concerns the LAST save before a real shutdown, which Close owns).
 func (c *Controller) queueAvailabilitySave(pair session.Pair) {
 	select {
 	case <-c.availSaveStop:
-		// Close already ran (or is running): the writer is gone or exiting.
-		// Dropping here is safe — Close's own drain step already persisted
-		// whatever was queued at the time it was called, and no code path
-		// depends on a save queued strictly after Close for correctness
-		// (the restart guarantee only concerns the LAST save before
-		// a real shutdown, which Close itself owns).
 		return
 	default:
 	}
-	c.availSaveOnce.Do(func() {
-		c.availSaveWG.Add(1)
-		go c.runAvailabilitySaveLoop()
+	c.cacheWriteMu.Lock()
+	if n := len(c.pendingCacheWrites); n > 0 && c.pendingCacheWrites[n-1].availPair == pair {
+		c.cacheWriteMu.Unlock()
+		return
+	}
+	c.cacheWriteMu.Unlock()
+	c.stageCacheWrite(cacheWrite{
+		run:       func() { _ = c.core.SaveAvailabilityFromRows(pair) },
+		availPair: pair,
 	})
-	select {
-	case c.availSaveCh <- pair:
-	default:
-		select {
-		case <-c.availSaveCh:
-		default:
-		}
-		select {
-		case c.availSaveCh <- pair:
-		default:
-		}
-	}
-}
-
-// runAvailabilitySaveLoop is the single writer goroutine started by
-// queueAvailabilitySave. It drives the menu-badge persistence path's disk
-// write (SaveAvailabilityFromRows -> WithCacheStoreSave ->
-// store.CommitSave's temp file+chmod+rename) off any goroutine holding
-// Controller.mu. Exits once Close closes availSaveStop, after running any
-// save still pending in availSaveCh (Close.Wait()s on availSaveWG for
-// exactly this).
-func (c *Controller) runAvailabilitySaveLoop() {
-	defer c.availSaveWG.Done()
-	for {
-		select {
-		case pair := <-c.availSaveCh:
-			_ = c.core.SaveAvailabilityFromRows(pair)
-		case <-c.availSaveStop:
-			// Drain exactly one more pending save (if any) so a Close
-			// racing a just-queued one still persists it, then exit.
-			select {
-			case pair := <-c.availSaveCh:
-				_ = c.core.SaveAvailabilityFromRows(pair)
-			default:
-			}
-			return
-		}
-	}
 }
 
 // Close deterministically shuts down the availability-cache writer: it
@@ -492,6 +457,9 @@ func (c *Controller) runAvailabilitySaveLoop() {
 // before returning, or the writer goroutine can still be persisting when the
 // temp directory is removed.
 func (c *Controller) Close() {
+	// The writer is started lazily, so a controller that queued saves and
+	// never reached a nudge would otherwise have nothing to drain them.
+	c.wakeCacheWriter()
 	c.availSaveCloseOnce.Do(func() {
 		close(c.availSaveStop)
 	})

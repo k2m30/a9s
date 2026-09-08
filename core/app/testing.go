@@ -53,6 +53,6 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 // synchronise on, and polling the file cannot tell a stale copy from the new
 // one.
 func (c *Controller) WaitForCacheWrites() {
-	c.flushCacheWrites()
+	c.wakeCacheWriter()
 	c.cacheWriteWG.Wait()
 }

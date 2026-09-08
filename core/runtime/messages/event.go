@@ -93,10 +93,10 @@ type ResourcesLoaded struct {
 	Gen domain.Gen
 	// ListSeq is the per-type canonical-list fetch sequence the dispatch that
 	// produced this result was stamped with (runtime.TaskRequest.ListSeq).
-	// The apply point discards a canonical list result whose ListSeq is no
-	// longer the latest one handed out for its type — an on-entry
-	// verification overtaken by a later Ctrl+R, a load-more, or another
-	// refresh. Zero means the result carries no ordering claim (a cache-seed
+	// Core.HandleResourcesLoaded compares it against the latest sequence
+	// handed out for the type and writes the answer to Superseded below — a
+	// result overtaken by a later Ctrl+R, a load-more, or another refresh is
+	// discarded by whoever applies the message. Zero means the result carries no ordering claim (a cache-seed
 	// replay, a filtered/child/by-ID fetch, a synthetic construction) and is
 	// applied as-is.
 	ListSeq domain.Gen
@@ -106,6 +106,13 @@ type ResourcesLoaded struct {
 	// renders Resources as usual AND routes Err through Flash so the `!`
 	// log records the partial failure.
 	Err error
+	// Superseded is the runtime seam's answer about this message: a later
+	// request for the same list was already handed out, so nothing this
+	// result carries may land. Core.HandleResourcesLoaded is the one place
+	// the question is asked (runtime.StampListResult writes the answer here);
+	// whoever applies the message reads this field rather than asking again,
+	// and still retires the activity flag the discarded request raised.
+	Superseded bool
 	// LoadingMore names the activity flag the request that produced this
 	// result raised on its list, so the completion retires the one it
 	// actually owns. Every producer stamps it from what its own request did,

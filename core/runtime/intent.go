@@ -243,6 +243,20 @@ type ClearFlash struct{}
 
 func (ClearFlash) isIntent() {}
 
+// ListResultVerdict carries HandleResourcesLoaded's two answers about the
+// messages.ResourcesLoaded it was handed: the canonical short name it keyed
+// the gen guard, the reseed and the task scope by, and whether a later
+// request for the same list has already superseded this result. It is a
+// verdict, not an instruction — nothing applies it to the screen stack.
+// runtime.StampListResult writes it onto the message so the screen state that
+// consumes the result reads what the seam decided instead of deciding again.
+type ListResultVerdict struct {
+	ResourceType string
+	Superseded   bool
+}
+
+func (ListResultVerdict) isIntent() {}
+
 // SetErrorHintIntent toggles the persistent "errors visible — press ! to view"
 // hint shown after an error flash auto-clears (the adapter's showErrorHint
 // flag). HandleClearFlash emits this when the cleared flash carried an error.

@@ -78,6 +78,10 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// fetch from a previous profile/region overwrite the current list rows, so
 	// re-check staleness with the same predicate before mutating the controller.
 	if msg, ok := ev.(messages.ResourcesLoaded); ok && !messages.IsStale(msg, c.core) {
+		// HandleEvent above already ran the one seam that canonicalises this
+		// message's type and answers whether it was superseded; the message
+		// carries both answers from here on.
+		msg = runtime.StampListResult(msg, intents)
 		c.handleResourcesLoadedEvent(msg)
 		// Reverse-scan reapply, mirroring the TUI (runtime_adapter_resources.go):
 		// re-run the source predicate against each loaded page so a truncated
@@ -263,7 +267,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 			c.mu.Unlock()
 		}
 	}
-	c.flushCacheWrites()
+	c.wakeCacheWriter()
 
 	return vs, tasks
 }
@@ -313,32 +317,24 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 // the two paths cannot drift apart and reintroduce the asymmetry where a
 // failure lands on whatever screen happens to be on top instead of the one
 // that actually issued the failed request.
-func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance) (screen *Screen, canon string, ok bool) {
+func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance) (screen *Screen, ok bool) {
 	if resourceType == "" || provenance == messages.FetchProvenanceUnknown {
-		return nil, "", false
-	}
-	canon = resourceType
-	if td := resource.FindResourceType(resourceType); td != nil {
-		canon = td.ShortName
+		return nil, false
 	}
 	for i := len(c.stack) - 1; i >= 0; i-- {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
 			continue
 		}
-		screenType := s.Ctx.ResourceType
-		if td := resource.FindResourceType(screenType); td != nil {
-			screenType = td.ShortName
-		}
-		if screenType != canon {
+		if canonicalScreenType(s) != resourceType {
 			continue
 		}
 		if isTopLevelCanonicalList(s.ID, s.State.List) != provenance.CanonicalList() {
 			continue
 		}
-		return s, canon, true
+		return s, true
 	}
-	return nil, canon, false
+	return nil, false
 }
 
 // handleResourcesLoadedEvent applies a ResourcesLoaded event to the list
@@ -346,7 +342,8 @@ func (c *Controller) findResourceListScreen(resourceType string, provenance mess
 // full matching contract. Staleness is the caller's responsibility — Handle
 // drops stale ResourcesLoaded via messages.IsStale before invoking this.
 func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
-	s, canon, ok := c.findResourceListScreen(msg.ResourceType, msg.Provenance)
+	canon := msg.ResourceType
+	s, ok := c.findResourceListScreen(canon, msg.Provenance)
 	if !ok {
 		// No screen owns this result — it arrived after its list was popped,
 		// or none was ever opened. A canonical one still speaks for the type's
@@ -358,21 +355,19 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		// filtered drill, a by-ID lookup and a child fetch share this message
 		// shape but are never the type's global population, and must neither
 		// replace nor extend the shared per-type entry a canonical fetch owns.
-		if msg.Provenance.CanonicalList() && msg.ResourceType != "" &&
-			!c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
-			c.core.ObserveRows(resource.CanonicalShortName(msg.ResourceType), msg.Resources,
+		if msg.Provenance.CanonicalList() && canon != "" && !msg.Superseded {
+			c.core.ObserveRows(canon, msg.Resources,
 				msg.Pagination, session.OriginFetch, msg.Append)
 		}
 		return
 	}
-	// Superseded-dispatch discard, the same rule each lane's door applies —
-	// this seam is called directly by the TUI as well as by Handle, so it
-	// carries its own check rather than trusting its callers. Discarding the
-	// result still retires the activity flag the discarded request raised:
-	// no other completion is coming for it, and a Ctrl+R that supersedes an
-	// outstanding load-more clears only Loading/Refreshing, so LoadingMore
-	// would stay set for the rest of the session and the "m" key with it.
-	if c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
+	// Superseded-dispatch discard, on the answer the runtime seam already gave
+	// for this message (StampListResult). Discarding the result still retires
+	// the activity flag the discarded request raised: no other completion is
+	// coming for it, and a Ctrl+R that supersedes an outstanding load-more
+	// clears only Loading/Refreshing, so LoadingMore would stay set for the
+	// rest of the session and the "m" key with it.
+	if msg.Superseded {
 		if ls := s.State.List; ls != nil {
 			ls.clearFetchInFlight(msg.LoadingMore)
 		}
@@ -431,7 +426,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 // those, mirroring FetchResourcesPayload.Provenance's own zero-value grace.
 func (c *Controller) clearActiveListLoadingTarget(v runtime.ClearActiveListLoadingIntent) *ListState {
 	if v.ResourceType != "" && v.Provenance != messages.FetchProvenanceUnknown {
-		s, _, ok := c.findResourceListScreen(v.ResourceType, v.Provenance)
+		s, ok := c.findResourceListScreen(v.ResourceType, v.Provenance)
 		if !ok {
 			return nil
 		}
@@ -441,9 +436,9 @@ func (c *Controller) clearActiveListLoadingTarget(v runtime.ClearActiveListLoadi
 }
 
 // syncExactTotalToMenu applies the load-more-exhaustion exact-total sync-back
-// to the root menu's availability + issue-badge state. screen is
-// the list screen whose ResourcesLoaded just landed; canon is its canonical
-// resource type. Skipped for related/filtered/child-context lists (EscPops or
+// to the root menu's availability + issue-badge state. screen is the list
+// screen whose ResourcesLoaded just landed; canon is the canonical short name
+// the message arrived carrying. Skipped for related/filtered/child-context lists (EscPops or
 // a non-nil ParentContext) — those show a filtered subset, not the global
 // population.
 //
@@ -546,42 +541,39 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	rows := append([]resource.Resource(nil), ls.Rows...)
 	pair := c.core.Pair()
 	// C4: every input is frozen here, under the lock; the write itself runs
-	// after the caller releases it (queueCacheWrite), so a slow filesystem
-	// can never stall the next key or a web snapshot behind this save. The
-	// frozen pair is what lets the write still be rejected if the operator
-	// switches profile before it lands.
-	c.queueCacheWrite(func() {
+	// after the caller releases it, so a slow filesystem can never stall the
+	// next key or a web snapshot behind this save. The frozen pair is what
+	// lets the write still be rejected if the operator switches profile
+	// before it lands.
+	c.stageCacheWrite(cacheWrite{run: func() {
 		_ = c.core.SaveTypeRows(pair, canon, rows, len(rows), exact, issues, issuesKnown, truncated, false)
-	})
+	}})
 }
 
-// queueCacheWrite stages a cache write whose inputs are already frozen, to
-// be run by flushCacheWrites once c.mu is released. Caller must hold c.mu
-// (write). Mirrors the costs cache's dirty-store handoff in Handle — the
-// controller mutex is the same lock every key event needs, so no disk I/O
-// may happen while it is held (C4).
-func (c *Controller) queueCacheWrite(write func()) {
-	c.cacheWriteWG.Add(1)
-	c.cacheWriteMu.Lock()
-	c.pendingCacheWrites = append(c.pendingCacheWrites, write)
-	c.cacheWriteMu.Unlock()
-}
-
-// flushCacheWrites hands whatever queueCacheWrite staged to the cache writer
-// and returns. It does not perform the write: a type file's yaml.Marshal of
-// the whole row set is the same order of work as the row pass the absorb just
-// moved off the lock (C4), and running it here only moves that cost from the
-// lock into the caller's own latency — the fetch that triggered the save, and
-// the key press behind it, still wait for a 6000-row marshal.
+// stageCacheWrite appends one save to the ordered queue. Callers hold c.mu
+// (write) and have already frozen the save's inputs — the controller mutex is
+// the same lock every key event needs, so no disk I/O may happen while it is
+// held (C4), the same handoff the costs cache's dirty store performs in Handle. It never performs the
+// write: a type file's yaml.Marshal of the whole row set is the same order of
+// work as the row pass the absorb moved off the lock (C4), and running it on
+// this goroutine only moves that cost from the lock into the caller's own
+// latency — the fetch that triggered the save, and the key press behind it,
+// would still wait for a 6000-row marshal.
 //
-// Caller must NOT hold c.mu.
-func (c *Controller) flushCacheWrites() {
+// Staging does not wake the writer: the caller still holds c.mu, and a marshal
+// started here competes for CPU with the very hold it is meant to stay out of.
+// The wake happens at the seams that have just released the lock (Apply,
+// Handle, HandleResourcesLoadedEvent, Close).
+func (c *Controller) stageCacheWrite(w cacheWrite) {
 	c.cacheWriteMu.Lock()
-	pending := len(c.pendingCacheWrites) > 0
+	c.cacheWriteWG.Add(1)
+	c.pendingCacheWrites = append(c.pendingCacheWrites, w)
 	c.cacheWriteMu.Unlock()
-	if !pending {
-		return
-	}
+}
+
+// wakeCacheWriter starts the writer goroutine if it is not running yet and
+// tells it there is work. Never blocks. Caller must NOT hold c.mu.
+func (c *Controller) wakeCacheWriter() {
 	c.cacheWriteOnce.Do(func() {
 		c.availSaveWG.Add(1)
 		go c.runCacheWriteLoop()
@@ -592,11 +584,12 @@ func (c *Controller) flushCacheWrites() {
 	}
 }
 
-// runCacheWriteLoop is the single goroutine that performs the staged per-type
-// saves, in the order they were queued. It shares Close's stop signal and wait
-// group with the availability writer, so one Close drains and waits for both —
-// the restart guarantee (the last save before a real shutdown lands) covers
-// this lane too.
+// runCacheWriteLoop is the single goroutine that performs the staged saves, in
+// the order they were queued — both lanes, so the file a restart reads is the
+// one the later decision produced rather than the one that happened to finish
+// last. Close's stop signal and wait group are shared with it, so one Close
+// drains and waits: the restart guarantee (the last save before a real
+// shutdown lands) covers everything on the queue.
 func (c *Controller) runCacheWriteLoop() {
 	defer c.availSaveWG.Done()
 	for {
@@ -623,8 +616,8 @@ func (c *Controller) drainCacheWrites() {
 		if len(pending) == 0 {
 			return
 		}
-		for _, write := range pending {
-			write()
+		for _, w := range pending {
+			w.run()
 			c.cacheWriteWG.Done()
 		}
 	}
@@ -780,12 +773,17 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 // HandleResourcesLoadedEvent is the public adapter seam used by the TUI's
 // runtime_adapter_resources.go. It routes a ResourcesLoaded message into the
 // matching controller list screen's state, replacing the old updateActiveView
-// path that routed the message through a stored ResourceListModel.Update(). The
-// caller must perform the IsStale check before invoking this.
+// path that routed the message through a stored ResourceListModel.Update().
+//
+// The caller must perform the IsStale check, and must hand in a message the
+// runtime seam has already stamped (runtime.StampListResult): the canonical
+// short name and the supersession answer are read off the message here, never
+// recomputed. A superseded message is still routed — it owes the request that
+// raised it the retirement of its activity flag.
 func (c *Controller) HandleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	// The per-type save this result queues runs after the lock is released
 	// (C4), exactly as Handle runs it — deferred first so it fires last.
-	defer c.flushCacheWrites()
+	defer c.wakeCacheWriter()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.handleResourcesLoadedEvent(msg)

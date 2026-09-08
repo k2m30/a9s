@@ -11,6 +11,11 @@
   the number of rows.
 - A list that could not finish loading no longer records its rows as the
   complete set of that type, and no longer offers "more" when there is none.
+- The cached row count for a type no longer flips between "exact" and
+  "at least" depending on which of two background saves happened to finish
+  first. A restart now reads the same number the session ended with.
+- A cached type file is no longer briefly written without its rows, so a
+  restart during a refresh no longer opens the list empty.
 - Load-more and Ctrl+R on a related drill now act on the drill, not on the
   list underneath it. A refreshed drill keeps showing what it found instead of
   the type's whole list, and its title counts the drill, not the account.

@@ -68,20 +68,9 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	if messages.IsStale(msg, m.core) {
 		return m, nil
 	}
-	if m.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
-		// Still routed to the controller: its own door discards the result
-		// AND retires the activity flag the discarded request raised, which
-		// no later completion will ever do (core/app/handle.go).
-		m.ctrl.HandleResourcesLoadedEvent(msg)
-		return m, nil
-	}
-	// Update the controller's list state with the loaded resources.
-	m.ctrl.HandleResourcesLoadedEvent(msg)
-	// Re-apply the checker if the active list has one (related-navigation lists).
-	rs := m.activeRS()
-	if rs.kind == rsKindList {
-		m.ctrl.ApplyReapplyCheckerAgainst(msg.Resources)
-	}
+	// The runtime seam runs first: it is the one place this message's type is
+	// canonicalised and the one place a superseded result is recognised, and
+	// the controller applies what it stamps rather than asking again.
 	intents, tasks := m.core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: msg.ResourceType,
 		Resources:    msg.Resources,
@@ -92,6 +81,19 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 		Err:          msg.Err,
 		Provenance:   msg.Provenance,
 	})
+	msg = runtime.StampListResult(msg, intents)
+	// Still routed to the controller when superseded: its door discards the
+	// result AND retires the activity flag the discarded request raised, which
+	// no later completion will ever do (core/app/handle.go).
+	m.ctrl.HandleResourcesLoadedEvent(msg)
+	if msg.Superseded {
+		return m, nil
+	}
+	// Re-apply the checker if the active list has one (related-navigation lists).
+	rs := m.activeRS()
+	if rs.kind == rsKindList {
+		m.ctrl.ApplyReapplyCheckerAgainst(msg.Resources)
+	}
 	coreCmd := m.dispatchCoreScreenResult(intents, tasks)
 
 	// Auto-open-single-detail: when the active list was created with

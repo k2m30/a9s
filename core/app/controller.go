@@ -109,12 +109,16 @@ type Controller struct {
 	// unlocking. nil means nothing is pending.
 	costsDirtyStore *costs.Store
 
-	// pendingCacheWrites holds per-type disk saves whose inputs were frozen
-	// under c.mu and whose write runs on the cache writer's goroutine (C4) —
-	// the same handoff costsDirtyStore performs for the costs cache. Staged by
-	// queueCacheWrite, performed by runCacheWriteLoop (both in handle.go).
+	// pendingCacheWrites is the one ordered queue of disk saves for this
+	// controller: the rows-carrying per-type save and the counts-only
+	// availability save both stage here, so the two writers of a type file
+	// land in the order they were decided rather than racing (a restart would
+	// otherwise read whichever finished last). Inputs are frozen under c.mu;
+	// the write runs on the cache writer's goroutine (C4) — the same handoff
+	// costsDirtyStore performs for the costs cache. Staged by stageCacheWrite
+	// (both lanes), performed by runCacheWriteLoop.
 	// Guarded by cacheWriteMu, not c.mu.
-	pendingCacheWrites []func()
+	pendingCacheWrites []cacheWrite
 
 	// identityResult holds the resolved caller identity received via
 	// messages.IdentityLoaded so snapshot can build IdentityBody without
@@ -160,18 +164,8 @@ type Controller struct {
 	// completion, not generation validity.
 	menuSweepAcked map[string]bool
 
-	// availSaveCh feeds persistMenuAvailabilityCache's save requests — one
-	// pair at a time — to the writer goroutine started once by
-	// availSaveOnce. Buffered to exactly 1 so a burst of calls coalesces into
-	// one disk write.
-	availSaveCh chan session.Pair
-
-	// availSaveOnce starts the persistMenuAvailabilityCache writer goroutine
-	// on the first save that needs it.
-	availSaveOnce sync.Once
-
-	// availSaveStop signals runAvailabilitySaveLoop and the cache writer to
-	// drain and exit; closed exactly once by Close via availSaveCloseOnce.
+	// availSaveStop signals the cache writer to drain and exit; closed
+	// exactly once by Close via availSaveCloseOnce.
 	availSaveStop chan struct{}
 
 	// availSaveCloseOnce guards closing availSaveStop so a Controller.Close
@@ -185,7 +179,7 @@ type Controller struct {
 	// a writer is waiting), which is the latency this lane exists to avoid.
 	// Never held while a write runs — a staged write calls back into the
 	// Controller (SaveColumnsForType takes c.mu.RLock), so holding this lock
-	// across one would invert the order queueCacheWrite establishes.
+	// across one would invert the order the queue establishes.
 	cacheWriteMu sync.Mutex
 
 	// cacheWriteWake nudges the per-type cache writer that pendingCacheWrites
@@ -209,6 +203,17 @@ type Controller struct {
 	// its return; Close.Wait()s on it so the last queued write is guaranteed
 	// to have run before Close returns.
 	availSaveWG sync.WaitGroup
+}
+
+// cacheWrite is one staged disk save. availPair is set only on a counts-only
+// availability save, which names the pair it will read the row store for:
+// two of those queued back to back would write the same file twice from the
+// same source, so the second coalesces into the first (queueAvailabilitySave).
+// A rows-carrying save between them is a different write and stops the
+// coalescing, which is what keeps the queue's order meaningful.
+type cacheWrite struct {
+	run       func()
+	availPair session.Pair
 }
 
 // controllerErrorEntry is one session-error-log entry stored in Controller.
@@ -237,7 +242,6 @@ func New(core *runtime.Core) *Controller {
 				State: ScreenState{Menu: &MenuState{}},
 			},
 		},
-		availSaveCh:    make(chan session.Pair, 1),
 		availSaveStop:  make(chan struct{}),
 		cacheWriteWake: make(chan struct{}, 1),
 	}
@@ -266,7 +270,7 @@ func New(core *runtime.Core) *Controller {
 // It reads c.viewConfig and c.fallbackTypeDefs, and it takes the read lock to
 // do it: neither caller of Core.SaveTypeRows holds c.mu. The list-open lane
 // queues its save with frozen inputs and the cache writer performs it on its
-// own goroutine (queueCacheWrite/runCacheWriteLoop), and the executor's sweep
+// own goroutine (stageCacheWrite/runCacheWriteLoop), and the executor's sweep
 // lane never touches Controller at all. Without the lock, a save running there
 // reads those maps while RegisterFallbackTypeDef or SetViewConfig writes them —
 // a concurrent map read that took the whole process down once the writer moved
@@ -413,9 +417,13 @@ func (c *Controller) registerFallbackTypeDefLocked(td resource.ResourceTypeDef) 
 // All navigate/session actions and row-dependent actions are fully wired.
 func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	vs, tasks := c.applyLocked(a)
-	return vs, c.stampDispatchSnapshotLocked(tasks)
+	tasks = c.stampDispatchSnapshotLocked(tasks)
+	c.mu.Unlock()
+	// Whatever applyLocked staged is handed to the writer only now: a marshal
+	// started while the lock was still held competes with the hold itself (C4).
+	c.wakeCacheWriter()
+	return vs, tasks
 }
 
 // selectedResourceForAction resolves the resource a row-dependent action targets:

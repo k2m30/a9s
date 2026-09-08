@@ -124,12 +124,12 @@ func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
 // ListResultSuperseded reports whether a list result dispatched for shortName
 // at sequence seq has been overtaken by a later request for the same list —
 // seq is no longer the newest value StampListFetchSeq handed out for the
-// type. The single ordering rule for list results, read at each lane's own
-// door so a superseded result reaches neither the screen nor the shared row
-// store (the TUI's ResourcesLoaded shim, HandleEvent's own case, and the
-// controller's apply seam) and again by the enrichment-rerun reseed, whose
-// own token says which rerun a result answers and nothing about which of two
-// results is newer.
+// type. The single ordering rule for list results, and it is asked once per
+// message: Core.HandleResourcesLoaded is the seam every lane routes a
+// messages.ResourcesLoaded through, and its answer travels on the message
+// (StampListResult) to the screen state that would otherwise ask again. The
+// enrichment-rerun token is a different question — which rerun a result
+// answers, never which of two results for the list is newer.
 //
 // A zero seq carries no ordering claim — a cache-seed replay, a
 // filtered/child/by-ID result, a synthetic construction — and is never

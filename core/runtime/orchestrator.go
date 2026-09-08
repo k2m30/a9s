@@ -126,7 +126,8 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// core/app behavior change this stage must not make. Feed RowStore
 		// the same canonicalization + Fetch-origin write HandleResourcesLoaded
 		// performs, then call HandleResourcesLoaded ourselves and forward its
-		// tasks plus ONLY its FlashIntent (filterFlashIntents): a partial-fetch
+		// tasks plus its FlashIntent and its verdict
+		// (filterResourcesLoadedIntents): a partial-fetch
 		// composite error (C4) is the one intent HandleResourcesLoaded emits
 		// that has no other producer on this lane — applyResourcesLoaded only
 		// installs the screen's own LastFetchError marker, it never flashes —
@@ -150,9 +151,12 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// core/app.Controller.handleResourcesLoadedEvent owns the write for
 		// every screen state, including the one this used to cover: a
 		// canonical result whose screen is gone.
-		if c.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
-			return nil, nil
-		}
+		//
+		// Nor is the supersession check here any more. HandleResourcesLoaded
+		// asks it once and the answer leaves as a ListResultVerdict, which
+		// Controller.Handle stamps onto the message before its own pipeline
+		// sees it — a second check on this lane could only ever agree, or be
+		// the one that got it wrong.
 		intents, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 			ResourceType: msg.ResourceType,
 			Resources:    msg.Resources,
@@ -163,7 +167,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 			Err:          msg.Err,
 			Provenance:   msg.Provenance,
 		})
-		return filterFlashIntents(intents), tasks
+		return filterResourcesLoadedIntents(intents), tasks
 	case messages.RelatedCheckResult:
 		// Row-store dual-write ONLY — same double-dispatch hazard as
 		// ResourcesLoaded above (Controller.Handle applies its own
@@ -198,17 +202,20 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	return nil, nil
 }
 
-// filterFlashIntents keeps only the FlashIntent entries from a Core handler's
-// intents slice, dropping every other intent kind. HandleEvent's
-// messages.ResourcesLoaded case uses this to forward HandleResourcesLoaded's
+// filterResourcesLoadedIntents keeps the FlashIntent and the ListResultVerdict
+// entries from HandleResourcesLoaded's intents, dropping every other kind.
+// HandleEvent's messages.ResourcesLoaded case uses it to forward the
 // partial-fetch-error flash without forwarding the ClearFlash/
 // PatchResourceCache intents Controller.Handle's own ResourcesLoaded pipeline
 // already owns (see that case's doc comment for why double-applying those
-// would be a real behavior change).
-func filterFlashIntents(intents []UIIntent) []UIIntent {
+// would be a real behavior change). The verdict is not applied to anything —
+// it is how the canonical short name and the supersession answer reach the
+// pipeline that consumes the message (StampListResult).
+func filterResourcesLoadedIntents(intents []UIIntent) []UIIntent {
 	var out []UIIntent
 	for _, in := range intents {
-		if _, ok := in.(FlashIntent); ok {
+		switch in.(type) {
+		case FlashIntent, ListResultVerdict:
 			out = append(out, in)
 		}
 	}

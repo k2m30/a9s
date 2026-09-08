@@ -162,8 +162,10 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //
 // Rules, applied in order:
 //
-//  0. Contradiction (false-exact self-heal, D14/D7): existing.Exact is stored
-//     true, but the CURRENT observation is itself truncated (rawTruncated)
+//  0. Contradiction (false-exact self-heal, D14/D7): the write carries an
+//     observation of its own (NOT Derived — a write that only reads the row
+//     store back has nothing to contradict the file with), existing.Exact is
+//     stored true, but the CURRENT observation is itself truncated (rawTruncated)
 //     AND its own accumulated depth already reaches or exceeds the stored
 //     exact count (rawCount >= existing.Count), AND that depth is itself
 //     proof of a live population — existing.Count > 0 (the general case), or,
@@ -221,17 +223,23 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // argument since it is the thing being reconciled AGAINST, not a rule
 // input).
 type reconcileInput struct {
-	Incoming           cache.TypeFile
-	RowsProvided       bool
-	RawTruncated       bool
-	RawCount           int
+	Incoming     cache.TypeFile
+	RowsProvided bool
+	RawTruncated bool
+	RawCount     int
+	// Derived marks a write whose numbers were read back out of the row
+	// store rather than observed from AWS. It carries no rows and no
+	// observation of its own, so it can neither prove nor disprove the
+	// file's exactness: rule 0's self-heal is not available to it, and its
+	// Exact is whatever the file already said.
+	Derived            bool
 	ShortName          string
 	Wave2Authoritative bool
 }
 
 func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFile {
 	incoming := in.Incoming
-	if existing.Exact && in.RawTruncated && in.RawCount >= existing.Count && (existing.Count > 0 || in.RawCount > 0) {
+	if existing.Exact && !in.Derived && in.RawTruncated && in.RawCount >= existing.Count && (existing.Count > 0 || in.RawCount > 0) {
 		// Rule 0: the stored Exact is provably false — accept the poisoned
 		// pair's self-healing observation instead of letting it re-stick.
 		// The (existing.Count > 0 || in.RawCount > 0) clause covers a stored
@@ -325,7 +333,7 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 // operator has since switched (C9). Best-effort like every other cache write.
 func (c *Core) SaveAvailabilityFromRows(pair session.Pair) error {
 	entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
-	return c.SaveAvailabilityCache(pair, entries, truncated, issueCounts, issueTruncated, issueKnown)
+	return c.saveAvailabilityCache(pair, entries, truncated, issueCounts, issueTruncated, issueKnown, true)
 }
 
 // SaveAvailabilityCache persists the supplied availability state to disk, one
@@ -359,6 +367,27 @@ func (c *Core) SaveAvailabilityCache(
 	issueTruncated map[string]bool,
 	issueKnown map[string]bool,
 ) error {
+	return c.saveAvailabilityCache(pair, entries, truncated, issueCounts, issueTruncated, issueKnown, false)
+}
+
+// saveAvailabilityCache is SaveAvailabilityCache's body plus the one thing
+// that separates its two callers. A probe's write observed AWS itself:
+// its truncation flag is evidence, and a truncated walk that reaches the
+// stored exact depth disproves that stored exactness (rule 0). A derived
+// write only reads the row store back — the same numbers another lane
+// already recorded, under a truncation flag that describes the screen's last
+// observation, not the persisted population. It therefore adopts the file's
+// exactness verbatim and never lowers a count the file calls exact, so the
+// two lanes writing one file cannot answer the same question two ways.
+func (c *Core) saveAvailabilityCache(
+	pair session.Pair,
+	entries map[string]int,
+	truncated map[string]bool,
+	issueCounts map[string]int,
+	issueTruncated map[string]bool,
+	issueKnown map[string]bool,
+	derived bool,
+) error {
 	if entries == nil {
 		return nil
 	}
@@ -386,7 +415,15 @@ func (c *Core) SaveAvailabilityCache(
 				// rule 0's doc comment).
 				Exact: existing.Exact || !trunc,
 			}
-			if existing.Exact && trunc && existing.Count > count {
+			if derived && hadExisting {
+				// Adopt, never raise or lower: this write read the row store
+				// back, so it has no observation with which to change what
+				// the file already decided. A file that does not exist yet
+				// has no answer to adopt, and the row store's own view is
+				// then the only one there is.
+				incoming.Exact = existing.Exact
+			}
+			if existing.Exact && (trunc || (derived && hadExisting)) && existing.Count > count {
 				// Preserve the previously-observed exact count rather than
 				// letting a smaller truncated lower-bound regress it. Rule 0
 				// overrides this too when the contradiction condition holds.
@@ -396,6 +433,7 @@ func (c *Core) SaveAvailabilityCache(
 				Incoming:     incoming,
 				RawTruncated: trunc,
 				RawCount:     count,
+				Derived:      derived,
 				ShortName:    name,
 			})
 			if issueKnown[rawName] {

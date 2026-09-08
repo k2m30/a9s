@@ -123,13 +123,18 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	// rerun a result belongs to, never which of two results for the list is
 	// newer. Nothing it carries may land — not the reseed, not the enrich
 	// dispatch, and not the cross-view cache seed below, all of which would
-	// write the older page. Both lanes already drop such a message at their
-	// own door; this keeps the method itself honest for a direct caller.
-	if c.ListResultSuperseded(resType, ev.ListSeq) {
-		return nil, nil
+	// write the older page. This is the one place the question is asked: the
+	// answer leaves as a ListResultVerdict, and the screen state that applies
+	// the result reads it (StampListResult) rather than asking again. A
+	// superseded result still reaches that screen state, which owes the
+	// discarded request the retirement of the activity flag it raised.
+	superseded := c.ListResultSuperseded(resType, ev.ListSeq)
+	verdict := ListResultVerdict{ResourceType: resType, Superseded: superseded}
+	if superseded {
+		return []UIIntent{verdict}, nil
 	}
 
-	intents := []UIIntent{ClearFlash{}}
+	intents := []UIIntent{verdict, ClearFlash{}}
 
 	// Cross-view cache seed: only a genuinely canonical top-level result may
 	// seed the shared per-type ResourceCache entry. A filtered/by-ID/child
@@ -213,6 +218,30 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	}
 
 	return intents, tasks
+}
+
+// StampListResult writes HandleResourcesLoaded's verdict onto the message the
+// hosts hand on to their screen state: the canonical short name that seam
+// keyed its work by, and whether the result was superseded. Both hosts route a
+// messages.ResourcesLoaded through the seam first and stamp with this, so the
+// canonicalisation and the supersession check happen once per message and
+// every later reader — the delivery gate, the RowStore write, the flag
+// retirement — agrees with what the seam actually did.
+//
+// A message the seam never saw is returned unchanged: an unstamped
+// ResourceType is still the caller's own, which is what a direct test seam
+// hands in.
+func StampListResult(msg messages.ResourcesLoaded, intents []UIIntent) messages.ResourcesLoaded {
+	for _, in := range intents {
+		v, ok := in.(ListResultVerdict)
+		if !ok {
+			continue
+		}
+		msg.ResourceType = v.ResourceType
+		msg.Superseded = v.Superseded
+		return msg
+	}
+	return msg
 }
 
 // RefreshListEnrichment prepares a top-level list refresh for rt: the single
