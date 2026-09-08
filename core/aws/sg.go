@@ -114,6 +114,9 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 // open_ports is the sorted, comma-separated list of sensitive ports the group
 // leaves open to the internet, empty when it leaves none. A wide-open group
 // reports no list: every port is open, which wide_open already says.
+// dangerous_open_count counts matching rules, not ports, so it is non-zero
+// beside an empty list for a wide-open group and can exceed the list's length
+// when several rules open one port.
 func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
 	dangerousCount := 0
 	wideOpen := false
@@ -131,9 +134,6 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 			// Capture the specific port(s) covered.
 			if p.FromPort != nil && p.ToPort != nil {
 				from, to := *p.FromPort, *p.ToPort
-				if to < from {
-					from, to = to, from
-				}
 				// Always enumerate the dangerous ports that fall inside [from, to].
 				// We iterate the sensitive-port set (small, constant) rather than the
 				// range itself, so a 1-65535 rule stays O(|sensitivePorts|) and
