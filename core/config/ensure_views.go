@@ -222,13 +222,6 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 		want[c.Title] = c
 	}
 
-	// A file nobody has touched carries this build's column set, or the set the
-	// build at its stamp generated, and nothing else. It has no order of its
-	// own to protect, so it takes this build's — which is the only way a
-	// corrected default order reaches an operator who has already run a9s once.
-	// The trade is deliberate: reordering columns and changing nothing else is
-	// indistinguishable from never having opened the file, and such a file is
-	// reordered back.
 	// belongs reports whether a built-in column belongs in the migrated file:
 	// one the file already carries, or one introduced after the stamp it was
 	// written at. Both writers below ask, so neither can restore a column the
@@ -241,6 +234,13 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 		return vd.Generated == 0 || have[title] || introducedAfter(name, title, vd.Generated)
 	}
 
+	// A file nobody has touched carries this build's column set, or the set the
+	// build at its stamp generated, and nothing else. It has no order of its
+	// own to protect, so it takes this build's — which is the only way a
+	// corrected default order reaches an operator who has already run a9s once.
+	// The trade is deliberate: reordering columns and changing nothing else is
+	// indistinguishable from never having opened the file, and such a file is
+	// reordered back.
 	if generatedAsIs(name, vd.List, want, vd.Generated) {
 		kept := make([]ListColumn, 0, len(def.List))
 		for _, c := range def.List {
