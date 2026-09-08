@@ -592,3 +592,58 @@ func TestOneOwner_TheFilterChainHasOneCaller(t *testing.T) {
 			len(outside), strings.Join(outside, "\n  "))
 	}
 }
+
+// wipfixHitsOutsideFunc returns file:line for every non-comment line in a
+// repo-relative file containing expr, excluding the body of the named
+// function.
+func wipfixHitsOutsideFunc(t *testing.T, rel, signature, expr string) []string {
+	t.Helper()
+	src := wipfixReadRepoFile(t, rel)
+	start := strings.Index(src, signature)
+	if start < 0 {
+		t.Fatalf("%s does not declare %s", rel, signature)
+	}
+	end := start + len(signature)
+	if next := strings.Index(src[end:], "\nfunc "); next >= 0 {
+		end += next
+	} else {
+		end = len(src)
+	}
+	skipFrom := strings.Count(src[:start], "\n")
+	skipTo := strings.Count(src[:end], "\n")
+
+	var hits []string
+	for i, line := range strings.Split(src, "\n") {
+		if i >= skipFrom && i <= skipTo {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), "//") || !strings.Contains(line, expr) {
+			continue
+		}
+		hits = append(hits, rel+":"+strconv.Itoa(i+1)+"  "+strings.TrimSpace(line))
+	}
+	return hits
+}
+
+// TestOneOwner_IncomingExactnessIsDerivedOnce pins row 37. Two lanes write a
+// type file — the one carrying rows and the counts-only one — and each works
+// out the count and the exactness it is about to hand the reconciler in its
+// own code. They agree today, which is the whole of what stops the file
+// saying two things; a third lane would have to copy the same reasoning a
+// third time to keep agreeing. The derivation belongs in one function both
+// lanes call, leaving reconcileTypeFile as the only other place exactness is
+// decided.
+func TestOneOwner_IncomingExactnessIsDerivedOnce(t *testing.T) {
+	const (
+		file       = "core/runtime/probes.go"
+		reconciler = "func reconcileTypeFile("
+	)
+	for _, expr := range []string{"incoming.Exact =", "incoming.Count =", "Exact:"} {
+		hits := wipfixHitsOutsideFunc(t, file, reconciler, expr)
+		if len(hits) > 1 {
+			t.Errorf("a save's incoming %q is worked out at %d sites outside the reconciler, "+
+				"want 1 — one function derives it from what the save carries and both lanes "+
+				"call it:\n  %s", expr, len(hits), strings.Join(hits, "\n  "))
+		}
+	}
+}
