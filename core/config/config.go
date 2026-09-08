@@ -87,12 +87,15 @@ type ViewsConfig struct {
 }
 
 // GeneratedViewsVersion stamps the view files this build generates. Bump it in
-// the same change that adds, removes or renames a built-in column: EnsureViewsDir
-// reads the stamp off a file already on disk and, when it is older, adds the
-// columns this build ships that the file has never heard of. Without the stamp
-// an operator who ran a9s once keeps the column set of that day forever, and
-// every column added since is invisible to them alone.
-const GeneratedViewsVersion = 1
+// the same change that adds, removes or renames a built-in column, or that
+// changes where an existing one reads its value from: EnsureViewsDir reads the
+// stamp off a file already on disk and, when it is older, adds the columns this
+// build ships that the file has never heard of and carries the corrected source
+// onto the columns listed in viewColumnSourceChanges. Without the stamp an
+// operator who ran a9s once keeps the columns of that day forever — and without
+// the source half, they keep a column reading the field it was corrected away
+// from, which is worse than a missing column because it looks like it works.
+const GeneratedViewsVersion = 2
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {
