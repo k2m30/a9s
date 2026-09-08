@@ -16,13 +16,11 @@
 //  3. IdentityColumnIndex (core/app/list_columns.go) — byte-parity
 //     against the legacy identity-column cascade (resolveIdentityColumn in
 //     internal/tui/views/table_render.go), across every real catalog type.
-//     tui_viewstate_purity_list_test.go's MarkerCol case only covers the
-//     render-CONSUMPTION side (translate body.MarkerCol into a glyph) with
-//     one synthetic type; it never checks that IdentityColumnIndex
-//     COMPUTES the same index the legacy cascade would for real types. This
-//     is deliberately self-contained (no shared helpers with
-//     resourcelist_render_parity_test.go) so it keeps running after that
-//     file is deleted.
+//     Nothing else checks that IdentityColumnIndex COMPUTES the same index
+//     the legacy cascade would for real types: the purity file's
+//     render-consumption counterpart went with the glyph it used to translate
+//     body.MarkerCol into. Self-contained on purpose — it shares no helper
+//     with the parity file it outlived.
 package unit_test
 
 import (

@@ -14,9 +14,9 @@ import (
 )
 
 // applyListFilters applies the relatedIDSet prefilter, text filter, and
-// attention filter to base, returning the visible subset. Mirrors
-// ResourceListModel.applyFilter exactly so ListSelected and buildListBody
-// agree on which row is "selected".
+// attention filter to base, returning the visible subset. It is the only
+// filter: ListSelected and buildListBody both call it, so the two cannot
+// disagree about which row is "selected".
 func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
 	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
 	// the model constructor) over the catalog: the model's typeDef is the
@@ -46,7 +46,9 @@ func (c *Controller) applyListFilters(ls *ListState, typeName string, base []res
 	// Text filter — matches r.ID, r.Name, r.Fields values, r.Findings[i].Phrase.
 	result := listFilterResources(ls.Filter, base)
 
-	// Attention filter: mirrors ResourceListModel.applyFilter §7.
+	// Attention filter: a row is kept when it carries an issue finding of its
+	// own, or — having no findings at all — when the type's classifier calls
+	// it an issue or the Wave-2 store holds one for it.
 	if ls.AttentionOnly && td != nil {
 		findings := c.listEnrichmentFindings(typeName)
 		kept := make([]resource.Resource, 0, len(result))

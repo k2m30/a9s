@@ -136,7 +136,10 @@ func (c *Core) FetchProfiles() ([]string, error) {
 	configPath := awsclient.DefaultConfigPath()
 	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list profiles: %w", err)
+		// Returned as it is: the surface that renders it names the local AWS
+		// config itself, so a wrapper here only puts this call's own name in
+		// front of the cause the operator has to act on.
+		return nil, err
 	}
 	if len(profiles) == 0 {
 		return nil, fmt.Errorf("no AWS profiles found")

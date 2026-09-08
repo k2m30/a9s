@@ -198,8 +198,17 @@ type ListBody struct {
 	EnrichmentFindings  map[string][]domain.Finding `json:"enrichment_findings,omitempty"`
 	EnrichmentTruncated map[string]bool             `json:"enrichment_truncated,omitempty"`
 	// MarkerCol is the full-column-list index (before hscroll) of the identity
-	// column that receives the enrichment-finding glyph ("! "/"~ ") prefix.
-	// Pre-computed by buildListBody so RenderList does not need typeDef.
+	// column — the one column whose cell names the row, elected by
+	// IdentityColumnIndex and pre-computed by buildListBody so no renderer
+	// re-derives it from a key, a title or a path.
+	//
+	// It marks nothing, despite the name: no renderer paints anything at this
+	// index. A row's colour is the worst finding over both waves, so a row
+	// with anything to say is already off-green and there is no green row for
+	// a marker to annotate (docs/attention-signals.md §Visualization
+	// Surfaces). What reads the index is the widen pass, and
+	// tests/unit/cols_one_resolver_test.go, which pins that its cell carries
+	// the row's name.
 	MarkerCol int `json:"marker_col"`
 	// StatusCol is the full-column-list index (before hscroll) of the
 	// status/lifecycle column, or -1 when the type has none. Sibling of

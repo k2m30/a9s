@@ -31,12 +31,13 @@ func (c *Controller) OpenProfileSelector() (ViewState, []runtime.TaskRequest) {
 
 	profiles, err := c.core.FetchProfiles()
 	if err != nil {
-		// The failure is a local file, not an API, so no error class in
-		// core/aws names it — a9s supplies the cause word and the error's own
-		// words follow through awsclient.CauseOf, the one formatter every
-		// other surface that renders a failure phrases through.
+		// MessageOf, the one extraction of an error's own words, and not
+		// CauseOf: CauseOf answers from the AWS error-class table, which has
+		// no word for a local file. An *fs.PathError satisfies net.Error, so
+		// that table calls a missing or unreadable config a "transport
+		// failure" and sends the operator to the network instead of the file.
 		c.applyIntents([]runtime.UIIntent{runtime.FlashIntent{
-			Text:    "local AWS config: " + awsclient.CauseOf(err),
+			Text:    "local AWS config: " + awsclient.MessageOf(err),
 			IsError: true,
 		}})
 		return c.snapshot(), nil

@@ -612,11 +612,12 @@ func renderListVisibleWindow(selected, total, viewHeight int) (int, int) {
 }
 
 // renderListDataRow renders a single data row as a pure consumer of
-// app.ListRow: cell text comes from row.Cells verbatim, and buildListBody has
-// already baked any S4 status-column override into the appropriate cell
-// (docs/resources/*.md §4). No re-derivation from an enrichment findings map
-// happens here, and no marker is prepended to any cell — a row's colour
-// already carries its worst finding.
+// app.ListRow: cell text comes from row.Cells verbatim. The status-column
+// override is already baked into the cell by core/app's buildListBody, which
+// is where the rule that docs/resources/*.md §4 states for each type lives.
+// No re-derivation from an enrichment findings map happens here, and no
+// marker is prepended to any cell — a row's colour already carries its worst
+// finding.
 func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, cellOffset int) string {
 	var b strings.Builder
 	b.WriteString(base.Render(" "))

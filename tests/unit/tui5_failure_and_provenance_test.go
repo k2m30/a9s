@@ -22,24 +22,27 @@ import (
 // TestProfileSelector_LocalConfigFailureIsPhrased covers both ways the local
 // AWS config can refuse to yield profiles — a path that cannot be read at all,
 // and a file that names none — and asserts the flash phrases the failure as a
-// local-file cause instead of handing over the error chain's own text.
+// local-file cause: what went wrong with the file, with neither the fetcher's
+// own call-stack wrapper nor a guess at an AWS error class in front of it.
 func TestProfileSelector_LocalConfigFailureIsPhrased(t *testing.T) {
 	cases := []struct {
 		name string
 		path func(t *testing.T) string
+		want string
 	}{
 		{"unreadable", func(t *testing.T) string {
-			// A directory where a file is expected: os.ReadFile refuses it,
-			// which is the read failure w122 flashed verbatim.
+			// A directory where a file is expected: os.ReadFile refuses it.
 			return t.TempDir()
-		}},
+		}, "is a directory"},
+		// A missing config file is deliberately not a read error
+		// (core/aws/ini_config.go:20, matching the SDK), so it lands here too.
 		{"no profiles", func(t *testing.T) string {
 			p := filepath.Join(t.TempDir(), "config")
 			if err := os.WriteFile(p, []byte("# nothing here\n"), 0600); err != nil {
 				t.Fatalf("seeding config: %v", err)
 			}
 			return p
-		}},
+		}, "no AWS profiles found"},
 	}
 
 	for _, tc := range cases {
@@ -56,8 +59,17 @@ func TestProfileSelector_LocalConfigFailureIsPhrased(t *testing.T) {
 			if !strings.HasPrefix(text, "local AWS config: ") {
 				t.Errorf("flash = %q, want it phrased as a local AWS config failure", text)
 			}
-			if strings.TrimSpace(strings.TrimPrefix(text, "local AWS config:")) == "" {
-				t.Errorf("flash = %q names the file but no cause", text)
+			cause := strings.TrimSpace(strings.TrimPrefix(text, "local AWS config:"))
+			if !strings.Contains(cause, tc.want) {
+				t.Errorf("flash = %q, want the cause to say %q", text, tc.want)
+			}
+			// The cause is the failure itself: not the call stack that reached
+			// it, and not an AWS error class guessed for a local file.
+			if strings.Contains(cause, "failed to list profiles") {
+				t.Errorf("flash = %q carries the fetcher's own wrapper", text)
+			}
+			if strings.Contains(cause, "transport") {
+				t.Errorf("flash = %q reports a local file as a network failure", text)
 			}
 		})
 	}
