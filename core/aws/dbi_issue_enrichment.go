@@ -126,12 +126,12 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		setWave2Finding(&result, key, dbiCodePendingMaintenance, rows)
 	}
 
-	enrichDBIEngineVersions(ctx, clients, resources, &result)
+	engineErr := enrichDBIEngineVersions(ctx, clients, resources, &result)
 
 	// Pending maintenance is "~"-only: EnrichmentCap bounds informational
 	// coverage, never the issue count. The engine-deprecated pass below is
 	// "!", and sets Truncated itself when its walk is cut short.
-	return result, errors.Join(tagErr, walkErr)
+	return result, errors.Join(tagErr, walkErr, engineErr)
 }
 
 // enrichDBIEngineVersions calls DescribeDBEngineVersions once per distinct
@@ -139,7 +139,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 // a real fleet, so the per-run cache turns an N-instance walk into a handful
 // of calls — and emits the deprecated-engine finding for every instance on a
 // version AWS no longer lists as available.
-func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) {
+func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
 
 	type enginePair struct{ engine, version string }
@@ -183,6 +183,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 	}
 
 	SetTruncated(result, len(failures) > 0)
+	return AggregateFailures("DescribeDBEngineVersions", failures, len(resources))
 }
 
 // isDeprecatedEngineVersion reads the DescribeDBEngineVersions answer for one

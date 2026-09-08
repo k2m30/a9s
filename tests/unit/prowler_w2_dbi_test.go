@@ -412,7 +412,16 @@ func TestW2DBIEngineLookupErrorMarksTruncated(t *testing.T) {
 		status: map[string]string{"mysql|5.7.44": "deprecated"},
 		errs:   map[string]error{"oracle-se2|19.0.0.0": &smithy.GenericAPIError{Code: "AccessDenied", Message: "denied"}},
 	}
-	res := w2DBIEnrich(t, fake, denied, ok)
+	// Not w2DBIEnrich: that helper fatals on any error, and a denied lookup
+	// legitimately returns the composite one (codex2 round 5 — the pass used
+	// to record the failure and drop it). w2AssertEnricherShape is the map
+	// half of the invariants, documented for exactly this case.
+	res, err := w2Enricher(t, "dbi")(context.Background(),
+		&awsclient.ServiceClients{RDS: fake}, codex2DBIRows(t, denied, ok), nil)
+	if err == nil {
+		t.Error("a denied engine lookup must reach the operator through the composite error")
+	}
+	w2AssertEnricherShape(t, res)
 
 	if !res.TruncatedIDs["acme-denied-db"] {
 		t.Error("instance whose engine lookup failed was not marked in TruncatedIDs")

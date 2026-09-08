@@ -19,3 +19,4 @@
 - An IAM role that is deleted while a9s is looking at it no longer reports as a failed lookup. It is treated as the ordinary race it is, like every other resource type.
 - A refused call while checking IAM roles or groups is now reported instead of passing silently. Those two checks built a failure list and threw it away.
 - A resource that is deleted while a9s is checking it no longer counts as a failed check anywhere. The row still says it was not inspected.
+- A refused lookup of an RDS engine version is now reported instead of only greying the row. That check built a failure list and threw it away, the third such lane found.
