@@ -64,7 +64,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.KnownRelated("kms", nil, false)
 	}
 
-	ebsList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ebs")
+	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
@@ -112,7 +112,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 	if instanceID == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	logList, truncated, err := ec2RelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -155,7 +155,7 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 
 	instanceARN := res.Fields["arn"]
 
-	backupList, truncated, err := ec2RelatedResources(ctx, clients, cache, "backup")
+	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}

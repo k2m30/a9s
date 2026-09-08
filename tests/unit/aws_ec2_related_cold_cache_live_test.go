@@ -109,7 +109,7 @@ func TestEC2RelatedCheckers_EIPResolvesOnColdCache(t *testing.T) {
 
 // T003: verifies that on a cold cache miss the "tg" checker calls the registered
 // paginated fetcher exactly once — NOT the old full-account FetchTargetGroups.
-// Currently FAILS because ec2RelatedResources uses FetchTargetGroups directly and
+// Currently FAILS because relatedResourcesFor uses FetchTargetGroups directly and
 // early-returns on nil clients before ever calling the paginated fetcher.
 func TestEC2RelatedColdCache_FirstPageOnly_TG(t *testing.T) {
 	var mockCallCount int
@@ -148,7 +148,7 @@ func TestEC2RelatedColdCache_FirstPageOnly_TG(t *testing.T) {
 
 // T004: verifies that on a cold cache miss the "cfn" checker calls the registered
 // paginated fetcher exactly once — NOT the old full-account FetchCloudFormationStacks.
-// Currently FAILS because ec2RelatedResources uses FetchCloudFormationStacks directly and
+// Currently FAILS because relatedResourcesFor uses FetchCloudFormationStacks directly and
 // early-returns on nil clients before ever calling the paginated fetcher.
 func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 	var mockCallCount int

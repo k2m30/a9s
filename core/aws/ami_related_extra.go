@@ -27,7 +27,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 	if stackName == "" {
 		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
 	}
-	cfnList, truncated, err := amiRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -77,7 +77,7 @@ func checkAMING(ctx context.Context, clients any, res resource.Resource, cache r
 	if amiID == "" {
 		return resource.KnownRelated("ng", nil, false)
 	}
-	ngList, truncated, err := amiRelatedResources(ctx, clients, cache, "ng")
+	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.ErrorRelated("ng", err)
 	}

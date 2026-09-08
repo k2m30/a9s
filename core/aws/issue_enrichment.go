@@ -71,7 +71,12 @@ const EnrichmentParallelism = 8
 
 // PerParentPageCap limits per-parent pagination walks in enrichers to avoid
 // runaway enumeration on huge tenants. When hit, the emitted count is marked
-// with a "+" suffix to signal truncated.
+// with a "+" suffix (resource.FormatTruncated) and nothing else: the resource
+// WAS inspected and the enricher's other checks on it stand, so the row must
+// never be added to TruncatedIDs. That is the whole reason this bound is not
+// EnrichmentCap's helper family — EnrichmentCap marks rows nobody looked at,
+// this one marks a number that may be short. See docs/architecture.md,
+// "A cap marks whichever fact it made uncertain".
 const PerParentPageCap = 10
 
 // isInstanceARN returns true when the RDS ARN targets a DB instance

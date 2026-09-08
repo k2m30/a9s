@@ -20,7 +20,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if name == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	logList, truncated, err := ddbRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -44,7 +44,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 //   - type == "Gateway" (the vpce fetcher stores VpcEndpointType in Fields["type"])
 func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	_ = res
-	vpceList, truncated, err := ddbRelatedResources(ctx, clients, cache, "vpce")
+	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
 		return resource.ErrorRelated("vpce", err)
 	}

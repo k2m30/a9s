@@ -188,9 +188,3 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	return relatedResult("lambda", ids)
 }
-
-// ddbRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func ddbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	return relatedResourcesFor(ctx, clients, cache, target)
-}

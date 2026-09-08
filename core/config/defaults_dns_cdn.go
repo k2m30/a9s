@@ -55,14 +55,20 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 28},
 				{Title: "Status", Width: 12},
-				{Title: "API ID", Path: "ApiId", Width: 14},
-				{Title: "Protocol", Path: "ProtocolType", Width: 12},
+				// api_id/protocol/endpoint are read by key, not by path: the
+				// REST (v1) and HTTP/WebSocket (v2) lanes return different SDK
+				// structs and only the v2 one has ApiId/ProtocolType/
+				// ApiEndpoint. Both fetchers write these three keys, so the key
+				// is the one form that answers for every row in the list.
+				{Title: "API ID", Key: "api_id", Width: 14},
+				{Title: "Protocol", Key: "protocol", Width: 12},
 				{Title: "Stages", Key: "stages_count", Width: 7},
-				{Title: "Endpoint", Path: "ApiEndpoint", Width: 50},
+				{Title: "Endpoint", Key: "endpoint", Width: 50},
 				{Title: "Description", Path: "Description", Width: 30},
 			},
 			Detail: []DetailField{
-				{Path: "ApiId"}, {Path: "Name"}, {Path: "ProtocolType"}, {Path: "ApiEndpoint"},
+				{Key: "api_id", Label: "ApiId"}, {Path: "Name"},
+				{Key: "protocol", Label: "Protocol"}, {Key: "endpoint", Label: "Endpoint"},
 				{Path: "Description"}, {Path: "CreatedDate"}, {Path: "ApiKeySelectionExpression"},
 				{Path: "RouteSelectionExpression"}, {Path: "CorsConfiguration"}, {Path: "Tags"},
 			},

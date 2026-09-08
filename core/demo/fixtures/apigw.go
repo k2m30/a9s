@@ -324,7 +324,11 @@ var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:go
 			apigwV1RestAPI(APIGWRESTNoAuthorizer, "acme-orders-rest", "EDGE"),
 			apigwV1RestAPI(APIGWRESTNoAccessLogs, "acme-unlogged-rest", "REGIONAL"),
 			apigwV1RestAPI(APIGWRESTTracingOff, "acme-untraced-rest", "REGIONAL"),
-			apigwV1RestAPI(APIGWRESTStageSecret, "acme-leaky-rest", "REGIONAL"),
+			// Private, so the three endpoint words the REST rows can carry
+			// (edge, regional, private) all render on the bench. This row has
+			// an authorizer, so the endpoint word decides nothing here — the
+			// two endpoint-type findings keep their single witnesses each.
+			apigwV1RestAPI(APIGWRESTStageSecret, "acme-leaky-rest", "PRIVATE"),
 		},
 		Authorizers: map[string][]apigwv1types.Authorizer{
 			// APIGWRESTNoAuthorizer deliberately has none — it is the witness.

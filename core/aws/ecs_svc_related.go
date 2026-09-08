@@ -315,9 +315,3 @@ func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource
 	}
 	return resource.KnownRelated("role", nil, false)
 }
-
-// ecsSvcRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	return relatedResourcesFor(ctx, clients, cache, target)
-}

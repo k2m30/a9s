@@ -6,26 +6,26 @@ list:
   Status:
     width: 12
   API ID:
-    path: ApiId
+    key: api_id
     width: 14
   Protocol:
-    path: ProtocolType
+    key: protocol
     width: 12
   Stages:
     key: stages_count
     width: 7
   Endpoint:
-    path: ApiEndpoint
+    key: endpoint
     width: 50
   Description:
     path: Description
     width: 30
 
 detail:
-  - ApiId
+  - { key: api_id, label: "ApiId" }
   - Name
-  - ProtocolType
-  - ApiEndpoint
+  - { key: protocol, label: "Protocol" }
+  - { key: endpoint, label: "Endpoint" }
   - Description
   - CreatedDate
   - ApiKeySelectionExpression

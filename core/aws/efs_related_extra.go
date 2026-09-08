@@ -23,7 +23,7 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	if fsID == "" {
 		return resource.KnownRelated("alarm", nil, false)
 	}
-	alarmList, truncated, err := efsRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -52,7 +52,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 	if fsID == "" {
 		return resource.KnownRelated("eni", nil, false)
 	}
-	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
+	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
@@ -78,7 +78,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 	if fsID == "" {
 		return resource.KnownRelated("vpc", nil, false)
 	}
-	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
+	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}
@@ -126,7 +126,7 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	fsARN := *fs.FileSystemArn
 
-	plans, truncated, err := efsRelatedResources(ctx, clients, cache, "backup")
+	plans, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}

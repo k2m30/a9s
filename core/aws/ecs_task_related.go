@@ -156,9 +156,3 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 	}
 	return relatedResultTrunc("role", ids, truncated)
 }
-
-// ecsTaskRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func ecsTaskRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	return relatedResourcesFor(ctx, clients, cache, target)
-}

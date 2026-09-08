@@ -173,7 +173,13 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"iam-group", realisticIAMGroup(), []string{"developers", "AGPAEXAMPLEGROUPID"}},
 		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "deployed"}},
 		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
-		{"apigw", realisticAPIGW(), []string{"abc123def4", "prod-api", "HTTP"}},
+		// apigw's API ID, Protocol and Endpoint columns read mapped fields,
+		// not RawStruct paths: the list merges the REST (v1) and HTTP (v2)
+		// lanes, whose SDK structs share no field names, and only the mapped
+		// keys answer for both. Name and Description still resolve through a
+		// RawStruct path, so the case pins the rule on the cells that still
+		// exercise it — the ses precedent below, not a weakened rule.
+		{"apigw", realisticAPIGW(), []string{"prod-api", "Production REST API"}},
 		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
 		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
 		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "enabled"}},
@@ -305,10 +311,15 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 			[]string{"/hostedzone/Z1234567890ABC", "example.com."},
 		},
 		{
+			// api_id is deliberately absent from wrongFields: the API ID
+			// column reads that field by key (the v1/v2 lanes share no SDK
+			// field names), so Fields is SUPPOSED to win there. Name still
+			// resolves through a RawStruct path and is the cell this case
+			// pins.
 			"apigw",
 			realisticAPIGW(),
-			map[string]string{"api_id": "WRONG-API", "name": "WRONG-NAME"},
-			[]string{"abc123def4", "prod-api"},
+			map[string]string{"name": "WRONG-NAME"},
+			[]string{"prod-api"},
 		},
 		{
 			// identity_type is deliberately absent from wrongFields: the Type

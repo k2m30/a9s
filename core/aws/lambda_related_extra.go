@@ -82,7 +82,7 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 	if fnName == "" {
 		return resource.KnownRelated("apigw", nil, false)
 	}
-	apiList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "apigw")
+	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
 	if err != nil {
 		return resource.ErrorRelated("apigw", err)
 	}
@@ -123,7 +123,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 	if fnARN == "" {
 		return unreadZero(res, resource.KnownRelated("cf", nil, false))
 	}
-	cfList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "cf")
+	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
 		return resource.ErrorRelated("cf", err)
 	}
@@ -276,7 +276,7 @@ func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource
 	if fnName == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -326,7 +326,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	if fnARN == "" && fnName == "" {
 		return resource.KnownRelated("tg", nil, false)
 	}
-	tgList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "tg")
+	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.ErrorRelated("tg", err)
 	}
@@ -412,7 +412,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 	if fnARN == "" && fnName == "" {
 		return resource.KnownRelated("sns", nil, false)
 	}
-	subList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "sns-sub")
+	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
@@ -453,7 +453,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 	if fnARN == "" && fnName == "" {
 		return resource.KnownRelated("sns-sub", nil, false)
 	}
-	subList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "sns-sub")
+	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns-sub", err)
 	}
@@ -486,7 +486,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	if fnARN == "" && fnName == "" {
 		return resource.KnownRelated("s3", nil, false)
 	}
-	s3List, truncated, err := lambdaRelatedResources(ctx, clients, cache, "s3")
+	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
 	}
@@ -516,7 +516,7 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 	if fnName == "" {
 		return resource.KnownRelated("eni", nil, false)
 	}
-	eniList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "eni")
+	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
@@ -564,7 +564,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 	if len(arnSet) == 0 {
 		return resource.KnownRelated("secrets", nil, false)
 	}
-	secretList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "secrets")
+	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -609,7 +609,7 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 	if len(candidates) == 0 {
 		return resource.KnownRelated("ssm", nil, false)
 	}
-	ssmList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "ssm")
+	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
 	if err != nil {
 		return resource.ErrorRelated("ssm", err)
 	}

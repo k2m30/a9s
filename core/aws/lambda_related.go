@@ -345,9 +345,3 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	}
 	return relatedResultTrunc("eb-rule", ids, truncated)
 }
-
-// lambdaRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	return relatedResourcesFor(ctx, clients, cache, target)
-}

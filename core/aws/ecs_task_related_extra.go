@@ -22,7 +22,7 @@ func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, 
 	if taskID == "" {
 		return resource.KnownRelated("alarm", nil, false)
 	}
-	alarmList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -54,7 +54,7 @@ func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resourc
 	if taskID == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -183,7 +183,7 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 		return resource.KnownRelated("secrets", nil, false)
 	}
 
-	secretList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "secrets")
+	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -226,7 +226,7 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.KnownRelated("ssm", nil, false)
 	}
 
-	ssmList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "ssm")
+	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
 	if err != nil {
 		return resource.ErrorRelated("ssm", err)
 	}
@@ -271,7 +271,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("sg", nil, false)
 	}
 
-	eniList, eniTruncated, err := ecsTaskRelatedResources(ctx, clients, cache, "eni")
+	eniList, eniTruncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}
@@ -301,7 +301,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("sg", nil, false)
 	}
 
-	sgList, sgTruncated, err := ecsTaskRelatedResources(ctx, clients, cache, "sg")
+	sgList, sgTruncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}

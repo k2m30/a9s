@@ -269,9 +269,3 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 	}
 	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || joinIncomplete)
 }
-
-// efsRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func efsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	return relatedResourcesFor(ctx, clients, cache, target)
-}

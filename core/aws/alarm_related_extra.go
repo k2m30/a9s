@@ -171,7 +171,7 @@ func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource,
 	if name == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := alarmRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}

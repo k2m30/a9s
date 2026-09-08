@@ -25,7 +25,7 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 	if svcName == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -55,7 +55,7 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 	if svcName == "" {
 		return resource.KnownRelated("ecs-task", nil, false)
 	}
-	taskList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "ecs-task")
+	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
 		return resource.ErrorRelated("ecs-task", err)
 	}
@@ -111,7 +111,7 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 	if len(subnetIDs) == 0 {
 		return resource.KnownRelated("vpc", nil, false)
 	}
-	subnetList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "subnet")
+	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}

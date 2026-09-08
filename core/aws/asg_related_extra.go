@@ -57,7 +57,7 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 
-	tgList, truncated, err := asgRelatedResources(ctx, clients, cache, "tg")
+	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.ErrorRelated("tg", err)
 	}

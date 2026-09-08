@@ -27,7 +27,7 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if clusterName == "" {
 		return resource.KnownRelated("asg", nil, false)
 	}
-	asgList, truncated, err := ecsRelatedResources(ctx, clients, cache, "asg")
+	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -62,7 +62,7 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 	if clusterName == "" {
 		return resource.KnownRelated("ec2", nil, false)
 	}
-	ec2List, truncated, err := ecsRelatedResources(ctx, clients, cache, "ec2")
+	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -95,7 +95,7 @@ func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	if clusterName == "" {
 		return resource.KnownRelated("ct-events", nil, false)
 	}
-	evList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -128,7 +128,7 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 	if clusterName == "" {
 		return resource.KnownRelated("ecs-task", nil, false)
 	}
-	taskList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ecs-task")
+	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
 		return resource.ErrorRelated("ecs-task", err)
 	}
@@ -160,7 +160,7 @@ func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if clusterName == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	logList, truncated, err := ecsRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
