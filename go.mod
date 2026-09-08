@@ -18,7 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/backup v1.64.0
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.80.0
 	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.72.0
-	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.63.0
+	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.64.0
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.71.0
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.86.0
 	github.com/aws/aws-sdk-go-v2/service/codeartifact v1.45.0
@@ -27,7 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.71.0
 	github.com/aws/aws-sdk-go-v2/service/docdb v1.55.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.67.0
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.329.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.330.0
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.64.0
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.96.0
 	github.com/aws/aws-sdk-go-v2/service/efs v1.48.0
@@ -47,7 +47,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/rds v1.128.0
 	github.com/aws/aws-sdk-go-v2/service/redshift v1.70.0
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.69.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.111.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.112.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.48.0
 	github.com/aws/aws-sdk-go-v2/service/ses v1.41.0
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.72.0
@@ -61,7 +61,7 @@ require (
 	github.com/aws/smithy-go v1.28.1
 	github.com/charmbracelet/x/ansi v0.11.8
 	golang.org/x/sync v0.23.0
-	golang.org/x/tools v0.49.0
+	golang.org/x/tools v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -91,6 +91,6 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	golang.org/x/mod v0.40.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )

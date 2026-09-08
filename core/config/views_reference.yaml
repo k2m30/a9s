@@ -2533,6 +2533,7 @@ trail:  # cloudtrailtypes.Trail
   - KmsKeyId
   - LogFileValidationEnabled
   - Name
+  - RecursiveLogging
   - S3BucketName
   - S3KeyPrefix
   - SnsTopicARN
