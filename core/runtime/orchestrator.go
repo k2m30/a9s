@@ -133,7 +133,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// via its own direct HandleResourcesLoaded call in
 		// runtime_adapter_resources.go, so this task is emitted exactly
 		// once per lane per list load.
-		if c.ListResultSuperseded(msg) {
+		if c.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
 			return nil, nil
 		}
 		c.observeResourcesLoadedRows(msg)
@@ -143,6 +143,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 			Pagination:   msg.Pagination,
 			Append:       msg.Append,
 			TypeGen:      msg.TypeGen,
+			ListSeq:      msg.ListSeq,
 			Err:          msg.Err,
 		})
 		return nil, tasks

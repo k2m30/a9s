@@ -44,7 +44,14 @@ type ResourcesLoadedEvent struct {
 	Pagination   *resource.PaginationMeta
 	Append       bool
 	TypeGen      domain.Gen
-	Err          error
+	// ListSeq is the per-type request sequence the fetch that produced this
+	// result was dispatched at (messages.ResourcesLoaded.ListSeq). Ordering
+	// between two results for one list is its question, not TypeGen's:
+	// TypeGen says only whether this result answers the enrichment rerun that
+	// is currently outstanding, and a result can hold the current rerun token
+	// while a later request has already superseded it.
+	ListSeq domain.Gen
+	Err     error
 }
 
 // HandleResourcesLoaded owns the session-state portion of the post-fetch
@@ -90,6 +97,17 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	resType := ev.ResourceType
 	if td := resource.FindResourceType(resType); td != nil {
 		resType = td.ShortName
+	}
+
+	// A superseded result answers a request a later one has already replaced,
+	// whatever its rerun token says: the token below tells which enrichment
+	// rerun a result belongs to, never which of two results for the list is
+	// newer. Nothing it carries may land — not the reseed, not the enrich
+	// dispatch, and not the cross-view cache seed below, all of which would
+	// write the older page. Both lanes already drop such a message at their
+	// own door; this keeps the method itself honest for a direct caller.
+	if c.ListResultSuperseded(resType, ev.ListSeq) {
+		return nil, nil
 	}
 
 	intents := []UIIntent{ClearFlash{}}

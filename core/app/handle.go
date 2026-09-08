@@ -282,7 +282,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	// Superseded-dispatch discard, the same rule each lane's door applies —
 	// this seam is called directly by the TUI as well as by Handle, so it
 	// carries its own check rather than trusting its callers.
-	if c.core.ListResultSuperseded(msg) {
+	if c.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
 		return
 	}
 	// A fetch result belongs to a single list — the active (topmost) one of its

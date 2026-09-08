@@ -65,7 +65,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	// invoked directly (not via HandleEvent's central GenStamped gate) and the
 	// pre-Core view-side derive + updateActiveView would otherwise mutate state
 	// from a previous profile/region rotation.
-	if messages.IsStale(msg, m.core) || m.core.ListResultSuperseded(msg) {
+	if messages.IsStale(msg, m.core) || m.core.ListResultSuperseded(msg.ResourceType, msg.ListSeq) {
 		return m, nil
 	}
 	// Update the controller's list state with the loaded resources.
@@ -81,6 +81,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 		Pagination:   msg.Pagination,
 		Append:       msg.Append,
 		TypeGen:      msg.TypeGen,
+		ListSeq:      msg.ListSeq,
 		Err:          msg.Err,
 	})
 	coreCmd := m.dispatchCoreScreenResult(intents, tasks)

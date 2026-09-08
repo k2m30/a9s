@@ -116,19 +116,21 @@ func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
 	return c.session.ListFetchSeqLatest(canonShortName(shortName))
 }
 
-// ListResultSuperseded reports whether a canonical list result has been
-// overtaken by a later request for the same list — its ListSeq is no longer
-// the newest value StampListFetchSeq handed out for its type. The single
-// staleness rule for list ordering, read at each lane's own door so a
-// superseded result reaches neither the screen nor the shared row store: the
-// TUI's ResourcesLoaded shim, HandleEvent's own case (the headless lane and
-// any direct caller), and the controller's apply seam.
+// ListResultSuperseded reports whether a list result dispatched for shortName
+// at sequence seq has been overtaken by a later request for the same list —
+// seq is no longer the newest value StampListFetchSeq handed out for the
+// type. The single ordering rule for list results, read at each lane's own
+// door so a superseded result reaches neither the screen nor the shared row
+// store (the TUI's ResourcesLoaded shim, HandleEvent's own case, and the
+// controller's apply seam) and again by the enrichment-rerun reseed, whose
+// own token says which rerun a result answers and nothing about which of two
+// results is newer.
 //
-// ListSeq zero carries no ordering claim — a cache-seed replay, a
+// A zero seq carries no ordering claim — a cache-seed replay, a
 // filtered/child/by-ID result, a synthetic construction — and is never
 // superseded.
-func (c *Core) ListResultSuperseded(msg messages.ResourcesLoaded) bool {
-	return msg.ListSeq != 0 && msg.ListSeq != c.LatestListFetchSeq(msg.ResourceType)
+func (c *Core) ListResultSuperseded(shortName string, seq domain.Gen) bool {
+	return seq != 0 && seq != c.LatestListFetchSeq(shortName)
 }
 
 // ExecuteTask runs a task using a snapshot captured now. Synchronous callers
