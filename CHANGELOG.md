@@ -433,6 +433,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the generated signals page can no longer drift apart. A value AWS
   supplies that contains an angle bracket no longer swallows the rest of the
   phrase.
+- Errors now reach the `!` log wherever they happen. A failure that raised a banner in the terminal but left no trace in the web session log is recorded once for both, and the web error log shows the same entries.
+- A list no longer re-orders itself when a fetch lands over cached rows. A column sorts the same whether the rows came from the cache or from AWS.
+- The detail cursor stays on the finding you are reading when a new one arrives above it, instead of jumping back to the Attention heading.
 
 ### Added
 
