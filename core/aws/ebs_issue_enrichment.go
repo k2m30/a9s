@@ -52,7 +52,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 	// The cache-only joins above already answered; only the status question is
 	// affected by a short walk, so their findings stay and the rows the walk
 	// did not reach are marked uninspected for this check alone.
-	allVolumeStatuses, _, cut, walkErr := walkAccountPages(&result, resources,
+	allVolumeStatuses, _, cut, walkErr := walkAccountPages(&result, resources, oneItemPerRow,
 		func(v ec2types.VolumeStatusItem) string { return aws.ToString(v.VolumeId) },
 		func(token *string) ([]ec2types.VolumeStatusItem, *string, error) {
 			out, err := clients.EC2.DescribeVolumeStatus(ctx, &ec2svc.DescribeVolumeStatusInput{

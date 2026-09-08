@@ -142,12 +142,18 @@ func TestW4GroupFindingDef(t *testing.T) {
 
 // TestW4AdminPolicySetIsSharedAcrossPrincipals pins the architectural half of
 // rows 3/6/10: role, user and group answer "is this admin?" from one ARN set.
-// PowerUserAccess is the probe — a per-file copy of the set is exactly what
-// would let one principal type recognise it and the other two miss it.
+// A per-file copy of the set is exactly what would let one principal type
+// recognise the probe and the other two miss it.
+//
+// The probe was PowerUserAccess until codex2 row 6 (Codex finding 8) took it
+// out of the admin set — AWS's PowerUserAccess excludes IAM, Organizations
+// and Account, so it is not administrator-equivalent. The shared-set property
+// this test exists for is unchanged; only the probe moved. Do not restore
+// PowerUserAccess here.
 func TestW4AdminPolicySetIsSharedAcrossPrincipals(t *testing.T) {
 	t.Run("role", func(t *testing.T) {
 		fake := &w4RoleAdminFake{attached: map[string]map[string]string{
-			"acme-power-role": {"PowerUserAccess": w4PowerUserAccessARN},
+			"acme-power-role": {"AdministratorAccess": w4AdminAccessARN},
 		}}
 		clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
 		res, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients,
@@ -158,14 +164,14 @@ func TestW4AdminPolicySetIsSharedAcrossPrincipals(t *testing.T) {
 		w4AssertFinding(t, res.Findings["acme-power-role"], w4CodeRoleAdminAttached,
 			w4PhraseRoleAdminAttached, domain.SevWarn, w4SourceRoleWave2)
 		w4AssertRows(t, res.AttentionDetails["acme-power-role"], w4CodeRoleAdminAttached,
-			[]domain.DetailRow{{Label: "Policy", Value: "PowerUserAccess"}})
+			[]domain.DetailRow{{Label: "Policy", Value: "AdministratorAccess"}})
 	})
 
 	t.Run("iam-user", func(t *testing.T) {
 		fake := &w4UserFake{
 			mfaUsers: map[string]bool{"acme-power-user": true},
 			attached: map[string]map[string]string{
-				"acme-power-user": {"PowerUserAccess": w4PowerUserAccessARN},
+				"acme-power-user": {"AdministratorAccess": w4AdminAccessARN},
 			},
 		}
 		res := w4EnrichUsers(t, fake, []resource.Resource{
@@ -174,20 +180,20 @@ func TestW4AdminPolicySetIsSharedAcrossPrincipals(t *testing.T) {
 		w4AssertFinding(t, res.Findings["acme-power-user"], w4CodeUserAdminAttached,
 			"has an administrator policy", domain.SevWarn, w4SourceUserWave2)
 		w4AssertRows(t, res.AttentionDetails["acme-power-user"], w4CodeUserAdminAttached,
-			[]domain.DetailRow{{Label: "Policy", Value: "PowerUserAccess"}})
+			[]domain.DetailRow{{Label: "Policy", Value: "AdministratorAccess"}})
 	})
 
 	t.Run("iam-group", func(t *testing.T) {
 		fake := &w4GroupFake{
 			members: map[string][]string{"acme-power-group": {"acme-power-user"}},
 			attached: map[string]map[string]string{
-				"acme-power-group": {"PowerUserAccess": w4PowerUserAccessARN},
+				"acme-power-group": {"AdministratorAccess": w4AdminAccessARN},
 			},
 		}
 		res := w4EnrichGroups(t, fake, []resource.Resource{w4GroupResource("acme-power-group")})
 		w4AssertFinding(t, res.Findings["acme-power-group"], w4CodeGroupAdminAttached,
 			"has an administrator policy", domain.SevWarn, w4SourceGroupWave2)
 		w4AssertRows(t, res.AttentionDetails["acme-power-group"], w4CodeGroupAdminAttached,
-			[]domain.DetailRow{{Label: "Policy", Value: "PowerUserAccess"}})
+			[]domain.DetailRow{{Label: "Policy", Value: "AdministratorAccess"}})
 	})
 }

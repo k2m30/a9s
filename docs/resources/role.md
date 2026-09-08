@@ -106,7 +106,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
   - **API call**: `GetRole` per role (one per resource).
   - **Cost shape**: per-resource.
 
-- **Signal**: `AdministratorAccess` or `PowerUserAccess` attached.
+- **Signal**: `AdministratorAccess` attached. `PowerUserAccess` does not count: it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -131,7 +131,7 @@ One row per signal from §3:
 | an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping compared against a concrete value | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `service can assume without source scoping` |
 | an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inline policy allows privilege escalation` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S2, S3, S4, S5 | `dormant role (>90d)` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
 
 Rules for filling list and detail text:
 

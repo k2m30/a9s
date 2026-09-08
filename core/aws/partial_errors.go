@@ -287,14 +287,39 @@ func ClassifyAWSError(err error) (code string, message string, retryable bool) {
 	code = apiErr.ErrorCode()
 	message = apiErr.ErrorMessage()
 
-	switch code {
-	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded", "SlowDown":
-		retryable = true
-	default:
-		retryable = false
-	}
+	// Retryable is not a second opinion about the code: it is what the one
+	// table already says, read here so a code cannot be worth retrying and
+	// classify as a generic error at the same time.
+	return code, message, awsCodeClass[code] == ClassThrottled
+}
 
-	return code, message, retryable
+// awsCodeClass is the one AWS-error-code table in a9s: which class each code
+// a9s recognises belongs to. ErrClass reads it for the word every surface
+// phrases, ClassifyAWSError reads it for the retry decision. They were two
+// lists once, and they drifted — SlowDown was retryable but classified as a
+// generic error, and UnauthorizedOperation, EC2's spelling of access denied,
+// was in neither.
+//
+// A code outside this table is passed through by ErrClass as itself: a9s says
+// nothing about it beyond the code AWS wrote.
+var awsCodeClass = map[string]string{ //nolint:gochecknoglobals // static AWS error-code table
+	"Throttling":               ClassThrottled,
+	"ThrottlingException":      ClassThrottled,
+	"TooManyRequestsException": ClassThrottled,
+	"RequestLimitExceeded":     ClassThrottled,
+	// S3's spelling of throttling.
+	"SlowDown": ClassThrottled,
+
+	"AccessDenied":          ClassAccessDenied,
+	"AccessDeniedException": ClassAccessDenied,
+	// EC2 refuses an unauthorized caller under its own code rather than the
+	// IAM one, so a denied DescribeInstances would otherwise read as an
+	// unmodeled error and lose the "denied" word and the sweep title.
+	"UnauthorizedOperation": ClassAccessDenied,
+
+	"ExpiredToken":          "expired",
+	"ExpiredTokenException": "expired",
+	"RequestExpired":        "expired",
 }
 
 // ErrCodeIs reports whether err carries one of the named AWS error codes.
@@ -374,21 +399,16 @@ func ErrClass(err error) string {
 		return "transport"
 	}
 	code, _, _ := ClassifyAWSError(err)
-	switch code {
-	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
-		return ClassThrottled
-	case "AccessDenied", "AccessDeniedException":
-		return ClassAccessDenied
-	case "ExpiredToken", "ExpiredTokenException", "RequestExpired":
-		return "expired"
-	case "":
+	if class, ok := awsCodeClass[code]; ok {
+		return class
+	}
+	if code == "" {
 		// An empty class means no failure at all — the menu row shows its
 		// alias and the operator is told nothing. A response with no modeled
 		// code still failed.
 		return classUnknown
-	default:
-		return code
 	}
+	return code
 }
 
 // errClassPhrasing is the vocabulary a9s owns for the failure classes it names

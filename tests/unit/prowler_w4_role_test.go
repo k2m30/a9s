@@ -462,13 +462,29 @@ func TestW4RoleInlinePrivEscNegatives(t *testing.T) {
 
 	// A role whose inline policies cannot be listed is unknown, not clean and
 	// not flagged: an API failure must never read as a verdict.
+	//
+	// INVERTED by codex2 row 2 (Codex finding 3): this used to go through
+	// w4FetchRole, which fatals on any error, and so asserted that the page
+	// came back CLEAN from a refused call. That silence was the defect. The
+	// page now carries the failure on its own lane and the role's
+	// policy-derived facts read "?" — do not restore the fatal-on-error
+	// helper here.
 	t.Run("list_inline_policies_fails", func(t *testing.T) {
 		fake := &w4RoleListFake{
 			roles:   []iamtypes.Role{w4Role("acme-denied-role", "/", w4TrustEC2Only)},
 			listErr: map[string]error{"acme-denied-role": errors.New("AccessDenied")},
 		}
-		r := w4FetchRole(t, fake, "acme-denied-role")
-		w4AssertNoCode(t, r.Findings, w4CodeRoleInlinePrivEsc)
+		res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
+		if err == nil {
+			t.Fatal("FetchIAMRolesPage returned no error for a refused ListRolePolicies")
+		}
+		if len(res.Resources) != 1 {
+			t.Fatalf("got %d rows, want the role to survive the partial failure", len(res.Resources))
+		}
+		w4AssertNoCode(t, res.Resources[0].Findings, w4CodeRoleInlinePrivEsc)
+		if got := res.Resources[0].Fields["policy_resources"]; got != "?" {
+			t.Errorf("policy_resources = %q, want %q", got, "?")
+		}
 	})
 }
 
@@ -566,7 +582,7 @@ func TestW4RoleAdminAttachedSkipsServiceLinked(t *testing.T) {
 func TestW4RoleAdminAttachedAPIErrorIsUnknown(t *testing.T) {
 	fake := &w4RoleAdminFake{
 		attached: map[string]map[string]string{
-			"acme-ops-admin-role": {"PowerUserAccess": w4PowerUserAccessARN},
+			"acme-ops-admin-role": {"AdministratorAccess": w4AdminAccessARN},
 		},
 		attachErr: map[string]error{"acme-denied-role": errors.New("AccessDenied: not authorized")},
 	}

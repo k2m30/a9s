@@ -120,81 +120,39 @@ func extractIAMPolicyARN(r resource.Resource) (string, bool) {
 	return "", false
 }
 
-// isAdminStarPolicy reports whether a decoded policy document grants unrestricted admin access
-// (Effect=Allow + Action=* + Resource=* in any statement).
-func isAdminStarPolicy(doc any) bool {
+// parsePolicyDoc runs a decoded policy document through the one policy
+// engine. FetchManagedPolicyDocument hands back the unmarshalled document, so
+// the round trip is what keeps every question about it — admin, privilege
+// escalation — on iampolicy instead of a second ad-hoc walk of the map that
+// drifts (finding 6: the local admin detector read only an array Statement,
+// while AWS accepts a bare object and iampolicy.Parse always did).
+func parsePolicyDoc(doc any) (iampolicy.Document, bool) {
 	if doc == nil {
-		return false
-	}
-	// doc is a map[string]any from json.Unmarshal via FetchManagedPolicyDocument.
-	m, ok := doc.(map[string]any)
-	if !ok {
-		// If it was a string (raw JSON), do a simple substring check.
-		if s, ok2 := doc.(string); ok2 {
-			return isAdminStarPolicyString(s)
-		}
-		return false
-	}
-	stmts, ok := m["Statement"]
-	if !ok {
-		return false
-	}
-	stmtList, ok := stmts.([]any)
-	if !ok {
-		return false
-	}
-	for _, stmt := range stmtList {
-		sm, ok := stmt.(map[string]any)
-		if !ok {
-			continue
-		}
-		effect, _ := sm["Effect"].(string)
-		if !strings.EqualFold(effect, "Allow") {
-			continue
-		}
-		if matchesStar(sm["Action"]) && matchesStar(sm["Resource"]) {
-			return true
-		}
-	}
-	return false
-}
-
-// matchesStar returns true if the policy field value is "*" (string) or ["*"] (slice).
-func matchesStar(v any) bool {
-	switch val := v.(type) {
-	case string:
-		return val == "*"
-	case []any:
-		for _, item := range val {
-			if s, ok := item.(string); ok && s == "*" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// isAdminStarPolicyString does a quick substring check for admin-star in a raw JSON string.
-func isAdminStarPolicyString(doc string) bool {
-	return (strings.Contains(doc, `"Effect":"Allow"`) || strings.Contains(doc, `"Effect": "Allow"`)) &&
-		(strings.Contains(doc, `"Action":"*"`) || strings.Contains(doc, `"Action": "*"`)) &&
-		(strings.Contains(doc, `"Resource":"*"`) || strings.Contains(doc, `"Resource": "*"`))
-}
-
-// policyPrivEscCombos re-encodes the decoded policy document and runs it
-// through iampolicy's privilege-escalation matcher. FetchManagedPolicyDocument
-// hands back the unmarshalled document, so the round trip is what keeps this
-// on the one policy engine instead of a second ad-hoc walk of the map.
-func policyPrivEscCombos(doc any) []string {
-	if doc == nil {
-		return nil
+		return iampolicy.Document{}, false
 	}
 	raw, err := json.Marshal(doc)
 	if err != nil {
-		return nil
+		return iampolicy.Document{}, false
 	}
 	parsed, err := iampolicy.Parse(string(raw))
 	if err != nil {
+		return iampolicy.Document{}, false
+	}
+	return parsed, true
+}
+
+// isAdminStarPolicy reports whether a decoded policy document grants
+// unrestricted admin access (Effect=Allow + Action=* + Resource=*).
+func isAdminStarPolicy(doc any) bool {
+	parsed, ok := parsePolicyDoc(doc)
+	return ok && parsed.IsAdmin()
+}
+
+// policyPrivEscCombos runs the decoded policy document through iampolicy's
+// privilege-escalation matcher.
+func policyPrivEscCombos(doc any) []string {
+	parsed, ok := parsePolicyDoc(doc)
+	if !ok {
 		return nil
 	}
 	return parsed.PrivilegeEscalation()

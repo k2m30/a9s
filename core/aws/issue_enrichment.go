@@ -238,20 +238,6 @@ func MarkInformationalOnly(result *IssueEnricherResult) {
 	result.Truncated = false
 }
 
-// markAllUninspected records that a single account-wide call answered for
-// every row and failed, so none of them was inspected. Without it the rows
-// render as inspected-and-healthy, which is the one thing a failed check must
-// never claim. Enrichers whose calls are per-item use MarkSkipped instead —
-// only the row whose own call failed is uninspected there.
-func markAllUninspected(result *IssueEnricherResult, resources []resource.Resource) {
-	SetTruncated(result, true)
-	for _, r := range resources {
-		if r.ID != "" {
-			result.TruncatedIDs[r.ID] = true
-		}
-	}
-}
-
 // resourceIDsOf is capAtEnrichmentCap's idsOf for the common case: a work list
 // of resources, where inspecting one item decides exactly its own row.
 func resourceIDsOf(r resource.Resource) []string { return []string{r.ID} }
@@ -426,6 +412,21 @@ func capRows(kept, incoming []domain.DetailRow) []domain.DetailRow {
 	})
 }
 
+// sightingRule says what it means for a walked page to have named a row —
+// the one fact walkAccountPages cannot read off the items it is handed.
+type sightingRule bool
+
+const (
+	// oneItemPerRow: the service returns at most one item per row (a volume
+	// status, a pending-actions entry, a membership of a filtered set), so a
+	// row a walked page named is answered even when the walk is later cut.
+	oneItemPerRow sightingRule = true
+	// manyItemsPerRow: a row's items are spread over the walk (a plan's jobs),
+	// so until the last page is read no row has its whole answer and a cut
+	// walk leaves every one of them uninspected.
+	manyItemsPerRow sightingRule = false
+)
+
 // walkAccountPages runs an account-wide paginated walk bounded at
 // EnrichmentCap pages and returns everything the walked pages carried.
 //
@@ -435,18 +436,26 @@ func capRows(kept, incoming []domain.DetailRow) []domain.DetailRow {
 // is only half the rule and an enricher that writes the bound out itself
 // writes the visible half only.
 //
-// The other half is the rows the walk never reached. A cap limits what a9s
-// looked at, not what exists, so when the walk ends early every resource no
-// walked page named is recorded as uninspected: its answer sat on a page
-// nobody read, and such a row must not render as inspected-and-healthy. idOf
-// maps one item to the resource ID it answers for, and returns "" for an item
-// that answers for no row of this type.
+// The other half is the rows the walk never answered for. A cap limits what
+// a9s looked at, not what exists, so when the walk ends early every resource
+// the walked pages did not answer for is recorded as uninspected: its answer
+// sat on a page nobody read, and such a row must not render as
+// inspected-and-healthy. idOf maps one item to the resource ID it answers
+// for, and returns "" for an item that answers for no row of this type.
+//
+// rule says what a sighting is worth, and it is the caller's fact rather than
+// the walker's: a service that returns at most one item per row answers that
+// row the moment a page names it, while a service that spreads a row's items
+// across pages answers nothing until the walk reaches the end. Getting this
+// wrong is silent — a backup plan seen once on page 1 read as inspected while
+// its failed job sat past the cap.
 //
 // The aggregate Truncated flag stays with the caller: a walk that can hide
 // only informational coverage lower-bounds no issue count.
 func walkAccountPages[T any](
 	result *IssueEnricherResult,
 	resources []resource.Resource,
+	rule sightingRule,
 	idOf func(T) string,
 	next func(token *string) ([]T, *string, error),
 ) (items []T, pages int, cut bool, err error) {
@@ -470,7 +479,7 @@ func walkAccountPages[T any](
 		}
 	}
 	for _, r := range resources {
-		if r.ID != "" && !seen[r.ID] {
+		if r.ID != "" && (rule == manyItemsPerRow || !seen[r.ID]) {
 			result.TruncatedIDs[r.ID] = true
 		}
 	}

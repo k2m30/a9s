@@ -76,7 +76,7 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `AdministratorAccess` or `PowerUserAccess` attached.
+- **Signal**: `AdministratorAccess` attached. `PowerUserAccess` does not count: it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -109,7 +109,7 @@ One row per signal from §3:
 | Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S2, S3, S4, S5 | `console sign-in unused for 90 days` |
 | Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S2, S3, S4, S5 | `access key unused` |
 | Two Active access keys | 2 | Warning | `~` | S2, S3, S4, S5 | `two active access keys` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
 | Console login without MFA | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `console user without MFA` |
 | an access key created more than 90 days ago | 2 | Warning | `~` | S2, S3, S4, S5 | `access key past rotation` |
 

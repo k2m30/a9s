@@ -99,7 +99,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 	// renders "?" rather than inspected-and-healthy, the same contract as the
 	// ebs-snap public-share query. The findings the cache-only and user-data
 	// passes already produced survive.
-	allInstanceStatuses, _, cut, walkErr := walkAccountPages(&result, resources,
+	allInstanceStatuses, _, cut, walkErr := walkAccountPages(&result, resources, oneItemPerRow,
 		func(is ec2types.InstanceStatus) string { return aws.ToString(is.InstanceId) },
 		func(token *string) ([]ec2types.InstanceStatus, *string, error) {
 			out, err := clients.EC2.DescribeInstanceStatus(ctx, &ec2svc.DescribeInstanceStatusInput{

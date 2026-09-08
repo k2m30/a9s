@@ -22,8 +22,14 @@ fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Named by position, never by the branch name: `tr / _` maps "task/a_b" and
+# "task_a/b" to one file, so one branch's list silently replaced the other's
+# and the clash rule reported PASS on a real overlap. "$@" in the same order
+# is the index -> branch map both loops read.
+i=0
 for branch in "$@"; do
-  git diff --name-only "$base...$branch" | LC_ALL=C sort -u > "$tmp/$(echo "$branch" | tr / _)"
+  git diff --name-only "$base...$branch" | LC_ALL=C sort -u > "$tmp/$i"
+  i=$((i + 1))
 done
 
 overlap="$(cat "$tmp"/* | LC_ALL=C sort | uniq -d)"
@@ -36,10 +42,12 @@ fi
 echo "FAIL: files touched by more than one task branch:"
 while IFS= read -r file; do
   owners=""
+  i=0
   for branch in "$@"; do
-    if grep -qxF -- "$file" "$tmp/$(echo "$branch" | tr / _)"; then
+    if grep -qxF -- "$file" "$tmp/$i"; then
       owners="$owners $branch"
     fi
+    i=$((i + 1))
   done
   echo "  $file —$owners"
 done <<< "$overlap"

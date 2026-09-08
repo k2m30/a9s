@@ -117,9 +117,11 @@ const (
 	// AdministratorAccess attachment is the natural witness for
 	// iam-group.admin-attached.
 	IAMGroupAdminAttached = "admins"
-	// IAMGroupPowerUser carries PowerUserAccess, the other member of
-	// adminManagedPolicyARNs, so the finding's Policy row is witnessed naming
-	// something other than AdministratorAccess.
+	// IAMGroupPowerUser carries PowerUserAccess. It is the healthy control for
+	// iam-group.admin-attached: PowerUserAccess withholds IAM, Organizations
+	// and Account, so a group holding only it must NOT be flagged as an
+	// administrator, and IAMGroupAdminAttached must remain the only group that
+	// is.
 	IAMGroupPowerUser = "platform-engineers"
 )
 
@@ -727,9 +729,8 @@ func buildIAMPolicies() []iamtypes.Policy {
 			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
-		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUser so
-		// the admin-attached finding's Policy row is witnessed naming a policy
-		// other than AdministratorAccess.
+		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUser: the
+		// near-miss the admin-attached finding must not fire on.
 		{
 			PolicyName:       aws.String("PowerUserAccess"),
 			PolicyId:         aws.String("ANPAEXAMPLE000000002"),
@@ -1116,6 +1117,12 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)
 
 	f.InlinePolicyDocuments["acme-lambda-execution/logging-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/*"}]}`)
+	// Every name ListRolePolicies returns must have a document here: the roles
+	// fetcher reads each one, and a name with nothing behind it is a policy
+	// a9s cannot inspect, which now reports as a partial failure rather than
+	// as a clean role.
+	f.InlinePolicyDocuments["AcmeBackupRoleProd/backup-access"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["backup:StartBackupJob","backup:DescribeBackupJob"],"Resource":"arn:aws:backup:us-east-1:123456789012:backup-vault:*"}]}`)
+	f.InlinePolicyDocuments["redshift-reporting-copy-role/s3-audit-copy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":"arn:aws:s3:::acme-audit-logs/*"}]}`)
 	f.InlinePolicyDocuments["a9s-demo-s3-access-role/s3-bucket-access"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["` + HealthyBucketARN + `","` + HealthyBucketARN + `/*"]}]}`)
 
 	// Issue role: wildcard trust — no external-id condition

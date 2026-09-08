@@ -179,8 +179,8 @@ func Root() string {
 // is safe to use as one path element (e.g. a profile or region name) in a
 // cache file/directory name. NOT injective — "team/a" and "team_a" collapse
 // to the same element — so the pair-directory layout uses EncodePathElem
-// instead and keeps this only for the legacy-read fallback in LoadDirIn and
-// for core/costs' single-file-per-profile layout.
+// instead; this remains only for core/costs' single-file-per-profile layout,
+// which has one element and therefore no joiner to forge.
 func SanitizePathElem(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
 	s = strings.ReplaceAll(s, "\\", "_")
@@ -194,19 +194,24 @@ func SanitizePathElem(s string) string {
 //
 // Percent-escapes "%" itself first (so an escape is never confused with
 // literal input), then the characters that must not reach a path element,
-// then any "-" belonging to a run of two or more. That last rule is what
-// makes the "--" joiner in DirIn unambiguous: no encoded element contains
-// "--", so the first "--" in a directory name is always the separator. Names
-// without those characters — every ordinary profile and region — pass
-// through byte-identical, so the common cache directory keeps its existing
-// name and content.
+// then any "-" that could form a "--" once the two elements are joined: one
+// belonging to a run of two or more, and one at either boundary. Those two
+// rules together are what make the "--" joiner in DirIn unambiguous: no
+// encoded element contains "--", starts with "-" or ends with "-", so the
+// first "--" in a directory name is always the separator and the split back
+// into (profile, region) is unique. A boundary hyphen alone is enough to
+// forge one — ("team-","us-east-1") and ("team","-us-east-1") both joined to
+// "team---us-east-1" before it was escaped. Names without those characters —
+// every ordinary profile and region — pass through byte-identical, so the
+// common cache directory keeps its existing name and content.
 func EncodePathElem(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		doubleDash := c == '-' && ((i+1 < len(s) && s[i+1] == '-') || (i > 0 && s[i-1] == '-'))
+		joinerHyphen := c == '-' && (i == 0 || i == len(s)-1 ||
+			s[i+1] == '-' || s[i-1] == '-')
 		switch {
-		case c == '%' || c == '/' || c == '\\' || c == ' ' || doubleDash:
+		case c == '%' || c == '/' || c == '\\' || c == ' ' || joinerHyphen:
 			fmt.Fprintf(&b, "%%%02X", c)
 		default:
 			b.WriteByte(c)
@@ -277,6 +282,12 @@ func LoadDirForTest(profile, region string) *Store {
 // root at construction time (see session.Session.cacheRoot) never re-reads
 // Root() — and therefore A9S_CONFIG_FOLDER — on a later, possibly
 // differently-configured call.
+//
+// A pair reads its own DirIn directory and nothing else. There is no fallback
+// to the older, non-injective SanitizePathElem layout: that name is shared by
+// every pair it collapses, so reading it would hand one pair another's rows.
+// A pair whose name needs escaping therefore starts cold once and writes its
+// own directory from then on.
 func LoadDirIn(root, profile, region string) *Store {
 	dir := DirIn(root, profile, region)
 	s := &Store{
@@ -290,19 +301,7 @@ func LoadDirIn(root, profile, region string) *Store {
 		return s
 	}
 
-	readFrom := dir
-	entries, err := os.ReadDir(readFrom)
-	if err != nil {
-		// A pair whose name needed escaping may still have a directory under
-		// the old, non-injective sanitized layout. Read it — writes always go
-		// to the injective path above, so the legacy directory is never
-		// extended, only inherited.
-		if legacy := legacyDirIn(root, profile, region); legacy != "" && legacy != dir {
-			if legacyEntries, legacyErr := os.ReadDir(legacy); legacyErr == nil {
-				readFrom, entries = legacy, legacyEntries
-			}
-		}
-	}
+	entries, _ := os.ReadDir(dir)
 	loadedFrom := make(map[string]string, len(entries))
 	if entries == nil {
 		// Missing (or otherwise unreadable) directory: "no cache" for every
@@ -320,7 +319,7 @@ func LoadDirIn(root, profile, region string) *Store {
 			continue
 		}
 		shortName := strings.TrimSuffix(name, ".yaml")
-		path := filepath.Join(readFrom, name)
+		path := filepath.Join(dir, name)
 
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -379,22 +378,6 @@ func LoadDirIn(root, profile, region string) *Store {
 	}
 
 	return s
-}
-
-// legacyDirIn returns the pre-EncodePathElem directory for one pair — the
-// non-injective SanitizePathElem layout LoadDirIn still reads when the
-// injective directory does not exist, so an existing cache written by an
-// older build is inherited rather than silently starting cold.
-func legacyDirIn(root, profile, region string) string {
-	if root == "" {
-		return ""
-	}
-	dir := filepath.Join(root, SanitizePathElem(profile)+"--"+SanitizePathElem(region))
-	cleanRoot := filepath.Clean(root)
-	if cleaned := filepath.Clean(dir); cleaned != cleanRoot && !strings.HasPrefix(cleaned, cleanRoot+string(os.PathSeparator)) {
-		return ""
-	}
-	return dir
 }
 
 // Pair returns the profile and region this Store was loaded for. Every

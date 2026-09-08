@@ -236,11 +236,21 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 	// Title match, as an ordered preference (config.TitleFieldKeys states the
 	// order and why). Accepting either spelling inside a single `range` over
 	// Fields makes the cell depend on map order whenever both are present.
+	//
+	// Within ONE preference the smallest matching key wins, for the same
+	// reason: a warm-cache row can hold two keys differing only by case
+	// ("Time" beside "time"), both satisfy the fold, and a bare `range` would
+	// show whichever one map order reached first — a different cell on two
+	// consecutive starts.
 	for _, want := range config.TitleFieldKeys(col.Title) {
-		for k, v := range r.Fields {
-			if strings.EqualFold(k, want) {
-				return humanizeListCell(col, v)
+		best, found := "", false
+		for k := range r.Fields {
+			if strings.EqualFold(k, want) && (!found || k < best) {
+				best, found = k, true
 			}
+		}
+		if found {
+			return humanizeListCell(col, r.Fields[best])
 		}
 	}
 

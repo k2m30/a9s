@@ -62,7 +62,7 @@ One bullet per distinct signal.
   - **API call**: `GetGroup` — one call per group.
   - **Cost shape**: per-resource.
 
-- **Signal**: `AdministratorAccess` or `PowerUserAccess` attached.
+- **Signal**: `AdministratorAccess` attached. `PowerUserAccess` does not count: it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -85,7 +85,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | no members, or members but no attached or inline policies | 2 | Warning | `~` | S2, S3, S4, S5 | `no members or no policies` |
-| `AdministratorAccess` or `PowerUserAccess` attached | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
 
 ## 4.1 UX review (two sentences)
 

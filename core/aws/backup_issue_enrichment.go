@@ -46,7 +46,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 	// history scan far more pages than needed and hit EnrichmentCap early,
 	// reporting a cut walk even when zero issues exist in the window.
 	cutoff := time.Now().Add(-24 * time.Hour)
-	allJobs, pages, cut, walkErr := walkAccountPages(&result, resources,
+	allJobs, pages, cut, walkErr := walkAccountPages(&result, resources, manyItemsPerRow,
 		func(job backuptypes.BackupJob) string {
 			if job.CreatedBy == nil {
 				return ""

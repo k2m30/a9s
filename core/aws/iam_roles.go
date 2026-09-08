@@ -29,6 +29,12 @@ const (
 	// up to full administrator.
 	roleCodeInlinePrivEsc domain.FindingCode = "role.inline-privilege-escalation"
 
+	// uninspectedPolicyResources is what the policy_resources Field holds
+	// when the role's inline policies could not be read. Empty would read as
+	// "this role's policies name no resources", which is a claim a9s did not
+	// earn; "?" is the same unknown mark every other surface uses.
+	uninspectedPolicyResources = "?"
+
 	// awsServiceRolePathPrefix marks an AWS service-linked role. AWS owns the
 	// trust policy and the attached permissions, so posture findings about
 	// either are not actionable by the operator.
@@ -102,6 +108,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 	getPolicyAPI, _ := api.(IAMGetRolePolicyAPI)
 
 	var resources []resource.Resource
+	var failures []Failure
 	for _, role := range output.Roles {
 		roleName := ""
 		if role.RoleName != nil {
@@ -141,6 +148,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			var inline inlinePolicyScan
 			policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
 			findings, details = addInlinePrivEsc(findings, details, inline)
+			failures = append(failures, inline.failures...)
 		}
 
 		r := resource.Resource{
@@ -186,7 +194,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("role: inline policy scan", failures, len(output.Roles))
 }
 
 // FetchRolesByIDs resolves a batch of IAM role names to resource.Resource
@@ -227,7 +235,9 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 			failures = append(failures, FailedCall(id, err))
 			continue
 		}
-		resources = append(resources, roleToResource(ctx, api, *output.Role))
+		r, roleFailures := roleToResource(ctx, api, *output.Role)
+		resources = append(resources, r)
+		failures = append(failures, roleFailures...)
 	}
 	return resources, AggregateFailures("role FetchByIDs", failures, len(ids))
 }
@@ -236,8 +246,10 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 // same resource.Resource shape FetchIAMRolesPage produces from ListRoles, so
 // a lazily-fetched role is indistinguishable from a paginated one — including
 // its inline policies, which GetRole does not return and which api is walked
-// for when it serves the two inline-policy operations.
-func roleToResource(ctx context.Context, api any, role iamtypes.Role) resource.Resource {
+// for when it serves the two inline-policy operations. The returned failures
+// are that walk's own: the caller aggregates them onto its lane, because a
+// role whose policies were refused must not be handed back as inspected.
+func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.Resource, []Failure) {
 	roleName := ""
 	if role.RoleName != nil {
 		roleName = *role.RoleName
@@ -274,10 +286,12 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) resource.R
 	listPoliciesAPI, okList := api.(IAMListRolePoliciesAPI)
 	getPolicyAPI, okGet := api.(IAMGetRolePolicyAPI)
 	policyResources := ""
+	var failures []Failure
 	if okList && okGet && roleName != "" {
 		var inline inlinePolicyScan
 		policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
 		findings, details = addInlinePrivEsc(findings, details, inline)
+		failures = inline.failures
 	}
 
 	return resource.Resource{
@@ -298,15 +312,21 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) resource.R
 		Findings:         findings,
 		AttentionDetails: details,
 		RawStruct:        role,
-	}
+	}, failures
 }
 
 // inlinePolicyScan carries the privilege-escalation verdict of a role's
 // inline policies: at most one finding, whichever inline policy tripped
 // first, with the offending policy name and combination as its rows.
+//
+// failures is what the scan could not read. A non-empty failures means the
+// verdict is not a verdict: the absence of a finding says nothing about the
+// role, so the caller must surface the failures on its own lane and render
+// the role's policy-derived facts unknown rather than clean.
 type inlinePolicyScan struct {
-	finding *domain.Finding
-	rows    []domain.DetailRow
+	finding  *domain.Finding
+	rows     []domain.DetailRow
+	failures []Failure
 }
 
 // enumerateRoleInlinePolicies walks a role's inline policies once and
@@ -330,8 +350,13 @@ func enumerateRoleInlinePolicies(
 	listOut, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
 		RoleName: aws.String(roleName),
 	})
-	if err != nil || listOut == nil {
-		return "", scan
+	switch {
+	case err != nil:
+		scan.failures = append(scan.failures, FailedCall(roleName, err))
+		return uninspectedPolicyResources, scan
+	case listOut == nil:
+		scan.failures = append(scan.failures, UnusableAnswer(roleName, "ListRolePolicies returned no answer"))
+		return uninspectedPolicyResources, scan
 	}
 	var allResources []string
 	for _, policyName := range listOut.PolicyNames {
@@ -339,7 +364,13 @@ func enumerateRoleInlinePolicies(
 			RoleName:   aws.String(roleName),
 			PolicyName: aws.String(policyName),
 		})
-		if getErr != nil || getOut == nil || getOut.PolicyDocument == nil {
+		switch {
+		case getErr != nil:
+			scan.failures = append(scan.failures, FailedCall(roleName, getErr))
+			continue
+		case getOut == nil || getOut.PolicyDocument == nil:
+			scan.failures = append(scan.failures,
+				UnusableAnswer(roleName, "GetRolePolicy returned no document for "+policyName))
 			continue
 		}
 		doc := iampolicy.Decode(*getOut.PolicyDocument)
@@ -349,6 +380,7 @@ func enumerateRoleInlinePolicies(
 		}
 		parsed, perr := iampolicy.Parse(doc)
 		if perr != nil {
+			scan.failures = append(scan.failures, UnusableAnswer(roleName, "unreadable inline policy "+policyName))
 			continue
 		}
 		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
@@ -358,6 +390,11 @@ func enumerateRoleInlinePolicies(
 				[]domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "!"}},
 				privEscComboRows(combos)...)
 		}
+	}
+	if len(scan.failures) > 0 {
+		// A list assembled from the documents that did answer reads as the
+		// role's whole policy surface. It is not one.
+		return uninspectedPolicyResources, scan
 	}
 	return strings.Join(allResources, ","), scan
 }

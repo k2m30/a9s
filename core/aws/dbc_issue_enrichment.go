@@ -92,7 +92,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return key
 	}
 
-	allActions, pages, cut, walkErr := walkAccountPages(&result, resources, clusterKeyOf,
+	allActions, pages, cut, walkErr := walkAccountPages(&result, resources, oneItemPerRow, clusterKeyOf,
 		func(token *string) ([]docdbtypes.ResourcePendingMaintenanceActions, *string, error) {
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribePendingMaintenanceActionsOutput, error) {
 				return clients.DocDB.DescribePendingMaintenanceActions(ctx, &docdb.DescribePendingMaintenanceActionsInput{Marker: token})

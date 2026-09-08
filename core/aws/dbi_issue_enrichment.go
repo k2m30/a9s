@@ -86,7 +86,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	// instances they name have real pending maintenance whatever happened
 	// afterwards. A failed page does lower-bound the walk, unlike the cap,
 	// which bounds only informational coverage for this "~"-only pass.
-	allActions, _, _, walkErr := walkAccountPages(&result, resources, instanceKeyOf,
+	allActions, _, _, walkErr := walkAccountPages(&result, resources, oneItemPerRow, instanceKeyOf,
 		func(token *string) ([]rdstypes.ResourcePendingMaintenanceActions, *string, error) {
 			out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: token})
 			if err != nil {

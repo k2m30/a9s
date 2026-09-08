@@ -67,35 +67,38 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 	}
 
 	const op = "DescribeSnapshots(RestorableByUserIds=all)"
-	var nextToken *string
-	for range PerParentPageCap {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeSnapshotsOutput, error) {
-			return clients.EC2.DescribeSnapshots(ctx, &ec2svc.DescribeSnapshotsInput{
-				OwnerIds:            []string{"self"},
-				RestorableByUserIds: []string{"all"},
-				NextToken:           nextToken,
+	// The one account-wide walker owns the other half of the rule: a snapshot
+	// the walked pages never named is uninspected once the walk is cut, not
+	// private. Membership of the all-restorable set is decided by a single
+	// sighting, so a named snapshot stays answered.
+	public, pages, cut, walkErr := walkAccountPages(result, resources, oneItemPerRow,
+		func(snap ec2types.Snapshot) string { return aws.ToString(snap.SnapshotId) },
+		func(token *string) ([]ec2types.Snapshot, *string, error) {
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeSnapshotsOutput, error) {
+				return clients.EC2.DescribeSnapshots(ctx, &ec2svc.DescribeSnapshotsInput{
+					OwnerIds:            []string{"self"},
+					RestorableByUserIds: []string{"all"},
+					NextToken:           token,
+				})
 			})
-		})
-		if err != nil {
-			// One account-wide call answers for every row on screen, so its
-			// failure leaves every row uninspected, not inspected-and-private.
-			markAllUninspected(result, resources)
-			return AggregateFailures(op, []Failure{FailedCall("", err)}, len(resources))
-		}
-		for _, snap := range out.Snapshots {
-			id := aws.ToString(snap.SnapshotId)
-			if !known[id] {
-				continue
+			if err != nil {
+				return nil, nil, err
 			}
-			setWave2Finding(result, id, ebsSnapCodePublic, []domain.DetailRow{{Label: "Public", Value: "yes", Tier: tierOf(ebsSnapCodePublic)}})
-
+			return out.Snapshots, out.NextToken, nil
+		})
+	for _, snap := range public {
+		id := aws.ToString(snap.SnapshotId)
+		if !known[id] {
+			continue
 		}
-		if out.NextToken == nil || aws.ToString(out.NextToken) == "" {
-			return nil
-		}
-		nextToken = out.NextToken
+		setWave2Finding(result, id, ebsSnapCodePublic, []domain.DetailRow{{Label: "Public", Value: "yes", Tier: tierOf(ebsSnapCodePublic)}})
 	}
-	SetTruncated(result, true)
+	if cut {
+		SetTruncated(result, true)
+	}
+	if walkErr != nil {
+		return AggregateFailures(op, []Failure{FailedOnPage(pages, walkErr)}, len(resources))
+	}
 	return nil
 }
 

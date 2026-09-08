@@ -20,14 +20,20 @@ import (
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 )
 
-// adminManagedPolicyARNs are the AWS-managed policies whose attachment makes
-// the principal effectively an account administrator.
+// adminManagedPolicyResources are the AWS-managed policies whose attachment
+// makes the principal effectively an account administrator, i.e. whose
+// document allows every action on every resource.
 // They are named by their resource path rather than their full ARN: AWS
 // returns the ARN in the partition the session is connected to, so a literal
 // commercial ARN reports every China and GovCloud administrator unprivileged.
+//
+// AdministratorAccess is the only member. PowerUserAccess is deliberately not
+// one: AWS's document allows "*" on "*" only with a NotAction that excludes
+// IAM, Organizations and Account, so its holder can neither grant itself
+// permissions nor touch the account. Calling it administrator-equivalent
+// reported every developer as an admin.
 var adminManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
 	"policy/AdministratorAccess",
-	"policy/PowerUserAccess",
 }
 
 // listAttachedRolePolicies walks every page of a role's attached managed
@@ -104,9 +110,8 @@ func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 }
 
 // adminAttachedPhrase is the S4 cause for every admin-attached finding. It
-// names the class rather than one policy, because adminManagedPolicyResources
-// holds both AdministratorAccess and PowerUserAccess; the Policy row says
-// which one is attached.
+// names the class rather than one policy, so the set can grow without the
+// phrase becoming a lie; the Policy row says which one is attached.
 const adminAttachedPhrase = "has an administrator policy"
 
 // adminAttachedRows is the supporting Attention row shared by the role, user

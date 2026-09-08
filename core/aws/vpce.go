@@ -17,11 +17,20 @@ import (
 )
 
 // vpcePolicyExposure evaluates an endpoint policy document and reports the
-// Attention rows for an unrestricted grant. Only a wildcard principal holding
-// a wildcard action counts: that is the full-access policy AWS attaches when
-// the endpoint is created without one. A policy that names concrete actions,
-// or scopes the wildcard principal with a condition, is a deliberate grant
-// and is not a finding. An unparseable document is unknown, not open.
+// Attention rows for an unrestricted grant. All three of a wildcard
+// principal, a wildcard action and a wildcard resource must meet in ONE
+// unconditioned statement: that combination, and only it, is the full-access
+// policy AWS attaches when the endpoint is created without one. A policy that
+// names concrete actions, confines the grant to named resources, or scopes
+// the wildcard principal with a condition is a deliberate grant and is not a
+// finding. An unparseable document is unknown, not open.
+//
+// The statement is evaluated on its own rather than against the aggregate
+// Exposure, because the aggregate merges the actions of every public
+// statement: one statement granting "*" on a bucket beside another granting
+// s3:GetObject on "*" would otherwise add up to a full-access policy neither
+// of them is. Evaluate still owns the "is this principal public, and does a
+// condition scope it" rule, so there is no second reading of it here.
 //
 // ownAccount is empty here: only Exposure.Public is consulted, and that
 // verdict does not depend on which account owns the endpoint.
@@ -33,14 +42,20 @@ func vpcePolicyExposure(policyDocument string) ([]domain.DetailRow, bool) {
 	if err != nil {
 		return nil, false
 	}
-	ex := iampolicy.Evaluate(doc, "")
-	if !ex.Public || !slices.ContainsFunc(ex.PublicActions, isWildcardAction) {
-		return nil, false
+	for _, st := range doc.Statement {
+		if !slices.Contains(st.Resource, "*") {
+			continue
+		}
+		ex := iampolicy.Evaluate(iampolicy.Document{Statement: []iampolicy.Statement{st}}, "")
+		if !ex.Public || !slices.ContainsFunc(ex.PublicActions, isWildcardAction) {
+			continue
+		}
+		return []domain.DetailRow{
+			{Label: "Principal", Value: "*", Tier: "~"},
+			{Label: "Actions", Value: strings.Join(ex.PublicActions, ", "), Tier: "~"},
+		}, true
 	}
-	return []domain.DetailRow{
-		{Label: "Principal", Value: "*", Tier: "~"},
-		{Label: "Actions", Value: strings.Join(ex.PublicActions, ", "), Tier: "~"},
-	}, true
+	return nil, false
 }
 
 // isWildcardAction reports whether an IAM action string grants every action

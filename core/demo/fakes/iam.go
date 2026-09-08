@@ -214,7 +214,15 @@ func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput
 		return nil, fmt.Errorf("GetRolePolicy: policy name is required")
 	}
 	key := *input.RoleName + "/" + *input.PolicyName
-	doc := f.fix.InlinePolicyDocuments[key]
+	doc, ok := f.fix.InlinePolicyDocuments[key]
+	if !ok {
+		// Real IAM cannot list a policy name and then have no document for
+		// it. Answering an empty string here made a fixture gap look like an
+		// empty policy, which the roles fetcher can only read as unparseable.
+		return nil, &iamtypes.NoSuchEntityException{
+			Message: aws.String("The role policy with name " + *input.PolicyName + " cannot be found."),
+		}
+	}
 	return &iam.GetRolePolicyOutput{
 		PolicyName:     input.PolicyName,
 		RoleName:       input.RoleName,
