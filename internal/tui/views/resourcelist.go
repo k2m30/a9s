@@ -588,7 +588,7 @@ func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []a
 	maxW := cols[visIdx].width
 	for _, row := range rows {
 		if statusCol < len(row.Cells) {
-			if nat := lipgloss.Width(row.Cells[statusCol]) + glyphRoom; nat > maxW {
+			if nat := text.Width(row.Cells[statusCol]) + glyphRoom; nat > maxW {
 				maxW = nat
 			}
 		}

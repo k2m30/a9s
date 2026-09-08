@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // Layout policy constants shared between the root model (terminal-width
@@ -45,7 +46,7 @@ func CenterTitle(title string, w int) string {
 	}
 
 	titleRendered := lipgloss.NewStyle().Foreground(styles.ColAccent).Bold(true).Render(title)
-	titleVis := lipgloss.Width(titleRendered)
+	titleVis := text.Width(titleRendered)
 
 	// Layout: ┌ + leftDashes + " " + title + " " + rightDashes + ┐
 	// totalDashes = (w - 2) - titleVis - 2  (minus corners, minus spaces around title)
@@ -58,7 +59,7 @@ func CenterTitle(title string, w int) string {
 			return borderStyle.Render("\u250c" + strings.Repeat("\u2500", w-2) + "\u2510")
 		}
 		titleRendered = ansi.Truncate(titleRendered, maxTitleVis, "\u2026")
-		titleVis = lipgloss.Width(titleRendered)
+		titleVis = text.Width(titleRendered)
 		totalDashes = w - 2 - titleVis - 2
 	}
 
@@ -99,12 +100,12 @@ func BottomBorderWithHints(hints []KeyHint, w int) string {
 	for i, hint := range hints {
 		// Render the hint: "key desc"
 		rendered := keyStyle.Render(hint.Key) + " " + descStyle.Render(hint.Desc)
-		hintVis := lipgloss.Width(rendered)
+		hintVis := text.Width(rendered)
 
 		// Between hints: ── separator
 		sepVis := 0
 		if i > 0 {
-			sepVis = lipgloss.Width(dashSep)
+			sepVis = text.Width(dashSep)
 		}
 
 		if usedWidth+sepVis+hintVis > w {
@@ -154,7 +155,7 @@ func RenderFrameWithHints(lines []string, title string, hints []KeyHint, w, h in
 			content = lines[i]
 		}
 
-		visW := lipgloss.Width(content)
+		visW := text.Width(content)
 		var padded string
 		if visW < innerW {
 			padded = content + strings.Repeat(" ", innerW-visW)
@@ -192,7 +193,7 @@ func RenderHeader(profile, region, version string, w int, rightContent, accountB
 	left := accent + ver + ctx
 
 	dimStyle := lipgloss.NewStyle().Foreground(styles.ColDim)
-	rightW := lipgloss.Width(rightContent)
+	rightW := text.Width(rightContent)
 	innerW := w - 2
 
 	// Add identity parts only if they fit on one line with >=2 char gap
@@ -204,18 +205,18 @@ func RenderHeader(profile, region, version string, w int, rightContent, accountB
 		if roleName != "" {
 			candidate += dimStyle.Render(" " + roleName)
 		}
-		if lipgloss.Width(candidate)+rightW+2 <= innerW {
+		if text.Width(candidate)+rightW+2 <= innerW {
 			left = candidate
 		}
 	}
 
-	leftW := lipgloss.Width(left)
+	leftW := text.Width(left)
 	gap := innerW - leftW - rightW
 	if gap < 1 {
 		// Content too wide — truncate left side to fit
 		maxLeftW := max(innerW-rightW-1, 3)
 		left = ansi.Truncate(left, maxLeftW, "\u2026")
-		leftW = lipgloss.Width(left)
+		leftW = text.Width(left)
 		gap = max(innerW-leftW-rightW, 1)
 	}
 

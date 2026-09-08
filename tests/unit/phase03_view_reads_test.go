@@ -21,11 +21,9 @@ import (
 )
 
 // renderDetailPlain builds a DetailBody through the live Controller seam for
-// res/resourceType and renders it via NewTransientDetail+RenderDetail (the
-// live replacement for DetailModel.PlainContent(), which is dead). Used by
-// the 3 detail-family pins below (round 4, specs/022-codebase-cleanup, item
-// 5) — the other 11 tests in this file drive views.ResourceListModel, a
-// different (resourcelist-family) model out of this item's scope.
+// res/resourceType and renders it via NewTransientDetail+RenderDetail. Used by
+// the 3 detail-family pins below; the other 11 tests in this file drive
+// views.ResourceListModel instead.
 func renderDetailPlain(t *testing.T, res resource.Resource, resourceType string) string {
 	t.Helper()
 	c := newDetailController(t, res, resourceType)

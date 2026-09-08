@@ -339,9 +339,6 @@ type DetailBody struct {
 	// FieldCursor is the index of the highlighted field row (for cursor-selection
 	// rendering in RenderDetail).
 	FieldCursor int `json:"field_cursor,omitempty"`
-	// KeyWidth is the pre-computed key-column width so RenderDetail does not
-	// need to scan Fields again.
-	KeyWidth int `json:"key_width,omitempty"`
 }
 
 // SearchMatch is one highlighted match in a text screen.

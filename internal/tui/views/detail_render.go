@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/k2m30/a9s/v3/core/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 
 	"gopkg.in/yaml.v3"
 )
@@ -30,13 +31,19 @@ func (m DetailModel) RawYAML() string {
 	return string(data)
 }
 
-// computeKeyWidth returns the width needed for the key column: longest key + 1 (for colon), minimum 22.
+// detailKeyFloor is the narrowest the detail key column gets. A resource whose
+// longest field name is two characters would otherwise crowd its values against
+// the left edge, and they would sit in a different place on every screen.
+const detailKeyFloor = 22
+
+// computeKeyWidth returns the width of the key column: the widest key plus its
+// colon, never under detailKeyFloor. Measured in terminal columns, because that
+// is what the padding under it fills — a key counted in bytes reserves three
+// times the room a CJK field name paints.
 func computeKeyWidth(keys []string) int {
-	w := 22
+	w := detailKeyFloor
 	for _, k := range keys {
-		if len(k)+1 > w {
-			w = len(k) + 1
-		}
+		w = max(w, text.Width(k)+1)
 	}
 	return w
 }

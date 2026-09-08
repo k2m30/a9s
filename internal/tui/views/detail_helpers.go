@@ -15,6 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // SetSize initializes or resizes the viewport. Must be called before View().
@@ -199,7 +200,7 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 				right = ansi.Truncate(rightLines[i], rightW, "")
 			}
 			padded := left
-			leftVisible := lipgloss.Width(left)
+			leftVisible := text.Width(left)
 			if leftVisible < leftW {
 				padded = left + strings.Repeat(" ", leftW-leftVisible)
 			}
@@ -236,7 +237,7 @@ func renderRelatedPanel(rows []app.RelatedBlock, filterActive bool, cursor, scro
 	lines := make([]string, 0, h)
 
 	header := "RELATED"
-	padLeft := max((w-lipgloss.Width(header))/2, 0)
+	padLeft := max((w-text.Width(header))/2, 0)
 	centeredHeader := strings.Repeat(" ", padLeft) + header
 	lines = append(lines, styles.DimText.Render(centeredHeader))
 

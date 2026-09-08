@@ -14,13 +14,14 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -253,7 +254,7 @@ func (m Model) headerRight() string {
 		return styles.FilterActive.Render("/" + rs.rightCol.FilterQuery())
 	}
 	if m.flash.active {
-		text := m.flash.text
+		msg := m.flash.text
 		// Truncate to prevent header wrapping (fixes #84).
 		// Reserve ~40 chars for the left side (a9s + version + profile:region + padding).
 		// Errors get more header width; reserve 6 chars minimum for the brand + gap.
@@ -261,17 +262,16 @@ func (m Model) headerRight() string {
 		if m.flash.isError {
 			maxFlash = max(m.width-6, 20) // errors get wider display; 6 = innerPad(2)+minLeft(3)+gap(1)
 		}
-		if lipgloss.Width(text) > maxFlash {
-			// Truncate by runes to handle Unicode safely.
-			runes := []rune(text)
-			if len(runes) > maxFlash-3 {
-				text = string(runes[:maxFlash-3]) + "..."
-			}
+		// The slot is counted in terminal columns, so the cut is measured in
+		// them too: a message counted in runes fits the test at twice the
+		// width and takes the profile and region off the header to fit.
+		if text.Width(msg) > maxFlash {
+			msg = ansi.Truncate(msg, maxFlash, "...")
 		}
 		if m.flash.isError {
-			return styles.FlashError.Render(text)
+			return styles.FlashError.Render(msg)
 		}
-		return styles.FlashSuccess.Render(text)
+		return styles.FlashSuccess.Render(msg)
 	}
 	if rs.kind == rsKindReveal {
 		return styles.FlashError.Render("Secret visible — press esc to close")

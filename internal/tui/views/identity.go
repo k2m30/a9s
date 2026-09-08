@@ -11,6 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // IdentityData holds caller identity information for display.
@@ -186,7 +187,7 @@ func (m IdentityModel) renderLoaded() string {
 
 // padRight pads a string to the given width using spaces.
 func padRight(s string, w int) string {
-	visW := lipgloss.Width(s)
+	visW := text.Width(s)
 	if visW >= w {
 		return s
 	}

@@ -467,7 +467,7 @@ func Test_DetailSearch_LiveSeam_ActivateHighlightNextPrevEsc(t *testing.T) {
 // detail_fields.go's renderFromFieldList (the LIVE rendering switch RenderDetail
 // delegates to via renderDetailFieldsFromBody).
 func wave3RenderRows(fields []app.FieldRow, fieldCursor int) string {
-	body := app.DetailBody{Fields: fields, FieldCursor: fieldCursor, KeyWidth: 12}
+	body := app.DetailBody{Fields: fields, FieldCursor: fieldCursor}
 	vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(20))
 	m := views.NewTransientDetail(120, 20, vp)
 	return m.RenderDetail(body)
@@ -530,9 +530,8 @@ func Test_RenderDetail_ColorTier_IsNavigableWinsOverColorTier(t *testing.T) {
 func Test_RenderDetail_ColorTier_LabelAlwaysNeutral(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	// renderFromFieldList computes its own key-column width from the field
-	// list via computeKeyWidth (detail_render.go), which floors at 22 —
-	// body.KeyWidth is not consulted on this path.
+	// renderFromFieldList computes the key-column width from the field list
+	// via computeKeyWidth (detail_render.go), which floors at 22.
 	paddedLabel := text.PadOrTrunc("Status:", 22)
 	wantLabel := styles.DetailKey.Render(paddedLabel)
 
@@ -841,11 +840,7 @@ func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.
 // Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase pins
 // that when Finding.Detail is non-empty, buildAttentionSectionDetail
 // (detail_body.go:330) emits further Attention sub-rows carrying the full S5
-// operator sentence, in addition to the S4 Phrase row — the live replacement
-// for wave2_risk_text_s4_s5_test.go's
-// TestWave2_DetailAttention_RendersFullDetailSentence_AlongsidePhrase, which
-// asserts against the legacy DetailModel.PlainContent() (DEAD per
-// wave3-map-detail.md).
+// operator sentence, in addition to the S4 Phrase row.
 func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T) {
 	// Read the definition rather than build the sentence here: task w27 made
 	// catalog.Detail the one owner, and a literal copy in this test would

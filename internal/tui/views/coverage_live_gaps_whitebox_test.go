@@ -232,7 +232,6 @@ func TestLiveGap_DetailModel_RenderDetail_SearchActiveScrollsToMatch(t *testing.
 			{Key: "MarkerField", Value: marker},
 			{Key: "ZLast", Value: "last-field"},
 		},
-		KeyWidth: 12,
 	}
 	// wantLine is fixed by construction (Fields is a hand-built, explicitly
 	// ordered slice, not map-iteration-derived) — the marker row is index 1,
@@ -258,9 +257,8 @@ func TestLiveGap_DetailModel_RenderDetail_SearchActiveScrollsToMatch(t *testing.
 // NewDetail(...) path.
 func TestLiveGap_DetailModel_RenderDetail_SearchActiveNoMatch_LeavesScrollAtZero(t *testing.T) {
 	body := app.DetailBody{
-		Fields:   []app.FieldRow{{Key: "Other", Value: "value"}},
-		Search:   "no-such-substring-in-this-resource",
-		KeyWidth: 12,
+		Fields: []app.FieldRow{{Key: "Other", Value: "value"}},
+		Search: "no-such-substring-in-this-resource",
 	}
 	vp := viewport.New(viewport.WithWidth(100), viewport.WithHeight(10))
 	m := NewTransientDetail(100, 10, vp)

@@ -45,15 +45,6 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 	// Convert []fieldpath.FieldItem → []FieldRow for the body.
 	fields := fieldItemsToFieldRows(items)
 
-	// Compute key width (mirrors computeKeyWidth in detail_fields.go).
-	var topPaths []string
-	for _, item := range items {
-		if !item.IsHeader && !item.IsSubField {
-			topPaths = append(topPaths, item.Key)
-		}
-	}
-	keyWidth := computeDetailKeyWidth(topPaths)
-
 	// Build RelatedBlocks. When ds.RelatedRows is nil/empty but the resource
 	// type has registered related defs, synthesise loading-state blocks from
 	// those defs. This mirrors what newRightColumn() does in the TUI: it creates
@@ -113,7 +104,6 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		Wrap:                ds.Wrap,
 		ScrollY:             ds.ScrollY,
 		FieldCursor:         fc,
-		KeyWidth:            keyWidth,
 	}, layout
 }
 
@@ -576,17 +566,6 @@ func capitalizeFirstDetail(s string) string {
 	r := []rune(s)
 	r[0] = unicode.ToUpper(r[0])
 	return string(r)
-}
-
-// computeDetailKeyWidth mirrors computeKeyWidth in detail_fields.go.
-func computeDetailKeyWidth(keys []string) int {
-	maxW := 0
-	for _, k := range keys {
-		if n := len(k) + 1; n > maxW { // +1 for the ":" suffix
-			maxW = n
-		}
-	}
-	return maxW
 }
 
 // fieldItemsToFieldRows converts []fieldpath.FieldItem → []FieldRow for the
