@@ -35,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
@@ -153,10 +152,12 @@ func fakeNotFoundPins() []fakeNotFoundPin {
 			_, err := fakes.NewCloudTrail().GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: aws.String(id)})
 			return err
 		}},
-		{"cloudwatch", "ResourceNotFound", "", func(ctx context.Context, id string) error {
-			_, err := fakes.NewCloudWatch().DescribeAlarmHistory(ctx, &cloudwatch.DescribeAlarmHistoryInput{AlarmName: aws.String(id)})
-			return err
-		}},
+		// cloudwatch carries no pin: the only by-name read a9s makes of it is
+		// DescribeAlarmHistory, whose API models no not-found error — an unknown
+		// alarm name matches no history and succeeds empty. The rule is per
+		// OPERATION, so a fake that refused here would model a failure AWS never
+		// sends. Pinned the other way round in
+		// aws6_fake_models_only_real_errors_test.go.
 		{"codeartifact", "ResourceNotFoundException", "", func(ctx context.Context, id string) error {
 			_, err := fakes.NewCodeArtifact().DescribeDomain(ctx, &codeartifact.DescribeDomainInput{Domain: aws.String(id)})
 			return err
