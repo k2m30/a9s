@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -170,6 +171,37 @@ var viewColumnChanges = []viewColumnChange{
 	{Version: 5, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 }
 
+// viewColumnAdditions names a column the built-in views GAINED, and the
+// GeneratedViewsVersion that gained it. Add a row in the same change that adds
+// a column to core/config/defaults_*.go, and bump GeneratedViewsVersion with
+// it.
+//
+// It is what tells a migration the difference between a column a file has
+// never been offered and one the operator deleted. Absence is the only record
+// a view file keeps of that decision, so a migration that re-adds every
+// built-in the file does not carry reverses it — and does it again on the next
+// start, so deleting the column twice does not help either.
+var viewColumnAdditions = []struct { //nolint:gochecknoglobals // static migration table
+	Version int
+	View    string
+	Title   string
+}{
+	{Version: 5, View: "lambda", Title: "Handler"},
+}
+
+// introducedAfter reports whether the named column entered the built-in views
+// after the stamp a file was written at, which is the only reason to insert a
+// column the file does not carry.
+func introducedAfter(view, title string, stamp int) bool {
+	return slices.ContainsFunc(viewColumnAdditions, func(a struct {
+		Version int
+		View    string
+		Title   string
+	}) bool {
+		return a.View == view && a.Title == title && a.Version > stamp
+	})
+}
+
 // mergeGeneratedColumns returns the YAML for onDisk brought up to this build:
 // def's columns whose titles are missing are added, and a column still carrying
 // the source an older build generated for it takes this build's source and
@@ -197,13 +229,31 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 	// The trade is deliberate: reordering columns and changing nothing else is
 	// indistinguishable from never having opened the file, and such a file is
 	// reordered back.
+	// belongs reports whether a built-in column belongs in the migrated file:
+	// one the file already carries, or one introduced after the stamp it was
+	// written at. Both writers below ask, so neither can restore a column the
+	// operator deleted.
+	belongs := func(title string) bool {
+		// A file with no stamp at all predates the table: the build that wrote
+		// it never generated the current column vocabulary, so nothing missing
+		// from it can be a column the operator deleted. Every built-in is new
+		// to that file.
+		return vd.Generated == 0 || have[title] || introducedAfter(name, title, vd.Generated)
+	}
+
 	if generatedAsIs(name, vd.List, want, vd.Generated) {
-		vd.List = append([]ListColumn(nil), def.List...)
+		kept := make([]ListColumn, 0, len(def.List))
+		for _, c := range def.List {
+			if belongs(c.Title) {
+				kept = append(kept, c)
+			}
+		}
+		vd.List = kept
 		return GenerateViewYAML(*vd), true
 	}
 
 	for i, c := range def.List {
-		if have[c.Title] {
+		if have[c.Title] || !belongs(c.Title) {
 			continue
 		}
 		at := min(i, len(vd.List))

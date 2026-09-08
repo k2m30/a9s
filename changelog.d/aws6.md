@@ -27,6 +27,25 @@
   CloudTrail event's outcome, which showed the raw AWS error code, and to a
   role whose trust policy allows anyone, which read `WILDCARD`.
 
+- A CloudWatch alarm's state, a CloudFormation stack's status and an ECS
+  task's last and desired status read as words on the detail screen. They read
+  as words in the list already: the same fact is rendered from the AWS struct
+  under a different spelling there, and only the list's spelling had been
+  declared.
+
+- A nested field reads as words too. A Kinesis stream's mode sits under a
+  struct on the detail screen, and the row it renders in was labelled by its
+  parent, so nothing could tell it apart from the struct around it.
+
+- A view file you have edited keeps a column you deleted. The upgrade added
+  back every built-in column the file did not carry, so deleting one lasted
+  until the next start, and deleting it again did not help. An upgrade now
+  adds only the columns the new version introduced.
+
+- Demo mode shows an empty history for an alarm it does not model, rather
+  than an error. AWS answers an unknown alarm name with an empty list, and
+  only a fake was answering otherwise.
+
 - A folder inside an S3 folder now opens. The second level of the object
   browser dispatched nothing at all, so the screen stayed where it was.
 

@@ -478,7 +478,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Tasks",
 		ShortName:      "ecs-task",
-		HumanizeFields: []string{"stop_code", "launch_type", "status"},
+		HumanizeFields: []string{"stop_code", "launch_type", "status", "LastStatus", "DesiredStatus"},
 		Aliases:        []string{"ecs-task", "ecs-tasks", "tasks"},
 		Category:       "COMPUTE",
 		CloudTrailKey:  "ResourceName:ID",

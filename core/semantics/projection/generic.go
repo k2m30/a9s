@@ -242,6 +242,19 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		}
 		pathParts = append(pathParts, subKey)
 		composedPath := strings.Join(pathParts, ".")
+
+		// The item keeps the path this walk just worked out — where the
+		// subfield actually sits — instead of its parent's. It used to keep
+		// the parent's, so anything keyed by path (the type's readable-wording
+		// declaration, the nav map) matched the parent or nothing, and a
+		// reader that wanted the field had to re-split the rendered line.
+		//
+		// Value stays the rendered line. Splitting it into key and value here
+		// would move every nested row onto the renderer's pre-split branch,
+		// which paints no colour at all (internal/tui/views/detail_fields.go),
+		// so the whole detail tree would go grey to reword one constant.
+		items[i].Path = composedPath
+
 		if tt, ok := navMap[composedPath]; ok && subVal != "" {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt

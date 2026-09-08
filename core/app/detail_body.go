@@ -299,7 +299,7 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		for _, it := range sec.Items {
 			if !quoted {
 				if catalog.Humanizes(humanizePaths, it.Path, it.Label) {
-					it.Value = domain.HumanizeStatusPhrase(it.Value)
+					it.Value = humanizeDetailValue(it)
 				}
 				it.Value = config.CanonicalValue(it.Value)
 			}
@@ -307,6 +307,29 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		}
 	}
 	return items
+}
+
+// humanizeDetailValue rewrites a declared field's value into the words it
+// renders in.
+//
+// A nested row carries its whole rendered line as the value — "StreamMode:
+// ON_DEMAND" — because the renderer colours a subfield by that line and paints
+// nothing when it is handed a key and a value apart. So the label is left
+// where it is and only what follows the colon is reworded: humanizing the line
+// would lowercase "StreamMode" along with the constant.
+//
+// The projector already told us this row IS the nested field, by composing its
+// path (core/semantics/projection/generic.go); this splits the rendered text,
+// not the fact.
+func humanizeDetailValue(it domain.Item) string {
+	if it.Kind != domain.ItemSubfield {
+		return domain.HumanizeStatusPhrase(it.Value)
+	}
+	label, scalar, ok := strings.Cut(it.Value, ":")
+	if !ok || strings.TrimSpace(scalar) == "" {
+		return domain.HumanizeStatusPhrase(it.Value)
+	}
+	return label + ": " + domain.HumanizeStatusPhrase(strings.TrimSpace(scalar))
 }
 
 // domainItemToFieldItemDetail maps a domain.Item back to a fieldpath.FieldItem.

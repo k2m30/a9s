@@ -4,9 +4,7 @@ package fakes
 
 import (
 	"context"
-	"slices"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
@@ -31,19 +29,13 @@ func (f *CloudWatchFake) DescribeAlarmHistory(_ context.Context, in *cloudwatch.
 	if in == nil || in.AlarmName == nil {
 		return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: []cwtypes.AlarmHistoryItem{}}, nil
 	}
-	if !f.hasAlarm(*in.AlarmName) {
-		return nil, &cwtypes.ResourceNotFound{Message: notFoundMessage("Alarm", *in.AlarmName)}
-	}
-	// A registered alarm with no history answers empty: "this alarm has never
-	// changed state" and "there is no such alarm" are different facts.
+	// No refusal here, unlike the by-id lookups in the sibling fakes.
+	// DescribeAlarmHistory models no not-found error at all — AWS answers an
+	// unknown alarm name with an empty history — so refusing would show a
+	// fetch error where the real account shows an empty list. The rule is per
+	// OPERATION: a fake refuses only where the operation it stands in for
+	// models the refusal.
 	return &cloudwatch.DescribeAlarmHistoryOutput{
 		AlarmHistoryItems: f.fix.AlarmHistory[*in.AlarmName],
 	}, nil
-}
-
-// hasAlarm reports whether the fixtures register this alarm.
-func (f *CloudWatchFake) hasAlarm(name string) bool {
-	return slices.ContainsFunc(f.fix.Alarms, func(a cwtypes.MetricAlarm) bool {
-		return aws.ToString(a.AlarmName) == name
-	})
 }

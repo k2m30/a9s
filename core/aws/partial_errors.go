@@ -109,7 +109,6 @@ var notFoundCodes = map[string][]string{ //nolint:gochecknoglobals // static AWS
 	"NotFoundException":             nil, // apigw, apigw v1, kms, msk, ses
 	"NoSuchDistribution":            nil, // cloudfront
 	"TrailNotFoundException":        nil, // cloudtrail
-	"ResourceNotFound":              nil, // cloudwatch
 	"PipelineNotFoundException":     nil, // codepipeline
 	"DBSubnetGroupNotFoundFault":    nil, // rds, docdb
 	"RepositoryNotFoundException":   nil, // ecr

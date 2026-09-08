@@ -53,7 +53,7 @@ var humanizedDeclaredFields = []string{
 	"ecs-task/LaunchType",
 	"ecs/Status",
 	"eks/Status",
-	"kinesis/StreamModeDetails",
+	"kinesis/StreamModeDetails.StreamMode",
 	"kinesis/StreamStatus",
 	"lambda/LastUpdateStatus",
 	"msk/ClusterType",

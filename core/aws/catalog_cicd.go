@@ -58,7 +58,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CloudFormation Stacks",
 		ShortName:      "cfn",
-		HumanizeFields: []string{"status"},
+		HumanizeFields: []string{"status", "StackStatus"},
 		Aliases:        []string{"cfn", "cloudformation", "stacks"},
 		Category:       "CI/CD",
 		CloudTrailKey:  "ResourceName:ID",

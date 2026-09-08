@@ -286,10 +286,13 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 	return ""
 }
 
-// humanizeListCell applies what the COLUMN says about its own values, which
-// is one thing: col.Humanize opts an AWS enum into
-// domain.HumanizeStatusPhrase. What every value reads like regardless of its
-// column is ExtractCellValue's exit, not this.
+// humanizeListCell applies the TYPE's declaration as it was resolved onto this
+// column: col.Humanize is set by resolveListColumnsForBuild from
+// ResourceTypeDef.HumanizeFields, and says that the field this column reads
+// carries an AWS constant an operator should not have to read. The column
+// carries the answer; it does not own the question, which is why the detail
+// row for the same field reads the same words. What every value reads like
+// regardless of its column is ExtractCellValue's exit, not this.
 func humanizeListCell(col ColumnDef, v string) string {
 	if col.Humanize {
 		return domain.HumanizeStatusPhrase(v)

@@ -57,7 +57,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "CloudWatch Alarms",
 		ShortName:      "alarm",
-		HumanizeFields: []string{"state"},
+		HumanizeFields: []string{"state", "StateValue"},
 		ListTitle:      "alarms",
 		Aliases:        []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
 		Category:       "MONITORING",
