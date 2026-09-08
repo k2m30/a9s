@@ -320,7 +320,7 @@ func renderRelatedPanel(rows []app.RelatedBlock, filterActive bool, cursor, scro
 }
 
 // renderDetailFieldsFromBody renders the field list from body.Fields, mirroring
-// renderFromFieldList but reading state from body (FieldCursor, KeyWidth) and
+// renderFromFieldList but reading state from body (FieldCursor) and
 // m (viewport width for cursor-row padding, ready flag).
 func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
 	if len(body.Fields) == 0 {
