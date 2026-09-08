@@ -415,7 +415,12 @@ Wave 1 probes complete
       `ListEnrichmentPatch` — `runtime.FoldWave2Rows` is the single fold both
       the stored rows and the rows on screen (`Controller.applyRowFindings`)
       go through, so a row that keeps its glyph in the file keeps it on the
-      list, and neither surface re-decides which rows a result speaks for
+      list, and neither surface re-decides which rows a result speaks for.
+      The same set governs the on-screen carry across a later fetch
+      (`applyResourcesLoaded`): a row the latest result answered for is
+      re-folded from that result, and a row it did not answer for carries its
+      previous Wave-2 findings onto the incoming row, since nothing has
+      re-checked it and the re-fold has nothing to give it back
     → menu badge recomputed via unifiedIssueCount over the folded rows (a healed issue clears)
     → progress indicator updated
   → all done: save cache with enriched rows/findings (when caching enabled; the types the sweep actually answered for are named in `SaveCachePayload.Wave2Answered` and supersede their carried Wave-2 data, a type whose probe failed keeps what the file already knows);
@@ -549,7 +554,7 @@ A menu row seeded from the disk cache looks exactly like a freshly probed one un
 
 A profile or region rotation goes through one clear point, `MenuState.ClearAvailability` (`core/app/screenstate.go`), fired by `MenuClearAvailabilityIntent`. Every per-type map on `MenuState` — counts, truncation, issue badges, origin, probe cause — is a fact about the pair that was probed, so all of them go together; what the operator typed and where the cursor sits is not, and stays. A test reflects over the per-type fields, so a field added later cannot be missed.
 
-Origin has two writers, and both mean the same thing: a live `AvailabilityChecked` (`PatchMenuAvailability{Origin: OriginVerified}`) and a live list fetch, which marks the type verified inside `syncExactTotalToMenu` (`core/app/handle.go`) alongside the count it already syncs. A type the operator opened and fetched is not "not yet verified".
+Origin has one writer: the `PatchMenuAvailability` intent case. Both lanes that observe a type emit that intent — the sweep's `AvailabilityChecked`, and a live list fetch, which `syncExactTotalToMenu` (`core/app/handle.go`) turns into the same intent rather than writing the menu's maps itself, so a type the operator opened and fetched is not "not yet verified" and its previous probe's failure mark is retired by the same batch. A lane that wrote the map directly would bypass the observation rule below, which is the reason the map has a rule at all.
 
 Both halves of a menu entry — the count and the issue badge beside it — follow one observation rule, and neither half may follow a different one: a seed never outranks a value verified this session (`menuObservationOutranksStored`, the gate both intent cases call), an observation that carries a real answer assigns (a live probe or enrichment result, and a disk seed, which carries the last session's answer — `applyMenuIssueObservation`), and a rows-derived observation, whose zero proves only that the fetched rows carry no findings, only raises (`syncMenuIssueCount` with `authoritative=false`). The persisted issue count is that same reconciled badge, read back by `menuIssueBadge` at the list-open save rather than derived a second time from the same rows: the file records what the screen shows, so a restart cannot change a badge that nothing in the account answered for.
 

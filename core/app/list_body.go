@@ -94,9 +94,16 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 
 	// Silent-swap findings carry (continued): a silent swap is exactly the !appendPage && !stale
 	// replace path below. Fold the captured prior findings onto the incoming
-	// resources for any surviving ID BEFORE they land on ls.Rows/RowStore —
-	// only when the session enrichment store has nothing for this type yet
-	// (checked via listEnrichmentFindings).
+	// resources for any surviving ID BEFORE they land on ls.Rows/RowStore.
+	//
+	// A row the latest Wave-2 result answered for is re-folded from that
+	// result at the end of this function and needs no carry. A row it did NOT
+	// answer for — an id it reported as uninspected, and every row when no
+	// result has landed at all — does: nothing has re-checked it, and the
+	// re-fold has nothing to give it back. Reading the same uninspected set
+	// the result carried (runtime.FoldWave2Rows' rule, one decision for both
+	// lanes) is what keeps a row that the file and the probe lane still call
+	// broken from rendering clean here after a fresh fetch.
 	//
 	// Merged per-source, never wholesale: a fresh fetch result IS the
 	// authoritative statement about Wave-1 state for that row — a row that
@@ -110,8 +117,13 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// Wave-2 entry (never clobber a fresh Wave-2 result that already landed on
 	// this exact swap; the "wave2:" Source prefix is the same discipline
 	// ApplyWave2ToRow uses elsewhere).
-	if !appendPage && !stale && len(priorFindings) > 0 && len(c.listEnrichmentFindings(typeName)) == 0 {
+	if !appendPage && !stale && len(priorFindings) > 0 {
+		answeredByLatest := len(c.listEnrichmentFindings(typeName)) > 0
+		uninspected := c.listUninspectedIDs(typeName)
 		for i := range resources {
+			if answeredByLatest && !uninspected[resources[i].ID] {
+				continue
+			}
 			f, ok := priorFindings[resources[i].ID]
 			if !ok || len(f) == 0 || hasWave2Finding(resources[i].Findings) {
 				continue

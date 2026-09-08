@@ -10,6 +10,10 @@ package unit_test
 
 import (
 	"errors"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -839,4 +843,142 @@ func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
 			t.Errorf("menu s3 issue badge = %d after an unverified refresh, want 5 — an observation that cannot prove an issue is gone lowers neither surface", badge)
 		}
 	})
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Round 3 — one writer of the menu origin, and one carry rule for a row the
+// last Wave-2 result did not answer for.
+// ───────────────────────────────────────────────────────────────────────────
+
+// TestMenuOrigin_HasOneWriter is row 13: the menu's origin map records where
+// a type's count came from, and the two lanes that observe a type must not
+// each write it their own way. Exactly one assignment site may exist, and it
+// is the intent that carries the origin.
+func TestMenuOrigin_HasOneWriter(t *testing.T) {
+	fset := token.NewFileSet()
+	var sites []string
+	for _, dir := range []string{"core/app", "core/runtime"} {
+		entries, err := os.ReadDir(filepath.Join("..", "..", dir))
+		if err != nil {
+			t.Fatalf("ReadDir(%s): %v", dir, err)
+		}
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				continue
+			}
+			path := filepath.Join("..", "..", dir, name)
+			file, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				t.Fatalf("parse %s: %v", path, err)
+			}
+			ast.Inspect(file, func(n ast.Node) bool {
+				assign, ok := n.(*ast.AssignStmt)
+				if !ok {
+					return true
+				}
+				for _, lhs := range assign.Lhs {
+					idx, ok := lhs.(*ast.IndexExpr)
+					if !ok {
+						continue
+					}
+					if sel, ok := idx.X.(*ast.SelectorExpr); ok && sel.Sel.Name == "Origin" {
+						sites = append(sites, fmt.Sprintf("%s:%d", filepath.Join(dir, name), fset.Position(assign.Pos()).Line))
+					}
+				}
+				return true
+			})
+		}
+	}
+	if len(sites) != 1 || !strings.HasPrefix(sites[0], "core/app/intents.go:") {
+		t.Errorf("menu origin is written at %v, want exactly one site in core/app/intents.go — a type's origin is one fact, and a lane that writes it directly bypasses the rule every other observation goes through", sites)
+	}
+}
+
+// TestListFetch_MarksVerifiedAndClearsCause is row 13's behavioural half: the
+// list lane observes its type through the same intents the probe lane emits,
+// so opening and fetching a type still marks it verified and still retires a
+// previous probe's failure mark.
+func TestListFetch_MarksVerifiedAndClearsCause(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	ctrl, _, _ := newCachegenController(t, "cachegen-listorigin", "us-east-1")
+
+	ctrl.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenuProbeCause{ResourceType: "s3", Cause: "access-denied"},
+	})
+
+	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+	cachegenLoadList(ctrl, cachegenRows(2, "bucket-origin"))
+
+	// Back to the menu, where the origin and the cause are rendered.
+	_, _ = ctrl.Apply(app.Action{Kind: app.ActionBack})
+	menu := ctrl.Snapshot().Body.Menu
+	if menu == nil {
+		t.Fatal("menu body is nil")
+	}
+	var entry *app.MenuEntry
+	for i := range menu.Entries {
+		if menu.Entries[i].ShortName == "s3" {
+			entry = &menu.Entries[i]
+		}
+	}
+	if entry == nil {
+		t.Fatal("menu has no s3 entry")
+	}
+	if entry.Origin != runtime.OriginVerified {
+		t.Errorf("menu s3 origin = %q after the operator opened and fetched the list, want %q", entry.Origin, runtime.OriginVerified)
+	}
+	if entry.Cause != "" {
+		t.Errorf("menu s3 cause = %q after a successful live fetch, want empty — a fetched type is not a refused one", entry.Cause)
+	}
+}
+
+// TestFreshFetch_KeepsUninspectedRowsFinding is row 14: a row the last Wave-2
+// result could not inspect keeps its cached finding across a fresh list
+// fetch, on screen and in the file alike. Otherwise the list renders a row
+// clean that the probe lane and the file both know is not.
+func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	const profile = "cachegen-carryuninspected"
+	ctrl, _, _ := newCachegenController(t, profile, "us-east-1")
+
+	rows := cachegenRows(2, "bucket-carry")
+	uninspected, answered := rows[0].ID, rows[1].ID
+	for i := range rows {
+		rows[i].Findings = []domain.Finding{{
+			Code:     "s3-public-read",
+			Phrase:   "publicly accessible",
+			Severity: domain.SevBroken,
+			Source:   "wave2:s3",
+		}}
+	}
+	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+	cachegenLoadList(ctrl, rows)
+
+	// The enrichment pass answers for one row and times out on the other.
+	ctrl.Handle(messages.EnrichmentChecked{
+		ResourceType: "s3",
+		Findings:     map[string][]domain.Finding{answered: {cachegenWave2Finding("s3-public-read")}},
+		TruncatedIDs: map[string]bool{uninspected: true},
+		Err:          errors.New("operation timed out"),
+	})
+
+	// A fresh fetch: AWS returns both buckets, carrying no Wave-2 data of its
+	// own (Wave-2 is a separate pass).
+	fresh := cachegenRows(2, "bucket-carry")
+	cachegenLoadList(ctrl, fresh)
+
+	got := cachegenRowFor(t, cachegenListBody(t, ctrl), uninspected)
+	if got.Color != "broken" {
+		t.Errorf("rendered row color for the uninspected bucket = %q after a fresh fetch, want %q — nothing has re-checked that row, so its finding stands", got.Color, "broken")
+	}
+	tf, ok := cache.LoadDirForTest(profile, "us-east-1").Type("s3")
+	if !ok {
+		t.Fatal("no s3 type file on disk after the fetch")
+	}
+	for _, r := range tf.Rows {
+		if r.ID == uninspected && len(r.Findings) == 0 {
+			t.Errorf("persisted row %s lost its finding — the file and the screen must keep the same row's finding", uninspected)
+		}
+	}
 }

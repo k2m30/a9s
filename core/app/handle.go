@@ -351,15 +351,20 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	if ms == nil {
 		return
 	}
-	applyAvailabilityObservation(ms, canon, newCount, newTrunc)
 	// A list the operator opened and fetched live IS a live check of that
-	// type — the same fact the sweep's probe would record — so the menu stops
-	// showing it as unverified without waiting for the probe to reach it.
-	if ms.Origin == nil {
-		ms.Origin = make(map[string]string)
-	}
-	ms.Origin[canon] = runtime.OriginVerified
-	delete(ms.ProbeCause, canon)
+	// type — the same fact the sweep's probe would record — so this lane
+	// observes it through the same intents the probe lane emits, rather than
+	// writing the menu's maps itself: the type is verified, and its previous
+	// probe's failure mark is retired.
+	c.applyIntentsLocked([]runtime.UIIntent{
+		runtime.PatchMenuAvailability{
+			ResourceType: canon,
+			Count:        newCount,
+			Truncated:    newTrunc,
+			Origin:       runtime.OriginVerified,
+		},
+		runtime.PatchMenuProbeCause{ResourceType: canon},
+	})
 
 	// authoritative=false: newIssues here is derived from bare list rows, not
 	// a confirmed Wave-2 enrichment result, so a zero must not be treated as

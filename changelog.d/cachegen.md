@@ -2,7 +2,7 @@
 
 - Cached counts and rows loaded for one profile or region no longer land on another's menu when you switch while the load is still in flight, and a cache write prepared for one pair is never written into the other's directory.
 - Two profiles whose names differ only in a slash, a backslash or a space no longer share one cache directory and overwrite each other's answers.
-- A Wave-2 check that was denied, timed out, or could not inspect a row no longer wipes the findings already on screen or persists those rows as clean; it now replaces only what it actually answered.
+- A Wave-2 check that was denied, timed out, or could not inspect a row no longer wipes the findings already on screen or persists those rows as clean; it now replaces only what it actually answered, and the row keeps its finding across a later list refresh too.
 - A late cache load no longer regresses a count, an issue badge or a list the current session already verified, including a live answer of "none".
 - Two cache writes for the same resource type can no longer land out of order: the older one is skipped instead of overwriting the newer state on the next start.
 - Loading a resource list no longer holds the app while its cache file is written, so keys and web requests stay responsive on a slow filesystem.

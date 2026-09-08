@@ -24,6 +24,15 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 // applyIntents is the lock-free implementation of ApplyIntents.
 // Callers must hold c.mu (write).
 func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
+	c.applyIntentsLocked(intents)
+	return c.snapshot()
+}
+
+// applyIntentsLocked applies intents without building a ViewState. For a
+// caller already inside a handler that snapshots once at the end — the list
+// lane observing its own type, say — rendering a second snapshot per intent
+// batch is work nobody reads. Callers must hold c.mu (write).
+func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 	for _, intent := range intents {
 		switch v := intent.(type) {
 		case runtime.PushScreen:
@@ -341,7 +350,6 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			_ = v
 		}
 	}
-	return c.snapshot()
 }
 
 // refreshTasksForIntents scans intents for RefreshActiveListIntent and, when
