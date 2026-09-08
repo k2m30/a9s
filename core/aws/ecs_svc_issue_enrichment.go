@@ -31,13 +31,36 @@ func ecsServiceScheduling(status string) bool {
 	return status != "INACTIVE" && status != "DRAINING"
 }
 
+// ecsEventReason is AWS's own explanation out of a service event message: the
+// clause after the words AWS introduces it with, without the documentation
+// pointer AWS appends, which is not a reason and is long enough to push the
+// cause off a one-line cell.
+//
+// A message a9s finds no marker in keeps all of its words. AWS wording this
+// code has not seen must not lose its reason the way the fixed phrase did,
+// and an event a9s cannot parse still said something.
+func ecsEventReason(message string) string {
+	reason := message
+	for _, marker := range []string{" because ", " due to "} {
+		if _, tail, ok := strings.Cut(reason, marker); ok {
+			reason = tail
+			break
+		}
+	}
+	if i := strings.Index(reason, "For more information"); i >= 0 {
+		reason = reason[:i]
+	}
+	return strings.TrimSpace(reason)
+}
+
 // EnrichECSServices is a Wave 2 enricher for ECS services.
 // It groups services by cluster name, batches DescribeServices calls (up to 10 per
 // cluster per call — the ECS API maximum), and raises findings for:
 //   - Any deployment with RolloutState == FAILED → "!" finding
 //   - deployment circuit-breaker triggered → "!" finding
 //   - runningCount < desiredCount with no IN_PROGRESS deployment → "!" finding
-//   - Recent events (last 10m) containing "unable to place" or "ELB health checks failed" → "!" finding
+//   - Recent events (last 10m) containing "unable to place" or "ELB health checks failed" → "!" finding,
+//     each carrying AWS's own reason for the event as a row under a9s's phrase
 func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -137,7 +160,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					!hasInProgress
 
 				// Check recent events for placement/ELB failures.
-				var eventIssues []string
+				var eventRows []domain.DetailRow
 				for _, ev := range svc.Events {
 					if ev.CreatedAt == nil || ev.Message == nil {
 						continue
@@ -149,10 +172,23 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 						continue
 					}
 					msg := strings.ToLower(*ev.Message)
-					if strings.Contains(msg, "unable to place") {
-						eventIssues = append(eventIssues, "unable to place task")
-					} else if strings.Contains(msg, "elb health checks failed") || strings.Contains(msg, "health checks failed") {
-						eventIssues = append(eventIssues, "ELB health checks failed")
+					phrase := ""
+					switch {
+					case strings.Contains(msg, "unable to place"):
+						phrase = "unable to place task"
+					case strings.Contains(msg, "elb health checks failed"), strings.Contains(msg, "health checks failed"):
+						phrase = "ELB health checks failed"
+					default:
+						continue
+					}
+					// The phrase is a9s's, so it reads the same however AWS
+					// worded the event; the reason under it is AWS's, because
+					// only AWS knows whether it was memory, ports or capacity,
+					// and that is the difference between a scheduler problem
+					// and a code problem.
+					eventRows = append(eventRows, domain.DetailRow{Label: "Event", Value: phrase, Tier: "!"})
+					if reason := ecsEventReason(*ev.Message); reason != "" {
+						eventRows = append(eventRows, domain.DetailRow{Label: "Reason", Value: reason, Tier: "!"})
 					}
 				}
 
@@ -166,7 +202,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 
 				}
 
-				if len(deploymentIssues) == 0 && !serviceStuck && len(eventIssues) == 0 {
+				if len(deploymentIssues) == 0 && !serviceStuck && len(eventRows) == 0 {
 					continue
 				}
 
@@ -181,9 +217,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 						Tier:  "!",
 					})
 				}
-				for _, issue := range eventIssues {
-					rows = append(rows, domain.DetailRow{Label: "Event", Value: issue, Tier: "!"})
-				}
+				rows = append(rows, eventRows...)
 
 				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, rows)
 			}
