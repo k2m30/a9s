@@ -186,11 +186,12 @@ type Session struct {
 	// profile switch's field write interleaving with the detached
 	// availability-cache-save writer goroutine's read, caught by -race on CI
 	// run 28839454135: Core.HandleProfileSelected's write at
-	// handlers.go:418 against Core.WithCacheStore's read at accessors.go:97
-	// — that call site now goes through Core.WithCacheStoreSave instead, see
-	// its own doc comment — reached via the single-writer goroutine
-	// runAvailabilitySaveLoop spawns in core/app/menu.go).
-	// EnsureCacheStore/WithCacheStore/WithCacheStoreSave/ReadCacheStore now
+	// handlers.go:418 against a pre-lock Profile/Region read at the Core
+	// accessor call site — that call site now goes through
+	// Core.WithCacheStoreSave instead, see its own doc comment — reached via
+	// the single-writer goroutine runAvailabilitySaveLoop spawns in
+	// core/app/menu.go).
+	// EnsureCacheStore/WithCacheStoreSave/ReadCacheStore now
 	// read the pair
 	// via CurrentPair while already holding pairMu, closing that gap for
 	// every caller in one place rather than one at a time.
@@ -569,20 +570,32 @@ func (s *Session) EnsureCacheStore() *cache.Store {
 	return s.ensureCacheStoreLocked(s.Profile, s.Region)
 }
 
-// EnsureCacheStoreForRegion is EnsureCacheStore's counterpart for a caller
-// (LoadAvailabilityCache) that needs to substitute a locally-resolved default
-// region for an unresolved Session.Region without writing that resolution
-// back onto the session (connect still owns Session.Region — see
-// LoadAvailabilityCache's doc comment for why). Reads Session.Profile under
-// pairMu just like EnsureCacheStore; region is the caller-supplied override
-// rather than Session.Region.
-func (s *Session) EnsureCacheStoreForRegion(region string) *cache.Store {
+// ResolvePair fills an unresolved half of the session's profile/region pair
+// with the caller's locally-resolved values and leaves an already-resolved
+// half untouched. It is the session's single resolution point: the cache-load
+// lane calls it before it reads a pair's directory, so every later answer
+// stamped with a pair has a resolved session pair to be compared against.
+//
+// Without it the C9 pair guard had a window it could only skip: the load lane
+// resolved a region from local config to decide which directory to read and
+// deliberately did not write it back, so between boot and the first
+// ClientsReady the session's own region was still empty and a load answering
+// for a different pair had nothing to be rejected by.
+func (s *Session) ResolvePair(profile, region string) {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
-	return s.ensureCacheStoreLocked(s.Profile, region)
+	if s.Profile == "" {
+		if profile == "" {
+			profile = "default"
+		}
+		s.Profile = profile
+	}
+	if s.Region == "" {
+		s.Region = region
+	}
 }
 
-// ensureCacheStoreLocked is EnsureCacheStore/EnsureCacheStoreForRegion's
+// ensureCacheStoreLocked is EnsureCacheStore's
 // shared body, factored out so WithCacheStore/WithCacheStoreSave/
 // ReadCacheStore can also reuse it inside their own already-held pairMu
 // critical section without a reentrant Lock call (sync.Mutex is not
@@ -600,39 +613,15 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 	return s.CacheStore
 }
 
-// WithCacheStore runs fn against the current Profile/Region pair's
-// *cache.Store while holding pairMu for the ENTIRE call (the pair read, the
-// store decision, and fn itself, including any disk I/O fn performs) — the
-// coarse, general-purpose primitive. SaveResourceListCache and
-// SaveAvailabilityCache, the two hot per-type save call sites, use the
-// narrower WithCacheStoreSave below instead (so their disk write does not
-// hold pairMu); this method remains for any caller that genuinely needs a
-// single fn to run fully atomically against the store, and for tests seeding
-// a pair's on-disk state via store.Put+store.SaveType in one call.
-//
-// fn must not call back into WithCacheStore/WithCacheStoreSave/
-// EnsureCacheStore/CurrentPair/SetProfileRegion (Session's mutex is not
-// reentrant). Always calls fn (never skips it) — when profile/region has not
-// resolved yet, fn receives a nil store, matching EnsureCacheStore's
-// nil-store contract. The NoCache short-circuit lives one layer up, in
-// Core.WithCacheStore/Core.ReadCacheStore, which never call down into this
-// method at all when NoCache is set.
-func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
-	s.pairMu.Lock()
-	defer s.pairMu.Unlock()
-	return fn(s.ensureCacheStoreLocked(s.Profile, s.Region))
-}
-
 // WithCacheStoreSave runs fn against the current Profile/Region pair's
 // *cache.Store while holding pairMu for the pair read, the store decision,
-// and fn itself (mirroring WithCacheStore's discipline) — but fn does NOT
+// and fn itself (mirroring ReadCacheStore's discipline) — but fn does NOT
 // write to disk. fn stages its writes as cache.WritePlan values (via
 // store.Put + store.PrepareSave, both cheap in-memory work) and returns them;
 // WithCacheStoreSave commits each one via store.CommitSave AFTER pairMu is
 // released, so a save's disk I/O (MkdirAll/temp-write/rename) never blocks a
 // concurrent pairMu-guarded reader (CurrentPair, ReadCacheStore, ...) behind
-// file I/O. This is WithCacheStore narrowed for the save lanes specifically:
-// hold pairMu across only the read/mutate/marshal part of the former
+// file I/O. It holds pairMu across only the read/mutate/marshal part of the former
 // store.Type(read)/mutate/store.Put+SaveType(write) sequence, not the write.
 //
 // Store-lock serialization (D13) still holds for the part that matters to
@@ -647,14 +636,13 @@ func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
 // and does not guarantee: two commits for the same pair can never tear each
 // other's rename, but the ORDER two racing commits land in is not guaranteed
 // to match the order their corresponding fn/Put calls ran in under pairMu
-// (an accepted trade-off — see CommitSave's doc comment). WithCacheStore
-// above holds pairMu across the disk write specifically to close that
-// ordering gap (a list's own fetch-completion save racing a background
-// availability-sweep save for the same resource type could otherwise
-// interleave: each reads the other's stale pre-write TypeFile, and whichever
-// write lands last wins with a Count/Rows pairing that never itself violated
-// the persisted-pair invariant (runtime/probes.go) but does not reflect
-// either write in full). WithCacheStoreSave accepts that a losing commit's
+// (an accepted trade-off — see CommitSave's doc comment): a list's own
+// fetch-completion save racing a background availability-sweep save for the
+// same resource type can interleave, each reading the other's stale pre-write
+// TypeFile, and whichever write lands last wins with a Count/Rows pairing
+// that never itself violated the persisted-pair invariant
+// (runtime/probes.go) but does not reflect either write in full.
+// WithCacheStoreSave accepts that a losing commit's
 // stale bytes could transiently be what's on disk for that type until its
 // next save — which, given no cache entry has a TTL (C1) and every save lane
 // here runs on a recurring sweep/list-refresh cadence rather than a

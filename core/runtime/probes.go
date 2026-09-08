@@ -90,24 +90,27 @@ type DemoPrefetchResult struct {
 // does not have to wait on a live connection (C1: cached data renders
 // before any AWS activity). This mirrors the resolution
 // handleClientsReadySuccess performs post-connect. The resolved region is
-// passed directly to Session.EnsureCacheStoreForRegion and is NOT written
-// back to c.session.Region — connect owns that field, and if it resolves a
-// different region the pair-stamped Store self-corrects on the next call.
+// resolved region is stamped onto the session (Session.ResolvePair) rather
+// than kept local to this call: it is the pair every answer this lane
+// produces will be stamped with, so the C9 guard that compares the two needs
+// the session to already carry it. Connect still resolves the same region
+// from the same config and finds the pair already filled.
 //
 // This method is itself dispatched as a tea.Cmd (background goroutine), so
-// its own Profile/Region read goes through the pairMu-guarded
-// EnsureCacheStoreForRegion rather than reading c.session.Region/Profile
+// its own Profile/Region read goes through the pairMu-guarded CurrentPair/
+// ResolvePair rather than reading c.session.Region/Profile
 // directly — the same cross-goroutine hazard EnsureCacheStore/
 // WithCacheStoreSave/ReadCacheStore close (see Session.pairMu's doc comment).
 func (c *Core) LoadAvailabilityCache() *cache.Store {
-	if c.session.NoCache {
-		return nil
-	}
 	profile, region := c.session.CurrentPair()
 	if region == "" {
 		region = awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile)
 	}
-	return c.session.EnsureCacheStoreForRegion(region)
+	c.session.ResolvePair(profile, region)
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.EnsureCacheStore()
 }
 
 // reconcileTypeFile is the SINGLE chokepoint every type-file write goes
@@ -300,6 +303,27 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 		}
 	}
 	return true
+}
+
+// SaveAvailabilityFromRows is the one producer of a pair's availability
+// counts on disk: it derives them from RowStore — the session's single source
+// of truth for every row it has observed — and hands them to
+// SaveAvailabilityCache. Both lanes that persist the badge use it, so the
+// file never records two answers to the same question: the sweep-completion
+// save (TaskKindSaveCache) and the menu-badge writer
+// (app.Controller.runAvailabilitySaveLoop, which owns the exact-total
+// sync-back and the in-list Wave-2 badge).
+//
+// The menu lane used to freeze a clone of MenuState's five maps instead. That
+// snapshot was a second source of truth and a stale one — it described the
+// menu as it was when the save was queued, so a queued snapshot landing after
+// the sweep's wrote the pre-observation counts back over it.
+//
+// pair is carried through to the save chokepoint, which refuses it when the
+// operator has since switched (C9). Best-effort like every other cache write.
+func (c *Core) SaveAvailabilityFromRows(pair session.Pair) error {
+	entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
+	return c.SaveAvailabilityCache(pair, entries, truncated, issueCounts, issueTruncated, issueKnown)
 }
 
 // SaveAvailabilityCache persists the supplied availability state to disk, one

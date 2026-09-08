@@ -11,6 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // Controller is the headless app controller. It wraps runtime.Core and
@@ -148,11 +149,11 @@ type Controller struct {
 	// completion, not generation validity.
 	menuSweepAcked map[string]bool
 
-	// availSaveCh feeds persistMenuAvailabilityCache's snapshots to the
-	// single writer goroutine started by availSaveOnce. Buffered to exactly
-	// 1 so a burst of calls coalesces into a latest-wins queue of one pending
-	// write instead of stacking a write per call (see menu.go).
-	availSaveCh chan availabilitySavePayload
+	// availSaveCh feeds persistMenuAvailabilityCache's save requests — one
+	// profile/region pair each — to the single writer goroutine started by
+	// availSaveOnce. Buffered to exactly 1 so a burst of calls coalesces into
+	// one pending write instead of stacking a write per call (see menu.go).
+	availSaveCh chan session.Pair
 
 	// availSaveOnce starts the persistMenuAvailabilityCache writer goroutine
 	// on the first send, so a Controller that never touches the availability
@@ -199,7 +200,7 @@ func New(core *runtime.Core) *Controller {
 				State: ScreenState{Menu: &MenuState{}},
 			},
 		},
-		availSaveCh:   make(chan availabilitySavePayload, 1),
+		availSaveCh:   make(chan session.Pair, 1),
 		availSaveStop: make(chan struct{}),
 	}
 	core.SetSaveColumns(c.SaveColumnsForType)

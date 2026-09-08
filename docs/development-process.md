@@ -136,7 +136,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 
 1. `make verify-hooks` — aborts unless `git config core.hooksPath` is `.githooks`. The sensitive-term half of `check-no-real-data` lives in the git hooks; an unhooked clone would silently lose it.
 2. `make check-no-real-data` — blocks real AWS/environment identifiers (account IDs in ARNs, previously-leaked terms) from tracked files; tree mode also term-scans NEW content against the merge-base with `origin/main`.
-3. `make test-race` — unit tests with race detector and `-shuffle=on` (a gate that runs in declaration order cannot catch order-dependent leaks, per the v3.54.0 macOS TempDir incident). One green run is one ordering; sweep seeds when order-dependence is suspected.
+3. `make test-race` — unit tests with race detector and `-shuffle=on` (a gate that runs in declaration order cannot catch order-dependent leaks, per the v3.54.0 macOS TempDir incident). One green run is one ordering; sweep seeds when order-dependence is suspected. Its `-timeout` is 900s while `make test` and `make integration` keep 300s: under `-race` the `tests/unit` package alone takes around 200s on an idle machine, so a 300s ceiling reports a timeout as soon as anything else is running.
 4. `make integration` — the build-tagged demo-bench suite under `tests/integration/` (scenario harness, full-integration walks, visual scenarios). `make test` does not compile it, so a demo fixture or fake change that breaks a rendered surface is invisible to every other gate.
 5. `make lint` — golangci-lint, including the gofmt formatter: an unformatted Go file fails the gate.
 6. `make security` — govulncheck.

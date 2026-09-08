@@ -21,8 +21,11 @@ install:
 test:
 	go test ./... -count=1 -timeout 300s
 
+# 900s, not the 300s the other two targets use: -race makes tests/unit alone
+# take ~200s solo, which leaves no margin once the machine is doing anything
+# else. See docs/development-process.md.
 test-race:
-	go test ./... -count=1 -timeout 300s -race -shuffle=on
+	go test ./... -count=1 -timeout 900s -race -shuffle=on
 
 # Captures wall time of `make test` and writes test-budget.json. The CI
 # `test-budget` job (.github/workflows/ci.yml) runs this, then invokes

@@ -13,24 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// availabilitySavePayload is one snapshot of the menu availability/issue
-// state, queued by persistMenuAvailabilityCache for the single writer
-// goroutine (runAvailabilitySaveLoop) to persist. Fields mirror
-// Core.SaveAvailabilityCache's parameters exactly — the writer passes them
-// through unchanged.
-type availabilitySavePayload struct {
-	// pair is the profile/region the snapshot was taken under, so a save
-	// still queued when the operator switches is rejected at the save
-	// chokepoint instead of writing one account's counts into another's
-	// directory (C9).
-	pair        session.Pair
-	avail       map[string]int
-	trunc       map[string]bool
-	issueCounts map[string]int
-	issueTrunc  map[string]bool
-	issueKnown  map[string]bool
-}
-
 // CostsMenuShortName is the synthetic main-menu entry for the Cost Explorer
 // screen. It is spliced into menuAllItems() for cursor/filter/selection
 // purposes only — it is never added to resource.AllResourceTypes() itself,
@@ -381,71 +363,60 @@ func applyAvailabilityObservation(ms *MenuState, key string, count int, truncate
 	}
 }
 
-// persistMenuAvailabilityCache best-effort persists ms's availability/issue
-// state to disk (the exact-total menu sync-back's restart half: the badge
-// must survive a restart). No-op when
-// profile or region is unset (no cache file identity to write to). Shared by
-// both callers of syncMenuIssueCount — syncExactTotalToMenu (handle.go) and
+// persistMenuAvailabilityCache best-effort persists the current pair's
+// availability/issue state to disk (the exact-total menu sync-back's restart
+// half: the badge must survive a restart). No-op when profile or region is
+// unset (no cache file identity to write to). Shared by both callers of
+// syncMenuIssueCount — syncExactTotalToMenu (handle.go) and
 // applyEnrichmentState (list_filter.go) — which used to each carry their own
-// verbatim copy of this five-map-clone-then-save block. Caller must hold c.mu
-// (at least read, since it only reads ms and c.core's profile/region).
+// verbatim copy of the save block. Caller must hold c.mu (at least read).
+//
+// The menu state the callers pass is what the badge now shows, not what gets
+// written: the counts on disk are derived from RowStore by the one producer
+// (Core.SaveAvailabilityFromRows), the same derivation the sweep's own save
+// uses. This lane used to freeze a clone of the menu's five maps and write
+// EVERY type's count from that snapshot, which made the rendered menu a
+// second source of truth for the file — and a losing one, since a queued
+// snapshot could land its pre-observation counts on top of the sweep's.
 //
 // The actual disk write never runs on this call stack. c.mu is the same lock
 // every key event needs (Apply/Handle take it for their whole duration), and
-// Core.SaveAvailabilityCache performs synchronous file I/O (temp file,
-// chmod, rename) under session.cacheStoreMu — running it inline here would
-// serialize user input behind disk latency on every Wave-2 result. Instead
-// the five maps are cloned (cheap, still under c.mu — this is the only part
-// that must not race the maps' own mutation) and handed to a single writer
-// goroutine via a latest-wins, buffer-1 channel: a burst of calls (e.g. the
-// startup availability sweep) collapses into whatever the newest snapshot is
-// by the time the writer gets to it, rather than queuing one disk write per
-// call. A write failure is silently dropped, mirroring the existing
-// TaskKindSaveCache/probe-completion paths that already treat cache writes
-// as best-effort.
+// the save performs synchronous file I/O (temp file, chmod, rename) —
+// running it inline here would serialize user input behind disk latency on
+// every Wave-2 result. Instead the pair is handed to a single writer
+// goroutine over a latest-wins channel, one pending save per pair, so a
+// burst of calls (e.g. the startup availability sweep) collapses into one
+// disk write per pair. A write failure is silently dropped, mirroring the
+// existing TaskKindSaveCache/probe-completion paths that already treat cache
+// writes as best-effort.
 //
 // Close (below) is the deterministic shutdown hook: it stops the writer and
-// blocks until the last queued snapshot has been persisted, so the sync-back's
+// blocks until the last queued save has run, so the sync-back's
 // "survives a restart" guarantee holds even though no write here ever blocks
 // a live key event. Every real Controller owner (TUI, web session) must call
 // Close on its own shutdown path — see Close's doc comment for the current
 // wiring.
-func (c *Controller) persistMenuAvailabilityCache(ms *MenuState) {
-	profile, region := c.core.Profile(), c.core.Region()
-	if profile == "" || region == "" {
+func (c *Controller) persistMenuAvailabilityCache(_ *MenuState) {
+	pair := c.core.Pair()
+	if pair.Profile == "" || pair.Region == "" {
 		return
 	}
-	avail := make(map[string]int, len(ms.Availability))
-	maps.Copy(avail, ms.Availability)
-	trunc := make(map[string]bool, len(ms.Truncated))
-	maps.Copy(trunc, ms.Truncated)
-	issueCounts := make(map[string]int, len(ms.IssueCounts))
-	maps.Copy(issueCounts, ms.IssueCounts)
-	issueTrunc := make(map[string]bool, len(ms.IssueTruncated))
-	maps.Copy(issueTrunc, ms.IssueTruncated)
-	issueKnown := make(map[string]bool, len(ms.IssueKnown))
-	maps.Copy(issueKnown, ms.IssueKnown)
-	c.queueAvailabilitySave(availabilitySavePayload{
-		pair:        c.core.Pair(),
-		avail:       avail,
-		trunc:       trunc,
-		issueCounts: issueCounts,
-		issueTrunc:  issueTrunc,
-		issueKnown:  issueKnown,
-	})
+	c.queueAvailabilitySave(pair)
 }
 
-// queueAvailabilitySave hands p to the single availability-cache writer
-// goroutine, starting it on first use, and applies latest-wins coalescing: if
-// the buffer-1 channel already holds an unconsumed snapshot, that snapshot is
-// dropped in favor of p (the writer never blocks a caller by falling behind,
-// and a burst of N calls only ever produces the last one's disk write).
+// queueAvailabilitySave hands pair to the single availability-cache writer
+// goroutine, starting it on first use, and coalesces: if the buffer-1 channel
+// already holds an unconsumed request, it is dropped in favor of pair (the
+// writer never blocks a caller by falling behind, and a burst of N calls only
+// ever produces one disk write). Each request names only the pair; the counts
+// are read from RowStore when the write runs, so a coalesced-away request
+// costs nothing — the surviving one writes at least as fresh a picture.
 // Non-blocking by construction — never runs disk I/O itself. A no-op after
 // Close has been called (send on availSaveStop-closed path is guarded by the
-// same select, so a very late call harmlessly drops its payload rather than
+// same select, so a very late call harmlessly drops its request rather than
 // panicking on a closed channel — the writer goroutine has already exited by
-// then, and Close already flushed the last snapshot it had).
-func (c *Controller) queueAvailabilitySave(p availabilitySavePayload) {
+// then, and Close already flushed the last request it had).
+func (c *Controller) queueAvailabilitySave(pair session.Pair) {
 	select {
 	case <-c.availSaveStop:
 		// Close already ran (or is running): the writer is gone or exiting.
@@ -462,38 +433,38 @@ func (c *Controller) queueAvailabilitySave(p availabilitySavePayload) {
 		go c.runAvailabilitySaveLoop()
 	})
 	select {
-	case c.availSaveCh <- p:
+	case c.availSaveCh <- pair:
 	default:
 		select {
 		case <-c.availSaveCh:
 		default:
 		}
 		select {
-		case c.availSaveCh <- p:
+		case c.availSaveCh <- pair:
 		default:
 		}
 	}
 }
 
 // runAvailabilitySaveLoop is the single writer goroutine started by
-// queueAvailabilitySave. It owns every call to Core.SaveAvailabilityCache for
-// the menu-badge persistence path, so the disk write (SaveAvailabilityCache
-// -> WithCacheStoreSave -> store.CommitSave's temp file+chmod+rename) never
-// runs on a goroutine holding Controller.mu. Exits
-// once Close closes availSaveStop, after persisting any snapshot still
-// pending in availSaveCh (Close.Wait()s on availSaveWG for exactly this).
+// queueAvailabilitySave. It drives the menu-badge persistence path's disk
+// write (SaveAvailabilityFromRows -> WithCacheStoreSave ->
+// store.CommitSave's temp file+chmod+rename) off any goroutine holding
+// Controller.mu. Exits once Close closes availSaveStop, after running any
+// save still pending in availSaveCh (Close.Wait()s on availSaveWG for
+// exactly this).
 func (c *Controller) runAvailabilitySaveLoop() {
 	defer c.availSaveWG.Done()
 	for {
 		select {
-		case p := <-c.availSaveCh:
-			_ = c.core.SaveAvailabilityCache(p.pair, p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
+		case pair := <-c.availSaveCh:
+			_ = c.core.SaveAvailabilityFromRows(pair)
 		case <-c.availSaveStop:
-			// Drain exactly one more pending snapshot (if any) so a Close
-			// racing a just-queued save still persists it, then exit.
+			// Drain exactly one more pending save (if any) so a Close
+			// racing a just-queued one still persists it, then exit.
 			select {
-			case p := <-c.availSaveCh:
-				_ = c.core.SaveAvailabilityCache(p.pair, p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
+			case pair := <-c.availSaveCh:
+				_ = c.core.SaveAvailabilityFromRows(pair)
 			default:
 			}
 			return

@@ -29,7 +29,6 @@
 package unit_test
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -59,15 +58,13 @@ func TestSessionCacheRoot_PinnedAtConstruction_EnvChangeAfterNewDoesNotRedirectW
 	t.Setenv("A9S_CONFIG_FOLDER", dirB)
 
 	const shortName = "ec2"
-	err := s.WithCacheStore(func(store *cache.Store) error {
-		if store == nil {
-			return fmt.Errorf("WithCacheStore handed a nil store for a resolved profile/region pair")
-		}
-		store.Put(shortName, cache.TypeFile{HasResources: true, Count: 1})
-		return store.SaveType(shortName)
-	})
-	if err != nil {
-		t.Fatalf("WithCacheStore: %v", err)
+	store := s.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("EnsureCacheStore returned nil for a resolved profile/region pair")
+	}
+	store.Put(shortName, cache.TypeFile{HasResources: true, Count: 1})
+	if err := store.SaveType(shortName); err != nil {
+		t.Fatalf("SaveType(%s): %v", shortName, err)
 	}
 
 	wantPath := filepath.Join(dirA, "cache", "testprofile--us-east-1", shortName+".yaml")

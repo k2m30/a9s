@@ -35,13 +35,13 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	// C9: a load carries the pair it read. A result for a pair the operator
 	// has since left is discarded whole — counts, issue badges and seeded
 	// rows alike — rather than describing one account with another's answer.
-	// Checked against a RESOLVED current pair only: before connect settles,
-	// the session's own region is still empty while the load already resolved
-	// one from local config, and dropping the seed there would empty the
-	// first frame (D10/D11).
+	// The comparison is unconditional because the session pair is always
+	// resolved by the time a stamped load exists: LoadAvailabilityCache
+	// stamps the region it resolved (Session.ResolvePair) before it reads a
+	// directory, so the pre-connect load answers for a pair the session
+	// already carries (D10/D11) and any other pair is a stale answer.
 	if msg.Profile != "" && msg.Region != "" {
-		if profile, region := c.session.CurrentPair(); profile != "" && region != "" &&
-			(profile != msg.Profile || region != msg.Region) {
+		if profile, region := c.session.CurrentPair(); profile != msg.Profile || region != msg.Region {
 			logging.L().Warn("cache load discarded", "loaded_pair", msg.Profile+"--"+msg.Region, "current_pair", profile+"--"+region)
 			return nil, nil
 		}
@@ -323,11 +323,18 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UIIntent, []TaskRequest) {
 	c.session.AvailChecked++
 
+	// One name for this result everywhere below. A probe may be delivered
+	// under a registry alias ("rds") or under the canonical short name
+	// ("dbi"); keying the per-sweep scan-health guard, the probe-status
+	// record and the emitted intents on the raw string made the same type two
+	// entries and let a redundant delivery re-flash its banner.
+	canon := canonShortName(msg.ResourceType)
+
 	// #462: record this probe's scan status regardless of outcome — a
 	// hard-failed probe still needs to be visible via Core.ScanStatus.
-	outcome, errClass := availabilityOutcome(c, msg.ResourceType, len(msg.Resources) > 0, msg.Truncated, msg.Err)
+	outcome, errClass := availabilityOutcome(c, canon, len(msg.Resources) > 0, msg.Truncated, msg.Err)
 	// This probe IS the new Wave-1 baseline: aggregate == baseline.
-	c.setProbeStatus(msg.ResourceType, outcome, msg.Duration, errClass, time.Now(), outcome, msg.Duration, errClass)
+	c.setProbeStatus(canon, outcome, msg.Duration, errClass, time.Now(), outcome, msg.Duration, errClass)
 
 	var intents []UIIntent
 	var tasks []TaskRequest
@@ -340,12 +347,12 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	if outcome == ProbeFailed {
 		cause = errClass
 	}
-	intents = append(intents, PatchMenuProbeCause{ResourceType: msg.ResourceType, Cause: cause})
+	intents = append(intents, PatchMenuProbeCause{ResourceType: canon, Cause: cause})
 
 	// Update menu availability on full success or partial-success.
 	if msg.Err == nil || len(msg.Resources) > 0 {
 		intents = append(intents, PatchMenuAvailability{
-			ResourceType: msg.ResourceType,
+			ResourceType: canon,
 			Count:        msg.Count,
 			Truncated:    msg.Truncated,
 			// Per cache contract C3: a live AvailabilityChecked result confirms this type
@@ -357,7 +364,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		})
 		// T032: wire issue counts from probe.
 		intents = append(intents, PatchMenu{
-			ResourceType: msg.ResourceType,
+			ResourceType: canon,
 			Issues:       msg.Issues,
 			Truncated:    msg.Truncated,
 		})
@@ -365,10 +372,6 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		// T032: retain probe resources for Wave-2 enrichment. Fetcher-emitted
 		// rows already carry Findings; no re-derive needed (W1.4b.3 dropped
 		// the legacy Status/Issues bridge).
-		canonType := msg.ResourceType
-		if td := resource.FindResourceType(msg.ResourceType); td != nil {
-			canonType = td.ShortName
-		}
 		// C6b/D17: this bare Wave-1 probe result carries no Wave-2 data of its
 		// own — if a prior Wave-2 enrichment pass this session already wrote
 		// Findings/Fields onto the type's previous in-memory rows, a plain
@@ -381,9 +384,9 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		// session.ProbeResources[canonType] read) — the Wave-2-carried result
 		// IS this probe's final row state, and ObserveRows below is its only
 		// write destination now.
-		previous, _ := c.ProbeResources(canonType)
-		freshResources := carryWave2ForResources(previous, msg.Resources, issueEnricherFieldKeysFor(canonType))
-		c.ObserveRows(canonType, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
+		previous, _ := c.ProbeResources(canon)
+		freshResources := carryWave2ForResources(previous, msg.Resources, issueEnricherFieldKeysFor(canon))
+		c.ObserveRows(canon, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
 	}
 
 	// Surface probe failures. A soft failure records into the `!` error log
@@ -397,15 +400,15 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// banner on the redundant delivery. Both branches below emit one
 	// FlashIntent and the entry is made where that intent is applied, so
 	// gating the emission on the guard gates the entry too.
-	if msg.Err != nil && !c.session.ScanHealthLogged[msg.ResourceType] {
+	if msg.Err != nil && !c.session.ScanHealthLogged[canon] {
 		if c.session.ScanHealthLogged == nil {
 			c.session.ScanHealthLogged = make(map[string]bool)
 		}
-		c.session.ScanHealthLogged[msg.ResourceType] = true
-		logging.L().Warn("scan probe failed", "type", msg.ResourceType, "outcome", string(outcome), "detail", errClass)
+		c.session.ScanHealthLogged[canon] = true
+		logging.L().Warn("scan probe failed", "type", canon, "outcome", string(outcome), "detail", errClass)
 
 		_, region := c.session.CurrentPair()
-		line := failureLine("availability "+msg.ResourceType, msg.Err, region)
+		line := failureLine("availability "+canon, msg.Err, region)
 		if softFailure(msg.Err, len(msg.Resources) > 0) {
 			intents = append(intents, FlashIntent{Text: line, IsError: true, LogOnly: true})
 		} else {

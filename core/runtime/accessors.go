@@ -109,19 +109,6 @@ func (c *Core) EnsureCacheStore() *cache.Store {
 	return c.session.EnsureCacheStore()
 }
 
-// WithCacheStore runs fn against the current pair's *cache.Store with
-// session.pairMu held for fn's ENTIRE duration, including any disk I/O fn
-// performs — the coarse, general-purpose primitive. See
-// Session.WithCacheStore's doc comment for why SaveResourceListCache/
-// SaveAvailabilityCache use the narrower WithCacheStoreSave below instead.
-// No-op (fn not called) when NoCache is set, mirroring EnsureCacheStore.
-func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
-	if c.session.NoCache {
-		return nil
-	}
-	return c.session.WithCacheStore(fn)
-}
-
 // WithCacheStoreSave runs fn against pair's *cache.Store with
 // session.pairMu held for the pair read, the store decision, and fn itself —
 // fn's own store.Type read and store.Put write for one type file can never

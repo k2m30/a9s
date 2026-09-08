@@ -214,10 +214,12 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 	for i := range rows {
 		rows[i] = cache.Row{ID: "obj-" + itoaC6a(i), Name: "obj-" + itoaC6a(i)}
 	}
-	if err := core.WithCacheStore(func(store *cache.Store) error {
-		store.Put("s3", cache.TypeFile{Count: 55, Exact: false, Rows: rows})
-		return store.SaveType("s3")
-	}); err != nil {
+	store := core.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("EnsureCacheStore returned nil for a resolved profile/region pair")
+	}
+	store.Put("s3", cache.TypeFile{Count: 55, Exact: false, Rows: rows})
+	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("seeding C6a pair: %v", err)
 	}
 

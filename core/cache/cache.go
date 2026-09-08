@@ -14,6 +14,7 @@
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -460,6 +461,13 @@ type WritePlan struct {
 // against another WritePlan for the same path — two renames into the same
 // path have no ordering guarantee against each other without it).
 func (wp WritePlan) commit() error {
+	// A hand-built zero WritePlan has no target. Without this it reached
+	// MkdirAll with an empty directory and failed naming neither the plan nor
+	// the type — a caller reading the log learned only that "" is not a
+	// directory. Only PrepareSave can produce a usable plan.
+	if wp.dir == "" || wp.path == "" {
+		return errors.New("cache: unusable WritePlan (zero value) — a plan must come from Store.PrepareSave")
+	}
 	if err := os.MkdirAll(wp.dir, 0700); err != nil {
 		return fmt.Errorf("creating cache directory %s: %w", wp.dir, err)
 	}
