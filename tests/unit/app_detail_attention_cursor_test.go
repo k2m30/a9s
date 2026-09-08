@@ -93,7 +93,7 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSo
 	c := newAttentionCursorController(t, res, "ec2")
 
 	// Move cursor to the bottom — lands on the last content field row
-	// (skips section headers / spacers per ActionMoveBottom's detailFieldCount).
+	// (ActionMoveBottom walks back off a trailing section header or spacer).
 	c.Apply(app.Action{Kind: app.ActionMoveBottom})
 
 	vs0 := c.Snapshot()

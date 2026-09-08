@@ -222,3 +222,34 @@ func TestDetailCursor_DetailLineKeepsItsOwnFindingWhenTwoSentencesMatch(t *testi
 		)
 	}
 }
+
+// TestDetailCursor_BottomOfAFindingsOnlyDetailIsNotABlankLine: the Attention
+// block ends in a spacer, and a resource whose projection yields no content
+// rows has that spacer as its last row. Sending the cursor to the bottom of
+// such a detail used to park it on a blank line.
+func TestDetailCursor_BottomOfAFindingsOnlyDetailIsNotABlankLine(t *testing.T) {
+	res := resource.Resource{
+		ID: "witness-1", Type: "unregistered-type",
+		Findings: []domain.Finding{{
+			Code: "ec2.long-stopped", Phrase: "instance stopped 42d ago",
+			Detail:   "Instance stopped more than 30 days ago — review whether it is still needed.",
+			Severity: domain.SevWarn, Source: "wave1",
+		}},
+	}
+	c := newAttentionCursorController(t, res, "unregistered-type")
+	c.Apply(app.Action{Kind: app.ActionMoveBottom})
+
+	body := c.Snapshot().Body.Detail
+	last := fieldRowAt(t, body, len(body.Fields)-1)
+	if !last.IsSpacer {
+		t.Fatalf("fixture no longer ends in a spacer (last row Key=%q) — the blank-line case is what this pins", last.Key)
+	}
+	row := fieldRowAt(t, body, body.FieldCursor)
+	if row.IsSpacer {
+		t.Errorf(
+			"the cursor sits on a blank line at the bottom of a findings-only detail: FieldCursor=%d of %d rows\n"+
+				"the clamp must land on the last row an operator can read.",
+			body.FieldCursor, len(body.Fields),
+		)
+	}
+}

@@ -64,13 +64,19 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		related = buildDetailRelatedLoadingBlocks(ds.ResourceType)
 	}
 
-	// Clamp FieldCursor.
+	// Clamp FieldCursor, then walk back off a spacer: the Attention block ends
+	// in one, and a resource whose projection yields no content rows has that
+	// spacer as its last row, so a cursor sent to the bottom would sit on a
+	// blank line.
 	fc := ds.FieldCursor
 	if len(fields) > 0 && fc >= len(fields) {
 		fc = len(fields) - 1
 	}
 	if fc < 0 {
 		fc = 0
+	}
+	for fc > 0 && fc < len(fields) && fields[fc].IsSpacer {
+		fc--
 	}
 
 	// Name the row the cursor is on. This build is the layout the operator
@@ -205,11 +211,20 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 		keys:    keys,
 		prepend: len(attention),
 	}
+	// A content row is identified by its path and its label, which together
+	// survive the rebuild a finding or an enrichment triggers while a bare
+	// index does not. One projection can repeat a pair — two targets of one
+	// CloudTrail event, two identical lines of a raw YAML document — so a
+	// repeat is numbered in projection order, which is as stable as the
+	// projection itself.
+	seenContent := make(map[string]int, len(content))
 	for _, it := range content {
-		// A content row is identified by its path and its label, which
-		// together survive the rebuild a finding or an enrichment triggers
-		// while a bare index does not.
-		built.keys = append(built.keys, it.Path+"\x1f"+it.Key)
+		key := it.Path + "\x1f" + it.Key
+		if n := seenContent[key]; n > 0 {
+			key = fmt.Sprintf("%s#%d", key, n)
+		}
+		seenContent[it.Path+"\x1f"+it.Key]++
+		built.keys = append(built.keys, key)
 	}
 	return built
 }

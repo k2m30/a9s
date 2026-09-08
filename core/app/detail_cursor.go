@@ -107,9 +107,16 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 
 	case ActionMoveBottom:
 		if !ds.RelatedFocus {
-			fieldCount := c.detailFieldCount(ds)
-			if fieldCount > 0 {
-				ds.FieldCursor = fieldCount - 1
+			// The last row an operator can read, not the last row: the
+			// Attention block ends in a spacer, and on a resource whose
+			// projection yields no content rows that spacer is the last row.
+			items := c.buildDetailFieldItems(ds).items
+			if len(items) > 0 {
+				ds.FieldCursor = len(items) - 1
+				for ds.FieldCursor > 0 &&
+					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
+					ds.FieldCursor--
+				}
 			}
 			reconcileDetailScrollToCursor(ds, ds.ViewportHeight)
 		} else {
@@ -230,13 +237,6 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 	}
 
 	return ViewState{}, nil, false
-}
-
-// detailFieldCount returns the number of field items for the given DetailState's
-// resource by running the projector pipeline. Used by cursor clamping in
-// applyDetailActions without building a full body.
-func (c *Controller) detailFieldCount(ds *DetailState) int {
-	return len(c.buildDetailFieldItems(ds).items)
 }
 
 // detailRelatedVisibleCount returns the number of visible related rows after
