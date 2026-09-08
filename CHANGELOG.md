@@ -445,6 +445,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A cached main menu loaded for one profile could briefly seed the screen of another. On startup the app resolves a region from the local AWS config so the cache can render before the connection settles, but it kept that resolution to itself, so until the connection landed there was nothing to compare an incoming cache read against. The resolved profile and region are now the session's from the moment the cache is read, and a read that answers for any other pair is discarded.
 - The main menu's saved counts and issue badges could go backwards. Two places wrote them: the background scan, from the rows the session had actually observed, and the menu itself, from a copy of what it was showing when the save was queued. The menu's copy could land last and put the older numbers back. Both now write the same answer, derived from the observed rows.
 - A scan failure for a type reachable under two names (`rds` and `dbi` are the same type) could raise its banner and log its error twice in one sweep. One type is now one entry per sweep whichever name the result arrives under.
+- The detail cursor stays on the row you were reading when an enrichment result lands, including a field below the Attention block and a wrapped sentence two findings word identically.
+- Jumping to the bottom of a detail that has only findings no longer parks the cursor on a blank line.
+- A list column whose title carries a wide character (CJK, an emoji) now reserves the room it is painted into, so the columns stay lined up with their rows and the sort arrow survives.
+- The reason a resource type's count is missing on the main menu now reads in the warning colour instead of the dim one the alias uses.
 
 ### Added
 
