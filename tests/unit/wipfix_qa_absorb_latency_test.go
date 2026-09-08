@@ -27,18 +27,31 @@ import (
 )
 
 // wipfixAbsorbHoldBudget is the longest the controller lock may be held while
-// a fetch result is absorbed. Instrumentation on this tree records a 49 ms
-// hold for 6000 rows — about 8 µs per row — because the rows are merged and
-// the body is built under the lock. Once only the built body is swapped under
-// it the hold is a pointer assignment, so 10 ms is generous by three orders of
-// magnitude while sitting five times below what the row work costs today.
-const wipfixAbsorbHoldBudget = 10 * time.Millisecond
-
-// wipfixAbsorbGrowthAllowance bounds how much the hold may grow when the
-// result doubles. A hold that scales with row count is row work under the
-// lock however small the constant; a swap does not care how many rows it
-// swaps.
-const wipfixAbsorbGrowthAllowance = 4 * time.Millisecond
+// a fetch result is absorbed, and wipfixAbsorbGrowthAllowance bounds how much
+// that hold may grow when the result doubles. A hold that scales with the row
+// count is row work under the lock however small the constant; a swap does not
+// care how many rows it swaps.
+//
+// Two builds, two budgets, each measured rather than derived from the other.
+// Holds observed on this bench, absorbing 6000 then 12000 rows:
+//
+//	build      row work under the lock   only the swap under it
+//	ordinary   46 ms / 76 ms             4.1 ms / 4.9 ms
+//	-race      227 ms / 452 ms           10.1 ms / 18.9 ms
+//
+// The detector instruments every memory access, so it inflates both columns
+// and re-introduces a slope in the swap column: the bookkeeping for a swap
+// still scales with what is swapped. The budgets sit between the two columns
+// of their own row — a factor above what a swap costs there, several factors
+// below what the row work costs — so each build's pin is red before the work
+// moves off the lock and green after it, and neither build's number was
+// guessed from the other's.
+func wipfixAbsorbBudgets() (budget, growth time.Duration) {
+	if wipfixRaceDetector {
+		return 40 * time.Millisecond, 15 * time.Millisecond
+	}
+	return 10 * time.Millisecond, 4 * time.Millisecond
+}
 
 // wipfixEC2Rows returns n rows in the shape the ec2 fetcher writes.
 func wipfixEC2Rows(n int) []resource.Resource {
@@ -107,19 +120,20 @@ func wipfixLockHoldDuringAbsorb(t *testing.T, n int) time.Duration {
 
 // TestLargeFetchAbsorb_HoldsTheLockOnlyForTheSwap pins row 23.
 func TestLargeFetchAbsorb_HoldsTheLockOnlyForTheSwap(t *testing.T) {
+	budget, growth := wipfixAbsorbBudgets()
 	small := wipfixLockHoldDuringAbsorb(t, 6000)
 	large := wipfixLockHoldDuringAbsorb(t, 12000)
 
-	if small > wipfixAbsorbHoldBudget {
-		t.Errorf("absorbing 6000 rows held the controller lock for %v, budget %v — "+
+	if small > budget {
+		t.Errorf("absorbing 6000 rows held the controller lock for %v, budget %v (race=%v) — "+
 			"the row work is pure in-memory and belongs outside the lock, with only the "+
-			"built body swapped under it", small, wipfixAbsorbHoldBudget)
+			"built body swapped under it", small, budget, wipfixRaceDetector)
 	}
-	if large > wipfixAbsorbHoldBudget {
-		t.Errorf("absorbing 12000 rows held the controller lock for %v, budget %v",
-			large, wipfixAbsorbHoldBudget)
+	if large > budget {
+		t.Errorf("absorbing 12000 rows held the controller lock for %v, budget %v (race=%v)",
+			large, budget, wipfixRaceDetector)
 	}
-	if large-small > wipfixAbsorbGrowthAllowance {
+	if large-small > growth {
 		t.Errorf("the lock hold grew from %v at 6000 rows to %v at 12000 — a hold that scales "+
 			"with the result is row work under the lock; a swap does not", small, large)
 	}

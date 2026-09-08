@@ -523,3 +523,57 @@ func wipfixReadRepoFile(t *testing.T, rel string) string {
 	}
 	return string(b)
 }
+
+// wipfixFuncBody returns the text of the named top-level function in a
+// repo-relative file, from its signature to the next one.
+func wipfixFuncBody(t *testing.T, rel, signature string) string {
+	t.Helper()
+	src := wipfixReadRepoFile(t, rel)
+	start := strings.Index(src, signature)
+	if start < 0 {
+		t.Fatalf("%s does not declare %s", rel, signature)
+	}
+	rest := src[start+len(signature):]
+	if end := strings.Index(rest, "\nfunc "); end >= 0 {
+		return rest[:end]
+	}
+	return rest
+}
+
+// TestOneOwner_SupersessionIsCheckedOncePerMessage pins the first half of row
+// 36: both hosts already ask whether a list result has been superseded before
+// they hand it on, and the controller asks again at its own door. Core's
+// handler asking a third time for the same message is a fourth answer to one
+// question, and a fourth place to get the guard wrong.
+func TestOneOwner_SupersessionIsCheckedOncePerMessage(t *testing.T) {
+	body := wipfixFuncBody(t, "core/runtime/handlers_resources.go",
+		"func (c *Core) HandleResourcesLoaded(")
+	if strings.Contains(body, "ListResultSuperseded(") {
+		t.Error("HandleResourcesLoaded re-checks ListResultSuperseded for a message its " +
+			"caller has already dropped on that answer — one check per message, at one seam")
+	}
+	if strings.Contains(body, "CanonicalShortName(") || strings.Contains(body, "FindResourceType(") {
+		t.Error("HandleResourcesLoaded re-canonicalises the resource type its caller " +
+			"already canonicalised for the same message")
+	}
+}
+
+// TestOneOwner_TheFilterChainHasOneCaller pins the second half of row 36: the
+// list body's build filters and sorts the rows once and memoises the result.
+// A title or an accessor that runs the same chain again pays for it on every
+// call and can disagree with what is on screen — the drill-count defect this
+// task already fixed was exactly that disagreement.
+func TestOneOwner_TheFilterChainHasOneCaller(t *testing.T) {
+	hits := wipfixCountOccurrences(t, "c.applyListFilters(", "core/app")
+	var outside []string
+	for _, h := range hits {
+		if strings.Contains(h, "list_body.go") {
+			outside = append(outside, h)
+		}
+	}
+	if len(outside) > 1 {
+		t.Errorf("the build's filter chain is re-run at %d sites in core/app/list_body.go, "+
+			"want 1 (the build itself) — the title and the accessors read the memo:\n  %s",
+			len(outside), strings.Join(outside, "\n  "))
+	}
+}
