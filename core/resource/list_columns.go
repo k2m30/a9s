@@ -72,7 +72,7 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 //
 // The catalog owns what the cell reads: its Key wins wherever it declares one.
 // The defaults own the rendering hints the catalog literal has no field for —
-// Path, SortKey, Humanize — and their own Key on a column the catalog does not
+// Path, SortKey — and their own Key on a column the catalog does not
 // declare at all. Title and width come from whichever declaration the calling
 // arm is built around, which is the only thing the two arms still differ on.
 func mergeListColumn(title string, width int, catalogKey string, def config.ListColumn) config.ListColumn {
@@ -81,18 +81,17 @@ func mergeListColumn(title string, width int, catalogKey string, def config.List
 		key = catalogKey
 	}
 	return config.ListColumn{
-		Title:    title,
-		Width:    width,
-		Key:      key,
-		Path:     def.Path,
-		SortKey:  def.SortKey,
-		Humanize: def.Humanize,
+		Title:   title,
+		Width:   width,
+		Key:     key,
+		Path:    def.Path,
+		SortKey: def.SortKey,
 	}
 }
 
 // copyListColumns copies a view definition's columns whole. Every field a
-// column carries decides something downstream — Path and Humanize what the
-// cell shows and SortKey what the comparator reads — so a branch
+// column carries decides something downstream — Path what the cell shows and
+// SortKey what the comparator reads — so a branch
 // that copies field by field is a branch that silently drops one.
 func copyListColumns(src []config.ListColumn) []config.ListColumn {
 	if len(src) == 0 {

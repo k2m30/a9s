@@ -5,6 +5,7 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -30,6 +31,9 @@ func (f *SSMFake) DescribeParameters(_ context.Context, _ *ssm.DescribeParameter
 func (f *SSMFake) GetParameter(_ context.Context, input *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 	if input.Name == nil {
 		return nil, fmt.Errorf("GetParameter: Name is required")
+	}
+	if !f.hasParameter(*input.Name) {
+		return nil, &ssmtypes.ParameterNotFound{Message: notFoundMessage("Parameter", *input.Name)}
 	}
 	val, ok := f.fix.ParameterValues[*input.Name]
 	if !ok {
@@ -70,4 +74,14 @@ func (f *SSMFake) DescribeInstanceInformation(_ context.Context, input *ssm.Desc
 		infos = append(infos, ssmtypes.InstanceInformation{InstanceId: aws.String(id)})
 	}
 	return &ssm.DescribeInstanceInformationOutput{InstanceInformationList: infos}, nil
+}
+
+// hasParameter reports whether the fixtures register this parameter. A
+// registered parameter with no stored value still answers a demo value; an
+// unregistered name does not exist, and inventing one for it would make every
+// path in the tree look populated.
+func (f *SSMFake) hasParameter(name string) bool {
+	return slices.ContainsFunc(f.fix.Parameters, func(p ssmtypes.ParameterMetadata) bool {
+		return aws.ToString(p.Name) == name
+	})
 }

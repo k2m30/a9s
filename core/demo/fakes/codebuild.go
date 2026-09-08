@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
@@ -40,6 +42,11 @@ func (f *CodeBuildFake) ListBuildsForProject(_ context.Context, input *codebuild
 	if input != nil && input.ProjectName != nil {
 		projectName = *input.ProjectName
 	}
+	if !f.hasProject(projectName) {
+		return nil, &cbtypes.ResourceNotFoundException{
+			Message: notFoundMessage("Project", projectName),
+		}
+	}
 	builds := f.fix.Builds[projectName]
 	ids := make([]string, 0, len(builds))
 	for _, b := range builds {
@@ -64,4 +71,12 @@ func (f *CodeBuildFake) BatchGetBuilds(_ context.Context, input *codebuild.Batch
 		}
 	}
 	return &codebuild.BatchGetBuildsOutput{Builds: result}, nil
+}
+
+// hasProject reports whether the fixtures register this CodeBuild project. A
+// project that has never been built still answers an empty build list.
+func (f *CodeBuildFake) hasProject(name string) bool {
+	return slices.ContainsFunc(f.fix.Projects, func(p cbtypes.Project) bool {
+		return aws.ToString(p.Name) == name
+	})
 }

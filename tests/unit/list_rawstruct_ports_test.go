@@ -145,14 +145,14 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"alarm", realisticAlarm(), []string{"HighCPUAlarm", "alarm", "CPUUtilization"}},
 		{"sns", realisticSNSTopic(), []string{"arn:aws:sns:us-east-1:123456789012:my-notifications"}},
 		{"elb", realisticELB(), []string{"my-app-alb", "application", "internet-faci"}},
-		{"tg", realisticTargetGroup(), []string{"my-app-tg", "8080", "HTTP", "/health"}},
+		{"tg", realisticTargetGroup(), []string{"my-app-tg", "8080", "http", "/health"}},
 		{"ecs", realisticECSClusterStruct(), []string{"prod-cluster", "active"}},
-		{"ecs-svc", realisticECSService(), []string{"api-service", "active", "FARGATE"}},
+		{"ecs-svc", realisticECSService(), []string{"api-service", "active", "fargate"}},
 		{"ecs-task", realisticECSTask(), []string{"running", "256", "512"}},
 		{"cfn", realisticCFNStack(), []string{"my-app-stack", "create complete"}},
 		{"role", realisticIAMRole(), []string{"lambda-exec-role", "/"}},
 		{"logs", realisticLogGroup(), []string{"/aws/lambda/my-api-handler"}},
-		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "String"}},
+		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "string"}},
 		{"ddb", realisticDDBTable(), []string{"users-table"}},
 		{"acm", realisticACMCertificate(), []string{"example.com", "issued", "amazon issued"}},
 		{"asg", realisticASG(), []string{"my-app-asg"}},
@@ -183,12 +183,23 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
 		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
 		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "enabled"}},
-		{"sfn", realisticSFN(), []string{"order-processing", "STANDARD"}},
-		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "V2"}},
+		{"sfn", realisticSFN(), []string{"order-processing", "standard"}},
+		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "v2"}},
 		{"kinesis", realisticKinesis(), []string{"events-stream", "active"}},
 		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
 		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "ready"}},
+		// INVERTED for aws6 rows 4-6 and 10 (one humanize owner). Six cells
+		// above name a value in the readable form rather than the SDK
+		// constant — tg's protocol, ecs-svc's launch type, ssm's and sfn's
+		// type, pipeline's type, msk's cluster type. The rule this table
+		// pins is unchanged: those words are on screen only because the
+		// column read the field off RawStruct, and a column that stopped
+		// reading it renders nothing at all. The SDK-constant spellings are
+		// not to be restored — each of those fields is now declared on its
+		// type (ResourceTypeDef.HumanizeFields), and restoring them would
+		// mean the column shows a constant the detail shows as words.
+		//
 		// ses's Identity column still takes a RawStruct path
 		// (.a9s/views/ses.yaml: path: IdentityName). Its Type column no
 		// longer does — it reads the mapped identity_type field, because the
@@ -203,7 +214,7 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"cb", realisticCodeBuild(), []string{"build-project", "CODECOMMIT"}},
 		{"opensearch", realisticOpenSearch(), []string{"search-prod", "OpenSearch_2.11"}},
 		{"kms", realisticKMS(), []string{"12345678-1234-1234-1234-123456789012", "enabled"}},
-		{"msk", realisticMSK(), []string{"events-kafka", "PROVISIONED", "active"}},
+		{"msk", realisticMSK(), []string{"events-kafka", "provisioned", "active"}},
 		{"backup", realisticBackup(), []string{"daily-backup-plan", "abc12345-1234-1234-1234-123456789012"}},
 	}
 
@@ -543,20 +554,24 @@ func TestListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 
 // ===========================================================================
 // 4a. TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct —
-// a Humanize:true, Path-only (Key-less) column must still route through
+// a humanized, Path-only (Key-less) column must still route through
 // domain.HumanizeStatusPhrase when RawStruct is nil and the raw AWS enum is
 // only reachable via the title-match Fields fallback (a cache-warm row:
 // RawStruct stripped, value materialized into Fields). "transfer"'s Endpoint/
-// Identity Provider columns (core/config/defaults_networking.go) are
-// real, registered Key-less/Path-based Humanize:true columns — the title-
-// match loop (list_columns.go's ExtractCellValue) looks them up by their
-// OWN title-derived key ("endpoint", "identity_provider"), which is what a
-// Fields-only (RawStruct-stripped) row must carry for that fallback to find
-// them at all — exactly the shape ExtractCellValue's RawStruct-gated
-// Humanize branch currently only reaches when RawStruct != nil. Domain also
-// pins the non-Humanize sibling column ("Domain", Path-only, no Humanize)
-// stays completely raw either way — the fix must not humanize every Path
-// column, only the ones explicitly flagged.
+// Identity Provider columns (core/config/defaults_networking.go) are real,
+// registered Key-less/Path-based columns their type declares as humanized —
+// the title-match loop (list_columns.go's ExtractCellValue) looks them up by
+// their OWN title-derived key ("endpoint", "identity_provider"), which is
+// what a Fields-only (RawStruct-stripped) row must carry for that fallback to
+// find them at all.
+//
+// INVERTED for aws6 row 10: the Domain column used to be the negative case,
+// pinning that a column WITHOUT the flag stays raw. transfer's domain was one
+// of the fields row 10 declares, so it reads as words now and cannot play
+// that part. The negative case it carried has moved to the Server ID cell,
+// which no declaration names and which must stay verbatim because it is an
+// identifier. The "EFS" assertion is not to be restored — restoring it would
+// mean the column shows a constant the detail shows as words.
 // ===========================================================================
 
 func TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T) {
@@ -586,8 +601,13 @@ func TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T
 		t.Errorf(`transfer row cells should NOT show the raw enum "SERVICE_MANAGED" when RawStruct is nil, got: %q`, joined)
 	}
 
-	if !strings.Contains(joined, "EFS") {
-		t.Errorf(`transfer row cells should still show the raw "EFS" for the Domain column (no Humanize flag), got: %q`, joined)
+	if !strings.Contains(joined, "efs") {
+		t.Errorf(`transfer row cells should humanize the Domain column to "efs", got: %q`, joined)
+	}
+	// The negative case: humanizing is per declared field, not per column. An
+	// identifier the type declares nothing about reaches the cell verbatim.
+	if !strings.Contains(joined, "s-0abc1234def56789a") {
+		t.Errorf(`transfer row cells should show the server id verbatim — no declaration names it, got: %q`, joined)
 	}
 }
 

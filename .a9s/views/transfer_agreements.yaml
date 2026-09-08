@@ -1,4 +1,4 @@
-generated: 4
+generated: 5
 list:
   Agreement Id:
     key: agreement_id
@@ -24,8 +24,8 @@ detail:
   - ServerId
   - Description
   - Status
-  - LocalProfileId
-  - PartnerProfileId
+  - { key: local_profile, label: "Local Profile" }
+  - { key: partner_profile, label: "Partner Profile" }
   - BaseDirectory
   - AccessRole
   - EnforceMessageSigning

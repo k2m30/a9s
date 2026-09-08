@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -181,9 +182,10 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 			Name: folderKey,
 			Fields: map[string]string{
 				"key":           folderKey,
-				"size":          "",
-				"last_modified": "",
-				"storage_class": "",
+				"size":          domain.NotApplicable,
+				"size_raw":      domain.NotApplicable,
+				"last_modified": domain.NotApplicable,
+				"storage_class": domain.NotApplicable,
 				"kind":          "folder",
 				"bucket":        bucket,
 			},

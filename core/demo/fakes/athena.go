@@ -4,8 +4,11 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
+	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -28,10 +31,24 @@ func (f *AthenaFake) ListWorkGroups(_ context.Context, _ *athena.ListWorkGroupsI
 // requested workgroup name, or an empty output when no fixture detail exists
 // (healthy default representation — list-only workgroups without per-config).
 func (f *AthenaFake) GetWorkGroup(_ context.Context, input *athena.GetWorkGroupInput, _ ...func(*athena.Options)) (*athena.GetWorkGroupOutput, error) {
-	if input != nil && input.WorkGroup != nil {
-		if out, ok := f.fix.WorkGroupDetails[*input.WorkGroup]; ok && out != nil {
-			return out, nil
+	if input == nil || input.WorkGroup == nil {
+		return &athena.GetWorkGroupOutput{}, nil
+	}
+	if !f.hasWorkGroup(*input.WorkGroup) {
+		return nil, &athenatypes.InvalidRequestException{
+			Message: notFoundMessage("WorkGroup", *input.WorkGroup),
 		}
 	}
+	if out, ok := f.fix.WorkGroupDetails[*input.WorkGroup]; ok && out != nil {
+		return out, nil
+	}
 	return &athena.GetWorkGroupOutput{}, nil
+}
+
+// hasWorkGroup reports whether the fixtures register this workgroup. A
+// workgroup listed without a per-config detail is still a workgroup.
+func (f *AthenaFake) hasWorkGroup(name string) bool {
+	return slices.ContainsFunc(f.fix.WorkGroups, func(w athenatypes.WorkGroupSummary) bool {
+		return aws.ToString(w.Name) == name
+	})
 }

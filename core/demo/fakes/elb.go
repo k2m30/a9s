@@ -5,7 +5,9 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -94,12 +96,17 @@ func (f *ELBFake) DescribeRules(_ context.Context, input *elbv2.DescribeRulesInp
 // (checkELBS3). Returns an empty attribute set for everything else so Wave 2
 // enrichment produces no findings for those load balancers in demo mode.
 func (f *ELBFake) DescribeLoadBalancerAttributes(_ context.Context, input *elbv2.DescribeLoadBalancerAttributesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
-	if input != nil && input.LoadBalancerArn != nil {
-		if attrs, ok := f.fix.LoadBalancerAttributes[*input.LoadBalancerArn]; ok {
-			return &elbv2.DescribeLoadBalancerAttributesOutput{Attributes: attrs}, nil
+	if input == nil || input.LoadBalancerArn == nil {
+		return &elbv2.DescribeLoadBalancerAttributesOutput{}, nil
+	}
+	if !f.hasLoadBalancer(*input.LoadBalancerArn) {
+		return nil, &elbv2types.LoadBalancerNotFoundException{
+			Message: notFoundMessage("Load balancer", *input.LoadBalancerArn),
 		}
 	}
-	return &elbv2.DescribeLoadBalancerAttributesOutput{}, nil
+	return &elbv2.DescribeLoadBalancerAttributesOutput{
+		Attributes: f.fix.LoadBalancerAttributes[*input.LoadBalancerArn],
+	}, nil
 }
 
 // DescribeTags returns resource tags for known demo ELB/TG ARNs, backing the
@@ -121,4 +128,11 @@ func (f *ELBFake) DescribeTags(_ context.Context, input *elbv2.DescribeTagsInput
 		descriptions = append(descriptions, elbv2types.TagDescription{ResourceArn: &a, Tags: tags})
 	}
 	return &elbv2.DescribeTagsOutput{TagDescriptions: descriptions}, nil
+}
+
+// hasLoadBalancer reports whether the fixtures register this load balancer ARN.
+func (f *ELBFake) hasLoadBalancer(arn string) bool {
+	return slices.ContainsFunc(f.fix.LoadBalancers, func(lb elbv2types.LoadBalancer) bool {
+		return aws.ToString(lb.LoadBalancerArn) == arn
+	})
 }

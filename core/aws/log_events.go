@@ -73,13 +73,13 @@ func capRunes(s string, n int) string {
 }
 
 // logEventFindings returns wave1 findings derived from a classified log status
-// (see classifyLogEventStatus). ERROR → broken; WARN → warn; REPORT/META/""
+// (see classifyLogEventStatus). error → broken; warn → warn; report/meta/""
 // emit no finding (healthy).
 func logEventFindings(status string) []domain.Finding {
 	switch status {
-	case "ERROR":
+	case logStatusError:
 		return []domain.Finding{wave1Finding(CodeCWLogError)}
-	case "WARN":
+	case logStatusWarn:
 		return []domain.Finding{wave1Finding(CodeCWLogWarn)}
 	}
 	return nil
@@ -157,21 +157,34 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 	}, nil
 }
 
+// The classes classifyLogEventStatus sorts a log line into. These are a9s's
+// own judgement about a line, not a value CloudWatch returned, so they are
+// written in the words the status cell renders rather than in the shape of an
+// AWS constant that would have to be translated back on every surface.
+const (
+	logStatusError  = "error"
+	logStatusWarn   = "warn"
+	logStatusReport = "report"
+	logStatusMeta   = "meta"
+)
+
 // classifyLogEventStatus classifies a log event message into a status category.
+// The tokens it matches on are what a runtime writes into the LINE; the class
+// it returns is what a9s says about the line.
 func classifyLogEventStatus(message string) string {
 	switch {
 	case strings.Contains(message, "ERROR") ||
 		strings.Contains(message, "FATAL") ||
 		strings.Contains(message, "Exception") ||
 		strings.Contains(message, "Traceback"):
-		return "ERROR"
+		return logStatusError
 	case strings.Contains(message, "WARN"):
-		return "WARN"
+		return logStatusWarn
 	case strings.Contains(message, "REPORT"):
-		return "REPORT"
+		return logStatusReport
 	case strings.Contains(message, "START") ||
 		strings.Contains(message, "END"):
-		return "META"
+		return logStatusMeta
 	default:
 		return ""
 	}

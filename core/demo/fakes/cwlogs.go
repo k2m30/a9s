@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
@@ -43,6 +45,11 @@ func (f *CWLogsFake) DescribeLogStreams(_ context.Context, input *cloudwatchlogs
 	var logGroupName string
 	if input != nil && input.LogGroupName != nil {
 		logGroupName = *input.LogGroupName
+	}
+	if !f.hasLogGroup(logGroupName) {
+		return nil, &cwlogstypes.ResourceNotFoundException{
+			Message: notFoundMessage("The specified log group", logGroupName),
+		}
 	}
 	return &cloudwatchlogs.DescribeLogStreamsOutput{LogStreams: f.fix.LogStreams[logGroupName]}, nil
 }
@@ -86,4 +93,12 @@ func (f *CWLogsFake) DescribeSubscriptionFilters(_ context.Context, input *cloud
 		logGroupName = *input.LogGroupName
 	}
 	return &cloudwatchlogs.DescribeSubscriptionFiltersOutput{SubscriptionFilters: f.fix.SubscriptionFilters[logGroupName]}, nil
+}
+
+// hasLogGroup reports whether the fixtures register this log group. A group
+// with no streams still answers an empty stream list.
+func (f *CWLogsFake) hasLogGroup(name string) bool {
+	return slices.ContainsFunc(f.fix.LogGroups, func(g cwlogstypes.LogGroup) bool {
+		return aws.ToString(g.LogGroupName) == name
+	})
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -37,7 +38,9 @@ func (f *MSKFake) DescribeClusterV2(_ context.Context, input *kafka.DescribeClus
 			return &kafka.DescribeClusterV2Output{ClusterInfo: &c}, nil
 		}
 	}
-	return &kafka.DescribeClusterV2Output{}, nil
+	return nil, &kafkatypes.NotFoundException{
+		Message: notFoundMessage("Cluster", *input.ClusterArn),
+	}
 }
 
 // ListScramSecrets returns SCRAM secret ARNs for the given cluster from

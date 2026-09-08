@@ -63,7 +63,31 @@ func IsNotFoundErr(err error) bool {
 		// instance profile. Both spellings: the modeled
 		// *NoSuchEntityException answers ErrorCode() "NoSuchEntity", while a
 		// response the SDK could not bind to it carries the exception name.
-		"NoSuchEntity", "NoSuchEntityException")
+		"NoSuchEntity", "NoSuchEntityException",
+		// One entry per service that spells the race with a code of its own.
+		// The demo fakes answer these same codes for a key the fixtures never
+		// registered, so a refusal reaches production in the one spelling
+		// every caller already branches on.
+		"NotFoundException",             // apigw, apigw v1, kms, msk, ses
+		"ValidationError",               // asg, cfn — a group or stack that no longer exists
+		"InvalidRequestException",       // athena
+		"NoSuchDistribution",            // cloudfront
+		"TrailNotFoundException",        // cloudtrail
+		"ResourceNotFound",              // cloudwatch
+		"PipelineNotFoundException",     // codepipeline
+		"DBSubnetGroupNotFoundFault",    // rds, docdb
+		"RepositoryNotFoundException",   // ecr
+		"ClusterNotFoundException",      // ecs
+		"FileSystemNotFound",            // efs
+		"CacheSubnetGroupNotFoundFault", // elasticache
+		"LoadBalancerNotFound",          // elb — the wire code; the SDK type is named LoadBalancerNotFoundException
+		"EntityNotFoundException",       // glue
+		"ClusterNotFound",               // redshift — the wire code; the SDK type is named ClusterNotFoundFault
+		"StateMachineDoesNotExist",      // sfn
+		"QueueDoesNotExist",             // sqs
+		"ParameterNotFound",             // ssm
+		"WAFNonexistentItemException",   // waf
+	)
 }
 
 // aggregateFailuresCap is the maximum number of distinct causes

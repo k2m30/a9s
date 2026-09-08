@@ -47,7 +47,7 @@ func (f *KMSFake) DescribeKey(_ context.Context, input *kms.DescribeKeyInput, _ 
 	}
 	meta, ok := f.fix.Keys[*input.KeyId]
 	if !ok {
-		return nil, fmt.Errorf("DescribeKey: key %q not found", *input.KeyId)
+		return nil, &kmstypes.NotFoundException{Message: notFoundMessage("Key", *input.KeyId)}
 	}
 	return &kms.DescribeKeyOutput{KeyMetadata: meta}, nil
 }

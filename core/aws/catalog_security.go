@@ -294,11 +294,12 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 	},
 	{
-		Name:          "WAF Web ACLs",
-		ShortName:     "waf",
-		Aliases:       []string{"waf", "webacl", "web-acl"},
-		Category:      "SECURITY & IAM",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "WAF Web ACLs",
+		ShortName:      "waf",
+		HumanizeFields: []string{"scope"},
+		Aliases:        []string{"waf", "webacl", "web-acl"},
+		Category:       "SECURITY & IAM",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			scope := r.Fields["scope"]
 			if r.Name == "" || scope == "" {

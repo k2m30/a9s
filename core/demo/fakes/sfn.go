@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	"github.com/aws/smithy-go"
@@ -63,6 +65,11 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 		}
 		arn = *input.StateMachineArn
 	}
+	if !f.hasStateMachine(arn) {
+		return nil, &sfntypes.StateMachineDoesNotExist{
+			Message: notFoundMessage("State Machine", arn),
+		}
+	}
 	definition := "{}"
 	if d, ok := f.fix.Definitions[arn]; ok {
 		definition = d
@@ -106,4 +113,11 @@ func validateSFNArn(val string) error {
 // ListTagsForResource returns an empty tag list — demo mode does not model SFN tags.
 func (f *SFNFake) ListTagsForResource(_ context.Context, _ *sfn.ListTagsForResourceInput, _ ...func(*sfn.Options)) (*sfn.ListTagsForResourceOutput, error) {
 	return &sfn.ListTagsForResourceOutput{}, nil
+}
+
+// hasStateMachine reports whether the fixtures register this state machine ARN.
+func (f *SFNFake) hasStateMachine(arn string) bool {
+	return slices.ContainsFunc(f.fix.StateMachines, func(m sfntypes.StateMachineListItem) bool {
+		return aws.ToString(m.StateMachineArn) == arn
+	})
 }

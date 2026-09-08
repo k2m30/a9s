@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
@@ -85,11 +86,18 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 	if len(lcs) == 0 {
 		return nil
 	}
+	// The type's own declaration, not the column's: see
+	// ResourceTypeDef.HumanizeFields. A column reads it; it does not own it.
+	humanized := map[string]bool(nil)
+	if td != nil {
+		humanized = td.HumanizedFields()
+	}
 	cols := make([]ColumnDef, len(lcs))
 	for i, lc := range lcs {
 		cols[i] = ColumnDef{
 			Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,
-			Humanize: lc.Humanize, SortKey: lc.SortKey,
+			Humanize: catalog.Humanizes(humanized, lc.Key, lc.Path),
+			SortKey:  lc.SortKey,
 		}
 	}
 	cols[IdentityColumnIndex(cols, td)].Identity = true

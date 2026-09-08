@@ -34,7 +34,13 @@ func (f *CFNFake) DescribeStacks(_ context.Context, input *cloudformation.Descri
 			return &cloudformation.DescribeStacksOutput{Stacks: []cfntypes.Stack{stack}}, nil
 		}
 	}
-	return &cloudformation.DescribeStacksOutput{}, nil
+	// CloudFormation is a query-protocol API with no modeled not-found shape:
+	// a stack that does not exist comes back as ValidationError.
+	return nil, &smithy.GenericAPIError{
+		Code:    "ValidationError",
+		Message: "Stack with id " + *input.StackName + " does not exist",
+		Fault:   smithy.FaultClient,
+	}
 }
 
 func (f *CFNFake) DescribeStackEvents(_ context.Context, input *cloudformation.DescribeStackEventsInput, _ ...func(*cloudformation.Options)) (*cloudformation.DescribeStackEventsOutput, error) {

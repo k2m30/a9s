@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
@@ -202,7 +203,15 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 	if td != nil && td.Augment != nil {
 		sections = td.Augment(r, sections)
 	}
-	content := sectionsToFieldItemsDetail(sections, humanizedDetailPaths(vc, ds.ResourceType, td))
+	// The fields whose readable wording the TYPE declares. It lives on neither
+	// surface: a field no column happens to show — mwaa's EndpointManagement
+	// is one — has no column to carry a flag, so while the opt-in lived on the
+	// column the detail had no way to ask and rendered the constant verbatim.
+	var humanized map[string]bool
+	if td != nil {
+		humanized = td.HumanizedFields()
+	}
+	content := sectionsToFieldItemsDetail(sections, humanized)
 	attention, keys := buildAttentionSectionDetail(ds, td, c.detailNotInspected(ds))
 	built := detailItems{
 		items:   append(attention, content...),
@@ -289,7 +298,7 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		quoted := quotedSections[sec.Title]
 		for _, it := range sec.Items {
 			if !quoted {
-				if humanizePaths[strings.ToLower(it.Path)] || humanizePaths[strings.ToLower(it.Label)] {
+				if catalog.Humanizes(humanizePaths, it.Path, it.Label) {
 					it.Value = domain.HumanizeStatusPhrase(it.Value)
 				}
 				it.Value = config.CanonicalValue(it.Value)
@@ -298,36 +307,6 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		}
 	}
 	return items
-}
-
-// humanizedDetailPaths is the set of fields the type's own columns opt into
-// readable wording, keyed by path and by key, lowercased.
-//
-// The opt-in is declared once, on the column (config.ListColumn.Humanize), and
-// read by both surfaces. It says something about the FACT — this field carries
-// an AWS constant an operator should not have to read — not about the list, so
-// a detail row for the same field owes the same words. Moving the flag onto a
-// second declaration for the detail view would put the fact in two places to
-// disagree, which is the shape of the bug it was added to fix.
-func humanizedDetailPaths(vc *config.ViewsConfig, typeName string, td *resource.ResourceTypeDef) map[string]bool {
-	var out map[string]bool
-	for _, lc := range resource.ResolveListColumnCascade(vc, typeName, td) {
-		if !lc.Humanize {
-			continue
-		}
-		if out == nil {
-			out = map[string]bool{}
-		}
-		// Path and key only. The column's TITLE is prose for a header and can
-		// name a different field than the one it reads ("Endpoint" over
-		// EndpointType), so matching on it would opt a field in by coincidence.
-		for _, k := range []string{lc.Path, lc.Key} {
-			if k != "" {
-				out[strings.ToLower(k)] = true
-			}
-		}
-	}
-	return out
 }
 
 // domainItemToFieldItemDetail maps a domain.Item back to a fieldpath.FieldItem.

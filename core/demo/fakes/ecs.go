@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -57,6 +58,11 @@ func (f *ECSFake) DescribeClusters(_ context.Context, input *ecs.DescribeCluster
 
 func (f *ECSFake) ListServices(_ context.Context, input *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
 	clusterFilter := aws.ToString(input.Cluster)
+	if clusterFilter != "" && !f.hasCluster(clusterFilter) {
+		return nil, &ecstypes.ClusterNotFoundException{
+			Message: notFoundMessage("Cluster", clusterFilter),
+		}
+	}
 	var arns []string
 	for _, svc := range f.fix.Services {
 		clusterArn := aws.ToString(svc.ClusterArn)
@@ -166,4 +172,12 @@ func (f *ECSFake) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeT
 		}
 	}
 	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: tdef}, nil
+}
+
+// hasCluster reports whether the fixtures register this cluster, under either
+// spelling ListServices accepts: the cluster's short name or its ARN.
+func (f *ECSFake) hasCluster(nameOrARN string) bool {
+	return slices.ContainsFunc(f.fix.Clusters, func(c ecstypes.Cluster) bool {
+		return aws.ToString(c.ClusterName) == nameOrARN || aws.ToString(c.ClusterArn) == nameOrARN
+	})
 }

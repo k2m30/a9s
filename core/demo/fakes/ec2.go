@@ -302,7 +302,19 @@ func (f *EC2Fake) DescribeLaunchTemplateVersions(_ context.Context, input *ec2.D
 // requests. Returns the same demoUserData script, base64-encoded, for any
 // InstanceId.
 func (f *EC2Fake) DescribeInstanceAttribute(_ context.Context, input *ec2.DescribeInstanceAttributeInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceAttributeOutput, error) {
-	if input == nil || input.Attribute != ec2types.InstanceAttributeNameUserData {
+	if input == nil {
+		return &ec2.DescribeInstanceAttributeOutput{}, nil
+	}
+	// The instance is checked before the attribute: an id the account does not
+	// hold is not found whichever attribute was asked for.
+	if id := aws.ToString(input.InstanceId); !f.hasInstance(id) {
+		return nil, &smithy.GenericAPIError{
+			Code:    "InvalidInstanceID.NotFound",
+			Message: "The instance ID '" + id + "' does not exist",
+			Fault:   smithy.FaultClient,
+		}
+	}
+	if input.Attribute != ec2types.InstanceAttributeNameUserData {
 		return &ec2.DescribeInstanceAttributeOutput{}, nil
 	}
 	script := demoUserData
@@ -345,4 +357,14 @@ func validateARN(val string) error {
 		Code:    "ValidationError",
 		Message: "'" + val + "' is not a valid ARN",
 	}
+}
+
+// hasInstance reports whether the fixtures register this instance id, across
+// every reservation the account holds.
+func (f *EC2Fake) hasInstance(id string) bool {
+	return slices.ContainsFunc(f.fix.Reservations, func(r ec2types.Reservation) bool {
+		return slices.ContainsFunc(r.Instances, func(i ec2types.Instance) bool {
+			return aws.ToString(i.InstanceId) == id
+		})
+	})
 }

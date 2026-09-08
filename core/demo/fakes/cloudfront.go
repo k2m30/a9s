@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
@@ -55,12 +57,27 @@ func (f *CloudFrontFake) ListDistributionsByWebACLId(_ context.Context, input *c
 // else so Wave 2 enrichment (viewer/origin protocol policy checks) produces
 // no findings for those distributions in demo mode.
 func (f *CloudFrontFake) GetDistributionConfig(_ context.Context, input *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {
-	if input != nil && input.Id != nil {
-		if cfg, ok := f.fix.DistributionConfigs[*input.Id]; ok {
-			return &cloudfront.GetDistributionConfigOutput{DistributionConfig: cfg}, nil
+	if input == nil || input.Id == nil {
+		return &cloudfront.GetDistributionConfigOutput{
+			DistributionConfig: &cftypes.DistributionConfig{},
+		}, nil
+	}
+	if !f.hasDistribution(*input.Id) {
+		return nil, &cftypes.NoSuchDistribution{
+			Message: notFoundMessage("Distribution", *input.Id),
 		}
+	}
+	if cfg, ok := f.fix.DistributionConfigs[*input.Id]; ok {
+		return &cloudfront.GetDistributionConfigOutput{DistributionConfig: cfg}, nil
 	}
 	return &cloudfront.GetDistributionConfigOutput{
 		DistributionConfig: &cftypes.DistributionConfig{},
 	}, nil
+}
+
+// hasDistribution reports whether the fixtures register this distribution id.
+func (f *CloudFrontFake) hasDistribution(id string) bool {
+	return slices.ContainsFunc(f.fix.Distributions, func(d cftypes.DistributionSummary) bool {
+		return aws.ToString(d.Id) == id
+	})
 }

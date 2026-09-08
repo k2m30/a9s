@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -31,6 +32,11 @@ func (f *CloudTrailFake) DescribeTrails(_ context.Context, _ *cloudtrail.Describ
 
 func (f *CloudTrailFake) GetTrailStatus(_ context.Context, input *cloudtrail.GetTrailStatusInput, _ ...func(*cloudtrail.Options)) (*cloudtrail.GetTrailStatusOutput, error) {
 	name := aws.ToString(input.Name)
+	if !f.hasTrail(name) {
+		return nil, &cloudtrailtypes.TrailNotFoundException{
+			Message: notFoundMessage("Trail", name),
+		}
+	}
 	if status, ok := f.fix.TrailStatus[name]; ok {
 		return &status, nil
 	}
@@ -97,4 +103,12 @@ func matchesLookupAttributes(evt cloudtrailtypes.Event, attrs []cloudtrailtypes.
 		}
 	}
 	return true
+}
+
+// hasTrail reports whether the fixtures register this trail, under either
+// spelling GetTrailStatus accepts: the trail's name or its ARN.
+func (f *CloudTrailFake) hasTrail(name string) bool {
+	return slices.ContainsFunc(f.fix.Trails, func(t cloudtrailtypes.Trail) bool {
+		return aws.ToString(t.Name) == name || aws.ToString(t.TrailARN) == name
+	})
 }

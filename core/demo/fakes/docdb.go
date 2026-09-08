@@ -45,6 +45,11 @@ func (f *DocDBFake) DescribeDBSubnetGroups(_ context.Context, in *docdb.Describe
 			matched = append(matched, sg)
 		}
 	}
+	if len(matched) == 0 {
+		return nil, &docdbtypes.DBSubnetGroupNotFoundFault{
+			Message: notFoundMessage("DBSubnetGroup", name),
+		}
+	}
 	return &docdb.DescribeDBSubnetGroupsOutput{DBSubnetGroups: matched}, nil
 }
 

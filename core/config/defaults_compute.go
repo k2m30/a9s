@@ -67,7 +67,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Task ID", Key: "task_id", Path: "TaskArn", Width: 38},
 				{Title: "Cluster", Path: "ClusterArn", Width: 24},
 				{Title: "Status", Path: "LastStatus", Width: 12},
-				{Title: "Stop Code", Path: "StopCode", Width: 24, Humanize: true},
+				{Title: "Stop Code", Path: "StopCode", Width: 24},
 				{Title: "Health", Path: "HealthStatus", Width: 12},
 				{Title: "Task Definition", Path: "TaskDefinitionArn", Width: 30},
 				{Title: "Launch", Path: "LaunchType", Width: 10},

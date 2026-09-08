@@ -4,8 +4,11 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -46,6 +49,9 @@ func (f *SNSFake) GetTopicAttributes(_ context.Context, input *sns.GetTopicAttri
 	if input != nil && input.TopicArn != nil {
 		topicARN = *input.TopicArn
 	}
+	if !f.hasTopic(topicARN) {
+		return nil, &snstypes.NotFoundException{Message: notFoundMessage("Topic", topicARN)}
+	}
 	return &sns.GetTopicAttributesOutput{Attributes: f.fix.TopicAttributes[topicARN]}, nil
 }
 
@@ -58,4 +64,11 @@ func (f *SNSFake) GetSubscriptionAttributes(_ context.Context, _ *sns.GetSubscri
 // ListTagsForResource returns an empty tag list — demo mode does not model SNS tags.
 func (f *SNSFake) ListTagsForResource(_ context.Context, _ *sns.ListTagsForResourceInput, _ ...func(*sns.Options)) (*sns.ListTagsForResourceOutput, error) {
 	return &sns.ListTagsForResourceOutput{}, nil
+}
+
+// hasTopic reports whether the fixtures register this topic ARN.
+func (f *SNSFake) hasTopic(arn string) bool {
+	return slices.ContainsFunc(f.fix.Topics, func(t snstypes.Topic) bool {
+		return aws.ToString(t.TopicArn) == arn
+	})
 }

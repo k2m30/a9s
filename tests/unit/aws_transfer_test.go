@@ -649,21 +649,25 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 // config-driven render path projection.buildItems actually uses
 // (the generic projector + fieldpath.ExtractFieldList), not merely present
 // somewhere on the enricher's return value. defaults_networking.go's
-// transfer_agreements Detail declares {Path: "LocalProfileId"} /
-// {Path: "PartnerProfileId"} (docs/resources/transfer.md §2.1).
+// transfer_agreements Detail declares {Key: "local_profile"} /
+// {Key: "partner_profile"} (docs/resources/transfer.md §2.1).
 // ---------------------------------------------------------------------------
 
 // TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail verifies that
 // enrichTransferAgreement's resolved As2Id values actually reach the rendered
 // detail content, not just Resource.Fields.
 //
-// Regression origin: enrichTransferAgreement writes the resolved As2Id into
-// Fields["local_profile"]/Fields["partner_profile"], while the Detail config
-// path is "LocalProfileId"/"PartnerProfileId". fieldpath.ExtractFieldList
-// resolves that path to a different Fields-map key ("local_profile_id", with
-// a trailing "_id") than the enricher populates, so the lookup used to miss
-// and fall back to the unresolved RawStruct value. Fixed — this test pins
-// that the resolved As2Id, not the bare profile id, reaches the render path.
+// Regression origin: enrichTransferAgreement wrote the resolved As2Id into
+// Fields["local_profile"]/Fields["partner_profile"] while the Detail config
+// path was "LocalProfileId"/"PartnerProfileId", which fieldpath resolves to
+// the different key "local_profile_id"; the first fix wrote BOTH spellings.
+//
+// INVERTED for aws6 row 2 (one key per fact): the second spelling is deleted
+// and the Detail declares the surviving key directly, so the rendered path is
+// now "local_profile"/"partner_profile". The old "LocalProfileId" assertion
+// is NOT to be restored — restoring it would re-create the duplicate key
+// this row removed. What the test still pins is unchanged: the resolved
+// As2Id, not the bare profile id, reaches the render path.
 func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)
@@ -700,11 +704,11 @@ func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T
 		}
 	}
 
-	if got, want := rendered["LocalProfileId"], "ACME-LOCAL"; got != want {
-		t.Errorf("rendered LocalProfileId = %q, want resolved As2Id %q — enriched.Fields[\"local_profile\"]=%q IS set correctly by enrichTransferAgreement but never reaches the detail render path (see test doc comment)", got, want, enriched.Fields["local_profile"])
+	if got, want := rendered["local_profile"], "ACME-LOCAL"; got != want {
+		t.Errorf("rendered local_profile = %q, want resolved As2Id %q — enriched.Fields[\"local_profile\"]=%q IS set correctly by enrichTransferAgreement but never reaches the detail render path (see test doc comment)", got, want, enriched.Fields["local_profile"])
 	}
-	if got, want := rendered["PartnerProfileId"], "PARTNER-CO"; got != want {
-		t.Errorf("rendered PartnerProfileId = %q, want resolved As2Id %q — same fieldpath.ExtractFieldList snake_case mismatch as LocalProfileId (enriched.Fields[\"partner_profile\"]=%q)", got, want, enriched.Fields["partner_profile"])
+	if got, want := rendered["partner_profile"], "PARTNER-CO"; got != want {
+		t.Errorf("rendered partner_profile = %q, want resolved As2Id %q — the same render path as local_profile (enriched.Fields[\"partner_profile\"]=%q)", got, want, enriched.Fields["partner_profile"])
 	}
 }
 

@@ -72,5 +72,5 @@ func (f *KinesisFake) DescribeStreamSummary(_ context.Context, input *kinesis.De
 			}, nil
 		}
 	}
-	return &kinesis.DescribeStreamSummaryOutput{}, nil
+	return nil, &kinesistypes.ResourceNotFoundException{Message: notFoundMessage("Stream", name)}
 }

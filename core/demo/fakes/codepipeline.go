@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
@@ -47,6 +49,11 @@ func (f *CodePipelineFake) GetPipeline(_ context.Context, input *codepipeline.Ge
 	if input != nil && input.Name != nil {
 		name = *input.Name
 	}
+	if !f.hasPipeline(name) {
+		return nil, &cptypes.PipelineNotFoundException{
+			Message: notFoundMessage("Pipeline", name),
+		}
+	}
 	if decl, ok := f.fix.Declarations[name]; ok {
 		return &codepipeline.GetPipelineOutput{Pipeline: decl}, nil
 	}
@@ -55,4 +62,11 @@ func (f *CodePipelineFake) GetPipeline(_ context.Context, input *codepipeline.Ge
 			Name: &name,
 		},
 	}, nil
+}
+
+// hasPipeline reports whether the fixtures register this pipeline.
+func (f *CodePipelineFake) hasPipeline(name string) bool {
+	return slices.ContainsFunc(f.fix.Pipelines, func(p cptypes.PipelineSummary) bool {
+		return aws.ToString(p.Name) == name
+	})
 }

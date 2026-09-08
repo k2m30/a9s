@@ -64,7 +64,7 @@ func (f *R53Fake) GetHostedZone(_ context.Context, input *route53.GetHostedZoneI
 		}
 		return out, nil
 	}
-	return nil, fmt.Errorf("GetHostedZone: zone %q not found", *input.Id)
+	return nil, &r53types.NoSuchHostedZone{Message: notFoundMessage("Hosted zone", *input.Id)}
 }
 
 // ListQueryLoggingConfigs returns the fixture query-logging configuration

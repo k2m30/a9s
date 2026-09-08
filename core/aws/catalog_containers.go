@@ -44,12 +44,13 @@ func colorEKSNodeGroup(r domain.Resource) domain.Color {
 
 var containersTypes = []catalog.ResourceTypeDef{
 	{
-		Name:          "EKS Clusters",
-		ShortName:     "eks",
-		Aliases:       []string{"eks", "kubernetes", "k8s"},
-		Category:      "CONTAINERS",
-		CloudTrailKey: "ResourceName:Fields.arn",
-		LifecycleKey:  "status",
+		Name:           "EKS Clusters",
+		ShortName:      "eks",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"eks", "kubernetes", "k8s"},
+		Category:       "CONTAINERS",
+		CloudTrailKey:  "ResourceName:Fields.arn",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(r.ID))
 		},
@@ -111,12 +112,13 @@ var containersTypes = []catalog.ResourceTypeDef{
 		},
 	},
 	{
-		Name:          "EKS Node Groups",
-		ShortName:     "ng",
-		Aliases:       []string{"ng", "nodegroups", "node-groups"},
-		Category:      "CONTAINERS",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "EKS Node Groups",
+		ShortName:      "ng",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"ng", "nodegroups", "node-groups"},
+		Category:       "CONTAINERS",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			cluster := r.Fields["cluster_name"]
 			if cluster == "" {

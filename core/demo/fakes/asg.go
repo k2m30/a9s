@@ -6,10 +6,12 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -47,6 +49,15 @@ func (f *ASGFake) DescribeScalingActivities(_ context.Context, input *autoscalin
 		}
 		return &autoscaling.DescribeScalingActivitiesOutput{Activities: all}, nil
 	}
+	if !f.hasGroup(asgName) {
+		// Auto Scaling is a query-protocol API with no modeled not-found
+		// shape: a group that does not exist comes back as ValidationError.
+		return nil, &smithy.GenericAPIError{
+			Code:    "ValidationError",
+			Message: "AutoScalingGroup name not found - AutoScalingGroup " + asgName + " not found",
+			Fault:   smithy.FaultClient,
+		}
+	}
 	return &autoscaling.DescribeScalingActivitiesOutput{Activities: f.fix.Activities[asgName]}, nil
 }
 
@@ -83,4 +94,11 @@ func (f *ASGFake) DescribeNotificationConfigurations(_ context.Context, input *a
 func (f *ASGFake) DescribeLifecycleHooks(_ context.Context, input *autoscaling.DescribeLifecycleHooksInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeLifecycleHooksOutput, error) {
 	name := aws.ToString(input.AutoScalingGroupName)
 	return &autoscaling.DescribeLifecycleHooksOutput{LifecycleHooks: f.fix.LifecycleHooks[name]}, nil
+}
+
+// hasGroup reports whether the fixtures register this Auto Scaling group.
+func (f *ASGFake) hasGroup(name string) bool {
+	return slices.ContainsFunc(f.fix.AutoScalingGroups, func(g asgtypes.AutoScalingGroup) bool {
+		return aws.ToString(g.AutoScalingGroupName) == name
+	})
 }

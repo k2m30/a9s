@@ -99,6 +99,13 @@ const (
 	// PolicyPrivEsc is a customer-managed policy granting the same
 	// escalation combination — policy.privilege-escalation.
 	PolicyPrivEsc = "acme-privesc-policy"
+	// RetiredManagedPolicyName is attached to redshift-reporting-copy-role and
+	// registered in NO policy list, because AWS has retired it: the attachment
+	// on the role survives while GetPolicy answers NoSuchEntity. It is the
+	// demo witness for a pivot that names a policy the account cannot read,
+	// where the aggregate reports the failure instead of returning the role's
+	// attachments one row short with no sign anything is missing.
+	RetiredManagedPolicyName = "AmazonElasticTranscoder_FullAccess"
 	// IAMUserAdminAttached carries AdministratorAccess — iam-user.admin-attached.
 	IAMUserAdminAttached = "break-glass-admin"
 	// IAMUserConsoleNeverUsed has a console password created long ago and
@@ -1008,6 +1015,7 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.InlineRolePolicies["redshift-reporting-copy-role"] = []string{"s3-audit-copy"}
 	f.AttachedRolePolicies["redshift-reporting-copy-role"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("AmazonRedshiftAllCommandsFullAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess")},
+		{PolicyName: aws.String(RetiredManagedPolicyName), PolicyArn: aws.String("arn:aws:iam::aws:policy/" + RetiredManagedPolicyName)},
 	}
 
 	// Attached user policies
@@ -1112,6 +1120,8 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ec2:DescribeInstances","ec2:DescribeRouteTables","ec2:DescribeSecurityGroups","ec2:DescribeSubnets","ec2:DescribeVolumes","ec2:DescribeVpcs","eks:DescribeCluster"],"Resource":"*"}]}`)
 
 	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ecr:GetAuthorizationToken","ecr:BatchCheckLayerAvailability","ecr:GetDownloadUrlForLayer","ecr:BatchGetImage"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["dynamodb:DescribeTable","dynamodb:CreateBackup","rds:DescribeDBSnapshots","rds:CreateDBSnapshot","ec2:CreateSnapshot","ec2:DescribeVolumes"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["redshift:DescribeClusters","redshift-data:ExecuteStatement","s3:GetObject","s3:PutObject","sqs:ReceiveMessage"],"Resource":"*"}]}`)
 
 	// Inline policy documents
 	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)

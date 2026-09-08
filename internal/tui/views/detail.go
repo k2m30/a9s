@@ -85,17 +85,20 @@ func inferDetailResourceType(res resource.Resource) string {
 	}
 	// EC2 signature: infer only from EC2-shaped key sets.
 	// Anchor on instance id key plus at least one EC2-specific companion field.
-	hasInstanceID := has("InstanceId") || has("instance_id")
-	hasEC2Companion := has("ImageId") || has("image_id") ||
-		has("VpcId") || has("vpc_id") ||
-		has("SubnetId") || has("subnet_id") ||
-		has("PrivateIpAddress") || has("private_ip") ||
-		has("PublicIpAddress") || has("public_ip") ||
-		has("KeyName") || has("key_name") ||
-		has("InstanceLifecycle") || has("lifecycle") ||
-		has("LaunchTime") || has("launch_time") ||
-		has("IamInstanceProfile") || has("iam_instance_profile") ||
-		has("SecurityGroups") || has("security_groups")
+	// Fetchers write snake_case, and that is the only spelling a Fields map
+	// carries: a path-cased key here would name a fact under a second
+	// spelling nothing writes.
+	hasInstanceID := has("instance_id")
+	hasEC2Companion := has("image_id") ||
+		has("vpc_id") ||
+		has("subnet_id") ||
+		has("private_ip") ||
+		has("public_ip") ||
+		has("key_name") ||
+		has("lifecycle") ||
+		has("launch_time") ||
+		has("iam_instance_profile") ||
+		has("security_groups")
 	if hasInstanceID && hasEC2Companion {
 		return "ec2"
 	}

@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
@@ -37,6 +38,11 @@ func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.Des
 		return &redshift.DescribeLoggingStatusOutput{}, nil
 	}
 	clusterID := *in.ClusterIdentifier
+	if !f.hasCluster(clusterID) {
+		return nil, &redshifttypes.ClusterNotFoundFault{
+			Message: notFoundMessage("Cluster", clusterID),
+		}
+	}
 
 	switch clusterID {
 	case fixtures.AcmeWarehouseID:
@@ -125,4 +131,11 @@ func (f *RedshiftFake) DescribeClusterSubnetGroups(_ context.Context, in *redshi
 	default:
 		return &redshift.DescribeClusterSubnetGroupsOutput{}, nil
 	}
+}
+
+// hasCluster reports whether the fixtures register this cluster identifier.
+func (f *RedshiftFake) hasCluster(id string) bool {
+	return slices.ContainsFunc(f.fix.Clusters, func(c redshifttypes.Cluster) bool {
+		return aws.ToString(c.ClusterIdentifier) == id
+	})
 }

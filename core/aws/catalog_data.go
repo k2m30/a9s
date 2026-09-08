@@ -88,11 +88,12 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 	},
 	{
-		Name:          "Athena Workgroups",
-		ShortName:     "athena",
-		Aliases:       []string{"athena", "workgroups"},
-		Category:      "DATA & ANALYTICS",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "Athena Workgroups",
+		ShortName:      "athena",
+		HumanizeFields: []string{"state"},
+		Aliases:        []string{"athena", "workgroups"},
+		Category:       "DATA & ANALYTICS",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "athena/home?region="+region+"#/workgroups/details/"+url.PathEscape(r.ID))
 		},
@@ -122,12 +123,13 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 	},
 	{
-		Name:          "Managed Airflow",
-		ShortName:     "mwaa",
-		Aliases:       []string{"mwaa", "airflow"},
-		Category:      "DATA & ANALYTICS",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "Managed Airflow",
+		ShortName:      "mwaa",
+		HumanizeFields: []string{"webserver_access_mode", "endpoint_management", "last_update_status"},
+		Aliases:        []string{"mwaa", "airflow"},
+		Category:       "DATA & ANALYTICS",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "mwaa/home?region="+region+"#environments/"+url.PathEscape(r.ID))
 		},
@@ -235,7 +237,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Global(region, "s3/object/"+url.PathEscape(bucket)+"?prefix="+url.QueryEscape(key))
 		},
 		Columns:   resource.S3ObjectColumns(),
-		FieldKeys: []string{"key", "size", "size_raw", "last_modified", "storage_class", "bucket"},
+		FieldKeys: []string{"key", "size", "size_raw", "last_modified", "storage_class", "kind", "bucket"},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "s3_objects",
 			Key:            "enter",

@@ -344,12 +344,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "ECS Services",
-		ShortName:     "ecs-svc",
-		Aliases:       []string{"ecs-svc", "ecs-services"},
-		Category:      "COMPUTE",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "ECS Services",
+		ShortName:      "ecs-svc",
+		HumanizeFields: []string{"launch_type", "status"},
+		Aliases:        []string{"ecs-svc", "ecs-services"},
+		Category:       "COMPUTE",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -429,12 +430,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "ECS Clusters",
-		ShortName:     "ecs",
-		Aliases:       []string{"ecs", "ecs-clusters"},
-		Category:      "COMPUTE",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "ECS Clusters",
+		ShortName:      "ecs",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"ecs", "ecs-clusters"},
+		Category:       "COMPUTE",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "ecs/v2/clusters/"+url.PathEscape(r.ID)+"?region="+region)
 		},
@@ -474,12 +476,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "ECS Tasks",
-		ShortName:     "ecs-task",
-		Aliases:       []string{"ecs-task", "ecs-tasks", "tasks"},
-		Category:      "COMPUTE",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "ECS Tasks",
+		ShortName:      "ecs-task",
+		HumanizeFields: []string{"stop_code", "launch_type", "status"},
+		Aliases:        []string{"ecs-task", "ecs-tasks", "tasks"},
+		Category:       "COMPUTE",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -543,11 +546,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "Lambda Functions",
-		ShortName:     "lambda",
-		Aliases:       []string{"lambda", "functions"},
-		Category:      "COMPUTE",
-		CloudTrailKey: "ResourceName:Fields.arn",
+		Name:           "Lambda Functions",
+		ShortName:      "lambda",
+		HumanizeFields: []string{"last_update_status"},
+		Aliases:        []string{"lambda", "functions"},
+		Category:       "COMPUTE",
+		CloudTrailKey:  "ResourceName:Fields.arn",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "lambda/home?region="+region+"#/functions/"+url.PathEscape(r.ID))
 		},
@@ -814,9 +818,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				Name: id,
 				Fields: map[string]string{
 					"image_id": id,
-					"ImageId":  id,
 					"name":     id,
-					"Name":     id,
 				},
 			}
 		},

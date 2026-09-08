@@ -384,11 +384,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "EventBridge Rules",
-		ShortName:     "eb-rule",
-		Aliases:       []string{"eb-rule", "eventbridge"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "EventBridge Rules",
+		ShortName:      "eb-rule",
+		HumanizeFields: []string{"state"},
+		Aliases:        []string{"eb-rule", "eventbridge"},
+		Category:       "MESSAGING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			bus := r.Fields["event_bus"]
 			if bus == "" {
@@ -436,12 +437,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "Kinesis Streams",
-		ShortName:     "kinesis",
-		Aliases:       []string{"kinesis", "streams"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "Kinesis Streams",
+		ShortName:      "kinesis",
+		HumanizeFields: []string{"stream_mode", "stream_status"},
+		Aliases:        []string{"kinesis", "streams"},
+		Category:       "MESSAGING",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "kinesis/home?region="+region+"#/streams/details/"+url.PathEscape(r.ID)+"/monitoring")
 		},
@@ -474,11 +476,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "MSK Clusters",
-		ShortName:     "msk",
-		Aliases:       []string{"msk", "kafka"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "MSK Clusters",
+		ShortName:      "msk",
+		HumanizeFields: []string{"cluster_type", "state"},
+		Aliases:        []string{"msk", "kafka"},
+		Category:       "MESSAGING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["cluster_arn"]
 			if arn == "" {
@@ -529,11 +532,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "Step Functions",
-		ShortName:     "sfn",
-		Aliases:       []string{"sfn", "stepfunctions", "state-machines"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "Step Functions",
+		ShortName:      "sfn",
+		HumanizeFields: []string{"type"},
+		Aliases:        []string{"sfn", "stepfunctions", "state-machines"},
+		Category:       "MESSAGING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -589,12 +593,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "SES Identities",
-		ShortName:     "ses",
-		Aliases:       []string{"ses", "email", "ses-identities"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "SES Identities",
+		ShortName:      "ses",
+		HumanizeFields: []string{"verification_status"},
+		Aliases:        []string{"ses", "email", "ses-identities"},
+		Category:       "MESSAGING",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "ses/home?region="+region+"#/identities/"+url.PathEscape(r.ID))
 		},

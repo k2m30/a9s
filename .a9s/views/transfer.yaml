@@ -1,4 +1,4 @@
-generated: 4
+generated: 5
 list:
   Server Id:
     path: ServerId
@@ -12,11 +12,9 @@ list:
   Endpoint:
     path: EndpointType
     width: 14
-    humanize: true
   Identity Provider:
     path: IdentityProviderType
     width: 20
-    humanize: true
   Users:
     path: UserCount
     width: 8

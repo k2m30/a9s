@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	apigwv1types "github.com/aws/aws-sdk-go-v2/service/apigateway/types"
 
@@ -38,9 +40,19 @@ func (f *APIGWV1Fake) GetStages(_ context.Context, input *apigateway.GetStagesIn
 	if input != nil && input.RestApiId != nil {
 		id = *input.RestApiId
 	}
+	if !f.hasRestAPI(id) {
+		return nil, &apigwv1types.NotFoundException{Message: notFoundMessage("RestApi", id)}
+	}
 	stages := f.fix.Stages[id]
 	if stages == nil {
 		stages = []apigwv1types.Stage{}
 	}
 	return &apigateway.GetStagesOutput{Item: stages}, nil
+}
+
+// hasRestAPI reports whether the fixtures register this REST API id.
+func (f *APIGWV1Fake) hasRestAPI(id string) bool {
+	return slices.ContainsFunc(f.fix.RestApis, func(a apigwv1types.RestApi) bool {
+		return aws.ToString(a.Id) == id
+	})
 }

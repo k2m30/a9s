@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -356,8 +357,12 @@ func TestOneHumanizer_DetailRowReadsTheColumnsWords(t *testing.T) {
 				if lc.Path != tc.label {
 					continue
 				}
+				// INVERTED for aws6 rows 4-6: the humanize opt-in is the
+				// type's declaration, not the column's.
+				humanized := td.HumanizedFields()
 				cell = app.ExtractCellValue(app.ColumnDef{
-					Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize,
+					Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,
+					Humanize: catalog.Humanizes(humanized, lc.Key, lc.Path),
 				}, td, res)
 			}
 			if cell != tc.want {

@@ -57,6 +57,11 @@ func (f *ElastiCacheFake) DescribeCacheSubnetGroups(_ context.Context, input *el
 				filtered = append(filtered, sg)
 			}
 		}
+		if len(filtered) == 0 {
+			return nil, &elasticachetypes.CacheSubnetGroupNotFoundFault{
+				Message: notFoundMessage("CacheSubnetGroup", name),
+			}
+		}
 		return &elasticache.DescribeCacheSubnetGroupsOutput{CacheSubnetGroups: filtered}, nil
 	}
 	return &elasticache.DescribeCacheSubnetGroupsOutput{CacheSubnetGroups: f.fix.SubnetGroups}, nil

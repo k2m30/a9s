@@ -108,7 +108,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "Status", Path: "State", Width: 12},
-				{Title: "Failure", Path: "FailureCode", Width: 22, Humanize: true},
+				{Title: "Failure", Path: "FailureCode", Width: 22},
 				{Title: "Public IP", Path: "", Key: "public_ip", Width: 16},
 			},
 			Detail: []DetailField{
@@ -200,8 +200,8 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Server Id", Path: "ServerId", Width: 32},
 				{Title: "Status", Key: "status", Width: 32},
 				{Title: "Domain", Path: "Domain", Width: 10},
-				{Title: "Endpoint", Path: "EndpointType", Width: 14, Humanize: true},
-				{Title: "Identity Provider", Path: "IdentityProviderType", Width: 20, Humanize: true},
+				{Title: "Endpoint", Path: "EndpointType", Width: 14},
+				{Title: "Identity Provider", Path: "IdentityProviderType", Width: 20},
 				{Title: "Users", Path: "UserCount", Width: 8},
 			},
 			Detail: []DetailField{
@@ -280,7 +280,9 @@ func networkingDefaultViews() map[string]ViewDef {
 			},
 			Detail: []DetailField{
 				{Path: "AgreementId"}, {Path: "ServerId"}, {Path: "Description"}, {Path: "Status"},
-				{Path: "LocalProfileId"}, {Path: "PartnerProfileId"}, {Path: "BaseDirectory"},
+				{Key: "local_profile", Label: "Local Profile"},
+				{Key: "partner_profile", Label: "Partner Profile"},
+				{Path: "BaseDirectory"},
 				{Path: "AccessRole"}, {Path: "EnforceMessageSigning"}, {Path: "PreserveFilename"},
 			},
 		},

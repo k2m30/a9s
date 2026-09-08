@@ -23,20 +23,38 @@
 // registered FetchByIDs helper cannot be drilled by exact ID in demo mode
 // either — those are logged and skipped, not silently ignored.
 //
-// Unlike qa_demo_pivot_coverage_test.go, this test carries NO allowlist:
-// every orphaned ID is a hard failure. The pivot-coverage ratchet tracks
-// "the count is a dead zero"; this test tracks "the count lies about what
-// you can actually open" — a strictly worse user experience, so it does not
-// get a burn-down grace period.
+// Unlike qa_demo_pivot_coverage_test.go, this test carries NO burn-down
+// allowlist: every orphaned ID is a hard failure. The pivot-coverage ratchet
+// tracks "the count is a dead zero"; this test tracks "the count lies about
+// what you can actually open" — a strictly worse user experience, so it does
+// not get a grace period.
+//
+// INVERTED for aws6 row 8, and narrowly. Exactly one witnessed ID is expected
+// NOT to resolve, and it is REQUIRED to be present: a demo role attaches
+// fixtures.RetiredManagedPolicyName, a policy AWS has retired, so the
+// attachment survives on the role while GetPolicy answers NoSuchEntity.
+//
+// That is not the defect this gate hunts. The lie is a FIXTURE gap — the demo
+// referencing something it never modelled — and the operator sees a count with
+// nothing behind it. Here the name came from the role's OWN attachment list,
+// which is what AWS itself reports, and the aggregate says which id it could
+// not read. Dropping the name instead would render the role's attachments one
+// row short with no sign anything was missing.
+//
+// The exception is not an allowlist: it names one id, and it goes red if that
+// id ever starts resolving or stops being witnessed, so it cannot quietly
+// widen to cover a real orphan.
 package unit_test
 
 import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -111,11 +129,28 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 		}
 	}
 
-	if len(orphans) > 0 {
-		sort.Strings(orphans)
+	var real []string
+	sawRetiredPolicy := false
+	for _, orphan := range orphans {
+		if strings.Contains(orphan, fixtures.RetiredManagedPolicyName) {
+			sawRetiredPolicy = true
+			continue
+		}
+		real = append(real, orphan)
+	}
+
+	if !sawRetiredPolicy {
+		t.Errorf("no witnessed related ID names %s — the demo bench is supposed to carry exactly one "+
+			"policy a role attaches and the account cannot read, so the aggregate's navigation-defect "+
+			"failure is something an operator can actually see (core/demo/fixtures/iam.go)",
+			fixtures.RetiredManagedPolicyName)
+	}
+
+	if len(real) > 0 {
+		sort.Strings(real)
 		t.Errorf("%d related-panel ID(s) do not resolve against demo fixtures for their target type "+
-			"(count shown but drill fails) — fix worklist, one per line:", len(orphans))
-		for _, orphan := range orphans {
+			"(count shown but drill fails) — fix worklist, one per line:", len(real))
+		for _, orphan := range real {
 			t.Errorf("  %s", orphan)
 		}
 	}

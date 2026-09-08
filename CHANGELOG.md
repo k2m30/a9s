@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Detail screens no longer show a raw AWS constant beside the readable form of
+  the same fact. Thirty-five fields across thirty-two resource types now read
+  as words wherever they appear, including the ones no list column shows and
+  which therefore had no way to ask: a Managed Airflow environment's endpoint
+  management and last update status, an API Gateway API's protocol, an ECS
+  service's launch type and status, a node group's status, and the type,
+  state, mode and scope fields of Athena, CloudFormation, CloudFront,
+  CodeBuild, ECR, ECS, EKS, EventBridge, Kinesis, KMS, Lambda, MSK,
+  OpenSearch, CodePipeline, Secrets Manager, SES, Step Functions, SSM, target
+  groups, Transfer, VPC endpoints, WAF, CloudWatch alarms and Elastic IPs. A
+  field now reads the same way in its column and in its detail row, because
+  both read one declaration on the type rather than a flag on the column.
+
+- A log event's status now reads as a word. The classification is a9s's own
+  judgement about the line rather than anything CloudWatch returned, and it
+  showed as `ERROR`, `WARN`, `REPORT` or `META`. The same applies to a role
+  whose trust policy allows anyone, which read `WILDCARD`. The demo account
+  gained a warning log line, which was the one class it could not show.
+
+- An S3 folder row no longer renders three blank cells. A prefix has no size,
+  no last-modified instant and no storage class, and a blank cell reads the
+  same as a value nobody managed to fetch. Those cells now say so, and the row
+  carries the same fields an object row does, so both render through the same
+  columns. Folders still sort first.
+
+- Demo mode no longer answers "none" for a resource it does not model. Every
+  service stand-in refused an unknown identifier for one service only; the
+  other forty answered an empty result, so drilling into something the demo
+  never modelled read as "this resource has none" instead of "no such thing".
+  Each now refuses with its own service's not-found error, and a9s recognises
+  all of them.
+
+- An AMI row no longer carries its id under four field names, and a Transfer
+  agreement no longer carries each resolved partner profile under two. One
+  fact under two names is a fact that can disagree with itself.
+
+### Changed
+
+- Per-resource view files in `~/.a9s/views/` are regenerated on next start.
+  The `humanize` key a column could carry is gone: whether a field reads as
+  words is now a property of the resource type, not of one column, so the key
+  is no longer read. Widths, sources and column order an operator has changed
+  stay theirs.
+
 - The menu count for a resource type now follows a full list downward. A list
   that reached the end of the type and found five is the answer for that type,
   so a badge left at 200 by an earlier count is replaced instead of kept, even

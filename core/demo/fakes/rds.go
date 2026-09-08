@@ -56,7 +56,9 @@ func (f *RDSFake) DescribeDBSubnetGroups(_ context.Context, in *rds.DescribeDBSu
 				return &rds.DescribeDBSubnetGroupsOutput{DBSubnetGroups: []rdstypes.DBSubnetGroup{sg}}, nil
 			}
 		}
-		return &rds.DescribeDBSubnetGroupsOutput{}, nil
+		return nil, &rdstypes.DBSubnetGroupNotFoundFault{
+			Message: notFoundMessage("DBSubnetGroup", name),
+		}
 	}
 	return &rds.DescribeDBSubnetGroupsOutput{DBSubnetGroups: f.fix.DBSubnetGroups}, nil
 }

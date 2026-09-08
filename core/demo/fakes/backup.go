@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -124,6 +125,11 @@ func (f *BackupFake) DescribeBackupVault(_ context.Context, input *backup.Descri
 	if input == nil || input.BackupVaultName == nil {
 		return &backup.DescribeBackupVaultOutput{}, nil
 	}
+	if !f.hasVault(*input.BackupVaultName) {
+		return nil, &backuptypes.ResourceNotFoundException{
+			Message: notFoundMessage("Backup vault", *input.BackupVaultName),
+		}
+	}
 	out := &backup.DescribeBackupVaultOutput{
 		BackupVaultName: input.BackupVaultName,
 		BackupVaultArn:  aws.String("arn:aws:backup:us-east-1:123456789012:backup-vault:" + *input.BackupVaultName),
@@ -169,4 +175,28 @@ func (f *BackupFake) ListRecoveryPointsByResource(_ context.Context, input *back
 		return &backup.ListRecoveryPointsByResourceOutput{}, nil
 	}
 	return &backup.ListRecoveryPointsByResourceOutput{RecoveryPoints: rps}, nil
+}
+
+// hasVault reports whether the fixtures model this backup vault. The fixtures
+// carry no vault LIST — a vault exists here because a plan rule targets it or
+// a job ran into it — so the registry is assembled from the places that name
+// one. A vault with neither an encryption key nor an SNS topic registered is
+// still a vault.
+func (f *BackupFake) hasVault(name string) bool {
+	if _, ok := f.fix.VaultEncryptionKeys[name]; ok {
+		return true
+	}
+	if _, ok := f.fix.VaultSNSTopics[name]; ok {
+		return true
+	}
+	for _, rules := range f.fix.PlanRules {
+		for _, r := range rules {
+			if aws.ToString(r.TargetBackupVaultName) == name {
+				return true
+			}
+		}
+	}
+	return slices.ContainsFunc(f.fix.Jobs, func(j backuptypes.BackupJob) bool {
+		return aws.ToString(j.BackupVaultName) == name
+	})
 }

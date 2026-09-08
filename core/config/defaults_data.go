@@ -58,7 +58,7 @@ func dataDefaultViews() map[string]ViewDef {
 				{Title: "Class", Path: "EnvironmentClass", Width: 14},
 				{Title: "Workers", Path: "MaxWorkers", Width: 9},
 				{Title: "Schedulers", Path: "Schedulers", Width: 10},
-				{Title: "Access", Path: "WebserverAccessMode", Width: 16, Humanize: true},
+				{Title: "Access", Path: "WebserverAccessMode", Width: 16},
 				{Title: "Created", Path: "CreatedAt", Width: 22},
 			},
 			Detail: []DetailField{

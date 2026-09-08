@@ -65,3 +65,18 @@ func humanizeCamelCase(s string) string {
 func isUpperRune(r rune) bool {
 	return r >= 'A' && r <= 'Z'
 }
+
+// NotApplicable is what a cell says when the fact its column names does not
+// exist for this row — an S3 prefix has no size, no last-modified instant and
+// no storage class, because it is not an object.
+//
+// It is a written value, not an empty string, for two reasons. A blank cell is
+// indistinguishable from a value nobody managed to fetch, which is the
+// confident-zero shape a9s exists to disprove. And a row that omits the key
+// altogether renders cells no formatter ever saw, so the key set of two rows
+// the same columns render has to match.
+//
+// The hyphen sorts before every digit, so a listing ordered by a numeric
+// column keeps the not-applicable rows at the ascending end rather than
+// scattering them.
+const NotApplicable = "-"

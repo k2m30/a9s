@@ -55,12 +55,13 @@ func colorCTEvents(r domain.Resource) domain.Color {
 
 var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "CloudWatch Alarms",
-		ShortName:     "alarm",
-		ListTitle:     "alarms",
-		Aliases:       []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
-		Category:      "MONITORING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "CloudWatch Alarms",
+		ShortName:      "alarm",
+		HumanizeFields: []string{"state"},
+		ListTitle:      "alarms",
+		Aliases:        []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
+		Category:       "MONITORING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#alarmsV2:alarm/"+url.PathEscape(r.ID))
 		},

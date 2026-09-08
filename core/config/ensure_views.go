@@ -34,9 +34,6 @@ func GenerateViewYAML(v ViewDef) []byte {
 			if col.SortKey != "" {
 				fmt.Fprintf(&b, "    sort_key: %s\n", col.SortKey)
 			}
-			if col.Humanize {
-				b.WriteString("    humanize: true\n")
-			}
 		}
 	}
 
@@ -164,6 +161,13 @@ var viewColumnChanges = []viewColumnChange{
 	// The two columns that gained humanize: the cell showed a raw AWS constant.
 	{Version: 4, View: "ecs-task", Was: ListColumn{Title: "Stop Code", Path: "StopCode", Width: 24}},
 	{Version: 4, View: "nat", Was: ListColumn{Title: "Failure", Path: "FailureCode", Width: 22}},
+	// Version 5 regenerates every file: the humanize flag stopped being a
+	// column field at all and became the type's own declaration
+	// (ResourceTypeDef.HumanizeFields), so the key a v4 file carries for it is
+	// read by nothing. The Retention entry is renewed at this stamp because it
+	// is the one column here whose older spelling still differs from what this
+	// build generates, so it is what the carry has to deliver.
+	{Version: 5, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 }
 
 // mergeGeneratedColumns returns the YAML for onDisk brought up to this build:
@@ -282,9 +286,6 @@ func carryGeneratedFields(on, was, now ListColumn) ListColumn {
 	}
 	if on.SortKey == was.SortKey {
 		on.SortKey = now.SortKey
-	}
-	if on.Humanize == was.Humanize {
-		on.Humanize = now.Humanize
 	}
 	return on
 }

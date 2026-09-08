@@ -125,9 +125,19 @@ func TestViewUpgrade_EditedFileKeepsItsOrder(t *testing.T) {
 // ---------------------------------------------------------------------------
 // The migration table generalises. An entry names a title and the whole column
 // the previous build generated for it; an on-disk column still matching that
-// takes the current default column wholesale — source, width, humanize, and
-// whatever a later build adds — so a correction reaches an installation that
-// already exists rather than only a fresh one.
+// takes the current default column wholesale — source, width, and whatever a
+// later build adds — so a correction reaches an installation that already
+// exists rather than only a fresh one.
+//
+// INVERTED for aws6 rows 4-6 (one humanize owner). These two tests used to
+// demonstrate the carry on ecs-task's Stop Code column, whose correction WAS
+// the humanize flag. That flag is no longer a column field at all — it is the
+// type's own declaration (ResourceTypeDef.HumanizeFields) — so there is
+// nothing left on that column for the carry to deliver, and the assertions
+// naming it are not to be restored. The rule they pin is unchanged and is now
+// demonstrated on logs' Retention column, whose correction is live: an older
+// build sourced it from the RawStruct path RetentionInDays at width 10, and
+// this build reads Fields["retention"] at width 12.
 // ---------------------------------------------------------------------------
 
 // tui5ColumnTitled returns the on-disk column with the given title.
@@ -150,78 +160,74 @@ func tui5ColumnTitled(t *testing.T, dir, name, title string) config.ListColumn {
 	return config.ListColumn{}
 }
 
-// tui5PreviousBuildColumn is the ecs-task Stop Code column exactly as the
-// build before the humanize correction generated it.
-var tui5PreviousBuildColumn = config.ListColumn{Title: "Stop Code", Path: "StopCode", Width: 24}
+// tui5PreviousBuildColumn is the logs Retention column exactly as the build
+// before the source correction generated it: read off the RawStruct path at
+// width 10, where this build reads the fetcher's key at width 12.
+var tui5PreviousBuildColumn = config.ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}
 
 // TestViewUpgrade_StillGeneratedColumnTakesTheCorrection seeds a file an
-// earlier build wrote and asserts the Stop Code column comes out of the
-// upgrade carrying this build's humanize flag, so an operator who has run a9s
-// before reads the cause rather than the constant.
+// earlier build wrote and asserts the Retention column comes out of the
+// upgrade carrying this build's source and width, so an operator who has run
+// a9s before reads the corrected cell rather than the old one.
 func TestViewUpgrade_StillGeneratedColumnTakesTheCorrection(t *testing.T) {
-	def, ok := config.DefaultConfig().Views["ecs-task"]
+	def, ok := config.DefaultConfig().Views["logs"]
 	if !ok {
-		t.Fatal("built-in views have no ecs-task entry")
+		t.Fatal("built-in views have no logs entry")
 	}
 	// The operator has moved a column, so the file is theirs and the wholesale
 	// order rule does not apply — only the per-column correction can carry it.
 	onDisk := tui5WithColumn(def.List, tui5PreviousBuildColumn)
 	onDisk[0], onDisk[1] = onDisk[1], onDisk[0]
 
-	dir := tui5SeedOlderView(t, "ecs-task", onDisk, def.Detail)
-	if got := tui5ColumnTitled(t, dir, "ecs-task", "Stop Code"); got.Humanize {
-		t.Fatalf("test sanity: the seeded file already carries humanize: %+v", got)
+	dir := tui5SeedOlderView(t, "logs", onDisk, def.Detail)
+	if got := tui5ColumnTitled(t, dir, "logs", "Retention"); got.Key != "" {
+		t.Fatalf("test sanity: the seeded file already carries the correction: %+v", got)
 	}
 
 	if err := config.EnsureViewsDir(dir); err != nil {
 		t.Fatalf("EnsureViewsDir: %v", err)
 	}
 
-	got := tui5ColumnTitled(t, dir, "ecs-task", "Stop Code")
+	got := tui5ColumnTitled(t, dir, "logs", "Retention")
 	var want config.ListColumn
 	for _, c := range def.List {
-		if c.Title == "Stop Code" {
+		if c.Title == "Retention" {
 			want = c
 		}
 	}
 	if got != want {
-		t.Errorf("Stop Code after the upgrade = %+v, want this build's column %+v", got, want)
+		t.Errorf("Retention after the upgrade = %+v, want this build's column %+v", got, want)
 	}
 }
 
 // TestViewUpgrade_OperatorsOwnFieldSurvivesTheCorrection is the other side,
-// and it is per field rather than per column: the operator widened Stop Code,
+// and it is per field rather than per column: the operator widened Retention,
 // so the width is theirs and stays, while every field they left alone — the
-// humanize flag among them — still takes this build's value. Freezing the
-// whole column on one edit would leave them reading the raw AWS constant
-// because they had once made a column wider.
+// source among them — still takes this build's value. Freezing the whole
+// column on one edit would leave them reading the old source because they had
+// once made a column wider.
 func TestViewUpgrade_OperatorsOwnFieldSurvivesTheCorrection(t *testing.T) {
-	def := config.DefaultConfig().Views["ecs-task"]
+	def := config.DefaultConfig().Views["logs"]
 	theirs := tui5PreviousBuildColumn
 	theirs.Width = 44 // the operator widened it
 
-	dir := tui5SeedOlderView(t, "ecs-task", tui5WithColumn(def.List, theirs), def.Detail)
+	dir := tui5SeedOlderView(t, "logs", tui5WithColumn(def.List, theirs), def.Detail)
 	if err := config.EnsureViewsDir(dir); err != nil {
 		t.Fatalf("EnsureViewsDir: %v", err)
 	}
 
-	got := tui5ColumnTitled(t, dir, "ecs-task", "Stop Code")
+	got := tui5ColumnTitled(t, dir, "logs", "Retention")
 	if got.Width != theirs.Width {
-		t.Errorf("Stop Code width = %d, want the operator's %d", got.Width, theirs.Width)
+		t.Errorf("Retention width = %d, want the operator's %d", got.Width, theirs.Width)
 	}
-	if !got.Humanize {
-		t.Errorf("Stop Code = %+v — a width they set kept the correction off a field they never touched", got)
+	if got.Key != "retention" {
+		t.Errorf("Retention = %+v — a width they set kept the correction off a field they never touched", got)
 	}
 }
 
-// No pin for "the operator turned the humanize flag off themselves": it
-// cannot be constructed. The carry compares the on-disk value against what the
-// previous build generated, and for a bool whose previous value was false,
-// "the operator set false" and "the operator never touched it" are the same
-// two bytes on disk. An operator who wants the raw constant back sets it after
-// the upgrade, and the current stamp then leaves their file alone.
-// TestUpgradeLeavesAnOperatorsOwnSourceAlone covers the distinguishable case,
-// a field whose value they changed to something neither build wrote.
+// TestUpgradeLeavesAnOperatorsOwnSourceAlone covers the other distinguishable
+// case, a field whose value the operator changed to something neither build
+// wrote.
 
 // tui5WithColumn returns cols with the entry sharing replacement's title
 // swapped for it.

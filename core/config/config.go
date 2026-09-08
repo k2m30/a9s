@@ -104,7 +104,7 @@ type ViewsConfig struct {
 // and a rename arrives as a title the file has never heard of — the operator
 // keeps the old column beside the new one. Shipping either needs a migration
 // this file does not have yet.
-const GeneratedViewsVersion = 4
+const GeneratedViewsVersion = 5
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {
@@ -139,10 +139,6 @@ type ListColumn struct {
 	// a path-based comparison would order the warm frame differently from the
 	// frame the fetch lands, and the rows would move under the operator.
 	SortKey string `yaml:"sort_key"`
-	// Humanize marks a Path-based column whose raw RawStruct-extracted enum
-	// value must be routed through domain.HumanizeStatusPhrase before
-	// rendering. See app.ColumnDef.Humanize for the consuming logic.
-	Humanize bool `yaml:"humanize,omitempty"`
 }
 
 // TitleFieldKey is the single Fields-map spelling a column title answers to:

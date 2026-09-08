@@ -6,9 +6,11 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -34,8 +36,12 @@ func (f *EBFake) DescribeEnvironmentHealth(_ context.Context, input *elasticbean
 	if input == nil || input.EnvironmentName == nil {
 		return &elasticbeanstalk.DescribeEnvironmentHealthOutput{}, nil
 	}
+	name := aws.ToString(input.EnvironmentName)
+	if !f.hasEnvironment(name) {
+		return nil, &ebtypes.ResourceNotFoundException{Message: notFoundMessage("Environment", name)}
+	}
 	return &elasticbeanstalk.DescribeEnvironmentHealthOutput{
-		Causes: f.fix.EnvironmentHealthCauses[aws.ToString(input.EnvironmentName)],
+		Causes: f.fix.EnvironmentHealthCauses[name],
 	}, nil
 }
 
@@ -72,4 +78,12 @@ func (f *EBFake) DescribeApplicationVersions(_ context.Context, input *elasticbe
 	return &elasticbeanstalk.DescribeApplicationVersionsOutput{
 		ApplicationVersions: f.fix.ApplicationVersions[aws.ToString(input.ApplicationName)],
 	}, nil
+}
+
+// hasEnvironment reports whether the fixtures register this environment. A
+// healthy environment has no causes and still answers an empty list.
+func (f *EBFake) hasEnvironment(name string) bool {
+	return slices.ContainsFunc(f.fix.Environments, func(e ebtypes.EnvironmentDescription) bool {
+		return aws.ToString(e.EnvironmentName) == name
+	})
 }

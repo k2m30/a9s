@@ -4,8 +4,11 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -28,6 +31,9 @@ func (f *GlueFake) GetJobRuns(_ context.Context, input *glue.GetJobRunsInput, _ 
 	var jobName string
 	if input != nil && input.JobName != nil {
 		jobName = *input.JobName
+	}
+	if !f.hasJob(jobName) {
+		return nil, &gluetypes.EntityNotFoundException{Message: notFoundMessage("Job", jobName)}
 	}
 	return &glue.GetJobRunsOutput{JobRuns: f.fix.JobRuns[jobName]}, nil
 }
@@ -54,4 +60,12 @@ func (f *GlueFake) GetTags(_ context.Context, input *glue.GetTagsInput, _ ...fun
 		arn = *input.ResourceArn
 	}
 	return &glue.GetTagsOutput{Tags: f.fix.TagsByResourceARN[arn]}, nil
+}
+
+// hasJob reports whether the fixtures register this Glue job. A job that has
+// never run still answers an empty run list.
+func (f *GlueFake) hasJob(name string) bool {
+	return slices.ContainsFunc(f.fix.Jobs, func(j gluetypes.Job) bool {
+		return aws.ToString(j.Name) == name
+	})
 }

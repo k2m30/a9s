@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -46,6 +47,11 @@ func (f *ECRFake) ListImages(_ context.Context, input *ecr.ListImagesInput, _ ..
 	var repoName string
 	if input != nil && input.RepositoryName != nil {
 		repoName = *input.RepositoryName
+	}
+	if !f.hasRepository(repoName) {
+		return nil, &ecrtypes.RepositoryNotFoundException{
+			Message: notFoundMessage("The repository with name", repoName),
+		}
 	}
 	images := f.fix.Images[repoName]
 	ids := make([]ecrtypes.ImageIdentifier, 0, len(images))
@@ -103,4 +109,12 @@ func (f *ECRFake) GetLifecyclePolicy(_ context.Context, input *ecr.GetLifecycleP
 		RepositoryName:      input.RepositoryName,
 		LifecyclePolicyText: &policyText,
 	}, nil
+}
+
+// hasRepository reports whether the fixtures register this repository. An
+// empty repository still answers an empty image list.
+func (f *ECRFake) hasRepository(name string) bool {
+	return slices.ContainsFunc(f.fix.Repositories, func(r ecrtypes.Repository) bool {
+		return aws.ToString(r.RepositoryName) == name
+	})
 }

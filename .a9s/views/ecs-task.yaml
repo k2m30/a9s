@@ -1,4 +1,4 @@
-generated: 4
+generated: 5
 list:
   Task ID:
     path: TaskArn
@@ -13,7 +13,6 @@ list:
   Stop Code:
     path: StopCode
     width: 24
-    humanize: true
   Health:
     path: HealthStatus
     width: 12

@@ -5,9 +5,11 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -47,12 +49,26 @@ func (f *SecretsFake) GetSecretValue(_ context.Context, input *secretsmanager.Ge
 // as a nil ResourcePolicy.
 func (f *SecretsFake) GetResourcePolicy(_ context.Context, input *secretsmanager.GetResourcePolicyInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetResourcePolicyOutput, error) {
 	secretID := aws.ToString(input.SecretId)
+	if !f.hasSecret(secretID) {
+		return nil, &smtypes.ResourceNotFoundException{
+			Message: notFoundMessage("Secrets Manager can't find the specified secret", secretID),
+		}
+	}
 	policy, ok := f.fix.ResourcePolicies[secretID]
 	if !ok {
+		// A registered secret with no resource policy is the healthy case.
 		return &secretsmanager.GetResourcePolicyOutput{Name: input.SecretId}, nil
 	}
 	return &secretsmanager.GetResourcePolicyOutput{
 		Name:           input.SecretId,
 		ResourcePolicy: aws.String(policy),
 	}, nil
+}
+
+// hasSecret reports whether the fixtures register this secret, under either
+// spelling the API accepts: the secret's name or its ARN.
+func (f *SecretsFake) hasSecret(nameOrARN string) bool {
+	return slices.ContainsFunc(f.fix.Secrets, func(s smtypes.SecretListEntry) bool {
+		return aws.ToString(s.Name) == nameOrARN || aws.ToString(s.ARN) == nameOrARN
+	})
 }

@@ -8,13 +8,16 @@ package unit_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -654,14 +657,32 @@ func TestFakes_SSMDescribeInstanceInformation_ServesEnrolledInstance(t *testing.
 	}
 }
 
+// INVERTED for aws6 row 7 (every fake refuses an unregistered key): this used
+// to call DescribeStateMachine with a nil input, which the fake answered with
+// the placeholder definition "{}" — non-empty, so the assertion passed without
+// ever reaching a fixture. The fake now refuses a state machine ARN it does
+// not hold, so the call has to name one, and naming one is what makes the
+// assertion say what its message always claimed. The nil-input call is not to
+// be restored.
 func TestFakes_SFNDescribeStateMachine_ServesECSRunTaskDefinition(t *testing.T) {
 	fake := fakes.NewSFN()
-	out, err := fake.DescribeStateMachine(context.Background(), nil)
+	listed, err := fake.ListStateMachines(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("DescribeStateMachine returned error: %v", err)
+		t.Fatalf("ListStateMachines returned error: %v", err)
 	}
-	if out.Definition == nil || *out.Definition == "" {
-		t.Fatalf("SFNFake.DescribeStateMachine returned no Definition — demo fixtures must model at least one state machine whose ASL contains an ecs:runTask state referencing a demo task-definition family, so checkECSSvcSFN can surface a real match")
+	found := ""
+	for _, m := range listed.StateMachines {
+		out, err := fake.DescribeStateMachine(context.Background(),
+			&sfn.DescribeStateMachineInput{StateMachineArn: m.StateMachineArn})
+		if err != nil {
+			t.Fatalf("DescribeStateMachine(%q) returned error: %v", aws.ToString(m.StateMachineArn), err)
+		}
+		if out.Definition != nil && strings.Contains(*out.Definition, "ecs:runTask") {
+			found = aws.ToString(m.StateMachineArn)
+		}
+	}
+	if found == "" {
+		t.Fatalf("no demo state machine has an ASL containing an ecs:runTask state — demo fixtures must model at least one whose ASL references a demo task-definition family, so checkECSSvcSFN can surface a real match")
 	}
 }
 

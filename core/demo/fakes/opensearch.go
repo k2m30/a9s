@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
@@ -98,7 +99,20 @@ func (f *OpenSearchFake) DescribeDomainConfig(_ context.Context, in *opensearch.
 			},
 		}, nil
 	}
+	if !f.hasDomain(*in.DomainName) {
+		return nil, &ostypes.ResourceNotFoundException{
+			Message: notFoundMessage("Domain", *in.DomainName),
+		}
+	}
 	return &opensearch.DescribeDomainConfigOutput{
 		DomainConfig: &ostypes.DomainConfig{},
 	}, nil
+}
+
+// hasDomain reports whether the fixtures register this domain. A registered
+// domain with no custom endpoint config still answers an empty config.
+func (f *OpenSearchFake) hasDomain(name string) bool {
+	return slices.ContainsFunc(f.fix.Domains, func(d ostypes.DomainStatus) bool {
+		return aws.ToString(d.DomainName) == name
+	})
 }

@@ -65,7 +65,9 @@ func (f *CodeArtifactFake) DescribeDomain(_ context.Context, input *codeartifact
 	}
 	domain, ok := f.fix.Domains[domainName]
 	if !ok {
-		return &codeartifact.DescribeDomainOutput{}, nil
+		return nil, &codeartifacttypes.ResourceNotFoundException{
+			Message: notFoundMessage("Domain", domainName),
+		}
 	}
 	return &codeartifact.DescribeDomainOutput{Domain: &domain}, nil
 }

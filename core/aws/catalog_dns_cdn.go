@@ -80,12 +80,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 	},
 	{
-		Name:          "CloudFront Distributions",
-		ShortName:     "cf",
-		Aliases:       []string{"cf", "cloudfront", "cdn"},
-		Category:      "DNS & CDN",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "CloudFront Distributions",
+		ShortName:      "cf",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"cf", "cloudfront", "cdn"},
+		Category:       "DNS & CDN",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Global(region, "cloudfront/v4/home#/distributions/"+r.ID)
 		},
@@ -134,12 +135,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 	},
 	{
-		Name:          "ACM Certificates",
-		ShortName:     "acm",
-		Aliases:       []string{"acm", "certificates", "certs"},
-		Category:      "DNS & CDN",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "ACM Certificates",
+		ShortName:      "acm",
+		HumanizeFields: []string{"Type"},
+		Aliases:        []string{"acm", "certificates", "certs"},
+		Category:       "DNS & CDN",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			uuid := r.ID
 			if idx := strings.LastIndex(r.ID, "/"); idx >= 0 {
@@ -179,11 +181,12 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 	},
 	{
-		Name:          "API Gateways",
-		ShortName:     "apigw",
-		Aliases:       []string{"apigw", "apigateway", "api-gateway"},
-		Category:      "DNS & CDN",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "API Gateways",
+		ShortName:      "apigw",
+		HumanizeFields: []string{"protocol"},
+		Aliases:        []string{"apigw", "apigateway", "api-gateway"},
+		Category:       "DNS & CDN",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			if r.Fields["protocol"] == "REST" {
 				return consolelink.Regional(region, "apigateway/home?region="+region+"#/apis/"+r.ID)

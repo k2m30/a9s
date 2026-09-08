@@ -7,6 +7,7 @@ import (
 	"maps"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -41,5 +42,7 @@ func (f *SQSFake) GetQueueAttributes(_ context.Context, input *sqs.GetQueueAttri
 			return &sqs.GetQueueAttributesOutput{Attributes: attrs}, nil
 		}
 	}
-	return &sqs.GetQueueAttributesOutput{Attributes: map[string]string{}}, nil
+	return nil, &sqstypes.QueueDoesNotExist{
+		Message: notFoundMessage("The specified queue", queueURL),
+	}
 }

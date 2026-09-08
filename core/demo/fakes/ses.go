@@ -4,9 +4,12 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -33,10 +36,16 @@ func (f *SESFake) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...f
 // output when the identity has no configuration set. This satisfies the eb-rule, kinesis,
 // and sns related-panel pivots for the graph-root identity "acme-corp.com".
 func (f *SESFake) GetEmailIdentity(_ context.Context, in *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
-	if in != nil && in.EmailIdentity != nil {
-		if out, ok := f.fix.GetEmailIdentityByName[*in.EmailIdentity]; ok {
-			return out, nil
+	if in == nil || in.EmailIdentity == nil {
+		return &sesv2.GetEmailIdentityOutput{}, nil
+	}
+	if !f.hasIdentity(*in.EmailIdentity) {
+		return nil, &sesv2types.NotFoundException{
+			Message: notFoundMessage("Email identity", *in.EmailIdentity),
 		}
+	}
+	if out, ok := f.fix.GetEmailIdentityByName[*in.EmailIdentity]; ok {
+		return out, nil
 	}
 	return &sesv2.GetEmailIdentityOutput{}, nil
 }
@@ -68,4 +77,11 @@ func NewSESV1() *SESV1Fake {
 // one rule with S3Action and LambdaAction wired to the graph-root identity.
 func (f *SESV1Fake) DescribeActiveReceiptRuleSet(_ context.Context, _ *ses.DescribeActiveReceiptRuleSetInput, _ ...func(*ses.Options)) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	return f.fix.ActiveReceiptRuleSet, nil
+}
+
+// hasIdentity reports whether the fixtures register this email identity.
+func (f *SESFake) hasIdentity(name string) bool {
+	return slices.ContainsFunc(f.fix.Identities, func(i sesv2types.IdentityInfo) bool {
+		return aws.ToString(i.IdentityName) == name
+	})
 }

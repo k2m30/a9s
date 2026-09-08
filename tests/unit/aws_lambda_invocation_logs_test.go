@@ -128,6 +128,10 @@ func TestFetchLambdaInvocationLogs_Basic(t *testing.T) {
 
 // TestFetchLambdaInvocationLogs_StatusClassification verifies that log line
 // Status is classified using classifyLogEventStatus (reused from log_events.go).
+//
+// INVERTED for aws6 row 6: that classifier returns the readable word, not an
+// SDK-shaped constant, because the class is a9s's own. The old UPPER-CASE
+// expectations are not to be restored.
 func TestFetchLambdaInvocationLogs_StatusClassification(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -165,11 +169,11 @@ func TestFetchLambdaInvocationLogs_StatusClassification(t *testing.T) {
 		expectedStatus string
 		description    string
 	}{
-		{0, "ERROR", "ERROR keyword"},
-		{1, "WARN", "WARN keyword"},
-		{2, "REPORT", "REPORT keyword"},
-		{3, "META", "START keyword"},
-		{4, "META", "END keyword"},
+		{0, "error", "ERROR keyword"},
+		{1, "warn", "WARN keyword"},
+		{2, "report", "REPORT keyword"},
+		{3, "meta", "START keyword"},
+		{4, "meta", "END keyword"},
 		{5, "", "plain INFO message"},
 	}
 

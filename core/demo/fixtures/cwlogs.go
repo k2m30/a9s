@@ -489,6 +489,15 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 				Message:       aws.String("REPORT RequestId: abc-121 Duration: 38.91 ms Billed Duration: 39 ms Memory Size: 256 MB Max Memory Used: 85 MB"),
 				IngestionTime: aws.Int64(1774253500100),
 			},
+			{
+				Timestamp: aws.Int64(1774253400000),
+				// The only demo witness of classifyLogEventStatus's warn class
+				// (core/aws/log_events.go) and of the cwlogs.log-warn finding it
+				// raises. Without it the class is a branch nothing on the bench
+				// ever shows.
+				Message:       aws.String("WARN Token cache miss for issuer https://auth.acme-corp.example; falling back to a full JWKS fetch, added 180 ms to this authorization"),
+				IngestionTime: aws.Int64(1774253400100),
+			},
 		},
 		"/aws/lambda/process-orders": {
 			{

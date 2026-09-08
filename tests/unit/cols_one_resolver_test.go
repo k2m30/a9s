@@ -3,7 +3,7 @@
 //
 // Two resolvers currently answer the first question — (*app.Controller).
 // ResolveColumnsForType and resource.ResolveListColumnCascade — and they
-// disagree about Path, Humanize and whether a child short name resolves at
+// disagree about Path and whether a child short name resolves at
 // all. Whichever one a caller happens to reach decides what the user sees,
 // so the two must be indistinguishable field by field, for every registered
 // type, with and without a view config loaded from disk.
@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -60,11 +61,25 @@ func colsAllShortNames() []string {
 // two answers are comparable field by field. The mapping lives here and not
 // in production precisely because there must be only one resolver to map
 // from.
+//
+// INVERTED for aws6 rows 4-6 (one humanize owner): the humanize opt-in moved
+// off config.ListColumn and onto the TYPE (ResourceTypeDef.HumanizeFields),
+// so the mirror reads it from the type the way production does. The old
+// `lc.Humanize` read is not to be restored — a column-owned flag cannot reach
+// a field no column shows, which is the defect that moved it.
 func colsCascade(vc *config.ViewsConfig, shortName string) []app.ColumnDef {
-	lcs := resource.ResolveListColumnCascade(vc, shortName, colsTypeDefFor(shortName))
+	td := colsTypeDefFor(shortName)
+	lcs := resource.ResolveListColumnCascade(vc, shortName, td)
+	var humanized map[string]bool
+	if td != nil {
+		humanized = td.HumanizedFields()
+	}
 	cols := make([]app.ColumnDef, len(lcs))
 	for i, lc := range lcs {
-		cols[i] = app.ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
+		cols[i] = app.ColumnDef{
+			Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,
+			Humanize: catalog.Humanizes(humanized, lc.Key, lc.Path),
+		}
 	}
 	return cols
 }

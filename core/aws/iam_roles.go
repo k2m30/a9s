@@ -58,7 +58,10 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 		return out
 	}
 	if iampolicy.EvaluateTrust(doc, "").Public {
-		out.wildcard, out.summary = "true", "WILDCARD"
+		// The summary is a9s's own verdict on the trust policy, not a value
+		// IAM returned, so it is written in the words the Trust column and the
+		// detail row render rather than in the shape of an SDK constant.
+		out.wildcard, out.summary = "true", "wildcard"
 		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust))
 	}
 	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {

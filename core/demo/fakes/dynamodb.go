@@ -53,7 +53,7 @@ func (f *DynamoDBFake) DescribeTable(_ context.Context, input *dynamodb.Describe
 			return &dynamodb.DescribeTableOutput{Table: t}, nil
 		}
 	}
-	return nil, fmt.Errorf("ResourceNotFoundException: table %q not found", name)
+	return nil, &ddbtypes.ResourceNotFoundException{Message: notFoundMessage("Requested resource not found: Table", name)}
 }
 
 // DescribeContinuousBackups returns PITR status per table.

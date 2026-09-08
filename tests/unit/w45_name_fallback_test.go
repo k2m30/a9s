@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/catalog"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
@@ -48,9 +49,15 @@ func w45Columns(vc *config.ViewsConfig, td resource.ResourceTypeDef) []app.Colum
 	if len(lcs) == 0 {
 		return nil
 	}
+	// INVERTED for aws6 rows 4-6: the humanize opt-in is the type's
+	// declaration (ResourceTypeDef.HumanizeFields), not the column's.
+	humanized := td.HumanizedFields()
 	cols := make([]app.ColumnDef, len(lcs))
 	for i, lc := range lcs {
-		cols[i] = app.ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
+		cols[i] = app.ColumnDef{
+			Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,
+			Humanize: catalog.Humanizes(humanized, lc.Key, lc.Path),
+		}
 	}
 	cols[app.IdentityColumnIndex(cols, &td)].Identity = true
 	return cols

@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
@@ -32,8 +33,11 @@ func (f *EFSFake) DescribeMountTargets(_ context.Context, in *efs.DescribeMountT
 	if in == nil || in.FileSystemId == nil {
 		return &efs.DescribeMountTargetsOutput{}, nil
 	}
-	mts := f.fix.MountTargets[aws.ToString(in.FileSystemId)]
-	return &efs.DescribeMountTargetsOutput{MountTargets: mts}, nil
+	id := aws.ToString(in.FileSystemId)
+	if !f.hasFileSystem(id) {
+		return nil, &efstypes.FileSystemNotFound{Message: notFoundMessage("File system", id)}
+	}
+	return &efs.DescribeMountTargetsOutput{MountTargets: f.fix.MountTargets[id]}, nil
 }
 
 // DescribeAccessPoints returns access points for the requested filesystem.
@@ -74,4 +78,12 @@ func (f *EFSFake) DescribeBackupPolicy(_ context.Context, in *efs.DescribeBackup
 	return &efs.DescribeBackupPolicyOutput{
 		BackupPolicy: &efstypes.BackupPolicy{Status: efstypes.StatusEnabled},
 	}, nil
+}
+
+// hasFileSystem reports whether the fixtures register this file system. One
+// with no mount targets still answers an empty list.
+func (f *EFSFake) hasFileSystem(id string) bool {
+	return slices.ContainsFunc(f.fix.FileSystems, func(fs efstypes.FileSystemDescription) bool {
+		return aws.ToString(fs.FileSystemId) == id
+	})
 }

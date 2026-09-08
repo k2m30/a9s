@@ -7,9 +7,11 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	smithy "github.com/aws/smithy-go"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
@@ -279,6 +281,9 @@ func (f *S3Fake) GetBucketVersioning(_ context.Context, input *s3.GetBucketVersi
 	if input.Bucket == nil {
 		return nil, fmt.Errorf("GetBucketVersioning: bucket name is required")
 	}
+	if !f.hasBucket(*input.Bucket) {
+		return nil, &s3types.NoSuchBucket{Message: notFoundMessage("Bucket", *input.Bucket)}
+	}
 	if out, ok := f.fix.VersioningConfigs[*input.Bucket]; ok && out != nil {
 		return out, nil
 	}
@@ -311,4 +316,11 @@ func (f *S3Fake) GetObjectLockConfiguration(_ context.Context, input *s3.GetObje
 		}
 	}
 	return cfg, nil
+}
+
+// hasBucket reports whether the fixtures register this bucket.
+func (f *S3Fake) hasBucket(name string) bool {
+	return slices.ContainsFunc(f.fix.Buckets, func(b s3types.Bucket) bool {
+		return aws.ToString(b.Name) == name
+	})
 }

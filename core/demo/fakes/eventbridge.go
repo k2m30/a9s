@@ -4,8 +4,11 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -28,6 +31,11 @@ func (f *EventBridgeFake) ListTargetsByRule(_ context.Context, input *eventbridg
 	var ruleName string
 	if input != nil && input.Rule != nil {
 		ruleName = *input.Rule
+	}
+	if !f.hasRule(ruleName) {
+		return nil, &eventbridgetypes.ResourceNotFoundException{
+			Message: notFoundMessage("Rule", ruleName),
+		}
 	}
 	return &eventbridge.ListTargetsByRuleOutput{Targets: f.fix.TargetsByRule[ruleName]}, nil
 }
@@ -53,4 +61,13 @@ func (f *EventBridgeFake) ListRuleNamesByTarget(_ context.Context, input *eventb
 		}
 	}
 	return &eventbridge.ListRuleNamesByTargetOutput{RuleNames: names}, nil
+}
+
+// hasRule reports whether the fixtures register this rule. A rule with no
+// targets still answers an empty target list — that is the shape the
+// no-targets finding is built on.
+func (f *EventBridgeFake) hasRule(name string) bool {
+	return slices.ContainsFunc(f.fix.Rules, func(r eventbridgetypes.Rule) bool {
+		return aws.ToString(r.Name) == name
+	})
 }

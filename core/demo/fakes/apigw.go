@@ -4,8 +4,11 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -30,6 +33,9 @@ func (f *APIGWFake) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ .
 func (f *APIGWFake) GetStages(_ context.Context, input *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
 	if input == nil || input.ApiId == nil {
 		return &apigatewayv2.GetStagesOutput{}, nil
+	}
+	if !f.hasAPI(*input.ApiId) {
+		return nil, &apigwtypes.NotFoundException{Message: notFoundMessage("Api", *input.ApiId)}
 	}
 	return &apigatewayv2.GetStagesOutput{Items: f.fix.Stages[*input.ApiId]}, nil
 }
@@ -68,4 +74,12 @@ func (f *APIGWFake) GetAuthorizers(_ context.Context, input *apigatewayv2.GetAut
 		return &apigatewayv2.GetAuthorizersOutput{}, nil
 	}
 	return &apigatewayv2.GetAuthorizersOutput{Items: f.fix.Authorizers[*input.ApiId]}, nil
+}
+
+// hasAPI reports whether the fixtures register this API id. An API with no
+// stages still answers empty; an API that does not exist does not.
+func (f *APIGWFake) hasAPI(id string) bool {
+	return slices.ContainsFunc(f.fix.APIs, func(a apigwtypes.Api) bool {
+		return aws.ToString(a.ApiId) == id
+	})
 }

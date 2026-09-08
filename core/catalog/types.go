@@ -2,7 +2,11 @@
 
 package catalog
 
-import "github.com/k2m30/a9s/v3/core/domain"
+import (
+	"strings"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+)
 
 // ResourceTypeDef is the declarative definition of one a9s resource type.
 // It is the single source of truth: identity, display, fetchers, enrichers,
@@ -64,6 +68,23 @@ type ResourceTypeDef struct {
 	// CopyField overrides which field CopyContent copies. When non-empty,
 	// the resource list copies Fields[CopyField] instead of the default ID.
 	CopyField string
+	// HumanizeFields names the fields of this type whose value is an AWS
+	// constant an operator should not have to read, so every surface routes
+	// them through domain.HumanizeStatusPhrase. Entries are matched
+	// case-insensitively against a Fields key, a RawStruct path or a detail
+	// row's label, because one fact is reached by all three spellings.
+	//
+	// The declaration is on the TYPE and not on a column: it says something
+	// about the FACT, so a field no column happens to show owes the same
+	// wording on the detail as one that has a column, and a field with a
+	// column cannot read one way there and another way in the detail. A
+	// second declaration for the second surface is a fact in two places to
+	// disagree.
+	//
+	// Only enum-shaped values belong here. A name AWS assigned and a person
+	// types back — an access key, a role id, an API operation name — must
+	// stay verbatim or it stops being the thing they can search for.
+	HumanizeFields []string
 
 	// ─── Behavior ──────────────────────────────────────────────────────────
 
@@ -193,4 +214,46 @@ type FindingDef struct {
 	// the docs. Empty means the finding renders its Phrase alone and the doc
 	// cell reads "—". The emitter copies it from here; nothing else declares it.
 	Detail string
+}
+
+// HumanizeFieldKey normalizes a field identifier to the FACT it names: case
+// and underscores dropped, so "ClusterType", "cluster_type" and "Cluster Type"
+// are one key.
+//
+// One fact is reached by more than one spelling — a list column reads it by
+// its RawStruct path, a fetcher writes it in snake_case, a detail row labels
+// it in words — and a declaration that answered only one of them would
+// humanize the surface that happens to use that spelling and leave the others
+// showing the constant. That is the same fact in two words, which is the
+// shape the declaration exists to remove.
+func HumanizeFieldKey(s string) string {
+	return strings.ToLower(strings.NewReplacer("_", "", " ", "").Replace(s))
+}
+
+// HumanizedFields returns HumanizeFields as a lookup set keyed by
+// HumanizeFieldKey, or nil when the type declares none. The list surface, the
+// detail surface and any later reader ask here, so none of them can disagree
+// about which fields the type wants in words.
+func (d ResourceTypeDef) HumanizedFields() map[string]bool {
+	if len(d.HumanizeFields) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(d.HumanizeFields))
+	for _, f := range d.HumanizeFields {
+		out[HumanizeFieldKey(f)] = true
+	}
+	return out
+}
+
+// Humanizes reports whether set — a type's HumanizedFields — names any of the
+// spellings by which one field is reached. Every reader asks here rather than
+// indexing the map itself, so no two of them can normalize a spelling
+// differently and disagree about the same field.
+func Humanizes(set map[string]bool, names ...string) bool {
+	for _, n := range names {
+		if n != "" && set[HumanizeFieldKey(n)] {
+			return true
+		}
+	}
+	return false
 }

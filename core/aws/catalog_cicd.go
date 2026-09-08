@@ -56,12 +56,13 @@ func colorCodeArtifact(r domain.Resource) domain.Color {
 
 var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "CloudFormation Stacks",
-		ShortName:     "cfn",
-		Aliases:       []string{"cfn", "cloudformation", "stacks"},
-		Category:      "CI/CD",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "CloudFormation Stacks",
+		ShortName:      "cfn",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"cfn", "cloudformation", "stacks"},
+		Category:       "CI/CD",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -112,11 +113,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 	},
 	{
-		Name:          "CodePipelines",
-		ShortName:     "pipeline",
-		Aliases:       []string{"pipeline", "codepipeline", "pipelines"},
-		Category:      "CI/CD",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "CodePipelines",
+		ShortName:      "pipeline",
+		HumanizeFields: []string{"pipeline_type"},
+		Aliases:        []string{"pipeline", "codepipeline", "pipelines"},
+		Category:       "CI/CD",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "codesuite/codepipeline/pipelines/"+url.PathEscape(r.ID)+"/view?region="+region)
 		},
@@ -158,11 +160,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 	},
 	{
-		Name:          "CodeBuild Projects",
-		ShortName:     "cb",
-		Aliases:       []string{"cb", "codebuild"},
-		Category:      "CI/CD",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "CodeBuild Projects",
+		ShortName:      "cb",
+		HumanizeFields: []string{"source_type"},
+		Aliases:        []string{"cb", "codebuild"},
+		Category:       "CI/CD",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, accountID string) string {
 			acct := consolelink.AccountFromARN(r.Fields["arn"])
 			if acct == "" {
@@ -224,11 +227,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 	},
 	{
-		Name:          "ECR Repositories",
-		ShortName:     "ecr",
-		Aliases:       []string{"ecr", "container-registry"},
-		Category:      "CI/CD",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "ECR Repositories",
+		ShortName:      "ecr",
+		HumanizeFields: []string{"tag_mutability"},
+		Aliases:        []string{"ecr", "container-registry"},
+		Category:       "CI/CD",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "ecr/repositories/"+url.PathEscape(r.ID)+"/?region="+region)
 		},

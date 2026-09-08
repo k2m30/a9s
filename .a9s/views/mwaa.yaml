@@ -1,4 +1,4 @@
-generated: 4
+generated: 5
 list:
   Name:
     path: Name
@@ -21,7 +21,6 @@ list:
   Access:
     path: WebserverAccessMode
     width: 16
-    humanize: true
   Created:
     path: CreatedAt
     width: 22

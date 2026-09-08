@@ -150,11 +150,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:          "Target Groups",
-		ShortName:     "tg",
-		Aliases:       []string{"tg", "targetgroups", "target-groups"},
-		Category:      "NETWORKING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "Target Groups",
+		ShortName:      "tg",
+		HumanizeFields: []string{"protocol"},
+		Aliases:        []string{"tg", "targetgroups", "target-groups"},
+		Category:       "NETWORKING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["target_group_arn"]
 			if arn == "" {
@@ -386,11 +387,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:          "NAT Gateways",
-		ShortName:     "nat",
-		Aliases:       []string{"nat", "natgateways", "nat-gateways"},
-		Category:      "NETWORKING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "NAT Gateways",
+		ShortName:      "nat",
+		HumanizeFields: []string{"failure_code"},
+		Aliases:        []string{"nat", "natgateways", "nat-gateways"},
+		Category:       "NETWORKING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "vpc/home?region="+region+"#NatGatewayDetails:natGatewayId="+r.ID)
 		},
@@ -463,11 +465,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:          "Elastic IPs",
-		ShortName:     "eip",
-		Aliases:       []string{"eip", "elastic-ips", "elasticips"},
-		Category:      "NETWORKING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "Elastic IPs",
+		ShortName:      "eip",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"eip", "elastic-ips", "elasticips"},
+		Category:       "NETWORKING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "vpc/home?region="+region+"#ElasticIpDetails:AllocationId="+r.ID)
 		},
@@ -512,11 +515,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:          "VPC Endpoints",
-		ShortName:     "vpce",
-		Aliases:       []string{"vpce", "vpc-endpoints", "vpcendpoints"},
-		Category:      "NETWORKING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "VPC Endpoints",
+		ShortName:      "vpce",
+		HumanizeFields: []string{"state"},
+		Aliases:        []string{"vpce", "vpc-endpoints", "vpcendpoints"},
+		Category:       "NETWORKING",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "vpc/home?region="+region+"#EndpointDetails:vpcEndpointId="+r.ID)
 		},
@@ -652,12 +656,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:          "Transfer Family",
-		ShortName:     "transfer",
-		Aliases:       []string{"transfer", "sftp", "as2", "ftps"},
-		Category:      "NETWORKING",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "Transfer Family",
+		ShortName:      "transfer",
+		HumanizeFields: []string{"endpoint_type", "identity_provider_type", "domain"},
+		Aliases:        []string{"transfer", "sftp", "as2", "ftps"},
+		Category:       "NETWORKING",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "transfer/home#/servers/"+r.ID)
 		},

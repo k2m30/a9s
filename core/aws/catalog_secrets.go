@@ -44,11 +44,12 @@ func colorKMS(r domain.Resource) domain.Color {
 
 var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "Secrets Manager",
-		ShortName:     "secrets",
-		Aliases:       []string{"secrets", "secretsmanager", "sm"},
-		Category:      "SECRETS & CONFIG",
-		CloudTrailKey: "ResourceName:Fields.arn",
+		Name:           "Secrets Manager",
+		ShortName:      "secrets",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"secrets", "secretsmanager", "sm"},
+		Category:       "SECRETS & CONFIG",
+		CloudTrailKey:  "ResourceName:Fields.arn",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "secretsmanager/secret?region="+region+"&name="+url.QueryEscape(r.ID))
 		},
@@ -97,11 +98,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "SSM Parameters",
-		ShortName:     "ssm",
-		Aliases:       []string{"ssm", "parameters", "parameter-store"},
-		Category:      "SECRETS & CONFIG",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "SSM Parameters",
+		ShortName:      "ssm",
+		HumanizeFields: []string{"type"},
+		Aliases:        []string{"ssm", "parameters", "parameter-store"},
+		Category:       "SECRETS & CONFIG",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			name := strings.TrimPrefix(r.ID, "/")
 			return consolelink.Regional(region, "systems-manager/parameters/"+name+"/description?region="+region)
@@ -135,12 +137,13 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "KMS Keys",
-		ShortName:     "kms",
-		Aliases:       []string{"kms", "keys"},
-		Category:      "SECRETS & CONFIG",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
+		Name:           "KMS Keys",
+		ShortName:      "kms",
+		HumanizeFields: []string{"status"},
+		Aliases:        []string{"kms", "keys"},
+		Category:       "SECRETS & CONFIG",
+		CloudTrailKey:  "ResourceName:ID",
+		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "kms/home?region="+region+"#/kms/keys/"+r.ID)
 		},

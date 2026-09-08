@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -76,13 +77,25 @@ func TestCatalogAndDefaultColumnsAgreeTitleByTitle(t *testing.T) {
 			}
 
 			// The two arms of the cascade, built exactly as it builds them.
+			// INVERTED for aws6 rows 4-6: Humanize is the TYPE's declaration
+			// now, so both arms read the same one and the old per-arm
+			// `lc.Humanize` read is not to be restored.
+			// The humanize flag is the TYPE's, and both arms resolve to the
+			// same merged column, so it is computed once from the key that
+			// merge produces (the catalog's where it declares one).
+			humanized := td.HumanizedFields()
+			mergedKey := lc.Key
+			if c.Key != "" {
+				mergedKey = c.Key
+			}
+			isHumanized := catalog.Humanizes(humanized, mergedKey, lc.Path)
 			fromCatalog := app.ColumnDef{
 				Key: c.Key, Title: c.Title, Width: c.Width,
-				Path: lc.Path, SortKey: lc.SortKey, Humanize: lc.Humanize,
+				Path: lc.Path, SortKey: lc.SortKey, Humanize: isHumanized,
 			}
 			fromDefaults := app.ColumnDef{
 				Key: lc.Key, Title: lc.Title, Width: lc.Width,
-				Path: lc.Path, SortKey: lc.SortKey, Humanize: lc.Humanize,
+				Path: lc.Path, SortKey: lc.SortKey, Humanize: isHumanized,
 			}
 			for _, r := range byType[td.ShortName] {
 				a := app.ExtractCellValue(fromCatalog, &td, r)

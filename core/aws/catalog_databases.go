@@ -440,11 +440,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "OpenSearch Domains",
-		ShortName:     "opensearch",
-		Aliases:       []string{"opensearch", "os", "elasticsearch"},
-		Category:      "DATABASES & STORAGE",
-		CloudTrailKey: "ResourceName:ID",
+		Name:           "OpenSearch Domains",
+		ShortName:      "opensearch",
+		HumanizeFields: []string{"domain_processing_status"},
+		Aliases:        []string{"opensearch", "os", "elasticsearch"},
+		Category:       "DATABASES & STORAGE",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "aos/home?region="+region+"#opensearch/domains/"+url.PathEscape(r.ID))
 		},

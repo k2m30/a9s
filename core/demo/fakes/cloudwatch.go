@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
@@ -29,9 +31,19 @@ func (f *CloudWatchFake) DescribeAlarmHistory(_ context.Context, in *cloudwatch.
 	if in == nil || in.AlarmName == nil {
 		return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: []cwtypes.AlarmHistoryItem{}}, nil
 	}
-	items, ok := f.fix.AlarmHistory[*in.AlarmName]
-	if !ok {
-		return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: []cwtypes.AlarmHistoryItem{}}, nil
+	if !f.hasAlarm(*in.AlarmName) {
+		return nil, &cwtypes.ResourceNotFound{Message: notFoundMessage("Alarm", *in.AlarmName)}
 	}
-	return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: items}, nil
+	// A registered alarm with no history answers empty: "this alarm has never
+	// changed state" and "there is no such alarm" are different facts.
+	return &cloudwatch.DescribeAlarmHistoryOutput{
+		AlarmHistoryItems: f.fix.AlarmHistory[*in.AlarmName],
+	}, nil
+}
+
+// hasAlarm reports whether the fixtures register this alarm.
+func (f *CloudWatchFake) hasAlarm(name string) bool {
+	return slices.ContainsFunc(f.fix.Alarms, func(a cwtypes.MetricAlarm) bool {
+		return aws.ToString(a.AlarmName) == name
+	})
 }

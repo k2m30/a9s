@@ -4,7 +4,9 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 
@@ -40,6 +42,9 @@ func (f *ACMFake) DescribeCertificate(_ context.Context, input *acm.DescribeCert
 	if err := validateARN(certARN); err != nil {
 		return nil, err
 	}
+	if !f.hasCertificate(certARN) {
+		return nil, &acmtypes.ResourceNotFoundException{Message: notFoundMessage("Certificate", certARN)}
+	}
 	detail := &acmtypes.CertificateDetail{CertificateArn: &certARN}
 	for _, summary := range f.fix.Certificates {
 		if summary.CertificateArn == nil || *summary.CertificateArn != certARN {
@@ -57,4 +62,11 @@ func (f *ACMFake) DescribeCertificate(_ context.Context, input *acm.DescribeCert
 	detail.InUseBy = f.fix.InUseBy[certARN]
 	detail.DomainValidationOptions = f.fix.DomainValidationOptions[certARN]
 	return &acm.DescribeCertificateOutput{Certificate: detail}, nil
+}
+
+// hasCertificate reports whether the fixtures register this certificate ARN.
+func (f *ACMFake) hasCertificate(arn string) bool {
+	return slices.ContainsFunc(f.fix.Certificates, func(c acmtypes.CertificateSummary) bool {
+		return aws.ToString(c.CertificateArn) == arn
+	})
 }

@@ -5,6 +5,7 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -49,6 +50,11 @@ func (f *WAFFake) ListResourcesForWebACL(_ context.Context, input *wafv2.ListRes
 func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ...func(*wafv2.Options)) (*wafv2.GetWebACLOutput, error) {
 	if input.Name == nil {
 		return nil, fmt.Errorf("GetWebACL: Name is required")
+	}
+	if !f.hasWebACL(aws.ToString(input.Id), *input.Name) {
+		return nil, &wafv2types.WAFNonexistentItemException{
+			Message: notFoundMessage("WebACL", *input.Name),
+		}
 	}
 	ruleCount := 3
 	switch *input.Name {
@@ -126,4 +132,14 @@ func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLog
 			LogDestinationConfigs: []string{"arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-acme"},
 		},
 	}, nil
+}
+
+// hasWebACL reports whether the fixtures register this web ACL, in either
+// scope. GetWebACL is keyed by id AND name, so both must match one summary.
+func (f *WAFFake) hasWebACL(id, name string) bool {
+	match := func(s wafv2types.WebACLSummary) bool {
+		return aws.ToString(s.Id) == id && aws.ToString(s.Name) == name
+	}
+	return slices.ContainsFunc(f.fix.WebACLSummaries, match) ||
+		slices.ContainsFunc(f.fix.CloudFrontWebACLSummaries, match)
 }
