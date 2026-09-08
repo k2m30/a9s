@@ -313,10 +313,13 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 		ResourceType: "ct-events",
 	})
 
-	// KEY ASSERTION: no new fetch command should be issued when cache is present.
-	// Currently this FAILS because the implementation always fetches on navigate.
-	if cmd != nil {
-		t.Errorf("re-entering ct-events after Esc should return nil cmd (cache hit), but got a non-nil command — this is Bug 2")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if cmd == nil {
+		t.Errorf("re-entering ct-events after Esc should seed the retained rows and re-verify them, but issued no command")
 	}
 
 	plain = stripANSI(rootViewContent(m))
@@ -449,8 +452,13 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 		ResourceType: "ct-events",
 	})
 
-	if ctCmd != nil {
-		t.Errorf("re-entering ct-events should not issue a fetch (cache hit), but returned a non-nil cmd")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if ctCmd == nil {
+		t.Errorf("re-entering ct-events should seed the retained rows and re-verify them, but issued no command")
 	}
 
 	plain := stripANSI(rootViewContent(m))
@@ -465,8 +473,13 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	if ec2Cmd != nil {
-		t.Errorf("re-entering ec2 should not issue a fetch (cache hit), but returned a non-nil cmd")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if ec2Cmd == nil {
+		t.Errorf("re-entering ec2 should seed the retained rows and re-verify them, but issued no command")
 	}
 
 	plain = stripANSI(rootViewContent(m))

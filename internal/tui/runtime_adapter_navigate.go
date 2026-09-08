@@ -127,11 +127,18 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
 		rl.SetEnrichmentState(issueCount, issueTrunc, wave2FindingsByID(entry.Resources), wave2DetailsByID(entry.Resources))
+		// C3: the retained rows are seeded-but-unverified until the
+		// verification task HandleNavigate returned for this branch lands, so
+		// the surface carries the refreshing marker. NewResourceListFromCache
+		// clears Refreshing as part of applying the seeded page, hence the
+		// set-after-construction ordering the miss branch below also uses.
+		m.ctrl.SetListRefreshing(true)
+		m.ctrl.SetListTotalCount(entry.TotalCount)
 		rs := newListRS(canon)
 		w, h := m.innerSize()
 		rs.width, rs.height = w, h
 		m.pushRS(rs)
-		return m, nil
+		return m, navigateTasksToCmd(m, tasks)
 
 	case runtime.NavigateKindPushResourceList:
 		canon := result.ResolvedType
@@ -178,9 +185,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			// seeded page, so this must run after construction — mirrors the
 			// headless controller's ordering in applyNavResult.
 			m.ctrl.SetListRefreshing(true)
-			// Seed-time provisional total: same set-after-seed ordering — ApplyResourcesLoaded
-			// unconditionally clears TotalCount as part of applying the seeded
-			// page, so this must also run after construction.
 			m.ctrl.SetListTotalCount(entry.TotalCount)
 		} else {
 			rl = views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)

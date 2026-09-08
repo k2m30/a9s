@@ -274,6 +274,12 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 		s := m.core.CaptureDispatch()
 		snap = &s
 	}
+	// Same producer rule as Snap above, for the per-type list fetch sequence:
+	// a task the Controller boundary already stamped keeps its value, a task
+	// the runtime built directly (HandleNavigate's own fetch task) is stamped
+	// here, still synchronously on the Update goroutine so dispatch order is
+	// what the apply point compares.
+	m.core.StampListFetchSeq(&req)
 	return func() tea.Msg {
 		ev, err := m.core.ExecuteTaskAt(ctx, req, *snap)
 		if err != nil {

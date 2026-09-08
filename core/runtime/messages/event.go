@@ -91,6 +91,15 @@ type ResourcesLoaded struct {
 	// so those messages still pass the guard rather than requiring every such
 	// caller to round-trip a live session gen.
 	Gen domain.Gen
+	// ListSeq is the per-type canonical-list fetch sequence the dispatch that
+	// produced this result was stamped with (runtime.TaskRequest.ListSeq).
+	// The apply point discards a canonical list result whose ListSeq is no
+	// longer the latest one handed out for its type — an on-entry
+	// verification overtaken by a later Ctrl+R, a load-more, or another
+	// refresh. Zero means the result carries no ordering claim (a cache-seed
+	// replay, a filtered/child/by-ID fetch, a synthetic construction) and is
+	// applied as-is.
+	ListSeq domain.Gen
 	// Err is non-nil when the paginated fetcher returned a partial-success
 	// composite error: SOME resources made it back AND something failed
 	// (e.g. one inline-group-policy enumeration call timed out). The handler

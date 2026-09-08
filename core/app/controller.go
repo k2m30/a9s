@@ -327,6 +327,9 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 		}
 		tasks[i].Snap = snap
 	}
+	for i := range tasks {
+		c.core.StampListFetchSeq(&tasks[i])
+	}
 	return tasks
 }
 

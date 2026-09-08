@@ -300,6 +300,17 @@ type Session struct {
 	EnrichmentTypeGen   map[string]domain.Gen
 	enrichmentTypeGenMu sync.Mutex
 
+	// listFetchSeq is the per-type canonical-list fetch dispatch counter,
+	// guarded by listFetchSeqMu. Every canonical top-level list fetch takes
+	// the next value for its type at dispatch time and carries it to the
+	// apply point, which accepts only the value it last handed out — the
+	// ordering the content-shape heuristic in core/app/list_body.go cannot
+	// see. Monotonic for the process lifetime rather than reset on Rotate:
+	// a counter that restarted could hand a post-rotate fetch the same value
+	// a pre-rotate straggler is still carrying.
+	listFetchSeq   map[string]domain.Gen
+	listFetchSeqMu sync.Mutex
+
 	// RowStore is the session-scoped, per-type row store (task #17 wave 1/3 —
 	// row-store unification). The single source of truth for every cached
 	// resource-list row this session has observed, replacing the former
@@ -428,6 +439,7 @@ func New() *Session {
 		PendingRefresh:         true,
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
+		listFetchSeq:           make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
 		ScanHealthLogged:       make(map[string]bool),
 		RowStore:               NewRowStore(),
@@ -765,6 +777,26 @@ func (s *Session) EnrichmentTypeGenBump(shortName string) domain.Gen {
 	defer s.enrichmentTypeGenMu.Unlock()
 	s.EnrichmentTypeGen[shortName]++
 	return s.EnrichmentTypeGen[shortName]
+}
+
+// ListFetchSeqNext hands out shortName's next canonical-list fetch sequence.
+// Called synchronously at dispatch time, never from the goroutine that runs
+// the fetch: two fetches dispatched in a known order must receive their
+// values in that same order for the apply point's comparison to mean
+// anything.
+func (s *Session) ListFetchSeqNext(shortName string) domain.Gen {
+	s.listFetchSeqMu.Lock()
+	defer s.listFetchSeqMu.Unlock()
+	s.listFetchSeq[shortName]++
+	return s.listFetchSeq[shortName]
+}
+
+// ListFetchSeqLatest returns the value ListFetchSeqNext last handed out for
+// shortName, or zero when no canonical list fetch has been dispatched for it.
+func (s *Session) ListFetchSeqLatest(shortName string) domain.Gen {
+	s.listFetchSeqMu.Lock()
+	defer s.listFetchSeqMu.Unlock()
+	return s.listFetchSeq[shortName]
 }
 
 // EnrichmentTypeGenSnapshot returns a defensive copy of every per-type

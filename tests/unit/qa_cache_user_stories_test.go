@@ -45,8 +45,13 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	if cmd != nil {
-		t.Fatal("warm re-entry should be served from cache without a fresh fetch")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if cmd == nil {
+		t.Fatal("warm re-entry should be served from cache AND re-verified")
 	}
 
 	m, cmd = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -100,8 +105,13 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	if cmd != nil {
-		t.Fatal("re-entering a paginated list after load-more should be a cache hit")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if cmd == nil {
+		t.Fatal("re-entering a paginated list after load-more should re-verify the merged page set")
 	}
 
 	plain := stripANSI(rootViewContent(m))
@@ -332,7 +342,12 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	if cmd != nil {
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if cmd == nil {
 		t.Fatal("refreshing a child view must not evict an unrelated top-level cache entry")
 	}
 

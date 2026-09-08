@@ -97,17 +97,15 @@ type ListState struct {
 	// Set by a messages.APIError landing while this screen is active; cleared
 	// on the next successful ResourcesLoaded for this screen.
 	LastFetchError string `json:"last_fetch_error,omitempty"`
-	// TotalCount is the authoritative total for a seeded-but-unverified list
-	// (the seed-time provisional total, #17 wave 2), set by cache-first seeding callers AFTER
-	// applyResourcesLoaded — mirroring Refreshing's set-after-seed ordering —
-	// when the seed source's known total exceeds len(Rows) (the C6a
-	// reconstructable disk pair: Count may outrun the last-known Rows).
-	// buildListFrameTitle prefers this over len(Rows) while it is set. Zero
-	// means "not applicable" — every other seed source already has
-	// len(Rows) == the authoritative total. Cleared by the next genuine
-	// fetch-result landing in applyResourcesLoaded, same trigger as Refreshing.
+	// TotalCount is the population a cache-first seed source reported for this
+	// type (cache.TypeFile.Population / the row store's own TotalCount) while
+	// the seed itself carried only the rows that source retained. Set by
+	// cache-first seeding callers AFTER applyResourcesLoaded, mirroring
+	// Refreshing's set-after-seed ordering. buildListFrameTitle prefers it
+	// over len(Rows) while it is set. Zero means "not applicable" — every
+	// other seed source already has len(Rows) == the authoritative total.
+	// Retired by the first fetch result that supersedes it (applyResourcesLoaded).
 	TotalCount int `json:"total_count,omitempty"`
-
 	// rowsVersion counts every content-changing mutation of Rows/RelatedIDSet
 	// on this screen: applyResourcesLoaded's non-stale write branches,
 	// seedRelatedExactRows, seedFilteredListFromCache, applyListFieldUpdates,

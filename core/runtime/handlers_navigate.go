@@ -201,12 +201,21 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		if entry, ok := c.ResourceCache(canon); ok {
 			// Cached resources already carry fetcher-emitted Findings; no
 			// re-derive needed (W1.4b.3 dropped the legacy Status/Issues bridge).
+			//
+			// C1: the retained rows are what the session last saw, not what AWS
+			// holds now — the re-entry seeds them and verifies them, exactly as
+			// the miss branch below does. The task is returned here rather than
+			// synthesised by whichever adapter happens to notice, so the TUI and
+			// the headless controller re-verify a re-entered list identically.
 			return NavigateResult{
-				Kind:         NavigateKindPushResourceListCached,
-				ResolvedType: canon,
-				DisplayAlias: alias,
-				CachedEntry:  entry,
-			}, nil
+					Kind:         NavigateKindPushResourceListCached,
+					ResolvedType: canon,
+					DisplayAlias: alias,
+					CachedEntry:  entry,
+				}, []TaskRequest{{
+					Key:   TaskKey{Kind: KindFetchResources, Scope: ev.ResourceType},
+					Cache: CacheNone,
+				}}
 		}
 		// Cache miss: adapter pushes a fresh list and the fetch task loads it.
 		// Scope keeps the user-supplied type (alias preserved) so the fetcher
@@ -266,19 +275,21 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 					return nil
 				}
 				if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
+					// The file's population is what the type is known to have;
+					// its rows are only what fitted. Teaching the store the
+					// population before the seed's own rows land is what keeps
+					// the shrink guard from letting a shallower page shrink it
+					// (RowStore.Observe), and what makes a page that stops short
+					// of the population honestly truncated rather than a page
+					// claiming to be the whole list.
+					population := tf.Population()
+					c.session.RowStore.ObserveCount(canon, population)
 					result.CachedEntry = &domain.ListViewCacheEntry{
 						Resources: rowsFromCacheRows(canon, tf.Rows),
 						Pagination: &resource.PaginationMeta{
-							IsTruncated: !tf.Exact,
+							IsTruncated: !tf.Exact || len(tf.Rows) < population,
 						},
-						// Seed-time provisional total: tf.Count is the authoritative total for the
-						// C6a reconstructable pair (Count may exceed len(tf.Rows) — a
-						// counts-only write never touches Rows). Carry it through so
-						// the seeded list's title shows the real total, not the
-						// last-known page count. Only set when it actually exceeds
-						// what Rows would already report, matching TotalCount's
-						// "unknown/not applicable" zero-value contract.
-						TotalCount: max(tf.Count, len(tf.Rows)),
+						TotalCount: population,
 					}
 				}
 				return nil

@@ -170,6 +170,14 @@ type TaskRequest struct {
 	// consumer (drain loops, executeTaskCmd) falls back to its own
 	// dispatch-time capture when this is nil.
 	Snap *DispatchSnapshot
+	// ListSeq is the per-type canonical-list fetch sequence this task was
+	// dispatched at, taken from Session.ListFetchSeqNext by the boundary that
+	// produced the task (core/app's stampDispatchSnapshotLocked, or the TUI's
+	// executeTaskCmd for a task the runtime built directly). The executor
+	// echoes it onto the resulting messages.ResourcesLoaded so the apply
+	// point can reject a result a later dispatch has already superseded. Zero
+	// for every task that does not produce a canonical top-level list result.
+	ListSeq domain.Gen
 }
 
 // ConnectPayload carries the profile/region/gen the adapter must use when

@@ -177,8 +177,13 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	if ctCmd != nil {
-		t.Fatalf("precondition: re-entering ct-events should be a cache hit (cmd == nil), but got a non-nil cmd — cache not yet implemented")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if ctCmd == nil {
+		t.Fatalf("re-entering ct-events should seed the retained rows and re-verify them, but issued no command")
 	}
 
 	// Step 4: Press Ctrl+R (code 0x12) to refresh ct-events.
@@ -195,9 +200,14 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// KEY ASSERTION: ec2 cache must still be intact — no fresh fetch.
-	if ec2Cmd != nil {
-		t.Errorf("after refreshing ct-events only, ec2 should still be a cache hit (cmd == nil), but got non-nil cmd")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	// KEY ASSERTION: ec2's retained rows are still there to seed from.
+	if ec2Cmd == nil {
+		t.Errorf("after refreshing ct-events only, re-entering ec2 should still re-verify its retained rows")
 	}
 }
 
@@ -245,8 +255,13 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	if ctCmd1 != nil {
-		t.Fatalf("precondition: re-entering ct-events (page 1) should be a cache hit (cmd == nil), but got non-nil cmd — cache not yet implemented")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if ctCmd1 == nil {
+		t.Fatalf("re-entering ct-events (page 1) should seed the retained rows and re-verify them, but issued no command")
 	}
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "50+") {
@@ -283,9 +298,13 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		ResourceType: "ct-events",
 	})
 
-	// KEY ASSERTION: still a cache hit (no fresh fetch).
-	if ctCmd2 != nil {
-		t.Errorf("re-entering ct-events after loading page 2 should still be a cache hit (cmd == nil), but got non-nil cmd")
+	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
+	// re-verifies. HandleNavigate returns the KindFetchResources task for the
+	// row-store hit, so both adapters seed the retained rows AND fetch. The
+	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
+	// restore it. The rows-rendered-instantly half below is unchanged.
+	if ctCmd2 == nil {
+		t.Errorf("re-entering ct-events after loading page 2 should seed both pages and re-verify them, but issued no command")
 	}
 
 	plain = stripANSI(rootViewContent(m))

@@ -73,6 +73,49 @@ func (c *Core) CaptureDispatch() DispatchSnapshot {
 	}
 }
 
+// StampListFetchSeq gives task the next per-type list fetch sequence when it
+// is a canonical-list fetch that does not already carry one. Call it
+// synchronously at dispatch time — the values must be handed out in the order
+// the fetches were requested, which the goroutines that later run them do not
+// preserve.
+//
+// A task is a canonical-list fetch when its result will carry
+// messages.FetchProvenanceCanonicalList: KindFetchResources always, and
+// KindFetchMore only when it continues the type's own top-level list rather
+// than a child or filtered drill. Anything else keeps ListSeq zero — those
+// results never reach a canonical list screen, and stamping them would let a
+// child list's load-more supersede an in-flight verification of the list
+// beneath it.
+func (c *Core) StampListFetchSeq(task *TaskRequest) {
+	if task.ListSeq != 0 {
+		return
+	}
+	switch task.Key.Kind {
+	case KindFetchResources:
+	case KindFetchMore:
+		p, ok := task.Payload.(FetchMorePayload)
+		if !ok || !messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter).CanonicalList() {
+			return
+		}
+	default:
+		return
+	}
+	task.ListSeq = c.NextListFetchSeq(task.Key.Scope)
+}
+
+// NextListFetchSeq hands out shortName's next canonical-list fetch sequence,
+// resolving an alias to the canonical short name the apply point compares
+// against.
+func (c *Core) NextListFetchSeq(shortName string) domain.Gen {
+	return c.session.ListFetchSeqNext(canonShortName(shortName))
+}
+
+// LatestListFetchSeq returns the newest canonical-list fetch sequence handed
+// out for shortName — the only value the apply point accepts.
+func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
+	return c.session.ListFetchSeqLatest(canonShortName(shortName))
+}
+
 // ExecuteTask runs a task using a snapshot captured now. Synchronous callers
 // (DrainSync, non-TUI hosts) have no dispatch/execute gap. Async callers (the
 // TUI's executeTaskCmd) MUST capture via CaptureDispatch at dispatch time and
@@ -347,6 +390,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Err:          err,
 			Gen:          gen,
 			TypeGen:      typeGen,
+			ListSeq:      req.ListSeq,
 			Provenance:   messages.FetchProvenanceCanonicalList,
 		}, nil
 
@@ -395,6 +439,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Append:       true,
 			Err:          err,
 			Gen:          gen,
+			ListSeq:      req.ListSeq,
 			Provenance:   messages.ProvenanceForContinuation(p.ParentContext, p.FetchFilter),
 		}, nil
 

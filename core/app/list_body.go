@@ -66,14 +66,14 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// Stale verify-refetch discard (D14): a background verify-refetch (e.g. cold-open's
 	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
 	// dispatch time) can complete AFTER a foreground load-more (m) has
-	// already appended deeper rows onto this same screen. No per-list
-	// dispatch sequence/generation exists in the plumbing to reject this by
-	// gen-stamp (messages.ResourcesLoaded.Gen is a session-wide
-	// AvailabilityGen, unrelated to per-screen fetch ordering), so a smaller,
-	// still-truncated, ID-subset result is treated as stale by construction
-	// (C2: a result older than a later invalidation — here, the append — is
-	// discarded) and the richer on-screen state (rows, pagination, cache
-	// mirror) is kept rather than clobbered.
+	// already appended deeper rows onto this same screen. A stamped result
+	// never reaches here — handleResourcesLoadedEvent rejects a superseded
+	// messages.ResourcesLoaded.ListSeq outright — but a result that carries no
+	// ordering claim (a cache-seed replay, the ApplyResourcesLoaded seam) does,
+	// so a smaller, still-truncated, ID-subset result is still treated as stale
+	// by construction (C2: a result older than a later invalidation — here, the
+	// append — is discarded) and the richer on-screen state (rows, pagination,
+	// cache mirror) is kept rather than clobbered.
 	//
 	// The gate is ls.HasPagination == false (the screen already reached a
 	// CONFIRMED EXACT total), not merely "an append happened" — a Ctrl+R
@@ -189,11 +189,16 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// method, so this unconditional clear only ever fires for a genuine
 		// fetch-result swap, never undoing the seed-time flag.
 		ls.clearFetchInFlight()
-		// Seed-time provisional total (#17 wave 2): a genuine fetch result also retires the seed-time
-		// TotalCount override — len(ls.Rows) is authoritative again once a real
-		// fetch has confirmed/replaced the seeded page. Mirrors Refreshing's
-		// clear-then-caller-rearms-after-seed ordering above.
-		ls.TotalCount = 0
+		// Seed-time provisional total: a fetch result retires the seed's
+		// population only when it actually supersedes it — an EXACT result
+		// (authoritative proof of the new total, C5), or one that already
+		// reaches the seeded population. A still-truncated result shallower
+		// than the seed knew has verified only part of the list and cannot
+		// downgrade the total to its own row depth; that regression is the
+		// "N+" frame where N shrank back to the last-known page.
+		if pagination == nil || !pagination.IsTruncated || len(ls.Rows) >= ls.TotalCount {
+			ls.TotalCount = 0
+		}
 		// Per cache contract C4: a successful fetch result clears any outstanding error
 		// marker from a previous failed attempt. A partial-failure result
 		// (hadErr) leaves any existing marker in place instead — the fetch
@@ -290,11 +295,11 @@ func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) (map
 //     a strict ID subset of existing, meaning it can only be an earlier,
 //     shallower page of the same list, not a disjoint or refreshed set.
 //
-// This is a heuristic, not a generation stamp: no per-list-screen fetch
-// dispatch sequence exists in the current plumbing (messages.ResourcesLoaded.
-// Gen is a session-wide AvailabilityGen for profile/region rotation, not
-// per-fetch ordering within a pair). The subset check is a conservative,
-// false-negative-biased approximation — it only suppresses a replace when
+// This is a heuristic, not a generation stamp — the stamp
+// (messages.ResourcesLoaded.ListSeq) already rejects every superseded fetch
+// result before this function is reached, and what is left for the heuristic
+// is the results that carry no ordering claim at all. The subset check is a
+// conservative, false-negative-biased approximation — it only suppresses a replace when
 // the incoming set could not possibly be anything other than a shallower
 // view of the same, already-superseded page.
 func isStaleReplace(existing, incoming []resource.Resource, pagination *resource.PaginationMeta) bool {
@@ -589,11 +594,11 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	allResources := c.listScreenResources(ls, typeName)
 	total := len(allResources)
-	// Seed-time provisional total: a seeded-but-unverified list (C6a reconstructable disk
-	// pair) may know a larger authoritative total than its last-known Rows —
-	// prefer it for display until the next real fetch result clears it
-	// (applyResourcesLoaded). Only the displayed total is overridden; filtered
-	// still reflects the rows actually on screen.
+	// Seed-time provisional total: a seeded-but-unverified list knows the
+	// population its seed source reported (cache.TypeFile.Population) while
+	// holding only the rows that source retained. Prefer it for display until
+	// a fetch result supersedes it (applyResourcesLoaded). Only the displayed
+	// total is overridden; filtered still reflects the rows actually on screen.
 	total = max(total, ls.TotalCount)
 	visible := c.applyListFilters(ls, typeName, allResources)
 	filtered := len(visible)

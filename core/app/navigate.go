@@ -63,10 +63,11 @@ func resourceJSONLines(r resource.Resource) []string {
 
 // applyNavResult converts a NavigateResult into PushScreen/ReplaceScreen/PopScreen
 // stack operations. Called by Apply after HandleNavigate returns. Returns any
-// additional TaskRequests the stack operation itself spawns (currently only
-// the cache-first-seeding fresh-fetch dispatch for
-// NavigateKindPushResourceListCached) — callers must append these to the
-// tasks HandleNavigate already returned.
+// additional TaskRequests the stack operation itself spawns — callers must
+// append these to the tasks HandleNavigate already returned. A list open of
+// either kind spawns none: HandleNavigate returns the verification task for
+// the cached branch as well as the miss branch, so no adapter decides for
+// itself whether a re-entered list is re-verified.
 //
 // The adapter (not the runtime) decides which ScreenID to push for each kind;
 // this method encodes that mapping for the headless controller.
@@ -122,41 +123,20 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 		c.ensureListState()
 		top := &c.stack[len(c.stack)-1]
-		// For the cache-hit path (a previous visit's RowStore-retained full
-		// entry), populate rows immediately from the cache entry so headless/web
-		// callers see data without waiting for a fetch round-trip — then mark
-		// Refreshing and dispatch a fresh fetch task so the seeded rows are
-		// confirmed/replaced (cache-first seeding never skips the
-		// live fetch, it only removes the visible wait for it).
-		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
+		// Cache-first seeding: HandleNavigate attaches CachedEntry on both
+		// kinds — the RowStore-retained full entry of a previous visit
+		// (NavigateKindPushResourceListCached) and the availability probe's or
+		// on-disk cache's first page (NavigateKindPushResourceList). Populate
+		// rows immediately so headless/web callers see data without waiting for
+		// the fetch round-trip, and mark Refreshing: the verification task
+		// HandleNavigate returned for both kinds is still on its way, and
+		// cache-first seeding never skips it.
+		if res.CachedEntry != nil {
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List), false)
 			top.State.List.Refreshing = true
-			// Seed-time provisional total (#17 wave 2): set AFTER applyResourcesLoaded, same ordering as
-			// Refreshing above — applyResourcesLoaded unconditionally clears
-			// TotalCount as part of every fetch-result landing (including this
-			// seed call itself).
-			if res.CachedEntry.TotalCount > 0 {
-				top.State.List.TotalCount = res.CachedEntry.TotalCount
-			}
-			return []runtime.TaskRequest{{
-				Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: res.ResolvedType},
-				Cache: runtime.CacheNone,
-			}}
-		}
-		// Cache miss (NavigateKindPushResourceList): HandleNavigate already
-		// emits the KindFetchResources task. HandleNavigate attaches CachedEntry
-		// on this Kind too, seeded from session.ProbeResources (first-page rows
-		// retained by the availability probe, or replayed from the on-disk
-		// availability cache at startup) — C1/C5: render what you know, verify
-		// on sight. Consume it here the same way the cache-hit branch above
-		// does, so the list still renders instantly instead of falling back to
-		// the no-rows-known Loading=true path ensureListState already applied.
-		if res.Kind == runtime.NavigateKindPushResourceList && res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List), false)
-			top.State.List.Refreshing = true
-			// Seed-time provisional total: same set-after-seed ordering as the cache-hit branch
-			// above.
-			if res.CachedEntry.TotalCount > 0 {
+			// Set after the seeding call, per SetListTotalCount's ordering note;
+			// lock-free here because applyNavResult already runs under c.mu.
+			if res.CachedEntry.TotalCount > len(top.State.List.Rows) {
 				top.State.List.TotalCount = res.CachedEntry.TotalCount
 			}
 		}

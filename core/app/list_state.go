@@ -519,22 +519,18 @@ func (c *Controller) SetListRefreshing(v bool) {
 	ls.Refreshing = v
 }
 
-// SetListTotalCount sets the TotalCount override on the top list screen.
-// Mirrors SetListRefreshing's locking/topListState pattern. Used by
-// cache-first seeding callers (the seed-time provisional total, #17 wave 2) AFTER
-// applyResourcesLoaded so the seed-time value survives the unconditional
-// clear inside it — same set-after-seed ordering SetListRefreshing already
-// requires. n <= 0 is a no-op: TotalCount's zero value already means
-// "not applicable", and buildListFrameTitle only prefers TotalCount when it
-// exceeds len(Rows).
+// SetListTotalCount sets the seed-time provisional total on the top list
+// screen. Mirrors SetListRefreshing's locking/topListState pattern, and its
+// set-after-seed ordering: applyResourcesLoaded evaluates the retirement rule
+// against whatever TotalCount is already there, so a seed must write its own
+// value after the seeding call, not before. A value the seeded rows already
+// report is a no-op — TotalCount's zero value means "not applicable", which is
+// exactly what a population equal to the row depth is.
 func (c *Controller) SetListTotalCount(n int) {
-	if n <= 0 {
-		return
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ls := c.topListState()
-	if ls == nil {
+	if ls == nil || n <= len(ls.Rows) {
 		return
 	}
 	ls.TotalCount = n

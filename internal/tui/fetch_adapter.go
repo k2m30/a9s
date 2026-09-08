@@ -35,6 +35,7 @@ type profilesLoadedMsg struct {
 // returned message so the handler can discard stale results after a switch.
 func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
+	seq := m.core.NextListFetchSeq(resourceType)
 	return func() tea.Msg {
 		res, err := m.core.FetchResources(ctx, clients, resourceType)
 		// Partial-success contract: fetchers may return BOTH a non-empty
@@ -50,6 +51,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			ListSeq:      seq,
 			Provenance:   messages.FetchProvenanceCanonicalList,
 		}
 	}
@@ -145,6 +147,11 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 		ParentCtx:    msg.ParentContext,
 		FetchFilter:  msg.FetchFilter,
 	}
+	provenance := messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
+	var seq domain.Gen
+	if provenance.CanonicalList() {
+		seq = m.core.NextListFetchSeq(msg.ResourceType)
+	}
 	return func() tea.Msg {
 		res, err := m.core.FetchMoreResources(ctx, clients, p)
 		if err != nil && len(res.Resources) == 0 {
@@ -157,7 +164,8 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 			Append:       true,
 			Err:          err,
 			Gen:          gen,
-			Provenance:   messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter),
+			ListSeq:      seq,
+			Provenance:   provenance,
 		}
 	}
 }
