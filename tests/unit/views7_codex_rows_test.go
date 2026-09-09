@@ -355,3 +355,79 @@ detail:
 			"produced is what the next start reads", got, "us-east-1a")
 	}
 }
+
+// TestTwoFilesForOneTypeAreReported pins row 24. Two files in one directory
+// can name the same type — an operator who renamed a file and kept the old
+// one, or a case-insensitive filesystem's two spellings — and the loader
+// merges them in directory order with the last one winning. Whichever it
+// picks, the operator has two files and one screen, and only the loader knows
+// which one they are looking at.
+func TestTwoFilesForOneTypeAreReported(t *testing.T) {
+	dir := t.TempDir()
+	views7WriteViewFile(t, dir, "EC2", `generated: 7
+list:
+  Instance ID:
+    key: instance_id
+    width: 99
+
+detail:
+  - InstanceId
+`)
+	views7WriteViewFile(t, dir, "ec2", `generated: 7
+list:
+  Instance ID:
+    key: instance_id
+    width: 20
+
+detail:
+  - InstanceId
+`)
+
+	cfg, err := config.LoadFromDirs([]string{dir})
+	if cfg == nil {
+		t.Fatal("LoadFromDirs returned no config for a directory holding two files")
+	}
+
+	// One of them is in use, whole — never a column from each.
+	view := config.GetViewDef(cfg, "ec2")
+	if len(view.List) != 1 {
+		t.Fatalf("ec2 resolved to %d columns; each file declares one", len(view.List))
+	}
+	active := "ec2.yaml"
+	if view.List[0].Width == 99 {
+		active = "EC2.yaml"
+	}
+
+	if err == nil {
+		t.Fatalf("two files in one directory both name the ec2 type and %s is the one in use — the "+
+			"other was read, discarded and never mentioned", active)
+	}
+	report := err.Error()
+	for _, name := range []string{"EC2.yaml", "ec2.yaml"} {
+		if n := strings.Count(report, name); n != 1 {
+			t.Errorf("the load names %s %d times in %q; the report names both files, once each",
+				name, n, report)
+		}
+	}
+	if !views7SaysWhichIsActive(report, active) {
+		t.Errorf("the load reported %q — it says which of the two files the screen is showing, so the "+
+			"operator edits that one", report)
+	}
+}
+
+// views7SaysWhichIsActive reports whether a collision report states that the
+// named file is the one in use. The sentence is dev's; what it has to carry is
+// the file name and the fact that this is the one being read.
+func views7SaysWhichIsActive(report, active string) bool {
+	i := strings.Index(report, active)
+	if i < 0 {
+		return false
+	}
+	tail := strings.ToLower(report[i:])
+	for _, said := range []string{"active", "in use", "wins", "is read", "reading"} {
+		if strings.Contains(tail, said) {
+			return true
+		}
+	}
+	return false
+}
