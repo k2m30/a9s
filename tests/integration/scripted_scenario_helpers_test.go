@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -84,6 +85,56 @@ func fullIntegrationNewDemoScenario(t *testing.T) *fullIntegrationScenario {
 		region:            demo.DemoRegion,
 		lastRelatedByName: make(map[string]messages.RelatedCheckResult),
 	}
+}
+
+// fullIntegrationNewDemoScenarioWithCache is the demo scenario an
+// installation actually is: the on-disk cache is on, rooted in a temp home of
+// this test's own. Every other demo scenario runs WithNoCache(true), which
+// switches off the availability cache AND its background probes — so the two
+// writers of a type's badge (the list-open lane and the probe lane) have no
+// rendered witness between them, and a disagreement can only be found in
+// production.
+//
+// The temp home is registered before the model is built, so the model's own
+// cleanup (which flushes the pending cache write) runs first and the writer is
+// never persisting into a directory RemoveAll is walking.
+func fullIntegrationNewDemoScenarioWithCache(t *testing.T) *fullIntegrationScenario {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	clients := demo.NewServiceClients()
+	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+		tui.WithClients(clients), tui.WithIsDemo(true), tui.WithNoCache(false))
+	t.Cleanup(m.CloseController)
+	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
+	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion, Gen: m.Core().ConnectGen()})
+	return &fullIntegrationScenario{
+		t:                 t,
+		model:             m,
+		clients:           clients,
+		profile:           demo.DemoProfile,
+		region:            demo.DemoRegion,
+		lastRelatedByName: make(map[string]messages.RelatedCheckResult),
+	}
+}
+
+// ListTitleIssueCount reads the issue count the open list's own frame title
+// renders — the " !N" (or " !N+") suffix. ok is false when the title carries
+// no suffix, which is the list saying it has no issues to report.
+func (s *fullIntegrationScenario) ListTitleIssueCount() (n int, truncated, ok bool) {
+	s.t.Helper()
+	re := regexp.MustCompile(`!(\d+)(\+?)`)
+	for _, line := range strings.Split(s.currentView(), "\n") {
+		m := re.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		v, err := strconv.Atoi(m[1])
+		if err != nil {
+			continue
+		}
+		return v, m[2] == "+", true
+	}
+	return 0, false, false
 }
 
 func fullIntegrationNewLiveScenario(t *testing.T, profile, region string) *fullIntegrationScenario {

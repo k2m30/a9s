@@ -11,6 +11,7 @@ package unit
 // dispatch-order tests in enrich_queue_test.go) are not duplicated here.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -390,26 +391,28 @@ func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// A row marked uninspected says why
+// A row marked uninspected says which check did not answer
 // ---------------------------------------------------------------------------
 
-// TestConformance_UninspectedRowsRecordTheirReason pins the "skipped" spec
-// rows 4 and 5: a Wave 2 enricher that marks a row uninspected records the
-// failed call that made it so, through MarkSkipped (or MarkUnusable when the
-// service answered without the field and there is no error to read). Writing
-// TruncatedIDs directly is the silent-skip shape — the row renders "?" and
-// nobody can say what refused.
+// TestConformance_UninspectedRowsRecordTheirReason holds the one recorder
+// rule: a Wave 2 enricher that marks a row uninspected does it through the
+// recorder (MarkSkipped, MarkUnusable, markAllUninspected, capAtEnrichmentCap
+// — whichever states what happened), never by writing TruncatedIDs itself.
 //
-// What is left is a cap mark or a documented race: the walk stopped at its own
-// page cap, or the resource went away between the list call and the per-item
-// one. Each carries a one-line reason on the line above it, and the census
-// below holds the count per file. It is a ratchet in both directions: a new
-// direct write fails the gate, and a file that loses one fails it until its
-// number comes down.
+// The recorder is what carries the check from the mark site to the session
+// set, so a row that could not be inspected can say which call refused rather
+// than only that something did. A direct write reaches the session with the
+// row and without the check, which is the silent-skip shape: the row renders
+// "?" and nobody can say what refused.
+//
+// There is no census. A per-file count of allowed direct writes leaves every
+// one of them nameless, which is the defect, so the number this gate accepts
+// is zero.
 func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
-	directWrite := regexp.MustCompile(`\w+\.TruncatedIDs\[[^\]]*\]\s*=\s*true`)
+	directWrite := regexp.MustCompile(`\w+\.TruncatedIDs\[[^\]]*\]\s*=\s*`)
 
-	seen := map[string]int{}
+	var violations []string
+	recorderSites := 0
 	entries, err := os.ReadDir("../../core/aws")
 	if err != nil {
 		t.Fatalf("read core/aws: %v", err)
@@ -419,75 +422,32 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		// issue_enrichment.go holds MarkSkipped, MarkUnusable,
-		// markAllUninspected and capAtEnrichmentCap themselves — the helpers
-		// the rule routes through.
-		if name == "issue_enrichment.go" {
-			continue
-		}
 		raw, rerr := os.ReadFile(filepath.Join("../../core/aws", name))
 		if rerr != nil {
 			t.Fatalf("read %s: %v", name, rerr)
 		}
-		lines := strings.Split(string(raw), "\n")
-		for i, line := range lines {
+		for i, line := range strings.Split(string(raw), "\n") {
 			if !directWrite.MatchString(line) || strings.HasPrefix(strings.TrimSpace(line), "//") {
 				continue
 			}
-			seen[name]++
-			if i == 0 || !strings.HasPrefix(strings.TrimSpace(lines[i-1]), "//") {
-				t.Errorf("core/aws/%s:%d marks a row uninspected with no reason on the line above: "+
-					"name the cap or the race, or record the failure through MarkSkipped", name, i+1)
+			// issue_enrichment.go holds MarkSkipped, MarkUnusable,
+			// markAllUninspected and capAtEnrichmentCap themselves — the
+			// recorder writes the set, which is the whole point of routing
+			// through it.
+			if name == "issue_enrichment.go" {
+				recorderSites++
+				continue
 			}
+			violations = append(violations, fmt.Sprintf("core/aws/%s:%d %s", name, i+1, strings.TrimSpace(line)))
 		}
 	}
 
-	for name, n := range seen {
-		want, ok := uninspectedWithoutAReasonCensus[name]
-		switch {
-		case !ok:
-			t.Errorf("core/aws/%s writes TruncatedIDs directly (%d times): a row nobody looked at must "+
-				"record what refused, via MarkSkipped(&result, id, &failures, err)", name, n)
-		case n > want:
-			t.Errorf("core/aws/%s writes TruncatedIDs directly %d times, census says %d: "+
-				"the new one must record its reason through MarkSkipped", name, n, want)
-		case n < want:
-			t.Errorf("core/aws/%s writes TruncatedIDs directly %d times, census says %d: "+
-				"lower the number in uninspectedWithoutAReasonCensus", name, n, want)
-		}
+	if recorderSites == 0 {
+		t.Fatal("core/aws/issue_enrichment.go writes TruncatedIDs nowhere — the scan is not reading the recorder it thinks it is")
 	}
-	for name := range uninspectedWithoutAReasonCensus {
-		if _, ok := seen[name]; !ok {
-			t.Errorf("core/aws/%s is in uninspectedWithoutAReasonCensus but writes TruncatedIDs "+
-				"nowhere any more: drop its entry", name)
-		}
+	if len(violations) > 0 {
+		t.Errorf("%d mark site(s) write TruncatedIDs directly, so the row reaches the session without the "+
+			"check that did not answer — record it through MarkSkipped/MarkUnusable (or the cap recorder) "+
+			"instead:\n  %s", len(violations), strings.Join(violations, "\n  "))
 	}
-}
-
-// uninspectedWithoutAReasonCensus is the per-file count of marks that are not
-// a recorded failure: a page cap, or a resource that went away between the
-// list call and the per-item one. Both are true statements about coverage with
-// no error to log, and each site says which it is on the line above the write.
-// Five files left the census when a page cap on a COUNTING walk stopped
-// marking its row uninspected: apigw stages, codeartifact packages, sns
-// subscriptions, efs mount targets and eb-rule targets each report their cap
-// as the "+" on the count instead, so what the enricher did establish beside
-// the capped walk — an authorizer read, a permissions policy, a topic's
-// posture, a file-system policy, the targets the walk already saw — still
-// reaches the row instead of being skipped by FoldWave2Rows.
-var uninspectedWithoutAReasonCensus = map[string]int{
-	"asg_issue_enrichment.go":       1,
-	"ec2_issue_enrichment.go":       1,
-	"ecs_task_issue_enrichment.go":  1,
-	"iam_group_issue_enrichment.go": 1,
-	"kinesis_issue_enrichment.go":   1,
-	"lambda_issue_enrichment.go":    1,
-	"r53_issue_enrichment.go":       1,
-	"redshift_issue_enrichment.go":  1,
-	"s3_issue_enrichment.go":        1,
-	"secrets_issue_enrichment.go":   1,
-	"snapshot_cross_ref.go":         1,
-	"trail_issue_enrichment.go":     2,
-	"tgw_issue_enrichment.go":       1,
-	"vpc_issue_enrichment.go":       1,
 }

@@ -13,7 +13,6 @@ package unit_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -45,17 +45,35 @@ func uninspectedEC2Rows() []resource.Resource {
 	}
 }
 
-// uninspectedResultFor builds a REAL enricher result the way a Wave-2 enricher
-// whose per-item call failed does: awsclient.MarkSkipped, not a hand-written
-// map literal.
-func uninspectedResultFor(ids ...string) awsclient.IssueEnricherResult {
-	result := awsclient.IssueEnricherResult{
-		TruncatedIDs: map[string]bool{},
-		Findings:     map[string][]domain.Finding{},
+// uninspectedCheck is the API call the pins below make fail, so the check the
+// row's Attention entry has to name is a value this file wrote and not one it
+// read back out of the code under test.
+const uninspectedCheck = "DescribeInstanceStatus"
+
+// uninspectedDenied is what the SDK hands an enricher when a per-item call is
+// refused: an operation error naming the call, wrapping the service's own
+// code.
+func uninspectedDenied(op string) error {
+	return &smithy.OperationError{
+		ServiceID:     "EC2",
+		OperationName: op,
+		Err: &smithy.GenericAPIError{
+			Code:    "AccessDenied",
+			Message: "User: arn:aws:iam::123456789012:user/example is not authorized to perform: ec2:" + op,
+		},
 	}
+}
+
+// uninspectedResultFor builds a REAL enricher result the way a Wave-2 enricher
+// whose per-item call failed does: the shared empty result every enricher
+// starts from, then awsclient.MarkSkipped — never a hand-written map literal,
+// which would pin the shape the recorder carries the mark in rather than the
+// mark itself.
+func uninspectedResultFor(ids ...string) awsclient.IssueEnricherResult {
+	result, _ := awsclient.InFetcherWave2Sentinel(context.Background(), nil, nil, nil)
 	var failures []awsclient.Failure
 	for _, id := range ids {
-		awsclient.MarkSkipped(&result, id, &failures, errors.New("AccessDenied"))
+		awsclient.MarkSkipped(&result, id, &failures, uninspectedDenied(uninspectedCheck))
 	}
 	return result
 }
@@ -212,26 +230,64 @@ func TestUninspectedRow_DetailAttentionCarriesNotInspected(t *testing.T) {
 		}
 		t.Fatalf("detail body carries no \"not inspected\" Attention entry for a row the ec2 enricher could not inspect; fields were:\n%s", strings.Join(keys, "\n"))
 	}
-	// The entry names no check. The Wave-2 enricher is registered per resource
-	// type, so its "short name" is just the type name — which the operator can
-	// already read from the screen and which names no individual check. The
-	// session set carries no check identity today (backlog w95), so the entry
-	// says only that the attention checks for this row did not answer.
+	// The entry names the check that did not answer. This assertion is the
+	// INVERSE of what this pin held before: it used to require the phrase to
+	// carry no name, because the recorder threw the failing call away and the
+	// only name available was the resource type, which the operator can
+	// already read off the screen. A row whose posture is unknown is a
+	// different fact from a row whose posture is unknown BECAUSE
+	// DescribeInstanceStatus was refused — the second one the operator can act
+	// on, and the first is what the old shape could say. Do not "restore" the
+	// negative.
 	joined := strings.Join(attention, " ")
-	if !strings.Contains(strings.ToLower(joined), domain.NotInspectedPhrase) {
-		t.Fatalf("the Attention block carries no %q entry: %v", domain.NotInspectedPhrase, attention)
-	}
-	if strings.Contains(joined, "not inspected:") {
-		t.Errorf("the Attention entry still qualifies the phrase with a name: %v", attention)
-	}
-	if strings.Contains(joined, "ec2 check") {
-		t.Errorf("the Attention entry claims a check called %q, which does not exist: %v", "ec2", attention)
-	}
-	if !strings.Contains(strings.ToLower(joined), "attention checks for this row did not answer") {
-		t.Errorf("the Attention entry does not say the checks did not answer: %v", attention)
+	want := domain.NotInspectedPhrase + ": " + uninspectedCheck
+	if !strings.Contains(joined, want) {
+		t.Errorf("the Attention entry reads %v, want one entry %q — the row reached the detail view "+
+			"without the check that refused, so the operator is told a check failed and not which",
+			attention, want)
 	}
 	if !strings.Contains(strings.ToLower(joined), "unknown rather than clean") {
 		t.Errorf("the Attention entry does not say the posture is unknown rather than clean: %v", attention)
+	}
+}
+
+// TestUninspectedRow_InspectedNeighbourGetsNoNotInspectedEntry is the negative
+// half: the check name must travel with the row it was recorded for. A second
+// row the same enricher answered for carries no Attention entry at all — an
+// entry there would read as a failed check on a row that passed one.
+func TestUninspectedRow_InspectedNeighbourGetsNoNotInspectedEntry(t *testing.T) {
+	c, core := newTestControllerAndCore(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+
+	rows := uninspectedEC2Rows()
+	c.ApplyResourcesLoaded("ec2", rows, nil, false)
+	core.ObserveRows("ec2", rows, nil, session.OriginFetch, false)
+
+	result := uninspectedResultFor(rows[0].ID)
+	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: result.TruncatedIDs,
+		Findings:     result.Findings,
+	})
+	c.ApplyIntents(intents)
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{
+			ID:      runtime.ScreenDetail,
+			Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: rows[1].ID},
+		},
+	})
+	c.EnsureDetailState(rows[1], "ec2")
+
+	detail := c.Snapshot().Body.Detail
+	if detail == nil {
+		t.Fatal("no detail body on the snapshot after EnsureDetailState")
+	}
+	for _, f := range detail.Fields {
+		if strings.Contains(strings.ToLower(f.Key), domain.NotInspectedPhrase) {
+			t.Errorf("the row the enricher DID answer for carries %q in its detail — the mark leaked "+
+				"off the row it was recorded for", f.Key)
+		}
 	}
 }
 

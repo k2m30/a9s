@@ -90,33 +90,19 @@ func TestFailureDischargeGate_ARecordedFailureLeavesItsFunction(t *testing.T) {
 		if perr != nil {
 			t.Fatalf("parse %s: %v", path, perr)
 		}
-		for _, decl := range src.Decls {
-			fn, isFunc := decl.(*ast.FuncDecl)
-			if !isFunc || fn.Body == nil {
-				continue
+		found, n := failureDischargeViolations(fset, filepath.Base(path), src, func(key string) bool {
+			reason, exempt := failureDischargeExempt[key]
+			if !exempt {
+				return false
 			}
-			records, discharges := scanFailureCalls(fn.Body)
-			if len(records) == 0 {
-				continue
+			seenExempt[key] = true
+			if reason == "" {
+				t.Errorf("%s: exemption needs a reason", key)
 			}
-			recording++
-			key := filepath.Base(path) + ":" + fn.Name.Name
-			if reason, exempt := failureDischargeExempt[key]; exempt {
-				seenExempt[key] = true
-				if reason == "" {
-					t.Errorf("%s: exemption needs a reason", key)
-				}
-				continue
-			}
-			if len(discharges) > 0 || carriesFailuresInSignature(fn.Type) {
-				continue
-			}
-			violations = append(violations, fmt.Sprintf(
-				"%s:%d %s records %s and neither discharges it (AggregateFailures/Finish) "+
-					"nor carries it out (a *[]Failure parameter, or a Failure result)",
-				filepath.Base(path), fset.Position(fn.Pos()).Line, fn.Name.Name,
-				strings.Join(records, ", ")))
-		}
+			return true
+		})
+		recording += n
+		violations = append(violations, found...)
 		return nil
 	})
 	if err != nil {
@@ -198,4 +184,123 @@ func isFailureSlice(e ast.Expr) bool {
 func isFailureIdent(e ast.Expr) bool {
 	id, isIdent := e.(*ast.Ident)
 	return isIdent && id.Name == "Failure"
+}
+
+// failureDischargeViolations reports every function in file that records a
+// failure and neither discharges it nor hands it onward, and how many
+// functions in the file record at all. exempt is asked once per recording
+// function, keyed "<file>:<func>".
+func failureDischargeViolations(fset *token.FileSet, fileName string, file *ast.File, exempt func(key string) bool) (violations []string, recording int) {
+	for _, decl := range file.Decls {
+		fn, isFunc := decl.(*ast.FuncDecl)
+		if !isFunc || fn.Body == nil {
+			continue
+		}
+		records, discharges := scanFailureCalls(fn.Body)
+		if len(records) == 0 {
+			continue
+		}
+		recording++
+		if exempt != nil && exempt(fileName+":"+fn.Name.Name) {
+			continue
+		}
+		if len(discharges) > 0 || carriesFailuresInSignature(fn.Type) {
+			continue
+		}
+		violations = append(violations, fmt.Sprintf(
+			"%s:%d %s records %s and neither discharges it (AggregateFailures/Finish) "+
+				"nor carries it out (a *[]Failure parameter, or a Failure result)",
+			fileName, fset.Position(fn.Pos()).Line, fn.Name.Name,
+			strings.Join(records, ", ")))
+	}
+	return violations, recording
+}
+
+// TestFailureDischargeGate_FollowsTheSliceEachRecorderWritesTo pins what the
+// rule is actually about: the list a recorder writes into is the one that has
+// to leave the function. Deciding it from the signature alone reads a shape,
+// not a slice — a function that takes a *[]Failure for one walk and drops a
+// local one for another satisfies the shape while a refused call in the second
+// walk still reaches the operator as silence.
+//
+// Each probe below is a whole file, so the analyser sees exactly what it sees
+// in core/aws.
+func TestFailureDischargeGate_FollowsTheSliceEachRecorderWritesTo(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "a parameter list the caller owns",
+			src: `package aws
+func walk(out *[]Failure) {
+	for _, id := range ids() {
+		MarkSkipped(nil, id, out, errBoom)
+	}
+}`,
+		},
+		{
+			name: "a local list the function discharges",
+			src: `package aws
+func walk() error {
+	var failures []Failure
+	for _, id := range ids() {
+		MarkSkipped(nil, id, &failures, errBoom)
+	}
+	return AggregateFailures("walk", failures, 1)
+}`,
+		},
+		{
+			name: "a local list dropped beside a parameter the function also takes",
+			src: `package aws
+func walk(out *[]Failure) error {
+	for _, id := range ids() {
+		MarkSkipped(nil, id, out, errBoom)
+	}
+	var dropped []Failure
+	for _, id := range more() {
+		MarkSkipped(nil, id, &dropped, errBoom)
+	}
+	return nil
+}`,
+			want: []string{"walk"},
+		},
+		{
+			name: "a local list dropped beside one the function returns",
+			src: `package aws
+func walk() []Failure {
+	var carried []Failure
+	MarkSkipped(nil, "a", &carried, errBoom)
+	var dropped []Failure
+	MarkUnusable(nil, "b", &dropped, "no name")
+	return carried
+}`,
+			want: []string{"walk"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, "probe.go", tc.src, 0)
+			if err != nil {
+				t.Fatalf("parse probe: %v", err)
+			}
+			got, recording := failureDischargeViolations(fset, "probe.go", file, nil)
+			if recording != 1 {
+				t.Fatalf("the probe has %d recording functions, want 1 — the analyser is not reading it", recording)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("the gate reported %d violation(s) %v, want %d %v — it decides from the "+
+					"function's shape instead of following the slice each recorder writes to",
+					len(got), got, len(tc.want), tc.want)
+			}
+			for i, name := range tc.want {
+				if !strings.Contains(got[i], name) {
+					t.Errorf("violation %d is %q, want it to name %q", i, got[i], name)
+				}
+			}
+		})
+	}
 }
