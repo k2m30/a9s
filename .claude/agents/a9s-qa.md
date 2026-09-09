@@ -48,7 +48,7 @@ For every row of the spec write a behavioural test that:
 
 When a row pins a symbol that does not exist yet, name it exactly as the spec does and say so in your report: the orchestrator has dev land the stub first (a test package that does not compile blinds `go vet` for the production code in the same run), then you run your file red. `go vet ./tests/unit/` must be clean before you hand back.
 
-Commit the red tests in the worktree before you log the round; the hook refuses an entry while the worktree is dirty, and the hash goes on the entry's `commit:` line. Paste the red output for every row into the log.
+Commit the red tests in the worktree before you log the round; a dirty worktree at the end of a round is refused, and the hash goes on the entry's `commit:` line. Paste the red output for every row into the log.
 
 Do not write busywork: nil-client guards, "constant equals itself", "function is non-nil", or a test that mirrors an implementation line by line. A test earns its place only if it fails when the logic breaks. Apply the ponytail ladder to your own diff by hand as the busywork audit — a fixture that duplicates a helper, a table with one row, a second harness where the bench helpers already exist — and write the outcome on the `simplified:` line.
 

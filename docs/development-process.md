@@ -47,7 +47,7 @@ If any of those is missing, do not start fuzzy — resolve it first.
 
 - Acceptance criteria demonstrably met (test, screenshot, or live run).
 - Stage 6 (`make ready-to-push`) gates green locally.
-- Docs sync respected: README is regenerated when `docs/shared/` changes; `changelog.d/<task>.md` written for any user-visible change (`make changelog` assembles `CHANGELOG.md` at landing); `docs/architecture.md` aligned for cross-cutting changes.
+- Docs sync respected: README is regenerated when `docs/shared/` changes; `CHANGELOG.md` updated for any user-visible change; `docs/architecture.md` aligned for cross-cutting changes.
 - Single-source-of-truth invariants intact (no dual-authoring, no permanent dual API surface).
 - Conventional commit message on every commit.
 
@@ -113,7 +113,7 @@ Lenses, used as tools:
 - `a9s-consistency-checker` — cross-file drift (code ↔ docs ↔ website ↔ config).
 - Direct review for Bubble Tea v2 / Lipgloss v2 correctness (see the `a9s-bt-v2` skill), security (read-only AWS invariant, no secrets), and test-coverage gaps.
 - `arch-review` skill — architecture checklist for size ≥ `M`.
-- `/ponytail-review` on the integrated diff — over-engineering only; it does not hunt correctness. Inside the team loop every dev and QA round already ran it on its own diff and recorded the outcome on the round entry's `simplified:` line (the stop hook refuses a round without it), so the integrated pass is the second look, not the first.
+- `/ponytail-review` on the integrated diff — over-engineering only; it does not hunt correctness. Inside the team loop every dev and QA round already ran it on its own diff and recorded the outcome on the round entry's `simplified:` line, so the integrated pass is the second look, not the first.
 
 External passes, batched — one per phase boundary or pre-tag, never per fix:
 

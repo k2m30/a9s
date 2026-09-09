@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security check-deps coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs smoke-enrichers check-no-real-data install-hooks ready-to-push ready-to-release generate changelog check-changelog
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security check-deps coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs smoke-enrichers check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -98,7 +98,7 @@ check-deps:
 # stops. Excluding here keeps unrelated doc PRs from being gated by lint
 # regressions inside in-flight refactor documents.
 mdlint:
-	markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "changelog.d/**/*.md" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
+	markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
 
 coverage:
 	go test ./core/... ./internal/... ./tests/... -coverpkg=./core/...,./internal/... -coverprofile=coverage.out -covermode=atomic
@@ -149,15 +149,6 @@ verify-zero-init:
 
 demo:
 	vhs docs/demos/demo.tape
-
-# changelog assembles CHANGELOG.md's Unreleased section from the per-task
-# fragments in changelog.d/ (see changelog.d/README.md); check-changelog is the
-# gate that a fragment did not stay behind unassembled.
-changelog:
-	@./scripts/changelog-assemble.sh
-
-check-changelog:
-	@./scripts/changelog-assemble.sh --check
 
 readme:
 	@go run ./cmd/readmegen/ > README.md
@@ -281,7 +272,7 @@ ready-to-push: verify-hooks check-no-real-data test-race integration lint securi
 # is not *readonly*. Requires read-only AWS credentials and tmux.
 # See docs/development-process.md.
 # Usage: make ready-to-release PROFILE=<readonly-profile> REGION=<region>
-ready-to-release: check-changelog smoke-live smoke-related-live
+ready-to-release: smoke-live smoke-related-live
 	@echo "Prerequisite (NOT re-run here): green 'make ready-to-push' on this same tree — Stage 6."
 	@echo "Manual checklist (not automatable, must be confirmed by release owner):"
 	@echo "  [ ] CHANGELOG.md updated for this version"

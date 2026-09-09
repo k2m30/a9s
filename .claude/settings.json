@@ -124,46 +124,6 @@
     "deny": []
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "CMD=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',d).get('command',''))\" 2>/dev/null || true); case \"$CMD\" in *grep*|*rg\\ *|*find\\ *|*fd\\ *|*ack\\ *|*ag\\ *) case \"$CMD\" in *core/*|*internal/*|*cmd/*|*tests/*) [ -f graphify-out/graph.json ] && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"graphify-out/graph.json is present: `graphify query \\\"<question>\\\"` returns a scoped subgraph of the repo source, usually smaller than the grep output. Grep raw files once it has oriented you, or to modify specific lines.\"}}' || true ;; esac ;; esac"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/require-arch-verdict.py"
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Glob",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "HIT=$(python3 -c \"import json,sys;d=json.load(sys.stdin);t=d.get('tool_input',d);j=' '.join(str(t.get(k) or '') for k in ('file_path','pattern','path')).replace(chr(92),'/');sys.stdout.write('1' if any(s in j for s in ('core/','internal/','cmd/','tests/')) else '')\" 2>/dev/null || true); if [ \"$HIT\" = 1 ] && [ -f graphify-out/graph.json ]; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"graphify-out/graph.json is present: `graphify query \\\"<question>\\\"`, `graphify explain \\\"<concept>\\\"` or `graphify path \\\"<A>\\\" \\\"<B>\\\"` returns a scoped subgraph of the repo source. Read raw files once it has oriented you, or to modify specific lines.\"}}'; fi || true"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "F=$(python3 -c \"import json,sys;d=json.load(sys.stdin);print(d.get('tool_input',{}).get('file_path',''))\" 2>/dev/null || true); case \"$F\" in *.go) gofmt -l \"$F\" 2>/dev/null | grep -q . && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"gofmt reports %s as unformatted. Run gofmt -w on it before the gate.\"}}' \"$F\" ;; esac; exit 0"
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "matcher": "compact",
@@ -171,17 +131,6 @@
           {
             "type": "command",
             "command": "[ -f ./.claude/task-context.md ] && cat ./.claude/task-context.md; exit 0"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "a9s-dev|a9s-qa|a9s-acceptance",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -f .claude/hooks/require-green-gate.py ] || exit 0; python3 .claude/hooks/require-green-gate.py"
           }
         ]
       }

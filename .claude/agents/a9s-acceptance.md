@@ -53,7 +53,7 @@ gates: make build EXIT=0 · task tests EXIT=0 · check-catalogen EXIT=0 · check
 observed, out of scope: none | <file:line — what — what closing it takes>, one per line
 ```
 
-The `observed, out of scope:` line is required; the stop hook refuses a verdict without it.
+The `observed, out of scope:` line is required.
 
 `ACCEPT` requires zero failed criteria and all gates green. Do not accept "with notes"; a note is a defect or it is nothing.
 
