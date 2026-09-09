@@ -57,21 +57,40 @@ var paintedBuildersThatKeepTheRawID = map[string]string{ //nolint:gochecknogloba
 	"TextFrameTitle": "paints the screen's own identifier (a runtime.ScreenID: yaml, json, errors), not a resource's",
 }
 
-// readsRawID reports whether fn reads a .ID field into a string it builds,
-// without that read being wrapped in DisplayID. A read inside a DisplayID call
-// is the compliant form; a read compared against another value, indexed with,
-// or passed to a non-painting call is not a paint and is not flagged, because
-// only string building reaches a screen.
+// readsRawID reports whether fn puts a raw identifier into a string it
+// builds, without that value being wrapped in DisplayID.
+//
+// Two shapes count, because a builder can be handed an identifier as well as
+// read one. A .ID field read is the shape the gate was written for. A STRING
+// PARAMETER is the other, and it is the one the title builder takes: the
+// caller has already read the field, so there is no .ID left to see, and a
+// gate looking only for field reads calls the site that actually paints the
+// title compliant. A parameter reassigned from DisplayID counts as wrapped
+// from then on — flow-insensitively, which is the whole of what this needs
+// for a builder that cleans its arguments in one line at the top.
+//
+// A value compared, indexed with, or passed to a non-painting call is not a
+// paint and is not flagged, because only string building reaches a screen.
 func readsRawID(fn *ast.FuncDecl) []string {
 	var raw []string
 	wrapped := map[ast.Node]bool{}
+	wrappedNames := map[string]bool{}
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		if assign, isAssign := n.(*ast.AssignStmt); isAssign {
+			for i, rhs := range assign.Rhs {
+				if !isDisplayIDCall(rhs) || i >= len(assign.Lhs) {
+					continue
+				}
+				if id, isIdent := assign.Lhs[i].(*ast.Ident); isIdent {
+					wrappedNames[id.Name] = true
+				}
+			}
+		}
 		call, isCall := n.(*ast.CallExpr)
 		if !isCall {
 			return true
 		}
-		fun, isSel := call.Fun.(*ast.SelectorExpr)
-		if isSel && fun.Sel.Name == "DisplayID" || isIdent(call.Fun, "DisplayID") {
+		if isDisplayIDCall(call) {
 			for _, arg := range call.Args {
 				ast.Inspect(arg, func(inner ast.Node) bool {
 					wrapped[inner] = true
@@ -81,6 +100,8 @@ func readsRawID(fn *ast.FuncDecl) []string {
 		}
 		return true
 	})
+
+	params := stringParams(fn)
 	// Only string-building positions count: a binary + with a string operand,
 	// or a return of the read itself.
 	flag := func(e ast.Expr) {
@@ -90,6 +111,12 @@ func readsRawID(fn *ast.FuncDecl) []string {
 			// it. Only the last hop can call DisplayID, and this is not it.
 			if call, isCall := n.(*ast.CallExpr); isCall && callsPaintedBuilder(call) {
 				return false
+			}
+			if id, isIdent := n.(*ast.Ident); isIdent {
+				if params[id.Name] && !wrappedNames[id.Name] && !wrapped[n] {
+					raw = append(raw, id.Name+" (parameter)")
+				}
+				return true
 			}
 			sel, isSel := n.(*ast.SelectorExpr)
 			if !isSel || sel.Sel.Name != "ID" || wrapped[n] {
@@ -126,6 +153,36 @@ func callsPaintedBuilder(call *ast.CallExpr) bool {
 		return isPaintedBuilder(fun.Sel.Name)
 	}
 	return false
+}
+
+// stringParams returns fn's string-typed parameter names, which are the
+// values a builder can be handed an identifier in.
+func stringParams(fn *ast.FuncDecl) map[string]bool {
+	out := map[string]bool{}
+	if fn.Type.Params == nil {
+		return out
+	}
+	for _, field := range fn.Type.Params.List {
+		if id, isIdent := field.Type.(*ast.Ident); !isIdent || id.Name != "string" {
+			continue
+		}
+		for _, name := range field.Names {
+			out[name.Name] = true
+		}
+	}
+	return out
+}
+
+// isDisplayIDCall reports whether e is a call to DisplayID.
+func isDisplayIDCall(e ast.Expr) bool {
+	call, isCall := e.(*ast.CallExpr)
+	if !isCall {
+		return false
+	}
+	if fun, isSel := call.Fun.(*ast.SelectorExpr); isSel {
+		return fun.Sel.Name == "DisplayID"
+	}
+	return isIdent(call.Fun, "DisplayID")
 }
 
 func isIdent(e ast.Expr, name string) bool {
