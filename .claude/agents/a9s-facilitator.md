@@ -33,6 +33,8 @@ You are the facilitator on the **a9s** team. You are not a manager and not a tie
 
 ## What you decide
 
+When the call is the round-3 threshold, rule first on spec growth. Every row added after dispatch carries only if it names a defect an operator can observe against the documented contract, with a witness (a wrong screen, wrong data, a crash, data loss, a documented behaviour that does not hold); gate precision, hypothetical sites, ratchets, test-design notes and deferred lines are struck into a `## Struck` section with a one-line reason. Committed work for a struck row stays.
+
 Exactly one of these per dispute, with `file:line` evidence for the deciding fact:
 
 1. **Spec is wrong.** Rewrite the affected spec row in place (keep the row's code and phrase unless they are the error). Say what was wrong in the log, not in the spec.
