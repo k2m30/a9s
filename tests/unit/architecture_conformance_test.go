@@ -12,9 +12,13 @@ package unit
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -391,63 +395,229 @@ func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// A row marked uninspected says which check did not answer
+// A row marked uninspected goes through the recorder
 // ---------------------------------------------------------------------------
 
-// TestConformance_UninspectedRowsRecordTheirReason holds the one recorder
-// rule: a Wave 2 enricher that marks a row uninspected does it through the
-// recorder (MarkSkipped, MarkUnusable, markAllUninspected, capAtEnrichmentCap
-// — whichever states what happened), never by writing TruncatedIDs itself.
-//
-// The recorder is what carries the check from the mark site to the session
-// set, so a row that could not be inspected can say which call refused rather
-// than only that something did. A direct write reaches the session with the
-// row and without the check, which is the silent-skip shape: the row renders
-// "?" and nobody can say what refused.
-//
-// There is no census. A per-file count of allowed direct writes leaves every
-// one of them nameless, which is the defect, so the number this gate accepts
-// is zero.
-func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
-	directWrite := regexp.MustCompile(`\w+\.TruncatedIDs\[[^\]]*\]\s*=\s*`)
+// uninspectedSetField is the field only the recorder may write.
+const uninspectedSetField = "TruncatedIDs"
 
-	var violations []string
-	recorderSites := 0
+// uninspectedRecorderViolations reports every element write to the uninspected
+// set in file, wherever the map that is written came from. The rule is the
+// call, not the spelling: an enricher marks a row by CALLING the recorder
+// (MarkSkipped, MarkUnusable, the cap recorder), and a row that reaches the
+// session by any other route arrives without the check that did not answer.
+//
+// It follows the map one hop: a local the set is assigned to, and a parameter
+// of a same-file helper the set is passed to. Reading the set, carrying it
+// forward in a composite literal, copying it into a merged map and allocating
+// it are all untouched — none of them marks a row.
+//
+// reached counts the selectors seen, so the walk can say when it is reading
+// the wrong tree.
+func uninspectedRecorderViolations(fset *token.FileSet, fileName string, file *ast.File) (violations []string, reached int) {
+	funcs := map[string]*ast.FuncDecl{}
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+			funcs[fn.Name.Name] = fn
+		}
+	}
+
+	// tainted names hold the set itself: a local it was assigned to, or a
+	// parameter a same-file helper received it in.
+	tainted := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.SelectorExpr:
+			if isUninspectedSet(v) {
+				reached++
+			}
+		case *ast.AssignStmt:
+			for i, rhs := range v.Rhs {
+				if !isUninspectedSet(rhs) || i >= len(v.Lhs) {
+					continue
+				}
+				if id, ok := v.Lhs[i].(*ast.Ident); ok {
+					tainted[id.Name] = true
+				}
+			}
+		case *ast.CallExpr:
+			name, ok := v.Fun.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			fn, known := funcs[name.Name]
+			if !known {
+				return true
+			}
+			for i, arg := range v.Args {
+				if !isUninspectedSet(arg) {
+					continue
+				}
+				if param := paramNameAt(fn, i); param != "" {
+					tainted[param] = true
+				}
+			}
+		}
+		return true
+	})
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		assign, ok := n.(*ast.AssignStmt)
+		if !ok {
+			return true
+		}
+		for _, lhs := range assign.Lhs {
+			idx, isIdx := lhs.(*ast.IndexExpr)
+			if !isIdx {
+				continue
+			}
+			switch target := idx.X.(type) {
+			case *ast.SelectorExpr:
+				if isUninspectedSet(target) {
+					violations = append(violations, fmt.Sprintf("%s:%d writes %s[…] itself instead of calling the recorder",
+						fileName, fset.Position(idx.Pos()).Line, uninspectedSetField))
+				}
+			case *ast.Ident:
+				if tainted[target.Name] {
+					violations = append(violations, fmt.Sprintf("%s:%d writes an element of %s through %q, so the mark never passes the recorder",
+						fileName, fset.Position(idx.Pos()).Line, uninspectedSetField, target.Name))
+				}
+			}
+		}
+		return true
+	})
+	sort.Strings(violations)
+	return violations, reached
+}
+
+// isUninspectedSet reports whether e selects the uninspected set off anything.
+func isUninspectedSet(e ast.Node) bool {
+	sel, ok := e.(*ast.SelectorExpr)
+	return ok && sel.Sel != nil && sel.Sel.Name == uninspectedSetField
+}
+
+// paramNameAt returns the name of fn's i-th parameter, or "" when it has none
+// (an unnamed or variadic-past-the-end position).
+func paramNameAt(fn *ast.FuncDecl, i int) string {
+	if fn.Type.Params == nil {
+		return ""
+	}
+	pos := 0
+	for _, field := range fn.Type.Params.List {
+		for _, name := range field.Names {
+			if pos == i {
+				return name.Name
+			}
+			pos++
+		}
+		if len(field.Names) == 0 {
+			pos++
+		}
+	}
+	return ""
+}
+
+// TestConformance_UninspectedRowsRecordTheirReason walks core/aws.
+// issue_enrichment.go holds the recorder itself, which is what the rule routes
+// every mark through.
+func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 	entries, err := os.ReadDir("../../core/aws")
 	if err != nil {
 		t.Fatalf("read core/aws: %v", err)
 	}
+	fset := token.NewFileSet()
+	var violations []string
+	recorderUses := 0
 	for _, e := range entries {
 		name := e.Name()
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		raw, rerr := os.ReadFile(filepath.Join("../../core/aws", name))
-		if rerr != nil {
-			t.Fatalf("read %s: %v", name, rerr)
+		file, perr := parser.ParseFile(fset, filepath.Join("../../core/aws", name), nil, 0)
+		if perr != nil {
+			t.Fatalf("parse %s: %v", name, perr)
 		}
-		for i, line := range strings.Split(string(raw), "\n") {
-			if !directWrite.MatchString(line) || strings.HasPrefix(strings.TrimSpace(line), "//") {
-				continue
-			}
-			// issue_enrichment.go holds MarkSkipped, MarkUnusable,
-			// markAllUninspected and capAtEnrichmentCap themselves — the
-			// recorder writes the set, which is the whole point of routing
-			// through it.
-			if name == "issue_enrichment.go" {
-				recorderSites++
-				continue
-			}
-			violations = append(violations, fmt.Sprintf("core/aws/%s:%d %s", name, i+1, strings.TrimSpace(line)))
+		found, reached := uninspectedRecorderViolations(fset, "core/aws/"+name, file)
+		if name == "issue_enrichment.go" {
+			recorderUses += reached
+			continue
 		}
+		violations = append(violations, found...)
 	}
-
-	if recorderSites == 0 {
-		t.Fatal("core/aws/issue_enrichment.go writes TruncatedIDs nowhere — the scan is not reading the recorder it thinks it is")
+	if recorderUses == 0 {
+		t.Fatalf("core/aws/issue_enrichment.go reaches %s nowhere — the gate is not reading the recorder it thinks it is", uninspectedSetField)
 	}
 	if len(violations) > 0 {
-		t.Errorf("%d mark site(s) write TruncatedIDs directly, so the row reaches the session without the "+
-			"check that did not answer — record it through MarkSkipped/MarkUnusable (or the cap recorder) "+
-			"instead:\n  %s", len(violations), strings.Join(violations, "\n  "))
+		sort.Strings(violations)
+		t.Errorf("%d site(s) reach the uninspected set without calling the recorder, so the row arrives at "+
+			"the session without the check that did not answer:\n  %s", len(violations), strings.Join(violations, "\n  "))
+	}
+}
+
+// TestConformance_UninspectedGateFollowsTheCall is the gate's own probe. Its
+// predecessor matched the source text `result.TruncatedIDs[x] = true`, so a
+// helper that took the map and wrote an element inside itself never appeared
+// in the pattern and passed — the same hole the discharge gate had.
+func TestConformance_UninspectedGateFollowsTheCall(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want int
+	}{
+		{
+			name: "marked through the recorder",
+			src: `package aws
+func enrich(result *IssueEnricherResult, failures *[]Failure) {
+	MarkSkipped(result, "i-1", failures, errBoom)
+	if _, marked := result.TruncatedIDs["i-1"]; marked {
+		_ = len(result.TruncatedIDs)
+	}
+	for id := range result.TruncatedIDs {
+		_ = id
+	}
+}`,
+		},
+		{
+			name: "marked by writing the element",
+			src: `package aws
+func enrich(result *IssueEnricherResult) {
+	result.TruncatedIDs["i-1"] = ""
+}`,
+			want: 1,
+		},
+		{
+			name: "marked by a helper of the enricher's own spelling",
+			src: `package aws
+func noteGone(ids map[string]string, id string) { ids[id] = "" }
+
+func enrich(result *IssueEnricherResult) {
+	noteGone(result.TruncatedIDs, "i-1")
+}`,
+			want: 1,
+		},
+		{
+			name: "the map lifted into a local first",
+			src: `package aws
+func enrich(result *IssueEnricherResult) {
+	set := result.TruncatedIDs
+	set["i-1"] = ""
+}`,
+			want: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, "probe.go", tc.src, 0)
+			if err != nil {
+				t.Fatalf("parse probe: %v", err)
+			}
+			got, _ := uninspectedRecorderViolations(fset, "probe.go", file)
+			if len(got) != tc.want {
+				t.Errorf("the gate reported %d violation(s) %v, want %d — it matches the shape of a write "+
+					"rather than following every route to the set", len(got), got, tc.want)
+			}
+		})
 	}
 }

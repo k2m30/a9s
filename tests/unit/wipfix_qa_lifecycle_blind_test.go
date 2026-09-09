@@ -204,7 +204,11 @@ func TestDrillLoadMore_AppendsToTheDrillThatAskedForIt(t *testing.T) {
 	// drill's own requests.
 	stamped := loadMore[0]
 	b.core.StampListFetchSeq(&stamped)
-	if stamped.ScreenID != 0 && stamped.ListSeq == 0 {
+	if stamped.ScreenID == 0 {
+		t.Error("the drill's continuation names no screen, so the sequence it draws belongs to nobody " +
+			"and the guard has no instance to key by")
+	}
+	if stamped.ListSeq == 0 {
 		t.Error("the drill's continuation drew no list sequence — the drill cannot order it against " +
 			"its own next request")
 	}
