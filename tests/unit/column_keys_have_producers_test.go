@@ -97,23 +97,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 				}
 			}
 
-			lifecycleKey := "state"
-			if td := resource.FindResourceType(shortName); td != nil && td.LifecycleKey != "" {
-				lifecycleKey = td.LifecycleKey
-			}
-
 			for _, col := range view.List {
-				// The type's declared status column is exempt, as a rule about
-				// the shape rather than fifteen entries about fifteen types
-				// (w197 row 11). Its cell is the finding phrase first, and the
-				// save lane persists what the screen showed under this very
-				// key, so a fetcher that never writes it is not a gap: the
-				// cell is not empty for want of it. Fifteen types are in that
-				// position today and the sixteenth needs no line here.
-				if config.IsStatusColumn(col.Key, lifecycleKey) {
-					continue
-				}
-
 				// A column reads its cell from a Fields key or from a
 				// RawStruct path, and the registry answers for the first. A
 				// column that declares neither is not out of scope: its value
@@ -139,7 +123,12 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 					}
 				}
 
-				if !producerSet[col.Key] {
+				// w197 row 22: config.ColumnFilled is the one rule, asked here
+				// and by the load's own report, so a column this gate accepts
+				// is never one the operator is told is broken. It carries the
+				// status-column exemption (row 11) and counts a Path as the
+				// producer it is.
+				if td := resource.FindResourceType(shortName); td != nil && !config.ColumnFilled(*td, col) {
 					t.Errorf(
 						"column %q on type %q has no producer (fetcher or enricher) — "+
 							"add SetFieldKeysForTest or RegisterEnricherFieldKeys for this key, "+

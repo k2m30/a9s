@@ -125,6 +125,19 @@ func FindChild(name string) *ResourceTypeDef {
 	return nil
 }
 
+// FindAny returns the type a view name refers to, parent or child, or nil.
+//
+// A view file, a migration and a load report all name a type the same way and
+// none of them cares which registry it lives in — asking Find alone answered
+// "no such type" for every child view, which is how child files were stamped
+// as migrated and migrated by nothing.
+func FindAny(name string) *ResourceTypeDef {
+	if td := Find(name); td != nil {
+		return td
+	}
+	return FindChild(name)
+}
+
 // AllChildren returns the installed child-type catalog as a slice. The order
 // is not stable — child types are stored in a map for ShortName lookup. Use
 // only for replay walks where iteration order is irrelevant.

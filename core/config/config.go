@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -266,6 +267,7 @@ func ParseSingle(data []byte) (*ViewDef, error) {
 // Returns (nil, nil) when no directories exist or contain no .yaml files.
 func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 	merged := make(map[string]ViewDef)
+	var unresolved []string
 
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
@@ -300,6 +302,20 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 				return nil, fmt.Errorf("parsing %s: %w", filePath, err)
 			}
 
+			// The file's name is the type it configures, resolved the way
+			// every other lookup resolves one — parents and children, and the
+			// canonical spelling whatever case or alias the file used. Storing
+			// the file's own spelling meant "EC2.yaml" validated at load and
+			// was then never read, because the runtime asks for "ec2".
+			// Resolved after the parse so a malformed file is still a parse
+			// error, whatever its name says.
+			td := catalog.FindAny(resourceName)
+			if td == nil {
+				unresolved = append(unresolved, name)
+				continue
+			}
+			resourceName = td.ShortName
+
 			if existing, ok := merged[resourceName]; ok {
 				if len(vd.List) > 0 {
 					existing.List = vd.List
@@ -315,22 +331,72 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 	}
 
 	if len(merged) == 0 {
-		return nil, nil
+		// No file this build can use — but a file whose name names no type is
+		// still a file the operator wrote, and the report is the only thing
+		// that tells them the screen they are looking at is not theirs.
+		return nil, loadReport(nil, unresolved)
 	}
 
 	cfg := &ViewsConfig{Views: merged}
-	return cfg, unfillableColumnKeys(cfg)
+	return cfg, loadReport(cfg, unresolved)
 }
 
-// unfillableColumnKeys reports every list column whose key names nothing on
-// its type — no fetcher field, no enricher field, and no column the type
-// declares. Such a cell is empty on every row, forever, and a view file is the
-// one thing in a9s a person is invited to edit, so the load says which file
-// and which key rather than leaving them to wonder.
+// loadReport is everything the load has to say about the files it read: a file
+// whose name is no type this build has, and a column nothing can fill. Both
+// are the same mistake — a line the operator wrote that reaches no screen —
+// and both are reported rather than rejected, so the rest of the file is used.
+func loadReport(cfg *ViewsConfig, unresolved []string) error {
+	reports := make([]string, 0, len(unresolved))
+	sort.Strings(unresolved)
+	for _, name := range unresolved {
+		reports = append(reports, fmt.Sprintf("%s: names no resource type this build has", name))
+	}
+	if cfg != nil {
+		reports = append(reports, unfillableColumnKeys(cfg)...)
+	}
+	if len(reports) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(reports, "; "))
+}
+
+// ColumnFilled reports whether anything puts a value in this column's cell on
+// td: a RawStruct path it reads the value from, or a key some producer writes
+// — the type's Wave 1 fields, its Wave 2 enricher's, a key the type's own
+// columns name, or its status key, which the findings fill and the save lane
+// stores.
 //
-// It is a report and not a rejection: the caller keeps the config it was
-// handed. One bad key costs the operator that one column, not the file.
-func unfillableColumnKeys(cfg *ViewsConfig) error {
+// A Path is a producer, which is the half the report used to miss: the cascade
+// reads the struct live, and MaterializeListFields writes that same value
+// under the column's key for the row a restart replays. So a column naming
+// both was reported as filled by nothing while rendering correctly on both
+// lanes.
+//
+// The load's report and the producers gate ask here, so a column the gate
+// accepts is never one the operator is told is broken.
+func ColumnFilled(td catalog.ResourceTypeDef, col ListColumn) bool {
+	if col.Path != "" || col.Key == "" {
+		return true
+	}
+	if col.Key == "@id" || col.Key == td.StatusKey() {
+		return true
+	}
+	if slices.Contains(td.FieldKeys, col.Key) || slices.Contains(td.IssueEnricherFieldKeys, col.Key) {
+		return true
+	}
+	for _, c := range td.Columns {
+		if c.Key == col.Key {
+			return true
+		}
+	}
+	return false
+}
+
+// unfillableColumnKeys reports every list column nothing can fill. Such a cell
+// is empty on every row, forever, and a view file is the one thing in a9s a
+// person is invited to edit, so the load says which file and which key rather
+// than leaving them to wonder.
+func unfillableColumnKeys(cfg *ViewsConfig) []string {
 	names := make([]string, 0, len(cfg.Views))
 	for name := range cfg.Views {
 		names = append(names, name)
@@ -339,40 +405,19 @@ func unfillableColumnKeys(cfg *ViewsConfig) error {
 
 	var reports []string
 	for _, name := range names {
-		td := catalog.Find(name)
+		td := catalog.FindAny(name)
 		if td == nil {
-			if child := catalog.FindChild(name); child != nil {
-				td = child
-			} else {
-				// A file for a type this build does not have: nothing to
-				// check it against, and not the operator's mistake to report.
-				continue
-			}
-		}
-		fillable := map[string]bool{"@id": true, td.StatusKey(): true}
-		for _, k := range td.FieldKeys {
-			fillable[k] = true
-		}
-		for _, k := range td.IssueEnricherFieldKeys {
-			fillable[k] = true
-		}
-		for _, c := range td.Columns {
-			if c.Key != "" {
-				fillable[c.Key] = true
-			}
+			continue
 		}
 		for _, col := range cfg.Views[name].List {
-			if col.Key == "" || fillable[col.Key] {
+			if ColumnFilled(*td, col) {
 				continue
 			}
 			reports = append(reports, fmt.Sprintf("%s.yaml: column %q reads key %q, which nothing on %s writes",
 				name, col.Title, col.Key, name))
 		}
 	}
-	if len(reports) == 0 {
-		return nil
-	}
-	return errors.New(strings.Join(reports, "; "))
+	return reports
 }
 
 // ReportText is the one sentence both lanes show for a config that did not

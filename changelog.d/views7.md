@@ -30,6 +30,17 @@
   write a message only to the log. The message no longer claims defaults are in
   use when your file is.
 
+- Five more ways an edited view file was not read the way it was written. A key
+  you typed on a column the built-in view leaves blank is kept instead of being
+  taken for one the upgrade moved, and the rest of that file is no longer
+  replaced along with it. A status column you renamed keeps working: the upgrade
+  maps it to the field the type now uses. Files for the views you drill into,
+  like a target group's health checks, are upgraded like any other. A file named
+  `EC2.yaml` is used for EC2, and one named after nothing at all is reported at
+  startup instead of being ignored in silence. And a column of your own that
+  reads an AWS field by path is no longer reported as unfillable — it renders,
+  live and after a restart.
+
 - A resource whose status the list computes now shows that status, not another
   value stored beside it. A target group whose own column said `unhealthy
   targets: 2/5` displayed `available`, and a build project reading `last build

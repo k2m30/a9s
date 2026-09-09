@@ -207,43 +207,66 @@ var viewColumnChanges = []viewColumnChange{
 // does not record as theirs.
 const keyMoveVersion = 6
 
-// keyMovedOnly reports whether onDisk is this build's column for that title as
-// the build before keyMoveVersion generated it: same title, same value path,
-// same width, same sort key, and only the key the type declares missing.
+// keyMovedOnly reports whether onDisk is, whole, what the build before
+// keyMoveVersion generated for this column: its title, path, width and sort
+// key, and NO key where this build declares one.
+//
+// The empty key is the load-bearing half. The move only ever added keys — 325
+// of them across 77 files, and not one column's key was replaced — so the
+// previous generated form of a moved column is this build's column with the
+// key taken off, and that is what "untouched" has to mean. Asking merely
+// whether the key DIFFERS from this build's reads an operator's own key as the
+// generator's output, and since generatedAsIs asks this same question of every
+// column to decide whether the file was ever edited, one such key made the
+// whole file look untouched and be replaced wholesale.
 func keyMovedOnly(on, now ListColumn, stamp int) bool {
 	return stamp < keyMoveVersion &&
-		on.Key != now.Key &&
+		on.Key == "" && now.Key != "" &&
 		on.Title == now.Title &&
 		on.Path == now.Path &&
 		on.Width == now.Width &&
 		on.SortKey == now.SortKey
 }
 
-// statusKeyMoveVersion is the stamp at which a column stopped answering to the
-// literal key "status". Until it, the status cell was the one a column's TITLE
-// said was the status column, or the one whose key was spelled "status"
-// whatever the type calls its own lifecycle key — so an operator editing a
-// view file typed "status" and it worked. The type declares the key now
-// (catalog.ResourceTypeDef.LifecycleKey), and a hand-typed "status" on a type
-// that calls it something else names nothing.
+// statusKeyMoveVersion is the stamp at which the status column stopped being
+// the one a TITLE said was the status column, or the one whose key was spelled
+// "status" whatever the type calls its own key. The type declares it now
+// (catalog.ResourceTypeDef.LifecycleKey), so a file written before this stamp
+// carries columns the replaced rule treated as the status and this build does
+// not — a renamed Status column above all, which is the one the renderer's
+// title merge cannot reach either.
 //
-// That is a key this build moved, so this build moves it: the same bargain
-// keyMoveVersion makes. It is matched on the key alone and not on the title,
-// because renaming the column is the other half of what an operator does to
-// it, and a renamed column is exactly the one the title merge cannot reach.
+// A migration encodes the rule it replaced. movedStatusKey is that rule,
+// written out once: it is what config.IsStatusColumn said before this build,
+// and every column it recognises takes the key the type now declares.
 const statusKeyMoveVersion = 7
 
-// movedStatusKey returns the key a column carrying the old literal "status"
+// movedStatusKey returns the key a column the REPLACED status rule recognised
 // takes on this type, and whether it moved at all.
-func movedStatusKey(view, key string, stamp int) (string, bool) {
-	if stamp >= statusKeyMoveVersion || key != "status" {
+func movedStatusKey(view string, col ListColumn, stamp int) (string, bool) {
+	if stamp >= statusKeyMoveVersion {
 		return "", false
 	}
-	td := catalog.Find(view)
-	if td == nil || td.StatusKey() == "status" {
+	// catalog.FindAny and not Find: a child type has a view file, an operator
+	// and a lifecycle key of its own, and looking only among the parents
+	// stamped every child file as migrated while migrating nothing.
+	td := catalog.FindAny(view)
+	if td == nil {
 		return "", false
 	}
-	return td.StatusKey(), true
+	statusKey := td.StatusKey()
+	if col.Key == statusKey {
+		return "", false
+	}
+	// The replaced predicate, verbatim: key "status", key == the type's
+	// lifecycle key, or a title of "status"/"state" whatever the key said.
+	wasStatus := col.Key == "status" ||
+		strings.EqualFold(col.Title, "status") ||
+		strings.EqualFold(col.Title, "state")
+	if !wasStatus {
+		return "", false
+	}
+	return statusKey, true
 }
 
 // viewColumnAdditions names a column the built-in views GAINED, and the
@@ -342,7 +365,7 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 	// happens to change would leave the next kind of correction stranded —
 	// which is how the humanize flag reached new installations alone.
 	for i, on := range vd.List {
-		if moved, ok := movedStatusKey(name, on.Key, vd.Generated); ok {
+		if moved, ok := movedStatusKey(name, on, vd.Generated); ok {
 			vd.List[i].Key = moved
 		}
 		now, ok := want[on.Title]
