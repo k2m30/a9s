@@ -20,3 +20,15 @@
   of being recomputed by the terminal renderer from a different width on every
   frame. The values on a detail screen now start in the same place whatever is
   rendering them, including with the related panel open.
+
+- The error a failed refresh leaves over a list is inert too. It is the same
+  AWS message the banner shows, and it was painted verbatim.
+
+- A search finds the match where it is painted. A name holding a character
+  whose lowercase form is a different length, a Turkish dotted I among them,
+  used to shift the highlight off the word by one column for the rest of the
+  line.
+
+- The status column is as wide as the list body says it is. It was declared in
+  one place and widened again in the terminal renderer, so a second lane
+  reading the same body laid the column out differently.

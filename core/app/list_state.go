@@ -581,7 +581,7 @@ func (c *Controller) SetListFetchError(err string) {
 		return
 	}
 	ls.Refreshing = false
-	ls.LastFetchError = err
+	ls.setFetchError(err)
 }
 
 // SetListRefreshing sets the Refreshing flag on the top list screen. Mirrors

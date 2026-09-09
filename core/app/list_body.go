@@ -4,8 +4,11 @@ package app
 
 import (
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
+
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -184,7 +187,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// stale marker (or no marker at all) left over from an unrelated
 		// earlier attempt.
 		if fetchErr != nil {
-			ls.LastFetchError = fetchErr.Error()
+			ls.setFetchError(fetchErr.Error())
 		} else {
 			ls.LastFetchError = ""
 		}
@@ -637,12 +640,45 @@ func (b listBodyBuild) run() listBodyMemo {
 		sortCol:         b.ls.SortCol,
 		sortDir:         b.ls.SortDir,
 		enrichGen:       b.enrichGen,
-		columns:         b.columns,
+		columns:         widenStatusColumn(b.columns, rows, statusCol),
 		rows:            rows,
 		// Resolve the identity column index (full column list, before hscroll).
 		identityCol: IdentityColumnIndex(b.columns, b.td),
 		statusCol:   statusCol,
 	}
+}
+
+// setFetchError installs the error marker a failed fetch leaves over the rows
+// it could not replace. The text is an AWS response's own message, which
+// quotes the input it rejected — a bucket name, a tag value — so it reaches
+// the screen by the same lane a row does and crosses the same boundary.
+func (ls *ListState) setFetchError(text string) {
+	ls.LastFetchError = domain.Sanitize(text)
+}
+
+// widenStatusColumn returns columns with the status column wide enough for the
+// widest status cell in rows. Every column publishes the width the painter
+// fills, and the status column is the one whose content the type cannot
+// declare a width for: the phrase is written by an enricher, per row, after
+// the column was declared. So it is widened where the rest of the layout is
+// decided — a lane with no renderer of its own reads the same number the
+// terminal paints, and a caller that narrows it is obeyed.
+func widenStatusColumn(columns []ColumnDef, rows []ListRow, statusCol int) []ColumnDef {
+	if statusCol < 0 || statusCol >= len(columns) {
+		return columns
+	}
+	w := columns[statusCol].Width
+	for _, row := range rows {
+		if statusCol < len(row.Cells) {
+			w = max(w, lipgloss.Width(row.Cells[statusCol]))
+		}
+	}
+	if w == columns[statusCol].Width {
+		return columns
+	}
+	out := slices.Clone(columns)
+	out[statusCol].Width = w
+	return out
 }
 
 // ListFrameTitle mirrors FrameTitle in ResourceListModel.

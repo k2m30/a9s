@@ -3,7 +3,7 @@
 package app
 
 import (
-	"strings"
+	"regexp"
 
 	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -130,32 +130,28 @@ func (c *Controller) GetTextScreenContext() (runtime.ScreenID, runtime.ScreenCon
 // a CJK name, so the published offset carries the unit its name claims and
 // every reader converts from that one.
 //
-// Each line is measured with its own styling stripped: the lines a text screen
-// carries are already syntax-coloured, and a column is a thing the operator
-// sees, not a byte of an escape sequence.
+// The walk runs over the line that is painted, with its styling stripped and
+// nothing else changed. A folded copy is not that line: "İ" is two bytes and
+// lowercases to three, so an offset read off the folded copy sits one byte
+// past the text it names and the highlight lands beside the match. The
+// case-insensitivity is the regexp's, applied to the painted bytes.
 func TextSearchMatches(lines []string, query string) []SearchMatch {
 	if query == "" {
 		return nil
 	}
-	q := strings.ToLower(query)
+	re, err := regexp.Compile("(?i)" + regexp.QuoteMeta(query))
+	if err != nil {
+		return nil
+	}
 	var matches []SearchMatch
 	for lineIdx, line := range lines {
 		plain := ansi.Strip(line)
-		lower := strings.ToLower(plain)
-		start := 0
-		for {
-			idx := strings.Index(lower[start:], q)
-			if idx < 0 {
-				break
-			}
-			at := min(start+idx, len(plain))
-			end := min(at+len(q), len(plain))
+		for _, at := range re.FindAllStringIndex(plain, -1) {
 			matches = append(matches, SearchMatch{
 				Line:     lineIdx,
-				ColStart: lipgloss.Width(plain[:at]),
-				ColEnd:   lipgloss.Width(plain[:end]),
+				ColStart: lipgloss.Width(plain[:at[0]]),
+				ColEnd:   lipgloss.Width(plain[:at[1]]),
 			})
-			start += idx + len(q)
 		}
 	}
 	return matches

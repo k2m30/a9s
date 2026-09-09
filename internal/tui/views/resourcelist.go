@@ -444,15 +444,6 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		cols = nil
 	}
 
-	// Widen lifecycle/status column to the max natural phrase width across all rows.
-	// body.Rows[i].Cells are indexed by the full (pre-scroll) column list, so
-	// body.StatusCol (also full-column-space) is passed to resolve the correct
-	// cell index regardless of the scroll offset. The widen pass measures
-	// row.Cells verbatim — the S4 status-column override is already baked into
-	// Cells by buildListBody, so no separate findings-phrase measurement is
-	// needed.
-	cols = renderListWidenLifecycleColumn(cols, fullCols, body.Rows, body.StatusCol, scrollX)
-
 	cols = m.fitColumns(cols)
 
 	if len(cols) == 0 {
@@ -516,56 +507,6 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	}
 
 	return sb.String()
-}
-
-// renderListWidenLifecycleColumn widens the status/lifecycle column to the
-// max natural width of its baked cell text (body.Rows[i].Cells[statusCol]) —
-// a pure consumer of the pre-resolved body.StatusCol index. No re-measurement
-// of EnrichmentFindings phrases happens here: buildListBody has already baked
-// any S4 status-column override into Cells, so measuring Cells verbatim is
-// sufficient.
-//
-// statusCol is the full-column-space index (body.StatusCol); -1 means the
-// type has no status column, a no-op. cols is the post-scroll visible slice
-// whose matching entry gets widened; fullCols is the pre-scroll full column
-// list used to translate statusCol into a visible index.
-func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []app.ListRow, statusCol int, scrollX int) []listCol {
-	if len(cols) == 0 || len(rows) == 0 || statusCol < 0 {
-		return cols
-	}
-
-	// Translate the full-column-space status index into the visible
-	// (post-scroll, post-fit) index.
-	visIdx := -1
-	if statusCol >= scrollX {
-		candidate := statusCol - scrollX
-		if candidate < len(cols) && candidate < len(fullCols[scrollX:]) {
-			origIdx := scrollX + candidate
-			if origIdx < len(fullCols) && cols[candidate].key == fullCols[origIdx].key {
-				visIdx = candidate
-			}
-		}
-	}
-	if visIdx < 0 {
-		// Lifecycle column is scrolled off; nothing to widen.
-		return cols
-	}
-
-	maxW := cols[visIdx].width
-	for _, row := range rows {
-		if statusCol < len(row.Cells) {
-			if nat := text.Width(row.Cells[statusCol]); nat > maxW {
-				maxW = nat
-			}
-		}
-	}
-	if maxW == cols[visIdx].width {
-		return cols
-	}
-	out := make([]listCol, len(cols))
-	copy(out, cols)
-	out[visIdx].width = maxW
-	return out
 }
 
 // renderListRowStyle returns the lipgloss.Style for a row, mirroring the base

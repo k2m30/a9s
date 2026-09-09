@@ -26,17 +26,22 @@ import (
 // filter and match. It is the substitution the painter already makes for the
 // C0 bytes it meets.
 func Sanitize(s string) string {
-	if !strings.ContainsFunc(s, isControlRune) {
+	if !needsSanitizing(s) {
 		return s
 	}
 	var b strings.Builder
 	b.Grow(len(s))
 	for i := 0; i < len(s); {
 		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 && isControlRune(rune(s[i])) {
+			// A C1 control as the single 8-bit byte a terminal in that mode
+			// obeys, which is not valid UTF-8 and so decodes as no rune at all.
+			r = rune(s[i])
+		}
 		switch {
-		case r == 0x1b:
+		case r == 0x1b || isC1Introducer(r):
 			b.WriteByte(' ')
-			i += escapeLen(s[i:])
+			i += sequenceLen(s[i:], r, size)
 		case isControlRune(r):
 			b.WriteByte(' ')
 			i += size
@@ -48,41 +53,98 @@ func Sanitize(s string) string {
 	return b.String()
 }
 
+// needsSanitizing reports whether s holds anything Sanitize would change: a
+// control rune, or a C1 control written as the raw 8-bit byte that is not
+// valid UTF-8 on its own. A continuation byte inside a CJK rune is neither,
+// which is why this decodes rather than scanning bytes.
+func needsSanitizing(s string) bool {
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if isControlRune(r) {
+			return true
+		}
+		if r == utf8.RuneError && size == 1 && isControlRune(rune(s[i])) {
+			return true
+		}
+		i += size
+	}
+	return false
+}
+
 // isControlRune reports whether r is a C0 control, DEL, or a C1 control.
 func isControlRune(r rune) bool {
 	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
 }
 
-// escapeLen returns the byte length of the escape sequence at the start of s,
-// which begins with ESC. A CSI or SS runs to its final byte, a string sequence
-// (OSC, DCS, SOS, PM, APC) to its BEL or ST terminator, and anything else is
-// the ESC and the byte after it. An unterminated sequence is the whole rest of
-// the string: it would have swallowed everything after it on a real terminal
-// too.
-func escapeLen(s string) int {
-	if len(s) < 2 {
-		return len(s)
+// isC1Introducer reports whether r is a C1 control that opens a sequence in
+// its own right: CSI, OSC, DCS, SOS, PM and APC each have a single-character
+// C1 spelling beside the two-character ESC one.
+func isC1Introducer(r rune) bool {
+	switch r {
+	case 0x9b, 0x9d, 0x90, 0x98, 0x9e, 0x9f:
+		return true
 	}
-	switch s[1] {
+	return false
+}
+
+// sequenceLen returns the byte length of the control sequence at the start of
+// s, which begins with the introducer r of size bytes. A CSI runs to its final
+// byte, a string sequence (OSC, DCS, SOS, PM, APC) to its BEL or ST
+// terminator, and anything else is the introducer and the byte after it. An
+// unterminated sequence is the whole rest of the string: it would have
+// swallowed everything after it on a real terminal too.
+//
+// The payload goes with the introducer, never only the control byte: "31m"
+// left behind as text is the sequence still on the screen, minus the part that
+// made it invisible.
+func sequenceLen(s string, r rune, size int) int {
+	kind := byte(0)
+	switch r {
+	case 0x1b:
+		if len(s) < 2 {
+			return len(s)
+		}
+		kind = s[1]
+		size = 2
+	case 0x9b:
+		kind = '['
+	case 0x9d:
+		kind = ']'
+	case 0x90:
+		kind = 'P'
+	case 0x98:
+		kind = 'X'
+	case 0x9e:
+		kind = '^'
+	case 0x9f:
+		kind = '_'
+	}
+	switch kind {
 	case '[': // CSI: parameter and intermediate bytes, then a final byte.
-		for i := 2; i < len(s); i++ {
+		for i := size; i < len(s); i++ {
 			if s[i] >= 0x40 && s[i] <= 0x7e {
 				return i + 1
 			}
 		}
 		return len(s)
 	case ']', 'P', 'X', '^', '_': // string sequences, terminated by BEL or ST.
-		for i := 2; i < len(s); i++ {
+		for i := size; i < len(s); i++ {
 			if s[i] == 0x07 {
 				return i + 1
 			}
 			if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '\\' {
 				return i + 2
 			}
+			if s[i] == 0x9c {
+				return i + 1
+			}
+			if s[i] == 0xc2 && i+1 < len(s) && s[i+1] == 0x9c {
+				return i + 2
+			}
 		}
 		return len(s)
 	default:
-		return 2
+		return size
 	}
 }
 

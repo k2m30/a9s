@@ -89,6 +89,27 @@ func (m YAMLModel) Viewport() viewport.Model {
 	return m.viewport
 }
 
+// ── JSONModel ─────────────────────────────────────────────────────────────────
+
+// NewTransientJSON creates a JSONModel whose viewport is pre-initialised from
+// vp. ready is set to true so RenderText does not return early. The JSON lane
+// paints a body the same way the YAML lane does, and without this it was the
+// one text lane no test could drive.
+func NewTransientJSON(w, h int, vp viewport.Model) JSONModel {
+	return JSONModel{
+		width:    w,
+		height:   h,
+		viewport: vp,
+		ready:    true,
+	}
+}
+
+// Viewport returns the current viewport.Model so the caller can persist
+// scroll state across renders.
+func (m JSONModel) Viewport() viewport.Model {
+	return m.viewport
+}
+
 // ── SelectorModel ─────────────────────────────────────────────────────────────
 
 // NewTransientSelector creates a SelectorModel with only width/height set.

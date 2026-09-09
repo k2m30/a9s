@@ -279,7 +279,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// refreshing marker and swaps in an error marker instead —
 				// nothing goes blank, rows stay on screen.
 				if v.Err != "" {
-					ls.LastFetchError = v.Err
+					ls.setFetchError(v.Err)
 				}
 			}
 

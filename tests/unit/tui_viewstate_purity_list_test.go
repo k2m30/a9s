@@ -153,8 +153,19 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 		ResourceID: "res-3",
 		Color:      "healthy",
 	}
+	// The status column is declared wide enough for the baked phrase here.
+	// tui6 row 5 moved the "widen the status column to its widest cell"
+	// decision out of the renderer and into the body build, so the width a
+	// hand-assembled body publishes is the width the painter fills, exactly
+	// like every other column's. A narrower declaration truncates the phrase,
+	// which is the new contract holding rather than the override returning:
+	// this case is about WHICH string reaches the cell, and the decoy
+	// assertion below is what pins that.
+	columns := purityColumns()
+	columns[1].Width = len(bakedPhrase) + 1
+
 	body := app.ListBody{
-		Columns:     purityColumns(),
+		Columns:     columns,
 		Rows:        []app.ListRow{row},
 		Selected:    0,
 		IdentityCol: 0,
