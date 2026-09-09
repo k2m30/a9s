@@ -435,3 +435,71 @@ func views7SaysWhichIsActive(report, active string) bool {
 	}
 	return false
 }
+
+// TestStampedFileForAnUnknownTypeIsRetired pins row 26. The generator writes a
+// file per type it knows; when a type is renamed, the file the generator wrote
+// under the old name stays on disk and names nothing. That is the generator's
+// leftover, not the operator's mistake, and reporting it flashes an error on
+// every start of an installation that has done nothing wrong.
+//
+// The stamp is what tells them apart: a generated file carries one, a file a
+// person wrote does not.
+func TestStampedFileForAnUnknownTypeIsRetired(t *testing.T) {
+	t.Run("the generator's leftover is retired in silence", func(t *testing.T) {
+		dir := t.TempDir()
+		views7WriteViewFile(t, dir, "docdb-snap", `generated: 6
+list:
+  Snapshot ID:
+    key: snapshot_id
+    width: 36
+
+detail:
+  - DBClusterSnapshotIdentifier
+`)
+		if err := config.EnsureViewsDir(dir); err != nil {
+			t.Fatalf("EnsureViewsDir: %v", err)
+		}
+		if _, statErr := os.Stat(filepath.Join(dir, "docdb-snap.yaml")); statErr == nil {
+			t.Errorf("docdb-snap.yaml is still in the views dir — a stamped file for a type this build " +
+				"does not have is the generator's own leftover from the rename, and the migration owns it")
+		}
+		if _, err := config.LoadFromDirs([]string{dir}); err != nil {
+			t.Errorf("the load reported %v — an installation whose only fault is having run an older "+
+				"build sees this flash on every start", err)
+		}
+	})
+
+	t.Run("a file a person wrote is still reported", func(t *testing.T) {
+		dir := t.TempDir()
+		views7WriteViewFile(t, dir, "ec22", `list:
+  Instance ID:
+    key: instance_id
+    width: 20
+
+detail:
+  - InstanceId
+`)
+		if err := config.EnsureViewsDir(dir); err != nil {
+			t.Fatalf("EnsureViewsDir: %v", err)
+		}
+		if _, statErr := os.Stat(filepath.Join(dir, "ec22.yaml")); statErr != nil {
+			t.Errorf("ec22.yaml was retired: %v — no generator wrote it, so it is the operator's file "+
+				"and theirs to fix", statErr)
+		}
+		_, err := config.LoadFromDirs([]string{dir})
+		if err == nil || !strings.Contains(err.Error(), "ec22.yaml") {
+			t.Errorf("the load reported %v — a file nobody generated, naming a type nothing has, is "+
+				"still the operator's typo", err)
+		}
+	})
+
+	t.Run("a views dir this build wrote reports nothing", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := config.EnsureViewsDir(dir); err != nil {
+			t.Fatalf("EnsureViewsDir: %v", err)
+		}
+		if _, err := config.LoadFromDirs([]string{dir}); err != nil {
+			t.Errorf("a freshly generated views dir reported %v", err)
+		}
+	})
+}
