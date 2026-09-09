@@ -19,15 +19,16 @@ Surviving subagents and their write boundaries:
 
 | Subagent | Writes to | Use for |
 |---|---|---|
-| `a9s-dev` | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, `tests/`, generated docs | The implementer: red test per spec row, the fix, its own edge-case probes; production code, tests, fixtures, catalog, doc regeneration |
-| `a9s-facilitator` | `TASKDIR/spec.md`, `TASKDIR/log.md` | Binding ruling when dev logs `OFF` / `LOOP` / `BLOCKED` |
+| `a9s-qa` | `tests/` | The red test per spec row before dev starts, blind to the implementation; never production code |
+| `a9s-dev` | `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/`, its own probe tests under `tests/`, generated docs | The implementer: makes QA's tests pass, probes its own edge cases, runs the suite itself; never edits a QA test |
+| `a9s-facilitator` | `TASKDIR/spec.md`, `TASKDIR/log.md` | Binding ruling on `OFF` / `LOOP` / `BLOCKED`, and at round 3 on spec growth |
 | `a9s-acceptance` | `TASKDIR/` | Skeptical end-user acceptance on rendered surfaces, docs and gates |
 | `a9s-qa-stories` | Nothing (read-only) | Given/when/then stories from the design spec, zero source knowledge |
 | `a9s-consistency-checker` | Nothing (read-only) | Cross-file drift: code ↔ docs ↔ website ↔ config |
 | `a9s-devops` | All | AWS-practitioner consult: resource priorities, real-world workflows |
 | `tui-designer` | Design artifacts | TUI wireframes, color schemes, preview mockups |
 
-The dev/QA write split is the TDD guardrail: dev cannot edit tests, QA cannot edit production code. Keep it. The loop itself — task workspace, round log, statuses, escalation to the facilitator, final acceptance — is defined once in `.claude/skills/a9s-team-loop/SKILL.md`.
+The dev/QA write split is the TDD guardrail: dev cannot edit QA's tests, QA cannot edit production code. Keep it. A spec is frozen at dispatch, at most eight rows, each with an operator-observable witness; growth past that is the facilitator's ruling, never the orchestrator's addition. The loop itself — task workspace, round log, statuses, escalation to the facilitator, final acceptance — is defined once in `.claude/skills/a9s-team-loop/SKILL.md`.
 
 ## Definitions
 
@@ -46,7 +47,7 @@ If any of those is missing, do not start fuzzy — resolve it first.
 
 - Acceptance criteria demonstrably met (test, screenshot, or live run).
 - Stage 6 (`make ready-to-push`) gates green locally.
-- Docs sync respected: README is regenerated when `docs/shared/` changes; `CHANGELOG.md` updated for any user-visible change; `docs/architecture.md` aligned for cross-cutting changes.
+- Docs sync respected: README is regenerated when `docs/shared/` changes; `changelog.d/<task>.md` written for any user-visible change (`make changelog` assembles `CHANGELOG.md` at landing); `docs/architecture.md` aligned for cross-cutting changes.
 - Single-source-of-truth invariants intact (no dual-authoring, no permanent dual API surface).
 - Conventional commit message on every commit.
 
@@ -66,7 +67,7 @@ Every unit of work goes through these stages. Stages 2, 4, 6.5 may be **skipped*
 
 **When the lane applies — all of the following must hold:**
 
-1. The change touches **only** `*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`, or `CHANGELOG.md`. No Go source, tests, fixtures, Makefile, `.github/workflows/`, `core/`, `internal/`, or `cmd/`.
+1. The change touches **only** `*.md`, `docs/`, `website/`, `specs/`, `.claude/`, or `LICENSE`. No Go source, tests, fixtures, Makefile, `.github/workflows/`, `core/`, `internal/`, or `cmd/`.
 2. Size is `XS`: ≤ 30 LOC added/changed across ≤ 2 files.
 3. The change is one of: typo fix, link fix, formatting/style fix, or clarification.
 4. The change does **not** reverse an existing rule. Reversing a rule routes through normal Stages 1–5.
@@ -90,8 +91,8 @@ Every unit of work goes through these stages. Stages 2, 4, 6.5 may be **skipped*
 ### Stage 3 — Tests
 
 - **Trigger**: spec published (size ≥ M) or scoped task (`XS`/`S`).
-- **Tools**: `a9s-qa-stories` (given/when/then, zero source knowledge), `a9s-dev` (the failing Go test per spec row, red output pasted in the round log).
-- **Action**: `a9s-dev` writes the behavioural test for each spec row before its fix, runs it red, and only then implements; both land in the same round and the same commit, test file first in the diff. A separate QA role was retired on 2026-09-07: its verify round re-ran the suite dev had just run.
+- **Tools**: `a9s-qa-stories` (given/when/then, zero source knowledge), `a9s-qa` (the failing Go test per spec row, red output pasted in the round log).
+- **Action**: `a9s-qa` writes the behavioural test for each spec row from the spec and the stories, blind to the implementation, runs it red and commits it before `a9s-dev` enters the worktree. Dev makes them pass and runs the suite itself; there is no QA verify round.
 - **Exit**: failing tests committed.
 - **Anti-pattern**: a test written after the fix and never seen red. The round log carries the red output; a test with no red output proves nothing.
 

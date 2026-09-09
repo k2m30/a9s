@@ -21,7 +21,10 @@ SETTINGS = os.path.join(REPO_ROOT, ".claude", "settings.json")
 CLAUDE_MD_MAX_LINES = 180
 # Retired agents. A prompt naming a subagent that no longer exists produces a
 # dispatch failure, not a warning, so every mention has to go.
-RETIRED_AGENTS = ("a9s-coder", "a9s-fixtures", "a9s-qa\"", "a9s-qa`", "a9s-qa ")
+# a9s-qa is deliberately absent from this tuple: it was retired on 2026-09-07 and
+# restored on 2026-09-08 (the waste was the verify round, not the role), and a
+# test that still listed it made the restored loop look like a regression.
+RETIRED_AGENTS = ("a9s-coder", "a9s-fixtures")
 # The confidence bar that contradicted the autonomy rule: "95%+ confidence ...
 # ask me follow up questions" told the agent to stop where it is told to decide.
 RETIRED_CONFIDENCE_BAR = "95%"

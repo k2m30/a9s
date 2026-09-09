@@ -37,13 +37,13 @@ Your dispatch names `WORKTREE` and `TASKDIR` (see the `a9s-team-loop` skill); af
 
 You are the only agent in the worktree for the length of your round. Start from the commit the last log entry names and put that commit in your own entry's `from:` line.
 
-## Round shape — red first, then green, then your own attack
+## Round shape — QA's red, your green, then your own attack
 
-Every spec row gets its failing test before its fix, in the same round:
+QA's failing tests are in the tree and their red output is in the log before you start. Per row:
 
-1. Write the behavioural test in `tests/unit/` that drives the real code path (the real enricher or fetcher through its fake, the controller, the rendered surface) and asserts the row's "done when". Run it and paste the red output into the log: a test that was never red proves nothing.
+1. Run QA's test for the row and confirm it is red for the row's reason; a test that is green before your change or red for a compile error goes to the orchestrator, not to your editor.
 2. Make it pass with the smallest correct change.
-3. Attack your own change (step 7b below) before the gates: the cases no test pins are the ones a rewrite breaks.
+3. Attack your own change (step 7b below) before the gates: the cases no test pins are the ones a rewrite breaks. A probe that finds a defect becomes your own pinned test in a file named after the task, never an edit to QA's.
 
 A stub-only round exists only when a spec names a symbol another task or a fixture must reference before the behaviour lands; otherwise there is none.
 
@@ -51,7 +51,7 @@ A stub-only round exists only when a spec names a symbol another task or a fixtu
 
 - `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/` — production code, fixtures (`core/demo/fixtures/`), fakes (`core/demo/fakes/`), catalog literals (`core/aws/catalog_<category>.go`), and the smoke scripts' expectations when a fixture legitimately changes a count.
 - Generated docs: `go run ./cmd/catalogen` after any `FindingDef` change, `go run ./cmd/viewsgen/` after defaults, `go run ./cmd/readmegen/ > README.md` after `docs/shared/`. The hand-written prose row in `docs/attention-signals.md` and `docs/resources/<short>.md` §4 for every type whose findings you changed. `changelog.d/<task>.md` for every user-visible change (see `changelog.d/README.md`); never `CHANGELOG.md`, which only `make changelog` writes at landing.
-- `tests/unit/` and `tests/integration/` for this task's tests. Never `core/fieldpath/` (frozen), never another task's files.
+- `tests/unit/` and `tests/integration/` for your own probe tests only; QA's files are read-only to you. Never `core/fieldpath/` (frozen), never another task's files.
 
 ## How you work
 
@@ -63,7 +63,7 @@ A stub-only round exists only when a spec names a symbol another task or a fixtu
 6. **Simplify before you gate.** Apply the ponytail ladder to the round's own diff (`git diff <from>..HEAD` plus the working tree, never the whole tree); the `/ponytail-review` skill is not loadable in an agent session, so the ladder is applied by hand: does it need to exist, is it already here, does stdlib do it, can it be one line. It hunts over-engineering only: a helper with one caller, a struct for one value, a second counter, a flag nobody reads. Apply what survives the rules below — a deletion is still a hypothesis proven by grepping every caller and running the gates, and nothing that guards, tests or silences a linter goes to look simpler. Write the outcome on the `simplified:` line: the range reviewed, what was cut, what was proposed and refused and why.
 7. **Gates, in order, from captured output**: `go build ./...` · `go vet ./...` · the task's tests (`go test ./tests/unit/ -run '<pattern>' -count=1`) · `make test` · `make lint` · `make verify-readonly verify-zero-init verify-renderer-free` (the boundary checks the landing gate runs; a round that adds an import or an init body fails them, not the landing) · `make check-catalogen` (only after regenerating) · `make build` so `./a9s --demo` reflects the change. `make integration`, the smokes, `make test-race`, `make security` and `make gofix` are the landing gate's, run once by the orchestrator; never in a round. Paste the exit lines into the log. `make test` and `make lint` go into `$TASKDIR/gate.txt` using the capture recipe in the team-loop skill verbatim, whole and in one pass — its first line truncates the file, so running one gate on its own leaves the other describing an earlier tree. Do not restate the recipe anywhere; that skill is the only place it is written down, and the only shape the `SubagentStop` hook parses. The hook hands your round back if `DONE` is not backed by it.
 7b. **Check your own edges before you gate.** For each rule you changed, enumerate the cases nobody pinned yet (the negated form, the empty input, the boundary value, the other partition or family, the second caller) and exercise each with a throwaway probe (an ad-hoc table in a scratch file, a mutation in a disposable copy) deleted before the gates. A green suite proves only what a test pins. Write the input and the observed result for each on the `checked:` line, and turn any probe that found a defect into a pinned test before you fix it.
-8. **Log the round** per the protocol: `TASKDIR=` and `WORKTREE=` lines, what changed (`file:line`), gate exit lines, the `checked:` line, the `simplified:` line, and the `deferred:` line — every duplicated fact, raw value, stale comment, lying fixture or unpaginated call you saw and did not fix, with `file:line`, why, and who owns it. "Not this batch's" is a reason to write it down, not a reason to leave it out. `DONE` only when the stated gates are green. When the spec cannot be implemented as written (field does not exist in the SDK, condition is unobservable read-only, two truth sources would be needed), log `OFF` with the evidence — do not improvise a different feature.
+8. **Log the round** per the protocol: `TASKDIR=` and `WORKTREE=` lines, what changed (`file:line`), gate exit lines, the `checked:` line and the `simplified:` line; a `deferred:` line only for a defect an operator would see, with what they would see. `DONE` only when the stated gates are green. When the spec cannot be implemented as written (field does not exist in the SDK, condition is unobservable read-only, two truth sources would be needed), log `OFF` with the evidence — do not improvise a different feature.
 
 ## Rules that end rounds early
 
@@ -71,7 +71,7 @@ A stub-only round exists only when a spec names a symbol another task or a fixtu
 - An existing test that pins the behaviour your spec row deletes is inverted in the same round, with a comment naming the row and why the old assertion is not to be restored, and listed in your log entry. Never a value tweak to make a test pass, never a deletion.
 - Deleting a test, a helper, or a `//nolint` to get green is never the fix. Understand why it exists first; if it is dead, say so with evidence.
 - A "fix" that adds a second place computing the same fact is `OFF`.
-- Do not widen scope. Adjacent problems you notice go in the log's `deferred:` line for the orchestrator — never in your head.
+- Do not widen scope. An adjacent defect an operator would see goes on the log's `deferred:` line with what they would see; anything else you notice is not written anywhere.
 - Your final output is your report, to the orchestrator only; do not also send it as a message.
 - A sweep claim names every caller: grep the symbol across `core/`, `internal/` and `cmd/`, not the files in your diff. A "dead" branch is deleted only after the gates run on the deletion.
-- Never `gofmt -w` a directory; format the files you edited, by name. Drift in files you did not touch is a `deferred:` line.
+- Never `gofmt -w` a directory; format the files you edited, by name.

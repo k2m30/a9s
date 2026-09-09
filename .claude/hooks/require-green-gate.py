@@ -17,15 +17,20 @@ code. This file parses that shape and nothing else, so the recipe and the
 parser cannot drift apart. Within a section the LAST exit line wins -- an
 `EXIT=0` quoted inside a test transcript must never rescue a red gate.
 
-The same hook enforces the other line a round cannot end without: `deferred:`.
-When the first team was asked what it had left open it produced 65 items, a
-dozen of them never written anywhere and most of the rest parked under
-"pre-existing" or "out of batch". So a dev or QA entry that ends a round
-(DONE for dev, ACCEPT/REJECT for acceptance) must carry its required lines: a `deferred:` line -- `none`, or one
-item per line with file:line and an owner -- and a `simplified:` line naming
-the ponytail-review pass on the round's own diff and its outcome, and an
-acceptance verdict (ACCEPT, REJECT) must carry an `observed, out of scope:`
-line. The orchestrator routes those lines; the hook only makes sure they exist.
+The same hook enforces the lines a round cannot end without: a `simplified:`
+line naming the ponytail pass on the round's own diff and its outcome, a
+`checked:` line on a dev round, and an `observed, out of scope:` line on an
+acceptance verdict. A `deferred:` line is optional: a mandatory one made three
+roles manufacture items every round and the orchestrator promote them into
+spec rows, which is how a four-row task reached round seven.
+
+It also holds the round-3 threshold. A dev round numbered four or higher may
+not end DONE unless the task log already carries a facilitator ruling: the
+orchestrator is the only party that counts rounds and the only one no other
+hook watches, so the count is read from the entry and the log instead.
+
+A round that ends with an uncommitted worktree hands the next agent a tree no
+`from:` line names; dev and QA are both refused for it.
 
 The hook never blocks when it has no reliable information — no parseable
 payload, no round-ending status. A DONE it cannot locate is refused, because an
@@ -45,12 +50,18 @@ REQUIRED_GATES = ("make test", "make lint")
 # Statuses that end a round, per agent, and the line each such entry must carry.
 ROUND_END = {
     "a9s-dev": ("DONE",),
+    "a9s-qa": ("DONE",),
     "a9s-acceptance": ("ACCEPT", "REJECT"),
 }
 REQUIRED_LINES = {
-    "a9s-dev": ("deferred:", "simplified:", "checked:"),
+    "a9s-dev": ("simplified:", "checked:"),
+    "a9s-qa": ("simplified:",),
     "a9s-acceptance": ("observed, out of scope:",),
 }
+COMMITTED_ROUNDS = ("a9s-dev", "a9s-qa")
+
+# A dev round at or past this number needs a facilitator ruling in the log.
+FACILITATOR_ROUND = 4
 
 # A gate older than this is from an earlier round no matter what else is true.
 MAX_GATE_AGE_SECONDS = 6 * 60 * 60
@@ -60,6 +71,8 @@ MAX_GATE_AGE_SECONDS = 6 * 60 * 60
 OWNED_DIRS = ("core", "internal", "cmd", "scripts", ".a9s")
 
 EXIT_RE = re.compile(r"\bEXIT=(\d+)\b")
+ROUND_RE = re.compile(r"^##\s*a9s-dev\s*·\s*round\s*(\d+)", re.M)
+RULING_RE = re.compile(r"^##\s*a9s-facilitator\b", re.M)
 GATE_MARKER_RE = re.compile(r"^##\s*gate:\s*(.+?)\s*$")
 
 CAPTURE_RECIPE = """  : > $TASKDIR/gate.txt
@@ -214,6 +227,21 @@ def failure(gate_path, worktree):
     return None
 
 
+def past_threshold_without_ruling(message, taskdir):
+    """True when the entry names a round at or past FACILITATOR_ROUND and the
+    task log carries no facilitator ruling heading. An entry with no round
+    number is not judged: the hook never blocks on information it lacks."""
+    found = ROUND_RE.search(message)
+    if not found or int(found.group(1)) < FACILITATOR_ROUND:
+        return False
+    try:
+        with open(os.path.join(taskdir, "log.md")) as fh:
+            log = fh.read()
+    except OSError:
+        return True
+    return RULING_RE.search(log) is None
+
+
 def has_line(message, key):
     """True when some line of the entry starts with `key` and says something
     after it; `- deferred:` with nothing behind it is not a deferral line."""
@@ -258,15 +286,13 @@ def main():
         else:
             sys.stderr.write(
                 "Round entry ends a round but carries no `%s` line. Add it: `none`, "
-                "or one item per line as file:line — what — why left — owner. "
-                "Anything noticed and not written there is a defect of the round.\n"
-                % required
+                "or one item per line with a capture or file:line.\n" % required
             )
         sys.exit(2)
 
     taskdir, worktree = resolve_paths(message, str(payload.get("cwd") or ""))
 
-    dirty = uncommitted(worktree) if agent == "a9s-dev" else None
+    dirty = uncommitted(worktree) if agent in COMMITTED_ROUNDS else None
     if dirty:
         sys.stderr.write(
             "Round entry ends a round but the worktree at %s has uncommitted "
@@ -277,6 +303,16 @@ def main():
 
     if agent != AGENT or "DONE" not in message:
         return
+
+    if taskdir and past_threshold_without_ruling(message, taskdir):
+        sys.stderr.write(
+            "This dev round is numbered %d or higher and %s/log.md holds no "
+            "`## a9s-facilitator` ruling. A task past round 3 is ruled before it "
+            "goes on: end this round as OFF naming the round-3 threshold, so the "
+            "orchestrator dispatches the facilitator; do not report DONE.\n"
+            % (FACILITATOR_ROUND, taskdir)
+        )
+        sys.exit(2)
 
     if not taskdir:
         reason = (

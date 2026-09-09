@@ -156,6 +156,22 @@ def payload(message, taskdir):
     }
 
 
+DONE_ROUND4 = """## a9s-dev · round 4 · DONE
+
+TASKDIR={taskdir}
+WORKTREE=/private/tmp/a9s-wt/w10
+- simplified: ladder on 4f1a9c2..HEAD — nothing proposed
+- checked: empty policy → no finding
+"""
+
+QA_DONE = """## a9s-qa · round 1 · DONE
+- TASKDIR={taskdir}
+- WORKTREE={worktree}
+- from: 9c2d1e0
+- simplified: ladder on 9c2d1e0..HEAD — one table with one row inlined
+- red: tests/unit/w10_test.go (2 tests)
+"""
+
 DONE_WITH_WORKTREE = """## a9s-dev · round 2 · DONE
 - TASKDIR={taskdir}
 - WORKTREE={worktree}
@@ -228,20 +244,52 @@ class GreenGateHookTest(unittest.TestCase):
         code, reason = run_hook(payload(DONE_MESSAGE, self.taskdir))
         self.assertEqual(0, code, reason)
 
-    def test_done_without_deferred_line_blocks(self):
-        """A green gate does not excuse a missing deferred line: the first team
-        left 65 items unwritten behind green gates."""
+    def test_done_without_deferred_line_passes(self):
+        """The deferred line is optional. Inverted on 2026-09-09: requiring it
+        made every role manufacture items each round and the orchestrator
+        promote them into spec rows; a task dispatched with four rows reached
+        round seven that way. Do not restore the requirement."""
         self.write_gate(GREEN_GATE)
         code, reason = run_hook(payload(DONE_NO_DEFERRED, self.taskdir))
-        self.assertEqual(2, code)
-        self.assertIn("deferred:", reason)
+        self.assertEqual(0, code, reason)
 
-    def test_done_with_empty_deferred_line_blocks(self):
-        """`- deferred:` with nothing after it is not a deferral line."""
-        self.write_gate(GREEN_GATE)
-        code, reason = run_hook(payload(DONE_EMPTY_DEFERRED, self.taskdir))
+    def test_qa_round_end_with_uncommitted_worktree_blocks(self):
+        """QA's round is its commit too: an uncommitted QA tree was inherited by
+        a dev round on 2026-09-09 and the two edited it at once."""
+        repo = scratch_repo()
+        self.addCleanup(shutil.rmtree, repo, True)
+        with open(os.path.join(repo, "stray_test.go"), "w") as fh:
+            fh.write("package unit\n")
+        p = payload(QA_DONE.format(worktree=repo, taskdir="{taskdir}"), self.taskdir)
+        p["agent_type"] = "a9s-qa"
+        code, reason = run_hook(p)
         self.assertEqual(2, code)
-        self.assertIn("deferred:", reason)
+        self.assertIn("uncommitted", reason)
+
+    def test_qa_round_end_with_clean_worktree_passes(self):
+        repo = scratch_repo()
+        self.addCleanup(shutil.rmtree, repo, True)
+        p = payload(QA_DONE.format(worktree=repo, taskdir="{taskdir}"), self.taskdir)
+        p["agent_type"] = "a9s-qa"
+        code, reason = run_hook(p)
+        self.assertEqual(0, code, reason)
+
+    def test_dev_round4_without_ruling_blocks(self):
+        """A task past round 3 is the facilitator's before it goes on; two tasks
+        ran to rounds five and seven on 2026-09-09 with nobody counting."""
+        self.write_gate(GREEN_GATE)
+        with open(os.path.join(self.taskdir, "log.md"), "w") as fh:
+            fh.write("## a9s-dev · round 3 · DONE\n- deferred: none\n")
+        code, reason = run_hook(payload(DONE_ROUND4, self.taskdir))
+        self.assertEqual(2, code)
+        self.assertIn("a9s-facilitator", reason)
+
+    def test_dev_round4_with_ruling_passes(self):
+        self.write_gate(GREEN_GATE)
+        with open(os.path.join(self.taskdir, "log.md"), "w") as fh:
+            fh.write("## a9s-dev · round 3 · DONE\n\n## a9s-facilitator · ruling 1 · DONE\n1. spec is wrong\n")
+        code, reason = run_hook(payload(DONE_ROUND4, self.taskdir))
+        self.assertEqual(0, code, reason)
 
     def test_done_without_simplified_line_blocks(self):
         """A green gate and a deferred line do not excuse a round nobody

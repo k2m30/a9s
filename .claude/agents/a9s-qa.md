@@ -76,4 +76,4 @@ The ruling comes back in `spec.md` / `log.md`; continue from there.
 - `//nolint:<linter> // reason` on a line that intentionally discards a value; never delete the check.
 - A test's comment says what behaviour it pins and why that behaviour is right — nothing about who asked for it or which round it came from.
 - Your final message goes to the orchestrator only. Never start a round because dev messaged you.
-- Every round entry carries the `simplified:` line and the `deferred:` line: what you noticed and did not pin, with `file:line` and an owner.
+- Every round entry carries the `simplified:` line. A `deferred:` line is optional and only for a defect an operator would see that no spec row covers.
